@@ -334,6 +334,33 @@ fn spawn_background_services(pool: &sqlx::PgPool, _config: &AppConfig) {
         unanswered_messages_loop(unanswered_pool).await;
     });
 
+    /* [237A-7d] Background task: worker de alertas de chat (outbox → SMTP + WhatsApp) */
+    let alert_pool = pool.clone();
+    let alert_email = glory_backend::services::EmailConfig::from_env();
+    let alert_client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .expect("alert worker HTTP client");
+    tokio::spawn(async move {
+        glory_backend::services::chat_alert_worker::run_chat_alert_worker(
+            alert_pool,
+            alert_email,
+            alert_client,
+        )
+        .await;
+    });
+
+    /* [237A-9] Background task: worker de response cycles (fallback IA 10min) 
+     * Solo necesita el pool: persiste mensajes directamente vía ChatRepository.
+     * El broadcast WS se omite (ChatHub se crea después en AppState). */
+    let cycle_pool = pool.clone();
+    tokio::spawn(async move {
+        glory_backend::services::response_cycle_worker::run_response_cycle_worker(
+            cycle_pool,
+        )
+        .await;
+    });
+
     let coolify_config = CoolifyConfig::from_env();
     let coolify_config_vps1 = CoolifyConfig::from_env_with_prefix("COOLIFY_VPS1_");
 

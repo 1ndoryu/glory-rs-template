@@ -38,6 +38,38 @@ impl NotificationRepository {
         Ok(row)
     }
 
+    /* [237A-7d] Versión transaccional: inserta dentro de un tx existente.
+     * Se usa cuando el mensaje y la notificación deben persistir juntos.
+     * ON CONFLICT DO NOTHING previene duplicados por constraint único.
+     * Usa query_as runtime (sin macro) porque el índice parcial se crea en
+     * la migración 20260723100000 y no existe en la BD local de compilación. */
+    pub async fn create_tx(
+        conn: &mut sqlx::PgConnection,
+        params: &CreateNotification,
+    ) -> Result<Option<Notification>, AppError> {
+        let row = sqlx::query_as::<_, Notification>(
+            "INSERT INTO notifications
+                (user_id, notification_type, title, body, link, reference_type, reference_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (user_id, notification_type, reference_type, reference_id)
+                DO NOTHING
+            RETURNING id, user_id, notification_type, title, body, link,
+                      read, reference_type, reference_id, created_at",
+        )
+        .bind(params.user_id)
+        .bind(&params.notification_type)
+        .bind(&params.title)
+        .bind(&params.body)
+        .bind(&params.link)
+        .bind(&params.reference_type)
+        .bind(params.reference_id)
+        .fetch_optional(&mut *conn)
+        .await
+        .map_err(|e| AppError::Internal(format!("Error creando notificación (tx): {e}")))?;
+
+        Ok(row)
+    }
+
     /// Lista notificaciones de un usuario, paginadas, más recientes primero
     pub async fn list_for_user(
         pool: &PgPool,

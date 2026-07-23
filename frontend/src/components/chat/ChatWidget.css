@@ -529,6 +529,48 @@
     }
 }
 
+/* [237A-7g] Contact CTA: botón de WhatsApp para escalamiento */
+.chatWidgetContactCta {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.chatWidgetContactCtaMsg {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--text-primary);
+    line-height: 1.4;
+}
+
+.chatWidgetContactCtaBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xs);
+    margin-top: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-md);
+    background: #25d366;
+    color: #fff;
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    text-align: center;
+    transition: opacity var(--transicion-rapida);
+}
+
+.chatWidgetContactCtaBtn:hover {
+    opacity: 0.85;
+}
+
+.chatWidgetContactCtaFallback {
+    margin: 0;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    font-style: italic;
+}
+
 /* [104A-4] Input oculto para file picker (antes era inline style display:none) */
 .chatWidgetFileInput {
     display: none;

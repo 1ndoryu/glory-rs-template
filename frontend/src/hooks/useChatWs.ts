@@ -11,6 +11,55 @@ import {
     type WsServerMessage,
 } from '../api/chat';
 import {useAuthStore} from '../stores/authStore';
+import {playNotificationSound} from '../utils/notificationSound';
+
+/* [237A-6b] Audio leader election: solo una pestaña reproduce sonido.
+ * Usa Web Locks API si está disponible, fallback a localStorage lease. */
+const AUDIO_LOCK_NAME = 'nakomi-audio-leader';
+const AUDIO_LEASE_TTL_MS = 15_000;
+const processedMessageIds = new Set<string>();
+let isAudioLeader = false;
+
+function acquireAudioLeader(): void {
+    if (typeof navigator !== 'undefined' && 'locks' in navigator) {
+        navigator.locks.request(AUDIO_LOCK_NAME, {mode: 'exclusive', ifAvailable: true}, (lock) => {
+            isAudioLeader = lock !== null;
+            return new Promise<void>(() => {}); /* hold forever */
+        }).catch(() => { isAudioLeader = false; });
+    } else {
+        /* Fallback: localStorage lease */
+        const key = 'nakomi-audio-leader';
+        const now = Date.now();
+        try {
+            const raw = localStorage.getItem(key);
+            if (raw) {
+                const {id, expires} = JSON.parse(raw) as {id: string; expires: number};
+                if (id === window.name && expires > now) {
+                    isAudioLeader = true;
+                    return;
+                }
+                if (expires > now) return; /* another tab holds it */
+            }
+        } catch { /* ignore */ }
+        if (!window.name) window.name = crypto.randomUUID();
+        localStorage.setItem(key, JSON.stringify({id: window.name, expires: now + AUDIO_LEASE_TTL_MS}));
+        isAudioLeader = true;
+    }
+}
+
+function shouldPlaySound(msg: WsServerMessage, currentUserId: string | null): boolean {
+    if (msg.delivery && msg.delivery !== 'live') return false;
+    if (msg.sender_id && currentUserId && msg.sender_id === currentUserId) return false;
+    if (msg.id && processedMessageIds.has(msg.id)) return false;
+    if (msg.id) processedMessageIds.add(msg.id);
+    /* Keep set bounded */
+    if (processedMessageIds.size > 500) {
+        const iter = processedMessageIds.values();
+        for (let i = 0; i < 200; i++) processedMessageIds.delete(iter.next().value!);
+    }
+    return isAudioLeader;
+}
+
 
 export interface TypingInfo {
     sender: string;
@@ -40,7 +89,10 @@ export function useChatWs() {
         const ws = new WebSocket(url);
         wsRef.current = ws;
 
-        ws.onopen = () => setConnected(true);
+        ws.onopen = () => {
+            setConnected(true);
+            acquireAudioLeader();
+        };
         ws.onclose = () => {
             setConnected(false);
             wsRef.current = null;
@@ -56,6 +108,11 @@ export function useChatWs() {
                         break;
                     case 'message':
                         if (msg.id && msg.session_id && msg.content) {
+                            /* [237A-6b] Sound dedupe: solo sonar para delivery=live, remitente distinto, id no procesado, y ser líder de audio */
+                            const currentUserId = useAuthStore.getState().user?.userId ?? null;
+                            if (shouldPlaySound(msg, currentUserId)) {
+                                playNotificationSound();
+                            }
                             setMessages(prev => [
                                 ...prev,
                                 {
@@ -67,6 +124,7 @@ export function useChatWs() {
                                     created_at: msg.created_at || new Date().toISOString(),
                                     sender_avatar_url: null,
                                     sender_display_name: null,
+                                    sequence_num: msg.sequence_num ?? null,
                                 },
                             ]);
                         }
@@ -170,7 +228,8 @@ export function useChatWs() {
 
     const toggleAi = useCallback(
         (sessionId: string, enable: boolean) => {
-            sendWsMessage({type: 'toggle_ai', session_id: sessionId, enable});
+            /* [237A-7d] Corregido: backend espera 'enabled', no 'enable' */
+            sendWsMessage({type: 'toggle_ai', session_id: sessionId, enabled: enable});
             /* [BUGFIX] Optimistic update: reflejar el cambio inmediatamente sin esperar
              * el status WS del servidor. Evita el lag visual y el caso donde el broadcast
              * no llega (suscripción al canal de sesión aún no activa). */

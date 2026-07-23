@@ -75,7 +75,9 @@ function handleMessageEvent(deps: ChatWidgetServerMessageDeps, msg: WsServerMess
         clearTimeout(deps.typingTimerRef.current);
         deps.typingTimerRef.current = null;
     }
-    if (msg.sender !== 'visitor' && msg.sender !== 'client') {
+    /* [237A-6b] Sonido solo para delivery=live (no historial en reconexión) y remitente no local */
+    const isHistory = msg.delivery && msg.delivery !== 'live';
+    if (!isHistory && msg.sender !== 'visitor' && msg.sender !== 'client') {
         playNotificationSound();
     }
 }

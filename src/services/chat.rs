@@ -232,16 +232,7 @@ impl ChatHub {
             ChatRepository::save_message(&self.pool, session_id, sender_type, sender_id, content)
                 .await?;
 
-        let ws_msg = WsServerMessage::Message {
-            id: msg.id,
-            session_id: msg.session_id,
-            sender: msg.sender_type.clone(),
-            sender_id: msg.sender_id.clone(),
-            content: msg.content.clone(),
-            created_at: msg.created_at,
-            message_type: msg.message_type.clone(),
-            metadata: msg.metadata.clone(),
-        };
+        let ws_msg = WsServerMessage::from_chat_message(&msg, "live");
         self.broadcast(session_id, &ws_msg);
         tracing::debug!(%session_id, sender = sender_type, "send_message: broadcast completado");
 
@@ -270,16 +261,7 @@ impl ChatHub {
         )
         .await?;
 
-        let ws_msg = WsServerMessage::Message {
-            id: msg.id,
-            session_id: msg.session_id,
-            sender: msg.sender_type.clone(),
-            sender_id: msg.sender_id.clone(),
-            content: msg.content.clone(),
-            created_at: msg.created_at,
-            message_type: msg.message_type.clone(),
-            metadata: msg.metadata.clone(),
-        };
+        let ws_msg = WsServerMessage::from_chat_message(&msg, "live");
         self.broadcast(session_id, &ws_msg);
 
         Ok(msg)

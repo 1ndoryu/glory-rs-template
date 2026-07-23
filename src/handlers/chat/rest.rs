@@ -16,6 +16,7 @@ use crate::models::{
     ChatSessionResponse, CreateChatSessionRequest, CreateNotification, NOTIF_NEW_CONVERSATION,
 };
 use crate::repositories::{OrderRepository, UserRepository};
+use serde_json::Value as JsonValue;
 use crate::AppState;
 
 pub use super::rest_messages::{get_messages, send_message};
@@ -24,6 +25,13 @@ pub use super::rest_upload::upload_chat_file;
 
 /* Re-exportar structs __path_* generados por utoipa para OpenAPI */
 pub use super::rest_messages::*;
+
+/* [237A-7j] Resultado del canje de token de continuación. */
+#[derive(serde::Serialize)]
+pub struct ContinuationClaimResponse {
+    pub session_id: Uuid,
+    pub visitor_id: String,
+}
 
 /* ============================================================
 REST API ENDPOINTS
@@ -212,6 +220,34 @@ pub async fn mark_session_viewed(
 ROUTES (REST — montadas bajo /api)
 ============================================================ */
 
+/* [237A-7j] Canje de token de continuación de chat.
+ * Endpoint público (sin JWT): el visitante llega desde un enlace de email.
+ * Valida el token, lo marca como usado y retorna session_id + visitor_id
+ * para que el frontend pueda reconectar al widget con la sesión original. */
+pub async fn claim_continuation_token(
+    State(state): State<AppState>,
+    Json(req): Json<JsonValue>,
+) -> Result<Json<ContinuationClaimResponse>, AppError> {
+    let token = req["token"]
+        .as_str()
+        .ok_or_else(|| AppError::Validation("token es requerido".into()))?;
+
+    let info = crate::repositories::continuation_token::redeem_token(&state.pool, token)
+        .await
+        .map_err(|e| AppError::Internal(format!("Error canjeando token: {e}")))?
+        .ok_or_else(|| AppError::NotFound("Token inválido, expirado o ya utilizado".into()))?;
+
+    tracing::info!(
+        session_id = %info.session_id,
+        "Token de continuación canjeado exitosamente"
+    );
+
+    Ok(Json(ContinuationClaimResponse {
+        session_id: info.session_id,
+        visitor_id: info.visitor_id,
+    }))
+}
+
 pub fn rest_routes() -> Router<AppState> {
     Router::new()
         .route("/chat/sessions", get(list_sessions).post(create_session))
@@ -239,5 +275,10 @@ pub fn rest_routes() -> Router<AppState> {
         .route(
             "/chat/sessions/:session_id/upload",
             axum::routing::post(upload_chat_file),
+        )
+        /* [237A-7j] Canje de token de continuación (público, sin JWT — viene de enlace por email) */
+        .route(
+            "/chat/continuation/claim",
+            axum::routing::post(claim_continuation_token),
         )
 }

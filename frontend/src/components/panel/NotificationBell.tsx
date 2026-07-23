@@ -7,7 +7,6 @@ import { Bell } from 'lucide-react';
 
 import { NOTIF_TYPES, type NotificationType } from '../../api/notifications';
 import { useNotifications } from '../../hooks/useNotifications';
-import { useNotificationWs } from '../../hooks/useNotificationWs';
 import { buildPanelNotificationTarget } from '../../utils/panelUrlState';
 import { Button } from '../ui/Button';
 import { MenuContextual } from '../ui/ContextMenu';
@@ -20,9 +19,8 @@ export default function NotificationBell() {
     marcarTodasLeidas,
   } = useNotifications();
 
-  /* Activar WebSocket push */
-  useNotificationWs();
-
+  /* [237A-7d] WebSocket push ahora se monta globalmente en App.tsx via
+   * AuthenticatedNotificationRuntime. NotificationBell solo consume la cache. */
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
 

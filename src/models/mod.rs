@@ -1,6 +1,7 @@
 mod billing;
 mod blog;
 mod chat;
+pub mod chat_alert;
 mod dashboard;
 mod delegation;
 mod deliverable;
@@ -34,6 +35,10 @@ pub use chat::{
     ChatAttachment, ChatMessage, ChatMessageResponse, ChatSession, ChatSessionNote,
     ChatSessionResponse, CreateChatSessionRequest, CreateSessionNoteRequest, SendMessageRequest,
     UpdateVisitorNameRequest, VisitorProfile, WsClientMessage, WsServerMessage,
+};
+pub use chat_alert::{
+    AiMode, AlertChannel, AlertEventType, AlertPayload, ChatAlertOutbox,
+    ChatEscalation, ChatResponseCycle, OutboxStatus,
 };
 pub use dashboard::{
     DashboardAlerts, DashboardResponse, EmployeePerformance, OrderCounts, RevenueStats,

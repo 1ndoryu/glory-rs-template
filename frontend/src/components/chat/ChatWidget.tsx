@@ -284,6 +284,30 @@ function renderMessageContent(msg: {
                 </div>
             );
         }
+        /* [237A-7g] CTA de WhatsApp: botón para escribir al soporte cuando la IA escala */
+        case 'contact_cta': {
+            const label = (msg.metadata?.label as string) || 'Escribir por WhatsApp';
+            const href = (msg.metadata?.href as string) || '';
+            const fallback = (msg.metadata?.fallback as string) || 'El equipo fue notificado y responderá por este chat.';
+
+            return (
+                <div className="chatWidgetMsgRich chatWidgetContactCta">
+                    <p className="chatWidgetContactCtaMsg">{msg.content}</p>
+                    {href ? (
+                        <a
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="chatWidgetContactCtaBtn"
+                        >
+                            {label}
+                        </a>
+                    ) : (
+                        <p className="chatWidgetContactCtaFallback">{fallback}</p>
+                    )}
+                </div>
+            );
+        }
         default:
             return <>{msg.content}</>;
     }

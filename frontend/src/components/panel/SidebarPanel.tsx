@@ -82,6 +82,20 @@ export const SidebarPanel: React.FC<SidebarPanelProps> = ({seccionActiva, onCamb
     });
     const pendingBillingCount = billingItems.filter(item => item.status === 'pending').length;
 
+    /* [237A-7d] Badge de mensajes no leídos: lee del cache de React Query
+     * que se actualiza via WS global (AuthenticatedNotificationRuntime). */
+    const { data: unreadNotifData } = useQuery<
+        { count: number },
+        unknown,
+        { count: number },
+        readonly ['notifications', 'unread']
+    >({
+        queryKey: ['notifications', 'unread'] as const,
+        enabled: false,
+        staleTime: Infinity,
+    });
+    const unreadNotifCount = unreadNotifData?.count ?? 0;
+
     /* [114A-9] Nav inferior móvil: muestra 4 items + botón "Más" para overflow */
     const MAX_BOTTOM_NAV = 4;
     const [menuAbierto, setMenuAbierto] = useState(false);
@@ -170,6 +184,9 @@ export const SidebarPanel: React.FC<SidebarPanelProps> = ({seccionActiva, onCamb
                             {tab.id === 'hosting' && pendingBillingCount > 0 && (
                                 <span className="sidebarItemIndicador" aria-label={`${pendingBillingCount} pagos pendientes`} />
                             )}
+                            {tab.id === 'mensajes' && unreadNotifCount > 0 && (
+                                <span className="sidebarItemIndicador" aria-label={`${unreadNotifCount} mensajes sin leer`} />
+                            )}
                         </Button>
                     );
                 })}
@@ -189,6 +206,9 @@ export const SidebarPanel: React.FC<SidebarPanelProps> = ({seccionActiva, onCamb
                             <Icono size={20} className="sidebarItemIcono" aria-hidden="true" />
                             {tab.id === 'hosting' && pendingBillingCount > 0 && (
                                 <span className="sidebarItemIndicador sidebarItemIndicadorMovil" aria-label={`${pendingBillingCount} pagos pendientes`} />
+                            )}
+                            {tab.id === 'mensajes' && unreadNotifCount > 0 && (
+                                <span className="sidebarItemIndicador sidebarItemIndicadorMovil" aria-label={`${unreadNotifCount} mensajes sin leer`} />
                             )}
                         </Button>
                     );

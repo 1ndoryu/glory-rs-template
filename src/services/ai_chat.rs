@@ -746,6 +746,7 @@ mod tests {
                 created_at: chrono::Utc::now(),
                 message_type: None,
                 metadata: None,
+                sequence_num: None,
             },
             ChatMessage {
                 id: Uuid::new_v4(),
@@ -756,6 +757,7 @@ mod tests {
                 created_at: chrono::Utc::now(),
                 message_type: None,
                 metadata: None,
+                sequence_num: None,
             },
         ];
         let msgs = build_context_messages("System prompt", &history, "Nueva pregunta");
@@ -780,6 +782,7 @@ mod tests {
                 "file_name": "referencia.png",
                 "ai_description": "Mockup de landing con hero oscuro y CTA principal."
             })),
+            sequence_num: None,
         }];
         let msgs = build_context_messages("System prompt", &history, "Qué opinas?");
         let content = msgs[1]["content"].as_str().unwrap_or_default();

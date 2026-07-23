@@ -23,6 +23,8 @@ export interface ChatSession {
     visitor_country: string | null;
     /* [124A-ESC] true cuando la IA detectó que se necesita intervención humana */
     is_escalated: boolean;
+    /* [237A-6c] Modo IA: automatic | human_priority | manual_pause */
+    ai_mode?: string;
     /* [104A-39] Cuándo se vio por última vez (para badge unread) */
     last_viewed_at: string | null;
     /* [104A-40] Cuándo se conectó el visitante por última vez via WS */
@@ -47,6 +49,8 @@ export interface ChatMessage {
     /* [T-5] Mensajes ricos: tipo + metadatos estructurados */
     message_type?: string | null;
     metadata?: Record<string, unknown> | null;
+    /* [237A-6a] Secuencia monotónica por sesión para dedupe y gap detection */
+    sequence_num?: number | null;
 }
 
 export interface WsServerMessage {
@@ -61,6 +65,9 @@ export interface WsServerMessage {
     /* [T-5] Rich message fields */
     message_type?: string | null;
     metadata?: Record<string, unknown> | null;
+    /* [237A-6a] Contrato realtime v2: delivery + sequence */
+    delivery?: 'live' | 'history';
+    sequence_num?: number | null;
     /* status */
     value?: string;
     /* session_new */

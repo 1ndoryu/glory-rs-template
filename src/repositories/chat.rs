@@ -155,7 +155,9 @@ impl ChatRepository {
         .await
     }
 
-    /// Toggle IA en una sesión
+    /// Toggle IA en una sesión. También sincroniza ai_mode.
+    /* [237A-9] Al reactivar IA → ai_mode='automatic'; al desactivar → ai_mode='manual_pause'.
+     * El staff puede usar set_ai_mode('human_priority') para modo intermedio. */
     pub async fn toggle_ai(
         pool: &PgPool,
         session_id: Uuid,
@@ -166,8 +168,9 @@ impl ChatRepository {
         } else {
             "staff_handling"
         };
+        let new_mode = if enabled { "automatic" } else { "manual_pause" };
         sqlx::query_as::<_, ChatSession>(
-            "UPDATE chat_sessions SET ai_enabled = $2, status = $3, \
+            "UPDATE chat_sessions SET ai_enabled = $2, status = $3, ai_mode = $4, \
              updated_at = NOW() WHERE id = $1 \
              RETURNING id, visitor_id, visitor_name, user_id, order_id, status, \
                assigned_staff_id, ai_enabled, created_at, updated_at, \
@@ -177,8 +180,27 @@ impl ChatRepository {
         .bind(session_id)
         .bind(enabled)
         .bind(new_status)
+        .bind(new_mode)
         .fetch_one(pool)
         .await
+    }
+
+    /* [237A-9] Cambiar ai_mode sin tocar ai_enabled.
+     * Usado cuando staff envía mensaje (→ human_priority) o cuando el worker
+     * expira el response cycle (→ automatic para fallback IA). */
+    pub async fn set_ai_mode(
+        pool: &PgPool,
+        session_id: Uuid,
+        mode: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "UPDATE chat_sessions SET ai_mode = $2, updated_at = NOW() WHERE id = $1",
+        )
+        .bind(session_id)
+        .bind(mode)
+        .execute(pool)
+        .await?;
+        Ok(())
     }
 
     /// Cerrar sesión
@@ -314,7 +336,9 @@ impl ChatRepository {
     MENSAJES
     ============================================================ */
 
-    /// Guardar mensaje en BD
+    /// Guardar mensaje en BD con secuencia monotónica atómica.
+    /* [237A-8] CTE incrementa next_message_sequence y lo asigna como sequence_num
+     * en la misma transacción. Garantiza monotonicidad sin locks explícitos. */
     pub async fn save_message(
         pool: &PgPool,
         session_id: Uuid,
@@ -322,31 +346,27 @@ impl ChatRepository {
         sender_id: Option<&str>,
         content: &str,
     ) -> Result<ChatMessage, sqlx::Error> {
-        /* Actualizar timestamp de sesión al recibir mensaje */
-        let _ = sqlx::query!(
-            r#"UPDATE chat_sessions SET updated_at = NOW() WHERE id = $1"#,
-            session_id,
+        sqlx::query_as::<_, ChatMessage>(
+            "WITH seq AS ( \
+               UPDATE chat_sessions SET next_message_sequence = next_message_sequence + 1, \
+                 updated_at = NOW() \
+               WHERE id = $1 \
+               RETURNING next_message_sequence \
+             ) \
+             INSERT INTO chat_messages (session_id, sender_type, sender_id, content, sequence_num) \
+             VALUES ($1, $2, $3, $4, (SELECT next_message_sequence FROM seq)) \
+             RETURNING id, session_id, sender_type, sender_id, content, created_at, \
+                       message_type, metadata, sequence_num",
         )
-        .execute(pool)
-        .await;
-
-        sqlx::query_as!(
-            ChatMessage,
-            r#"INSERT INTO chat_messages (session_id, sender_type, sender_id, content)
-             VALUES ($1, $2, $3, $4)
-             RETURNING id, session_id, sender_type, sender_id, content, created_at,
-                       message_type, metadata"#,
-            session_id,
-            sender_type,
-            sender_id,
-            content,
-        )
+        .bind(session_id)
+        .bind(sender_type)
+        .bind(sender_id)
+        .bind(content)
         .fetch_one(pool)
         .await
     }
 
-    /* [T-2] Guardar mensaje rico con tipo y metadatos estructurados.
-     * Usado para service_cards, invoices, order_cards, etc. generados por tool use. */
+    /* [T-2][237A-8] Guardar mensaje rico con tipo, metadatos y secuencia atómica. */
     pub async fn save_rich_message(
         pool: &PgPool,
         session_id: Uuid,
@@ -356,26 +376,24 @@ impl ChatRepository {
         message_type: &str,
         metadata: &serde_json::Value,
     ) -> Result<ChatMessage, sqlx::Error> {
-        let _ = sqlx::query!(
-            r#"UPDATE chat_sessions SET updated_at = NOW() WHERE id = $1"#,
-            session_id,
+        sqlx::query_as::<_, ChatMessage>(
+            "WITH seq AS ( \
+               UPDATE chat_sessions SET next_message_sequence = next_message_sequence + 1, \
+                 updated_at = NOW() \
+               WHERE id = $1 \
+               RETURNING next_message_sequence \
+             ) \
+             INSERT INTO chat_messages (session_id, sender_type, sender_id, content, message_type, metadata, sequence_num) \
+             VALUES ($1, $2, $3, $4, $5, $6, (SELECT next_message_sequence FROM seq)) \
+             RETURNING id, session_id, sender_type, sender_id, content, created_at, \
+                       message_type, metadata, sequence_num",
         )
-        .execute(pool)
-        .await;
-
-        sqlx::query_as!(
-            ChatMessage,
-            r#"INSERT INTO chat_messages (session_id, sender_type, sender_id, content, message_type, metadata)
-             VALUES ($1, $2, $3, $4, $5, $6)
-             RETURNING id, session_id, sender_type, sender_id, content, created_at,
-                       message_type, metadata"#,
-            session_id,
-            sender_type,
-            sender_id,
-            content,
-            message_type,
-            metadata,
-        )
+        .bind(session_id)
+        .bind(sender_type)
+        .bind(sender_id)
+        .bind(content)
+        .bind(message_type)
+        .bind(metadata)
         .fetch_one(pool)
         .await
     }
@@ -392,10 +410,10 @@ impl ChatRepository {
          * restaura el orden ascendente esperado por la UI. `id` desempata fechas. */
         sqlx::query_as::<_, ChatMessage>(
             "SELECT id, session_id, sender_type, sender_id, content, created_at, \
-                    message_type, metadata \
+                    message_type, metadata, sequence_num \
              FROM ( \
                SELECT id, session_id, sender_type, sender_id, content, created_at, \
-                      message_type, metadata \
+                      message_type, metadata, sequence_num \
                FROM chat_messages \
                WHERE session_id = $1 \
                ORDER BY created_at DESC, id DESC \
@@ -415,16 +433,15 @@ impl ChatRepository {
         pool: &PgPool,
         session_ids: &[Uuid],
     ) -> Result<Vec<ChatMessage>, sqlx::Error> {
-        sqlx::query_as!(
-            ChatMessage,
-            r#"SELECT DISTINCT ON (session_id)
-               id, session_id, sender_type, sender_id, content, created_at,
-               message_type, metadata
-             FROM chat_messages
-             WHERE session_id = ANY($1)
-             ORDER BY session_id, created_at DESC"#,
-            session_ids,
+        sqlx::query_as::<_, ChatMessage>(
+            "SELECT DISTINCT ON (session_id) \
+               id, session_id, sender_type, sender_id, content, created_at, \
+               message_type, metadata, sequence_num \
+             FROM chat_messages \
+             WHERE session_id = ANY($1) \
+             ORDER BY session_id, created_at DESC",
         )
+        .bind(session_ids)
         .fetch_all(pool)
         .await
     }

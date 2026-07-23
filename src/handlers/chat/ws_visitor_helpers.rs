@@ -27,16 +27,7 @@ pub async fn send_history(
     {
         let had_messages = !history.is_empty();
         for msg in history {
-            let ws_msg = WsServerMessage::Message {
-                id: msg.id,
-                session_id: msg.session_id,
-                sender: msg.sender_type,
-                sender_id: msg.sender_id,
-                content: msg.content,
-                created_at: msg.created_at,
-                message_type: msg.message_type,
-                metadata: msg.metadata,
-            };
+            let ws_msg = WsServerMessage::from_chat_message(&msg, "history");
             if let Ok(json) = serde_json::to_string(&ws_msg) {
                 match tokio::time::timeout(
                     std::time::Duration::from_secs(5),
@@ -187,10 +178,34 @@ async fn handle_visitor_text_message(
         };
     }
 
-    let _ = state
-        .chat_hub
-        .send_message(session_id, "client", Some(visitor_id), &content)
-        .await;
+    /* [237A-7d] Persistir con alertas en TX + broadcast después del commit */
+    let msg_result = crate::services::chat_alert::send_message_with_alerts(
+        &state.pool, session_id, "client", Some(visitor_id), &content,
+    )
+    .await;
+
+    if let Ok(ref msg) = msg_result {
+        let ws_msg = crate::models::WsServerMessage::from_chat_message(msg, "live");
+        state.chat_hub.broadcast(session_id, &ws_msg);
+
+        /* [237A-9] Si la sesión está en human_priority, crear response cycle
+         * para que el worker active fallback IA si nadie responde en 10 min. */
+        if let Ok(Some(session)) = crate::repositories::ChatRepository::find_session_by_id(&state.pool, session_id).await {
+            if session.ai_mode == "human_priority" {
+                let _ = crate::repositories::ResponseCycleRepository::create_if_needed(
+                    &state.pool, session_id, msg.id,
+                ).await;
+            }
+        }
+
+        /* Push conteo de notificaciones no leídas a admins via WS */
+        if let Ok(admin_ids) = crate::repositories::UserRepository::admin_ids(&state.pool).await {
+            for admin_id in admin_ids {
+                state.notification_hub.send_unread_count(admin_id).await;
+            }
+        }
+    }
+
     tracing::debug!(%session_id, "Mensaje persistido y broadcast, enviando a timing channel...");
     /* [096A-8] try_send en vez de send: si el canal timing está lleno (IA ocupada),
      * NO bloquear el handler WS. send().await congela la lectura del WebSocket

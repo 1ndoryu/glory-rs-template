@@ -406,3 +406,45 @@
 - Bypass de emergencia: `ssh-unsafe` y `scp-unsafe` ejecutan los comandos reales sin filtro. Útil para diagnóstico puntual.
 - IPs bloqueadas: `66.94.100.241` (VPS1) y `173.249.50.44` (VPS2). Para agregar más, editar `$Script:BlockedSSHHosts` en el perfil.
 - **Lección del lockout anterior (jun 2026):** nunca usar `$(date)` en nombres de backup SSH — el shell remoto puede interpretar el `$` y romper el authorized_keys. Usar nombre fijo.
+
+## Chat system integral — Bloques A/B/C/D/E (jul 2026)
+
+### `#[sqlx(default)]` vs `#[sqlx(default = "expr")]`
+- `#[sqlx(default = "String::from(\"automatic\")")]` no compila en sqlx 0.8. Usar `#[sqlx(default)]` simple y dejar que `Default::default()` del tipo maneje el valor (String → "", Option → None, bool → false, i64 → 0).
+- Si se necesita un default distinto al del tipo, implementar un setter separado o usar la query de inserción.
+
+### Construcciones manuales de structs con campos nuevos
+- Al añadir un campo a un struct derive(FromRow) con #[sqlx(default)], las queries SQL siguen funcionando.
+- PERO las construcciones manuales del struct (en tests, helpers, etc.) requieren TODOS los campos explícitamente.
+- Buscar con `grep -n 'StructName {'` todos los sitios que construyen el struct manualmente.
+- Ejemplo: añadir `sequence_num: Option<i64>` a ChatMessage rompió 3 construcciones en ai_chat.rs tests.
+
+### Worker background no debe crear su propio hub/cliente
+- Si un worker necesita enviar mensajes por WS, debe reutilizar el hub existente del AppState.
+- Pero los workers se spawnean ANTES de que AppState esté completamente construido.
+- Solución: simplificar el worker para que solo persista en BD. El WS broadcast ocurrirá en el próximo reconnect/fetch del cliente.
+- Aceptar este trade-off si el delay es razonable (10 min de inactividad → el cliente probablemente se desconectó).
+
+### Audio leader election entre pestañas
+- Web Locks API (`navigator.locks.request`) es la forma más fiable de elegir un líder entre pestañas.
+- Con `ifAvailable: true`, retorna `null` si el lock no está disponible (otra pestaña lo tiene).
+- Limitación: si la pestaña líder se cierra, el lock se libera pero las demás no reciben notificación. Necesitan re-intentar.
+- Fallback: localStorage lease con ownerId + timestamp de expiración. Más propenso a carrera pero funciona en todos los navegadores.
+- `processedMessageIds` debe ser un Set global (módulo), no local al componente, para persistir entre re-renders.
+
+### Tests con env vars compartidos
+- `std::env::remove_var` / `set_var` no son thread-safe. Tests en paralelo pueden interferir.
+- Si un test depende de una env var, limpiarla al inicio del test con remove_var.
+- Ideal: usar un Mutex estático (como ENV_LOCK en test_checkout.rs) para serializar acceso a env vars en tests.
+- El patrón `checkout_bypass_is_configured()` lee env vars → un test que no setea la var puede fallar si otro test la seteó.
+
+### Migraciones con columnas nuevas en visitor_profiles
+- Las columnas `email_normalized`, `email_captured_at`, `continuation_consent_at`, `continuation_declined_at`, `email_source` ya existen en la migración de alertas.
+- No crear migración duplicada; usar la existente o una nueva que solo añada lo que falta.
+- Las columnas con #[sqlx(default)] en el modelo no requieren que TODAS las queries las seleccionen.
+
+### Email templates: patrón consistente
+- Todas las plantillas usan helpers: `section_title()`, `paragraph()`, `summary_table()`, `cta_button()`, `email_layout()`.
+- `html_escape()` es obligatorio para todo input dinámico.
+- Las funciones de envío en email.rs siguen el patrón: construir subject, llamar template, enviar, loguear en email_logs.
+- `EmailLogRepository::insert` registra categoría, context, object_id, status y error.

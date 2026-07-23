@@ -287,7 +287,7 @@ pub fn render_vps_approved(
     username: &str,
     password: &str,
 ) -> String {
-    let rows = format!(
+    let _rows = format!(
         "{r1}\n{r2}\n{r3}\n{r4}",
         r1 = table_row("IP pública", &html_escape(public_ip)),
         r2 = table_row("Plan", &html_escape(plan_name)),
@@ -565,4 +565,45 @@ pub fn render_new_user_registered_admin(
         button = cta_button("Ver usuario", panel_link),
     );
     email_layout("#1a1a1a", "👤 Nuevo Usuario", &content, "Notificación automática de registro")
+}
+
+/* [237A-7d] Nuevo mensaje de cliente en chat — notificación a admin.
+ * Se envía via outbox worker cuando un cliente/visitante envía un mensaje. */
+pub fn render_chat_client_message_admin(
+    sender_label: &str,
+    preview: &str,
+    panel_link: &str,
+) -> String {
+    let content = format!(
+        "{p1}\n{table}\n{button}",
+        p1 = paragraph_tight(&format!(
+            "<strong>{}</strong> ha enviado un nuevo mensaje en el chat.",
+            html_escape(sender_label)
+        )),
+        table = summary_table(&[
+            ("Remitente", &html_escape(sender_label)),
+            ("Mensaje", &html_escape(preview)),
+        ]),
+        button = cta_button("Abrir chat", panel_link),
+    );
+    email_layout("#c9a84c", "💬 Nuevo Mensaje de Chat", &content, "Notificación automática de chat")
+}
+
+/* [237A-7j] Email de continuación de conversación de chat.
+ * Se envía cuando el visitante con email conocido se desconecta por más de 2 minutos.
+ * Contiene un enlace firmado de un solo uso para reanudar la conversación. */
+pub fn render_chat_continuation(
+    visitor_name: &str,
+    continuation_url: &str,
+) -> String {
+    let content = format!(
+        "{title}\n{p1}\n{p2}\n{button}\n{p3}",
+        title = section_title(&format!("Hola, {}", html_escape(visitor_name))),
+        p1 = paragraph("Notamos que te desconectaste de nuestra conversación. \
+             Puedes continuar exactamente donde lo dejaste usando el botón de abajo."),
+        p2 = paragraph("Este enlace es personal, de un solo uso y expira en 7 días."),
+        button = cta_button("Continuar conversación", continuation_url),
+        p3 = paragraph("Si no solicitaste este enlace, puedes ignorar este correo con seguridad."),
+    );
+    email_layout("#c9a84c", "💬 Continúa tu conversación", &content, "Enlace de continuación de chat")
 }

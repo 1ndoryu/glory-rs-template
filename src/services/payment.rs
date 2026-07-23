@@ -164,7 +164,7 @@ impl PaymentService {
 
         /* Crear PaymentIntent en Stripe con metadata de checkout.
          * [20CA-1] Guardamos email en vez de user_id — el usuario se crea en el webhook. */
-        let mut params = vec![
+        let params = vec![
             ("amount", final_price.to_string()),
             ("currency", currency.clone()),
             ("capture_method", "manual".to_string()),

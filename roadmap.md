@@ -78,6 +78,8 @@ Planes activos:
 - Cierre ejecutable de alertas, WhatsApp, Realtime y bloques difíciles:
   `Agente/planes/plan-cierre-bloques-dificiles-nakomi-2026-07-23.md`.
 
+**Estado (2026-07-23):** Bloques A, B, C, D, E implementados en backend + frontend. 210 tests pasan, cargo check limpio. Pendiente: deploy a producción y gateway WhatsApp en glorytemplate.
+
 Este problema debe ser resuelto por un agente inteligente, todas estas tareas necesita un plan, separado o unido lo que sea mejor, primero investiga en profundida y luego plantea como solucionar todo y yo autorizare o no:
 
 1. Este problema lleva mucho tiempo, uno en el que el sitio de congela, y cae, lo que se ha logrado hacer es que se puede restaurar automáticamente, hay muchos md sueltos y comentarios sobre este problema, realmente no se porque exactamente, pero la pista es el chat, al escribir, vuelve a sonar el sonido de chat como si hubiera respondido y al sonar de nuevo (sin recibir ningún mensaje) se cae el sitio, por supuesto esta pista puede ser útil o despistar. Hay que conciliar todos los detalles, incidentes, md, comentarios en uno solo para entender el contexto.

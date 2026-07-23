@@ -250,10 +250,41 @@ pub async fn send_message(
 
     let sender_id = auth.user_id.to_string();
 
-    let msg = state
-        .chat_hub
-        .send_message(session_id, sender_type, Some(&sender_id), &req.content)
-        .await?;
+    /* [237A-7d] Persistir mensaje con alertas en una sola transacción.
+     * Para mensajes de cliente: crea notificaciones in-app + outbox email/WhatsApp.
+     * Para otros remitentes: persiste sin outbox. */
+    let msg = crate::services::chat_alert::send_message_with_alerts(
+        &state.pool, session_id, sender_type, Some(&sender_id), &req.content,
+    )
+    .await?;
+
+    /* [237A-9] Staff/enviado admin envía mensaje → toma humana.
+     * Si la sesión estaba en modo automático, pasar a human_priority para
+     * que la IA deje de responder mientras el humano está activo. */
+    if matches!(auth.effective_role, UserRole::Admin | UserRole::Employee)
+        && !sender_type.eq("client")
+    {
+        let _ = crate::repositories::ChatRepository::set_ai_mode(
+            &state.pool, session_id, "human_priority",
+        ).await;
+        /* Cancelar cualquier ciclo de fallback activo — el humano ya respondió */
+        let _ = crate::repositories::ResponseCycleRepository::mark_answered_human(
+            &state.pool, session_id, msg.id,
+        ).await;
+    }
+
+    /* Broadcast WS DESPUÉS de la transacción (evita notificaciones fantasma) */
+    let ws_msg = crate::models::WsServerMessage::from_chat_message(&msg, "live");
+    state.chat_hub.broadcast(session_id, &ws_msg);
+
+    /* [237A-7d] Push conteo de notificaciones no leídas a admins via WS */
+    if sender_type == "client" {
+        if let Ok(admin_ids) = crate::repositories::UserRepository::admin_ids(&state.pool).await {
+            for admin_id in admin_ids {
+                state.notification_hub.send_unread_count(admin_id).await;
+            }
+        }
+    }
 
     /* [104A-38] Notificar al otro participante del chat (solo sesiones de orden).
      * Cliente envía → notificar staff asignado. Staff/admin envía → notificar cliente. */

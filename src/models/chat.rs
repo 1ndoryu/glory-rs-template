@@ -46,6 +46,13 @@ pub struct ChatSession {
      * Se persiste en BD para que el panel muestre el indicador al recargar. */
     #[sqlx(default)]
     pub is_escalated: bool,
+    /* [237A-9] Modo de IA: automatic|human_priority|manual_pause.
+     * automatic: IA responde siempre. human_priority: IA como fallback 10min.
+     * manual_pause: IA desactivada completamente. 
+     * Default "automatic" vía BD; queries legacy que no seleccionan esta
+     * columna reciben "" (tratado como "automatic" en código). */
+    #[sqlx(default)]
+    pub ai_mode: String,
 }
 
 /* [P-2] Perfil de visitante — memoria persistente entre sesiones.
@@ -95,6 +102,10 @@ pub struct ChatMessage {
     pub message_type: Option<String>,
     #[sqlx(default)]
     pub metadata: Option<serde_json::Value>,
+    /* [237A-8] Secuencia monotónica por sesión para detección de gaps y dedupe.
+     * Incrementada atómicamente en save_message/save_rich_message vía CTE. */
+    #[sqlx(default)]
+    pub sequence_num: Option<i64>,
 }
 
 /* [064A-70] Respuesta enriquecida con datos del sender (avatar + nombre) */
@@ -111,6 +122,8 @@ pub struct ChatMessageResponse {
     /* [P-2] Campos de mensajes ricos */
     pub message_type: Option<String>,
     pub metadata: Option<serde_json::Value>,
+    /* [237A-8] Secuencia monotónica por sesión */
+    pub sequence_num: Option<i64>,
 }
 
 /* ============================================================
@@ -228,6 +241,11 @@ pub enum WsServerMessage {
         message_type: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         metadata: Option<serde_json::Value>,
+        /* [237A-8] Secuencia monotónica + tipo de entrega */
+        #[serde(skip_serializing_if = "Option::is_none")]
+        sequence_num: Option<i64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        delivery: Option<String>,
     },
     #[serde(rename = "typing")]
     Typing {
@@ -256,4 +274,24 @@ pub enum WsServerMessage {
         #[serde(skip_serializing_if = "Option::is_none")]
         last_connected_at: Option<DateTime<Utc>>,
     },
+}
+
+/* [237A-8] Helper para construir WsServerMessage::Message desde ChatMessage.
+ * Evita repetir todos los campos en cada sitio de construcción.
+ * delivery: "live" para mensajes nuevos, "history" para replay. */
+impl WsServerMessage {
+    pub fn from_chat_message(msg: &ChatMessage, delivery: &str) -> Self {
+        Self::Message {
+            id: msg.id,
+            session_id: msg.session_id,
+            sender: msg.sender_type.clone(),
+            sender_id: msg.sender_id.clone(),
+            content: msg.content.clone(),
+            created_at: msg.created_at,
+            message_type: msg.message_type.clone(),
+            metadata: msg.metadata.clone(),
+            sequence_num: msg.sequence_num,
+            delivery: Some(delivery.to_string()),
+        }
+    }
 }

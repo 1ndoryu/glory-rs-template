@@ -99,6 +99,7 @@ async fn enrich_messages(
                 sender_display_name: name,
                 message_type: m.message_type,
                 metadata: m.metadata,
+                sequence_num: m.sequence_num,
             }
         })
         .collect()

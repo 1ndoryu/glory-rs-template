@@ -45,6 +45,7 @@ import {useChatStore} from './stores/chatStore';
 const PanelIsland = lazy(() => import('./islands/PanelIsland').then(m => ({default: m.PanelIsland})));
 const AdminEditorProvider = lazy(() => import('./components/AdminEditorProvider').then(m => ({default: m.AdminEditorProvider})));
 const ChatWidget = lazy(() => import('./components/chat/ChatWidget').then(m => ({default: m.ChatWidget})));
+const AuthenticatedNotificationRuntime = lazy(() => import('./components/notifications/AuthenticatedNotificationRuntime').then(m => ({default: m.AuthenticatedNotificationRuntime})));
 
 /* [155A-1] Google OAuth — importaciones para el callback */
 import {useAuthStore} from './stores/authStore';
@@ -160,6 +161,8 @@ function DeferredGlobalWidgets() {
 
     return (
         <>
+            {/* [237A-7d] Runtime global de notificaciones WS: una sola conexión para todo el sitio */}
+            <Suspense fallback={null}><AuthenticatedNotificationRuntime /></Suspense>
             <Suspense fallback={null}><ChatWidget /></Suspense>
             {isAdmin && <Suspense fallback={null}><AdminEditorProvider /></Suspense>}
         </>

@@ -1,7 +1,7 @@
 # 237A-3 — Estabilidad integral de Nakomi Studio
 
 > **Fecha:** 2026-07-23  
-> **Estado:** Watchdog y persistencia desplegados; alertas externas, Realtime y finanzas pendientes
+> **Estado:** Fases A-E implementadas localmente (210 tests pasan); deploy a producción pendiente
 > **Prioridad:** Crítica  
 > **Responsable técnico:** agente principal  
 > **Delegación:** las tareas mecánicas y de bajo riesgo se asignan a un subagente con criterios de aceptación explícitos.  
@@ -313,9 +313,17 @@ Pruebas:
 
 **Responsable:** agente principal  
 **Dificultad:** Alta
-**Estado:** Autorización WS completada; contrato de eventos/sonido queda pendiente
+**Estado:** ✅ Implementado (2026-07-23) — backend + frontend, validado localmente
 
-Plan de ejecución actualizado: `Agente/planes/plan-cierre-bloques-dificiles-nakomi-2026-07-23.md`.
+Plan de ejecución detallado: `Agente/planes/plan-cierre-bloques-dificiles-nakomi-2026-07-23.md`.
+
+Resultado:
+- `sequence_num` monotónico por sesión con CTE atómico.
+- Campo `delivery` (live/history) en mensajes WS.
+- `from_chat_message` helper centraliza construcción de ChatMessageResponse.
+- Frontend: audio leader election (Web Locks API + localStorage fallback), `shouldPlaySound()` con delivery=live + sender!=current + messageId dedupe + leader check.
+- Widget: filtrado de sonido por delivery=live en reconexiones.
+- `toggle_ai` corregido: frontend envía `enabled` (no `enable`).
 
 Tareas:
 
@@ -349,6 +357,7 @@ Pruebas:
 
 **Responsable arquitectónico:** agente principal  
 **Implementación mecánica delegable:** subagente
+**Estado:** ✅ Implementado (2026-07-23) — backend + frontend, validado localmente
 
 > **Corrección de alcance 2026-07-23:** esta fase vuelve a ser prioritaria. Cada
 > mensaje de cliente debe producir inmediatamente notificación persistente,
@@ -356,10 +365,29 @@ Pruebas:
 > `glorytemplate` mediante un gateway interno firmado y colas idempotentes; no se
 > instalará un segundo cliente ni se compartirán stores entre contenedores.
 
+Resultado:
+- Outbox `chat_alert_outbox` con idempotency key, estados, backoff y dead-letter.
+- Orquestador `chat_alert.rs`: mensaje + notificaciones in-app + outbox email/WhatsApp en una sola TX.
+- Worker `chat_alert_worker.rs`: SMTP + WhatsApp gateway (HMAC-SHA256), tick 5s, backoff 5s→30s→2m→10m→30m.
+- Feature flags: `CHAT_ALERT_CAPTURE_ENABLED`, `CHAT_EMAIL_DELIVERY_ENABLED`, `CHAT_WHATSAPP_DELIVERY_ENABLED`.
+- Email template `render_chat_client_message_admin` + `send_chat_continuation`.
+- WhatsApp gateway client `whatsapp_gateway.rs` con firma HMAC.
+- `AuthenticatedNotificationRuntime` montado globalmente en App.tsx.
+- `NotificationBell` en HeaderPanel (panel) y Header (sitio público autenticado).
+- Ciclo de escalamiento `chat_escalations` + CTA WhatsApp (`contact_cta`).
+- Captura de email: `is_valid_email` (RFC 5322), `email_normalized`, `email_captured_at`, `continuation_consent_at`, `email_source`.
+- Token de continuación: `chat_continuation_tokens` (SHA-256, un uso, 7 días), handler `POST /api/chat/continuation/claim`.
+- Toma humana: `ai_mode` (automatic/human_priority/manual_pause), `chat_response_cycles`, `response_cycle_worker` (FOR UPDATE SKIP LOCKED, fallback 10 min).
+
+Pendiente para producción:
+- Gateway WhatsApp en glorytemplate (endpoint HMAC + worker saliente + wacli).
+- Rate limiting en endpoint de claim de tokens.
+- Tests E2E con proveedor IA simulado.
+
 Arquitectura:
 
 - Un provider autenticado global para sitio público y panel.
-- Unread persistido por conversación/usuario.
+- Unread persistente por mensaje de cliente.tido por conversación/usuario.
 - Badge en:
   - sidebar desktop;
   - navegación móvil;

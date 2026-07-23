@@ -1767,10 +1767,40 @@ async fn exec_create_invoice(
     }
 }
 
-/* request_human_assistance: marca escalación. El resultado es para la IA,
- * la lógica de notificación real la maneja chat_timing/escalation. */
+/* [237A-7g] request_human_assistance: marca escalación + genera CTA de WhatsApp.
+ * El resultado para la IA indica que se escaló. El rich_message contact_cta
+ * muestra al cliente un botón para escribir por WhatsApp directamente.
+ * La URL se construye desde PUBLIC_SUPPORT_WHATSAPP (número público del soporte). */
 fn exec_request_human(args: &Value) -> ToolExecResult {
     let reason = args["reason"].as_str().unwrap_or("Sin motivo especificado");
+
+    /* Construir CTA de WhatsApp si el número público está configurado */
+    let support_whatsapp = std::env::var("PUBLIC_SUPPORT_WHATSAPP")
+        .ok()
+        .filter(|s| !s.is_empty());
+
+    let rich_message = support_whatsapp.and_then(|raw_number| {
+        /* Normalizar a dígitos para wa.me — requiere al menos 7 dígitos (número real) */
+        let digits: String = raw_number.chars().filter(|c| c.is_ascii_digit()).collect();
+        if digits.len() < 7 {
+            tracing::warn!("PUBLIC_SUPPORT_WHATSAPP no tiene dígitos suficientes: {raw_number}");
+            return None;
+        }
+        let prefill = "Hola, necesito ayuda con mi consulta.";
+        let href = format!("https://wa.me/{digits}?text={}", urlencoding::encode(prefill));
+
+        Some(RichMessage {
+            content: "Este caso necesita atención personal.".to_string(),
+            message_type: "contact_cta".to_string(),
+            metadata: json!({
+                "label": "Escribir por WhatsApp",
+                "href": href,
+                "fallback": "El equipo fue notificado y responderá por este chat.",
+                "reason": reason,
+            }),
+        })
+    });
+
     ToolExecResult {
         tool_result_json: json!({
             "status": "escalated",
@@ -1778,7 +1808,7 @@ fn exec_request_human(args: &Value) -> ToolExecResult {
             "message": "Se ha notificado al equipo. Un especialista se conectará pronto."
         })
         .to_string(),
-        rich_message: None,
+        rich_message,
     }
 }
 
@@ -1959,6 +1989,34 @@ async fn update_session_visitor_name(
 /* [T-3] capture_email: guarda email del visitante en visitor_profiles.
  * También actualiza display_name si lo proporcionó.
  * [124A-CHAT2] Actualiza visitor_name en chat_sessions para que el panel muestre el nombre real. */
+/* [237A-10] Validación de email: formato básico RFC 5322 simplificado.
+ * No es exhaustivo (DNS/MX check queda fuera), pero filtra la mayoría de
+ * entradas inválidas que la IA pueda aceptar por error. */
+fn is_valid_email(email: &str) -> bool {
+    let trimmed = email.trim().to_lowercase();
+    if trimmed.len() < 5 || trimmed.len() > 254 {
+        return false;
+    }
+    /* Debe tener exactamente un @ con texto antes y después */
+    let parts: Vec<&str> = trimmed.splitn(2, '@').collect();
+    if parts.len() != 2 {
+        return false;
+    }
+    let (local, domain) = (parts[0], parts[1]);
+    if local.is_empty() || domain.is_empty() {
+        return false;
+    }
+    /* Dominio debe tener al menos un punto y no empezar/terminar con punto */
+    if !domain.contains('.') || domain.starts_with('.') || domain.ends_with('.') {
+        return false;
+    }
+    /* Local no puede empezar/terminar con punto ni tener dos puntos seguidos */
+    if local.starts_with('.') || local.ends_with('.') || local.contains("..") {
+        return false;
+    }
+    true
+}
+
 async fn exec_capture_email(
     pool: &PgPool,
     visitor_id: Option<&str>,
@@ -1969,11 +2027,17 @@ async fn exec_capture_email(
         return tool_status("error", "visitor_id no disponible");
     };
 
-    let email = args["email"].as_str().unwrap_or("");
-    if email.is_empty() || !email.contains('@') {
-        return tool_status("error", "Email inválido");
+    let raw_email = args["email"].as_str().unwrap_or("");
+    if raw_email.is_empty() {
+        return tool_status("error", "Email no proporcionado");
     }
 
+    /* [237A-10] Validación real de formato email */
+    if !is_valid_email(raw_email) {
+        return tool_status("error", "El email proporcionado no tiene un formato válido.");
+    }
+
+    let email_normalized = raw_email.trim().to_lowercase();
     let display_name = args["display_name"].as_str();
 
     /* Si la IA nos da el nombre junto con el email, actualizar visitor_name en la sesión */
@@ -1981,9 +2045,23 @@ async fn exec_capture_email(
         let _ = update_session_visitor_name(pool, session_id, name).await;
     }
 
-    match ChatRepository::update_visitor_email(pool, vid, email, display_name).await {
+    match ChatRepository::update_visitor_email(pool, vid, &email_normalized, display_name).await {
         Ok(profile) => {
-            tracing::info!("Email capturado para visitor {vid}: {email}");
+            /* [237A-10] Guardar email normalizado + timestamp de captura + source */
+            let _ = sqlx::query(
+                "UPDATE visitor_profiles SET \
+                   email_normalized = $2, \
+                   email_captured_at = NOW(), \
+                   continuation_consent_at = NOW(), \
+                   email_source = 'chatbot' \
+                 WHERE visitor_id = $1",
+            )
+            .bind(vid)
+            .bind(&email_normalized)
+            .execute(pool)
+            .await;
+
+            tracing::info!("Email capturado para visitor {vid}: {email_normalized}");
             ToolExecResult {
                 tool_result_json: json!({
                     "status": "ok",
@@ -2385,10 +2463,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn create_hosting_checkout_requires_stripe_key() {
-        let pool = PgPool::connect_lazy("postgres://invalid@localhost/test").unwrap();
-        let http = reqwest::Client::new();
-        let result = execute_tool(
+async fn create_hosting_checkout_requires_stripe_key() {
+    /* Asegurar que checkout_bypass no está configurado para que el test
+     * realmente verifique el check de Stripe. Sin esto, otros tests que
+     * seteen GLORY_TEST_CHECKOUT_EMAILS en paralelo pueden hacer que
+     * checkout_bypass_is_configured() retorne true y el flujo se salte
+     * el Stripe check, llegando a un error de DB en vez de "Stripe". */
+    std::env::remove_var("GLORY_TEST_CHECKOUT_EMAILS");
+
+    let pool = PgPool::connect_lazy("postgres://invalid@localhost/test").unwrap();
+    let http = reqwest::Client::new();
+    let result = execute_tool(
             ToolExecutionContext {
                 pool: &pool,
                 http_client: &http,

@@ -598,17 +598,37 @@ async fn generate_ai_response(
     mut irrelevant_count: u32,
     deps: &TimingSessionDeps,
 ) -> u32 {
-    /* Verificar que la sesión sigue con IA activa */
-    let session_ok =
+    /* Verificar que la sesión sigue con IA activa.
+     * [237A-9] Respetar ai_mode: manual_pause bloquea IA completamente;
+     * human_priority con ciclo waiting también bloquea (el worker genera fallback). */
+    let session =
         match crate::repositories::ChatRepository::find_session_by_id(&deps.pool, session_id).await
         {
-            Ok(Some(s)) => s.ai_enabled && s.assigned_staff_id.is_none(),
-            _ => false,
+            Ok(Some(s)) => s,
+            _ => {
+                tracing::info!(%session_id, "generate_ai_response: sesión no encontrada");
+                return irrelevant_count;
+            }
         };
 
-    if !session_ok {
+    if !session.ai_enabled || session.assigned_staff_id.is_some() {
         tracing::info!(%session_id, "generate_ai_response: sesión no activa, saltando IA");
         return irrelevant_count;
+    }
+
+    /* [237A-9] manual_pause: IA desactivada por staff explícitamente */
+    if session.ai_mode == "manual_pause" {
+        tracing::debug!(%session_id, "generate_ai_response: ai_mode=manual_pause, saltando IA");
+        return irrelevant_count;
+    }
+
+    /* [237A-9] human_priority con ciclo waiting: dejar que el humano responda.
+     * El worker de response cycles generará fallback si expira el deadline. */
+    if session.ai_mode == "human_priority" {
+        if let Ok(true) = crate::repositories::ResponseCycleRepository::is_in_human_window(&deps.pool, session_id).await {
+            tracing::debug!(%session_id, "generate_ai_response: human_priority + ciclo waiting, saltando IA");
+            return irrelevant_count;
+        }
     }
 
     if !ensure_ai_request_allowed(session_id, combined, deps).await {

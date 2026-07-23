@@ -1,7 +1,7 @@
 # Plan de cierre de bloques difíciles — Nakomi Studio
 
 > **Fecha:** 2026-07-23  
-> **Estado:** Planificado; sin implementación en este bloque  
+> **Estado:** Bloques A, B, C, D, E implementados (backend + frontend); deploy pendiente  
 > **Rama de proyecto:** `glory-rust-nakomi`  
 > **Framework compartido:** `glory-rs-framework/master`  
 > **Objetivo:** cerrar alertas inmediatas, escalamiento a WhatsApp, contrato Realtime y flujos financieros sin volver a crear ramas temporales ni duplicar infraestructura.
@@ -51,19 +51,21 @@ Cuando una persona del equipo responda:
   - ejecución segura con argumentos separados;
   - soporte multi-cuenta y health checks.
 
-### No está listo
+### No está listo (residual post-implementación)
 
-- Nakomi Rust no tiene integración WhatsApp.
-- El camino WebSocket del visitante guarda el mensaje, pero no crea alertas para el administrador.
-- El camino REST compara tipos legacy (`visitor`/`user`) aunque actualmente el remitente es `client`; por ello tampoco garantiza la alerta administrativa.
-- El correo de escalamiento solo se envía cuando la IA escala, no por cada mensaje de cliente.
-- `useNotificationWs` existe, pero no está montado globalmente.
-- Fuera del panel no existe una campana/indicador persistente.
-- La tool de escalamiento devuelve texto plano; no genera CTA de WhatsApp.
-- Historial y eventos live usan el mismo mensaje WS, por lo que una reconexión puede volver a producir sonido.
-- Frontend envía `toggle_ai.enable`, mientras backend espera `enabled`.
-- El job legacy de 20 minutos puede repetirse y será retirado: las alertas serán
-  inmediatas y el único timeout funcional será el fallback IA a diez minutos.
+- Gateway WhatsApp en glorytemplate no implementado (worker + endpoint HMAC + wacli). Nakomi ya envía a outbox; falta el receptor.
+- Rate limiting en endpoint de claim de tokens de continuación.
+- Tests de aceptación E2E con proveedor IA simulado (capture_email tool call real).
+- Frontend: `ModalAsignar` tiene error preexistente TS6133 (variable sin usar).
+- Re-elección de audio leader si la pestaña líder se cierra (Web Locks no notifica).
+
+### Ya implementado (2026-07-23)
+
+- ✅ Bloque A: Outbox (`chat_alert_outbox`), notificaciones in-app, worker SMTP/WhatsApp, gateway client HMAC, feature flags, email template `chat_client_message_admin`.
+- ✅ Bloque B: CTA de WhatsApp (`contact_cta`), ciclo de escalamiento (`chat_escalations`), `exec_request_human` devuelve `RichMessage`.
+- ✅ Bloque C: Secuencia monotónica (`next_message_sequence`), campo `delivery` (live/history), `from_chat_message` helper, dedupe de sonido por delivery+sender+messageId+audio leader (Web Locks API + localStorage fallback).
+- ✅ Bloque D: `ai_mode` (automatic/human_priority/manual_pause), `chat_response_cycles`, `response_cycle_worker` (FOR UPDATE SKIP LOCKED, fallback 10 min, mantiene human_priority), toggle_ai sincroniza ai_mode, staff envía → human_priority.
+- ✅ Bloque E: `is_valid_email` (RFC 5322 simplificada), `exec_capture_email` con validación real + `email_normalized` + `email_captured_at` + `continuation_consent_at` + `email_source='chatbot'`, token de continuación (`chat_continuation_tokens`, SHA-256, un uso, 7 días), handler `POST /api/chat/continuation/claim`, template `render_chat_continuation`, `send_chat_continuation`.
 
 ## 3. Decisión arquitectónica para WhatsApp
 
@@ -1048,21 +1050,21 @@ líder inserta mensajes, pero nunca reproduce sonido.
 
 Cada fila es un commit independiente. No mezclar repositorios en un commit.
 
-| Orden | ID sugerido | Repositorio | Resultado |
-|---|---|---|---|
-| 1 | `237A-7a` | glorytemplate | Esquema outbox saliente + repositorio + tests de idempotencia. |
-| 2 | `237A-7b` | glorytemplate | Endpoint HMAC + nonce + tests de contrato/replay. |
-| 3 | `237A-7c` | glorytemplate | Worker saliente + `WacliService` + canary controlado. |
-| 4 | `237A-7d` | Nakomi | Migración/modelos/repositorio outbox + transacción de mensaje. |
-| 5 | `237A-7e` | Nakomi | Worker SMTP/gateway + consulta de estado + métricas. |
-| 6 | `237A-7f` | Nakomi frontend | Runtime global, campanas y badges persistentes. |
-| 7 | `237A-7g` | Nakomi | Ciclo de escalamiento + rich message `contact_cta`. |
-| 8 | `237A-7h` | Nakomi frontend | Render CTA + pruebas responsive. |
-| 9 | `237A-6a` | Nakomi backend | Secuencia, envelope v2, snapshot y reparación de huecos. |
-| 10 | `237A-6b` | Nakomi frontend | Realtime v2, dedupe, líder de audio y compatibilidad. |
-| 11 | `237A-6c` | Nakomi | Modos IA, ACK del botón y ciclo durable de fallback a 10 minutos. |
-| 12 | `237A-7i` | Nakomi | Captura/consentimiento de email y tests de tool call. |
-| 13 | `237A-7j` | Nakomi | Token y correo de continuación tras desconexión real. |
+| Orden | ID sugerido | Repositorio | Resultado | Estado |
+|---|---|---|---|---|
+| 1 | `237A-7a` | glorytemplate | Esquema outbox saliente + repositorio + tests de idempotencia. | ⏳ Pendiente (gateway glorytemplate) |
+| 2 | `237A-7b` | glorytemplate | Endpoint HMAC + nonce + tests de contrato/replay. | ⏳ Pendiente (gateway glorytemplate) |
+| 3 | `237A-7c` | glorytemplate | Worker saliente + `WacliService` + canary controlado. | ⏳ Pendiente (gateway glorytemplate) |
+| 4 | `237A-7d` | Nakomi | Migración/modelos/repositorio outbox + transacción de mensaje. | ✅ Implementado |
+| 5 | `237A-7e` | Nakomi | Worker SMTP/gateway + consulta de estado + métricas. | ✅ Implementado |
+| 6 | `237A-7f` | Nakomi frontend | Runtime global, campanas y badges persistentes. | ✅ Implementado (AuthenticatedNotificationRuntime + NotificationBell en HeaderPanel) |
+| 7 | `237A-7g` | Nakomi | Ciclo de escalamiento + rich message `contact_cta`. | ✅ Implementado |
+| 8 | `237A-7h` | Nakomi frontend | Render CTA + pruebas responsive. | ✅ Implementado (ChatWidget render contact_cta) |
+| 9 | `237A-6a` | Nakomi backend | Secuencia, envelope v2, snapshot y reparación de huecos. | ✅ Implementado |
+| 10 | `237A-6b` | Nakomi frontend | Realtime v2, dedupe, líder de audio y compatibilidad. | ✅ Implementado |
+| 11 | `237A-6c` | Nakomi | Modos IA, ACK del botón y ciclo durable de fallback a 10 minutos. | ✅ Implementado |
+| 12 | `237A-7i` | Nakomi | Captura/consentimiento de email y tests de tool call. | ✅ Implementado |
+| 13 | `237A-7j` | Nakomi | Token y correo de continuación tras desconexión real. | ✅ Implementado |
 
 Gates:
 

@@ -145,6 +145,7 @@ pub(crate) fn html_escape(s: &str) -> String {
         .replace('"', "&quot;")
 }
 
+#[allow(dead_code)]
 pub(crate) fn recipient_label(display_name: Option<&str>, email: &str) -> String {
     let raw = display_name
         .map(str::trim)
@@ -256,7 +257,7 @@ impl EmailService {
         config: &EmailConfig,
         pool: &PgPool,
         admin_emails: &[String],
-        client_email: &str,
+        _client_email: &str,
         client_name: &str,
         order_number: i32,
         amount_display: &str,
@@ -299,8 +300,8 @@ impl EmailService {
         pool: &PgPool,
         client_email: &str,
         amount_usd: f64,
-        site_url: &str,
-        register_url: &str,
+        _site_url: &str,
+        _register_url: &str,
     ) {
         let subject = "Tu pago fue recibido — Nakomi Studio".to_string();
         let amount_display = format!("${:.2} USD", amount_usd);
@@ -588,7 +589,7 @@ impl EmailService {
         to_email: &str,
         client_name: &str,
         order_number: i32,
-        site_url: &str,
+        _site_url: &str,
         order_id: uuid::Uuid,
     ) {
         let subject = format!("✅ Orden #{order_number} completada — Nakomi Studio");
@@ -692,9 +693,9 @@ impl EmailService {
         to_email: &str,
         client_name: &str,
         order_number: i32,
-        problem_title: &str,
+        _problem_title: &str,
         problem_description: &str,
-        site_url: &str,
+        _site_url: &str,
         order_id: uuid::Uuid,
     ) {
         let subject = format!("⚠️ Problema reportado — Orden #{order_number} — Nakomi Studio");
@@ -727,7 +728,7 @@ impl EmailService {
         pool: &PgPool,
         admin_emails: &[String],
         client_name: &str,
-        client_email: &str,
+        _client_email: &str,
         order_number: i32,
         order_id: uuid::Uuid,
         site_url: &str,
@@ -766,7 +767,7 @@ impl EmailService {
         pool: &PgPool,
         admin_emails: &[String],
         client_name: &str,
-        client_email: &str,
+        _client_email: &str,
         order_number: i32,
         reason: &str,
         order_id: uuid::Uuid,
@@ -806,9 +807,9 @@ impl EmailService {
         pool: &PgPool,
         admin_emails: &[String],
         client_name: &str,
-        client_email: &str,
+        _client_email: &str,
         order_number: i32,
-        problem_title: &str,
+        _problem_title: &str,
         problem_description: &str,
         order_id: uuid::Uuid,
         site_url: &str,
@@ -847,7 +848,7 @@ impl EmailService {
         pool: &PgPool,
         admin_emails: &[String],
         client_name: &str,
-        client_email: &str,
+        _client_email: &str,
         order_number: i32,
         amount_display: &str,
         reason: &str,
@@ -915,6 +916,45 @@ impl EmailService {
         }
         if !admin_emails.is_empty() {
             tracing::info!("Email nuevo usuario registrado ({user_email}) enviado a {} admins", admin_emails.len());
+        }
+    }
+
+    /* [237A-7j] Email de continuación de conversación al visitante.
+     * Se envía cuando el visitante con email conocido se desconecta por más de 2 minutos.
+     * Contiene un enlace firmado de un solo uso para reanudar la conversación. */
+    pub async fn send_chat_continuation(
+        config: &EmailConfig,
+        pool: &PgPool,
+        to_email: &str,
+        visitor_name: &str,
+        continuation_url: &str,
+        session_id: uuid::Uuid,
+    ) {
+        let subject = "Continúa tu conversación — Nakomi Studio";
+
+        let html = super::email_templates::render_chat_continuation(
+            visitor_name,
+            continuation_url,
+        );
+
+        let result = Self::send(config, to_email, subject, &html).await;
+        let status = if result.is_ok() { "sent" } else { "failed" };
+        let error_msg = result.as_ref().err().map(String::as_str);
+
+        if let Err(log_err) = EmailLogRepository::insert(
+            pool, to_email, subject, "chat_continuation",
+            Some("chat_session"), Some(session_id), status, error_msg,
+        ).await {
+            tracing::warn!("Error registrando email_log: {log_err}");
+        }
+
+        match result {
+            Ok(()) => {
+                tracing::info!(%session_id, "Email de continuación enviado a visitante");
+            }
+            Err(error) => {
+                tracing::error!(%session_id, "Error enviando email de continuación: {error}");
+            }
         }
     }
 }
