@@ -1,7 +1,7 @@
 # 237A-3 — Estabilidad integral de Nakomi Studio
 
 > **Fecha:** 2026-07-23  
-> **Estado:** Núcleo crítico implementado y validado localmente; sincronización y deploy pendientes
+> **Estado:** Watchdog y persistencia desplegados; alertas externas, Realtime y finanzas pendientes
 > **Prioridad:** Crítica  
 > **Responsable técnico:** agente principal  
 > **Delegación:** las tareas mecánicas y de bajo riesgo se asignan a un subagente con criterios de aceptación explícitos.  
@@ -312,6 +312,8 @@ Pruebas:
 **Dificultad:** Alta
 **Estado:** Autorización WS completada; contrato de eventos/sonido queda pendiente
 
+Plan de ejecución actualizado: `Agente/planes/plan-cierre-bloques-dificiles-nakomi-2026-07-23.md`.
+
 Tareas:
 
 1. Crear un endpoint/protocolo WS de sesión de orden inequívoco.
@@ -344,6 +346,12 @@ Pruebas:
 
 **Responsable arquitectónico:** agente principal  
 **Implementación mecánica delegable:** subagente
+
+> **Corrección de alcance 2026-07-23:** esta fase vuelve a ser prioritaria. Cada
+> mensaje de cliente debe producir inmediatamente notificación persistente,
+> correo y WhatsApp. La integración WhatsApp reutilizará el `wacli` operativo de
+> `glorytemplate` mediante un gateway interno firmado y colas idempotentes; no se
+> instalará un segundo cliente ni se compartirán stores entre contenedores.
 
 Arquitectura:
 
@@ -747,10 +755,22 @@ Prevenciones candidatas para Glory Sentinel:
 - [ ] Producción desplegada con procedencia verificable.
 - [ ] `glory-rs-template/main` restaurada.
 
+Estado de producción corregido:
+
+- [x] Rama proyecto sincronizada con `origin`.
+- [x] Watchdog y persistencia desplegados y verificados.
+- [x] Framework de producción actualizado en `master`.
+- [ ] Alertas inmediatas in-app + correo + WhatsApp.
+- [ ] CTA de WhatsApp para escalamiento.
+
 ## 11. Recorte de alcance solicitado el 2026-07-23
 
-El usuario pidió terminar únicamente lo importante y complicado. Por tanto:
+El usuario pidió terminar únicamente lo importante y complicado. Después aclaró
+que alertas, WhatsApp, correo y Realtime forman parte de ese núcleo. Por tanto:
 
-- Se cierra primero sincronización reproducible y deploy de watchdog + persistencia de chat.
-- Permanecen pendientes y no bloquean este cierre: CMS/media, pulido visual, notificaciones globales, pagos/reembolsos, restauración de `main` y documentación secundaria.
+- Watchdog y persistencia ya están desplegados.
+- El siguiente bloque obligatorio es alertas inmediatas + CTA de escalamiento,
+  seguido por contrato Realtime y alerta idempotente de 20 minutos.
+- Pagos/reembolsos continúan como bloques difíciles posteriores.
+- Permanecen fáciles y delegables: CMS/media y pulido visual.
 - Los cambios fáciles ya preparados pero no pertenecientes al bloque crítico se preservan fuera de los commits de producción.
