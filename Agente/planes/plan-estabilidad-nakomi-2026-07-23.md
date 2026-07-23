@@ -1,7 +1,7 @@
 # 237A-3 — Estabilidad integral de Nakomi Studio
 
 > **Fecha:** 2026-07-23  
-> **Estado:** En progreso  
+> **Estado:** Núcleo crítico implementado y validado localmente; sincronización y deploy pendientes
 > **Prioridad:** Crítica  
 > **Responsable técnico:** agente principal  
 > **Delegación:** las tareas mecánicas y de bajo riesgo se asignan a un subagente con criterios de aceptación explícitos.  
@@ -27,8 +27,8 @@
 - El remoto raíz `origin` apunta correctamente a `glory-rs-template`.
 - El remoto raíz llamado `framework` apunta a un repositorio legado `glory-rs.git`; no es `glory-rs-framework`.
 - La rama local `glory-rust-nakomi` rastrea por error `framework/glory-rust-nakomi`.
-- El HEAD local es `3f6d0c47`.
-- `origin/glory-rust-nakomi` está en `5ff27edf`, siete commits por detrás.
+- El HEAD local inicial era `3f6d0c47`.
+- `origin/glory-rust-nakomi` estaba en `5ff27edf`, siete commits por detrás del HEAD local inicial.
 - Coolify clona correctamente `glory-rs-template/glory-rust-nakomi`; por tanto reconstruye frontend y backend desde la rama de proyecto desactualizada.
 - El núcleo real está en `./glory-rs`, como repositorio Git anidado ignorado, y su `origin` sí apunta a `glory-rs-framework`.
 - Local y producción no fijan el mismo commit del framework:
@@ -210,6 +210,14 @@ Criterios de aceptación:
 **Responsable:** agente principal  
 **Dificultad:** Alta  
 **Prioridad:** Primera implementación
+**Estado:** Implementado y validado localmente; deploy pendiente
+
+Resultado 2026-07-23:
+
+- Watchdog agnóstico implementado en `glory-rs-framework`, rama `codex/237A-runtime-watchdog`, commit `fce94c1`.
+- Integración del proyecto en commit `3ac24da9`.
+- Eliminados los dos watchdog legacy basados en epoch que coexistían en `main.rs`.
+- Framework: 15 tests aprobados; proyecto: `cargo check`, `clippy -D warnings` y 208 tests aprobados.
 
 Diseño:
 
@@ -254,6 +262,18 @@ Observabilidad:
 
 **Responsable:** agente principal  
 **Dificultad:** Alta
+**Estado:** Núcleo crítico implementado y validado localmente; migración/deploy pendientes
+
+Resultado 2026-07-23:
+
+- Chats cerrados visibles como historial de solo lectura.
+- Cleanup limitado a sesiones anónimas; pedidos y usuarios autenticados no expiran.
+- Consulta corregida para devolver los últimos N y restaurarlos en orden cronológico.
+- `/reset` archiva sin borrar mensajes y se rechaza en sesiones vinculadas.
+- `visitor_id` inválido se rota en frontend y se rechaza en backend.
+- Sesión de orden consolidada con migración e índice único parcial; creación/reapertura atómica.
+- Lectura, escritura y WS de staff autorizados por participante; admin conserva supervisión.
+- Queda pendiente sustituir el crecimiento de `limit` por cursor compuesto; no bloquea la corrección de desaparición.
 
 Tareas:
 
@@ -290,6 +310,7 @@ Pruebas:
 
 **Responsable:** agente principal  
 **Dificultad:** Alta
+**Estado:** Autorización WS completada; contrato de eventos/sonido queda pendiente
 
 Tareas:
 
@@ -717,8 +738,8 @@ Prevenciones candidatas para Glory Sentinel:
 - [x] Auditoría de pagos/reembolsos completada.
 - [x] Auditoría del trabajo anterior completada.
 - [x] Plan maestro creado.
-- [ ] Watchdog corregido y probado.
-- [ ] Persistencia de chat corregida.
+- [x] Watchdog corregido y probado localmente.
+- [x] Persistencia de chat corregida y probada localmente.
 - [ ] Realtime corregido.
 - [ ] Notificaciones globales implementadas.
 - [ ] Pagos/reembolsos endurecidos.
@@ -726,3 +747,10 @@ Prevenciones candidatas para Glory Sentinel:
 - [ ] Producción desplegada con procedencia verificable.
 - [ ] `glory-rs-template/main` restaurada.
 
+## 11. Recorte de alcance solicitado el 2026-07-23
+
+El usuario pidió terminar únicamente lo importante y complicado. Por tanto:
+
+- Se cierra primero sincronización reproducible y deploy de watchdog + persistencia de chat.
+- Permanecen pendientes y no bloquean este cierre: CMS/media, pulido visual, notificaciones globales, pagos/reembolsos, restauración de `main` y documentación secundaria.
+- Los cambios fáciles ya preparados pero no pertenecientes al bloque crítico se preservan fuera de los commits de producción.
