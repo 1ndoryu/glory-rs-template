@@ -1,7 +1,6 @@
 /* sentinel-disable-file sqlx-query-sin-macro: main.rs usa queries dinámicas para
  * setup inicial (admin seeding, cleanup test data) con formatos generados en runtime. */
 use std::net::SocketAddr;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use hyper::body::Incoming;
@@ -11,7 +10,7 @@ use hyper_util::server::graceful::GracefulShutdown;
 use tower::{Service, ServiceExt};
 
 use argon2::password_hash::rand_core::OsRng;
-use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
+use argon2::{password_hash::SaltString, Argon2, PasswordHasher};
 use glory_backend::config::AppConfig;
 use glory_backend::handlers;
 use glory_backend::services::bandwidth_enforcement::bandwidth_throttle_loop;
@@ -21,6 +20,7 @@ use glory_backend::services::storage_enforcement::storage_enforcement_loop;
 use glory_backend::services::vps_monitor::vps_monitor_loop;
 use glory_backend::services::{AssignmentService, ContaboConfig, ContaboService, CoolifyConfig};
 use glory_rs::fixtures::ContentManager;
+use glory_rs::runtime::{spawn_runtime_watchdog, RuntimeHeartbeat, RuntimeWatchdogConfig};
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 8)]
 #[allow(clippy::too_many_lines)]
@@ -44,8 +44,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pool = sqlx::postgres::PgPoolOptions::new()
         .max_connections(10)
         .min_connections(1)
-        .max_lifetime(Duration::from_secs(1800))
-        .idle_timeout(Duration::from_secs(300))
+        .max_lifetime(Duration::from_mins(30))
+        .idle_timeout(Duration::from_mins(5))
         .acquire_timeout(Duration::from_secs(5))
         .connect(&config.database_url)
         .await?;
@@ -83,49 +83,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     socket.listen(1024)?;
     let listener = tokio::net::TcpListener::from_std(socket.into())?;
 
-    /* [096A-5] Heartbeat atómico: el server loop marca timestamp en cada accept.
-     * El watchdog verifica sin HTTP (evita generar CLOSE_WAIT con probes).
-     * Box::leak es intencional: vive tanto como el proceso. */
-    let heartbeat: &'static AtomicU64 = Box::leak(Box::new(AtomicU64::new(0)));
-    spawn_heartbeat_watchdog(heartbeat);
-
-    /* [096A-10] Runtime watchdog: OS thread (NO tokio task) que detecta cuando
-     * el runtime tokio está congelado. Un tokio task actualiza un AtomicU64
-     * cada 5s; un OS thread separado lee ese timestamp. Si no se actualiza
-     * en 30s, el runtime está muerto → volcamos stacks del kernel y salimos.
-     * Esto es independiente del heartbeat del accept loop: captura el caso
-     * donde el accept loop funciona (Traefik healthchecks) pero los workers
-     * están todos bloqueados procesando chat. */
-    let rt_heartbeat: &'static AtomicU64 = Box::leak(Box::new(AtomicU64::new(0)));
-    spawn_runtime_watchdog(rt_heartbeat);
-
-    /* [096A-12] Heartbeat logger: confirma que el runtime está vivo cada 15s.
-     * Si el log desaparece, sabemos exactamente cuándo se congeló el runtime.
-     * Dos mecanismos: tokio task (funciona normalmente) + OS thread (funciona
-     * aunque el runtime esté parcialmente bloqueado). */
-    tokio::spawn(async move {
-        tokio::time::sleep(Duration::from_secs(15)).await;
-        loop {
-            tracing::debug!("[rt-heartbeat] runtime vivo — workers activos");
-            tokio::time::sleep(Duration::from_secs(15)).await;
-        }
-    });
-    std::thread::Builder::new()
-        .name("hb-logger".into())
-        .spawn(move || {
-            std::thread::sleep(Duration::from_secs(100));
-            loop {
-                let last = rt_heartbeat.load(Ordering::Relaxed);
-                let now = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_secs();
-                let stale = now.saturating_sub(last);
-                eprintln!("[hb-logger] last_pulse={last} stale={stale}s");
-                std::thread::sleep(Duration::from_secs(15));
-            }
-        })
-        .expect("spawn hb-logger");
+    /* [237A-4] El watchdog compartido usa una secuencia monotónica y emite el
+     * primer pulso inmediatamente. El estado inicial nunca activa recovery:
+     * solo una secuencia válida que deja de avanzar puede cerrar el proceso. */
+    let runtime_watchdog_disabled = std::env::var("GLORY_HTTP_WATCHDOG")
+        .is_ok_and(|value| value.eq_ignore_ascii_case("false") || value == "0");
+    if runtime_watchdog_disabled {
+        tracing::warn!("[rt-watchdog] Desactivado por GLORY_HTTP_WATCHDOG");
+    } else {
+        let runtime_heartbeat = spawn_runtime_watchdog(RuntimeWatchdogConfig::default(), || {
+            eprintln!(
+                "\n[rt-watchdog] ⚠️  RUNTIME FREEZE DETECTED: una secuencia válida dejó de avanzar"
+            );
+            eprintln!("[rt-watchdog] Volcando stacks del kernel...\n");
+            dump_kernel_stacks();
+            eprintln!("\n[rt-watchdog] Forzando exit(1) para restart de Docker...");
+            std::process::exit(1);
+        })?;
+        spawn_runtime_heartbeat_logger(runtime_heartbeat)?;
+    }
 
     /* [096A-2] Migrado de axum::serve() a hyper_util::auto::Builder para
      * configurar header_read_timeout a nivel HTTP. axum::serve() es
@@ -137,8 +113,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
      * header_read_timeout se rearma después de cada respuesta (confirmado
      * por test hyper: header_read_timeout_as_idle_timeout), actuando como
      * idle timeout entre requests keep-alive. */
-    let mut make_service =
-        app.into_make_service_with_connect_info::<SocketAddr>();
+    let mut make_service = app.into_make_service_with_connect_info::<SocketAddr>();
 
     let shutdown = shutdown_signal();
     tokio::pin!(shutdown);
@@ -185,16 +160,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             result = listener.accept() => {
                 let (tcp_stream, remote_addr) = result?;
 
-                /* [096A-5] Heartbeat: marcar que el event loop sigue aceptando.
-                 * El watchdog lee esto para detectar congelamiento sin HTTP. */
-                heartbeat.store(
-                    std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_secs(),
-                    Ordering::Relaxed,
-                );
-
                 /* [096A-5] CRÍTICO: TCP keepalive DEBE aplicarse al socket de conexión,
                  * NO al listener. accept() en Linux NO hereda SO_KEEPALIVE.
                  * Sin esto, el keepalive de fixes v1-v4 era NO-OP en todas las
@@ -207,7 +172,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let accepted = socket2::Socket::from(std_stream);
                     accepted.set_keepalive(true)?;
                     let ka = socket2::TcpKeepalive::new()
-                        .with_time(Duration::from_secs(60))
+                        .with_time(Duration::from_mins(1))
                         .with_interval(Duration::from_secs(15));
                     let _ = accepted.set_tcp_keepalive(&ka);
                     let std_back: std::net::TcpStream = accepted.into();
@@ -232,8 +197,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 /* [096A-4] watcher() crea un Watcher owned (no borrow graceful).
                  * watch(conn) toma ownership del Connection y retorna un Future
                  * que combina la conexión con la señal de shutdown. */
-                let watcher = graceful.watcher();
-                let watched = watcher.watch(conn);
+                let graceful_watcher = graceful.watcher();
+                let watched_connection = graceful_watcher.watch(conn);
 
                 tokio::spawn(async move {
                     let start = std::time::Instant::now();
@@ -242,7 +207,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                      * timeout. HTTP normal cierra mucho antes (header_read_timeout 30s).
                      * WS activos: su timeout de app (300s) cierra primero.
                      * Este es el safety net — dropea TcpStream → close() vía RAII. */
-                    match tokio::time::timeout(Duration::from_secs(300), watched).await {
+                    match tokio::time::timeout(Duration::from_mins(5), watched_connection).await {
                         Ok(Ok(())) => {
                             let secs = start.elapsed().as_secs();
                             if secs > 60 {
@@ -263,7 +228,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     /* Socket (TcpStream) se dropea aquí → close() automático vía RAII. */
                 });
             }
-            _ = &mut shutdown => {
+            () = &mut shutdown => {
                 tracing::info!("Graceful shutdown: dejando de aceptar conexiones");
                 break;
             }
@@ -305,8 +270,8 @@ async fn shutdown_signal() {
     let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = ctrl_c => { tracing::info!("Recibido SIGINT, iniciando graceful shutdown..."); }
-        _ = terminate => { tracing::info!("Recibido SIGTERM, iniciando graceful shutdown..."); }
+        () = ctrl_c => { tracing::info!("Recibido SIGINT, iniciando graceful shutdown..."); }
+        () = terminate => { tracing::info!("Recibido SIGTERM, iniciando graceful shutdown..."); }
     }
 }
 
@@ -429,113 +394,29 @@ fn spawn_background_services(pool: &sqlx::PgPool, _config: &AppConfig) {
     }
 }
 
-/* [096A-5] Watchdog basado en heartbeat atómico — NO usa HTTP.
- * El watchdog anterior (spawn_http_watchdog) creaba conexiones TCP a 127.0.0.1:3000
- * que contribuían al CLOSE_WAIT. Además, cuando el event loop se degradaba,
- * los probes HTTP fallaban (timeout 3s) → 3 fallos → exit(1), matando la app
- * antes de que los timeouts TCP pudieran limpiar las conexiones.
- *
- * Este watchdog lee un AtomicU64 que el server loop actualiza en cada accept().
- * Si no hay accepts en 5 minutos, el event loop está congelado → exit(1).
- * Cero conexiones TCP generadas. */
-fn spawn_heartbeat_watchdog(heartbeat: &'static AtomicU64) {
-    if std::env::var("GLORY_HTTP_WATCHDOG")
-        .is_ok_and(|value| value.eq_ignore_ascii_case("false") || value == "0")
-    {
-        tracing::warn!("[watchdog] Desactivado por GLORY_HTTP_WATCHDOG");
-        return;
-    }
-
-    tokio::spawn(async move {
-        /* Warmup: dar 2 minutos al servidor para arrancar y recibir tráfico. */
-        tokio::time::sleep(Duration::from_secs(120)).await;
-        loop {
-            tokio::time::sleep(Duration::from_secs(60)).await;
-            let last = heartbeat.load(Ordering::Relaxed);
-            if last == 0 {
-                /* Aún no ha recibido ninguna conexión — servidor recién arrancado
-                 * o sin tráfico. No matar por falta de tráfico. */
-                continue;
-            }
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs();
-            let stale_secs = now.saturating_sub(last);
-            if stale_secs > 300 {
-                tracing::error!(
-                    "[watchdog] Event loop congelado: sin accepts en {stale_secs}s — forzando restart"
-                );
-                std::process::exit(1);
-            }
-        }
-    });
-}
-
-/* [096A-10] Runtime watchdog: detecta tokio congelado via heartbeat de task + OS thread.
- * El tokio task actualiza un timestamp cada 5s; el OS thread lee el timestamp
- * con recv_timeout. Si el runtime está muerto, el tokio task no puede ejecutar,
- * el timestamp se estanca, y el OS thread lo detecta.
- * Al detectar freeze: volcamos stacks del kernel (/proc/self/task/TID/stack)
- * y forzamos exit(1) para que Docker reinicie. */
-fn spawn_runtime_watchdog(rt_heartbeat: &'static AtomicU64) {
-    use std::sync::mpsc as std_mpsc;
-
-    if std::env::var("GLORY_HTTP_WATCHDOG")
-        .is_ok_and(|value| value.eq_ignore_ascii_case("false") || value == "0")
-    {
-        return;
-    }
-
-    let (tx, rx) = std_mpsc::sync_channel::<()>(1);
-
-    /* Tokio task: envía pulso cada 5s */
-    tokio::spawn(async move {
-        tokio::time::sleep(Duration::from_secs(60)).await;
-        loop {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs();
-            rt_heartbeat.store(now, Ordering::Relaxed);
-            /* También enviar por canal como doble verificación */
-            let _ = tx.try_send(());
-            tokio::time::sleep(Duration::from_secs(5)).await;
-        }
-    });
-
-    /* OS thread: monitorea el pulso. Si no llega en 30s → runtime congelado */
+fn spawn_runtime_heartbeat_logger(heartbeat: RuntimeHeartbeat) -> std::io::Result<()> {
     std::thread::Builder::new()
-        .name("rt-watchdog".into())
+        .name("hb-logger".into())
         .spawn(move || {
-            std::thread::sleep(Duration::from_secs(90)); /* warmup */
+            let mut last_sequence = 0;
+            let mut last_progress = std::time::Instant::now();
+            std::thread::sleep(Duration::from_secs(15));
             loop {
-                match rx.recv_timeout(Duration::from_secs(30)) {
-                    Ok(()) => { /* runtime vivo */ }
-                    Err(std_mpsc::RecvTimeoutError::Timeout) => {
-                        /* Verificar también el atomic */
-                        let last = rt_heartbeat.load(Ordering::Relaxed);
-                        let now = std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap_or_default()
-                            .as_secs();
-                        let stale = now.saturating_sub(last);
-                        if stale < 20 {
-                            continue; /* fue timeout del canal, pero atomic está fresco */
-                        }
-                        eprintln!(
-                            "\n[rt-watchdog] ⚠️  RUNTIME FREEZE DETECTED: sin pulso en {stale}s"
-                        );
-                        eprintln!("[rt-watchdog] Volcando stacks del kernel...\n");
-                        dump_kernel_stacks();
-                        eprintln!("\n[rt-watchdog] Forzando exit(1) para restart de Docker...");
-                        std::process::exit(1);
-                    }
-                    Err(std_mpsc::RecvTimeoutError::Disconnected) => break,
+                let current_sequence = heartbeat.sequence();
+                if current_sequence != last_sequence {
+                    last_sequence = current_sequence;
+                    last_progress = std::time::Instant::now();
                 }
+                let status = if current_sequence == 0 {
+                    "starting".to_string()
+                } else {
+                    format!("healthy stalled_for={}s", last_progress.elapsed().as_secs())
+                };
+                eprintln!("[hb-logger] sequence={current_sequence} status={status}");
+                std::thread::sleep(Duration::from_secs(15));
             }
-        })
-        .expect("spawn rt-watchdog thread");
+        })?;
+    Ok(())
 }
 
 /* Volcar stacks del kernel de todos los threads via /proc/self/task/TID/stack.
@@ -580,9 +461,7 @@ fn dump_kernel_stacks() {
         }
         /* [096A-11] Fallback: si stacks vacíos, listar threads con estado */
         if !found_any {
-            eprintln!(
-                "[rt-watchdog] Thread {tid_str}: name={name} state={state}"
-            );
+            eprintln!("[rt-watchdog] Thread {tid_str}: name={name} state={state}");
         }
     }
 }
@@ -687,8 +566,9 @@ async fn cleanup_legacy_seed(pool: &sqlx::PgPool) {
     }
 }
 
-/* [114A-13] Background loop: cierra sesiones de chat inactivas (>24h sin actividad).
- * Ejecuta cada hora. Previene acumulación de sesiones zombie en BD y en el panel staff. */
+/* [114A-13][237A-5] Background loop: archiva solo sesiones anónimas inactivas.
+ * Los chats de pedido o usuario autenticado se conservan activos indefinidamente;
+ * las anónimas archivadas siguen disponibles en el historial del panel. */
 async fn session_cleanup_loop(pool: sqlx::PgPool) {
     use glory_backend::repositories::ChatRepository;
 
@@ -700,7 +580,7 @@ async fn session_cleanup_loop(pool: sqlx::PgPool) {
         match ChatRepository::close_inactive_sessions(&pool, INACTIVITY_HOURS).await {
             Ok(0) => {}
             Ok(n) => tracing::info!(
-                "[chat-cleanup] {n} sesiones inactivas cerradas (>{INACTIVITY_HOURS}h)"
+                "[chat-cleanup] {n} sesiones anónimas inactivas archivadas (>{INACTIVITY_HOURS}h)"
             ),
             Err(e) => tracing::error!("[chat-cleanup] Error cerrando sesiones inactivas: {e}"),
         }
@@ -716,7 +596,7 @@ async fn unanswered_messages_loop(pool: sqlx::PgPool) {
     use glory_backend::repositories::{ChatRepository, NotificationRepository, UserRepository};
 
     const THRESHOLD_MINUTES: i64 = 20;
-    const CHECK_INTERVAL: std::time::Duration = std::time::Duration::from_secs(300);
+    const CHECK_INTERVAL: std::time::Duration = std::time::Duration::from_mins(5);
     let mut notified: std::collections::HashSet<uuid::Uuid> = std::collections::HashSet::new();
 
     loop {
