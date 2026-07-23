@@ -351,3 +351,491 @@ El bloque no se considera listo solo porque compile. Deben existir evidencias re
 - alerta de 20 minutos exactamente una vez;
 - health y logs limpios tras deploy.
 
+## 12. Guía operativa para agentes implementadores
+
+Esta sección elimina decisiones implícitas. El agente que tome una fase debe
+seguir el orden indicado, modificar solo los archivos de su tarjeta y detenerse
+ante cualquiera de las condiciones de parada.
+
+### 12.1 Reglas que no se pueden reinterpretar
+
+1. **“Mensaje de cliente”** significa un mensaje nuevo persistido cuyo
+   `sender_type` sea `client` o `visitor`. No incluye:
+   - respuestas de IA;
+   - mensajes de admin/freelancer;
+   - historial enviado durante reconexión;
+   - typing, presencia o cambios de estado.
+2. **“Inmediato”** significa:
+   - notificación in-app en la misma operación lógica;
+   - outbox creada antes de responder éxito;
+   - worker iniciado en menos de cinco segundos;
+   - no significa ejecutar SMTP o `wacli` dentro del request.
+3. **Una vez** se garantiza por constraint/idempotency key, no por un `if`
+   previo ni por memoria del proceso.
+4. PostgreSQL es la fuente de verdad del chat y sus alertas.
+5. El gateway WordPress es el único dueño de `wacli`.
+6. Ningún agente puede:
+   - llamar `wacli`, SSH o Docker desde Nakomi;
+   - copiar el store de WhatsApp;
+   - crear un segundo proveedor WhatsApp;
+   - enviar alertas desde el frontend;
+   - marcar un trabajo `sent` antes de recibir confirmación;
+   - ocultar errores con `let _ =`, `catch {}` o retornos de éxito.
+7. No se reproducen mensajes existentes al crear la outbox. Solo se procesan
+   mensajes insertados después de habilitar la migración/feature flag.
+8. Se trabaja en las ramas habituales:
+   - Nakomi: `glory-rust-nakomi`;
+   - framework: `master`;
+   - glorytemplate: verificar su rama productiva antes de editar.
+
+### 12.2 Mapa de archivos — Nakomi Rust
+
+| Responsabilidad | Archivo existente o nuevo | Instrucción |
+|---|---|---|
+| Migración outbox/unread | `migrations/<fecha>_chat_alert_outbox.up.sql` y `.down.sql` | Crear tablas, constraints, índices y rollback simétrico. |
+| Modelo outbox | `src/models/chat_alert.rs` | Estados y payload tipados; no usar `serde_json::Value` para todo. |
+| Repositorio outbox | `src/repositories/chat_alert.rs` | Enqueue, claim, sent, retry y dead-letter con queries preparadas. |
+| Orquestador | `src/services/chat_alert.rs` | Construir evento, destinatarios y claves idempotentes. No enviar red aquí. |
+| Worker externo | `src/services/chat_alert_worker.rs` | Procesar email/WhatsApp con timeout y backoff. |
+| Cliente gateway | `src/services/whatsapp_gateway.rs` | HMAC, timeout HTTP, respuestas tipadas y redacción de logs. |
+| Registro módulos | `src/models/mod.rs`, `src/repositories/mod.rs`, `src/services/mod.rs` | Exportar solo lo necesario. |
+| Arranque worker | `src/main.rs` | Un `tokio::spawn` supervisado, con tick acotado y shutdown limpio. |
+| Chat REST | `src/handlers/chat/rest_messages.rs` | Sustituir `notify_chat_recipient` por el orquestador común. |
+| Chat WS visitante | `src/handlers/chat/ws_visitor_helpers.rs` | Usar el mismo orquestador después de persistir; no duplicar lógica. |
+| Adjuntos/acciones | `src/handlers/chat/rest_upload.rs`, `ws_visitor_helpers.rs` | Encolar solo si se creó un mensaje real de cliente. |
+| Email | `src/services/email_templates.rs`, `src/services/email.rs` | Una plantilla y un método trazable; nada duplicado en previews. |
+| Config | `.env.example`, configuración de arranque | Documentar flags y secretos sin valores reales. |
+| WS chat | `src/models/chat.rs`, handlers WS y servicio de chat | Añadir envelope/snapshot sin romper autorización existente. |
+
+También se deben registrar dependencias nuevas en `src/lib.rs` y construir el
+estado compartido en `src/handlers/mod.rs`; no crear pools o clientes HTTP
+adicionales dentro de cada handler.
+
+El agente debe leer estos archivos antes de editar:
+
+- `src/services/notification.rs`;
+- `src/repositories/notification.rs`;
+- `src/handlers/chat/rest_messages.rs`;
+- `src/handlers/chat/ws_visitor_helpers.rs`;
+- `src/services/email.rs`;
+- `src/services/email_templates.rs`;
+- `src/main.rs`.
+
+### 12.3 Mapa de archivos — gateway glorytemplate
+
+| Responsabilidad | Archivo existente o nuevo | Instrucción |
+|---|---|---|
+| Esquema | `App/Database/Schema.php` | Subir `DB_VERSION` y crear una outbox saliente, no reutilizar la cola entrante. |
+| Endpoint interno | `App/Api/InternalAlertApiController.php` | Ruta nueva, pública solo a nivel HTTP y protegida íntegramente por HMAC. |
+| Verificación firma | `App/Services/InternalAlertSignatureService.php` | Canonicalización, skew, nonce y comparación constante. |
+| Repositorio | `App/Repository/WhatsApp/WhatsAppOutboundRepository.php` | Insert idempotente, claim y estados. |
+| Worker | `App/Services/WhatsAppOutboundWorker.php` | Reclamar lote, usar `WacliService`, retry/dead-letter. |
+| Envío real | `App/Services/WacliService.php` | Reutilizar `enviarTexto(null, mensaje)`; no modificar su sesión/store. |
+| Cron | `functions.php` | Registrar hook y schedule siguiendo el worker WhatsApp ya existente. |
+
+No modificar para esta integración:
+
+- `WhatsAppWebhookService.php`: procesa mensajes entrantes, no alertas salientes.
+- `WhatsAppEventWorker.php`: su cola pertenece al chatbot multiusuario.
+- `WacliManagerService.php`: administra cuentas; no es el gateway de Nakomi.
+
+### 12.4 Tarjeta A1 — Migración y dominio de alertas
+
+**Entrada:** mensaje de chat ya validado.
+**Salida:** mensaje + notificaciones + outbox persistidos.
+
+Pasos:
+
+1. Crear `chat_alert_outbox` con:
+   - `id UUID`;
+   - `idempotency_key TEXT UNIQUE`;
+   - `event_type`, `channel`, `recipient`;
+   - `reference_type`, `reference_id`;
+   - payload JSON versionado;
+   - estado con `CHECK`;
+   - attempts, `available_at`, `locked_at`, `last_error`;
+   - created/updated/sent timestamps.
+2. Añadir índice de claim:
+   `(status, available_at, created_at)`.
+3. Añadir unicidad a notificaciones de chat:
+   `(user_id, notification_type, reference_type, reference_id)`.
+   Antes del constraint, consultar duplicados y reconciliarlos.
+4. Definir claves exactas:
+   - in-app: `chat:{message_id}:in_app:{admin_id}`;
+   - email: `chat:{message_id}:email:{email_normalizado}`;
+   - WhatsApp: `chat:{message_id}:whatsapp:admin`.
+5. Crear una función de aplicación que reciba `ChatMessage` persistido y
+   `ChatSession`; no debe aceptar strings sueltos que permitan alertar un mensaje
+   inexistente.
+6. Si aún no es viable meter `ChatHub::send_message` y outbox en una sola
+   transacción, detenerse y rediseñar el boundary. No aceptar “persistir y luego
+   intentar encolar” como cierre.
+
+Pruebas mínimas:
+
+- dos intentos con el mismo `message_id` producen una fila por canal;
+- fallo de outbox revierte el mensaje;
+- mensaje de IA no genera filas;
+- cliente por REST y WS generan el mismo resultado.
+
+### 12.5 Tarjeta A2 — Worker Nakomi
+
+Algoritmo obligatorio:
+
+1. Recuperar `processing` con `locked_at` mayor a cinco minutos.
+2. Reclamar máximo 20 filas mediante `FOR UPDATE SKIP LOCKED`.
+3. Cambiar a `processing` y aumentar attempts dentro de la transacción de claim.
+4. Ejecutar cada envío con timeout:
+   - SMTP: 30 segundos;
+   - gateway: 10 segundos.
+5. Resultado:
+   - 2xx/SMTP aceptado: `sent`;
+   - error temporal/429/5xx: `pending` con backoff;
+   - 4xx de contrato/firma: `dead`, excepto 408/429;
+   - configuración ausente: `failed` visible y sin falso éxito.
+6. Truncar `last_error`; nunca guardar tokens, firmas o bodies completos.
+7. Emitir resumen por lote, no un log ruidoso por tick vacío.
+
+Condición de parada:
+
+- Si no hay forma de distinguir aceptación real de envío simulado, no marcar
+  `sent` y no continuar al deploy.
+
+### 12.6 Tarjeta A3 — Gateway firmado
+
+Canonical string exacto:
+
+```text
+POST
+/wp-json/glory/v1/internal/alerts
+<unix_timestamp>
+<nonce>
+<sha256_hex_body>
+```
+
+Firma:
+
+```text
+hex(hmac_sha256(shared_secret, canonical_string))
+```
+
+Validación:
+
+1. Body crudo máximo 16 KiB.
+2. Timestamp entero y desfase máximo 300 segundos.
+3. Nonce de 16–128 caracteres, guardado con expiración.
+4. Firma comparada con `hash_equals`.
+5. `event` permitido: inicialmente solo `chat.client_message` y
+   `chat.unanswered_20m`.
+6. `idempotency_key` obligatoria y única.
+7. Preview sanitizado y limitado; URL restringida a `https://nakomi.studio/`.
+8. Responder:
+   - `202`: nuevo o duplicado ya aceptado;
+   - `400`: payload inválido;
+   - `401`: firma/timestamp/nonce inválido;
+   - `413`: body demasiado grande;
+   - `429`: rate limit;
+   - `503`: cola/BD no disponible.
+
+Variables:
+
+- ambos proyectos: `GLORY_INTERNAL_ALERT_SECRET`;
+- Nakomi: `GLORY_ALERT_GATEWAY_URL`;
+- glorytemplate ya conserva `WACLI_ACCOUNT` y destinatario WhatsApp.
+
+El secreto se genera nuevo. No reutilizar JWT, SMTP, Stripe ni webhook secrets.
+
+### 12.7 Tarjeta A4 — Notificación visible
+
+Estado confirmado:
+
+- `NotificationBell` llama `useNotificationWs`, pero solo se monta en
+  `HeaderPanel`.
+- Por eso existe realtime dentro del panel, no un provider global para toda la
+  sesión autenticada.
+
+Pasos:
+
+1. Extraer la conexión a un componente sin UI
+   `AuthenticatedNotificationRuntime`.
+2. Montarlo una sola vez bajo el provider de React Query y por encima de las
+   rutas públicas/panel.
+3. Quitar la llamada directa desde `NotificationBell` para evitar dos sockets.
+4. `NotificationBell` queda como consumidor de cache.
+5. Montar la campana en `Header.tsx` para desktop autenticado.
+6. En móvil, mostrar acción “Notificaciones” con badge dentro del menú.
+7. `SidebarPanel.tsx` obtiene el conteo de mensajes no leídos y coloca un punto
+   en el tab `mensajes`, tanto desktop como mobile/overflow.
+8. Abrir una notificación:
+   - navega a `panel?seccion=mensajes&chat=<session_id>`;
+   - marca solo esa notificación/sesión como leída;
+   - invalida lista y contador.
+9. Reconexión WS con backoff cancelable; logout cancela timers y socket.
+
+No pedir permiso de notificaciones del navegador automáticamente al montar. El
+permiso debe solicitarse tras una acción explícita del usuario; el badge interno
+no depende de ese permiso.
+
+### 12.8 Tarjeta B — CTA de escalamiento
+
+1. Cambiar `exec_request_human` para devolver `RichMessage`:
+   - `message_type = "contact_cta"`;
+   - metadata con `label`, `href` y `support_code`.
+2. El backend construye el `href`; el LLM nunca proporciona URLs.
+3. El `support_code` se deriva de una referencia pública persistida, no del
+   email/teléfono del cliente ni de secretos.
+4. Persistir el CTA mediante `chat_hub.send_rich_message`.
+5. Añadir `contact_cta` al renderer de `ChatWidget.tsx`.
+6. Usar recetas/tokens existentes en `ChatWidget.css`.
+7. Persistir ciclo de escalamiento y usarlo en la clave idempotente.
+8. Corregir `toggle_ai` a `enabled` en frontend y backend.
+
+Copy mínimo:
+
+- Texto: “Este caso necesita atención personal.”
+- Botón: “Escribir por WhatsApp”.
+- Fallback: “El equipo fue notificado y responderá por este chat.”
+
+### 12.9 Tarjeta C — Realtime
+
+Orden de edición:
+
+1. Añadir el nuevo envelope en backend manteniendo temporalmente compatibilidad.
+2. Añadir `chat.snapshot` para historial.
+3. Adaptar hooks frontend.
+4. Implementar dedupe y líder de sonido.
+5. Retirar el mensaje legacy solo después de pruebas con ambos clientes.
+
+Regla de sonido en pseudocódigo:
+
+```text
+if event.delivery != live: no sonar
+if event.senderId == currentIdentity: no sonar
+if processedMessageIds.contains(event.messageId): no sonar
+insertar mensaje
+registrar messageId
+si esta pestaña es líder: sonar
+```
+
+No reproducir sonido fuera de la misma rama que confirmó la inserción del ID.
+
+### 12.10 Matriz de pruebas y evidencias
+
+| Caso | BD | UI | Correo | WhatsApp | Realtime |
+|---|---|---|---|---|---|
+| Widget anónimo | mensaje + 3 canales | badge | recibido | recibido | una inserción |
+| Cliente autenticado | igual | badge persistente | recibido | recibido | una inserción |
+| Chat de orden | sesión única | abre chat exacto | recibido | recibido | cliente/admin |
+| Dos pestañas admin | una notif | mismo contador | uno | uno | un sonido |
+| Reconexión | sin filas nuevas | conserva unread | ninguno nuevo | ninguno nuevo | sin sonido |
+| Gateway 503 | outbox pending | notif visible | independiente | retry | chat no falla |
+| SMTP caído | outbox pending | notif visible | retry | independiente | chat no falla |
+| Escalación IA | ciclo + CTA | botón visible | alerta | alerta | CTA único |
+
+Cada evidencia debe incluir:
+
+- ID de mensaje;
+- claves idempotentes;
+- estados de outbox;
+- registro `email_logs`;
+- resultado enmascarado de `wacli`;
+- captura de badge/CTA;
+- logs sin secretos.
+
+### 12.11 Condiciones de parada obligatoria
+
+El agente se detiene y documenta antes de editar si:
+
+- la rama activa no es la rama habitual del repositorio;
+- hay cambios ajenos sin preservar;
+- el `wacli` productivo no está autenticado;
+- no se conoce la rama/deploy real de glorytemplate;
+- se detectan duplicados que impiden crear constraints;
+- el endpoint interno no puede usar HTTPS;
+- no se puede configurar un secreto distinto en ambos servicios;
+- una migración requiere borrar mensajes/notificaciones;
+- el cambio exige SSH directo o compartir stores;
+- las pruebas solo pueden demostrar “request enviado”, pero no recepción real.
+
+### 12.12 Formato de entrega de cada agente
+
+El agente entrega siempre:
+
+1. tarea/ID y repositorio;
+2. archivos tocados;
+3. invariantes preservadas;
+4. migraciones y rollback;
+5. pruebas ejecutadas y resultados;
+6. evidencia funcional;
+7. variables nuevas sin valores;
+8. riesgos/pendientes;
+9. commit y rama habitual;
+10. confirmación explícita de que no se desplegó, o health post-deploy si estaba autorizado.
+
+## 13. Decisiones cerradas para evitar interpretaciones
+
+### 13.1 Destinatarios y precedencia
+
+Hay dos números distintos aunque inicialmente puedan coincidir:
+
+- **WhatsApp interno de alertas:** destinatario por defecto ya configurado en
+  glorytemplate mediante `WHATSAPP_AGENT_TO`, luego `WHATSAPP_TO`, luego
+  `WHATSAPP`. Nakomi no conoce ni envía ese número.
+- **WhatsApp público de soporte:** `PUBLIC_SUPPORT_WHATSAPP` en Nakomi. Solo se
+  usa para construir el CTA que abre el cliente.
+
+Destinatarios:
+
+1. `PRIMARY_ORDER_ADMIN_ID` identifica al dueño operativo.
+2. La notificación in-app se crea para el dueño y para otros admins activos,
+   deduplicando IDs.
+3. El correo inmediato se envía al email actual del dueño obtenido desde BD.
+   `CHAT_ALERT_EMAIL_OVERRIDE` solo existe para canary/staging.
+4. WhatsApp externo se envía una vez al destinatario por defecto de
+   glorytemplate.
+5. Si falta `PRIMARY_ORDER_ADMIN_ID`, la aplicación debe reportar configuración
+   crítica y no fingir que las alertas externas están listas.
+
+### 13.2 Estados entre Nakomi y glorytemplate
+
+Un `202 Accepted` solo significa **encolado por el gateway**, no enviado a
+WhatsApp.
+
+Estados Nakomi:
+
+```text
+pending -> processing -> accepted_by_gateway -> sent
+                              |                  |
+                              v                  v
+                            retry              dead
+```
+
+El gateway devuelve `gateway_job_id`. Nakomi consulta con firma:
+
+`GET /wp-json/glory/v1/internal/alerts/{idempotency_key}`
+
+Respuesta:
+
+```json
+{
+  "idempotencyKey": "chat:...",
+  "status": "pending|processing|sent|failed|dead",
+  "attempts": 1,
+  "sentAt": null
+}
+```
+
+Nakomi marca `sent` únicamente cuando el gateway reporta `sent`. El worker
+WordPress marca `sent` solo si `WacliService` retorna `exitCode=0`. Esto demuestra
+aceptación por el cliente local; la recepción humana final se confirma en el
+canary de producción.
+
+Los reintentos conservan `idempotency_key`, pero generan timestamp, nonce y
+firma nuevos.
+
+### 13.3 Registro de correo
+
+- `email_logs` registra un resultado final por trabajo.
+- Los intentos individuales viven en `chat_alert_outbox.attempts/last_error`.
+- No insertar múltiples filas `email_logs` por retry del mismo mensaje.
+- `email_logs.status=sent` solo después de aceptación SMTP.
+
+### 13.4 Feature flags
+
+```text
+CHAT_ALERT_CAPTURE_ENABLED
+CHAT_EMAIL_DELIVERY_ENABLED
+CHAT_WHATSAPP_DELIVERY_ENABLED
+CHAT_REALTIME_V2_ENABLED
+```
+
+- `CAPTURE=false`: no crea outbox externa; sí mantiene el chat normal. Se usa
+  durante la instalación inicial para impedir backfill accidental.
+- Canal delivery `false`: las filas nuevas quedan `paused`, no `failed`.
+- Al reactivar un canal pausado, un operador debe elegir explícitamente:
+  - reanudar filas con menos de una hora;
+  - archivar las antiguas sin enviar.
+- Realtime v2 se activa después de que backend y frontend compatibles estén
+  desplegados.
+
+### 13.5 Ciclo de escalamiento
+
+Crear `chat_escalations`:
+
+- `id UUID`;
+- `session_id`;
+- `opened_by_message_id`;
+- `status open|resolved`;
+- `reason`;
+- `cta_message_id`;
+- `opened_at`, `resolved_at`, `resolved_by`.
+
+Reglas:
+
+1. Índice único parcial: una escalación `open` por sesión.
+2. La tool o fallback IA abre/reutiliza el ciclo abierto.
+3. El CTA usa `escalation_id` como idempotency key.
+4. Una respuesta humana de admin/freelancer resuelve el ciclo.
+5. Una respuesta IA no lo resuelve.
+6. Tras resolverlo, una nueva detección puede abrir otro ciclo y CTA.
+7. `chat_sessions.is_escalated` refleja si existe un ciclo abierto; no se
+   actualiza de forma independiente.
+
+### 13.6 Semántica de 20 minutos
+
+- El ciclo comienza con el **primer mensaje de cliente** después de la última
+  respuesta humana.
+- Mensajes adicionales del cliente pertenecen al mismo ciclo y no reinician el
+  reloj.
+- Una respuesta IA no cuenta como atención humana.
+- Una respuesta de admin/freelancer cierra el ciclo.
+- Sesiones cerradas no generan alertas.
+- Sesiones escaladas sí generan alerta si nadie humano respondió.
+- El barrido toma filas vencidas con lock; no recalcula solo desde
+  `MAX(created_at)` en cada ejecución.
+
+### 13.7 Secuencia Realtime
+
+1. Añadir `next_message_sequence BIGINT` a `chat_sessions`.
+2. Al insertar un mensaje:
+   - bloquear/actualizar la sesión;
+   - incrementar y obtener la secuencia;
+   - insertar mensaje con esa secuencia en la misma transacción.
+3. Constraint único `(session_id, sequence)`.
+4. Snapshot incluye `lastSequence`.
+5. Cliente conserva `lastSequence` por sesión.
+6. Si recibe una secuencia mayor que `lastSequence + 1`, llama REST con
+   `after_sequence=<lastSequence>`.
+7. Durante compatibilidad, backend emite v2 solo a clientes que negocien
+   `protocol=2`; v1 continúa hasta completar rollout.
+
+Para audio, una pestaña toma liderazgo con Web Locks API. Si no está disponible,
+se usa lease en `localStorage` con `ownerId` y expiración corta. La pestaña no
+líder inserta mensajes, pero nunca reproduce sonido.
+
+## 14. División exacta en tareas y commits
+
+Cada fila es un commit independiente. No mezclar repositorios en un commit.
+
+| Orden | ID sugerido | Repositorio | Resultado |
+|---|---|---|---|
+| 1 | `237A-7a` | glorytemplate | Esquema outbox saliente + repositorio + tests de idempotencia. |
+| 2 | `237A-7b` | glorytemplate | Endpoint HMAC + nonce + tests de contrato/replay. |
+| 3 | `237A-7c` | glorytemplate | Worker saliente + `WacliService` + canary controlado. |
+| 4 | `237A-7d` | Nakomi | Migración/modelos/repositorio outbox + transacción de mensaje. |
+| 5 | `237A-7e` | Nakomi | Worker SMTP/gateway + consulta de estado + métricas. |
+| 6 | `237A-7f` | Nakomi frontend | Runtime global, campanas y badges persistentes. |
+| 7 | `237A-7g` | Nakomi | Ciclo de escalamiento + rich message `contact_cta`. |
+| 8 | `237A-7h` | Nakomi frontend | Render CTA + pruebas responsive. |
+| 9 | `237A-6a` | Nakomi backend | Secuencia, envelope v2, snapshot y reparación de huecos. |
+| 10 | `237A-6b` | Nakomi frontend | Realtime v2, dedupe, líder de audio y compatibilidad. |
+| 11 | `237A-7i` | Nakomi | Ciclo de 20 minutos y entrega por los tres canales. |
+
+Gates:
+
+- No iniciar `237A-7d` hasta validar `237A-7a..c` y health de `wacli`.
+- No iniciar CTA hasta demostrar exactamente una alerta por canal.
+- No retirar protocolo v1 hasta validar v2 con widget y chat de pedido.
+- No desplegar alertas de 20 minutos hasta validar que el flujo inmediato no
+  duplica entregas.
+- Pagos/reembolsos empiezan después de cerrar estos gates.
