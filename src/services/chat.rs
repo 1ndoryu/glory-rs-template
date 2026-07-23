@@ -28,8 +28,8 @@ use crate::repositories::ChatRepository;
 pub type SessionSender = mpsc::UnboundedSender<WsServerMessage>;
 
 /// Hub central de chat: estado en memoria de sesiones activas + broadcasters.
-/// [096A-13] Cada suscriptor tiene su propio mpsc::unbounded_channel.
-/// En vez de un broadcast::Sender compartido, mantenemos un Vec de senders por sesión.
+/// [096A-13] Cada suscriptor tiene su propio `mpsc::unbounded_channel`.
+/// En vez de un `broadcast::Sender` compartido, mantenemos un Vec de senders por sesión.
 /// [T-4] `connection_counts`: refcount por sesión para multi-conexión (tabs/dispositivos).
 #[derive(Clone)]
 pub struct ChatHub {
@@ -64,10 +64,7 @@ impl ChatHub {
             .or_insert_with(|| AtomicUsize::new(0))
             .fetch_add(1, Ordering::Relaxed);
         let (tx, rx) = mpsc::unbounded_channel();
-        self.channels
-            .entry(session_id)
-            .or_default()
-            .push(tx);
+        self.channels.entry(session_id).or_default().push(tx);
         rx
     }
 
@@ -92,9 +89,9 @@ impl ChatHub {
         self.channels.remove(&session_id);
     }
 
-    /// [064A-68] Suscribirse al canal global de staff (nuevas sesiones, visitor_status, etc.)
+    /// [064A-68] Suscribirse al canal global de staff (nuevas sesiones, `visitor_status`, etc.)
     /// [096A-13] Crea un canal mpsc individual por staff conectado.
-    /// [096A-14] tokio::sync::Mutex: lock().await no bloquea el worker.
+    /// [096A-14] `tokio::sync::Mutex`: lock().await no bloquea el worker.
     pub async fn subscribe_staff(&self) -> mpsc::UnboundedReceiver<WsServerMessage> {
         let (tx, rx) = mpsc::unbounded_channel();
         self.staff_senders.lock().await.push(tx);
@@ -111,7 +108,7 @@ impl ChatHub {
     }
 
     /// [096A-13] Broadcast a todos los staff conectados.
-    /// [096A-14] tokio::sync::Mutex: lock().await suspende la task sin bloquear el worker.
+    /// [096A-14] `tokio::sync::Mutex`: lock().await suspende la task sin bloquear el worker.
     async fn broadcast_to_staff(&self, msg: &WsServerMessage) {
         let mut senders = self.staff_senders.lock().await;
         senders.retain(|tx| tx.send(msg.clone()).is_ok());
@@ -186,12 +183,10 @@ impl ChatHub {
         order_id: Uuid,
         user_id: Uuid,
     ) -> Result<ChatSession, AppError> {
-        if let Some(existing) = ChatRepository::find_session_by_order(&self.pool, order_id).await? {
-            return Ok(existing);
-        }
+        /* [237A-5] El repositorio resuelve creación/reapertura de forma atómica.
+         * Esto conserva el historial y evita dos sesiones si llegan requests simultáneos. */
         let session =
-            ChatRepository::create_session(&self.pool, None, None, Some(user_id), Some(order_id))
-                .await?;
+            ChatRepository::get_or_reopen_order_session(&self.pool, order_id, user_id).await?;
 
         /* Auto-asignar empleado de la orden como staff del chat */
         let employee_id: Option<Uuid> =
@@ -350,7 +345,7 @@ impl ChatHub {
         Ok(())
     }
 
-    /// Listar sesiones activas como responses con `last_message` preview
+    /// Listar sesiones e historial como responses con `last_message` preview.
     pub async fn list_sessions_for_user(
         &self,
         user_id: Uuid,
@@ -359,9 +354,9 @@ impl ChatHub {
         self.enrich_sessions(sessions).await
     }
 
-    /// Listar todas las sesiones activas (staff/admin)
-    pub async fn list_all_active_sessions(&self) -> Result<Vec<ChatSessionResponse>, AppError> {
-        let sessions = ChatRepository::list_active_sessions(&self.pool).await?;
+    /// Listar todas las sesiones e historial (staff/admin).
+    pub async fn list_all_sessions(&self) -> Result<Vec<ChatSessionResponse>, AppError> {
+        let sessions = ChatRepository::list_sessions(&self.pool).await?;
         self.enrich_sessions(sessions).await
     }
 

@@ -20,7 +20,8 @@ import {useAuthStore} from '../stores/authStore';
 export function useOrderChat(orderId: string) {
     const queryClient = useQueryClient();
     const token = useAuthStore(s => s.token);
-    const user = useAuthStore(s => s.user);
+    /* [237A-5] userId es la identidad canónica persistida por authStore. */
+    const userId = useAuthStore(s => s.user?.userId);
     const [sessionId, setSessionId] = useState<string | null>(null);
     const [session, setSession] = useState<ChatSession | null>(null);
     const [creando, setCreando] = useState(false);
@@ -48,13 +49,13 @@ export function useOrderChat(orderId: string) {
 
     /* [20CA-7] Conectar WebSocket cuando hay sesión activa */
     useEffect(() => {
-        if (!sessionId || !token || !user) return;
+        if (!sessionId || !token || !userId) return;
         /* Cerrar WS previo si existe */
         if (wsRef.current) {
             wsRef.current.close();
             wsRef.current = null;
         }
-        const url = buildVisitorWsUrl(user.id, undefined, token, `order:${orderId}`);
+        const url = buildVisitorWsUrl(userId, undefined, token, `order:${orderId}`);
         const ws = new WebSocket(url);
         wsRef.current = ws;
 
@@ -70,7 +71,7 @@ export function useOrderChat(orderId: string) {
 
         ws.onclose = () => { wsRef.current = null; };
         return () => { ws.close(); wsRef.current = null; };
-    }, [sessionId, token, user, orderId, queryClient]);
+    }, [sessionId, token, userId, orderId, queryClient]);
 
     /* Polling de mensajes cada 5s como fallback (WS puede perder mensajes) */
     const {data: mensajes = []} = useQuery({

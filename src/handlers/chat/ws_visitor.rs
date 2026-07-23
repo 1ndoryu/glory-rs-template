@@ -29,8 +29,20 @@ async fn ws_visitor(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     headers: axum::http::HeaderMap,
-    Query(params): Query<VisitorWsParams>,
+    Query(mut params): Query<VisitorWsParams>,
 ) -> impl IntoResponse {
+    /* [237A-5] visitor_id es una identidad persistente, no texto libre.
+     * Rechazar basura legacy impide que "undefined"/"null" mezclen historiales. */
+    let Ok(visitor_uuid) = Uuid::parse_str(params.visitor_id.trim()) else {
+        tracing::warn!(visitor_id = %params.visitor_id, "WS visitor rechazado: visitor_id inválido");
+        return (
+            axum::http::StatusCode::BAD_REQUEST,
+            "visitor_id debe ser un UUID válido",
+        )
+            .into_response();
+    };
+    params.visitor_id = visitor_uuid.to_string();
+
     /* [064A-72] [074A-41] Capturar IP (proxy headers → fallback a socket) y User-Agent */
     let (visitor_ip, visitor_ua, visitor_country) = extract_visitor_context(&headers, addr);
     let visitor_country_clone = visitor_country.clone();
@@ -46,6 +58,7 @@ async fn ws_visitor(
         };
         handle_visitor_ws(socket, state, params, visitor_ip, visitor_ua, country).await;
     })
+    .into_response()
 }
 
 /* [124A-PAIS] Geo-lookup por IP via ipapi.co (fallback cuando no hay CF-IPCountry).
@@ -151,9 +164,7 @@ fn spawn_visitor_send_task(
                         break;
                     }
                     Err(_) => {
-                        tracing::warn!(
-                            "Visitor WS write timeout (5s), abortando send task"
-                        );
+                        tracing::warn!("Visitor WS write timeout (5s), abortando send task");
                         break;
                     }
                 }

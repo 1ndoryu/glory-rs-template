@@ -64,14 +64,35 @@ pub async fn send_history(
     }
 }
 
-/* [084A-40] Ejecutar /reset: borrar mensajes, perfil, cerrar sesión y notificar al cliente.
- * El visitante obtiene un estado completamente limpio (como si fuera la primera visita). */
-pub async fn handle_reset(state: &AppState, session_id: uuid::Uuid, visitor_id: &str) {
+/* [084A-40][237A-5] `/reset` solo archiva chats anónimos y limpia su perfil.
+ * Nunca borra mensajes: el historial permanece auditable. Las conversaciones
+ * vinculadas a usuario u orden rechazan el comando y continúan conectadas. */
+pub async fn handle_reset(state: &AppState, session_id: uuid::Uuid, visitor_id: &str) -> bool {
     let pool = &state.pool;
 
-    if let Err(e) = ChatRepository::delete_session_messages(pool, session_id).await {
-        tracing::error!("Reset: error borrando mensajes session={session_id}: {e}");
+    let session = match ChatRepository::find_session_by_id(pool, session_id).await {
+        Ok(Some(session)) => session,
+        Ok(None) => {
+            tracing::warn!("Reset: sesión inexistente session={session_id}");
+            return false;
+        }
+        Err(error) => {
+            tracing::error!("Reset: error consultando session={session_id}: {error}");
+            return false;
+        }
+    };
+    if session.order_id.is_some() || session.user_id.is_some() {
+        state.chat_hub.broadcast(
+            session_id,
+            &WsServerMessage::Error {
+                message: "Esta conversación forma parte de tu historial y no se puede borrar."
+                    .to_string(),
+            },
+        );
+        tracing::warn!("Reset rechazado para sesión vinculada session={session_id}");
+        return false;
     }
+
     if let Err(e) = ChatRepository::delete_visitor_profile(pool, visitor_id).await {
         tracing::error!("Reset: error borrando perfil visitor={visitor_id}: {e}");
     }
@@ -79,8 +100,13 @@ pub async fn handle_reset(state: &AppState, session_id: uuid::Uuid, visitor_id: 
         tracing::error!("Reset: error cerrando session={session_id}: {e}");
     }
 
-    state.chat_hub.broadcast(session_id, &WsServerMessage::Reset);
-    tracing::info!("Reset ejecutado: session={session_id}, visitor={visitor_id}");
+    state
+        .chat_hub
+        .broadcast(session_id, &WsServerMessage::Reset);
+    tracing::info!(
+        "Reset archivado sin borrar mensajes: session={session_id}, visitor={visitor_id}"
+    );
+    true
 }
 
 enum VisitorTextFlow {
@@ -126,8 +152,11 @@ async fn handle_visitor_text_message(
     content: String,
 ) -> VisitorTextFlow {
     if content.trim().eq_ignore_ascii_case("/reset") {
-        handle_reset(state, session_id, visitor_id).await;
-        return VisitorTextFlow::Close;
+        return if handle_reset(state, session_id, visitor_id).await {
+            VisitorTextFlow::Close
+        } else {
+            VisitorTextFlow::Continue
+        };
     }
 
     let content = truncate_visitor_message(content);
@@ -189,14 +218,10 @@ pub async fn process_visitor_messages(
      * → cerrar conexión para liberar recursos y evitar acumulación de CLOSE_WAIT. */
     tracing::debug!(%session_id, "process_visitor_messages: entrando al loop");
     loop {
-        let msg = match tokio::time::timeout(
-            std::time::Duration::from_secs(300),
-            receiver.next(),
-        )
-        .await
-        {
-            Ok(Some(Ok(msg))) => msg,
-            Ok(None) | Ok(Some(Err(_))) | Err(_) => break,
+        let Ok(Some(Ok(msg))) =
+            tokio::time::timeout(std::time::Duration::from_mins(5), receiver.next()).await
+        else {
+            break;
         };
 
         let Message::Text(text) = msg else {
@@ -257,8 +282,13 @@ pub async fn process_visitor_messages(
                     .chat_hub
                     .send_message(session_id, "client", Some(visitor_id), &action_text)
                     .await;
-                if timing_tx.try_send(TimingEvent::Message(action_text)).is_err() {
-                    tracing::warn!("Canal timing lleno, descartando action para session {session_id}");
+                if timing_tx
+                    .try_send(TimingEvent::Message(action_text))
+                    .is_err()
+                {
+                    tracing::warn!(
+                        "Canal timing lleno, descartando action para session {session_id}"
+                    );
                 }
             }
             _ => {} /* join/toggle_ai son solo para staff */

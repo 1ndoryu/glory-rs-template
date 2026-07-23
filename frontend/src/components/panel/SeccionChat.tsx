@@ -10,7 +10,8 @@ import {useSeccionChat} from '../../hooks/useSeccionChat';
 import {useAuthStore} from '../../stores/authStore';
 import {ChatInfoPanel} from './ChatInfoPanel';
 import {MessageBubble, resolveSenderToneClass} from './ChatBurbujaMessage';
-import {resolveSessionTitle, SessionItem} from './ChatSessionList';
+import {resolveSessionTitle, SessionGroup} from './ChatSessionList';
+import {Badge} from '../ui/Badge';
 import {Button} from '../ui/Button';
 import {Textarea} from '../ui/Textarea';
 import './SeccionChat.css';
@@ -47,6 +48,10 @@ export const SeccionChat: React.FC = () => {
     const [showInfo, setShowInfo] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const activeSession = sessions.find(s => s.id === activeSessionId) ?? null;
+    /* [237A-5] Las cerradas siguen disponibles como historial y su sesión activa es solo lectura. */
+    const openSessions = sessions.filter(session => session.status !== 'closed');
+    const closedSessions = sessions.filter(session => session.status === 'closed');
+    const isActiveSessionClosed = activeSession?.status === 'closed';
     /* [104A-36] Info panel visible para admin y empleados (no solo admin) */
     const effectiveRole = useAuthStore(s => s.user?.effectiveRole);
     const isStaff = effectiveRole === 'admin' || effectiveRole === 'employee';
@@ -73,18 +78,23 @@ export const SeccionChat: React.FC = () => {
                 {sessions.length === 0 ? (
                     <div className="chatVacio">
                         <MessageCircle size={32} strokeWidth={1.2} />
-                        <p>Sin conversaciones activas</p>
+                        <p>Sin conversaciones</p>
                     </div>
                 ) : (
-                    sessions.map(s => (
-                        <SessionItem
-                            key={s.id}
-                            session={s}
-                            active={s.id === activeSessionId}
-                            onClick={() => selectSession(s.id)}
+                    <>
+                        <SessionGroup
+                            title="Activas" sessions={openSessions}
+                            activeSessionId={activeSessionId}
+                            onSelect={selectSession}
                             isStaff={isStaff}
                         />
-                    ))
+                        <SessionGroup
+                            title="Historial" sessions={closedSessions}
+                            activeSessionId={activeSessionId}
+                            onSelect={selectSession}
+                            isStaff={isStaff}
+                        />
+                    </>
                 )}
             </div>
 
@@ -107,6 +117,7 @@ export const SeccionChat: React.FC = () => {
                                     ? resolveSessionTitle(activeSession, isStaff)
                                     : 'Seleccionar chat'}
                             </span>
+                            {isActiveSessionClosed && <Badge label="Solo lectura" />}
                             {/* [104A-40] Indicador de presencia del visitante (staff only) */}
                             {isStaff && visitorStatus && (
                                 <span className={`chatVisitorStatus ${visitorStatus.online ? 'chatVisitorOnline' : 'chatVisitorOffline'}`}
@@ -216,7 +227,7 @@ export const SeccionChat: React.FC = () => {
                             <div ref={messagesEndRef} />
                         </div>
 
-                        <div className="chatInputArea">
+                        {!isActiveSessionClosed && <div className="chatInputArea">
                             {/* [114A-13] Botón adjuntar archivo (staff) */}
                             {isStaff && (
                                 <>
@@ -261,7 +272,7 @@ export const SeccionChat: React.FC = () => {
                             >
                                 <Send size={16} />
                             </Button>
-                        </div>
+                        </div>}
                     </>
                 ) : (
                     <div className="chatVacio chatVacioCentrado">

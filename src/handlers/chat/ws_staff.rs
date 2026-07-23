@@ -12,7 +12,8 @@ use axum::Router;
 use futures::{SinkExt, StreamExt};
 use uuid::Uuid;
 
-use crate::models::{WsClientMessage, WsServerMessage};
+use crate::models::{UserRole, WsClientMessage, WsServerMessage};
+use crate::repositories::{ChatRepository, OrderRepository};
 use crate::AppState;
 
 use super::StaffWsParams;
@@ -32,11 +33,40 @@ async fn ws_staff(
         return (StatusCode::UNAUTHORIZED, "Token inválido").into_response();
     };
 
-    ws.on_upgrade(move |socket| handle_staff_ws(socket, state, claims.sub))
+    if !matches!(claims.effective_role, UserRole::Admin | UserRole::Employee) {
+        return (StatusCode::FORBIDDEN, "Rol sin acceso al canal staff").into_response();
+    }
+
+    ws.on_upgrade(move |socket| handle_staff_ws(socket, state, claims.sub, claims.effective_role))
         .into_response()
 }
 
-async fn handle_staff_ws(socket: WebSocket, state: AppState, staff_id: Uuid) {
+/* [237A-6] Admin supervisa cualquier sesión; el empleado solo la asignada
+ * actualmente en la orden o en la propia conversación. */
+async fn staff_can_access_session(
+    state: &AppState,
+    staff_id: Uuid,
+    role: UserRole,
+    session_id: Uuid,
+) -> bool {
+    if role == UserRole::Admin {
+        return true;
+    }
+    let Ok(Some(session)) = ChatRepository::find_session_by_id(&state.pool, session_id).await
+    else {
+        return false;
+    };
+    if let Some(order_id) = session.order_id {
+        return OrderRepository::get_order_participants(&state.pool, order_id)
+            .await
+            .ok()
+            .flatten()
+            .is_some_and(|(_, assigned)| assigned == Some(staff_id));
+    }
+    session.assigned_staff_id == Some(staff_id)
+}
+
+async fn handle_staff_ws(socket: WebSocket, state: AppState, staff_id: Uuid, role: UserRole) {
     let (mut ws_sender, mut receiver) = socket.split();
 
     let hub = state.chat_hub.clone();
@@ -47,7 +77,12 @@ async fn handle_staff_ws(socket: WebSocket, state: AppState, staff_id: Uuid) {
 
     /* Enviar lista de sesiones activas al conectar.
      * [096A-14] 5s timeout para evitar bloqueo en TCP half-open. */
-    if let Ok(sessions) = hub.list_all_active_sessions().await {
+    let initial_sessions = if role == UserRole::Admin {
+        hub.list_all_sessions().await
+    } else {
+        hub.list_sessions_for_user(staff_id).await
+    };
+    if let Ok(sessions) = initial_sessions {
         let init_msg = serde_json::json!({
             "type": "init",
             "sessions": sessions
@@ -58,18 +93,22 @@ async fn handle_staff_ws(socket: WebSocket, state: AppState, staff_id: Uuid) {
         }
     }
 
-    /* [064A-68] Suscripción global al canal de staff para nuevas sesiones.
-     * Cualquier sesión creada (visitante u orden) se reenvía a este WS.
-     * [096A-13] subscribe_staff() devuelve mpsc::UnboundedReceiver. */
-    let mut staff_rx = hub.subscribe_staff().await;
-    let tx_staff = tx.clone();
-    let staff_sub = tokio::spawn(async move {
-        while let Some(server_msg) = staff_rx.recv().await {
-            if tx_staff.send(server_msg).await.is_err() {
-                break;
+    /* [064A-68][237A-6] El canal global contiene sesiones de todos los clientes
+     * y queda reservado al admin supervisor. Empleados reciben realtime solo
+     * tras autorizar y unirse a sus sesiones asignadas. */
+    let staff_sub = if role == UserRole::Admin {
+        let mut staff_rx = hub.subscribe_staff().await;
+        let tx_staff = tx.clone();
+        Some(tokio::spawn(async move {
+            while let Some(server_msg) = staff_rx.recv().await {
+                if tx_staff.send(server_msg).await.is_err() {
+                    break;
+                }
             }
-        }
-    });
+        }))
+    } else {
+        None
+    };
 
     /* Task: leer del mpsc y enviar al WS.
      * [096A-14] 5s timeout en cada envío WS para no bloquear el task ante TCP half-open. */
@@ -93,14 +132,10 @@ async fn handle_staff_ws(socket: WebSocket, state: AppState, staff_id: Uuid) {
     /* Recibir mensajes del staff.
      * [096A-1] Timeout de inactividad: 5 minutos sin mensajes → cerrar conexión. */
     loop {
-        let msg = match tokio::time::timeout(
-            std::time::Duration::from_secs(300),
-            receiver.next(),
-        )
-        .await
-        {
-            Ok(Some(Ok(msg))) => msg,
-            Ok(None) | Ok(Some(Err(_))) | Err(_) => break,
+        let Ok(Some(Ok(msg))) =
+            tokio::time::timeout(std::time::Duration::from_mins(5), receiver.next()).await
+        else {
+            break;
         };
         let Message::Text(text) = msg else {
             continue;
@@ -111,7 +146,10 @@ async fn handle_staff_ws(socket: WebSocket, state: AppState, staff_id: Uuid) {
 
         match ws_msg {
             WsClientMessage::Join { session_id } => {
-                let _ = hub.staff_join_session(session_id, staff_id).await;
+                if !staff_can_access_session(&state, staff_id, role, session_id).await {
+                    tracing::warn!(%staff_id, %session_id, "Join de chat staff rechazado");
+                    continue;
+                }
 
                 /* Suscribirse al canal de esta sesión → reenviar al mpsc
                  * [096A-13] subscribe() devuelve mpsc::UnboundedReceiver. */
@@ -139,14 +177,22 @@ async fn handle_staff_ws(socket: WebSocket, state: AppState, staff_id: Uuid) {
                  * session_id es obligatorio para staff (puede estar en varias sesiones).
                  * Gotcha: WsClientMessage::Typing no lo tenía antes → fix aquí. */
                 if let Some(sid) = session_id {
-                    hub.send_typing(sid, "staff", &content);
+                    if staff_can_access_session(&state, staff_id, role, sid).await {
+                        hub.send_typing(sid, "staff", &content);
+                    }
                 }
             }
             WsClientMessage::ToggleAi {
                 session_id,
                 enabled,
             } => {
-                let _ = hub.toggle_ai(session_id, enabled).await;
+                if staff_can_access_session(&state, staff_id, role, session_id).await {
+                    if let Err(error) = hub.toggle_ai(session_id, enabled).await {
+                        tracing::error!(%session_id, %staff_id, %error, "No se pudo cambiar estado IA");
+                    }
+                } else {
+                    tracing::warn!(%staff_id, %session_id, "Toggle IA de chat rechazado");
+                }
             }
             WsClientMessage::Close => {
                 break;
@@ -160,7 +206,9 @@ async fn handle_staff_ws(socket: WebSocket, state: AppState, staff_id: Uuid) {
     for handle in subscriptions {
         handle.abort();
     }
-    staff_sub.abort();
+    if let Some(staff_sub) = staff_sub {
+        staff_sub.abort();
+    }
     send_task.abort();
 
     let _ = pool;

@@ -56,21 +56,21 @@ impl ChatRepository {
         .await
     }
 
-    /// Sesiones activas para un usuario autenticado
+    /// Sesiones con historial para un usuario autenticado.
     pub async fn list_sessions_for_user(
         pool: &PgPool,
         user_id: Uuid,
     ) -> Result<Vec<ChatSession>, sqlx::Error> {
-        /* [074A-30] Filtrar sesiones sin mensajes
+        /* [074A-30] Filtrar sesiones sin mensajes.
          * [154A-12] FIX: Agregar last_viewed_at y visitor_last_connected_at para que
-         * el frontend pueda calcular correctamente qué sesiones tienen mensajes sin leer. */
+         * el frontend pueda calcular correctamente qué sesiones tienen mensajes sin leer.
+         * [237A-5] Las cerradas siguen visibles: `closed` es archivo, no borrado. */
         sqlx::query_as::<_, ChatSession>(
             "SELECT id, visitor_id, visitor_name, user_id, order_id, status, \
                assigned_staff_id, ai_enabled, created_at, updated_at, \
                last_viewed_at, visitor_last_connected_at \
              FROM chat_sessions \
              WHERE (user_id = $1 OR assigned_staff_id = $1) \
-             AND status != 'closed' \
              AND EXISTS (SELECT 1 FROM chat_messages WHERE session_id = chat_sessions.id) \
              ORDER BY updated_at DESC",
         )
@@ -79,7 +79,7 @@ impl ChatRepository {
         .await
     }
 
-    /// Sesión activa por orden (para evitar duplicados)
+    /// Sesión persistente por orden, incluso si está archivada.
     pub async fn find_session_by_order(
         pool: &PgPool,
         order_id: Uuid,
@@ -89,8 +89,8 @@ impl ChatRepository {
                assigned_staff_id, ai_enabled, created_at, updated_at, \
                last_viewed_at, visitor_last_connected_at \
              FROM chat_sessions \
-             WHERE order_id = $1 AND status != 'closed' \
-             ORDER BY created_at DESC LIMIT 1",
+             WHERE order_id = $1 \
+             ORDER BY created_at ASC LIMIT 1",
         )
         .bind(order_id)
         .fetch_optional(pool)
@@ -116,17 +116,17 @@ impl ChatRepository {
         .await
     }
 
-    /// Todas las sesiones activas (panel staff)
-    pub async fn list_active_sessions(pool: &PgPool) -> Result<Vec<ChatSession>, sqlx::Error> {
-        /* [074A-30] Filtrar sesiones sin mensajes — no tiene sentido mostrarlas */
+    /// Todas las sesiones con historial (panel staff).
+    pub async fn list_sessions(pool: &PgPool) -> Result<Vec<ChatSession>, sqlx::Error> {
+        /* [074A-30] Filtrar sesiones sin mensajes — no tiene sentido mostrarlas.
+         * [237A-5] Las cerradas forman el archivo auditable y no se ocultan. */
         sqlx::query_as::<_, ChatSession>(
             "SELECT id, visitor_id, visitor_name, user_id, order_id, status, \
                assigned_staff_id, ai_enabled, created_at, updated_at, \
                visitor_ip, visitor_user_agent, last_viewed_at, visitor_last_connected_at, \
                visitor_country, is_escalated \
              FROM chat_sessions \
-             WHERE status != 'closed' \
-             AND EXISTS (SELECT 1 FROM chat_messages WHERE session_id = chat_sessions.id) \
+             WHERE EXISTS (SELECT 1 FROM chat_messages WHERE session_id = chat_sessions.id) \
              ORDER BY updated_at DESC",
         )
         .fetch_all(pool)
@@ -199,22 +199,56 @@ impl ChatRepository {
         .await
     }
 
-    /* [114A-13] Cerrar sesiones inactivas automáticamente.
-     * Una sesión se considera inactiva si updated_at > inactivity_hours horas.
-     * Retorna el número de sesiones cerradas. */
+    /* [114A-13][237A-5] Archivar únicamente sesiones anónimas inactivas.
+     * Las conversaciones de pedidos o usuarios autenticados son contractuales
+     * y nunca deben cambiar de estado por un TTL general. */
     pub async fn close_inactive_sessions(
         pool: &PgPool,
         inactivity_hours: i32,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
             "UPDATE chat_sessions SET status = 'closed', updated_at = NOW() \
-             WHERE status != 'closed' \
-             AND updated_at < NOW() - make_interval(hours => $1)",
+              WHERE status != 'closed' \
+              AND order_id IS NULL \
+              AND user_id IS NULL \
+              AND updated_at < NOW() - make_interval(hours => $1)",
         )
         .bind(inactivity_hours)
         .execute(pool)
         .await?;
         Ok(result.rows_affected())
+    }
+
+    /* [237A-5] Una orden posee una sola conversación. El upsert depende del
+     * índice único parcial creado por la migración 20260723000000 y recupera
+     * explícitamente una conversación archivada sin fragmentar su historial. */
+    pub async fn get_or_reopen_order_session(
+        pool: &PgPool,
+        order_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<ChatSession, sqlx::Error> {
+        sqlx::query_as::<_, ChatSession>(
+            "INSERT INTO chat_sessions (user_id, order_id, status) \
+             VALUES ($1, $2, 'active') \
+             ON CONFLICT (order_id) WHERE order_id IS NOT NULL \
+             DO UPDATE SET \
+               status = CASE \
+                 WHEN chat_sessions.status = 'closed' THEN 'active' \
+                 ELSE chat_sessions.status \
+               END, \
+               updated_at = CASE \
+                 WHEN chat_sessions.status = 'closed' THEN NOW() \
+                 ELSE chat_sessions.updated_at \
+               END \
+             RETURNING id, visitor_id, visitor_name, user_id, order_id, status, \
+               assigned_staff_id, ai_enabled, created_at, updated_at, \
+               visitor_ip, visitor_user_agent, last_viewed_at, visitor_last_connected_at, \
+               visitor_country, is_escalated",
+        )
+        .bind(user_id)
+        .bind(order_id)
+        .fetch_one(pool)
+        .await
     }
 
     /* [104A-39] Marcar sesión como vista por staff — actualiza last_viewed_at = NOW().
@@ -263,19 +297,7 @@ impl ChatRepository {
         Ok(())
     }
 
-    /* [084A-40] Borrar todos los mensajes de una sesión (usado por /reset) */
-    pub async fn delete_session_messages(
-        pool: &PgPool,
-        session_id: Uuid,
-    ) -> Result<u64, sqlx::Error> {
-        let result = sqlx::query("DELETE FROM chat_messages WHERE session_id = $1")
-            .bind(session_id)
-            .execute(pool)
-            .await?;
-        Ok(result.rows_affected())
-    }
-
-    /* [084A-40] Borrar perfil del visitante (usado por /reset para limpiar
+    /* [084A-40][237A-5] Borrar perfil del visitante anónimo al resetear para limpiar
      * context_summary, preferences, sesiones acumuladas, etc.) */
     pub async fn delete_visitor_profile(
         pool: &PgPool,
@@ -358,23 +380,32 @@ impl ChatRepository {
         .await
     }
 
-    /// Historial de mensajes de una sesión (paginado)
+    /// Últimos mensajes de una sesión, reordenados cronológicamente para render.
     pub async fn list_messages(
         pool: &PgPool,
         session_id: Uuid,
         limit: i64,
         offset: i64,
     ) -> Result<Vec<ChatMessage>, sqlx::Error> {
-        sqlx::query_as!(
-            ChatMessage,
-            r#"SELECT id, session_id, sender_type, sender_id, content, created_at,
-                      message_type, metadata
-             FROM chat_messages WHERE session_id = $1
-             ORDER BY created_at ASC LIMIT $2 OFFSET $3"#,
-            session_id,
-            limit,
-            offset,
+        /* [237A-5] El LIMIT se aplica en orden descendente para no ocultar los
+         * mensajes nuevos al superar el tamaño de página; la consulta exterior
+         * restaura el orden ascendente esperado por la UI. `id` desempata fechas. */
+        sqlx::query_as::<_, ChatMessage>(
+            "SELECT id, session_id, sender_type, sender_id, content, created_at, \
+                    message_type, metadata \
+             FROM ( \
+               SELECT id, session_id, sender_type, sender_id, content, created_at, \
+                      message_type, metadata \
+               FROM chat_messages \
+               WHERE session_id = $1 \
+               ORDER BY created_at DESC, id DESC \
+               LIMIT $2 OFFSET $3 \
+             ) AS recent_messages \
+             ORDER BY created_at ASC, id ASC",
         )
+        .bind(session_id)
+        .bind(limit)
+        .bind(offset)
         .fetch_all(pool)
         .await
     }

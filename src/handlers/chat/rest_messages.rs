@@ -11,7 +11,8 @@ use uuid::Uuid;
 use crate::errors::AppError;
 use crate::middleware::AuthUser;
 use crate::models::{
-    ChatMessage, ChatMessageResponse, CreateNotification, SendMessageRequest, NOTIF_NEW_MESSAGE,
+    ChatMessage, ChatMessageResponse, ChatSession, CreateNotification, SendMessageRequest,
+    UserRole, NOTIF_NEW_MESSAGE,
 };
 use crate::repositories::OrderRepository;
 use crate::services::{AiChatService, AiResponse};
@@ -37,12 +38,15 @@ use super::{enrich_messages, MessagesQuery};
 )]
 pub async fn get_messages(
     State(state): State<AppState>,
-    _auth: AuthUser,
+    auth: AuthUser,
     Path(session_id): Path<Uuid>,
     Query(params): Query<MessagesQuery>,
 ) -> Result<Json<Vec<ChatMessageResponse>>, AppError> {
-    let limit = params.limit.unwrap_or(50).min(100);
-    let offset = params.offset.unwrap_or(0);
+    authorized_session(&state, &auth, session_id).await?;
+    /* [237A-5] Límites negativos no cruzan el boundary y el repositorio devuelve
+     * siempre la ventana más reciente en orden cronológico. */
+    let limit = params.limit.unwrap_or(50).clamp(1, 100);
+    let offset = params.offset.unwrap_or(0).max(0);
     let messages =
         crate::repositories::ChatRepository::list_messages(&state.pool, session_id, limit, offset)
             .await?;
@@ -61,39 +65,64 @@ fn sender_type_for(role: crate::models::UserRole) -> &'static str {
     }
 }
 
-/* [174A-2] Separa la política de quién puede hablar en un chat de orden del handler REST. */
-async fn enforce_order_chat_sender_permission(
+/* [237A-5] La persistencia amplía el historial visible, por lo que cada lectura
+ * y escritura vuelve a verificar participantes en el boundary. Admin supervisa;
+ * cliente y empleado solo acceden a conversaciones propias/asignadas. */
+pub(super) async fn authorized_session(
     state: &AppState,
+    auth: &AuthUser,
     session_id: Uuid,
-    user_id: Uuid,
-) -> Result<(), AppError> {
-    if let Ok(Some(session)) =
-        crate::repositories::ChatRepository::find_session_by_id(&state.pool, session_id).await
-    {
-        if let Some(order_id) = session.order_id {
-            let participants = OrderRepository::get_order_participants(&state.pool, order_id)
-                .await
-                .ok()
-                .flatten();
+) -> Result<ChatSession, AppError> {
+    let session = crate::repositories::ChatRepository::find_session_by_id(&state.pool, session_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Conversación no encontrada".into()))?;
 
-            if let Some((client_id, assigned_staff_id)) = participants {
-                let is_client = user_id == client_id;
-                let is_assigned = assigned_staff_id == Some(user_id);
-                if !is_client && !is_assigned {
-                    return Err(AppError::Forbidden(
-                        "Solo el cliente y el empleado asignado pueden enviar mensajes en este chat."
-                            .to_string(),
-                    ));
-                }
-
-                if is_assigned {
-                    let _ =
-                        OrderRepository::toggle_ai_intermediary(&state.pool, order_id, false).await;
-                }
-            }
-        }
+    if auth.effective_role == UserRole::Admin {
+        return Ok(session);
     }
 
+    let authorized = if let Some(order_id) = session.order_id {
+        OrderRepository::get_order_participants(&state.pool, order_id)
+            .await?
+            .is_some_and(|(client_id, assigned_staff_id)| {
+                client_id == auth.user_id || assigned_staff_id == Some(auth.user_id)
+            })
+    } else {
+        session.user_id == Some(auth.user_id) || session.assigned_staff_id == Some(auth.user_id)
+    };
+
+    if !authorized {
+        return Err(AppError::Forbidden(
+            "No tienes acceso a esta conversación.".to_string(),
+        ));
+    }
+    Ok(session)
+}
+
+/* [174A-2][237A-5] Política de escritura en chat de orden. */
+async fn enforce_order_chat_sender_permission(
+    state: &AppState,
+    session: &ChatSession,
+    auth: &AuthUser,
+) -> Result<(), AppError> {
+    if let Some(order_id) = session.order_id {
+        let participants = OrderRepository::get_order_participants(&state.pool, order_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Orden de la conversación no encontrada".into()))?;
+        let is_admin = auth.effective_role == UserRole::Admin;
+        let is_client = auth.user_id == participants.0;
+        let is_assigned = participants.1 == Some(auth.user_id);
+        if !is_admin && !is_client && !is_assigned {
+            return Err(AppError::Forbidden(
+                "Solo el cliente, el empleado asignado o un administrador pueden enviar mensajes."
+                    .to_string(),
+            ));
+        }
+
+        if is_assigned {
+            OrderRepository::toggle_ai_intermediary(&state.pool, order_id, false).await?;
+        }
+    }
     Ok(())
 }
 
@@ -195,6 +224,13 @@ pub async fn send_message(
     Path(session_id): Path<Uuid>,
     Json(req): Json<SendMessageRequest>,
 ) -> Result<(StatusCode, Json<ChatMessage>), AppError> {
+    let session = authorized_session(&state, &auth, session_id).await?;
+    if session.status == "closed" {
+        return Err(AppError::Conflict(
+            "La conversación está archivada y es de solo lectura.".to_string(),
+        ));
+    }
+
     /* [104A-36] Rate limiting para REST — reutiliza ChatTimingService con user_id como key.
      * Solo aplica a clientes; staff/admin no tienen límite. */
     if auth.effective_role == crate::models::UserRole::Client {
@@ -210,7 +246,7 @@ pub async fn send_message(
 
     /* [154A-15e] Restricción de chat de orden: solo 2 personas (cliente + empleado asignado).
      * Admin solo puede enviar si es el empleado asignado. Si no es sesión de orden, sin restricción. */
-    enforce_order_chat_sender_permission(&state, session_id, auth.user_id).await?;
+    enforce_order_chat_sender_permission(&state, &session, &auth).await?;
 
     let sender_id = auth.user_id.to_string();
 
@@ -371,7 +407,12 @@ async fn notify_escalation(state: &AppState, session_id: Uuid, visitor: &str) {
                 let site_url = std::env::var("SITE_URL")
                     .unwrap_or_else(|_| "https://nakomi.studio".to_string());
                 crate::services::EmailService::send_escalation_emails(
-                    email_cfg, &state.pool, &emails, visitor, session_id, &site_url,
+                    email_cfg,
+                    &state.pool,
+                    &emails,
+                    visitor,
+                    session_id,
+                    &site_url,
                 )
                 .await;
             }

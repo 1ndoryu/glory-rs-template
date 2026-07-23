@@ -12,7 +12,9 @@ use uuid::Uuid;
 
 use crate::errors::AppError;
 use crate::middleware::AuthUser;
-use crate::models::{ChatSessionResponse, CreateChatSessionRequest, CreateNotification, NOTIF_NEW_CONVERSATION};
+use crate::models::{
+    ChatSessionResponse, CreateChatSessionRequest, CreateNotification, NOTIF_NEW_CONVERSATION,
+};
 use crate::repositories::{OrderRepository, UserRepository};
 use crate::AppState;
 
@@ -42,10 +44,8 @@ pub async fn list_sessions(
     State(state): State<AppState>,
     auth: AuthUser,
 ) -> Result<Json<Vec<ChatSessionResponse>>, AppError> {
-    let sessions = if auth.effective_role == crate::models::UserRole::Admin
-        || auth.effective_role == crate::models::UserRole::Employee
-    {
-        state.chat_hub.list_all_active_sessions().await?
+    let sessions = if auth.effective_role == crate::models::UserRole::Admin {
+        state.chat_hub.list_all_sessions().await?
     } else {
         state.chat_hub.list_sessions_for_user(auth.user_id).await?
     };
@@ -70,16 +70,34 @@ pub async fn create_session(
     Json(req): Json<CreateChatSessionRequest>,
 ) -> Result<(StatusCode, Json<ChatSessionResponse>), AppError> {
     let session = if let Some(order_id) = req.order_id {
+        /* [237A-5] La sesión se vincula siempre al cliente real de la orden.
+         * Un UUID conocido no autoriza a crear/reabrir conversaciones ajenas. */
+        let (client_id, assigned_employee_id) =
+            OrderRepository::get_order_participants(&state.pool, order_id)
+                .await?
+                .ok_or_else(|| AppError::NotFound("Orden no encontrada".into()))?;
+        let can_access = auth.effective_role == crate::models::UserRole::Admin
+            || auth.user_id == client_id
+            || assigned_employee_id == Some(auth.user_id);
+        if !can_access {
+            return Err(AppError::Forbidden(
+                "No tienes acceso al chat de esta orden.".into(),
+            ));
+        }
         state
             .chat_hub
-            .get_or_create_order_session(order_id, auth.user_id)
+            .get_or_create_order_session(order_id, client_id)
             .await?
     } else {
-        let vid = req.visitor_id.unwrap_or_else(|| auth.user_id.to_string());
+        let vid = match req.visitor_id {
+            Some(visitor_id) => Uuid::parse_str(visitor_id.trim())
+                .map(|id| id.to_string())
+                .map_err(|_| AppError::Validation("visitor_id debe ser un UUID válido".into()))?,
+            None => auth.user_id.to_string(),
+        };
         /* [20CA-10] Verificar si ya existe sesión para detectar creación nueva */
         let existing =
-            crate::repositories::ChatRepository::find_session_by_visitor(&state.pool, &vid)
-                .await?;
+            crate::repositories::ChatRepository::find_session_by_visitor(&state.pool, &vid).await?;
         let is_new = existing.is_none();
 
         let session = state
@@ -89,21 +107,17 @@ pub async fn create_session(
 
         /* [20CA-10] Notificar admins si es nueva conversación de visitante */
         if is_new {
-            let admins = UserRepository::admin_ids(&state.pool).await.unwrap_or_default();
+            let admins = UserRepository::admin_ids(&state.pool)
+                .await
+                .unwrap_or_default();
             if !admins.is_empty() {
-                let visitor_label = session
-                    .visitor_name
-                    .as_deref()
-                    .unwrap_or("Visitante");
+                let visitor_label = session.visitor_name.as_deref().unwrap_or("Visitante");
                 let notif = CreateNotification {
                     user_id: Uuid::nil(),
                     notification_type: NOTIF_NEW_CONVERSATION.to_string(),
                     title: format!("Nueva conversación de {visitor_label}"),
                     body: Some(format!("{visitor_label} ha iniciado un chat.")),
-                    link: Some(format!(
-                        "/panel?seccion=mensajes&chat={}",
-                        session.id
-                    )),
+                    link: Some(format!("/panel?seccion=mensajes&chat={}", session.id)),
                     reference_type: Some("chat_session".to_string()),
                     reference_id: Some(session.id),
                 };
@@ -170,6 +184,7 @@ pub async fn close_session(
         crate::models::UserRole::Admin,
         crate::models::UserRole::Employee,
     ])?;
+    super::rest_messages::authorized_session(&state, &auth, session_id).await?;
     state.chat_hub.close_session(session_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -186,6 +201,7 @@ pub async fn mark_session_viewed(
         crate::models::UserRole::Admin,
         crate::models::UserRole::Employee,
     ])?;
+    super::rest_messages::authorized_session(&state, &auth, session_id).await?;
     crate::repositories::ChatRepository::mark_session_viewed(&state.pool, session_id)
         .await
         .map_err(AppError::Database)?;

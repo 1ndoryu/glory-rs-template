@@ -63,3 +63,38 @@ export function SessionItem({
         </Button>
     );
 }
+
+/* [237A-5] Agrupa conversaciones sin duplicar la receta visual de cada sesión.
+ * Las cerradas conservan acceso desde Historial, pero su lectura se controla en SeccionChat. */
+export function SessionGroup({
+    title,
+    sessions,
+    activeSessionId,
+    onSelect,
+    isStaff,
+}: {
+    title: string;
+    sessions: ChatSession[];
+    activeSessionId: string | null;
+    onSelect: (sessionId: string) => void;
+    isStaff: boolean;
+}) {
+    if (sessions.length === 0) return null;
+
+    return (
+        <section aria-label={title}>
+            <div className="chatListaHeader">
+                <h4 className="chatListaTitulo">{title}</h4>
+            </div>
+            {sessions.map(session => (
+                <SessionItem
+                    key={session.id}
+                    session={session}
+                    active={session.id === activeSessionId}
+                    onClick={() => onSelect(session.id)}
+                    isStaff={isStaff}
+                />
+            ))}
+        </section>
+    );
+}

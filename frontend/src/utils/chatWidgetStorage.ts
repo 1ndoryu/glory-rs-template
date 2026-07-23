@@ -7,6 +7,7 @@ export const ANONYMOUS_CHAT_OWNER = 'anonymous';
 
 const CHAT_MESSAGES_KEY = 'nakomi_chat_messages';
 const MAX_PERSISTED_MESSAGES = 100;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 interface PersistedChatMessages {
     sessionId: string;
@@ -47,7 +48,11 @@ export function getOrCreateChatVisitorId(ownerKey = ANONYMOUS_CHAT_OWNER): strin
     if (!canUseStorage()) return crypto.randomUUID();
     ensureChatStorageOwner(ownerKey);
     const saved = localStorage.getItem(CHAT_VISITOR_ID_KEY);
-    if (saved) return saved;
+    if (saved && UUID_PATTERN.test(saved)) return saved.toLowerCase();
+    /* [237A-5] Valores legacy como "undefined", "null" o vacíos no pueden
+     * compartir identidad. Rotar también la sesión local evita reconectar al
+     * historial contaminado mientras el backend rechaza IDs no UUID. */
+    if (saved) clearChatSessionData();
     const id = crypto.randomUUID();
     localStorage.setItem(CHAT_VISITOR_ID_KEY, id);
     return id;
@@ -55,7 +60,11 @@ export function getOrCreateChatVisitorId(ownerKey = ANONYMOUS_CHAT_OWNER): strin
 
 export function getSavedChatSessionId(): string | null {
     if (!canUseStorage()) return null;
-    return localStorage.getItem(CHAT_SESSION_ID_KEY);
+    const saved = localStorage.getItem(CHAT_SESSION_ID_KEY);
+    if (!saved || UUID_PATTERN.test(saved)) return saved;
+    localStorage.removeItem(CHAT_SESSION_ID_KEY);
+    localStorage.removeItem(CHAT_MESSAGES_KEY);
+    return null;
 }
 
 export function saveChatSessionId(id: string): void {
