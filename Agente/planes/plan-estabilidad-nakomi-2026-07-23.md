@@ -85,7 +85,10 @@ Además:
 - `ChatBell` calcula unread, pero no se monta.
 - El provider WebSocket de notificaciones tampoco se monta.
 - Fuera del panel no hay campana ni indicador.
-- El aviso de 20 minutos solo crea notificaciones in-app, puede repetirse cada cinco minutos y usa un deeplink incorrecto.
+- El aviso legacy de 20 minutos solo crea notificaciones in-app, puede repetirse
+  cada cinco minutos y usa un deeplink incorrecto. La decisión posterior es
+  retirarlo: cada mensaje alerta inmediatamente y la IA cubre al humano tras
+  diez minutos, sin una segunda alerta duplicada.
 - No existe integración WhatsApp.
 
 ### 2.7 Pagos y reembolsos
@@ -375,11 +378,17 @@ Alertas:
   - conservar email existente;
   - añadir WhatsApp;
   - verificar asignación y entrega.
-- Mensaje de cliente sin respuesta durante 20 minutos:
-  - una alerta por ciclo sin respuesta;
-  - destinatarios: admin y freelancer asignado;
-  - se rearma tras una respuesta o un mensaje posterior;
-  - sin repetición cada cinco minutos.
+- Respuesta humana y fallback IA:
+  - una respuesta de admin/freelancer silencia la IA;
+  - los mensajes posteriores esperan diez minutos por respuesta humana;
+  - si nadie responde, la IA cubre una sola vez usando el buffer completo;
+  - el botón manual pausa de forma absoluta y nunca se reactiva por timeout;
+  - la alerta externa ya ocurrió al llegar el mensaje y no se duplica al vencer.
+- Captura y continuidad:
+  - verificar que el agente solicite y persista email con consentimiento;
+  - tras desconexión real, enviar una vez un enlace firmado para retomar la
+    misma conversación;
+  - reconexiones breves cancelan el envío.
 
 Delegable:
 
@@ -693,13 +702,15 @@ Reglas:
 6. Conversación con más de 100 mensajes conserva los nuevos.
 7. Cliente y admin reciben mensajes realtime.
 8. Badge aparece fuera y dentro del panel.
-9. Alerta de 20 minutos se emite una vez.
-10. Pedido nuevo asigna al admin primario.
-11. Dos webhooks concurrentes crean una sola orden.
-12. Fallo parcial de persistencia revierte todo.
-13. Reembolso Stripe fallido queda reintentable.
-14. Empleado no puede aprobar reembolso.
-15. SHA proyecto/framework local, imagen y `/healthz` coinciden.
+9. Respuesta humana cancela IA; si falta, existe un único fallback a 10 minutos.
+10. Pausa manual de IA permanece hasta reactivación explícita.
+11. Email capturado permite retomar la conversación mediante token de un uso.
+12. Pedido nuevo asigna al admin primario.
+13. Dos webhooks concurrentes crean una sola orden.
+14. Fallo parcial de persistencia revierte todo.
+15. Reembolso Stripe fallido queda reintentable.
+16. Empleado no puede aprobar reembolso.
+17. SHA proyecto/framework local, imagen y `/healthz` coinciden.
 
 ## 8. Documentación y prevención
 
@@ -770,7 +781,8 @@ que alertas, WhatsApp, correo y Realtime forman parte de ese núcleo. Por tanto:
 
 - Watchdog y persistencia ya están desplegados.
 - El siguiente bloque obligatorio es alertas inmediatas + CTA de escalamiento,
-  seguido por contrato Realtime y alerta idempotente de 20 minutos.
+  seguido por captura de email/continuidad y contrato Realtime con toma humana
+  y fallback IA a diez minutos.
 - Pagos/reembolsos continúan como bloques difíciles posteriores.
 - Permanecen fáciles y delegables: CMS/media y pulido visual.
 - Los cambios fáciles ya preparados pero no pertenecientes al bloque crítico se preservan fuera de los commits de producción.

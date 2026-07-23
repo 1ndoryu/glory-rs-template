@@ -25,6 +25,16 @@ Cuando la IA escale una conversación:
 3. El cliente recibe dentro del chat un CTA claro para escribir por WhatsApp.
 4. Reconectar o abrir otra pestaña no duplica el CTA, la alerta ni el sonido.
 
+Cuando una persona del equipo responda:
+
+1. La IA deja de contestar inmediatamente.
+2. Los siguientes mensajes del cliente esperan hasta diez minutos por una
+   respuesta humana.
+3. Si admin/freelancer responde dentro del plazo, el trabajo IA se cancela.
+4. Si nadie responde, la IA cubre la conversación usando todos los mensajes
+   acumulados, sin duplicar respuestas.
+5. Una pausa manual mediante el botón es absoluta: nunca se reactiva por tiempo.
+
 ## 2. Estado real confirmado
 
 ### Ya funciona
@@ -52,7 +62,8 @@ Cuando la IA escale una conversación:
 - La tool de escalamiento devuelve texto plano; no genera CTA de WhatsApp.
 - Historial y eventos live usan el mismo mensaje WS, por lo que una reconexión puede volver a producir sonido.
 - Frontend envía `toggle_ai.enable`, mientras backend espera `enabled`.
-- La alerta de 20 minutos no tiene ciclo idempotente y puede repetirse.
+- El job legacy de 20 minutos puede repetirse y será retirado: las alertas serán
+  inmediatas y el único timeout funcional será el fallback IA a diez minutos.
 
 ## 3. Decisión arquitectónica para WhatsApp
 
@@ -248,30 +259,138 @@ Pruebas:
 - Un hueco de secuencia se recupera por REST.
 - Reasignación mueve el acceso al freelancer correcto.
 
-## 7. Bloque D — Alerta por 20 minutos sin respuesta
+## 7. Bloque D — Toma humana y fallback IA a los 10 minutos
 
-**Prioridad:** después de alertas inmediatas  
+**Prioridad:** después de alertas inmediatas
 **Dificultad:** alta
 
-1. Modelar un ciclo de espera:
-   - comienza con el primer mensaje de cliente posterior a una respuesta;
-   - termina cuando responde staff;
-   - tiene una única alerta de vencimiento.
-2. Constraint único por `session_id + cycle_id + alert_type`.
-3. No crear una alerta nueva cada cinco minutos.
-4. Enviar in-app, correo y WhatsApp por la misma outbox.
-5. Destinatarios: admin y freelancer asignado; WhatsApp administrativo configurable.
-6. Link siempre a la conversación exacta.
+La alerta externa de cada mensaje ya es inmediata. Por eso se elimina la alerta
+adicional de 20 minutos: sería tardía y duplicaría correo/WhatsApp. El timeout se
+usa para que la IA cubra al equipo, no para volver a notificar.
+
+Estados:
+
+```text
+ai_active
+human_priority
+manual_pause
+waiting_human
+ai_fallback_claimed
+```
+
+Reglas:
+
+1. Una respuesta de admin/freelancer cambia la sesión a `human_priority`.
+2. Si llega un mensaje de cliente:
+   - `ai_active`: la IA responde con el timing conversacional normal;
+   - `human_priority`: crear ciclo `waiting_human` con deadline a diez minutos;
+   - `manual_pause`: no crear trabajo IA;
+   - sesión cerrada: rechazar escritura o reabrir según la política existente.
+3. Mensajes adicionales del cliente se agregan al ciclo abierto; no crean timers.
+4. Una respuesta humana antes del deadline cancela el ciclo en la misma
+   transacción que persiste la respuesta.
+5. Al vencer:
+   - worker reclama el ciclo con `FOR UPDATE SKIP LOCKED`;
+   - relee mensajes y estado;
+   - si ya hubo respuesta humana, cancela;
+   - si continúa pendiente, genera una respuesta IA con el buffer completo.
+6. Tras el fallback, la sesión continúa en `human_priority`: el siguiente mensaje
+   del cliente abre otra espera de diez minutos.
+7. El botón manual usa `manual_pause` y solo otro clic puede volver a
+   `ai_active`/`human_priority`.
+8. No usar `tokio::sleep(600)` por sesión. El deadline vive en BD y un worker lo
+   reclama, para sobrevivir reinicios.
 
 Pruebas:
 
-- A los 19 minutos no alerta.
-- A los 20 minutos alerta una vez.
-- Barridos posteriores no duplican.
-- Respuesta de staff cierra el ciclo.
-- Un mensaje posterior abre un ciclo nuevo.
+- A los 9:59 minutos la IA no responde.
+- A los 10 minutos responde una sola vez si no hubo humano.
+- Respuesta humana a los 9:59 cancela el trabajo.
+- Carrera exacta en el deadline produce una sola respuesta: humana o IA.
+- Tres mensajes del cliente generan un ciclo y una respuesta combinada.
+- Reiniciar el backend no pierde el deadline.
+- `manual_pause` permanece pausado después de 10 minutos y tras reinicio.
 
-## 8. Bloques difíciles posteriores
+## 8. Bloque E — Captura de email y continuación de conversación
+
+**Prioridad:** junto al CTA/escalamiento
+**Dificultad:** alta
+
+### Estado actual
+
+- `capture_email` existe y guarda en `visitor_profiles`.
+- El prompt sugiere pedirlo después de 2–3 intercambios productivos.
+- La validación actual solo comprueba que contenga `@`; es insuficiente.
+- No existe prueba que demuestre que el modelo llama realmente la tool.
+- No existe correo de continuación ni enlace para recuperar una conversación.
+
+### Captura
+
+1. Para usuarios autenticados, usar el email verificado de su cuenta; no volver a
+   pedirlo en chat.
+2. Para visitante anónimo:
+   - pedir nombre en la primera/segunda interacción cuando sea natural;
+   - pedir email después de la primera ayuda útil y antes de cerrar/escalar;
+   - explicar: “Puedo enviarte un enlace para continuar esta conversación”.
+3. Cuando el visitante entregue un email, la IA debe llamar `capture_email`.
+4. Validar con un parser de email real, normalizar y limitar longitud.
+5. Guardar:
+   - email normalizado;
+   - `email_captured_at`;
+   - `continuation_consent_at`;
+   - origen `chat_ai|authenticated_account`;
+   - sesión en la que se obtuvo.
+6. La tool retorna éxito solo después de releer el perfil persistido.
+7. No escribir emails completos en logs.
+
+### Email para continuar
+
+No enviar inmediatamente por cada cierre de WebSocket: móviles y redes producen
+desconexiones breves. Crear un ciclo durable:
+
+1. Al desconectar:
+   - sesión abierta;
+   - email conocido/consentido;
+   - último mensaje relevante del cliente o respuesta pendiente;
+   - crear deadline con gracia de dos minutos.
+2. Si el mismo visitante reconecta antes del deadline, cancelar.
+3. Si sigue desconectado, encolar un correo único por ciclo.
+4. El correo contiene un enlace firmado de un solo propósito:
+   `https://nakomi.studio/chat/continuar?t=<token>`.
+5. Guardar únicamente el hash del token.
+6. Token:
+   - aleatorio criptográficamente;
+   - expira en siete días;
+   - un solo uso;
+   - ligado a sesión y destinatario;
+   - revocable al cerrar conversación.
+7. Al canjearlo:
+   - validar hash, expiración y uso;
+   - emitir credencial corta específica de chat;
+   - abrir el widget con la misma sesión;
+   - nunca exponer `visitor_id` o JWT administrativo en URL.
+8. Rate limit por IP/email/sesión.
+9. Plantilla central `chat_continuation` y registro en `email_logs`.
+10. No enviar si:
+    - email no fue consentido;
+    - sesión cerrada;
+    - cliente volvió;
+    - ya se envió en ese ciclo;
+    - no existe actividad pendiente.
+
+Pruebas:
+
+- Conversación guiada hace que la IA solicite email y llame la tool.
+- Email inválido no se persiste.
+- Email capturado sobrevive recarga.
+- Desconexión de 30 segundos no envía correo.
+- Desconexión superior a dos minutos envía uno.
+- Reconexión cancela el trabajo.
+- Token válido abre la conversación correcta.
+- Token usado/expirado/manipulado se rechaza.
+- Ningún log o URL revela email, `visitor_id` o token almacenado.
+
+## 9. Bloques difíciles posteriores
 
 ### Checkout/webhook
 
@@ -304,7 +423,7 @@ Pruebas:
 - Fijar el SHA del framework usado por Docker/local.
 - Restaurar `glory-rs-template/main` en un bloque independiente y sin mezclar Nakomi.
 
-## 9. Orden seguro de implementación y despliegue
+## 10. Orden seguro de implementación y despliegue
 
 1. Preflight de `wacli` usando únicamente herramientas aprobadas:
    - estado autenticado;
@@ -323,21 +442,24 @@ Pruebas:
    - `email_logs=sent`;
    - outbox WhatsApp `sent` y recepción real.
 9. Activar para todos los mensajes nuevos.
-10. Implementar contrato Realtime y alerta de 20 minutos.
-11. Endurecer pagos, reembolsos y asignación en commits separados.
+10. Implementar captura verificada de email y continuación segura.
+11. Implementar contrato Realtime, toma humana y fallback IA a diez minutos.
+12. Endurecer pagos, reembolsos y asignación en commits separados.
 
 Todos los deploys, health, logs y operaciones de producción pasan por `coolify-manager-rs`.
 
-## 10. Rollback y control de incidentes
+## 11. Rollback y control de incidentes
 
-- `CHAT_ALERTS_ENABLED=false` detiene nuevos eventos externos sin borrar la outbox.
-- `CHAT_WHATSAPP_ALERTS_ENABLED=false` aísla solo WhatsApp.
+- `CHAT_ALERT_CAPTURE_ENABLED=false` detiene nuevas filas externas sin borrar la
+  outbox existente.
+- `CHAT_EMAIL_DELIVERY_ENABLED=false` pausa solo correo.
+- `CHAT_WHATSAPP_DELIVERY_ENABLED=false` pausa solo WhatsApp.
 - El gateway puede rechazar temporalmente con `503`; Nakomi reintenta.
 - Nunca reproducir mensajes históricos al habilitar el sistema.
 - Una migración no elimina filas de chat o notificaciones.
 - Dead-letter se conserva para inspección y reenvío manual idempotente.
 
-## 11. Criterio de cierre
+## 12. Criterio de cierre
 
 El bloque no se considera listo solo porque compile. Deben existir evidencias reales de:
 
@@ -348,16 +470,18 @@ El bloque no se considera listo solo porque compile. Deben existir evidencias re
 - CTA de WhatsApp abierto por el cliente;
 - dos pestañas sin sonido duplicado;
 - reconexión sin replay;
-- alerta de 20 minutos exactamente una vez;
+- respuesta humana silencia IA y fallback único ocurre a los 10 minutos;
+- botón manual no se reactiva solo;
+- email capturado y enlace de continuación canjeable de forma segura;
 - health y logs limpios tras deploy.
 
-## 12. Guía operativa para agentes implementadores
+## 13. Guía operativa para agentes implementadores
 
 Esta sección elimina decisiones implícitas. El agente que tome una fase debe
 seguir el orden indicado, modificar solo los archivos de su tarjeta y detenerse
 ante cualquiera de las condiciones de parada.
 
-### 12.1 Reglas que no se pueden reinterpretar
+### 13.1 Reglas que no se pueden reinterpretar
 
 1. **“Mensaje de cliente”** significa un mensaje nuevo persistido cuyo
    `sender_type` sea `client` o `visitor`. No incluye:
@@ -388,7 +512,7 @@ ante cualquiera de las condiciones de parada.
    - framework: `master`;
    - glorytemplate: verificar su rama productiva antes de editar.
 
-### 12.2 Mapa de archivos — Nakomi Rust
+### 13.2 Mapa de archivos — Nakomi Rust
 
 | Responsabilidad | Archivo existente o nuevo | Instrucción |
 |---|---|---|
@@ -406,6 +530,10 @@ ante cualquiera de las condiciones de parada.
 | Email | `src/services/email_templates.rs`, `src/services/email.rs` | Una plantilla y un método trazable; nada duplicado en previews. |
 | Config | `.env.example`, configuración de arranque | Documentar flags y secretos sin valores reales. |
 | WS chat | `src/models/chat.rs`, handlers WS y servicio de chat | Añadir envelope/snapshot sin romper autorización existente. |
+| Toma humana | `src/services/chat_timing.rs`, `src/services/chat.rs`, `src/repositories/chat.rs` | Reemplazar timers en memoria por ciclos durables de respuesta. |
+| Toggle IA | `src/models/chat.rs`, `src/handlers/chat/ws_staff.rs`, `frontend/src/hooks/useChatWs.ts` | Unificar `enabled`; agregar ACK/rollback y modo manual explícito. |
+| Captura email | `src/services/ai_prompts.rs`, `src/services/ai_tools.rs`, `src/repositories/chat.rs` | Validación real, consentimiento y verificación post-write. |
+| Continuación | migración, servicio/token, handler dedicado y email template | Token hasheado, un uso, expiración y reconexión a la sesión exacta. |
 
 También se deben registrar dependencias nuevas en `src/lib.rs` y construir el
 estado compartido en `src/handlers/mod.rs`; no crear pools o clientes HTTP
@@ -421,7 +549,7 @@ El agente debe leer estos archivos antes de editar:
 - `src/services/email_templates.rs`;
 - `src/main.rs`.
 
-### 12.3 Mapa de archivos — gateway glorytemplate
+### 13.3 Mapa de archivos — gateway glorytemplate
 
 | Responsabilidad | Archivo existente o nuevo | Instrucción |
 |---|---|---|
@@ -439,7 +567,7 @@ No modificar para esta integración:
 - `WhatsAppEventWorker.php`: su cola pertenece al chatbot multiusuario.
 - `WacliManagerService.php`: administra cuentas; no es el gateway de Nakomi.
 
-### 12.4 Tarjeta A1 — Migración y dominio de alertas
+### 13.4 Tarjeta A1 — Migración y dominio de alertas
 
 **Entrada:** mensaje de chat ya validado.
 **Salida:** mensaje + notificaciones + outbox persistidos.
@@ -478,7 +606,7 @@ Pruebas mínimas:
 - mensaje de IA no genera filas;
 - cliente por REST y WS generan el mismo resultado.
 
-### 12.5 Tarjeta A2 — Worker Nakomi
+### 13.5 Tarjeta A2 — Worker Nakomi
 
 Algoritmo obligatorio:
 
@@ -501,7 +629,7 @@ Condición de parada:
 - Si no hay forma de distinguir aceptación real de envío simulado, no marcar
   `sent` y no continuar al deploy.
 
-### 12.6 Tarjeta A3 — Gateway firmado
+### 13.6 Tarjeta A3 — Gateway firmado
 
 Canonical string exacto:
 
@@ -525,8 +653,7 @@ Validación:
 2. Timestamp entero y desfase máximo 300 segundos.
 3. Nonce de 16–128 caracteres, guardado con expiración.
 4. Firma comparada con `hash_equals`.
-5. `event` permitido: inicialmente solo `chat.client_message` y
-   `chat.unanswered_20m`.
+5. `event` permitido inicialmente: solo `chat.client_message`.
 6. `idempotency_key` obligatoria y única.
 7. Preview sanitizado y limitado; URL restringida a `https://nakomi.studio/`.
 8. Responder:
@@ -545,7 +672,7 @@ Variables:
 
 El secreto se genera nuevo. No reutilizar JWT, SMTP, Stripe ni webhook secrets.
 
-### 12.7 Tarjeta A4 — Notificación visible
+### 13.7 Tarjeta A4 — Notificación visible
 
 Estado confirmado:
 
@@ -576,7 +703,7 @@ No pedir permiso de notificaciones del navegador automáticamente al montar. El
 permiso debe solicitarse tras una acción explícita del usuario; el badge interno
 no depende de ese permiso.
 
-### 12.8 Tarjeta B — CTA de escalamiento
+### 13.8 Tarjeta B — CTA de escalamiento
 
 1. Cambiar `exec_request_human` para devolver `RichMessage`:
    - `message_type = "contact_cta"`;
@@ -596,7 +723,7 @@ Copy mínimo:
 - Botón: “Escribir por WhatsApp”.
 - Fallback: “El equipo fue notificado y responderá por este chat.”
 
-### 12.9 Tarjeta C — Realtime
+### 13.9 Tarjeta C — Realtime
 
 Orden de edición:
 
@@ -619,7 +746,7 @@ si esta pestaña es líder: sonar
 
 No reproducir sonido fuera de la misma rama que confirmó la inserción del ID.
 
-### 12.10 Matriz de pruebas y evidencias
+### 13.10 Matriz de pruebas y evidencias
 
 | Caso | BD | UI | Correo | WhatsApp | Realtime |
 |---|---|---|---|---|---|
@@ -631,6 +758,10 @@ No reproducir sonido fuera de la misma rama que confirmó la inserción del ID.
 | Gateway 503 | outbox pending | notif visible | independiente | retry | chat no falla |
 | SMTP caído | outbox pending | notif visible | retry | independiente | chat no falla |
 | Escalación IA | ciclo + CTA | botón visible | alerta | alerta | CTA único |
+| Humano responde | ciclo cancelado | modo humano | ninguno extra | ninguno extra | IA silenciosa |
+| Humano tarda 10 min | claim único | estado fallback | alerta inmediata ya existente | alerta inmediata ya existente | una respuesta IA |
+| Pausa manual | `manual_pause` | botón confirmado | normal | normal | ninguna IA |
+| Email + desconexión | ciclo + token hash | retorno al mismo chat | continuación única | no aplica | reconexión segura |
 
 Cada evidencia debe incluir:
 
@@ -642,7 +773,7 @@ Cada evidencia debe incluir:
 - captura de badge/CTA;
 - logs sin secretos.
 
-### 12.11 Condiciones de parada obligatoria
+### 13.11 Condiciones de parada obligatoria
 
 El agente se detiene y documenta antes de editar si:
 
@@ -657,7 +788,7 @@ El agente se detiene y documenta antes de editar si:
 - el cambio exige SSH directo o compartir stores;
 - las pruebas solo pueden demostrar “request enviado”, pero no recepción real.
 
-### 12.12 Formato de entrega de cada agente
+### 13.12 Formato de entrega de cada agente
 
 El agente entrega siempre:
 
@@ -672,9 +803,9 @@ El agente entrega siempre:
 9. commit y rama habitual;
 10. confirmación explícita de que no se desplegó, o health post-deploy si estaba autorizado.
 
-## 13. Decisiones cerradas para evitar interpretaciones
+## 14. Decisiones cerradas para evitar interpretaciones
 
-### 13.1 Destinatarios y precedencia
+### 14.1 Destinatarios y precedencia
 
 Hay dos números distintos aunque inicialmente puedan coincidir:
 
@@ -696,7 +827,7 @@ Destinatarios:
 5. Si falta `PRIMARY_ORDER_ADMIN_ID`, la aplicación debe reportar configuración
    crítica y no fingir que las alertas externas están listas.
 
-### 13.2 Estados entre Nakomi y glorytemplate
+### 14.2 Estados entre Nakomi y glorytemplate
 
 Un `202 Accepted` solo significa **encolado por el gateway**, no enviado a
 WhatsApp.
@@ -733,14 +864,14 @@ canary de producción.
 Los reintentos conservan `idempotency_key`, pero generan timestamp, nonce y
 firma nuevos.
 
-### 13.3 Registro de correo
+### 14.3 Registro de correo
 
 - `email_logs` registra un resultado final por trabajo.
 - Los intentos individuales viven en `chat_alert_outbox.attempts/last_error`.
 - No insertar múltiples filas `email_logs` por retry del mismo mensaje.
 - `email_logs.status=sent` solo después de aceptación SMTP.
 
-### 13.4 Feature flags
+### 14.4 Feature flags
 
 ```text
 CHAT_ALERT_CAPTURE_ENABLED
@@ -758,7 +889,7 @@ CHAT_REALTIME_V2_ENABLED
 - Realtime v2 se activa después de que backend y frontend compatibles estén
   desplegados.
 
-### 13.5 Ciclo de escalamiento
+### 14.5 Ciclo de escalamiento
 
 Crear `chat_escalations`:
 
@@ -781,20 +912,120 @@ Reglas:
 7. `chat_sessions.is_escalated` refleja si existe un ciclo abierto; no se
    actualiza de forma independiente.
 
-### 13.6 Semántica de 20 minutos
+### 14.6 Modos IA y precedencia humana
 
-- El ciclo comienza con el **primer mensaje de cliente** después de la última
-  respuesta humana.
-- Mensajes adicionales del cliente pertenecen al mismo ciclo y no reinician el
-  reloj.
-- Una respuesta IA no cuenta como atención humana.
-- Una respuesta de admin/freelancer cierra el ciclo.
-- Sesiones cerradas no generan alertas.
-- Sesiones escaladas sí generan alerta si nadie humano respondió.
-- El barrido toma filas vencidas con lock; no recalcula solo desde
-  `MAX(created_at)` en cada ejecución.
+Estado actual que debe corregirse:
 
-### 13.7 Secuencia Realtime
+- Frontend envía `enable`, backend deserializa `enabled`; el botón puede mostrar
+  un cambio optimista aunque el servidor haya rechazado el payload.
+- El handler WS descarta el JSON inválido sin ACK de error. El toggle actual no
+  cancela buffers, timers ni una generación IA que ya está en vuelo.
+- `generate_ai_response` exige `assigned_staff_id IS NULL`. Asignar/tomar una
+  sesión puede apagar de hecho la IA sin representar la política de diez
+  minutos.
+- Responder como humano no tiene una transición uniforme: en chat general no
+  detiene la IA; en órdenes solo el empleado asignado desactiva la
+  intermediación, mientras el admin puede responder sin hacerlo.
+- El toggle de órdenes debe comprobar asignación: hoy un empleado no asignado
+  puede intentar cambiar el modo. La intervención humana tampoco limpia
+  consistentemente `is_escalated`.
+- Los timers actuales viven en tareas Tokio y se pierden al reiniciar.
+
+Modelo nuevo:
+
+- `ai_mode = automatic|human_priority|manual_pause`;
+- `assigned_staff_id` solo controla routing/autorización;
+- `chat_response_cycles` guarda:
+  - `id`, `session_id`, `opened_by_message_id`;
+  - `first_client_message_at`, `deadline_at`;
+  - `status waiting|claimed|answered_human|answered_ai|cancelled`;
+  - `claimed_at`, `answered_message_id`;
+  - constraint único para un ciclo abierto por sesión.
+
+Precedencia:
+
+1. `manual_pause` gana sobre todos los timers.
+2. Respuesta humana gana sobre un worker aún no reclamado.
+3. Si worker y humano compiten, ambos bloquean el mismo ciclo:
+   - humano primero: `answered_human`, worker aborta;
+   - worker primero: marca `claimed`, relee mensajes; la UI indica que IA está
+     preparando respuesta;
+   - antes de persistir respuesta IA, revalidar que no apareció respuesta humana.
+4. Activar manualmente IA cancela ciclos abiertos y pasa a `automatic`.
+5. Desactivar manualmente cancela ciclos y pasa a `manual_pause`.
+6. Toda respuesta de admin o empleado autorizado, por WS o REST, resuelve el
+   escalamiento abierto y cambia a `human_priority` en la misma transacción que
+   persiste el mensaje.
+7. Autorización: admin/supervisor puede cambiar cualquier sesión; un empleado
+   solo la orden que tiene asignada; visitante nunca puede cambiar el modo.
+8. Cada cambio de modo incrementa una `ai_generation_epoch`. Buffers, timers y
+   generaciones capturan esa época y abortan si cambia. Antes de guardar o
+   publicar una respuesta IA se releen época, modo y ciclo; no basta cancelar
+   una tarea local.
+
+Contrato toggle:
+
+```json
+{"type":"toggle_ai","session_id":"uuid","enabled":false,"request_id":"uuid"}
+```
+
+Servidor responde:
+
+```json
+{
+  "type":"ai_mode_changed",
+  "session_id":"uuid",
+  "mode":"manual_pause",
+  "enabled":false,
+  "request_id":"uuid"
+}
+```
+
+El frontend cambia el estado definitivo solo con ACK. Puede mostrar loading,
+pero debe revertir y mostrar toast si hay error/timeout. El backend emite el ACK
+solo después de persistir el modo y cancelar ciclos/buffers asociados. Añadir
+tests de contrato JSON, autorización, rollback, cambio durante `waiting`, cambio
+durante generación IA en vuelo y respuesta humana durante upload/procesamiento.
+
+### 14.7 Captura de email y consentimiento
+
+La instrucción del prompt no demuestra que la tool se ejecute. Deben existir
+tests de conversación con un proveedor IA simulado que verifiquen:
+
+1. visitante sin email recibe la pregunta después de una interacción útil;
+2. al responder con email, el siguiente tool call es `capture_email`;
+3. la tool persiste y relee el valor;
+4. el prompt de turnos posteriores contiene “email ya conocido” y no lo repite;
+5. visitante que rechaza no vuelve a ser presionado durante esa sesión.
+
+Antes de esos tests deben corregirse los defectos de persistencia ya
+confirmados:
+
+- ambos caminos, WS y REST, hacen upsert de `visitor_profiles` antes de ejecutar
+  tools; `capture_email` no puede depender de que otro flujo haya creado la fila;
+- `save_client_info(name)` actualiza solo el nombre y nunca escribe `email = ""`;
+- la escritura devuelve error explícito si falla; no se descarta el resultado;
+- logs registran como máximo dominio/hash y nunca la dirección completa;
+- unificar el nombre de la variable SMTP documentada con la que consume el
+  servicio antes de probar el correo de continuación.
+
+Añadir a `visitor_profiles`:
+
+- `email_normalized`;
+- `email_captured_at`;
+- `continuation_consent_at`;
+- `continuation_declined_at`;
+- `email_source`;
+- constraint case-insensitive según la política de perfiles.
+
+No inferir consentimiento solo porque aparece una dirección en texto citado,
+adjunto o contenido de terceros. La IA debe explicar el propósito y recibir una
+respuesta afirmativa o el propio email en respuesta a esa solicitud.
+La prueba de continuidad debe abrir el enlace en un navegador limpio, sin el
+`localStorage` original: reutilizar el mismo navegador no demuestra recuperación
+por email ni entre dispositivos.
+
+### 14.8 Secuencia Realtime
 
 1. Añadir `next_message_sequence BIGINT` a `chat_sessions`.
 2. Al insertar un mensaje:
@@ -813,7 +1044,7 @@ Para audio, una pestaña toma liderazgo con Web Locks API. Si no está disponibl
 se usa lease en `localStorage` con `ownerId` y expiración corta. La pestaña no
 líder inserta mensajes, pero nunca reproduce sonido.
 
-## 14. División exacta en tareas y commits
+## 15. División exacta en tareas y commits
 
 Cada fila es un commit independiente. No mezclar repositorios en un commit.
 
@@ -829,13 +1060,17 @@ Cada fila es un commit independiente. No mezclar repositorios en un commit.
 | 8 | `237A-7h` | Nakomi frontend | Render CTA + pruebas responsive. |
 | 9 | `237A-6a` | Nakomi backend | Secuencia, envelope v2, snapshot y reparación de huecos. |
 | 10 | `237A-6b` | Nakomi frontend | Realtime v2, dedupe, líder de audio y compatibilidad. |
-| 11 | `237A-7i` | Nakomi | Ciclo de 20 minutos y entrega por los tres canales. |
+| 11 | `237A-6c` | Nakomi | Modos IA, ACK del botón y ciclo durable de fallback a 10 minutos. |
+| 12 | `237A-7i` | Nakomi | Captura/consentimiento de email y tests de tool call. |
+| 13 | `237A-7j` | Nakomi | Token y correo de continuación tras desconexión real. |
 
 Gates:
 
 - No iniciar `237A-7d` hasta validar `237A-7a..c` y health de `wacli`.
 - No iniciar CTA hasta demostrar exactamente una alerta por canal.
 - No retirar protocolo v1 hasta validar v2 con widget y chat de pedido.
-- No desplegar alertas de 20 minutos hasta validar que el flujo inmediato no
-  duplica entregas.
+- No activar fallback de diez minutos hasta probar la carrera humano/worker y
+  el botón `manual_pause`.
+- No activar correo de continuación hasta probar consentimiento, cancelación por
+  reconexión y token de un solo uso.
 - Pagos/reembolsos empiezan después de cerrar estos gates.
