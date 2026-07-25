@@ -16,8 +16,12 @@ if ($IntervalMinutes -le 0) {
 
 $projectRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 $cleanScript = Join-Path $projectRoot 'glory-rs\scripts\clean-cargo-target.ps1'
+$hiddenRunner = Join-Path $PSScriptRoot 'run-cargo-cleanup-hidden.vbs'
 if (-not (Test-Path -LiteralPath $cleanScript)) {
     throw "No se encontro el limpiador compartido: $cleanScript"
+}
+if (-not (Test-Path -LiteralPath $hiddenRunner)) {
+    throw "No se encontro el lanzador oculto: $hiddenRunner"
 }
 
 <# [257A-6] La limpieza no puede depender del launcher dev: cargo check/test
@@ -25,10 +29,13 @@ if (-not (Test-Path -LiteralPath $cleanScript)) {
  cuando el watcher terminaba junto con npm run dev. La tarea periódica usa el
  limpiador conservador, que se aplaza mientras cargo/rustc están activos.
  [257A-7] WindowStyle Hidden evita que la ejecución periódica interrumpa al
- usuario mostrando una consola cada dos minutos. #>
-$powershellExe = Join-Path $PSHOME 'powershell.exe'
-$arguments = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$cleanScript`" -TargetDirs `"$TargetDir`" -MaxTotalMB $MaxTotalMB"
-$action = New-ScheduledTaskAction -Execute $powershellExe -Argument $arguments
+ usuario mostrando una consola cada dos minutos.
+ [257A-8] powershell.exe puede mostrar un destello antes de procesar
+ WindowStyle. wscript.exe es un proceso sin consola y lanza el limpiador con
+ ventana 0 desde el primer instante, sin requerir privilegios administrativos. #>
+$wscriptExe = Join-Path $env:WINDIR 'System32\wscript.exe'
+$arguments = "//B //Nologo `"$hiddenRunner`" `"$cleanScript`" `"$TargetDir`" $MaxTotalMB"
+$action = New-ScheduledTaskAction -Execute $wscriptExe -Argument $arguments
 $trigger = New-ScheduledTaskTrigger `
     -Once `
     -At (Get-Date).AddMinutes(1) `
