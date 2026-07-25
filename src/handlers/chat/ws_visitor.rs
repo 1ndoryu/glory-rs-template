@@ -400,15 +400,15 @@ async fn cleanup_visitor_session(
         state.chat_timing.unregister_session(session_id);
         let _ = state.chat_hub.close_session(session_id).await;
     } else if remaining == 0 {
-        /* [095A-16] Recargar/cerrar pestaña no significa cerrar conversación.
-         * Se marca offline y se libera timing en memoria, pero la sesión queda activa
-         * para que el mismo visitor_id recupere historial al volver. */
+        /* [257A-5] Recargar, perder red o reconectar no cancela el timing loop.
+         * El mensaje ya fue persistido y puede estar esperando el debounce de
+         * escritura; enviar Disconnect aquí vaciaba el buffer antes de que la IA
+         * respondiera. El loop queda vivo para que la nueva conexión reutilice su
+         * sender y se autolimpia al cerrar de verdad o al timeout global. */
         state
             .chat_hub
             .notify_visitor_offline(session_id, Some(visitor_online_at))
             .await;
-        let _ = timing_tx.try_send(TimingEvent::Disconnect);
-        state.chat_timing.unregister_session(session_id);
     }
     if !ip_for_tracking.is_empty() {
         state.chat_timing.track_ip_disconnect(ip_for_tracking);

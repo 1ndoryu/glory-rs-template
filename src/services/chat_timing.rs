@@ -21,8 +21,8 @@ use std::time::{Duration, Instant};
 
 use dashmap::DashMap;
 use sqlx::PgPool;
-use tokio::sync::{mpsc, Semaphore};
 use std::sync::atomic::{AtomicU64, Ordering};
+use tokio::sync::{mpsc, Semaphore};
 use uuid::Uuid;
 
 use crate::models::{CreateNotification, NOTIF_ESCALATION_NEEDED};
@@ -381,6 +381,7 @@ impl ChatTimingService {
         let ai_sem = self.ai_semaphore.clone();
         let loop_counter = self.active_timing_loops.clone();
         let counter_ref = loop_counter.clone();
+        let timing_service = self.clone();
         tokio::spawn(async move {
             counter_ref.fetch_add(1, Ordering::Relaxed);
             let result = tokio::time::timeout(
@@ -393,6 +394,12 @@ impl ChatTimingService {
                     "session_timing_loop {session_id} killed by global timeout ({TIMING_LOOP_MAX_LIFETIME:?})"
                 );
             }
+            /* [257A-5] El loop sobrevive desconexiones WS transitorias para no
+             * perder mensajes ya persistidos que aún esperan respuesta. Por eso
+             * su sender se elimina aquí al terminar realmente el loop; de otro
+             * modo, el timeout dejaría una entrada cerrada y las reconexiones
+             * reutilizarían un canal incapaz de recibir eventos. */
+            timing_service.unregister_session(session_id);
             counter_ref.fetch_sub(1, Ordering::Relaxed);
         });
 
@@ -489,16 +496,14 @@ async fn session_timing_loop(
          * Limita peticiones IA concurrentes para proteger pool DB y APIs. */
         /* [096A-8] Timeout en semaphore: si 3 permits ocupados >30s, abortar en vez de bloquear.
          * Sin timeout, una 4ta sesión espera indefinidamente → canal mpsc se llena → WS se congela. */
-        let _permit = match tokio::time::timeout(
-            Duration::from_secs(30),
-            ai_semaphore.acquire(),
-        ).await {
-            Ok(permit) => permit.expect("semaphore closed"),
-            Err(_) => {
-                tracing::warn!("Timeout 30s esperando semáforo IA para sesión {session_id}");
-                continue;
-            }
-        };
+        let _permit =
+            match tokio::time::timeout(Duration::from_secs(30), ai_semaphore.acquire()).await {
+                Ok(permit) => permit.expect("semaphore closed"),
+                Err(_) => {
+                    tracing::warn!("Timeout 30s esperando semáforo IA para sesión {session_id}");
+                    continue;
+                }
+            };
         irrelevant_count = generate_ai_response(
             session_id,
             visitor_name.as_deref(),
@@ -519,7 +524,13 @@ async fn session_timing_loop(
     tokio::spawn(async move {
         let _ = tokio::time::timeout(
             Duration::from_secs(60),
-            generate_context_summary(summary_pool, summary_config, summary_http, session_id, deps.visitor_id),
+            generate_context_summary(
+                summary_pool,
+                summary_config,
+                summary_http,
+                session_id,
+                deps.visitor_id,
+            ),
         )
         .await;
     });
@@ -625,7 +636,10 @@ async fn generate_ai_response(
     /* [237A-9] human_priority con ciclo waiting: dejar que el humano responda.
      * El worker de response cycles generará fallback si expira el deadline. */
     if session.ai_mode == "human_priority" {
-        if let Ok(true) = crate::repositories::ResponseCycleRepository::is_in_human_window(&deps.pool, session_id).await {
+        if let Ok(true) =
+            crate::repositories::ResponseCycleRepository::is_in_human_window(&deps.pool, session_id)
+                .await
+        {
             tracing::debug!(%session_id, "generate_ai_response: human_priority + ciclo waiting, saltando IA");
             return irrelevant_count;
         }
@@ -636,7 +650,9 @@ async fn generate_ai_response(
     }
 
     /* Clasificador de relevancia: filtrar off-topic con modelo pequeño */
-    if let Ok(false) = check_relevance(&deps.pool, &deps.ai_config, combined, &deps.http_client).await {
+    if let Ok(false) =
+        check_relevance(&deps.pool, &deps.ai_config, combined, &deps.http_client).await
+    {
         irrelevant_count += 1;
         let msg = if irrelevant_count >= MAX_IRRELEVANT_STREAK {
             irrelevant_count = 0;
@@ -823,7 +839,14 @@ async fn check_relevance(
         }),
         serde_json::json!({"role": "user", "content": content}),
     ];
-    let json = call_ai_api_with_options(config, &messages, None, ChatApiOptions::terse(5), Some(http_client)).await?;
+    let json = call_ai_api_with_options(
+        config,
+        &messages,
+        None,
+        ChatApiOptions::terse(5),
+        Some(http_client),
+    )
+    .await?;
 
     let answer = json["choices"][0]["message"]["content"]
         .as_str()
@@ -976,7 +999,11 @@ async fn generate_context_summary(
 
 /* [T-3] Llama a la API de Groq con modelo ligero para generar resumen de sesión.
  * Retorna None si la API falla o el resumen está vacío. */
-async fn call_summary_api(config: &AiChatConfig, transcript: &str, http_client: &reqwest::Client) -> Option<String> {
+async fn call_summary_api(
+    config: &AiChatConfig,
+    transcript: &str,
+    http_client: &reqwest::Client,
+) -> Option<String> {
     let messages = [
         serde_json::json!({
             "role": "system",
@@ -988,7 +1015,15 @@ async fn call_summary_api(config: &AiChatConfig, transcript: &str, http_client: 
         serde_json::json!({"role": "user", "content": transcript}),
     ];
 
-    match call_ai_api_with_options(config, &messages, None, ChatApiOptions::terse(200), Some(http_client)).await {
+    match call_ai_api_with_options(
+        config,
+        &messages,
+        None,
+        ChatApiOptions::terse(200),
+        Some(http_client),
+    )
+    .await
+    {
         Ok(json) => {
             let s = json["choices"][0]["message"]["content"]
                 .as_str()
