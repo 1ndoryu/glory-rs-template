@@ -16,7 +16,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use dashmap::DashMap;
+use dashmap::{mapref::entry::Entry, DashMap};
 use sqlx::PgPool;
 use tokio::sync::{mpsc, Mutex as TokioMutex};
 use uuid::Uuid;
@@ -72,15 +72,24 @@ impl ChatHub {
     /// Solo cerrar sesión si retorna 0 (última conexión).
     #[must_use]
     pub fn unsubscribe(&self, session_id: Uuid) -> usize {
-        if let Some(counter) = self.connection_counts.get(&session_id) {
-            let prev = counter.fetch_sub(1, Ordering::Relaxed);
-            if prev <= 1 {
-                self.connection_counts.remove(&session_id);
-                return 0;
+        /* [257A-4] La eliminación debe hacerse mediante el OccupiedEntry que ya
+         * posee el lock del shard. Antes se llamaba remove() mientras seguía vivo
+         * un Ref de get(); DashMap intentaba adquirir dos veces el mismo shard y
+         * bloqueaba permanentemente un worker Tokio por cada desconexión WS. Tras
+         * varias reconexiones, todos los workers quedaban bloqueados y el watchdog
+         * reiniciaba el sitio con una ventana de Bad Gateway. */
+        match self.connection_counts.entry(session_id) {
+            Entry::Occupied(entry) => {
+                let current = entry.get().load(Ordering::Relaxed);
+                if current <= 1 {
+                    entry.remove();
+                    0
+                } else {
+                    entry.get().fetch_sub(1, Ordering::Relaxed) - 1
+                }
             }
-            return prev - 1;
+            Entry::Vacant(_) => 0,
         }
-        0
     }
 
     /// Eliminar canales cuando la sesión se cierra.
@@ -471,5 +480,36 @@ impl ChatHub {
         };
         self.broadcast(session_id, &msg);
         self.broadcast_to_staff(&msg).await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ChatHub;
+    use sqlx::postgres::PgPoolOptions;
+    use uuid::Uuid;
+
+    fn test_hub() -> ChatHub {
+        let pool = PgPoolOptions::new()
+            .connect_lazy("postgres://test:test@localhost/test")
+            .expect("test database URL must parse");
+        ChatHub::new(pool)
+    }
+
+    #[tokio::test]
+    async fn unsubscribe_removes_last_connection_without_relocking_dashmap() {
+        let hub = test_hub();
+        let session_id = Uuid::new_v4();
+
+        let first_receiver = hub.subscribe(session_id);
+        assert_eq!(hub.unsubscribe(session_id), 0);
+        drop(first_receiver);
+
+        let second_receiver = hub.subscribe(session_id);
+        let third_receiver = hub.subscribe(session_id);
+        assert_eq!(hub.unsubscribe(session_id), 1);
+        assert_eq!(hub.unsubscribe(session_id), 0);
+        assert_eq!(hub.unsubscribe(session_id), 0);
+        drop((second_receiver, third_receiver));
     }
 }
