@@ -179,30 +179,63 @@ async fn handle_visitor_text_message(
     }
 
     /* [237A-7d] Persistir con alertas en TX + broadcast después del commit */
-    let msg_result = crate::services::chat_alert::send_message_with_alerts(
-        &state.pool, session_id, "client", Some(visitor_id), &content,
+    let msg = match crate::services::chat_alert::send_message_with_alerts(
+        &state.pool,
+        session_id,
+        "client",
+        Some(visitor_id),
+        &content,
     )
-    .await;
+    .await
+    {
+        Ok(msg) => msg,
+        Err(error) => {
+            /* [257A-1] Un mensaje que no se confirmó en BD no puede entrar al
+             * timing de IA. Antes se ocultaba el error y se producía divergencia,
+             * retries y reconexiones que amplificaban la carga del runtime. */
+            tracing::error!(%session_id, %visitor_id, %error, "No se pudo persistir mensaje de visitante");
+            state.chat_hub.broadcast(
+                session_id,
+                &crate::models::WsServerMessage::Error {
+                    message: "No pudimos enviar tu mensaje. Inténtalo nuevamente.".to_string(),
+                },
+            );
+            return VisitorTextFlow::Continue;
+        }
+    };
 
-    if let Ok(ref msg) = msg_result {
-        let ws_msg = crate::models::WsServerMessage::from_chat_message(msg, "live");
-        state.chat_hub.broadcast(session_id, &ws_msg);
+    let ws_msg = crate::models::WsServerMessage::from_chat_message(&msg, "live");
+    state.chat_hub.broadcast(session_id, &ws_msg);
 
-        /* [237A-9] Si la sesión está en human_priority, crear response cycle
-         * para que el worker active fallback IA si nadie responde en 10 min. */
-        if let Ok(Some(session)) = crate::repositories::ChatRepository::find_session_by_id(&state.pool, session_id).await {
-            if session.ai_mode == "human_priority" {
-                let _ = crate::repositories::ResponseCycleRepository::create_if_needed(
-                    &state.pool, session_id, msg.id,
-                ).await;
+    /* [237A-9] Si la sesión está en human_priority, crear response cycle
+     * para que el worker active fallback IA si nadie responde en 10 min. */
+    match crate::repositories::ChatRepository::find_session_by_id(&state.pool, session_id).await {
+        Ok(Some(session)) if session.ai_mode == "human_priority" => {
+            if let Err(error) = crate::repositories::ResponseCycleRepository::create_if_needed(
+                &state.pool,
+                session_id,
+                msg.id,
+            )
+            .await
+            {
+                tracing::error!(%session_id, message_id = %msg.id, %error, "No se pudo abrir response cycle");
             }
         }
+        Ok(_) => {}
+        Err(error) => {
+            tracing::error!(%session_id, message_id = %msg.id, %error, "No se pudo releer sesión tras persistir mensaje");
+        }
+    }
 
-        /* Push conteo de notificaciones no leídas a admins via WS */
-        if let Ok(admin_ids) = crate::repositories::UserRepository::admin_ids(&state.pool).await {
+    /* Push conteo de notificaciones no leídas a admins via WS */
+    match crate::repositories::UserRepository::admin_ids(&state.pool).await {
+        Ok(admin_ids) => {
             for admin_id in admin_ids {
                 state.notification_hub.send_unread_count(admin_id).await;
             }
+        }
+        Err(error) => {
+            tracing::error!(%session_id, message_id = %msg.id, %error, "No se pudo actualizar conteo de notificaciones");
         }
     }
 

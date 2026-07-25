@@ -52,6 +52,7 @@ impl NotificationRepository {
                 (user_id, notification_type, title, body, link, reference_type, reference_id)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             ON CONFLICT (user_id, notification_type, reference_type, reference_id)
+                WHERE reference_type IS NOT NULL AND reference_id IS NOT NULL
                 DO NOTHING
             RETURNING id, user_id, notification_type, title, body, link,
                       read, reference_type, reference_id, created_at",

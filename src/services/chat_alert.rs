@@ -13,30 +13,38 @@ use crate::errors::AppError;
 use crate::models::{
     AlertEventType, AlertPayload, ChatMessage, CreateNotification, NOTIF_NEW_MESSAGE,
 };
-use crate::repositories::{ChatAlertRepository, ChatRepository, NotificationRepository, UserRepository};
+use crate::repositories::{
+    ChatAlertRepository, ChatRepository, NotificationRepository, UserRepository,
+};
 
-/* Feature flags: si están desactivados, no se crean outbox entries. */
+/* [257A-1] Las alertas nuevas son fail-closed: una variable ausente, vacía o
+ * mal escrita nunca activa una ruta transaccional o una integración externa.
+ * Se habilitan por canal, mediante canary, solo con true/1 explícito. */
+fn enabled_flag_value(value: &str) -> bool {
+    matches!(value.trim().to_ascii_lowercase().as_str(), "true" | "1")
+}
+
+fn feature_flag_enabled(key: &str) -> bool {
+    std::env::var(key).is_ok_and(|value| enabled_flag_value(&value))
+}
+
 fn alerts_enabled() -> bool {
-    std::env::var("CHAT_ALERT_CAPTURE_ENABLED")
-        .map(|v| !v.eq_ignore_ascii_case("false") && v != "0")
-        .unwrap_or(true)
+    feature_flag_enabled("CHAT_ALERT_CAPTURE_ENABLED")
 }
 
 fn email_delivery_enabled() -> bool {
-    std::env::var("CHAT_EMAIL_DELIVERY_ENABLED")
-        .map(|v| !v.eq_ignore_ascii_case("false") && v != "0")
-        .unwrap_or(true)
+    feature_flag_enabled("CHAT_EMAIL_DELIVERY_ENABLED")
 }
 
 fn whatsapp_delivery_enabled() -> bool {
-    std::env::var("CHAT_WHATSAPP_DELIVERY_ENABLED")
-        .map(|v| !v.eq_ignore_ascii_case("false") && v != "0")
-        .unwrap_or(true)
+    feature_flag_enabled("CHAT_WHATSAPP_DELIVERY_ENABLED")
 }
 
 /// Admin email override para canary/staging.
 fn alert_email_override() -> Option<String> {
-    std::env::var("CHAT_ALERT_EMAIL_OVERRIDE").ok().filter(|s| !s.is_empty())
+    std::env::var("CHAT_ALERT_EMAIL_OVERRIDE")
+        .ok()
+        .filter(|s| !s.is_empty())
 }
 
 /// SITE_URL para construir enlaces al panel.
@@ -66,7 +74,7 @@ pub async fn send_message_with_alerts(
     }
 
     /* Pre-fetch datos necesarios fuera de la transacción (son estables) */
-    let admin_ids = UserRepository::admin_ids(pool).await.unwrap_or_default();
+    let admin_ids = UserRepository::admin_ids(pool).await?;
     if admin_ids.is_empty() {
         return ChatRepository::save_message(pool, session_id, sender_type, sender_id, content)
             .await
@@ -74,16 +82,17 @@ pub async fn send_message_with_alerts(
     }
 
     /* Pre-fetch admin emails para la outbox (evita query dentro de TX) */
-    let admin_emails = UserRepository::admin_emails(pool).await.unwrap_or_default();
+    let admin_emails = UserRepository::admin_emails(pool).await?;
 
     let session = ChatRepository::find_session_by_id(pool, session_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Sesión no encontrada".into()))?;
 
     /* ===== Transacción: mensaje + notificaciones + outbox ===== */
-    let mut tx = pool.begin().await.map_err(|e| {
-        AppError::Internal(format!("Error iniciando transacción de alertas: {e}"))
-    })?;
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| AppError::Internal(format!("Error iniciando transacción de alertas: {e}")))?;
 
     /* 1. Persistir mensaje (runtime query: no depende de BD local para compilar) */
     let msg = sqlx::query_as::<_, crate::models::ChatMessage>(
@@ -124,14 +133,13 @@ pub async fn send_message_with_alerts(
             reference_type: Some("chat_session".to_string()),
             reference_id: Some(session_id),
         };
-        let _ = NotificationRepository::create_tx(&mut *tx, &notif).await;
+        NotificationRepository::create_tx(&mut *tx, &notif).await?;
     }
 
     /* 3. Outbox email */
     if email_delivery_enabled() {
         /* Resolver email del admin: override de staging > primer email admin de BD */
-        let email_recipient = alert_email_override()
-            .or_else(|| admin_emails.first().cloned());
+        let email_recipient = alert_email_override().or_else(|| admin_emails.first().cloned());
 
         if let Some(to_email) = email_recipient {
             let idempotency_key = format!("chat:{}:email:{}", msg.id, to_email);
@@ -143,9 +151,11 @@ pub async fn send_message_with_alerts(
                 panel_url: panel_url.clone(),
                 occurred_at: msg.created_at,
             })
-            .unwrap_or_default();
+            .map_err(|error| {
+                AppError::Internal(format!("Error serializando alerta email: {error}"))
+            })?;
 
-            let _ = ChatAlertRepository::insert_tx(
+            ChatAlertRepository::insert_tx(
                 &mut *tx,
                 &idempotency_key,
                 AlertEventType::ClientMessage.as_str(),
@@ -155,7 +165,7 @@ pub async fn send_message_with_alerts(
                 Some(msg.id),
                 &payload,
             )
-            .await;
+            .await?;
         }
     }
 
@@ -170,9 +180,11 @@ pub async fn send_message_with_alerts(
             panel_url: panel_url.clone(),
             occurred_at: msg.created_at,
         })
-        .unwrap_or_default();
+        .map_err(|error| {
+            AppError::Internal(format!("Error serializando alerta WhatsApp: {error}"))
+        })?;
 
-        let _ = ChatAlertRepository::insert_tx(
+        ChatAlertRepository::insert_tx(
             &mut *tx,
             &idempotency_key,
             AlertEventType::ClientMessage.as_str(),
@@ -182,13 +194,13 @@ pub async fn send_message_with_alerts(
             Some(msg.id),
             &payload,
         )
-        .await;
+        .await?;
     }
 
     /* 5. Commit: todo o nada */
-    tx.commit().await.map_err(|e| {
-        AppError::Internal(format!("Error en commit de alertas: {e}"))
-    })?;
+    tx.commit()
+        .await
+        .map_err(|e| AppError::Internal(format!("Error en commit de alertas: {e}")))?;
 
     tracing::info!(
         %session_id,
@@ -198,4 +210,25 @@ pub async fn send_message_with_alerts(
     );
 
     Ok(msg)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::enabled_flag_value;
+
+    #[test]
+    fn feature_flags_only_accept_explicit_true_values() {
+        for enabled in ["true", "TRUE", " 1 "] {
+            assert!(
+                enabled_flag_value(enabled),
+                "{enabled} debe activar el flag"
+            );
+        }
+        for disabled in ["", "false", "0", "yes", "enabled", "tru"] {
+            assert!(
+                !enabled_flag_value(disabled),
+                "{disabled} no debe activar el flag"
+            );
+        }
+    }
 }

@@ -29,7 +29,7 @@ impl ResponseCycleRepository {
             "INSERT INTO chat_response_cycles \
                (session_id, opened_by_message_id, deadline_at) \
              VALUES ($1, $2, NOW() + make_interval(mins => $3)) \
-             ON CONFLICT ON CONSTRAINT uq_chat_response_cycles_open DO NOTHING \
+             ON CONFLICT (session_id) WHERE status = 'waiting' DO NOTHING \
              RETURNING id",
         )
         .bind(session_id)
