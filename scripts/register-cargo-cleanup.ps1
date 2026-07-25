@@ -23,9 +23,11 @@ if (-not (Test-Path -LiteralPath $cleanScript)) {
 <# [257A-6] La limpieza no puede depender del launcher dev: cargo check/test
  también escriben en el target compartido y antes podían llevarlo a 22+ GB
  cuando el watcher terminaba junto con npm run dev. La tarea periódica usa el
- limpiador conservador, que se aplaza mientras cargo/rustc están activos. #>
+ limpiador conservador, que se aplaza mientras cargo/rustc están activos.
+ [257A-7] WindowStyle Hidden evita que la ejecución periódica interrumpa al
+ usuario mostrando una consola cada dos minutos. #>
 $powershellExe = Join-Path $PSHOME 'powershell.exe'
-$arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$cleanScript`" -TargetDirs `"$TargetDir`" -MaxTotalMB $MaxTotalMB"
+$arguments = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$cleanScript`" -TargetDirs `"$TargetDir`" -MaxTotalMB $MaxTotalMB"
 $action = New-ScheduledTaskAction -Execute $powershellExe -Argument $arguments
 $trigger = New-ScheduledTaskTrigger `
     -Once `
