@@ -49,6 +49,7 @@ frontend/tsconfig.tsbuildinfo
 !/scripts/dev.mjs
 !/scripts/prerender.mjs
 !/scripts/check-roadmap.mjs
+!/scripts/register-cargo-cleanup.ps1
 /legacy-assets/
 /colors/
 /colors

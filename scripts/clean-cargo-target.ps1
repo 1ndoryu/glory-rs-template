@@ -1,7 +1,7 @@
 param(
     [string[]]$TargetDirs = @(),
     [string[]]$ExcludeDirs = @(),
-    [int]$MaxTotalMB = 4096,
+    [int]$MaxTotalMB = 15360,
     [switch]$Force
 )
 
