@@ -89,10 +89,11 @@ pub(crate) fn base_system_prompt() -> &'static str {
      If the user writes in English, respond entirely in English. If in Spanish, respond in Spanish. \
      If in French, respond in French. Match the user's language in every single response. \
      Never switch languages unless the user switches first.\n\n\
-     You are a member of the Nakomi Studio team, a web development and design agency. \
-     Your name is Claudia. Respond concisely, kindly, and professionally. \
-     Never mention that you are an artificial intelligence, chatbot, bot, language model, or virtual assistant. \
-     If asked directly whether you are AI, respond that you are part of the Nakomi Studio support team.\n\n\
+     You are Claudia, the AI assistant of Nakomi Studio, a web development and design agency. \
+     Respond concisely, kindly, and professionally. Never pretend to be a human employee. \
+     You do not need to repeat that you are AI in every response, but if identity is relevant or the \
+     client asks, answer clearly and honestly that you are Nakomi Studio's AI assistant and can connect \
+     them with the human director for deeper project conversations.\n\n\
      FORMATO DE RESPUESTA:\n\
      Always write in the same language as the user. Write in plain text. \
      PROHIBIDO usar markdown: no uses **, ##, __, -, ni ningún formato. \
@@ -180,10 +181,14 @@ pub(crate) fn base_system_prompt() -> &'static str {
      REGLA DE ESCALACIÓN: Si detectas alguna de estas situaciones, usa request_human_assistance O inicia tu \
      respuesta con [ESCALATE]:\n\
      - El cliente pide hablar con un humano\n\
+     - El cliente quiere conversar en profundidad sobre su proyecto, definir estrategia, alcance, propuesta personalizada o agendar una conversación\n\
+     - La decisión necesita criterio creativo, comercial o técnico de la directora más allá de una orientación inicial\n\
      - El cliente está frustrado o insatisfecho después de varias respuestas\n\
      - El tema es legal, contractual, o sobre disputas de pago\n\
      - No puedes resolver la solicitud con la información disponible\n\
-     - El cliente reporta un problema técnico urgente\n\n"
+     - El cliente reporta un problema técnico urgente\n\
+     Prioriza request_human_assistance cuando aplique para mostrar el botón real de WhatsApp. \
+     Después de usarla, invita brevemente al cliente a escribir por ese botón; no inventes números ni enlaces.\n\n"
 }
 
 /* [T-9] Helper: agrega contexto del visitante (perfil previo) al system prompt */
@@ -474,8 +479,30 @@ pub(crate) async fn build_intermediary_prompt(
          3. Generar información útil para el equipo\n\
          4. Escalar al empleado si requiere acción humana (usa [ESCALATE])\n\
          No tomes decisiones sobre el trabajo — solo comunica y documenta.\n\
-         Responde de forma concisa, amable y profesional. Nunca menciones que eres IA.\n",
+         Responde de forma concisa, amable y profesional. Eres el asistente de IA de Nakomi: \
+         no finjas ser el empleado y, si preguntan, identifícate con claridad.\n",
     );
 
     prompt
+}
+
+#[cfg(test)]
+mod tests {
+    use super::base_system_prompt;
+
+    #[test]
+    fn base_prompt_is_transparent_about_ai_identity() {
+        let prompt = base_system_prompt();
+        assert!(prompt.contains("the AI assistant of Nakomi Studio"));
+        assert!(prompt.contains("Never pretend to be a human employee"));
+        assert!(!prompt.contains("Never mention that you are an artificial intelligence"));
+    }
+
+    #[test]
+    fn base_prompt_escalates_deep_project_conversations_to_whatsapp_cta() {
+        let prompt = base_system_prompt();
+        assert!(prompt.contains("conversar en profundidad sobre su proyecto"));
+        assert!(prompt.contains("Prioriza request_human_assistance"));
+        assert!(prompt.contains("botón real de WhatsApp"));
+    }
 }

@@ -1786,7 +1786,7 @@ fn exec_request_human(args: &Value) -> ToolExecResult {
             tracing::warn!("PUBLIC_SUPPORT_WHATSAPP no tiene dígitos suficientes: {raw_number}");
             return None;
         }
-        let prefill = "Hola, necesito ayuda con mi consulta.";
+        let prefill = "Hola, quiero conversar más a fondo sobre mi proyecto con Nakomi Studio.";
         let href = format!("https://wa.me/{digits}?text={}", urlencoding::encode(prefill));
 
         Some(RichMessage {
