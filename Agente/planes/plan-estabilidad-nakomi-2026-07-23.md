@@ -2,8 +2,8 @@
 
 > **Fecha:** 2026-07-23  
 > **Estado:** Código desplegado el 2026-07-26. Freeze corregido; precedencia
-> humano–IA e identidad transparente desplegadas. Correo activado pendiente de
-> canary recibido; CTA configurado pendiente de prueba visual; gateway WhatsApp
+> humano–IA e identidad transparente desplegadas. Correo inmediato recibido y
+> confirmado por la usuaria; CTA configurado pendiente de prueba visual; gateway WhatsApp
 > automático todavía pendiente en glorytemplate.
 > **Prioridad:** Crítica  
 > **Responsable técnico:** agente principal  

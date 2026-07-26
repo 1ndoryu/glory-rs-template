@@ -1067,8 +1067,8 @@ Cada fila es un commit independiente. No mezclar repositorios en un commit.
 | 9 | `237A-6a` | Nakomi backend | Secuencia, envelope v2, snapshot y reparación de huecos. | ✅ Implementado |
 | 10 | `237A-6b` | Nakomi frontend | Realtime v2, dedupe, líder de audio y compatibilidad. | ✅ Implementado |
 | 11 | `237A-6c` | Nakomi | Modos IA, ACK del botón y ciclo durable de fallback a 10 minutos. | ✅ Implementado |
-| 12 | `237A-7i` | Nakomi | Captura/consentimiento de email y tests de tool call. | ✅ Implementado |
-| 13 | `237A-7j` | Nakomi | Token y correo de continuación tras desconexión real. | ✅ Implementado |
+| 12 | `237A-7i` | Nakomi | Captura/consentimiento de email y tests de tool call. | 🟡 Implementado parcialmente; `267A-2` separa nombre/email y elimina fallos silenciosos, faltan tests conversacionales/consentimiento explícito |
+| 13 | `237A-7j` | Nakomi | Token y correo de continuación tras desconexión real. | ⏳ Piezas backend aisladas; faltan disparador durable, cancelación por reconexión, enlace consumible en frontend y E2E en navegador limpio |
 
 Gates:
 

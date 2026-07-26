@@ -612,6 +612,55 @@ impl ChatRepository {
         .await
     }
 
+    /* [267A-2] Captura conversacional atómica: email, normalización y consentimiento
+     * deben persistirse juntos. Separarlos permitía guardar el email pero perder la
+     * autorización necesaria para enviar el enlace de continuación. */
+    pub async fn capture_visitor_email(
+        pool: &PgPool,
+        visitor_id: &str,
+        email: &str,
+        display_name: Option<&str>,
+    ) -> Result<VisitorProfile, sqlx::Error> {
+        sqlx::query_as::<_, VisitorProfile>(
+            "UPDATE visitor_profiles SET \
+               email = $2, \
+               email_normalized = $2, \
+               email_captured_at = NOW(), \
+               continuation_consent_at = NOW(), \
+               continuation_declined_at = NULL, \
+               email_source = 'chatbot', \
+               display_name = COALESCE($3, display_name), \
+               last_seen_at = NOW() \
+             WHERE visitor_id = $1 \
+             RETURNING id, visitor_id, email, user_id, display_name, context_summary, \
+               preferences, first_seen_at, last_seen_at, total_sessions, \
+               ip_addresses, device_fingerprints",
+        )
+        .bind(visitor_id)
+        .bind(email)
+        .bind(display_name)
+        .fetch_one(pool)
+        .await
+    }
+
+    /* [267A-2] El nombre tiene su propia operación para que nunca sobrescriba el
+     * email capturado. Este contrato evita depender de sentinelas como cadena vacía. */
+    pub async fn update_visitor_display_name(
+        pool: &PgPool,
+        visitor_id: &str,
+        display_name: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "UPDATE visitor_profiles SET display_name = $2, last_seen_at = NOW() \
+             WHERE visitor_id = $1",
+        )
+        .bind(visitor_id)
+        .bind(display_name)
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
     /* [T-3] Actualizar resumen de contexto (generado por IA al cerrar sesión) */
     pub async fn update_context_summary(
         pool: &PgPool,

@@ -102,11 +102,10 @@ que la experiencia solicitada funcione para la administradora.**
 
 #### Pendiente crítico — alertas y contacto
 
-1. **Correo inmediato por cada mensaje de cliente:** código, outbox, worker SMTP
-   y configuración están desplegados. `CHAT_ALERT_CAPTURE_ENABLED=true` y
-   `CHAT_EMAIL_DELIVERY_ENABLED=true`; el arranque confirma SMTP y worker. Falta
-   el canary final: mensaje real, correo recibido y estado `sent` en
-   `email_logs`/outbox. Hasta esa evidencia no se marca cerrado.
+1. **Correo inmediato por cada mensaje de cliente:** ✅ verificado por la usuaria
+   el 2026-07-26 con un mensaje real y correo recibido en
+   `andoryyu@gmail.com`. Código, outbox, worker SMTP y flags de captura/entrega
+   permanecen activos en producción.
 2. **WhatsApp inmediato por cada mensaje y pedido:** el cliente Nakomi existe,
    pero el gateway firmado/worker `wacli` de `glorytemplate` sigue pendiente de
    implementación y canary. Mientras tanto no hay entrega WhatsApp verificable.
@@ -127,9 +126,16 @@ que la experiencia solicitada funcione para la administradora.**
 6. Verificar botón de detener IA, precedencia de respuesta humana y fallback
    solo después de 10 minutos. No declarar completo sin carrera humano/worker
    y prueba visible.
-7. Verificar que la IA capture email con consentimiento, no lo vuelva a pedir,
-   y que el correo de continuación recupere la conversación desde un navegador
-   limpio. El código existe; la prueba extremo a extremo no está realizada.
+7. **Captura de contacto y continuación:** el prompt ya intenta obtener el
+   nombre en la primera/segunda respuesta y el correo después de una interacción
+   útil; reutiliza el perfil conocido para no volver a pedirlos. El 2026-07-26 se
+   corrigió el defecto por el que guardar el nombre podía borrar un correo ya
+   capturado, separando ambas escrituras y eliminando fallos silenciosos/PII de
+   logs. Sigue pendiente conectar el envío del correo de continuación: existen
+   tabla, token de un uso, plantilla y endpoint backend, pero todavía no hay
+   disparador durable tras desconexión ni consumidor frontend del token. Tampoco
+   existe recepción de respuestas por email; el diseño actual es volver al chat
+   mediante enlace seguro. No declarar completo hasta probar navegador limpio.
 8. Verificar retención: ningún mensaje debe desaparecer por cierre de sesión,
    paginación o reconexión. Falta prueba de conversación antigua y de más de
    100 mensajes.

@@ -448,3 +448,10 @@
 - `html_escape()` es obligatorio para todo input dinámico.
 - Las funciones de envío en email.rs siguen el patrón: construir subject, llamar template, enviar, loguear en email_logs.
 - `EmailLogRepository::insert` registra categoría, context, object_id, status y error.
+
+### Datos de contacto: no reutilizar una escritura con valores centinela
+- Actualizar solo el nombre con una función que también escribe email y pasar `""`
+  puede destruir silenciosamente un contacto válido.
+- Nombre, email y consentimiento necesitan contratos explícitos; la captura
+  conversacional de email debe persistir su metadata de forma atómica.
+- Los logs de captura deben confirmar el resultado sin imprimir la dirección.

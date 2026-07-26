@@ -42,9 +42,9 @@
 pero no hay aceptación funcional suficiente para marcarlas completas.
 - **C1 (Notif realtime):** pendiente de prueba en producción para mensaje de
   cliente, panel/fuera de panel y reconexión.
-- **C2 (Correo/alerta):** la lógica legacy y la outbox existen, pero las flags
-  de delivery son fail-closed y falta evidencia de correo recibido. El fallback
-  IA de 10 minutos también requiere prueba de carrera con respuesta humana.
+- **C2 (Correo/alerta):** ✅ correo inmediato confirmado por la usuaria en
+  producción el 2026-07-26. El fallback IA de 10 minutos todavía requiere prueba
+  de carrera con respuesta humana; WhatsApp automático sigue pendiente.
 - **C3 (Punto rojo):** el componente existe, pero fuera del panel el contador no
   se carga inicialmente; corregir y verificar en desktop/móvil.
 

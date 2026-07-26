@@ -26,8 +26,8 @@ use crate::repositories::{
     ProblemRepository, UserRepository, VpsRepository,
 };
 use crate::services::{
-    checkout_bypass_is_configured, is_checkout_bypass_email, CheckoutParams, HostingStripeService,
-    VpsCheckoutParams, VpsStripeService, vps_stripe_fee_cents,
+    checkout_bypass_is_configured, is_checkout_bypass_email, vps_stripe_fee_cents, CheckoutParams,
+    HostingStripeService, VpsCheckoutParams, VpsStripeService,
 };
 
 /* Resultado de ejecutar una tool: JSON para la IA y opcionalmente un
@@ -1787,7 +1787,10 @@ fn exec_request_human(args: &Value) -> ToolExecResult {
             return None;
         }
         let prefill = "Hola, quiero conversar más a fondo sobre mi proyecto con Nakomi Studio.";
-        let href = format!("https://wa.me/{digits}?text={}", urlencoding::encode(prefill));
+        let href = format!(
+            "https://wa.me/{digits}?text={}",
+            urlencoding::encode(prefill)
+        );
 
         Some(RichMessage {
             content: "Este caso necesita atención personal.".to_string(),
@@ -2034,34 +2037,27 @@ async fn exec_capture_email(
 
     /* [237A-10] Validación real de formato email */
     if !is_valid_email(raw_email) {
-        return tool_status("error", "El email proporcionado no tiene un formato válido.");
+        return tool_status(
+            "error",
+            "El email proporcionado no tiene un formato válido.",
+        );
     }
 
     let email_normalized = raw_email.trim().to_lowercase();
     let display_name = args["display_name"].as_str();
 
-    /* Si la IA nos da el nombre junto con el email, actualizar visitor_name en la sesión */
+    /* Si la IA nos da el nombre junto con el email, actualizar visitor_name en la sesión. */
     if let Some(name) = display_name {
-        let _ = update_session_visitor_name(pool, session_id, name).await;
+        if let Err(error) = update_session_visitor_name(pool, session_id, name).await {
+            tracing::error!(%session_id, "Error actualizando nombre de sesión: {error}");
+            return tool_status("error", "Error guardando el nombre del visitante");
+        }
     }
 
-    match ChatRepository::update_visitor_email(pool, vid, &email_normalized, display_name).await {
+    match ChatRepository::capture_visitor_email(pool, vid, &email_normalized, display_name).await {
         Ok(profile) => {
-            /* [237A-10] Guardar email normalizado + timestamp de captura + source */
-            let _ = sqlx::query(
-                "UPDATE visitor_profiles SET \
-                   email_normalized = $2, \
-                   email_captured_at = NOW(), \
-                   continuation_consent_at = NOW(), \
-                   email_source = 'chatbot' \
-                 WHERE visitor_id = $1",
-            )
-            .bind(vid)
-            .bind(&email_normalized)
-            .execute(pool)
-            .await;
-
-            tracing::info!("Email capturado para visitor {vid}: {email_normalized}");
+            /* [267A-2] No registrar PII: basta identificar al visitante y el resultado. */
+            tracing::info!(visitor_id = %vid, "Email de visitante capturado");
             ToolExecResult {
                 tool_result_json: json!({
                     "status": "ok",
@@ -2093,12 +2089,22 @@ async fn exec_save_client_info(
         return tool_status("error", "visitor_id no disponible");
     };
 
-    /* Si la IA capturó el nombre, actualizar visitor_name en la sesión para el panel */
+    /* [267A-2] Nombre y email tienen escrituras independientes: guardar el nombre
+     * nunca debe convertir un email previamente capturado en cadena vacía. */
     if let Some(name) = args["name"].as_str() {
         if !name.trim().is_empty() {
-            let _ = update_session_visitor_name(pool, session_id, name).await;
-            /* También guardar en visitor_profiles */
-            let _ = ChatRepository::update_visitor_email(pool, vid, "", Some(name)).await;
+            let normalized_name = name.trim();
+            if let Err(error) =
+                ChatRepository::update_visitor_display_name(pool, vid, normalized_name).await
+            {
+                tracing::error!(visitor_id = %vid, "Error guardando nombre del visitante: {error}");
+                return tool_status("error", "Error guardando el nombre del visitante");
+            }
+            if let Err(error) = update_session_visitor_name(pool, session_id, normalized_name).await
+            {
+                tracing::error!(%session_id, "Error actualizando nombre de sesión: {error}");
+                return tool_status("error", "Error guardando el nombre en la conversación");
+            }
         }
     }
 
@@ -2463,17 +2469,17 @@ mod tests {
     }
 
     #[tokio::test]
-async fn create_hosting_checkout_requires_stripe_key() {
-    /* Asegurar que checkout_bypass no está configurado para que el test
-     * realmente verifique el check de Stripe. Sin esto, otros tests que
-     * seteen GLORY_TEST_CHECKOUT_EMAILS en paralelo pueden hacer que
-     * checkout_bypass_is_configured() retorne true y el flujo se salte
-     * el Stripe check, llegando a un error de DB en vez de "Stripe". */
-    std::env::remove_var("GLORY_TEST_CHECKOUT_EMAILS");
+    async fn create_hosting_checkout_requires_stripe_key() {
+        /* Asegurar que checkout_bypass no está configurado para que el test
+         * realmente verifique el check de Stripe. Sin esto, otros tests que
+         * seteen GLORY_TEST_CHECKOUT_EMAILS en paralelo pueden hacer que
+         * checkout_bypass_is_configured() retorne true y el flujo se salte
+         * el Stripe check, llegando a un error de DB en vez de "Stripe". */
+        std::env::remove_var("GLORY_TEST_CHECKOUT_EMAILS");
 
-    let pool = PgPool::connect_lazy("postgres://invalid@localhost/test").unwrap();
-    let http = reqwest::Client::new();
-    let result = execute_tool(
+        let pool = PgPool::connect_lazy("postgres://invalid@localhost/test").unwrap();
+        let http = reqwest::Client::new();
+        let result = execute_tool(
             ToolExecutionContext {
                 pool: &pool,
                 http_client: &http,
