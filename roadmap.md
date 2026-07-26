@@ -158,6 +158,8 @@ Planes activos:
 - Maestro: `Agente/planes/plan-estabilidad-nakomi-2026-07-23.md`.
 - Cierre ejecutable de alertas, WhatsApp, Realtime y bloques difíciles:
   `Agente/planes/plan-cierre-bloques-dificiles-nakomi-2026-07-23.md`.
+- Cierre activo de WhatsApp y continuidad de contacto:
+  `Agente/planes/plan-cierre-whatsapp-continuacion-contacto-2026-07-26.md`.
 
 **Estado histórico (2026-07-23):** Bloques A, B, C, D, E declarados
 implementados en backend + frontend. El despliegue posterior está hecho, pero
