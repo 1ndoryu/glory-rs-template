@@ -19,7 +19,9 @@ export type SeccionPanel =
     /* [311A-1] Sección de trazabilidad de correos enviados (admin only) */
     | 'correos'
     /* [026B-1] Cobros pendientes: gestión admin de billing_items */
-    | 'cobros';
+    | 'cobros'
+    /* [SEO-A] Dashboard SEO admin */
+    | 'seo';
 
 export interface TabConfig {
     id: SeccionPanel;
@@ -195,6 +197,12 @@ const TABS_ADMIN: TabConfig[] = [
         id: 'cobros',
         label: 'Cobros',
         descripcion: 'Gestiona cobros pendientes de clientes: marca pagados o pendientes manualmente.'
+    },
+    /* [SEO-A] Dashboard SEO admin: auditoría de todas las páginas públicas */
+    {
+        id: 'seo',
+        label: 'SEO',
+        descripcion: 'Auditoría SEO de todas las páginas públicas. Títulos, descripciones, structured data y checks GEO.'
     }
 ];
 

@@ -3,6 +3,7 @@
 #![allow(clippy::needless_for_each)] // Generado por utoipa OpenApi derive
 
 mod admin_billing;
+mod admin_seo;
 mod admin_client_bootstrap;
 mod admin_email_preview;
 mod admin_emails;
@@ -608,6 +609,10 @@ fn spa_shell_routes() -> Router<AppState> {
         .route("/soluciones/vps", get(spa_index))
         .route("/portal-vps", get(spa_index))
         .route("/politica-privacidad", get(spa_index))
+        .route("/blog", get(spa_index))
+        .route("/blog/:slug", get(spa_index))
+        .route("/contacto", get(spa_index))
+        .route("/politica-privacidad", get(spa_index))
         .route("/usuario/:username", get(spa_index))
         .route("/panel", get(spa_index))
         .route("/panel/", get(spa_index))
@@ -704,6 +709,7 @@ fn api_routes() -> Router<AppState> {
         .merge(wallet::wallet_routes())
         .merge(cancellation::cancellation_routes())
         .merge(wallet::withdrawal_admin_routes())
+        .merge(admin_seo::routes())
         .merge(uploads::routes())
         .layer(GovernorLayer {
             config: std::sync::Arc::new(api_governor),

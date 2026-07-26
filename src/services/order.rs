@@ -129,7 +129,12 @@ impl OrderService {
 
         let base_price = plan.price_cents;
         let discount = Self::discount_for_mode(payment_mode);
-        let final_price = base_price - (base_price * discount / 100);
+
+        /* [SEO-D] Descuento 50% primer pedido: si el usuario no tiene órdenes previas,
+         * aplicar 50% de descuento. No acumula con payment_mode — se usa el mayor. */
+        let first_order_discount = Self::first_order_discount_percent(pool, client_id).await?;
+        let effective_discount = discount.max(first_order_discount);
+        let final_price = base_price - (base_price * effective_discount / 100);
 
         let plan_phases = ServiceRepository::list_plan_phases(pool, plan.id).await?;
 
@@ -150,7 +155,7 @@ impl OrderService {
                 plan_id: plan.id,
                 payment_mode,
                 base_price_cents: base_price,
-                discount_percent: discount,
+                discount_percent: effective_discount,
                 final_price_cents: final_price,
                 project_description: project_description.as_deref(),
                 client_notes: client_notes.as_deref(),
@@ -820,6 +825,19 @@ impl OrderService {
             PaymentMode::HalfHalf => 10,
             PaymentMode::Phased => 0,
         }
+    }
+
+    /// [SEO-D] Descuento 50% para primer pedido. Retorna 0 si ya tiene órdenes previas.
+    async fn first_order_discount_percent(pool: &PgPool, user_id: Uuid) -> Result<i32, AppError> {
+        let count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM orders WHERE client_id = $1",
+        )
+        .bind(user_id)
+        .fetch_one(pool)
+        .await
+        .map_err(|e| AppError::Internal(format!("Error verificando órdenes previas: {e}")))?;
+
+        if count == 0 { Ok(50) } else { Ok(0) }
     }
 
     /// Estado inicial de la primera fase segun modo de pago.

@@ -1,0 +1,178 @@
+/* [SEO-A] Estilos mínimos para SeccionSeo.
+ * Reutiliza: .contenidoContenedor, .contenidoSubTabs, .contenidoSubTab,
+ * .contenidoSubTab--activo, .contenidoPanel de SeccionContenido.css.
+ * Reutiliza: .correosTabla, .correosTablaWrapper, .correosFila, .correosFiltro,
+ * .correosBadge, .correosTag, .correosAsunto, .correosTotal de SeccionCorreo.css.
+ * Reutiliza: .listaServiciosFila, .listaServiciosFilaInfo, .listaServiciosNombre,
+ * .listaServiciosBadge de ListaServicios.css.
+ * Solo se definen clases nuevas específicas de SEO. */
+
+.seoCargando {
+    padding: var(--spacing-xl);
+    text-align: center;
+    color: var(--text-tertiary);
+    font-size: var(--text-sm);
+}
+
+/* Tarjetas de resumen */
+.seoResumenTarjetas {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+}
+
+.seoResumenTarjeta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-md);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--bg-primary);
+}
+
+.seoResumenValor {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.seoResumenLabel {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+}
+
+.seoResumenTarjeta--error .seoResumenValor {
+    color: var(--text-primary);
+}
+
+/* Issues lista */
+.seoIssuesLista {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.seoIssueFila {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+}
+
+.seoIssueBadge {
+    font-size: var(--text-2xs);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+    flex-shrink: 0;
+    background: var(--bg-item-hover);
+    color: var(--text-tertiary);
+}
+
+.seoIssuePath {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    white-space: nowrap;
+}
+
+.seoIssueMensaje {
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Página tab: campos específicos */
+.seoPaginaLabel {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.seoPaginaRuta {
+    font-size: var(--text-sm);
+    color: var(--text-primary);
+}
+
+.seoPaginaTitle {
+    max-width: 250px;
+}
+
+.seoPaginaTitle em {
+    color: var(--text-tertiary);
+    font-size: var(--text-xs);
+}
+
+.seoPaginaLen {
+    font-size: var(--text-2xs);
+    color: var(--text-tertiary);
+    margin-left: var(--spacing-xs);
+}
+
+/* Blog sub-tab: meta info */
+.seoBlogMeta {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    margin-top: 2px;
+}
+
+.seoBlogMetaVacio {
+    color: var(--text-tertiary);
+    opacity: 0.7;
+}
+
+/* GEO checklist */
+.seoGeoLista {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.seoGeoFila {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+}
+
+.seoGeoIcono {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.seoGeoIcono--ok {
+    color: var(--text-tertiary);
+}
+
+.seoGeoIcono--fail {
+    color: var(--text-primary);
+}
+
+.seoGeoInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.seoGeoLabel {
+    font-size: var(--text-sm);
+    color: var(--text-primary);
+}
+
+.seoGeoDetalle {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+}

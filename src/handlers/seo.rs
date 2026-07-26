@@ -14,6 +14,50 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/robots.txt", get(robots_txt))
         .route("/sitemap.xml", get(sitemap_xml))
+        .route("/llms.txt", get(llms_txt))
+}
+
+/* [SEO-C] llms.txt: resumen del sitio en formato Markdown para crawlers de IA.
+ * Estándar propuesto para que ChatGPT, Perplexity, Claude y Gemini entiendan
+ * la estructura y servicios del sitio. */
+async fn llms_txt() -> impl IntoResponse {
+    let body = "# Nakomi Studio\n\
+\n\
+        ## Descripción\n\
+        Nakomi Studio es una agencia digital con sede en Copenhague, especializada en\n\
+        desarrollo web, aplicaciones móviles, agentes de IA e identidad de marca.\n\
+        Opera globalmente con clientes en Europa, América y Asia.\n\
+\n\
+        ## Servicios\n\
+        - Diseño y desarrollo web: Sitios corporativos, landings, portafolios desde $350\n\
+        - Desarrollo de aplicaciones: Apps web y móviles con React, Rust, Node.js\n\
+        - Agentes de IA: Chatbots, asistentes virtuales, automatización con IA\n\
+        - Identidad de marca: Branding, logos, guías de estilo\n\
+        - Hosting administrado: WordPress y Nginx desde $2.48/mes\n\
+        - Servidores VPS: Infraestructura dedicada desde $4.73/mes\n\
+        - E-commerce: Tiendas online con pasarelas de pago integradas\n\
+\n\
+        ## Oferta especial\n\
+        50% de descuento en el primer servicio para nuevos clientes.\n\
+\n\
+        ## Contacto\n\
+        - Web: https://nakomi.studio\n\
+        - Chat en vivo disponible en el sitio\n\
+\n\
+        ## Stack tecnológico\n\
+        - Backend: Rust (Axum), PostgreSQL, SQLx\n\
+        - Frontend: React 18, TypeScript, Vite\n\
+        - Infraestructura: Coolify, Docker, Traefik\n\
+        - IA: DeepSeek, Groq, Gemini (multi-proveedor con fallback)\n\
+\n\
+        ## Páginas principales\n\
+        - Servicios: https://nakomi.studio/servicios\n\
+        - Proyectos: https://nakomi.studio/proyectos\n\
+        - Blog: https://nakomi.studio/blog\n\
+        - Hosting: https://nakomi.studio/soluciones/hosting\n\
+        - VPS: https://nakomi.studio/soluciones/vps\n\
+        - Nosotros: https://nakomi.studio/nosotros";
+    ([(header::CONTENT_TYPE, "text/plain; charset=utf-8")], body)
 }
 
 async fn robots_txt() -> impl IntoResponse {
@@ -38,6 +82,10 @@ async fn sitemap_xml(State(state): State<AppState>) -> impl IntoResponse {
         ("/blog".into(), "0.8", "daily"),
         ("/soluciones".into(), "0.8", "monthly"),
         ("/soluciones/hosting".into(), "0.8", "monthly"),
+        ("/soluciones/hosting-wordpress".into(), "0.8", "monthly"),
+        ("/soluciones/vps".into(), "0.8", "monthly"),
+        ("/contacto".into(), "0.6", "monthly"),
+        ("/politica-privacidad".into(), "0.3", "yearly"),
     ];
 
     /* [114A-SEO3] Rutas dinámicas desde BD: servicios con slug público */

@@ -26,6 +26,7 @@ import {SeccionInfraestructura} from '../components/panel/SeccionInfraestructura
 import {SeccionDominios} from '../components/panel/SeccionDominios';
 import {SeccionCorreo} from '../components/panel/SeccionCorreo';
 import {SeccionCobros} from '../components/panel/SeccionCobros';
+import {SeccionSeo} from '../components/panel/SeccionSeo';
 /* [064A-34] EmployeesSection y ServicesCatalogSection eliminados del panel. */
 import {SidebarPanel} from '../components/panel/SidebarPanel';
 import {PlaceholderSeccion} from '../components/panel/PlaceholderSeccion';
@@ -172,6 +173,8 @@ export const PanelIsland: React.FC = () => {
             /* [026B-1] Cobros pendientes: gestión admin de billing_items */
             case 'cobros':
                 return <SeccionCobros />;
+            case 'seo':
+                return <SeccionSeo />;
             default:
                 return <PlaceholderSeccion tab={tabActual} />;
         }

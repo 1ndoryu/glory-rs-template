@@ -194,6 +194,38 @@ async fn resolve_seo_meta(path: &str, pool: &PgPool, app_url: &str) -> Option<Se
             canonical,
             og_type: "website",
         }),
+        "/soluciones/hosting-wordpress" => Some(SeoMeta {
+            title: "Hosting WordPress — Nakomi Studio".into(),
+            description: "WordPress hosting optimizado con WP-CLI, backups automáticos y soporte experto."
+                .into(),
+            og_image: None,
+            canonical,
+            og_type: "website",
+        }),
+        "/soluciones/vps" => Some(SeoMeta {
+            title: "Servidores VPS — Nakomi Studio".into(),
+            description: "Servidores VPS dedicados con acceso root, bootstrap inicial y precios transparentes."
+                .into(),
+            og_image: None,
+            canonical,
+            og_type: "website",
+        }),
+        "/blog" => Some(SeoMeta {
+            title: "Blog — Nakomi Studio".into(),
+            description: "Artículos sobre desarrollo web, diseño, tecnología e inteligencia artificial."
+                .into(),
+            og_image: None,
+            canonical,
+            og_type: "website",
+        }),
+        "/contacto" => Some(SeoMeta {
+            title: "Contacto — Nakomi Studio".into(),
+            description: "Contacta con Nakomi Studio para tu proyecto web, app o solución digital."
+                .into(),
+            og_image: None,
+            canonical,
+            og_type: "website",
+        }),
         _ => resolve_dynamic_meta(path, pool, &canonical).await,
     }
 }
@@ -241,6 +273,30 @@ async fn resolve_dynamic_meta(path: &str, pool: &PgPool, canonical: &str) -> Opt
         Some(SeoMeta {
             title: format!("{} — Nakomi Studio", row.0),
             description: row.1,
+            og_image: row.2,
+            canonical: canonical.to_string(),
+            og_type: "article",
+        })
+    } else if let Some(slug) = path.strip_prefix("/blog/") {
+        let slug = slug.trim_end_matches('/');
+        if slug.is_empty() {
+            return None;
+        }
+        // sentinel-disable-next-line sqlx-query-as-sin-macro
+        let row: (String, Option<String>, Option<String>) = sqlx::query_as(
+            "SELECT COALESCE(meta_title, title), \
+                    COALESCE(meta_description, excerpt), \
+                    image_url \
+             FROM blog_posts WHERE slug = $1 AND status = 'published'",
+        )
+        .bind(slug)
+        .fetch_optional(pool)
+        .await
+        .ok()??;
+
+        Some(SeoMeta {
+            title: format!("{} — Nakomi Studio", row.0),
+            description: row.1.unwrap_or_default(),
             og_image: row.2,
             canonical: canonical.to_string(),
             og_type: "article",

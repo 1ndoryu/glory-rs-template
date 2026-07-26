@@ -51,7 +51,10 @@ export const organizationSchema = {
             },
         ],
     },
-    sameAs: [],
+    sameAs: [
+        'https://github.com/1ndoryu',
+        'https://www.linkedin.com/company/nakomi-studio',
+    ],
 };
 
 export const websiteSchema = {
@@ -81,7 +84,7 @@ export const serviceSchema = (nombre: string, descripcion: string, slug: string)
     availableLanguage: ['Spanish', 'English', 'Japanese'],
 });
 
-export const blogPostSchema = (titulo: string, descripcion: string, slug: string, fecha?: string) => ({
+export const blogPostSchema = (titulo: string, descripcion: string, slug: string, fecha?: string, fechaModificacion?: string) => ({
     '@context': 'https://schema.org',
     '@type': 'BlogPosting',
     headline: titulo,
@@ -89,6 +92,7 @@ export const blogPostSchema = (titulo: string, descripcion: string, slug: string
     url: `${SITE_URL}/blog/${slug}`,
     image: OG_IMAGE,
     ...(fecha && {datePublished: fecha}),
+    ...(fechaModificacion && {dateModified: fechaModificacion}),
     author: {
         '@type': 'Organization',
         name: 'Nakomi Studio',
@@ -117,6 +121,19 @@ export const breadcrumbSchema = (items: {name: string; url: string}[]) => ({
 });
 
 /* [074A-marketing] Person schema para miembros del equipo en /nosotros */
+export const faqSchema = (preguntas: {question: string; answer: string}[]) => ({
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: preguntas.map(p => ({
+        '@type': 'Question',
+        name: p.question,
+        acceptedAnswer: {
+            '@type': 'Answer',
+            text: p.answer,
+        },
+    })),
+});
+
 export const personSchema = (nombre: string, cargo: string, bio: string, avatar: string, slug: string) => ({
     '@context': 'https://schema.org',
     '@type': 'Person',

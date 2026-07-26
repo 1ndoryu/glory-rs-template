@@ -9,7 +9,10 @@
 > 2. Usar `ssh` — binario ausente en la imagen
 > 3. Leer rutas SSH (`COOLIFY_VPS1_SSH_KEY_PATH=ruta_windows`) — rutas Windows inválidas en Linux
 >
-> **Estado actualizado:** Este plan quedó subsumido por `plan-fixes-permanentes-studio-2026-05-23.md`.
+> **Estado actualizado:** ✅ COMPLETADO — subsumido y resuelto por `plan-fixes-permanentes-studio-2026-05-23.md`.
+> Todos los diagnósticos y correcciones de este plan se ejecutaron en las fases 1-5
+> del plan de fixes permanentes (2026-05-23). SSH VPS1/VPS2 runtime validado,
+> red coolify reconectada, build completo desplegado.
 > - `COOLIFY_VPS1_BASE_URL=http://coolify:8080` — runtime alcanzable desde contenedor (`401` esperado sin token)
 > - `COOLIFY_VPS1_SSH_KEY_PATH=/home/appuser/.ssh/id_ed25519` — forzado por `deploy-service` en compose efectivo
 > - Rutas Windows — filtradas por el manager para que no entren al runtime Linux
