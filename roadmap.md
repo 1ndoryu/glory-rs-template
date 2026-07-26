@@ -129,7 +129,7 @@ que la experiencia solicitada funcione para la administradora.**
 7. **Captura de contacto y continuación:** el prompt ya intenta obtener el
    nombre en la primera/segunda respuesta y el correo después de una interacción
    útil; reutiliza el perfil conocido para no volver a pedirlos. El 2026-07-26 se
-   corrigió el defecto por el que guardar el nombre podía borrar un correo ya
+   desplegó la corrección del defecto por el que guardar el nombre podía borrar un correo ya
    capturado, separando ambas escrituras y eliminando fallos silenciosos/PII de
    logs. Sigue pendiente conectar el envío del correo de continuación: existen
    tabla, token de un uso, plantilla y endpoint backend, pero todavía no hay
