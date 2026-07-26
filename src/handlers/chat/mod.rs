@@ -35,6 +35,8 @@ TIPOS COMPARTIDOS ENTRE SUBMÓDULOS
 #[derive(Deserialize)]
 pub struct VisitorWsParams {
     pub visitor_id: String,
+    /* [267A-3] Sesión recuperada por token; backend valida que pertenezca al visitor. */
+    pub session_id: Option<Uuid>,
     pub visitor_name: Option<String>,
     /* [T-9] Token JWT opcional para clientes autenticados */
     pub token: Option<String>,

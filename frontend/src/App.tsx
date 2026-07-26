@@ -51,6 +51,7 @@ const AuthenticatedNotificationRuntime = lazy(() => import('./components/notific
 import {useAuthStore} from './stores/authStore';
 import {apiGoogleLogin} from './api/auth';
 import {toast} from './stores/toastStore';
+import {ChatContinuationCoordinator} from './components/chat/ChatContinuationCoordinator';
 
 import './App.css';
 
@@ -177,11 +178,13 @@ function App() {
         <QueryClientProvider client={queryClient}>
             <ToastContainer />
             <BrowserRouter>
+                <ChatContinuationCoordinator />
                 <ScrollToTop />
                 <NavigateRegistrar />
                 <GoogleAuthCallback />
                 <Routes>
                     <Route path="/" element={<HomePage />} />
+                    <Route path="/continuar-chat" element={<HomePage />} />
                     <Route path="/servicios" element={<Suspense fallback={null}><ServiciosIsland /></Suspense>} />
                     <Route path="/servicios/:slug" element={<Suspense fallback={null}><ServicioDetallePage /></Suspense>} />
                     <Route path="/proyectos" element={<Suspense fallback={null}><ProyectosIsland /></Suspense>} />

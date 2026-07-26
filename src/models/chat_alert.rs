@@ -107,6 +107,15 @@ pub struct AlertPayload {
     pub occurred_at: DateTime<Utc>,
 }
 
+/* [267A-3] Payload durable para el seguimiento de una desconexión concreta. */
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContinuationAlertPayload {
+    pub session_id: Uuid,
+    pub visitor_id: String,
+    pub visitor_name: String,
+    pub disconnect_epoch: i64,
+}
+
 /* Ciclo de escalamiento de chat. */
 #[derive(Debug, Clone, FromRow, Serialize)]
 pub struct ChatEscalation {

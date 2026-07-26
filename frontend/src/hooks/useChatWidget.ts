@@ -147,7 +147,13 @@ export function useChatWidget() {
 
         const visitorId = getOrCreateChatVisitorId(chatOwnerKey);
         /* [T-9][095A-20] Enviar JWT actual si el usuario está autenticado. */
-        const url = buildVisitorWsUrl(visitorId, visitorName, authToken, context);
+        const url = buildVisitorWsUrl(
+            visitorId,
+            visitorName,
+            authToken,
+            context,
+            sessionIdRef.current,
+        );
         const ws = new WebSocket(url);
         wsRef.current = ws;
 

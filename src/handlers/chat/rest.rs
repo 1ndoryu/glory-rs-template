@@ -16,8 +16,8 @@ use crate::models::{
     ChatSessionResponse, CreateChatSessionRequest, CreateNotification, NOTIF_NEW_CONVERSATION,
 };
 use crate::repositories::{OrderRepository, UserRepository};
-use serde_json::Value as JsonValue;
 use crate::AppState;
+use serde_json::Value as JsonValue;
 
 pub use super::rest_messages::{get_messages, send_message};
 pub use super::rest_notes::{create_session_note, list_session_notes, update_visitor_name};
@@ -110,7 +110,14 @@ pub async fn create_session(
 
         let session = state
             .chat_hub
-            .get_or_create_visitor_session(&vid, req.visitor_name.as_deref(), None, None, None)
+            .get_or_create_visitor_session(
+                &vid,
+                None,
+                req.visitor_name.as_deref(),
+                None,
+                None,
+                None,
+            )
             .await?;
 
         /* [20CA-10] Notificar admins si es nueva conversación de visitante */
@@ -231,6 +238,9 @@ pub async fn claim_continuation_token(
     let token = req["token"]
         .as_str()
         .ok_or_else(|| AppError::Validation("token es requerido".into()))?;
+    if token.len() != 64 || !token.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(AppError::Validation("token tiene formato inválido".into()));
+    }
 
     let info = crate::repositories::continuation_token::redeem_token(&state.pool, token)
         .await

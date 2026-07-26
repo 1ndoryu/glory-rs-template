@@ -268,6 +268,7 @@ async fn handle_visitor_ws(
         .chat_hub
         .get_or_create_visitor_session(
             &params.visitor_id,
+            params.session_id,
             params.visitor_name.as_deref(),
             visitor_ip.as_deref(),
             visitor_ua.as_deref(),
@@ -284,7 +285,7 @@ async fn handle_visitor_ws(
 
     let session_id = session.id;
     tracing::info!(%session_id, visitor_id = %params.visitor_id, "WS session obtenida/creada");
-    let rx = state.chat_hub.subscribe(session_id);
+    let rx = state.chat_hub.subscribe_visitor(session_id);
     let (mut sender, mut receiver) = socket.split();
 
     /* [T-3] Upsert visitor_profile: crea o actualiza perfil persistente.
@@ -321,7 +322,7 @@ async fn handle_visitor_ws(
     /* [104A-40] Registrar timestamp de conexión y notificar al staff que el visitante está online.
      * Sirve como confirmación de lectura: si el visitante está online, vio los mensajes. */
     let visitor_online_at: chrono::DateTime<chrono::Utc> =
-        crate::repositories::ChatRepository::update_visitor_last_connected(&state.pool, session_id)
+        crate::repositories::continuation_token::mark_connected(&state.pool, session_id)
             .await
             .unwrap_or_else(|e| {
                 tracing::warn!("Error actualizando visitor_last_connected_at: {e}");
@@ -387,7 +388,7 @@ async fn cleanup_visitor_session(
     visitor_online_at: chrono::DateTime<chrono::Utc>,
     timing_tx: &tokio::sync::mpsc::Sender<TimingEvent>,
 ) {
-    let remaining = state.chat_hub.unsubscribe(session_id);
+    let remaining = state.chat_hub.unsubscribe_visitor(session_id);
     if explicit_close {
         state
             .chat_hub
@@ -409,6 +410,14 @@ async fn cleanup_visitor_session(
             .chat_hub
             .notify_visitor_offline(session_id, Some(visitor_online_at))
             .await;
+        if let Err(error) = crate::repositories::continuation_token::schedule_after_disconnect(
+            &state.pool,
+            session_id,
+        )
+        .await
+        {
+            tracing::error!(%session_id, "Error programando continuación de chat: {error}");
+        }
     }
     if !ip_for_tracking.is_empty() {
         state.chat_timing.track_ip_disconnect(ip_for_tracking);

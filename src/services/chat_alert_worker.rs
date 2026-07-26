@@ -64,7 +64,7 @@ async fn recover_stale_processing(pool: &PgPool) {
     let cutoff = now - chrono::Duration::seconds(300);
     let result = sqlx::query(
         "UPDATE chat_alert_outbox SET status = 'pending', locked_at = NULL, updated_at = $1
-         WHERE status = 'processing' AND locked_at < $2"
+         WHERE status = 'processing' AND locked_at < $2",
     )
     .bind(now)
     .bind(cutoff)
@@ -108,6 +108,10 @@ async fn process_email(
     entry: &ChatAlertOutbox,
     email_config: &Option<crate::services::EmailConfig>,
 ) {
+    if entry.event_type == "chat.continuation" {
+        process_continuation_email(pool, entry, email_config).await;
+        return;
+    }
     let Some(config) = email_config else {
         let _ = ChatAlertRepository::mark_dead(pool, entry.id, "SMTP no configurado").await;
         return;
@@ -117,7 +121,9 @@ async fn process_email(
     let payload: crate::models::AlertPayload = match serde_json::from_value(entry.payload.clone()) {
         Ok(p) => p,
         Err(e) => {
-            let _ = ChatAlertRepository::mark_dead(pool, entry.id, &format!("Payload inválido: {e}")).await;
+            let _ =
+                ChatAlertRepository::mark_dead(pool, entry.id, &format!("Payload inválido: {e}"))
+                    .await;
             return;
         }
     };
@@ -189,16 +195,140 @@ async fn process_email(
     }
 }
 
-/// Envía WhatsApp vía gateway firmado y marca el resultado.
-async fn process_whatsapp(
+/* [267A-3] El token en claro nace dentro del worker y nunca se persiste ni se
+ * registra. La presencia/época se revalida justo antes del SMTP. */
+async fn process_continuation_email(
     pool: &PgPool,
     entry: &ChatAlertOutbox,
-    http_client: &reqwest::Client,
+    email_config: &Option<crate::services::EmailConfig>,
 ) {
+    let Some(config) = email_config else {
+        let _ = ChatAlertRepository::mark_dead(pool, entry.id, "SMTP no configurado").await;
+        return;
+    };
+    let payload: crate::models::ContinuationAlertPayload =
+        match serde_json::from_value(entry.payload.clone()) {
+            Ok(payload) => payload,
+            Err(error) => {
+                let _ = ChatAlertRepository::mark_dead(
+                    pool,
+                    entry.id,
+                    &format!("Payload de continuación inválido: {error}"),
+                )
+                .await;
+                return;
+            }
+        };
+    match crate::repositories::continuation_token::is_disconnect_cycle_current(
+        pool,
+        payload.session_id,
+        payload.disconnect_epoch,
+    )
+    .await
+    {
+        Ok(true) => {}
+        Ok(false) => {
+            let _ = ChatAlertRepository::mark_cancelled(
+                pool,
+                entry.id,
+                "visitor_reconnected_or_consent_revoked",
+            )
+            .await;
+            return;
+        }
+        Err(error) => {
+            let _ = ChatAlertRepository::mark_retry(
+                pool,
+                entry.id,
+                &format!("Error revalidando continuación: {error}"),
+                entry.attempts,
+            )
+            .await;
+            return;
+        }
+    }
+
+    let token = match crate::repositories::continuation_token::generate_token(
+        pool,
+        payload.session_id,
+        &payload.visitor_id,
+        &entry.recipient,
+        payload.disconnect_epoch,
+    )
+    .await
+    {
+        Ok(token) => token,
+        Err(error) => {
+            let _ = ChatAlertRepository::mark_retry(
+                pool,
+                entry.id,
+                &format!("Error generando token: {error}"),
+                entry.attempts,
+            )
+            .await;
+            return;
+        }
+    };
+    let site_url = std::env::var("SITE_URL")
+        .unwrap_or_else(|_| "https://nakomi.studio".to_string())
+        .trim_end_matches('/')
+        .to_string();
+    let continuation_url = format!(
+        "{site_url}/continuar-chat#token={}",
+        urlencoding::encode(&token)
+    );
+    let result = tokio::time::timeout(
+        SMTP_TIMEOUT,
+        crate::services::EmailService::send_chat_continuation(
+            config,
+            pool,
+            &entry.recipient,
+            &payload.visitor_name,
+            &continuation_url,
+            payload.session_id,
+        ),
+    )
+    .await;
+    match result {
+        Ok(Ok(())) => {
+            let _ = ChatAlertRepository::mark_sent(pool, entry.id).await;
+        }
+        Ok(Err(error)) => {
+            let _ = crate::repositories::continuation_token::revoke_for_session(
+                pool,
+                payload.session_id,
+            )
+            .await;
+            let _ = ChatAlertRepository::mark_retry(pool, entry.id, &error, entry.attempts).await;
+        }
+        Err(_) => {
+            let _ = crate::repositories::continuation_token::revoke_for_session(
+                pool,
+                payload.session_id,
+            )
+            .await;
+            let _ = ChatAlertRepository::mark_retry(
+                pool,
+                entry.id,
+                "Timeout SMTP de continuación",
+                entry.attempts,
+            )
+            .await;
+        }
+    }
+}
+
+/// Envía WhatsApp vía gateway firmado y marca el resultado.
+async fn process_whatsapp(pool: &PgPool, entry: &ChatAlertOutbox, http_client: &reqwest::Client) {
     let gateway_url = match std::env::var("GLORY_ALERT_GATEWAY_URL") {
         Ok(u) if !u.is_empty() => u,
         _ => {
-            let _ = ChatAlertRepository::mark_dead(pool, entry.id, "GLORY_ALERT_GATEWAY_URL no configurado").await;
+            let _ = ChatAlertRepository::mark_dead(
+                pool,
+                entry.id,
+                "GLORY_ALERT_GATEWAY_URL no configurado",
+            )
+            .await;
             return;
         }
     };
@@ -206,7 +336,12 @@ async fn process_whatsapp(
     let shared_secret = match std::env::var("GLORY_INTERNAL_ALERT_SECRET") {
         Ok(s) if !s.is_empty() => s,
         _ => {
-            let _ = ChatAlertRepository::mark_dead(pool, entry.id, "GLORY_INTERNAL_ALERT_SECRET no configurado").await;
+            let _ = ChatAlertRepository::mark_dead(
+                pool,
+                entry.id,
+                "GLORY_INTERNAL_ALERT_SECRET no configurado",
+            )
+            .await;
             return;
         }
     };
@@ -214,7 +349,9 @@ async fn process_whatsapp(
     let payload: crate::models::AlertPayload = match serde_json::from_value(entry.payload.clone()) {
         Ok(p) => p,
         Err(e) => {
-            let _ = ChatAlertRepository::mark_dead(pool, entry.id, &format!("Payload inválido: {e}")).await;
+            let _ =
+                ChatAlertRepository::mark_dead(pool, entry.id, &format!("Payload inválido: {e}"))
+                    .await;
             return;
         }
     };
@@ -232,7 +369,12 @@ async fn process_whatsapp(
 
     let result = tokio::time::timeout(
         GATEWAY_TIMEOUT,
-        crate::services::whatsapp_gateway::send_alert(http_client, &gateway_url, &shared_secret, &gw_payload),
+        crate::services::whatsapp_gateway::send_alert(
+            http_client,
+            &gateway_url,
+            &shared_secret,
+            &gw_payload,
+        ),
     )
     .await;
 
@@ -291,9 +433,7 @@ async fn log_batch_summary(pool: &PgPool) {
     }
     if let Ok(Some(age)) = ChatAlertRepository::oldest_pending_age_secs(pool).await {
         if age > 60 {
-            tracing::warn!(
-                "[chat-alert-worker] Alerta más antigua pendiente: {age}s"
-            );
+            tracing::warn!("[chat-alert-worker] Alerta más antigua pendiente: {age}s");
         }
     }
 }

@@ -188,12 +188,22 @@ export async function apiUpdateVisitorName(
     await axiosInstance.patch(`/api/chat/sessions/${sessionId}/visitor-name`, {name});
 }
 
+export interface ChatContinuationClaim {
+    session_id: string;
+    visitor_id: string;
+}
+
+export async function apiClaimChatContinuation(token: string): Promise<ChatContinuationClaim> {
+    const {data} = await axiosInstance.post<ChatContinuationClaim>('/api/chat/continuation/claim', {token});
+    return data;
+}
+
 /*    WEBSOCKET HELPERS */
 
 /** Construye URL de WebSocket para visitante */
 /* [T-9] Acepta token JWT opcional para clientes autenticados */
 /* [084A-28] Acepta context para soporte contextual (hosting:id, service:slug, etc.) */
-export function buildVisitorWsUrl(visitorId: string, visitorName?: string, token?: string | null, context?: string | null): string {
+export function buildVisitorWsUrl(visitorId: string, visitorName?: string, token?: string | null, context?: string | null, sessionId?: string | null): string {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = getApiHost();
     let url = `${protocol}//${host}/ws/chat/visitor?visitor_id=${encodeURIComponent(visitorId)}`;
@@ -205,6 +215,9 @@ export function buildVisitorWsUrl(visitorId: string, visitorName?: string, token
     }
     if (context) {
         url += `&context=${encodeURIComponent(context)}`;
+    }
+    if (sessionId) {
+        url += `&session_id=${encodeURIComponent(sessionId)}`;
     }
     return url;
 }

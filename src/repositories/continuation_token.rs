@@ -22,6 +22,7 @@ pub async fn generate_token(
     session_id: Uuid,
     visitor_id: &str,
     email: &str,
+    disconnect_epoch: i64,
 ) -> Result<String, sqlx::Error> {
     /* Generar 32 bytes aleatorios y codificar como hex (64 caracteres) */
     let raw_bytes: [u8; 32] = rand::random();
@@ -29,17 +30,127 @@ pub async fn generate_token(
     let token_hash = hash_token(&token_hex);
 
     sqlx::query(
-        "INSERT INTO chat_continuation_tokens (session_id, visitor_id, token_hash, email)
-         VALUES ($1, $2, $3, $4)",
+        "INSERT INTO chat_continuation_tokens
+             (session_id, visitor_id, token_hash, email, disconnect_epoch)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (session_id, disconnect_epoch) DO UPDATE SET
+             visitor_id = EXCLUDED.visitor_id,
+             token_hash = EXCLUDED.token_hash,
+             email = EXCLUDED.email,
+             expires_at = NOW() + INTERVAL '7 days',
+             used_at = NULL,
+             revoked_at = NULL,
+             created_at = NOW()",
     )
     .bind(session_id)
     .bind(visitor_id)
     .bind(&token_hash)
     .bind(email)
+    .bind(disconnect_epoch)
     .execute(pool)
     .await?;
 
     Ok(token_hex)
+}
+
+/* [267A-3] Marca presencia y cancela de forma durable cualquier seguimiento
+ * que todavía no haya sido entregado para esta sesión. */
+pub async fn mark_connected(pool: &PgPool, session_id: Uuid) -> Result<DateTime<Utc>, sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    let connected_at: DateTime<Utc> = sqlx::query_scalar(
+        "UPDATE chat_sessions
+         SET visitor_last_connected_at = NOW(), visitor_disconnected_at = NULL
+         WHERE id = $1 RETURNING visitor_last_connected_at",
+    )
+    .bind(session_id)
+    .fetch_one(&mut *tx)
+    .await?;
+    sqlx::query(
+        "UPDATE chat_alert_outbox SET status = 'cancelled', locked_at = NULL,
+             updated_at = NOW(), last_error = 'visitor_reconnected'
+         WHERE event_type = 'chat.continuation' AND reference_id = $1
+           AND status IN ('pending','processing')",
+    )
+    .bind(session_id)
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(
+        "UPDATE chat_continuation_tokens SET revoked_at = NOW()
+         WHERE session_id = $1 AND used_at IS NULL AND revoked_at IS NULL",
+    )
+    .bind(session_id)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(connected_at)
+}
+
+/* [267A-3] La última desconexión crea el trabajo en la outbox en la misma TX.
+ * Si falta email, consentimiento o historial, solo persiste presencia. */
+pub async fn schedule_after_disconnect(pool: &PgPool, session_id: Uuid) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    let row: (i64, DateTime<Utc>) = sqlx::query_as(
+        "UPDATE chat_sessions SET visitor_disconnected_at = NOW(),
+             visitor_disconnect_epoch = visitor_disconnect_epoch + 1
+         WHERE id = $1 AND status <> 'closed'
+         RETURNING visitor_disconnect_epoch, visitor_disconnected_at",
+    )
+    .bind(session_id)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    sqlx::query(
+        "INSERT INTO chat_alert_outbox
+            (idempotency_key, event_type, channel, recipient, reference_type,
+             reference_id, payload, available_at)
+         SELECT CONCAT('chat-continuation:', s.id, ':', $2),
+                'chat.continuation', 'email', p.email_normalized,
+                'chat_session', s.id,
+                jsonb_build_object(
+                    'session_id', s.id,
+                    'visitor_id', s.visitor_id,
+                    'visitor_name', COALESCE(p.display_name, s.visitor_name, 'Visitante'),
+                    'disconnect_epoch', $2
+                ),
+                $3 + INTERVAL '2 minutes'
+         FROM chat_sessions s
+         JOIN visitor_profiles p ON p.visitor_id = s.visitor_id
+         WHERE s.id = $1
+           AND NULLIF(p.email_normalized, '') IS NOT NULL
+           AND p.continuation_consent_at IS NOT NULL
+           AND (p.continuation_declined_at IS NULL
+                OR p.continuation_declined_at < p.continuation_consent_at)
+           AND EXISTS (SELECT 1 FROM chat_messages m WHERE m.session_id = s.id)
+         ON CONFLICT (idempotency_key) DO NOTHING",
+    )
+    .bind(session_id)
+    .bind(row.0)
+    .bind(row.1)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await
+}
+
+pub async fn is_disconnect_cycle_current(
+    pool: &PgPool,
+    session_id: Uuid,
+    disconnect_epoch: i64,
+) -> Result<bool, sqlx::Error> {
+    sqlx::query_scalar(
+        "SELECT EXISTS(
+            SELECT 1 FROM chat_sessions s
+            JOIN visitor_profiles p ON p.visitor_id = s.visitor_id
+            WHERE s.id = $1 AND s.visitor_disconnect_epoch = $2
+              AND s.visitor_disconnected_at IS NOT NULL AND s.status <> 'closed'
+              AND p.continuation_consent_at IS NOT NULL
+              AND (p.continuation_declined_at IS NULL
+                   OR p.continuation_declined_at < p.continuation_consent_at)
+        )",
+    )
+    .bind(session_id)
+    .bind(disconnect_epoch)
+    .fetch_one(pool)
+    .await
 }
 
 /// Valida un token: busca su hash, verifica que no esté usado/revocado/expirado.
@@ -100,10 +211,7 @@ pub async fn redeem_token(
 }
 
 /// Revoca todos los tokens activos de una sesión (al cerrar conversación, etc.).
-pub async fn revoke_for_session(
-    pool: &PgPool,
-    session_id: Uuid,
-) -> Result<u64, sqlx::Error> {
+pub async fn revoke_for_session(pool: &PgPool, session_id: Uuid) -> Result<u64, sqlx::Error> {
     let result = sqlx::query(
         "UPDATE chat_continuation_tokens
          SET revoked_at = NOW()
@@ -120,10 +228,7 @@ pub async fn revoke_for_session(
 
 /// Verifica si ya existe un token activo (no usado, no revocado, no expirado) para esta sesión.
 /// Esto evita enviar múltiples emails de continuación para la misma desconexión.
-pub async fn has_active_token(
-    pool: &PgPool,
-    session_id: Uuid,
-) -> Result<bool, sqlx::Error> {
+pub async fn has_active_token(pool: &PgPool, session_id: Uuid) -> Result<bool, sqlx::Error> {
     let exists: bool = sqlx::query_scalar(
         "SELECT EXISTS(
             SELECT 1 FROM chat_continuation_tokens

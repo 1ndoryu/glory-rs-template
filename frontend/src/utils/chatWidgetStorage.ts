@@ -72,6 +72,18 @@ export function saveChatSessionId(id: string): void {
     localStorage.setItem(CHAT_SESSION_ID_KEY, id);
 }
 
+/* [267A-3] Restaura conjuntamente la identidad validada por el token y elimina
+ * cualquier historial local de otra conversación antes de montar el widget. */
+export function restoreChatWidgetIdentity(visitorId: string, sessionId: string): void {
+    if (!canUseStorage() || !UUID_PATTERN.test(visitorId) || !UUID_PATTERN.test(sessionId)) {
+        throw new Error('Identidad de continuación inválida');
+    }
+    clearChatSessionData();
+    localStorage.setItem(CHAT_OWNER_KEY, ANONYMOUS_CHAT_OWNER);
+    localStorage.setItem(CHAT_VISITOR_ID_KEY, visitorId.toLowerCase());
+    localStorage.setItem(CHAT_SESSION_ID_KEY, sessionId.toLowerCase());
+}
+
 export function loadPersistedChatMessages(sessionId: string | null): ChatMessage[] {
     if (!sessionId || !canUseStorage()) return [];
     try {

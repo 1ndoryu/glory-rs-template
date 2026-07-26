@@ -117,7 +117,12 @@ impl ChatAlertRepository {
     }
 
     /// Reintenta con backoff. Si se exceden MAX_ATTEMPTS → dead.
-    pub async fn mark_retry(pool: &PgPool, id: Uuid, error: &str, attempt: i32) -> Result<(), AppError> {
+    pub async fn mark_retry(
+        pool: &PgPool,
+        id: Uuid,
+        error: &str,
+        attempt: i32,
+    ) -> Result<(), AppError> {
         let now = Utc::now();
         let truncated_error: String = error.chars().take(500).collect();
 
@@ -163,6 +168,20 @@ impl ChatAlertRepository {
         .execute(pool)
         .await
         .map_err(|e| AppError::Internal(format!("Error marcando outbox dead: {e}")))?;
+        Ok(())
+    }
+
+    pub async fn mark_cancelled(pool: &PgPool, id: Uuid, reason: &str) -> Result<(), AppError> {
+        let truncated_reason: String = reason.chars().take(500).collect();
+        sqlx::query(
+            "UPDATE chat_alert_outbox SET status = 'cancelled', last_error = $2,
+             updated_at = NOW(), locked_at = NULL WHERE id = $1",
+        )
+        .bind(id)
+        .bind(truncated_reason)
+        .execute(pool)
+        .await
+        .map_err(|e| AppError::Internal(format!("Error cancelando outbox: {e}")))?;
         Ok(())
     }
 

@@ -117,7 +117,11 @@ impl EmailService {
         let subject = format!("¡Pedido #{order_number} recibido! — Nakomi Studio");
 
         let html = super::email_templates::render_order_confirmation(
-            client_name, order_number, service_title, plan_name, price_display,
+            client_name,
+            order_number,
+            service_title,
+            plan_name,
+            price_display,
         );
 
         /* [311A-1] Logging del envío en email_logs para trazabilidad. */
@@ -126,9 +130,17 @@ impl EmailService {
         let error_msg = result.as_ref().err().map(String::as_str);
 
         if let Err(log_err) = EmailLogRepository::insert(
-            pool, to_email, &subject, "order_confirmation",
-            Some("order"), None, status, error_msg,
-        ).await {
+            pool,
+            to_email,
+            &subject,
+            "order_confirmation",
+            Some("order"),
+            None,
+            status,
+            error_msg,
+        )
+        .await
+        {
             tracing::warn!("Error registrando email_log: {log_err}");
         }
 
@@ -181,7 +193,14 @@ impl EmailService {
         let panel_link = format!("{site_url}/panel?seccion=ordenes&id={order_id}");
 
         let html = super::email_templates::render_new_order_admin(
-            client_name, client_email, order_number, service_title, plan_name, price_display, payment_mode, &panel_link,
+            client_name,
+            client_email,
+            order_number,
+            service_title,
+            plan_name,
+            price_display,
+            payment_mode,
+            &panel_link,
         );
 
         for email in admin_emails {
@@ -191,9 +210,17 @@ impl EmailService {
             let error_msg = result.as_ref().err().map(String::as_str);
 
             if let Err(log_err) = EmailLogRepository::insert(
-                pool, email, &subject, "new_order_admin",
-                Some("order"), Some(order_id), status, error_msg,
-            ).await {
+                pool,
+                email,
+                &subject,
+                "new_order_admin",
+                Some("order"),
+                Some(order_id),
+                status,
+                error_msg,
+            )
+            .await
+            {
                 tracing::warn!("Error registrando email_log: {log_err}");
             }
 
@@ -202,7 +229,10 @@ impl EmailService {
             }
         }
         if !admin_emails.is_empty() {
-            tracing::info!("Email nueva orden #{order_number} enviado a {} admins", admin_emails.len());
+            tracing::info!(
+                "Email nueva orden #{order_number} enviado a {} admins",
+                admin_emails.len()
+            );
         }
     }
 
@@ -220,9 +250,7 @@ impl EmailService {
         let subject = format!("⚠ Escalación: {visitor_name} necesita ayuda — Nakomi Studio");
         let panel_link = format!("{site_url}/panel/chat?session={session_id}");
 
-        let html = super::email_templates::render_escalation(
-            visitor_name, &panel_link,
-        );
+        let html = super::email_templates::render_escalation(visitor_name, &panel_link);
 
         for email in admin_emails {
             /* [311A-1] Logging individual por admin para trazabilidad. */
@@ -231,9 +259,17 @@ impl EmailService {
             let error_msg = result.as_ref().err().map(String::as_str);
 
             if let Err(log_err) = EmailLogRepository::insert(
-                pool, email, &subject, "escalation",
-                Some("chat_session"), Some(session_id), status, error_msg,
-            ).await {
+                pool,
+                email,
+                &subject,
+                "escalation",
+                Some("chat_session"),
+                Some(session_id),
+                status,
+                error_msg,
+            )
+            .await
+            {
                 tracing::warn!("Error registrando email_log: {log_err}");
             }
 
@@ -268,7 +304,10 @@ impl EmailService {
         let panel_link = format!("{site_url}/panel/orders/{order_id}");
 
         let html = super::email_templates::render_payment_received_admin(
-            client_name, order_number, amount_display, &panel_link,
+            client_name,
+            order_number,
+            amount_display,
+            &panel_link,
         );
 
         for email in admin_emails {
@@ -278,9 +317,17 @@ impl EmailService {
             let error_msg = result.as_ref().err().map(String::as_str);
 
             if let Err(log_err) = EmailLogRepository::insert(
-                pool, email, &subject, "payment_received_admin",
-                Some("order"), Some(order_id), status, error_msg,
-            ).await {
+                pool,
+                email,
+                &subject,
+                "payment_received_admin",
+                Some("order"),
+                Some(order_id),
+                status,
+                error_msg,
+            )
+            .await
+            {
                 tracing::warn!("Error registrando email_log: {log_err}");
             }
 
@@ -289,7 +336,10 @@ impl EmailService {
             }
         }
         if !admin_emails.is_empty() {
-            tracing::info!("Email pago recibido orden #{order_number} enviado a {} admins", admin_emails.len());
+            tracing::info!(
+                "Email pago recibido orden #{order_number} enviado a {} admins",
+                admin_emails.len()
+            );
         }
     }
 
@@ -307,7 +357,9 @@ impl EmailService {
         let amount_display = format!("${:.2} USD", amount_usd);
 
         let html = super::email_templates::render_chat_invoice_paid_client(
-            client_email, &amount_display, "",
+            client_email,
+            &amount_display,
+            "",
         );
 
         /* [311A-1] Logging del envío en email_logs para trazabilidad. */
@@ -316,9 +368,17 @@ impl EmailService {
         let error_msg = result.as_ref().err().map(String::as_str);
 
         if let Err(log_err) = EmailLogRepository::insert(
-            pool, client_email, &subject, "chat_invoice_paid_client",
-            Some("chat_invoice"), None, status, error_msg,
-        ).await {
+            pool,
+            client_email,
+            &subject,
+            "chat_invoice_paid_client",
+            Some("chat_invoice"),
+            None,
+            status,
+            error_msg,
+        )
+        .await
+        {
             tracing::warn!("Error registrando email_log: {log_err}");
         }
 
@@ -344,7 +404,10 @@ impl EmailService {
         let amount_display = format!("${:.2} USD", amount_usd);
 
         let html = super::email_templates::render_chat_invoice_paid_admin(
-            client_email, &amount_display, &session_id.to_string(), &panel_link,
+            client_email,
+            &amount_display,
+            &session_id.to_string(),
+            &panel_link,
         );
 
         for email in admin_emails {
@@ -354,9 +417,17 @@ impl EmailService {
             let error_msg = result.as_ref().err().map(String::as_str);
 
             if let Err(log_err) = EmailLogRepository::insert(
-                pool, email, &subject, "chat_invoice_paid_admin",
-                Some("chat_session"), Some(session_id), status, error_msg,
-            ).await {
+                pool,
+                email,
+                &subject,
+                "chat_invoice_paid_admin",
+                Some("chat_session"),
+                Some(session_id),
+                status,
+                error_msg,
+            )
+            .await
+            {
                 tracing::warn!("Error registrando email_log: {log_err}");
             }
 
@@ -384,7 +455,10 @@ impl EmailService {
         let amount_display = format_usd_cents(monthly_price_cents);
 
         let html = super::email_templates::render_vps_pending_approval(
-            client_email, tier_name, "", &amount_display,
+            client_email,
+            tier_name,
+            "",
+            &amount_display,
         );
 
         for email in admin_emails {
@@ -394,9 +468,17 @@ impl EmailService {
             let error_msg = result.as_ref().err().map(String::as_str);
 
             if let Err(log_err) = EmailLogRepository::insert(
-                pool, email, &subject, "vps_pending_approval",
-                Some("vps"), None, status, error_msg,
-            ).await {
+                pool,
+                email,
+                &subject,
+                "vps_pending_approval",
+                Some("vps"),
+                None,
+                status,
+                error_msg,
+            )
+            .await
+            {
                 tracing::warn!("Error registrando email_log: {log_err}");
             }
 
@@ -419,7 +501,11 @@ impl EmailService {
         let ip = public_ip.unwrap_or("");
 
         let html = super::email_templates::render_vps_approved(
-            client_email, tier_name, ip, username, password,
+            client_email,
+            tier_name,
+            ip,
+            username,
+            password,
         );
 
         /* [311A-1] Logging del envío en email_logs para trazabilidad. */
@@ -428,9 +514,17 @@ impl EmailService {
         let error_msg = result.as_ref().err().map(String::as_str);
 
         if let Err(log_err) = EmailLogRepository::insert(
-            pool, client_email, &subject, "vps_approved",
-            Some("vps"), None, status, error_msg,
-        ).await {
+            pool,
+            client_email,
+            &subject,
+            "vps_approved",
+            Some("vps"),
+            None,
+            status,
+            error_msg,
+        )
+        .await
+        {
             tracing::warn!("Error registrando email_log: {log_err}");
         }
 
@@ -448,9 +542,7 @@ impl EmailService {
     ) {
         let subject = format!("Tu solicitud de {tier_name} fue rechazada — Nakomi Studio");
 
-        let html = super::email_templates::render_vps_rejected(
-            client_email, tier_name, reason,
-        );
+        let html = super::email_templates::render_vps_rejected(client_email, tier_name, reason);
 
         /* [311A-1] Logging del envío en email_logs para trazabilidad. */
         let result = Self::send(config, client_email, &subject, &html).await;
@@ -458,9 +550,17 @@ impl EmailService {
         let error_msg = result.as_ref().err().map(String::as_str);
 
         if let Err(log_err) = EmailLogRepository::insert(
-            pool, client_email, &subject, "vps_rejected",
-            Some("vps"), None, status, error_msg,
-        ).await {
+            pool,
+            client_email,
+            &subject,
+            "vps_rejected",
+            Some("vps"),
+            None,
+            status,
+            error_msg,
+        )
+        .await
+        {
             tracing::warn!("Error registrando email_log: {log_err}");
         }
 
@@ -482,7 +582,9 @@ impl EmailService {
         let recipient_name = display_name.unwrap_or(new_email);
 
         let html = super::email_templates::render_profile_email_changed_new(
-            old_email, new_email, recipient_name,
+            old_email,
+            new_email,
+            recipient_name,
         );
 
         /* [311A-1] Logging del envío en email_logs para trazabilidad. */
@@ -491,9 +593,17 @@ impl EmailService {
         let error_msg = result.as_ref().err().map(String::as_str);
 
         if let Err(log_err) = EmailLogRepository::insert(
-            pool, new_email, subject, "profile_email_changed_new",
-            Some("user"), None, status, error_msg,
-        ).await {
+            pool,
+            new_email,
+            subject,
+            "profile_email_changed_new",
+            Some("user"),
+            None,
+            status,
+            error_msg,
+        )
+        .await
+        {
             tracing::warn!("Error registrando email_log: {log_err}");
         }
 
@@ -520,7 +630,9 @@ impl EmailService {
         let recipient_name = display_name.unwrap_or(old_email);
 
         let html = super::email_templates::render_profile_email_changed_old(
-            old_email, new_email, recipient_name,
+            old_email,
+            new_email,
+            recipient_name,
         );
 
         /* [311A-1] Logging del envío en email_logs para trazabilidad. */
@@ -529,9 +641,17 @@ impl EmailService {
         let error_msg = result.as_ref().err().map(String::as_str);
 
         if let Err(log_err) = EmailLogRepository::insert(
-            pool, old_email, subject, "profile_email_changed_old",
-            Some("user"), None, status, error_msg,
-        ).await {
+            pool,
+            old_email,
+            subject,
+            "profile_email_changed_old",
+            Some("user"),
+            None,
+            status,
+            error_msg,
+        )
+        .await
+        {
             tracing::warn!("Error registrando email_log: {log_err}");
         }
 
@@ -556,9 +676,7 @@ impl EmailService {
         let subject = "Tu contraseña fue actualizada — Nakomi Studio";
         let recipient_name = display_name.unwrap_or(to_email);
 
-        let html = super::email_templates::render_profile_password_changed(
-            recipient_name,
-        );
+        let html = super::email_templates::render_profile_password_changed(recipient_name);
 
         /* [311A-1] Logging del envío en email_logs para trazabilidad. */
         let result = Self::send(config, to_email, subject, &html).await;
@@ -566,9 +684,17 @@ impl EmailService {
         let error_msg = result.as_ref().err().map(String::as_str);
 
         if let Err(log_err) = EmailLogRepository::insert(
-            pool, to_email, subject, "profile_password_changed",
-            Some("user"), None, status, error_msg,
-        ).await {
+            pool,
+            to_email,
+            subject,
+            "profile_password_changed",
+            Some("user"),
+            None,
+            status,
+            error_msg,
+        )
+        .await
+        {
             tracing::warn!("Error registrando email_log: {log_err}");
         }
 
@@ -594,18 +720,25 @@ impl EmailService {
     ) {
         let subject = format!("✅ Orden #{order_number} completada — Nakomi Studio");
 
-        let html = super::email_templates::render_order_completed_client(
-            client_name, order_number, "",
-        );
+        let html =
+            super::email_templates::render_order_completed_client(client_name, order_number, "");
 
         let result = Self::send(config, to_email, &subject, &html).await;
         let status = if result.is_ok() { "sent" } else { "failed" };
         let error_msg = result.as_ref().err().map(String::as_str);
 
         if let Err(log_err) = EmailLogRepository::insert(
-            pool, to_email, &subject, "order_completed_client",
-            Some("order"), Some(order_id), status, error_msg,
-        ).await {
+            pool,
+            to_email,
+            &subject,
+            "order_completed_client",
+            Some("order"),
+            Some(order_id),
+            status,
+            error_msg,
+        )
+        .await
+        {
             tracing::warn!("Error registrando email_log: {log_err}");
         }
 
@@ -629,7 +762,9 @@ impl EmailService {
         let subject = format!("❌ Orden #{order_number} cancelada — Nakomi Studio");
 
         let html = super::email_templates::render_order_cancelled_client(
-            client_name, order_number, reason,
+            client_name,
+            order_number,
+            reason,
         );
 
         let result = Self::send(config, to_email, &subject, &html).await;
@@ -637,9 +772,17 @@ impl EmailService {
         let error_msg = result.as_ref().err().map(String::as_str);
 
         if let Err(log_err) = EmailLogRepository::insert(
-            pool, to_email, &subject, "order_cancelled_client",
-            Some("order"), Some(order_id), status, error_msg,
-        ).await {
+            pool,
+            to_email,
+            &subject,
+            "order_cancelled_client",
+            Some("order"),
+            Some(order_id),
+            status,
+            error_msg,
+        )
+        .await
+        {
             tracing::warn!("Error registrando email_log: {log_err}");
         }
 
@@ -665,7 +808,10 @@ impl EmailService {
         let panel_link = format!("{site_url}/panel?seccion=ordenes&id={order_id}");
 
         let html = super::email_templates::render_phase_delivered_client(
-            client_name, order_number, phase_title, &panel_link,
+            client_name,
+            order_number,
+            phase_title,
+            &panel_link,
         );
 
         let result = Self::send(config, to_email, &subject, &html).await;
@@ -673,9 +819,17 @@ impl EmailService {
         let error_msg = result.as_ref().err().map(String::as_str);
 
         if let Err(log_err) = EmailLogRepository::insert(
-            pool, to_email, &subject, "phase_delivered_client",
-            Some("order"), Some(order_id), status, error_msg,
-        ).await {
+            pool,
+            to_email,
+            &subject,
+            "phase_delivered_client",
+            Some("order"),
+            Some(order_id),
+            status,
+            error_msg,
+        )
+        .await
+        {
             tracing::warn!("Error registrando email_log: {log_err}");
         }
 
@@ -701,7 +855,9 @@ impl EmailService {
         let subject = format!("⚠️ Problema reportado — Orden #{order_number} — Nakomi Studio");
 
         let html = super::email_templates::render_problem_reported_client(
-            client_name, order_number, problem_description,
+            client_name,
+            order_number,
+            problem_description,
         );
 
         let result = Self::send(config, to_email, &subject, &html).await;
@@ -709,9 +865,17 @@ impl EmailService {
         let error_msg = result.as_ref().err().map(String::as_str);
 
         if let Err(log_err) = EmailLogRepository::insert(
-            pool, to_email, &subject, "problem_reported_client",
-            Some("order"), Some(order_id), status, error_msg,
-        ).await {
+            pool,
+            to_email,
+            &subject,
+            "problem_reported_client",
+            Some("order"),
+            Some(order_id),
+            status,
+            error_msg,
+        )
+        .await
+        {
             tracing::warn!("Error registrando email_log: {log_err}");
         }
 
@@ -733,11 +897,15 @@ impl EmailService {
         order_id: uuid::Uuid,
         site_url: &str,
     ) {
-        let subject = format!("✅ Orden #{order_number} completada — {client_name} — Nakomi Studio");
+        let subject =
+            format!("✅ Orden #{order_number} completada — {client_name} — Nakomi Studio");
         let panel_link = format!("{site_url}/panel?seccion=ordenes&id={order_id}");
 
         let html = super::email_templates::render_order_completed_admin(
-            client_name, order_number, "", &panel_link,
+            client_name,
+            order_number,
+            "",
+            &panel_link,
         );
 
         for email in admin_emails {
@@ -745,9 +913,17 @@ impl EmailService {
             let status = if result.is_ok() { "sent" } else { "failed" };
             let error_msg = result.as_ref().err().map(String::as_str);
             if let Err(log_err) = EmailLogRepository::insert(
-                pool, email, &subject, "order_completed_admin",
-                Some("order"), Some(order_id), status, error_msg,
-            ).await {
+                pool,
+                email,
+                &subject,
+                "order_completed_admin",
+                Some("order"),
+                Some(order_id),
+                status,
+                error_msg,
+            )
+            .await
+            {
                 tracing::warn!("Error registrando email_log: {log_err}");
             }
             if let Err(e) = result {
@@ -755,7 +931,10 @@ impl EmailService {
             }
         }
         if !admin_emails.is_empty() {
-            tracing::info!("Email orden completada #{order_number} enviado a {} admins", admin_emails.len());
+            tracing::info!(
+                "Email orden completada #{order_number} enviado a {} admins",
+                admin_emails.len()
+            );
         }
     }
 
@@ -777,7 +956,10 @@ impl EmailService {
         let panel_link = format!("{site_url}/panel?seccion=ordenes&id={order_id}");
 
         let html = super::email_templates::render_order_cancelled_admin(
-            client_name, order_number, reason, &panel_link,
+            client_name,
+            order_number,
+            reason,
+            &panel_link,
         );
 
         for email in admin_emails {
@@ -785,9 +967,17 @@ impl EmailService {
             let status = if result.is_ok() { "sent" } else { "failed" };
             let error_msg = result.as_ref().err().map(String::as_str);
             if let Err(log_err) = EmailLogRepository::insert(
-                pool, email, &subject, "order_cancelled_admin",
-                Some("order"), Some(order_id), status, error_msg,
-            ).await {
+                pool,
+                email,
+                &subject,
+                "order_cancelled_admin",
+                Some("order"),
+                Some(order_id),
+                status,
+                error_msg,
+            )
+            .await
+            {
                 tracing::warn!("Error registrando email_log: {log_err}");
             }
             if let Err(e) = result {
@@ -795,7 +985,10 @@ impl EmailService {
             }
         }
         if !admin_emails.is_empty() {
-            tracing::info!("Email orden cancelada #{order_number} enviado a {} admins", admin_emails.len());
+            tracing::info!(
+                "Email orden cancelada #{order_number} enviado a {} admins",
+                admin_emails.len()
+            );
         }
     }
 
@@ -818,7 +1011,10 @@ impl EmailService {
         let panel_link = format!("{site_url}/panel?seccion=ordenes&id={order_id}");
 
         let html = super::email_templates::render_problem_reported_admin(
-            client_name, order_number, problem_description, &panel_link,
+            client_name,
+            order_number,
+            problem_description,
+            &panel_link,
         );
 
         for email in admin_emails {
@@ -826,9 +1022,17 @@ impl EmailService {
             let status = if result.is_ok() { "sent" } else { "failed" };
             let error_msg = result.as_ref().err().map(String::as_str);
             if let Err(log_err) = EmailLogRepository::insert(
-                pool, email, &subject, "problem_reported_admin",
-                Some("order"), Some(order_id), status, error_msg,
-            ).await {
+                pool,
+                email,
+                &subject,
+                "problem_reported_admin",
+                Some("order"),
+                Some(order_id),
+                status,
+                error_msg,
+            )
+            .await
+            {
                 tracing::warn!("Error registrando email_log: {log_err}");
             }
             if let Err(e) = result {
@@ -836,7 +1040,10 @@ impl EmailService {
             }
         }
         if !admin_emails.is_empty() {
-            tracing::info!("Email problema reportado orden #{order_number} enviado a {} admins", admin_emails.len());
+            tracing::info!(
+                "Email problema reportado orden #{order_number} enviado a {} admins",
+                admin_emails.len()
+            );
         }
     }
 
@@ -859,7 +1066,11 @@ impl EmailService {
         let panel_link = format!("{site_url}/panel?seccion=reembolsos&id={refund_id}");
 
         let html = super::email_templates::render_refund_requested_admin(
-            client_name, order_number, amount_display, reason, &panel_link,
+            client_name,
+            order_number,
+            amount_display,
+            reason,
+            &panel_link,
         );
 
         for email in admin_emails {
@@ -867,9 +1078,17 @@ impl EmailService {
             let status = if result.is_ok() { "sent" } else { "failed" };
             let error_msg = result.as_ref().err().map(String::as_str);
             if let Err(log_err) = EmailLogRepository::insert(
-                pool, email, &subject, "refund_requested_admin",
-                Some("refund"), Some(refund_id), status, error_msg,
-            ).await {
+                pool,
+                email,
+                &subject,
+                "refund_requested_admin",
+                Some("refund"),
+                Some(refund_id),
+                status,
+                error_msg,
+            )
+            .await
+            {
                 tracing::warn!("Error registrando email_log: {log_err}");
             }
             if let Err(e) = result {
@@ -877,7 +1096,10 @@ impl EmailService {
             }
         }
         if !admin_emails.is_empty() {
-            tracing::info!("Email reembolso solicitado orden #{order_number} enviado a {} admins", admin_emails.len());
+            tracing::info!(
+                "Email reembolso solicitado orden #{order_number} enviado a {} admins",
+                admin_emails.len()
+            );
         }
     }
 
@@ -897,7 +1119,9 @@ impl EmailService {
         let panel_link = format!("{site_url}/panel");
 
         let html = super::email_templates::render_new_user_registered_admin(
-            user_name, user_email, &panel_link,
+            user_name,
+            user_email,
+            &panel_link,
         );
 
         for email in admin_emails {
@@ -905,9 +1129,17 @@ impl EmailService {
             let status = if result.is_ok() { "sent" } else { "failed" };
             let error_msg = result.as_ref().err().map(String::as_str);
             if let Err(log_err) = EmailLogRepository::insert(
-                pool, email, &subject, "new_user_registered_admin",
-                Some("user"), Some(user_id), status, error_msg,
-            ).await {
+                pool,
+                email,
+                &subject,
+                "new_user_registered_admin",
+                Some("user"),
+                Some(user_id),
+                status,
+                error_msg,
+            )
+            .await
+            {
                 tracing::warn!("Error registrando email_log: {log_err}");
             }
             if let Err(e) = result {
@@ -915,7 +1147,10 @@ impl EmailService {
             }
         }
         if !admin_emails.is_empty() {
-            tracing::info!("Email nuevo usuario registrado ({user_email}) enviado a {} admins", admin_emails.len());
+            tracing::info!(
+                "Email nuevo usuario registrado ({user_email}) enviado a {} admins",
+                admin_emails.len()
+            );
         }
     }
 
@@ -929,31 +1164,38 @@ impl EmailService {
         visitor_name: &str,
         continuation_url: &str,
         session_id: uuid::Uuid,
-    ) {
+    ) -> Result<(), String> {
         let subject = "Continúa tu conversación — Nakomi Studio";
 
-        let html = super::email_templates::render_chat_continuation(
-            visitor_name,
-            continuation_url,
-        );
+        let html = super::email_templates::render_chat_continuation(visitor_name, continuation_url);
 
         let result = Self::send(config, to_email, subject, &html).await;
         let status = if result.is_ok() { "sent" } else { "failed" };
         let error_msg = result.as_ref().err().map(String::as_str);
 
         if let Err(log_err) = EmailLogRepository::insert(
-            pool, to_email, subject, "chat_continuation",
-            Some("chat_session"), Some(session_id), status, error_msg,
-        ).await {
+            pool,
+            to_email,
+            subject,
+            "chat_continuation",
+            Some("chat_session"),
+            Some(session_id),
+            status,
+            error_msg,
+        )
+        .await
+        {
             tracing::warn!("Error registrando email_log: {log_err}");
         }
 
         match result {
             Ok(()) => {
                 tracing::info!(%session_id, "Email de continuación enviado a visitante");
+                Ok(())
             }
             Err(error) => {
                 tracing::error!(%session_id, "Error enviando email de continuación: {error}");
+                Err(error)
             }
         }
     }

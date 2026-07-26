@@ -41,6 +41,9 @@ pub struct ChatHub {
     staff_senders: Arc<TokioMutex<Vec<SessionSender>>>,
     /* [T-4] Contador de conexiones WS activas por sesión (tabs/dispositivos) */
     connection_counts: Arc<DashMap<Uuid, AtomicUsize>>,
+    /* [267A-3] Presencia exclusiva de visitantes. Staff también se suscribe a
+     * canales de sesión y no debe impedir ni provocar el seguimiento por email. */
+    visitor_connection_counts: Arc<DashMap<Uuid, AtomicUsize>>,
 }
 
 impl ChatHub {
@@ -51,6 +54,7 @@ impl ChatHub {
             channels: Arc::new(DashMap::new()),
             staff_senders: Arc::new(TokioMutex::new(Vec::new())),
             connection_counts: Arc::new(DashMap::new()),
+            visitor_connection_counts: Arc::new(DashMap::new()),
         }
     }
 
@@ -66,6 +70,15 @@ impl ChatHub {
         let (tx, rx) = mpsc::unbounded_channel();
         self.channels.entry(session_id).or_default().push(tx);
         rx
+    }
+
+    #[must_use]
+    pub fn subscribe_visitor(&self, session_id: Uuid) -> mpsc::UnboundedReceiver<WsServerMessage> {
+        self.visitor_connection_counts
+            .entry(session_id)
+            .or_insert_with(|| AtomicUsize::new(0))
+            .fetch_add(1, Ordering::Relaxed);
+        self.subscribe(session_id)
     }
 
     /// [T-4] Decrementar refcount de conexiones WS. Retorna cuántas quedan.
@@ -90,6 +103,24 @@ impl ChatHub {
             }
             Entry::Vacant(_) => 0,
         }
+    }
+
+    #[must_use]
+    pub fn unsubscribe_visitor(&self, session_id: Uuid) -> usize {
+        let visitor_remaining = match self.visitor_connection_counts.entry(session_id) {
+            Entry::Occupied(entry) => {
+                let current = entry.get().load(Ordering::Relaxed);
+                if current <= 1 {
+                    entry.remove();
+                    0
+                } else {
+                    entry.get().fetch_sub(1, Ordering::Relaxed) - 1
+                }
+            }
+            Entry::Vacant(_) => 0,
+        };
+        let _ = self.unsubscribe(session_id);
+        visitor_remaining
     }
 
     /// Eliminar canales cuando la sesión se cierra.
@@ -132,11 +163,23 @@ impl ChatHub {
     pub async fn get_or_create_visitor_session(
         &self,
         visitor_id: &str,
+        requested_session_id: Option<Uuid>,
         visitor_name: Option<&str>,
         visitor_ip: Option<&str>,
         visitor_user_agent: Option<&str>,
         visitor_country: Option<&str>,
     ) -> Result<ChatSession, AppError> {
+        if let Some(session_id) = requested_session_id {
+            if let Some(existing) =
+                ChatRepository::find_session_by_id_and_visitor(&self.pool, session_id, visitor_id)
+                    .await?
+            {
+                return Ok(existing);
+            }
+            return Err(AppError::NotFound(
+                "La conversación recuperada no pertenece al visitante".into(),
+            ));
+        }
         if let Some(existing) =
             ChatRepository::find_session_by_visitor(&self.pool, visitor_id).await?
         {
@@ -333,6 +376,7 @@ impl ChatHub {
         self.broadcast(session_id, &WsServerMessage::SessionClosed { session_id });
         self.remove_channel(session_id);
         self.connection_counts.remove(&session_id);
+        self.visitor_connection_counts.remove(&session_id);
         Ok(())
     }
 
@@ -511,5 +555,19 @@ mod tests {
         assert_eq!(hub.unsubscribe(session_id), 0);
         assert_eq!(hub.unsubscribe(session_id), 0);
         drop((second_receiver, third_receiver));
+    }
+
+    #[tokio::test]
+    async fn visitor_presence_ignores_non_visitor_session_subscribers() {
+        let hub = test_hub();
+        let session_id = Uuid::new_v4();
+        let staff_session_receiver = hub.subscribe(session_id);
+        let visitor_one = hub.subscribe_visitor(session_id);
+        let visitor_two = hub.subscribe_visitor(session_id);
+
+        assert_eq!(hub.unsubscribe_visitor(session_id), 1);
+        assert_eq!(hub.unsubscribe_visitor(session_id), 0);
+
+        drop((staff_session_receiver, visitor_one, visitor_two));
     }
 }

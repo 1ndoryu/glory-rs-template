@@ -116,6 +116,25 @@ impl ChatRepository {
         .await
     }
 
+    pub async fn find_session_by_id_and_visitor(
+        pool: &PgPool,
+        session_id: Uuid,
+        visitor_id: &str,
+    ) -> Result<Option<ChatSession>, sqlx::Error> {
+        sqlx::query_as::<_, ChatSession>(
+            "SELECT id, visitor_id, visitor_name, user_id, order_id, status,
+               assigned_staff_id, ai_enabled, created_at, updated_at,
+               visitor_ip, visitor_user_agent, last_viewed_at, visitor_last_connected_at,
+               visitor_country, is_escalated
+             FROM chat_sessions
+             WHERE id = $1 AND visitor_id = $2 AND status != 'closed'",
+        )
+        .bind(session_id)
+        .bind(visitor_id)
+        .fetch_optional(pool)
+        .await
+    }
+
     /// Todas las sesiones con historial (panel staff).
     pub async fn list_sessions(pool: &PgPool) -> Result<Vec<ChatSession>, sqlx::Error> {
         /* [074A-30] Filtrar sesiones sin mensajes — no tiene sentido mostrarlas.
