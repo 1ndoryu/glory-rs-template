@@ -106,10 +106,14 @@ que la experiencia solicitada funcione para la administradora.**
    el 2026-07-26 con un mensaje real y correo recibido en
    `andoryyu@gmail.com`. Código, outbox, worker SMTP y flags de captura/entrega
    permanecen activos en producción.
-2. **WhatsApp inmediato por cada mensaje y pedido:** el cliente Nakomi existe,
-   pero el gateway firmado/worker `wacli` de `glorytemplate` sigue pendiente de
-   implementación y canary. Mientras tanto no hay entrega WhatsApp verificable.
-   `accepted_by_gateway` tampoco equivale a recepción humana.
+2. **WhatsApp inmediato por cada mensaje de cliente:** ✅ verificado físicamente
+   por la usuaria el 2026-07-26 en `+1 (608) 466-8134`. Está activo el contrato
+   HMAC con timestamp/nonce, la outbox idempotente separada, el worker `wacli`,
+   el lock asesor compartido con WP-Cron y un timer systemd `oneshot` cada 5 s.
+   La canary terminó `sent`, intento 1 y sin error. Pendiente no bloqueante de
+   observabilidad: reconciliar en Nakomi `accepted_by_gateway` con el estado
+   final del gateway. La alerta WhatsApp para **pedidos** requiere una canary
+   separada del flujo de órdenes antes de considerarla verificada.
 3. **Notificación visible y punto rojo:** los componentes y WebSocket global
    existen, pero el contador del sidebar no hace carga inicial fuera del panel;
    solo consume cache/eventos. Falta corregirlo y probar mensaje nuevo en panel,
@@ -131,11 +135,13 @@ que la experiencia solicitada funcione para la administradora.**
    útil; reutiliza el perfil conocido para no volver a pedirlos. El 2026-07-26 se
    desplegó la corrección del defecto por el que guardar el nombre podía borrar un correo ya
    capturado, separando ambas escrituras y eliminando fallos silenciosos/PII de
-   logs. Sigue pendiente conectar el envío del correo de continuación: existen
-   tabla, token de un uso, plantilla y endpoint backend, pero todavía no hay
-   disparador durable tras desconexión ni consumidor frontend del token. Tampoco
-   existe recepción de respuestas por email; el diseño actual es volver al chat
-   mediante enlace seguro. No declarar completo hasta probar navegador limpio.
+   logs. También están desplegados el scheduler durable por época de desconexión,
+   cancelación al reconectar, envío SMTP reintentable, token de un uso y el
+   coordinador frontend que consume `#token`, limpia la URL y restaura exactamente
+   la sesión. Falta la aceptación física completa: capturar un correo con
+   consentimiento, desconectar más de dos minutos, abrir el enlace recibido en
+   un navegador limpio y confirmar historial + mensaje nuevo. No existe recepción
+   de respuestas por email; el diseño actual vuelve al chat mediante enlace seguro.
 8. Verificar retención: ningún mensaje debe desaparecer por cierre de sesión,
    paginación o reconexión. Falta prueba de conversación antigua y de más de
    100 mensajes.

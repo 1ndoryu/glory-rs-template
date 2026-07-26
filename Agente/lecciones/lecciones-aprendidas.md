@@ -455,3 +455,18 @@
 - Nombre, email y consentimiento necesitan contratos explícitos; la captura
   conversacional de email debe persistir su metadata de forma atómica.
 - Los logs de captura deben confirmar el resultado sin imprimir la dirección.
+
+### Gateways firmados en WordPress: canonicalizar headers y probar recepción real
+- `WP_REST_Request::get_headers()` puede transformar `X-Glory-Timestamp` en
+  `x_glory_timestamp`. Un verificador debe aceptar la forma canónica del framework
+  y la forma HTTP, o usar `get_header()` para cada campo.
+- Validar que dos implementaciones calculan el mismo HMAC no prueba el endpoint:
+  la canary debe cubrir normalización de headers, nonce, persistencia, worker y
+  recepción física.
+- Cambiar variables en Coolify no modifica el entorno de un contenedor existente;
+  un restart conserva el entorno original. Los servicios que leen variables de
+  proceso requieren recreación/redeploy, o un mecanismo explícito que regenere
+  su `.env` y recargue el runtime.
+- Si systemd y WP-Cron consumen la misma outbox, `SKIP LOCKED` protege una fila,
+  pero no impide dos envíos distintos simultáneos. Un lock asesor global serializa
+  el cliente externo compartido sin depender del scheduler que ganó la carrera.

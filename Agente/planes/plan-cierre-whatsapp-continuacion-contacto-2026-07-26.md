@@ -1,7 +1,7 @@
 # 267A-3 — Cierre de WhatsApp y continuidad de conversación
 
 > **Fecha:** 2026-07-26  
-> **Estado:** En ejecución  
+> **Estado:** En validación final; WhatsApp cerrado, continuación pendiente de canary humana
 > **Prioridad:** Crítica  
 > **Destino administrativo:** email `andoryyu@gmail.com`, WhatsApp `+1 608 466 8134`  
 > **Repositorios:** Nakomi (`glory-rs-template`) y gateway reutilizable (`glorytemplate`)
@@ -89,8 +89,10 @@
 
 ## 6. Fase D — Restauración frontend
 
-1. URL: `https://nakomi.studio/?chat_continuation=<token>`.
-2. `ChatWidget` detecta el parámetro, llama una vez a
+1. URL: `https://nakomi.studio/continuar-chat#token=<token>`; el fragmento no
+   llega al servidor ni se filtra normalmente como `Referer`.
+2. El coordinador de continuación detecta el fragmento, lo elimina de la URL
+   antes de cargar recursos externos y llama una vez a
    `POST /api/chat/continuation/claim` y nunca lo imprime en logs.
 3. En éxito:
    - reemplazar de forma atómica la identidad anónima local con `visitor_id` y
@@ -118,8 +120,38 @@
 |---|---|
 | Correo inmediato al admin | ✅ Recibido por la usuaria |
 | Captura nombre/email sin pérdida | ✅ Código y producción |
-| Gateway WhatsApp firmado | ⏳ En auditoría/implementación |
-| WhatsApp automático al admin | ⏳ Depende del gateway y canary físico |
-| Scheduler durable de continuación | ⏳ Pendiente |
-| Restauración frontend desde token | ⏳ Pendiente |
+| Gateway WhatsApp firmado | ✅ Desplegado; firma válida, nonce e idempotencia |
+| WhatsApp automático al admin | ✅ Canary `sent` y recibida físicamente por la usuaria |
+| Timer saliente | ✅ systemd `oneshot` cada 5 s + WP-Cron fallback + lock MySQL |
+| Scheduler durable de continuación | ✅ Código, migración y producción |
+| Restauración frontend desde token | ✅ Código y producción; ⏳ canary en navegador limpio |
+| Reconciliación `accepted_by_gateway` → `sent` | ⏳ Mejora de observabilidad; la entrega física ya está confirmada |
 | Correo entrante/reply-to-chat | Fuera de alcance hasta elegir proveedor inbound |
+
+## 9. Evidencia de ejecución — 2026-07-26
+
+- Nakomi Rust: commits `bbd42cbb` (contacto), `c643442b` (continuación) y
+  despliegue saludable con 69 migraciones registradas.
+- Gateway WordPress: commits `1de3fbed`, `df077995`, `e1e59f40` y `8ea6226b`.
+- Se corrigió la normalización real de headers de `WP_REST_Request` (`x-glory-*`
+  → `x_glory_*`), causa del rechazo inicial de firmas válidas.
+- `coolify-manager-rs` commit `5dbeffd`: allowlist segura para las tres variables
+  del gateway; secreto compartido sincronizado sin imprimirlo.
+- Canary `canary-3c426b4b57c44b5ab1b7bd9d54ead2d6`: HTTP 202, outbox `sent`,
+  intento 1, `sent_at` registrado, sin `last_error`; recepción confirmada por la
+  usuaria en `+1 (608) 466-8134`.
+- Timer `cm-whatsapp-outbound-nakomi.timer`: activo, ejecución repetida con
+  `Result=success`, `ExecMainStatus=0`, sin solapamiento.
+- Health final: `nakomi` y `studio` con `http_ok=true`, `app_ok=true` y
+  `fatal_logs=false`. Un timeout SSH transitorio de Studio se repitió con éxito.
+
+## 10. Prueba humana que todavía falta
+
+1. Abrir el chat como visitante nuevo y aceptar seguimiento por correo.
+2. Enviar mensajes suficientes para que la IA capture nombre y email; verificar
+   en panel que ambos quedaron guardados.
+3. Cerrar todas las pestañas del visitante durante más de dos minutos.
+4. Confirmar que llega exactamente un correo de continuación.
+5. Abrir el enlace en navegador limpio, confirmar que el fragmento desaparece,
+   se abre el widget, aparece el historial correcto y se puede enviar otro mensaje.
+6. Repetir reconectando antes de dos minutos y confirmar que no llega correo.
