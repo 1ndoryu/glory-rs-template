@@ -1,7 +1,9 @@
 # Plan de cierre de bloques difíciles — Nakomi Studio
 
 > **Fecha:** 2026-07-23  
-> **Estado:** Bloques A, B, C, D, E implementados (backend + frontend); deploy pendiente  
+> **Estado:** Nakomi desplegado 2026-07-26: correo/captura activos y CTA
+> configurado; faltan canary de recepción, prueba visual del CTA y gateway
+> WhatsApp automático en glorytemplate.
 > **Rama de proyecto:** `glory-rust-nakomi`  
 > **Framework compartido:** `glory-rs-framework/master`  
 > **Objetivo:** cerrar alertas inmediatas, escalamiento a WhatsApp, contrato Realtime y flujos financieros sin volver a crear ramas temporales ni duplicar infraestructura.
@@ -61,8 +63,10 @@ Cuando una persona del equipo responda:
 
 ### Ya implementado (2026-07-23)
 
-- ✅ Bloque A: Outbox (`chat_alert_outbox`), notificaciones in-app, worker SMTP/WhatsApp, gateway client HMAC, feature flags, email template `chat_client_message_admin`.
-- ✅ Bloque B: CTA de WhatsApp (`contact_cta`), ciclo de escalamiento (`chat_escalations`), `exec_request_human` devuelve `RichMessage`.
+- 🟡 Bloque A: Outbox, worker SMTP y flags desplegados; captura/correo activos,
+  pero falta demostrar recepción. Cliente gateway presente; endpoint WordPress pendiente.
+- 🟡 Bloque B: CTA, ciclo y número público desplegados; prompt escala también
+  conversaciones profundas de proyecto y revela identidad IA; falta prueba visual.
 - ✅ Bloque C: Secuencia monotónica (`next_message_sequence`), campo `delivery` (live/history), `from_chat_message` helper, dedupe de sonido por delivery+sender+messageId+audio leader (Web Locks API + localStorage fallback).
 - ✅ Bloque D: `ai_mode` (automatic/human_priority/manual_pause), `chat_response_cycles`, `response_cycle_worker` (FOR UPDATE SKIP LOCKED, fallback 10 min, mantiene human_priority), toggle_ai sincroniza ai_mode, staff envía → human_priority.
 - ✅ Bloque E: `is_valid_email` (RFC 5322 simplificada), `exec_capture_email` con validación real + `email_normalized` + `email_captured_at` + `continuation_consent_at` + `email_source='chatbot'`, token de continuación (`chat_continuation_tokens`, SHA-256, un uso, 7 días), handler `POST /api/chat/continuation/claim`, template `render_chat_continuation`, `send_chat_continuation`.

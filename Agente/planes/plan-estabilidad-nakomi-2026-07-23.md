@@ -1,7 +1,10 @@
 # 237A-3 — Estabilidad integral de Nakomi Studio
 
 > **Fecha:** 2026-07-23  
-> **Estado:** Fases A-E implementadas localmente (210 tests pasan); deploy a producción pendiente
+> **Estado:** Código desplegado el 2026-07-26. Freeze corregido; precedencia
+> humano–IA e identidad transparente desplegadas. Correo activado pendiente de
+> canary recibido; CTA configurado pendiente de prueba visual; gateway WhatsApp
+> automático todavía pendiente en glorytemplate.
 > **Prioridad:** Crítica  
 > **Responsable técnico:** agente principal  
 > **Delegación:** las tareas mecánicas y de bajo riesgo se asignan a un subagente con criterios de aceptación explícitos.  
@@ -776,7 +779,7 @@ Prevenciones candidatas para Glory Sentinel:
 10. Fase J final — deploy y verificación.
 11. Fase K — restauración de `main`.
 
-## 10. Estado inicial
+## 10. Estado actualizado (2026-07-25)
 
 - [x] Investigación profunda.
 - [x] Causa del falso freeze identificada.
@@ -787,20 +790,33 @@ Prevenciones candidatas para Glory Sentinel:
 - [x] Plan maestro creado.
 - [x] Watchdog corregido y probado localmente.
 - [x] Persistencia de chat corregida y probada localmente.
-- [ ] Realtime corregido.
-- [ ] Notificaciones globales implementadas.
-- [ ] Pagos/reembolsos endurecidos.
-- [ ] Rama proyecto sincronizada con `origin`.
-- [ ] Producción desplegada con procedencia verificable.
-- [ ] `glory-rs-template/main` restaurada.
+- [~] Realtime corregido en código; falta aceptación funcional con reconexión,
+      chat de pedido y múltiples pestañas.
+- [~] Notificaciones globales presentes en código; falta carga inicial fuera
+      del panel y prueba real de badge/sonido/reconexión.
+- [ ] Pagos/reembolsos endurecidos (Fases F+G pendientes).
+- [x] Rama proyecto sincronizada con `origin`.
+- [~] Producción desplegada y health verificado el 2026-07-25; falta
+      procedencia SHA verificable y aceptación funcional de los flujos.
+- [ ] `glory-rs-template/main` restaurada (Fase K, después de estabilizar).
 
 Estado de producción corregido:
 
 - [x] Rama proyecto sincronizada con `origin`.
 - [x] Watchdog y persistencia desplegados y verificados.
 - [x] Framework de producción actualizado en `master`.
-- [ ] Alertas inmediatas in-app + correo + WhatsApp.
-- [ ] CTA de WhatsApp para escalamiento.
+- [~] Alertas in-app + correo: captura y delivery email activos en producción;
+      falta canary recibido. WhatsApp automático sigue pendiente del gateway.
+- [~] CTA de WhatsApp: renderer, prompt prioritario y número público desplegados;
+      falta prueba visible móvil/desktop.
+- [x] Deploy de los cambios críticos realizado el 2026-07-26; health 200,
+      restart_count=0, OOM=false, worker SMTP iniciado.
+- [ ] Investigación completa del incidente freeze (ver plan de incidente sección 8).
+- [ ] Hotfix SQL (ON CONFLICT en notificaciones y ciclos de respuesta).
+- [x] Feature flags fail-closed; captura y correo activados explícitamente tras
+      deploy, WhatsApp permanece apagado.
+- [ ] Rediseño watchdog (doble señal, umbral 90-120s).
+- [~] Canary de captura/correo activado; recepción real pendiente.
 
 ## 11. Recorte de alcance solicitado el 2026-07-23
 

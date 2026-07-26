@@ -1,7 +1,9 @@
 # Plan de incidente: freezes y Bad Gateway de Nakomi
 
 > **Fecha:** 2026-07-24
-> **Estado:** activo; investigación interrumpida por límite de tokens
+> **Estado:** causa raíz corregida y desplegada; monitoreo abierto. Deadlock de
+> desconexión eliminado, health estable, restart_count=0 y OOM=false tras deploy
+> del 2026-07-26. Alertas externas se rastrean como bloque separado.
 > **Rama correcta:** `glory-rust-nakomi`
 > **Servicio Coolify:** `studio`
 > **UUID esperado:** `do8k4w8swccwwogoc0os0ck0`
@@ -11,7 +13,13 @@
 
 ## 1. Regla principal para el siguiente agente
 
-No asumir que “Bad Gateway” es un problema de Traefik. En este incidente puede
+> **Corrección de sintaxis verificada 2026-07-25:** el binario instalado usa
+> comandos con guiones: `incident-investigate`, `incident-logs`,
+> `container-inspect`, `container-events` y `container-stats`. Algunos ejemplos
+> históricos de este documento los escriben con espacios y **no deben ejecutarse**;
+> usar estos nombres canónicos con `--name studio`.
+
+No asumir que "Bad Gateway" es un problema de Traefik. En este incidente puede
 ser la ventana durante la cual el backend fue terminado o reemplazado. Antes de
 editar, distinguir:
 
@@ -28,6 +36,61 @@ Toda operación de producción debe usar `coolify-manager-rs`. No usar SSH,
 
 Durante el incidente no restaurar la rama `main` del template ni mezclar la
 separación template/framework. Eso es otra tarea.
+
+---
+
+## 1.1. Herramientas de coolify-manager-rs disponibles
+
+> **Actualizado 2026-07-25:** Se implementaron comandos de investigación de
+> incidentes en `coolify-manager-rs`. Estas herramientas reemplazan los
+> diagnósticos manuales por SSH y proporcionan redacción automática de secretos.
+
+### Comandos de investigación
+
+| Comando | Uso en este incidente |
+|---|---|
+| `incident investigate --name studio --since 48h` | **Primer paso obligatorio.** Panel completo: health, inspección del contenedor (restart_count, OOM, exit_code, límites), eventos del ciclo de vida, stats de recursos, logs con patrones de incidente y métricas PostgreSQL. |
+| `incident logs --name studio --since 48h` | Busca patrones específicos: `FREEZE DETECTED`, `panic`, `OOM`, `no unique or exclusion constraint`, `current transaction is aborted`, `connection pool`/`pool timeout`. |
+| `container inspect --name studio` | Estado detallado del contenedor actual: restart_count, OOM killed, exit code, error message, límites de memoria/CPU, política de reinicio. **No imprime env vars ni secretos.** |
+| `container events --name studio --since 48h` | Eventos de ciclo de vida (create, start, die, destroy, oom, kill). **Crítico para saber qué pasó con el contenedor anterior** — resuelve el pendiente de "eventos de las últimas 24-48 horas". |
+| `container stats --name studio` | CPU, memoria, red, disco y PIDs en tiempo real. Útil para detectar memory leaks o saturación de recursos. |
+| `db-stats --name studio --json` | Métricas PostgreSQL: conexiones por estado, queries activas largas (>5s), lock waits, deadlocks, tablas por tamaño y dead tuples. Resuelve los pendientes de "pool exhaustion" y "queries lentas". |
+| `env-toggle --name studio --key CHAT_ALERT_CAPTURE_ENABLED --value false` | Mitigación rápida de flags. Bloquea automáticamente keys sensibles (SECRET, PASSWORD, TOKEN, KEY). |
+| `logs --name studio --since 2h --pattern "error\|panic\|oom"` | Logs con filtro de tiempo y patrón regex. |
+
+### Comandos de mitigación
+
+| Comando | Uso en este incidente |
+|---|---|
+| `env-toggle --name studio --key CHAT_ALERT_CAPTURE_ENABLED --value false` | Fase 1: desactivar captura de alertas |
+| `env-toggle --name studio --key CHAT_EMAIL_DELIVERY_ENABLED --value false` | Fase 1: desactivar delivery de email |
+| `env-toggle --name studio --key CHAT_WHATSAPP_DELIVERY_ENABLED --value false` | Fase 1: desactivar delivery de WhatsApp |
+| `restart --name studio` | Reiniciar tras cambio de env vars |
+| `health --name studio` | Verificar estabilidad post-mitigación |
+
+### Flujo de investigación recomendado
+
+```powershell
+# 1. Diagnóstico completo (primer paso)
+& $cm incident investigate --name studio --since 48h
+
+# 2. Eventos del contenedor (saber qué pasó con el anterior)
+& $cm container events --name studio --since 48h
+
+# 3. Métricas PostgreSQL (pool exhaustion, queries lentas)
+& $cm db-stats --name studio --json
+
+# 4. Si hay evidencia de freeze/crash, mitigar flags
+& $cm env-toggle --name studio --key CHAT_ALERT_CAPTURE_ENABLED --value false
+& $cm env-toggle --name studio --key CHAT_EMAIL_DELIVERY_ENABLED --value false
+& $cm env-toggle --name studio --key CHAT_WHATSAPP_DELIVERY_ENABLED --value false
+
+# 5. Verificar estabilidad
+& $cm health --name studio
+& $cm container stats --name studio
+```
+
+---
 
 ## 2. Hechos confirmados
 
@@ -85,6 +148,10 @@ Interpretación limitada: el contenedor actual fue creado/reemplazado a las
 qué pasó con el contenedor anterior. Hay que recuperar los eventos y logs
 anteriores para saber si fue deploy, watchdog o crash.
 
+> **Herramienta disponible:** `container events --name studio --since 48h`
+> proporciona exactamente los eventos del contenedor anterior (die, start,
+> destroy, create, oom, kill) sin necesidad de SSH directo.
+
 El diagnóstico integral reportó simultáneamente estado Coolify
 `degraded:unhealthy` y no encontró contenedores, aunque `health`, `logs` y la
 inspección exacta sí encontraron la app viva. Esto sugiere un problema de
@@ -107,7 +174,7 @@ El watchdog no origina necesariamente el stall, pero convierte cualquier
 starvation del runtime de 30 segundos en una terminación inmediata. Mientras
 Docker/Coolify recupera el backend, Traefik puede responder Bad Gateway.
 
-No “solucionar” esto desactivándolo para siempre: sin watchdog el backend puede
+No "solucionar" esto desactivándolo para siempre: sin watchdog el backend puede
 permanecer congelado. Primero corregir la carga/fallo y después exigir dos
 señales antes de terminar el proceso.
 
@@ -268,6 +335,14 @@ Antes de deploy/restart:
 No quedarse esperando logs en streaming. Usar rangos acotados, timestamps y
 salida a un reporte local sin secretos.
 
+> **Comandos recomendados para Fase 0:**
+> ```powershell
+> & $cm incident investigate --name studio --since 48h
+> & $cm container events --name studio --since 48h
+> & $cm db-stats --name studio --json
+> & $cm incident logs --name studio --since 48h --pattern "FREEZE DETECTED|panic|OOM|no unique or exclusion constraint|current transaction is aborted|pool timeout"
+> ```
+
 ### Fase 1 — Mitigación inmediata y reversible
 
 Objetivo: preservar mensajes y reducir carga antes de arreglar funciones nuevas.
@@ -291,6 +366,16 @@ Objetivo: preservar mensajes y reducir carga antes de arreglar funciones nuevas.
 
 Si no es posible aplicar el flag de forma segura, implementar primero un
 hotfix de código con captura desactivada por defecto y desplegarlo.
+
+> **Comandos recomendados para Fase 1:**
+> ```powershell
+> & $cm env-toggle --name studio --key CHAT_ALERT_CAPTURE_ENABLED --value false
+> & $cm env-toggle --name studio --key CHAT_EMAIL_DELIVERY_ENABLED --value false
+> & $cm env-toggle --name studio --key CHAT_WHATSAPP_DELIVERY_ENABLED --value false
+> & $cm restart --name studio
+> & $cm health --name studio
+> & $cm container stats --name studio
+> ```
 
 ### Fase 2 — Hotfix SQL y errores silenciosos
 
@@ -341,6 +426,12 @@ Hacer un commit pequeño, no mezclar UI:
    - queries lentas;
    - backlog outbox;
    - tiempo por lote.
+
+> **Comando para medir pool:**
+> ```powershell
+> & $cm db-stats --name studio --threshold 5 --json
+> ```
+
 5. Paginar `list_all_sessions()` o volver a sesiones activas + carga bajo
    demanda. Nunca hidratar todas las conversaciones cerradas en cada WS.
 6. Corregir `unanswered_messages_loop` para que la deduplicación sea durable,
@@ -390,6 +481,18 @@ Orden:
 
 Ante cualquier freeze, rollback de flags, no rollback destructivo de base de
 datos.
+
+> **Comandos para reactivación canary:**
+> ```powershell
+> # Activar captura (delivery externo false)
+> & $cm env-toggle --name studio --key CHAT_ALERT_CAPTURE_ENABLED --value true
+> & $cm restart --name studio
+> & $cm health --name studio
+> # Monitorear
+> & $cm container stats --name studio
+> & $cm db-stats --name studio --json
+> & $cm incident logs --name studio --since 30m
+> ```
 
 ## 5. Matriz mínima de pruebas
 
@@ -478,15 +581,32 @@ El siguiente agente debe cerrar explícitamente:
 - [ ] si el fallback se publica en vivo;
 - [ ] si el host watchdog y el watchdog interno pueden competir.
 
+> **Comandos para resolver pendientes:**
+> ```powershell
+> # Eventos y logs del contenedor anterior
+> & $cm container events --name studio --since 48h
+> & $cm incident logs --name studio --since 48h
+> # Pool y queries
+> & $cm db-stats --name studio --json
+> # Estado actual del contenedor
+> & $cm container inspect --name studio --json
+> ```
+
 ## 9. Problema de seguridad descubierto durante el diagnóstico
+
+> **✅ RESUELTO 2026-07-25:** `coolify-manager-rs` ahora redacta automáticamente
+> secretos en todos los comandos de diagnóstico. Implementado en `src/infra/secrets.rs`
+> con `redact_text()`, `redact_url_credentials()` y `redact_env_map()`. Los comandos
+> `incident investigate`, `incident logs`, `container inspect` y `db-stats` aplican
+> redacción automática. Tests de regresión incluidos.
 
 `coolify-manager diagnose --json` imprimió el compose completo con variables de
 entorno sin redacción. No copiar esa salida a issues, commits ni chats.
 
 Después de estabilizar disponibilidad:
 
-1. modificar `coolify-manager-rs` para redactar automáticamente claves, tokens,
-   passwords y URLs con credenciales;
+1. ~~modificar `coolify-manager-rs` para redactar automáticamente claves, tokens,~~
+   ~~passwords y URLs con credenciales;~~ **HECHO**
 2. añadir test snapshot que falle si aparece un patrón secreto;
 3. tratar las credenciales impresas como potencialmente expuestas y rotarlas de
    forma ordenada;
@@ -511,12 +631,68 @@ No cerrar por observar HTTP 200 una vez. Se requiere:
 
 Entregar a un agente el siguiente alcance exacto:
 
-> “Preserva evidencia de producción sin mutar nada. Reproduce en PostgreSQL los
+> "Preserva evidencia de producción sin mutar nada. Reproduce en PostgreSQL los
 > dos errores `ON CONFLICT`. Implementa solo el hotfix SQL y propagación de
 > errores, añade tests concurrentes y deja los tres flags fail-closed. No
 > modifiques UI, prompts, WhatsApp ni email. Valida todo localmente. Antes de
 > deploy, presenta diff, resultados y plan de rollback compatible con las
-> migraciones aplicadas.”
+> migraciones aplicadas."
 
 Ese bloque reduce riesgo y evita que un agente menor intente arreglar watchdog,
 Realtime, email y WhatsApp al mismo tiempo.
+
+---
+
+## 12. Herramientas de coolify-manager-rs implementadas (2026-07-25)
+
+Se implementaron los siguientes comandos en `coolify-manager-rs` para facilitar
+la investigación y mitigación de incidentes como este:
+
+### Nuevos comandos
+
+| Comando | Descripción | Archivo |
+|---|---|---|
+| `incident investigate` | Panel unificado de diagnóstico (health + inspect + events + stats + logs + db-stats) | `src/commands/incident.rs` |
+| `incident logs` | Búsqueda de patrones de incidente en logs con redacción automática | `src/commands/incident.rs` |
+| `container inspect` | `docker inspect` parseado (restart_count, OOM, exit_code, límites) | `src/commands/container.rs` |
+| `container events` | Eventos de ciclo de vida del contenedor (create, start, die, destroy, oom, kill) | `src/commands/container.rs` |
+| `container stats` | Métricas de recursos (CPU, memoria, red, disco, PIDs) | `src/commands/container.rs` |
+| `db-stats` | Métricas PostgreSQL (conexiones, queries largas, locks, deadlocks, tablas) | `src/commands/db_stats.rs` |
+| `env-toggle` | Toggle rápido de env vars para mitigación (con bloqueo de keys sensibles) | `src/commands/env_toggle.rs` |
+
+### Mejoras a comandos existentes
+
+| Comando | Mejora | Archivo |
+|---|---|---|
+| `logs` | Añadidos `--since`, `--until`, `--pattern` | `src/commands/view_logs.rs` |
+| `health` | (Existente, sin cambios) | `src/services/health_manager.rs` |
+
+### Infraestructura de seguridad
+
+| Función | Descripción | Archivo |
+|---|---|---|
+| `redact_text()` | Redacción genérica de tokens, passwords, URLs con credenciales | `src/infra/secrets.rs` |
+| `redact_url_credentials()` | Redacción de credenciales en URLs (postgres://, mysql://, etc.) | `src/infra/secrets.rs` |
+| `redact_env_map()` | Redacción de variables sensibles en mapas de entorno | `src/infra/secrets.rs` |
+| `is_sensitive_key()` | Detección de keys sensibles (SECRET, PASSWORD, TOKEN, KEY, etc.) | `src/infra/secrets.rs` |
+
+### Cómo usar para este incidente
+
+```powershell
+# Diagnóstico completo (Fase 0)
+& $cm incident investigate --name studio --since 48h
+
+# Mitigación rápida (Fase 1)
+& $cm env-toggle --name studio --key CHAT_ALERT_CAPTURE_ENABLED --value false
+& $cm env-toggle --name studio --key CHAT_EMAIL_DELIVERY_ENABLED --value false
+& $cm env-toggle --name studio --key CHAT_WHATSAPP_DELIVERY_ENABLED --value false
+
+# Monitoreo continuo
+& $cm container stats --name studio
+& $cm db-stats --name studio --json
+& $cm incident logs --name studio --since 30m
+
+# Reactivación canary (Fase 5)
+& $cm env-toggle --name studio --key CHAT_ALERT_CAPTURE_ENABLED --value true
+& $cm incident logs --name studio --since 5m --pattern "panic|OOM|FREEZE"
+```

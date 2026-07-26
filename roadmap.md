@@ -66,11 +66,86 @@ Ver análisis completo en `Agente/documentacion/hosting/producto-correo-proveedo
 ## Estado interno reciente
 
 - `275A-3`: hotfix del listado de backups para WordPress/Coolify. El endpoint fallaba con 500 porque `alpine:3.20` usa BusyBox y no soporta `ls --time-style=long-iso`; ahora el listing usa `ls --full-time`, comprueba la existencia del volumen antes de montarlo y el parser acepta timestamps `HH:MM:SS +0000`. Validado con test unitario nuevo y smoke SSH contra el VPS del hosting de prueba.
-- `20CA`: reorganización del roadmap (20 julio 2026). 14 tareas pendientes agrupadas por dominio.
+- `20CA`: reorganización del roadmap (20 julio 2026). Sus afirmaciones de
+  completado requieren aceptación funcional; no equivalen a una entrega
+  confirmada en producción.
+- `237A-3`: el código de los bloques A-E está en la rama y el despliegue del
+  25 julio pasó health, pero los canales externos de alertas permanecen
+  desactivados o sin evidencia de entrega. No tratar esos bloques como cerrados.
+- `257A`: limpieza de target Cargo (2026-07-25). Límite 15 GB, tarea oculta, sin consola visible.
+- Herramientas de incidente en coolify-manager-rs implementadas (2026-07-25): `incident-investigate`, `incident-logs`, `container-inspect/events/stats`, `db-stats`, `env-toggle`, redacción de secretos.
 
 ##
 
 ## 237A-3 — Estabilidad integral de Nakomi Studio
+
+### Estado funcional verificado — 2026-07-26
+
+Esta sección prevalece sobre etiquetas históricas de “implementado” en planes
+anteriores. **Código presente, una migración aplicada o un health 200 no prueban
+que la experiencia solicitada funcione para la administradora.**
+
+#### Hecho y desplegado
+
+- Se corrigió el deadlock de desconexión WebSocket que bloqueaba workers Tokio y
+  podía producir freeze/Bad Gateway.
+- Se corrigió la pérdida del mensaje pendiente de IA durante una reconexión.
+- El servicio respondió health 200 tras el último deploy, sin reinicios ni OOM
+  en la comprobación posterior.
+- La limpieza local de `C:\tmp\glory-target` quedó limitada a 15 GB mediante
+  tarea automática oculta.
+- `257A-9` está desplegado: toggle o intervención humana incrementan una época
+  durable, invalidan respuestas IA en vuelo y cancelan ciclos de fallback.
+- `257A-10` está desplegado: Claudia se identifica honestamente como asistente
+  de IA y prioriza el escalamiento cuando el cliente quiere profundizar en su
+  proyecto, estrategia, alcance o propuesta personalizada.
+
+#### Pendiente crítico — alertas y contacto
+
+1. **Correo inmediato por cada mensaje de cliente:** código, outbox, worker SMTP
+   y configuración están desplegados. `CHAT_ALERT_CAPTURE_ENABLED=true` y
+   `CHAT_EMAIL_DELIVERY_ENABLED=true`; el arranque confirma SMTP y worker. Falta
+   el canary final: mensaje real, correo recibido y estado `sent` en
+   `email_logs`/outbox. Hasta esa evidencia no se marca cerrado.
+2. **WhatsApp inmediato por cada mensaje y pedido:** el cliente Nakomi existe,
+   pero el gateway firmado/worker `wacli` de `glorytemplate` sigue pendiente de
+   implementación y canary. Mientras tanto no hay entrega WhatsApp verificable.
+   `accepted_by_gateway` tampoco equivale a recepción humana.
+3. **Notificación visible y punto rojo:** los componentes y WebSocket global
+   existen, pero el contador del sidebar no hace carga inicial fuera del panel;
+   solo consume cache/eventos. Falta corregirlo y probar mensaje nuevo en panel,
+   fuera del panel, móvil y tras reconexión.
+4. **CTA “Escribir por WhatsApp” de la IA:** código y
+   `PUBLIC_SUPPORT_WHATSAPP=16084668134` están desplegados. El prompt prioriza
+   este CTA para conversaciones profundas de proyecto y ya no oculta que es IA.
+   Falta prueba visible móvil/desktop y confirmar que abre el número correcto.
+
+#### Pendiente crítico — comportamiento de chat/IA
+
+5. Repetir prueba real de dos mensajes consecutivos y reconexión/reload; el
+   hotfix está desplegado, pero necesita aceptación funcional.
+6. Verificar botón de detener IA, precedencia de respuesta humana y fallback
+   solo después de 10 minutos. No declarar completo sin carrera humano/worker
+   y prueba visible.
+7. Verificar que la IA capture email con consentimiento, no lo vuelva a pedir,
+   y que el correo de continuación recupere la conversación desde un navegador
+   limpio. El código existe; la prueba extremo a extremo no está realizada.
+8. Verificar retención: ningún mensaje debe desaparecer por cierre de sesión,
+   paginación o reconexión. Falta prueba de conversación antigua y de más de
+   100 mensajes.
+
+#### Pendientes de producto previamente solicitados
+
+9. Reembolso: eliminar el `prompt()` administrativo, revisar transición Stripe
+   transaccional y conversación admin-cliente.
+10. Pagos/órdenes: impedir cuentas sin compra efectiva, comprobar cobros de
+    servicios y endurecer idempotencia/transacciones de webhook.
+11. Pedidos: confirmar en UI real auto-asignación ilimitada a admin,
+    reasignación/cancelación y etiqueta “Freelancer asignado”.
+12. CMS: permitir comas para tags; ajustar 10% de resolución de las galerías.
+13. Ramas: finalizar restauración/normalización de `main` y migrar consumidores
+    de `master`/`dev-launcher-centralizado` a `main` solo tras estabilizar
+    Nakomi, según el plan específico.
 
 Planes activos:
 
@@ -78,7 +153,10 @@ Planes activos:
 - Cierre ejecutable de alertas, WhatsApp, Realtime y bloques difíciles:
   `Agente/planes/plan-cierre-bloques-dificiles-nakomi-2026-07-23.md`.
 
-**Estado (2026-07-23):** Bloques A, B, C, D, E implementados en backend + frontend. 210 tests pasan, cargo check limpio. Pendiente: deploy a producción y gateway WhatsApp en glorytemplate.
+**Estado histórico (2026-07-23):** Bloques A, B, C, D, E declarados
+implementados en backend + frontend. El despliegue posterior está hecho, pero
+la aceptación funcional de alertas, correo, WhatsApp, Realtime y flujos IA sigue
+pendiente; consultar “Estado funcional verificado” arriba.
 
 Este problema debe ser resuelto por un agente inteligente, todas estas tareas necesita un plan, separado o unido lo que sea mejor, primero investiga en profundida y luego plantea como solucionar todo y yo autorizare o no:
 
