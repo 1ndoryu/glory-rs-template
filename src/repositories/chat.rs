@@ -48,7 +48,7 @@ impl ChatRepository {
             "SELECT id, visitor_id, visitor_name, user_id, order_id, status, \
                assigned_staff_id, ai_enabled, created_at, updated_at, \
                visitor_ip, visitor_user_agent, last_viewed_at, visitor_last_connected_at, \
-               visitor_country, is_escalated \
+               visitor_country, is_escalated, ai_mode, ai_generation_epoch \
              FROM chat_sessions WHERE id = $1",
         )
         .bind(id)
@@ -169,20 +169,32 @@ impl ChatRepository {
             "staff_handling"
         };
         let new_mode = if enabled { "automatic" } else { "manual_pause" };
-        sqlx::query_as::<_, ChatSession>(
+        let mut tx = pool.begin().await?;
+        let session = sqlx::query_as::<_, ChatSession>(
             "UPDATE chat_sessions SET ai_enabled = $2, status = $3, ai_mode = $4, \
-             updated_at = NOW() WHERE id = $1 \
+             ai_generation_epoch = ai_generation_epoch + 1, updated_at = NOW() WHERE id = $1 \
              RETURNING id, visitor_id, visitor_name, user_id, order_id, status, \
                assigned_staff_id, ai_enabled, created_at, updated_at, \
                visitor_ip, visitor_user_agent, last_viewed_at, visitor_last_connected_at, \
-               visitor_country, is_escalated",
+               visitor_country, is_escalated, ai_mode, ai_generation_epoch",
         )
         .bind(session_id)
         .bind(enabled)
         .bind(new_status)
         .bind(new_mode)
-        .fetch_one(pool)
-        .await
+        .fetch_one(&mut *tx)
+        .await?;
+
+        sqlx::query(
+            "UPDATE chat_response_cycles SET status = 'cancelled' \
+             WHERE session_id = $1 AND status IN ('waiting', 'claimed')",
+        )
+        .bind(session_id)
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+        Ok(session)
     }
 
     /* [237A-9] Cambiar ai_mode sin tocar ai_enabled.
@@ -194,7 +206,8 @@ impl ChatRepository {
         mode: &str,
     ) -> Result<(), sqlx::Error> {
         sqlx::query(
-            "UPDATE chat_sessions SET ai_mode = $2, updated_at = NOW() WHERE id = $1",
+            "UPDATE chat_sessions SET ai_mode = $2, \
+             ai_generation_epoch = ai_generation_epoch + 1, updated_at = NOW() WHERE id = $1",
         )
         .bind(session_id)
         .bind(mode)

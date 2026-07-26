@@ -254,7 +254,11 @@ pub async fn send_message(
      * Para mensajes de cliente: crea notificaciones in-app + outbox email/WhatsApp.
      * Para otros remitentes: persiste sin outbox. */
     let msg = crate::services::chat_alert::send_message_with_alerts(
-        &state.pool, session_id, sender_type, Some(&sender_id), &req.content,
+        &state.pool,
+        session_id,
+        sender_type,
+        Some(&sender_id),
+        &req.content,
     )
     .await?;
 
@@ -264,13 +268,18 @@ pub async fn send_message(
     if matches!(auth.effective_role, UserRole::Admin | UserRole::Employee)
         && !sender_type.eq("client")
     {
-        let _ = crate::repositories::ChatRepository::set_ai_mode(
-            &state.pool, session_id, "human_priority",
-        ).await;
+        crate::repositories::ChatRepository::set_ai_mode(&state.pool, session_id, "human_priority")
+            .await
+            .map_err(|error| {
+                AppError::Internal(format!("Error cediendo control a humano: {error}"))
+            })?;
         /* Cancelar cualquier ciclo de fallback activo — el humano ya respondió */
-        let _ = crate::repositories::ResponseCycleRepository::mark_answered_human(
-            &state.pool, session_id, msg.id,
-        ).await;
+        crate::repositories::ResponseCycleRepository::mark_answered_human(
+            &state.pool,
+            session_id,
+            msg.id,
+        )
+        .await?;
     }
 
     /* Broadcast WS DESPUÉS de la transacción (evita notificaciones fantasma) */

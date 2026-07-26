@@ -598,6 +598,25 @@ fn drain_pending(
     }
 }
 
+/* [257A-9] Revalida en PostgreSQL justo antes de publicar. Esto evita que una
+ * respuesta generada durante 90 s aparezca después de que el humano contestó
+ * o pulsó detener IA, incluso si ocurrió en otro worker o tras una reconexión. */
+async fn ai_generation_is_current(
+    pool: &sqlx::PgPool,
+    session_id: Uuid,
+    expected_epoch: i64,
+) -> bool {
+    match crate::repositories::ChatRepository::find_session_by_id(pool, session_id).await {
+        Ok(Some(session)) => {
+            session.ai_enabled
+                && session.assigned_staff_id.is_none()
+                && session.ai_mode != "manual_pause"
+                && session.ai_generation_epoch == expected_epoch
+        }
+        _ => false,
+    }
+}
+
 /* Genera respuesta IA con el buffer combinado.
  * Verifica sesión activa, clasifica relevancia, genera respuesta y escala si necesario.
  * [T-2] Envía rich_messages (service_cards, invoices) como mensajes separados.
@@ -645,6 +664,10 @@ async fn generate_ai_response(
         }
     }
 
+    /* [257A-9] Capturar la versión antes de cualquier llamada lenta. Un toggle
+     * o mensaje humano la incrementa en BD y vuelve obsoleta esta generación. */
+    let generation_epoch = session.ai_generation_epoch;
+
     if !ensure_ai_request_allowed(session_id, combined, deps).await {
         return irrelevant_count;
     }
@@ -664,10 +687,12 @@ async fn generate_ai_response(
              en lo que pueda ayudarte? Ofrecemos diseño web, desarrollo \
              de aplicaciones, branding y agentes IA."
         };
-        let _ = deps
-            .hub
-            .send_message(session_id, "ai", Some("ai"), msg)
-            .await;
+        if ai_generation_is_current(&deps.pool, session_id, generation_epoch).await {
+            let _ = deps
+                .hub
+                .send_message(session_id, "ai", Some("ai"), msg)
+                .await;
+        }
         return irrelevant_count;
     }
 
@@ -719,8 +744,17 @@ async fn generate_ai_response(
 
     tracing::info!(%session_id, has_escalation = ai_resp.needs_escalation, rich_count = ai_resp.rich_messages.len(), "Respuesta IA recibida, enviando...");
 
+    if !ai_generation_is_current(&deps.pool, session_id, generation_epoch).await {
+        tracing::info!(%session_id, generation_epoch, "Respuesta IA descartada por intervención humana");
+        return irrelevant_count;
+    }
+
     /* [T-2] Enviar rich messages (service_cards, invoices) antes del texto */
     for rm in &ai_resp.rich_messages {
+        if !ai_generation_is_current(&deps.pool, session_id, generation_epoch).await {
+            tracing::info!(%session_id, generation_epoch, "Rich messages IA interrumpidos por intervención humana");
+            return irrelevant_count;
+        }
         let _ = deps
             .hub
             .send_rich_message(
@@ -734,10 +768,12 @@ async fn generate_ai_response(
             .await;
     }
 
-    let _ = deps
-        .hub
-        .send_message(session_id, "ai", Some("ai"), &ai_resp.text)
-        .await;
+    if ai_generation_is_current(&deps.pool, session_id, generation_epoch).await {
+        let _ = deps
+            .hub
+            .send_message(session_id, "ai", Some("ai"), &ai_resp.text)
+            .await;
+    }
 
     if ai_resp.needs_escalation {
         send_escalation(

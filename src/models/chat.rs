@@ -48,11 +48,15 @@ pub struct ChatSession {
     pub is_escalated: bool,
     /* [237A-9] Modo de IA: automatic|human_priority|manual_pause.
      * automatic: IA responde siempre. human_priority: IA como fallback 10min.
-     * manual_pause: IA desactivada completamente. 
+     * manual_pause: IA desactivada completamente.
      * Default "automatic" vía BD; queries legacy que no seleccionan esta
      * columna reciben "" (tratado como "automatic" en código). */
     #[sqlx(default)]
     pub ai_mode: String,
+    /* [257A-9] Versión durable para invalidar respuestas IA que ya estaban
+     * generándose cuando un humano intervino o cambió el modo. */
+    #[sqlx(default)]
+    pub ai_generation_epoch: i64,
 }
 
 /* [P-2] Perfil de visitante — memoria persistente entre sesiones.

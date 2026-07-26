@@ -73,14 +73,27 @@ async fn process_expired_cycle(pool: &PgPool, cycle_id: uuid::Uuid, session_id: 
     let fallback_text = "No hemos recibido respuesta del equipo en este momento. \
          Mientras tanto, ¿puedo ayudarte con algo más?";
 
-    match ChatRepository::save_message(pool, session_id, "ai", Some("ai"), fallback_text).await {
-        Ok(msg) => {
-            let _ = ResponseCycleRepository::mark_answered_ai(pool, cycle_id, msg.id).await;
+    match ResponseCycleRepository::save_fallback_if_still_claimed(
+        pool,
+        cycle_id,
+        session_id,
+        fallback_text,
+    )
+    .await
+    {
+        Ok(Some(_msg)) => {
             /* [237A-9] Per plan rule 6: tras el fallback, la sesión continúa en
              * human_priority. El siguiente mensaje del cliente abrirá otra espera
              * de 10 min. No restaurar 'automatic' — eso violaría la política de
              * que el humano tiene prioridad permanente hasta otro toggle explícito. */
-            tracing::info!("Fallback IA para session {session_id}, modo permanece en human_priority");
+            tracing::info!(
+                "Fallback IA para session {session_id}, modo permanece en human_priority"
+            );
+        }
+        Ok(None) => {
+            tracing::info!(
+                "Fallback cancelado: hubo respuesta humana o cambió el ciclo {cycle_id}"
+            );
         }
         Err(e) => {
             tracing::error!("Error guardando fallback IA para session {session_id}: {e}");
