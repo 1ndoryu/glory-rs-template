@@ -57,7 +57,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_and_run_fixtures(&pool).await?;
     spawn_background_services(&pool, &config);
 
-    let addr = format!("{}:{}", config.host, config.port);
+    let server_port = config.port;
+    let addr = format!("{}:{}", config.host, server_port);
     tracing::info!("Servidor iniciando en {addr}");
     tracing::info!("Swagger UI disponible en http://{addr}/swagger-ui/");
 
@@ -96,7 +97,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let watchdog_config = RuntimeWatchdogConfig {
             /* [277A-6] HTTP probe loopback: verifica que el servidor HTTP sigue vivo */
             http_probe: Some(HttpProbeConfig {
-                port: config.port,
+                port: server_port,
                 path: "/healthz".to_string(),
                 timeout: Duration::from_secs(3),
             }),
@@ -106,7 +107,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
         tracing::info!(
             "[rt-watchdog] Doble señal activada: heartbeat + HTTP probe en 127.0.0.1:{}/healthz (grace 60s, threshold 120s)",
-            config.port
+            server_port
         );
         let runtime_heartbeat = spawn_runtime_watchdog(&watchdog_config, || {
             eprintln!("[rt-watchdog] Volcando stacks del kernel...\n");
@@ -423,6 +424,17 @@ fn spawn_background_services(pool: &sqlx::PgPool, _config: &AppConfig) {
     } else {
         tracing::warn!("[infra-metrics] Coolify no configurado — sampler desactivado");
     }
+
+    /* [277A-7] Background task: worker de retry de reembolsos fallidos (backoff exponencial) */
+    let refund_pool = pool.clone();
+    let refund_stripe_key = std::env::var("STRIPE_SECRET_KEY").ok();
+    tokio::spawn(async move {
+        glory_backend::services::RefundService::run_refund_retry_loop(
+            refund_pool,
+            refund_stripe_key,
+        )
+        .await;
+    });
 
     if let Some(contabo_config) = ContaboConfig::from_env() {
         let monitor_pool = pool.clone();

@@ -14,12 +14,12 @@ use uuid::Uuid;
 use crate::errors::AppError;
 use crate::middleware::AuthUser;
 use crate::models::{
-    CreateNotification, OrderStatus, PaymentStatus, RefundResponse, RefundStatus,
+    CreateNotification, PaymentStatus, RefundResponse, RefundStatus,
     RequestRefundBody, ReviewAction, ReviewRefundBody, UserRole, NOTIF_REFUND_REQUESTED,
     NOTIF_REFUND_RESOLVED,
 };
 use crate::repositories::{OrderRepository, PaymentRepository, RefundRepository, UserRepository};
-use crate::services::PaymentService;
+use crate::services::RefundService;
 use crate::AppState;
 
 /* ============================================================
@@ -157,7 +157,7 @@ pub async fn review_refund(
 
     match body.action {
         ReviewAction::Approve => {
-            /* Aprobar → ejecutar refund en Stripe → marcar completado */
+            /* [277A-7] Aprobar → delegar a RefundService para procesar con Stripe + retry */
             let approved = RefundRepository::approve(
                 &state.pool,
                 refund_id,
@@ -166,59 +166,53 @@ pub async fn review_refund(
             )
             .await?;
 
-            /* Buscar el pago asociado para ejecutar el refund en Stripe */
-            let payments = PaymentRepository::list_for_order(&state.pool, refund.order_id).await?;
-            let payment = payments
-                .iter()
-                .find(|p| p.id == refund.payment_id)
-                .ok_or_else(|| {
-                    AppError::Internal("Pago asociado al reembolso no encontrado".into())
-                })?;
-
-            /* Intentar refund en Stripe (si hay key configurada) */
-            let stripe_refund_id = match state.stripe_secret_key.as_ref() {
-                None => {
-                    /* Sin Stripe configurado, simular refund */
-                    tracing::warn!("Stripe no configurado, simulando refund");
-                    format!("simulated_refund_{refund_id}")
-                }
-                Some(key) => {
-                    PaymentService::refund_payment(&state.http_client, key, payment).await?
-                }
-            };
-
-            /* Marcar pago como refunded */
-            PaymentRepository::update_status(&state.pool, payment.id, PaymentStatus::Refunded)
-                .await?;
-
-            /* Marcar reembolso como completado */
-            let completed =
-                RefundRepository::mark_completed(&state.pool, approved.id, &stripe_refund_id)
-                    .await?;
-
-            /* Cancelar la orden */
-            OrderRepository::update_order_status(
+            let result = RefundService::process_approved_refund(
                 &state.pool,
-                refund.order_id,
-                OrderStatus::Cancelled,
+                &state.http_client,
+                state.stripe_secret_key.as_deref(),
+                approved.id,
             )
-            .await?;
+            .await;
 
-            /* [104A-38] Notificar al cliente que su reembolso fue aprobado */
+            match result {
+                Ok(()) => {
+                    /* Refund exitoso — la notificación se envía abajo */
+                }
+                Err(e) => {
+                    /* Refund falló en Stripe pero ya se programó retry en RefundService.
+                     * Notificamos al admin del error pero NO devolvemos error al cliente:
+                     * la aprobación se registró y el retry se ejecutará en background. */
+                    tracing::error!(
+                        "[277A-7] Refund Stripe falló para {refund_id}, retry programado: {e}"
+                    );
+                }
+            }
+
+            /* Re-leer el estado actual del reembolso (puede haber cambiado a failed/processing) */
+            let current = RefundRepository::find_by_id(&state.pool, refund_id)
+                .await?
+                .ok_or_else(|| AppError::NotFound("Reembolso no encontrado post-proceso".into()))?;
+
+            /* Notificar al cliente */
+            let notif_body = if current.status == RefundStatus::Failed {
+                "Tu reembolso fue aprobado pero el procesamiento en Stripe falló. Se reintentará automáticamente.".to_string()
+            } else {
+                "Tu solicitud de reembolso ha sido procesada".to_string()
+            };
             let _ = state
                 .notification_hub
                 .notify(CreateNotification {
                     user_id: refund.requested_by,
                     notification_type: NOTIF_REFUND_RESOLVED.to_string(),
                     title: "Reembolso aprobado".to_string(),
-                    body: Some("Tu solicitud de reembolso ha sido procesada".to_string()),
+                    body: Some(notif_body),
                     link: Some(format!("/panel?seccion=ordenes&id={}", refund.order_id)),
                     reference_type: Some("refund".to_string()),
                     reference_id: Some(refund.id),
                 })
                 .await;
 
-            Ok(Json(RefundResponse::from(completed)))
+            Ok(Json(RefundResponse::from(current)))
         }
         ReviewAction::Reject => {
             let rejected = RefundRepository::reject(

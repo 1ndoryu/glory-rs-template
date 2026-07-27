@@ -176,9 +176,13 @@ impl PaymentService {
             ("receipt_email", email.to_string()),
         ];
 
+        /* [277A-7] Idempotency-Key para checkout directo */
+        let idempotency_key = Uuid::new_v4().to_string();
+
         let resp = http_client
             .post("https://api.stripe.com/v1/payment_intents")
             .bearer_auth(stripe_key)
+            .header("Idempotency-Key", &idempotency_key)
             .form(&params)
             .send()
             .await
@@ -226,7 +230,7 @@ impl PaymentService {
         payment_mode: PaymentMode,
         stripe_intent_id: &str,
         charge_id: Option<&str>,
-        _amount_cents: i32,
+        stripe_amount_cents: i32,
     ) -> Result<(), AppError> {
         /* [20CA-1] Buscar o crear usuario por email */
         let user = Self::find_or_create_checkout_user(pool, email).await?;
@@ -238,6 +242,17 @@ impl PaymentService {
         let base_price = plan.price_cents;
         let discount = Self::discount_for_mode(payment_mode);
         let final_price = base_price - (base_price * discount / 100);
+
+        /* [277A-7] Validar que el monto de Stripe coincida con el esperado.
+         * Previene manipulación del monto en el webhook (spoofed amount). */
+        if stripe_amount_cents > 0 && stripe_amount_cents != final_price {
+            tracing::error!(
+                "[277A-7] Mismatch de monto checkout: Stripe={stripe_amount_cents}, esperado={final_price} para {service_slug}/{plan_slug}"
+            );
+            return Err(AppError::BadRequest(
+                "El monto del pago no coincide con el esperado".into(),
+            ));
+        }
 
         /* Crear la orden (status default: payment_held en BD) */
         let order = OrderRepository::create_order(
@@ -667,9 +682,14 @@ impl PaymentService {
             form.push(("receipt_email".to_string(), email.to_string()));
         }
 
+        /* [277A-7] Idempotency-Key: previene PaymentIntents duplicados si Stripe
+         * recibe la misma petición más de una vez (timeout, retry de red). */
+        let idempotency_key = Uuid::new_v4().to_string();
+
         let resp = client
             .post("https://api.stripe.com/v1/payment_intents")
             .basic_auth(api_key, None::<&str>)
+            .header("Idempotency-Key", &idempotency_key)
             .form(&form)
             .send()
             .await
@@ -817,9 +837,14 @@ impl PaymentService {
             }
             PaymentStatus::Released => {
                 /* Fondos ya capturados → crear Refund en Stripe */
+                /* [277A-7] Idempotency-Key en refunds: previene reembolsos duplicados
+                 * si el retry worker se ejecuta mientras Stripe aún procesa el anterior. */
+                let idempotency_key = Uuid::new_v4().to_string();
+
                 let resp = http_client
                     .post("https://api.stripe.com/v1/refunds")
                     .basic_auth(stripe_key, None::<&str>)
+                    .header("Idempotency-Key", &idempotency_key)
                     .form(&[("payment_intent", pi_id)])
                     .send()
                     .await

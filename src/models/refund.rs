@@ -15,7 +15,9 @@ pub enum RefundStatus {
     Requested,
     UnderReview,
     Approved,
+    Processing,
     Completed,
+    Failed,
     Rejected,
 }
 
@@ -31,6 +33,10 @@ pub struct OrderRefund {
     pub admin_response: Option<String>,
     pub status: RefundStatus,
     pub stripe_refund_id: Option<String>,
+    /* [277A-7] Retry tracking para reembolsos fallidos en Stripe */
+    pub attempts: i32,
+    pub max_attempts: i32,
+    pub next_retry_at: Option<DateTime<Utc>>,
     pub requested_at: DateTime<Utc>,
     pub reviewed_at: Option<DateTime<Utc>>,
     pub completed_at: Option<DateTime<Utc>>,
