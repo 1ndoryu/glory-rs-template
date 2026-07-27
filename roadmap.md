@@ -108,24 +108,21 @@ Lo siguiente está **confirmado en el código fuente actual** (no solo declarado
 
 ## ⚠️ Pendiente funcional (medio/alto)
 
-### 4. Pagos/reembolsos — migración pendiente en producción
+### 4. Pendiente deploy producción
 
-**Estado:** Código implementado y commiteado (277A-7). **Requiere deploy** para aplicar la migración SQL.
-**Incluye:** Idempotency-Key en Stripe, retry de reembolsos con backoff exponencial (1h→4h→16h→64h→72h cap), constraint único de pago activo por orden, validación de monto en checkout webhook, recovery de refunds stuck en Processing (>30min).
+**Bloqueado en autorización del usuario.** Incluye:
+- Migración SQL pagos/reembolsos (277A-7)
+- Watchdog doble señal (277A-6)
+- Todos los fixes SEO + banner 50% (277A-8/9/10)
+- Fixes preexistentes (277A-1-5)
 
-### 5. SEO: frontend descuento 50% (banner + badge)
+### ~~5. SEO: frontend descuento 50% (banner + badge)~~ ✅ Completado
 
-**Estado:** Backend ya implementado (`first_order_discount_percent` en `order.rs`). Falta:
-- Banner en checkout: "50% OFF en tu primer servicio"
-- Badge en cards de planes del sitio público
-- Endpoint API para que el frontend consulte si califica (~30min)
-**Esfuerzo:** ~2-3h.
+**Estado:** Implementado (277A-10). Endpoint `GET /api/orders/first-order-discount` + banner en ModalCompra con React Query.
 
-### 6. SEO: breadcrumbSchema en páginas de detalle
+### ~~6. SEO: breadcrumbSchema en páginas de detalle~~ ✅ Completado
 
-**Estado:** Schema definido en `schemas.ts` pero no integrado en ninguna página.
-**Páginas:** `/servicios/:slug`, `/proyectos/:slug`, `/blog/:slug`, `/soluciones/hosting`, `/soluciones/vps`
-**Esfuerzo:** ~2-3h.
+**Estado:** Implementado (277A-10). Integrado en ServicioIndividualIsland (@graph con serviceSchema) y ProyectoIndividualIsland.
 
 ---
 
