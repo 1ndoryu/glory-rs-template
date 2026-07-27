@@ -36,7 +36,7 @@ export const BlogSingleIsland = ({
     const {t} = useTranslation();
 
     /* [074A-11] Datos del post: API > props > fallback estático */
-    const {titulo, contenido, fecha, categoria, imagen} = useBlogSingle({
+    const {titulo, contenido, fecha, fechaModificacion, categoria, imagen} = useBlogSingle({
         slug,
         titulo: tituloProp,
         contenido: contenidoProp,
@@ -52,7 +52,7 @@ export const BlogSingleIsland = ({
                 description={contenido.substring(0, 160)}
                 path={`/blog/${slug || ''}`}
                 type="article"
-                jsonLd={blogPostSchema(titulo, contenido.substring(0, 160), slug || '', fecha)}
+                jsonLd={blogPostSchema(titulo, contenido.substring(0, 160), slug || '', fecha, fechaModificacion)}
             />
             {/* Hero del articulo */}
             <section className="blogSingleHero">

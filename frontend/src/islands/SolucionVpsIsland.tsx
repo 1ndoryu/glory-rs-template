@@ -2,6 +2,7 @@ import {useTranslation} from 'react-i18next';
 import {Cpu, Shield, HardDrive, TerminalSquare, Activity, Server} from 'lucide-react';
 import {LayoutPagina} from '../components/layout/LayoutPagina';
 import {SEOHead} from '../components/seo/SEOHead';
+import {faqSchema} from '../components/seo/schemas';
 import {SeccionContacto} from '../components/home/SeccionContacto';
 import {useChatStore} from '../stores/chatStore';
 import {Button} from '../components/ui/Button';
@@ -42,6 +43,12 @@ export const SolucionVpsIsland = (): JSX.Element => {
                 title="Servidores VPS"
                 description={`Servidores VPS dedicados con acceso root, bootstrap inicial, velocidad y tráfico visibles. Planes desde ${lowestPriceLabel}/mes.`}
                 path="/soluciones/vps"
+                jsonLd={faqSchema([
+                    {question: '¿Qué es un VPS de Nakomi Studio?', answer: 'Es un servidor virtual dedicado con acceso root, Docker preinstalado, firewall básico y bootstrap inicial. Lo provisionamos y te enviamos IP y credenciales listas para usar.'},
+                    {question: '¿Puedo escalar mi VPS después de contratarlo?', answer: 'Sí, puedes cambiar de tier en cualquier momento. El pricing es transparente y visible antes de pagar, sin sorpresas ni cargos ocultos.'},
+                    {question: '¿El VPS incluye backups?', answer: 'El VPS se entrega con acceso root completo. Los backups los gestionas tú o podemos añadir un plan de backups administrados como servicio adicional.'},
+                    {question: '¿Qué sistema operativo puedo instalar?', answer: 'Ofrecemos las distribuciones Linux más populares: Ubuntu, Debian y CentOS. El servidor se entrega con Docker y herramientas básicas ya configuradas.'},
+                ])}
             />
 
             <section className="hostingHero">

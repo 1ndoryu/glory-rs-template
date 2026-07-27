@@ -8,6 +8,7 @@ import {useTranslation} from 'react-i18next';
 import {Server, Shield, Zap, Clock, Globe, Headphones} from 'lucide-react';
 import {LayoutPagina} from '../components/layout/LayoutPagina';
 import {SEOHead} from '../components/seo/SEOHead';
+import {faqSchema} from '../components/seo/schemas';
 import {SeccionContacto} from '../components/home/SeccionContacto';
 import {useChatStore} from '../stores/chatStore';
 import {Button} from '../components/ui/Button';
@@ -121,6 +122,17 @@ function SolucionHostingContenido({kind}: {kind: HostingSolutionKind}): JSX.Elem
                     ? `WordPress hosting optimizado con WP-CLI, backups automáticos y soporte experto. Planes desde ${lowestHostingPriceLabel} con SSL, WordPress pre-instalado y acceso SSH.`
                     : t('hosting_normal_page.seo_desc', `Hosting administrado con Nginx, SSL y SFTP. Planes desde ${lowestHostingPriceLabel} para sitios corporativos, landings y frontends sin WordPress.`).replace('{{price}}', lowestHostingPriceLabel)}
                 path={seoPath}
+                jsonLd={faqSchema(isWordPress ? [
+                    {question: '¿Qué incluye el hosting WordPress de Nakomi?', answer: 'WordPress pre-instalado, WP-CLI, SSL gratuito, backups automáticos diarios, firewall y soporte técnico experto. Planes desde $2.48/mes.'},
+                    {question: '¿Puedo migrar mi sitio WordPress existente?', answer: 'Sí, ofrecemos migración gratuita para sitios WordPress. Nuestro equipo técnico se encarga de la transferencia sin tiempo de inactividad.'},
+                    {question: '¿El hosting WordPress tiene límites de tráfico?', answer: 'Cada plan incluye un límite de ancho de banda mensual. Si tu sitio necesita más, puedes escalar de plan en cualquier momento sin interrupciones.'},
+                    {question: '¿Incluye certificado SSL?', answer: 'Sí, todos los planes incluyen certificado SSL gratuito de Let\' Encrypt con renovación automática.'},
+                ] : [
+                    {question: '¿Qué es el hosting administrado de Nakomi?', answer: 'Es un servicio de hosting Nginx donde nosotros nos encargamos del servidor: SSL, backups, seguridad y actualizaciones. Tú solo subes tu sitio por SFTP.'},
+                    {question: '¿Puedo usar mi propio dominio?', answer: 'Sí, puedes vincular tu dominio personalizado. Incluimos configuración DNS y certificado SSL automático para tu dominio.'},
+                    {question: '¿El hosting incluye base de datos?', answer: 'Los planes de hosting administrado están optimizados para sitios estáticos y frontends. Si necesitas backend o base de datos, nuestros planes VPS son la mejor opción.'},
+                    {question: '¿Hay compromiso de permanencia?', answer: 'No, todos nuestros planes son mensuales sin compromiso. Puedes cancelar o cambiar de plan en cualquier momento.'},
+                ])}
             />
 
             {/* Hero */}

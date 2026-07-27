@@ -11,6 +11,7 @@ interface BlogSingleData {
     titulo: string;
     contenido: string;
     fecha: string;
+    fechaModificacion?: string;
     categoria: string;
     imagen: string;
 }
@@ -27,7 +28,7 @@ interface UseBlogSingleProps {
 export function useBlogSingle({slug, titulo: tituloProp, contenido: contenidoProp, fecha: fechaProp, categoria: categoriaProp, imagen: imagenProp}: UseBlogSingleProps): BlogSingleData {
     const {t} = useTranslation();
     const [apiData, setApiData] = useState<{
-        titulo: string; contenido: string; fecha: string; categoria: string; imagen: string;
+        titulo: string; contenido: string; fecha: string; fechaModificacion?: string; categoria: string; imagen: string;
     } | null>(null);
 
     /* Fetch del post desde la API */
@@ -42,6 +43,10 @@ export function useBlogSingle({slug, titulo: tituloProp, contenido: contenidoPro
                         contenido: post.content,
                         fecha: new Date(post.published_at ?? post.created_at)
                             .toLocaleDateString('es', {day: 'numeric', month: 'short', year: 'numeric'}),
+                        /* [277A-9] dateModified para Google: usa updated_at si existe, si no published_at */
+                        fechaModificacion: post.updated_at
+                            ? new Date(post.updated_at).toISOString().split('T')[0]
+                            : undefined,
                         categoria: post.tags[0] ?? 'General',
                         imagen: post.featured_image ?? '',
                     });
@@ -78,5 +83,5 @@ export function useBlogSingle({slug, titulo: tituloProp, contenido: contenidoPro
 
     if (!imagen) imagen = obtenerImagenBlog(1);
 
-    return {titulo, contenido, fecha, categoria, imagen};
+    return {titulo, contenido, fecha, fechaModificacion: apiData?.fechaModificacion, categoria, imagen};
 }

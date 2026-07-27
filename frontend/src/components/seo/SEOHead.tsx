@@ -65,11 +65,9 @@ export const SEOHead = ({
             <meta name="twitter:image" content={image} />
             {description && <meta name="twitter:image:alt" content={description} />}
 
-            {/* hreflang alternates */}
-            <link rel="alternate" hrefLang="es" href={`${SITE_URL}${path}`} />
-            <link rel="alternate" hrefLang="en" href={`${SITE_URL}${path}`} />
-            <link rel="alternate" hrefLang="ja" href={`${SITE_URL}${path}`} />
-            <link rel="alternate" hrefLang="x-default" href={`${SITE_URL}${path}`} />
+            {/* [277A-9] hreflang eliminado: todos los idiomas apuntan a la misma URL.
+             * Google considera hreflang con URLs idénticas como señal contradictoria.
+             * Se restaurará cuando existan URLs separadas por idioma (/en/, /ja/). */}
 
             {/* Structured Data */}
             {jsonLd && (
