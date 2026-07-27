@@ -162,7 +162,6 @@ function BdpCompras() {
             />
             <TooltipButton
               variant="outline"
-              size="sm"
               onClick={handleSync}
               disabled={syncMutation.isPending || demoMode}
               tooltip="Importa/actualiza albaranes desde BDP para el rango de fechas indicado. No modifica BDP."
@@ -190,18 +189,26 @@ function BdpCompras() {
               className="pl-9 max-w-xs"
             />
           </div>
-          <Input
-            type="date"
-            value={fechaDesde}
-            onChange={(e) => setFechaDesde(e.target.value)}
-            className="max-w-40"
-          />
-          <Input
-            type="date"
-            value={fechaHasta}
-            onChange={(e) => setFechaHasta(e.target.value)}
-            className="max-w-40"
-          />
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm text-muted-foreground shrink-0">Desde:</span>
+            <Input
+              type="date"
+              value={fechaDesde}
+              onChange={(e) => setFechaDesde(e.target.value)}
+              className="max-w-40"
+              aria-label="Fecha desde"
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm text-muted-foreground shrink-0">Hasta:</span>
+            <Input
+              type="date"
+              value={fechaHasta}
+              onChange={(e) => setFechaHasta(e.target.value)}
+              className="max-w-40"
+              aria-label="Fecha hasta"
+            />
+          </div>
         </div>
       </div>
 
@@ -271,7 +278,10 @@ function BdpCompras() {
                         </Button>
                       )}
                       {note.estado === 'conciliado' && (
-                        <span className="text-xs text-muted-foreground">Conciliado</span>
+                        <Button variant="outline" size="sm" disabled>
+                          <CheckCircle className="mr-1 size-3.5" />
+                          Conciliado
+                        </Button>
                       )}
                     </div>
                   </TableCell>
@@ -299,7 +309,12 @@ function formatEstado(estado: BdpPurchaseNote['estado']) {
     case 'borrador':
       return <span className="text-xs text-blue-600">Borrador</span>;
     case 'conciliado':
-      return <span className="text-xs text-green-600">Conciliado</span>;
+      return (
+        <Button variant="outline" size="sm" disabled className="h-7 text-xs pointer-events-none">
+          <CheckCircle className="mr-1 size-3" />
+          Conciliado
+        </Button>
+      );
     default:
       return <span className="text-xs text-muted-foreground">—</span>;
   }

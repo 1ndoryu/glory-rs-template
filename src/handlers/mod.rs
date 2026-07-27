@@ -34,6 +34,7 @@ mod ventas;
 
 use axum::Router;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
+use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::TraceLayer;
 use utoipa::OpenApi;
@@ -42,6 +43,10 @@ use utoipa_swagger_ui::SwaggerUi;
 use crate::errors::ErrorResponse;
 
 use crate::AppState;
+
+/* [S16-H2] Límite máximo del body de peticiones: 2 MB.
+ * Previene ataques de denegación de servicio mediante payloads excesivos. */
+const MAX_BODY_SIZE: usize = 2 * 1024 * 1024;
 
 /// Define el esquema de seguridad Bearer para Swagger UI
 struct SecurityAddon;
@@ -459,6 +464,7 @@ pub fn create_router(pool: sqlx::PgPool, config: crate::config::AppConfig) -> Ro
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .nest("/api", api_routes())
         .fallback_service(spa_fallback)
+        .layer(RequestBodyLimitLayer::new(MAX_BODY_SIZE)) /* [S16-H2] */
         .layer(TraceLayer::new_for_http())
         .layer(cors)
         .with_state(state)

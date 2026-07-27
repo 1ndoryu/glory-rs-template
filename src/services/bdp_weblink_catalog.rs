@@ -245,7 +245,8 @@ pub const BDP_ENDPOINTS: &[BdpEndpointSpec] = &[
 ];
 
 #[derive(Debug, Serialize)]
-pub struct BdpEmptyRequest;
+#[serde(rename_all = "PascalCase")]
+pub struct BdpEmptyRequest {}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "PascalCase")]

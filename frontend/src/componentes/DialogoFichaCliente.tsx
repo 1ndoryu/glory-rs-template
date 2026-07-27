@@ -87,8 +87,8 @@ function DialogoFichaCliente({ clienteId, onClose, clienteDetalle, clienteCargan
                 <p className="font-medium">{clienteDetalle.notas}</p>
               </div>
             )}
-            <Button variant="outline" size="sm" className="self-end mt-2" onClick={() => setEditando(true)}>
-              <Pencil className="size-3.5 mr-1.5" /> Editar cliente
+            <Button variant="outline" className="self-end mt-2" onClick={() => setEditando(true)}>
+              <Pencil className="size-4 mr-1.5" /> Editar cliente
             </Button>
           </div>
         ) : (

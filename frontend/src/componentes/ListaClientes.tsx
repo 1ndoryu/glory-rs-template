@@ -65,7 +65,7 @@ function ListaClientes() {
   };
 
   const sincronizarClienteBdp = async () => {
-    if (!clienteBdp || confirmacionBdp !== `CREAR CLIENTE ${clienteBdp.id} ${codigoBdp}`) return;
+    if (!clienteBdp || confirmacionBdp !== `CREAR CLIENTE ${clienteBdp.nombre} ${clienteBdp.apellidos} ${codigoBdp}`) return;
     setSincronizandoBdp(true);
     try {
       await customInstance(`/api/clientes/${clienteBdp.id}/bdp-sync`, {
@@ -118,10 +118,9 @@ function ListaClientes() {
           {seleccionados.length === 2 && (
             <Button
               variant="outline"
-              size="sm"
               onClick={() => { setDestinoId(null); setModalMerge(true); }}
             >
-              <Merge className="size-4 mr-1" /> Fusionar seleccionados
+              <Merge className="size-4 mr-1.5" /> Fusionar seleccionados
             </Button>
           )}
           {seleccionados.length > 0 && seleccionados.length < 2 && (
@@ -216,7 +215,7 @@ function ListaClientes() {
                           <Pencil className="size-4" />
                         </TooltipButton>
                         {!c.bdp_synced && (
-                          <TooltipButton variant="outline" size="sm" onClick={() => { setClienteBdp(c); setCodigoBdp(''); setConfirmacionBdp(''); }} tooltip="Vincular este cliente con un código BDP">
+                          <TooltipButton variant="outline" onClick={() => { setClienteBdp(c); setCodigoBdp(''); setConfirmacionBdp(''); }} tooltip="Vincular este cliente con un código BDP">
                             BDP
                           </TooltipButton>
                         )}
@@ -307,13 +306,13 @@ function ListaClientes() {
               <Input id="codigo-bdp-cliente" type="number" min={1} value={codigoBdp} onChange={(e) => setCodigoBdp(e.target.value)} />
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="confirmar-bdp-cliente">Escribe CREAR CLIENTE {clienteBdp?.id} {codigoBdp || '<código>'}</Label>
+              <Label htmlFor="confirmar-bdp-cliente">Escribe CREAR CLIENTE {clienteBdp?.nombre} {clienteBdp?.apellidos} {codigoBdp || '<código>'}</Label>
               <Input id="confirmar-bdp-cliente" value={confirmacionBdp} onChange={(e) => setConfirmacionBdp(e.target.value)} />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setClienteBdp(null)}>Cancelar</Button>
-            <Button disabled={!codigoBdp || confirmacionBdp !== `CREAR CLIENTE ${clienteBdp?.id} ${codigoBdp}` || sincronizandoBdp} onClick={sincronizarClienteBdp}>
+            <Button disabled={!codigoBdp || confirmacionBdp !== `CREAR CLIENTE ${clienteBdp?.nombre} ${clienteBdp?.apellidos} ${codigoBdp}` || sincronizandoBdp} onClick={sincronizarClienteBdp}>
               {sincronizandoBdp ? 'Verificando…' : 'Verificar y vincular'}
             </Button>
           </DialogFooter>

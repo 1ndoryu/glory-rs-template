@@ -2,7 +2,7 @@
  * Estructura coherente con ListaVentas/ListaGastos/ListaReservas.
  * Añadido modo demo para visualizar datos de prueba sin conexión a BDP. */
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import {
   Search,
   RefreshCw,
@@ -60,7 +60,6 @@ function BdpStock() {
   const { data, isLoading, error: listError } = useListarArticleMaps({
     query: { enabled: !demoMode },
   });
-  const [exportAll, setExportAll] = useState(false);
   const syncCatalogMutation = useSyncCatalog({
     mutation: {
       onSuccess: (resp) => {
@@ -120,7 +119,7 @@ function BdpStock() {
 
   function handleExport() {
     exportToCsv(mapeos, sorted, {
-      allRows: exportAll,
+      allRows: false,
       filterLabel: stockFilter !== 'all' ? stockFilter : undefined,
     });
   }
@@ -136,9 +135,17 @@ function BdpStock() {
         </p>
         <div className="flex items-center gap-2">
           <BdpDemoToggle demoMode={demoMode} onToggle={setDemoMode} />
+          <Button
+            variant="outline"
+            onClick={handleExport}
+            disabled={paginated.length === 0}
+            title="Exportar a CSV con BOM para Excel"
+          >
+            <Download className="size-4 mr-1.5" />
+            CSV
+          </Button>
           <TooltipButton
             variant="outline"
-            size="sm"
             onClick={() => syncCatalogMutation.mutate()}
             disabled={syncCatalogMutation.isPending || demoMode}
             tooltip="Importa/actualiza artículos y stock desde BDP a Glory. No modifica BDP."
@@ -180,7 +187,7 @@ function BdpStock() {
               <SelectValue placeholder="Stock" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="all">Cualquier stock</SelectItem>
               <SelectItem value="with">Con stock</SelectItem>
               <SelectItem value="without">Sin stock</SelectItem>
             </SelectContent>
@@ -196,32 +203,11 @@ function BdpStock() {
               <SelectValue placeholder="Estado" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="all">Cualquier estado</SelectItem>
               <SelectItem value="active">Activos</SelectItem>
               <SelectItem value="inactive">Inactivos</SelectItem>
             </SelectContent>
           </Select>
-        </div>
-        <div className="flex items-center gap-2">
-          <Select value={String(exportAll)} onValueChange={(v) => setExportAll(v === 'true')}>
-            <SelectTrigger className="w-36">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="false">Filtrados</SelectItem>
-              <SelectItem value="true">Todos</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExport}
-            disabled={(exportAll ? mapeos.length : paginated.length) === 0}
-            title="Exportar a CSV con BOM para Excel"
-          >
-            <Download className="size-3.5 mr-1" />
-            CSV
-          </Button>
         </div>
       </div>
 

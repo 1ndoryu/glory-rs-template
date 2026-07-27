@@ -7,7 +7,7 @@
  *          directamente. Selector de modo autorización integrado. */
 
 import { useState } from 'react';
-import { Activity, CheckCircle2, ChevronDown, ChevronRight, ClipboardCheck, Loader2, XCircle, BookOpen, Settings, Radio, Shield } from 'lucide-react';
+import { Activity, CheckCircle2, ChevronDown, ChevronRight, ClipboardCheck, Loader2, XCircle, BookOpen, Settings, Radio, Shield, ToggleLeft } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import axios from '@/api/axios-instance';
 import { Button } from '@/components/ui/button';
@@ -19,7 +19,6 @@ import { toast } from 'sonner';
 import type { EstadoConfiguracion } from '../hooks/useConfiguracion';
 import type { BdpDiagnosticoResponse } from '../api/generated/gestionRestauranteAPI.schemas';
 import ConfigBdpMapeos from '@/components/config-bdp-mapeos';
-import BdpMenuExplorer from '@/components/bdp-menu-explorer';
 
 interface BdpSyncDryRunCheck {
   nombre: string;
@@ -361,7 +360,9 @@ function ConfigBdp({ config, cambiarCampo, guardar, guardando, mensaje }: Config
         <div className="grid gap-3 md:grid-cols-2">
           <div className={`rounded-md border p-3 transition-colors ${(config.bdp_sync_mode || 'read_only') === 'read_only' ? 'border-primary bg-primary/5' : ''}`}>
             <div className="flex items-center gap-2 mb-1">
-              <Badge variant={(config.bdp_sync_mode || 'read_only') === 'read_only' ? 'default' : 'outline'}>Actual</Badge>
+              {(config.bdp_sync_mode || 'read_only') === 'read_only' && (
+                <Badge variant="default">Activo</Badge>
+              )}
               <p className="text-sm font-medium">Solo lectura (BDP → Glory)</p>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -370,7 +371,9 @@ function ConfigBdp({ config, cambiarCampo, guardar, guardando, mensaje }: Config
           </div>
           <div className={`rounded-md border p-3 transition-colors ${config.bdp_sync_mode === 'unidirectional' ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/20' : ''}`}>
             <div className="flex items-center gap-2 mb-1">
-              <Badge variant={config.bdp_sync_mode === 'unidirectional' ? 'default' : 'outline'} className={config.bdp_sync_mode === 'unidirectional' ? 'bg-amber-600' : ''}>Actual</Badge>
+              {config.bdp_sync_mode === 'unidirectional' && (
+                <Badge variant="default" className="bg-amber-600">Activo</Badge>
+              )}
               <p className="text-sm font-medium">Autorización manual (Glory → BDP)</p>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -386,10 +389,94 @@ function ConfigBdp({ config, cambiarCampo, guardar, guardando, mensaje }: Config
       </CardContent>
     </Card>
 
-    {/* [237A-3] Explorador de menús/packs/fastfoods — solo lectura */}
-    <div className="mt-4">
-      <BdpMenuExplorer />
-    </div>
+    {/* [267A-4] Feature flags BDP — toggles para activar funcionalidades por restaurante */}
+    <Card className="mt-4">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <ToggleLeft className="size-4" />
+          Funcionalidades BDP
+        </CardTitle>
+        <CardDescription>
+          Activa o desactiva funcionalidades avanzadas de la integración BDP. Los cambios se aplican inmediatamente sin necesidad de redeploy. Todos están desactivados por defecto por seguridad.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-4 rounded-md border p-3">
+          <div>
+            <Label htmlFor="ff-auto-arm">Auto-arming</Label>
+            <p className="text-xs text-muted-foreground">Permite que las operaciones de escritura (comandas, pagos, facturas) activen automáticamente un permiso temporal sin ir a Configuración. Tras la operación vuelve a solo lectura.</p>
+          </div>
+          <Switch
+            id="ff-auto-arm"
+            checked={config.ff_bdp_auto_arm}
+            onCheckedChange={(checked: boolean) => cambiarCampo('ff_bdp_auto_arm', checked)}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-4 rounded-md border p-3">
+          <div>
+            <Label htmlFor="ff-partial-payments">Pagos parciales</Label>
+            <p className="text-xs text-muted-foreground">Permite pagar una comanda BDP en varios pagos parciales en vez de un único pago completo. Cada pago se registra en un ledger local con clave de idempotencia.</p>
+          </div>
+          <Switch
+            id="ff-partial-payments"
+            checked={config.ff_bdp_partial_payments}
+            onCheckedChange={(checked: boolean) => cambiarCampo('ff_bdp_partial_payments', checked)}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-4 rounded-md border p-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="ff-cancel-order">Cancelar comandas</Label>
+              <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-700">Bloqueado por BDP</Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">Permitiría cancelar comandas directamente en BDP. El endpoint devuelve "Subscripción no activada" — activar solo cuando BDP habilite el módulo.</p>
+          </div>
+          <Switch
+            id="ff-cancel-order"
+            checked={config.ff_bdp_cancel_order}
+            onCheckedChange={(checked: boolean) => cambiarCampo('ff_bdp_cancel_order', checked)}
+          />
+        </div>
+        <div className="border-t pt-3">
+          <p className="text-xs font-medium text-muted-foreground mb-3">Compras (albaranes de proveedores BDP)</p>
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="flex items-center justify-between gap-4 rounded-md border p-3">
+              <div>
+                <Label htmlFor="ff-pn-read">Lectura</Label>
+                <p className="text-xs text-muted-foreground">Sincronizar albaranes de compra desde BDP.</p>
+              </div>
+              <Switch
+                id="ff-pn-read"
+                checked={config.ff_bdp_purchase_notes_read}
+                onCheckedChange={(checked: boolean) => cambiarCampo('ff_bdp_purchase_notes_read', checked)}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-4 rounded-md border p-3">
+              <div>
+                <Label htmlFor="ff-pn-draft">Borradores</Label>
+                <p className="text-xs text-muted-foreground">Crear borradores de compra locales (sin escribir en BDP).</p>
+              </div>
+              <Switch
+                id="ff-pn-draft"
+                checked={config.ff_bdp_purchase_notes_draft}
+                onCheckedChange={(checked: boolean) => cambiarCampo('ff_bdp_purchase_notes_draft', checked)}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-4 rounded-md border p-3">
+              <div>
+                <Label htmlFor="ff-pn-receive">Conciliación</Label>
+                <p className="text-xs text-muted-foreground">Recepcionar y conciliar compras con gastos existentes o nuevos.</p>
+              </div>
+              <Switch
+                id="ff-pn-receive"
+                checked={config.ff_bdp_purchase_notes_receive}
+                onCheckedChange={(checked: boolean) => cambiarCampo('ff_bdp_purchase_notes_receive', checked)}
+              />
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
 
     {/* [167A-1] Botón guardar propio de la pestaña BDP */}
     {guardar && (

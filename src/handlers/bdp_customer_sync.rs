@@ -330,7 +330,15 @@ pub async fn sincronizar_cliente_bdp(
     Path(id): Path<Uuid>,
     Json(sync_req): Json<BdpCustomerSyncRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let expected_confirmation = format!("CREAR CLIENTE {id} {}", sync_req.bdp_customer_code);
+    let cliente = ClienteRepository::find_by_id(&state.pool, id, auth.user_id)
+        .await
+        .map_err(|e| AppError::Internal(format!("Error buscando cliente: {e}")))?
+        .ok_or_else(|| AppError::NotFound("Cliente no encontrado".into()))?;
+
+    let expected_confirmation = format!(
+        "CREAR CLIENTE {} {} {}",
+        cliente.nombre, cliente.apellidos, sync_req.bdp_customer_code
+    );
     if sync_req.confirmacion.trim() != expected_confirmation {
         return Err(AppError::Validation(format!(
             "Confirmación inválida. Escriba exactamente: {expected_confirmation}"
@@ -354,11 +362,6 @@ pub async fn sincronizar_cliente_bdp(
             "Escritura BDP bloqueada: auto-backup pre-write desactivado.".into(),
         ));
     }
-
-    let cliente = ClienteRepository::find_by_id(&state.pool, id, auth.user_id)
-        .await
-        .map_err(|e| AppError::Internal(format!("Error buscando cliente: {e}")))?
-        .ok_or_else(|| AppError::NotFound("Cliente no encontrado".into()))?;
 
     if sync_req.bdp_customer_code <= 0 {
         return Err(AppError::Validation(

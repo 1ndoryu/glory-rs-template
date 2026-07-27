@@ -236,7 +236,6 @@ function SnapshotActions() {
                     ))}
                 </div>
                 <Button
-                    size="sm"
                     variant="secondary"
                     disabled={tiposSeleccionados.length === 0 || anyLoading}
                     onClick={() =>
@@ -267,7 +266,6 @@ function SnapshotActions() {
                     ))}
                 </div>
                 <Button
-                    size="sm"
                     variant="secondary"
                     disabled={tiposGlory.length === 0 || anyLoading}
                     onClick={() =>

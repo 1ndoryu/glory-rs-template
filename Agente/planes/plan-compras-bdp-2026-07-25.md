@@ -228,4 +228,9 @@ Implementado en 25 julio 2026 (`247A-11`).
 
 - Fase 1 es **solo lectura**. No se permite crear/modificar albaranes ni escribir en BDP.
 - `BdpPurchaseNoteData.lineas` asume clave `Lineas` en la respuesta BDP; si BDP usa otra clave, las líneas tipadas quedarán vacías, pero el JSON completo se conserva en `datos_bdp`.
-- Fases 2 y 3 (crear borradores / recepción y reconciliación) quedan pendientes de aprobación del cliente.
+- **Actualización (verificación 2026-07-26):** Las Fases 2 y 3 están implementadas en código:
+  - Fase 2 (borradores): endpoint `marcar_borrador_purchase_note` protegido por `ff_bdp_purchase_notes_draft`
+  - Fase 3 (conciliación): endpoint `conciliar_purchase_note` protegido por `ff_bdp_purchase_notes_receive`
+  - Modelo `BdpPurchaseNoteReconcileRequest` en `models/bdp_purchase_note.rs`
+  - **Los 3 feature flags existen** en `configuracion_restaurante` pero están desactivados por defecto.
+  - Pendiente: activar flags en producción y pruebas contra BDP real.

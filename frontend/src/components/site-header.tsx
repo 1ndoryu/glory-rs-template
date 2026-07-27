@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useSetSyncMode } from "@/api/bdp-backup"
 import { toast } from "sonner"
+import axios from "@/api/axios-instance"
+import { useQueryClient } from "@tanstack/react-query"
 
 const titulos: Record<string, string> = {
   "/": "Dashboard",
@@ -44,6 +46,7 @@ const titulos: Record<string, string> = {
 function BdpStatusIndicator() {
   const { data: config } = useObtenerConfiguracion()
   const { mutate: setSyncMode, isPending: isChangingMode } = useSetSyncMode()
+  const queryClient = useQueryClient()
   const navigate = useNavigate()
   const cfg = config?.status === 200 ? (config.data as unknown as Record<string, unknown>) : null
   if (!cfg) return null
@@ -51,11 +54,49 @@ function BdpStatusIndicator() {
   const syncEnabled = Boolean(cfg.bdp_sync_enabled)
   const syncMode = String(cfg.bdp_sync_mode ?? 'read_only')
 
+  const credencialesOk =
+    Boolean(cfg.bdp_base_url) &&
+    Boolean(cfg.bdp_login) &&
+    Boolean(cfg.bdp_password) &&
+    Boolean(cfg.bdp_integrator_code)
+
   if (!syncEnabled) {
     return (
-      <Badge variant="outline" className="text-xs gap-1">
-        BDP: off
-      </Badge>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button type="button" className="focus:outline-none">
+            <Badge variant="outline" className="text-xs gap-1 cursor-pointer hover:bg-muted">
+              BDP: off
+            </Badge>
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-64">
+          <div className="px-2 py-1.5 text-sm font-medium">
+            Integración BDP desactivada
+          </div>
+          <DropdownMenuSeparator />
+          {credencialesOk ? (
+            <DropdownMenuItem onClick={async () => {
+              try {
+                await axios.patch('/api/configuracion', { bdp_sync_enabled: true })
+                await queryClient.invalidateQueries({ queryKey: ['configuracion'] })
+                toast.success('BDP activado', { description: 'La integración BDP está ahora en modo lectura.' })
+              } catch {
+                toast.error('No se pudo activar BDP')
+              }
+            }}>
+              Activar BDP
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem disabled>
+              Sin credenciales — configura BDP primero
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem onClick={() => navigate('/configuracion', { state: { bdpSection: 'bdp' } })}>
+            {credencialesOk ? 'Configuración BDP' : 'Configurar credenciales BDP'}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     )
   }
 

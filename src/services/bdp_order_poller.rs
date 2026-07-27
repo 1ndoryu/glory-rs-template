@@ -142,30 +142,43 @@ impl BdpOrderPollerService {
                              Marcando bdp_synced=true.",
                             venta.id
                         );
-                        let _ = VentaRepository::update_bdp_status(
+                        /* [D10] No descartar errores: un fallo persistente de BD
+                         * haría que el poller repita reconciliaciones infinitamente. */
+                        if let Err(e) = VentaRepository::update_bdp_status(
                             pool,
                             venta.id,
                             true,
                             None,
                             venta.bdp_order_id,
                         )
-                        .await;
-                        let _ =
-                            VentaRepository::update_bdp_order_status(pool, venta.id, &status).await;
+                        .await
+                        {
+                            warn!("[D10] Error actualizando bdp_status de venta huérfana {}: {e}", venta.id);
+                            continue;
+                        }
+                        if let Err(e) =
+                            VentaRepository::update_bdp_order_status(pool, venta.id, &status).await
+                        {
+                            warn!("[D10] Error actualizando order_status de venta huérfana {}: {e}", venta.id);
+                        }
                         updated += 1;
                     }
                     Err(e) => {
                         /* La comanda no existe o BDP no responde → marcar error
                          * para que no se reintente infinitamente */
                         warn!("[AUDIT-2.11b] Venta {} no reconciliable: {e}", venta.id);
-                        let _ = VentaRepository::update_bdp_status(
+                        /* [D10] Propagar errores de BD en vez de descartarlos. */
+                        if let Err(e) = VentaRepository::update_bdp_status(
                             pool,
                             venta.id,
                             false,
                             Some("No se pudo verificar existencia en BDP; reconciliación manual requerida"),
                             venta.bdp_order_id,
                         )
-                        .await;
+                        .await
+                        {
+                            warn!("[D10] Error marcando venta huérfana {} como no reconciliable: {e}", venta.id);
+                        }
                     }
                 }
             }
@@ -399,10 +412,15 @@ impl BdpOrderPollerService {
                             .get("TenderId")
                             .and_then(serde_json::Value::as_i64)
                             .unwrap_or(-1);
-                        let amount = payment
+                        /* [D1] No usar unwrap_or(0.0) en montos financieros.
+                         * Si BDP devuelve Amount como string o null, no hacer match
+                         * con 0.0 — eso podría reconciliar un pago fantasma. */
+                        let Some(amount) = payment
                             .get("Amount")
                             .and_then(serde_json::Value::as_f64)
-                            .unwrap_or(0.0);
+                        else {
+                            continue;
+                        };
                         if tender == expected_tender && (amount - expected_amount).abs() < 0.005 {
                             matched = payment
                                 .get("PaymentId")
@@ -525,16 +543,35 @@ impl BdpOrderPollerService {
                     .get("amount")
                     .and_then(serde_json::Value::as_f64)
                     .unwrap_or(0.0);
+                /* [D1+D5] No usar unwrap_or(0.0) en montos de BDP.
+                 * Verificar PaymentId para evitar falsos positivos cuando
+                 * hay múltiples pagos con mismo tender y monto similar. */
+                let expected_payment_id = datos_enviados
+                    .get("idempotency_key")
+                    .and_then(serde_json::Value::as_str);
                 let matched = payments.iter().any(|payment| {
                     let tender = payment
                         .get("TenderId")
                         .and_then(serde_json::Value::as_i64)
                         .unwrap_or(-1);
-                    let amount = payment
+                    let Some(amount) = payment
                         .get("Amount")
                         .and_then(serde_json::Value::as_f64)
-                        .unwrap_or(0.0);
-                    tender == expected_tender && (amount - expected_amount).abs() < 0.005
+                    else {
+                        return false;
+                    };
+                    if tender != expected_tender || (amount - expected_amount).abs() >= 0.005 {
+                        return false;
+                    }
+                    /* [D5] Si tenemos idempotency_key esperado, verificar que
+                     * el PaymentId de BDP lo contenga como sufijo. El formato
+                     * de PaymentId es P{venta_prefix}-{key}. */
+                    if let Some(expected_pid) = expected_payment_id {
+                        if let Some(bdp_pid) = payment.get("PaymentId").and_then(serde_json::Value::as_str) {
+                            return bdp_pid.ends_with(expected_pid);
+                        }
+                    }
+                    true
                 });
                 if !matched {
                     return Ok(false);
@@ -544,9 +581,11 @@ impl BdpOrderPollerService {
                     .and_then(|v| v.as_str())
                     .map(String::from);
                 let mut tx = pool.begin().await.map_err(|e| e.to_string())?;
+                /* [D11] Solo marcar como facturado si NO lo estaba ya localmente.
+                 * Evita sobreescribir datos de factura tras una corrección manual. */
                 if invoice_number.is_some() {
                     sqlx::query(
-                        "UPDATE ventas SET bdp_invoiced = true, bdp_order_status = 'invoiced', updated_at = NOW() WHERE id = $1"
+                        "UPDATE ventas SET bdp_invoiced = true, bdp_order_status = 'invoiced', updated_at = NOW() WHERE id = $1 AND bdp_invoiced = FALSE"
                     )
                     .bind(venta_id)
                     .execute(&mut *tx)

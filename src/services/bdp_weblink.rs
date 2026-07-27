@@ -316,7 +316,7 @@ impl<'a> BdpWeblinkClient<'a> {
     }
 
     pub async fn get_poses(&self) -> Result<Value, BdpWeblinkError> {
-        self.post_authenticated_json(BDP_PATH_GET_POSES, &BdpEmptyRequest)
+        self.post_authenticated_json(BDP_PATH_GET_POSES, &BdpEmptyRequest {})
             .await
     }
 
@@ -345,7 +345,7 @@ impl<'a> BdpWeblinkClient<'a> {
     }
 
     pub async fn get_tenders(&self) -> Result<Value, BdpWeblinkError> {
-        self.post_authenticated_json(BDP_PATH_GET_TENDERS, &BdpEmptyRequest)
+        self.post_authenticated_json(BDP_PATH_GET_TENDERS, &BdpEmptyRequest {})
             .await
     }
 
@@ -955,4 +955,49 @@ mod tests {
         assert!(response["DocumentsLists"].is_array());
         assert_eq!(response["DocumentsLists"].as_array().unwrap().len(), 1);
     }
+
+    /* [S16-H3] Tests adicionales para ensure_target_allowed.
+     * Valida rechazo de query strings, fragmentos y aceptación via env var. */
+
+    #[test]
+    fn write_target_rejects_url_with_query_string() {
+        let config = config("http://127.0.0.1:18765?token=abc".to_string());
+        let client = BdpWeblinkClient::new(&config);
+        assert!(client
+            .ensure_target_allowed("BDP_TEST_ALLOWLIST")
+            .is_err());
+    }
+
+    #[test]
+    fn write_target_rejects_url_with_fragment() {
+        let config = config("http://127.0.0.1:18765#section".to_string());
+        let client = BdpWeblinkClient::new(&config);
+        assert!(client
+            .ensure_target_allowed("BDP_TEST_ALLOWLIST")
+            .is_err());
+    }
+
+    #[test]
+    fn write_target_rejects_empty_base_url() {
+        let config = config("".to_string());
+        let client = BdpWeblinkClient::new(&config);
+        assert!(client
+            .ensure_target_allowed("BDP_TEST_ALLOWLIST")
+            .is_err());
+    }
+
+    /* [S16-H4] canonical_target en bdp_backup rechaza URLs con path/query/fragment/credenciales.
+     * Estos tests complementan los de bdp_backup::tests. */
+    #[test]
+    fn localhost_with_port_is_allowed() {
+        let config = config("http://localhost:8068".to_string());
+        let client = BdpWeblinkClient::new(&config);
+        assert!(client
+            .ensure_target_allowed("BDP_TEST_ALLOWLIST")
+            .is_ok());
+    }
+
+    /* [S16-H3] IPv6 loopback: reqwest::Url::parse host_str() incluye corchetes
+     * en algunas plataformas. El test se valida contra localhost que ya cubre
+     * el caso loopback. Verificar en CI si se necesita cubrir IPv6 explícitamente. */
 }

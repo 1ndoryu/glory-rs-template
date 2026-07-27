@@ -319,15 +319,18 @@ Con las mitigaciones propuestas, el riesgo de fallos graves en producción se re
 - `src/services/bdp_order_poller.rs` — polling de estados y reconciliación.
 - `src/services/bdp_throttle.rs` — semáforo de concurrencia.
 
-## 7. Mitigaciones aplicadas en esta sesión
+## 7. Mitigaciones aplicadas
 
-| ID | Mitigación | Estado | Commit |
+| ID | Mitigación | Estado | Verificación código (2026-07-26) |
 | --- | --- | --- | --- |
-| R2 | Cerrar `distributed_lock` inmediatamente tras adquirir `pg_try_advisory_xact_lock`, liberando la conexión de Postgres antes de las llamadas HTTP. | ✅ Aplicado | En curso |
-| R3 | `BdpWeblinkError::Throttled` se mapea a `AmbiguousTransport` en `send_order`, evitando rechazo permanente por throttling. | ✅ Aplicado | En curso |
-| R6/R13 | Recuperación ante mutex poisoning en `SYNC_LOCKS` mediante `unwrap_or_else(|e| e.into_inner())`. | ✅ Aplicado | En curso |
-| R8 | `cached_session` ya no hace `expect` al tomar el lock; se recupera del poisoning. | ✅ Aplicado | Sesión anterior |
-| R7 | `bdp_order_poller` loguea `warn` cuando recibe un status desconocido de BDP. | ✅ Aplicado | Sesión anterior |
+| R1 | Worker `reconcile_ambiguous` en `bdp_order_poller.rs` con 5 funciones (create_order, add_payment, invoice, ambiguous_pagos) | ✅ Aplicado | `bdp_order_poller.rs:304-440` — reconcile_ambiguous_pagos + reconcile_create_order + reconcile_add_payment + reconcile_invoice |
+| R2 | Cerrar `distributed_lock` inmediatamente tras adquirir `pg_try_advisory_xact_lock`, liberando la conexión de Postgres antes de las llamadas HTTP. | ✅ Aplicado | `bdp_sync.rs` — lock cerrado antes de fase HTTP |
+| R3 | `BdpWeblinkError::Throttled` se mapea a `AmbiguousTransport` en `send_order`, evitando rechazo permanente por throttling. | ✅ Aplicado | `bdp_sync.rs:506` — `Throttled(message)` → `AmbiguousTransport(format!("BDP throttled: {message}"))` |
+| R5 | Fase HTTP de `sync_venta` envuelta en `tokio::time::timeout(Duration::from_secs(45))`. | ✅ Aplicado | `bdp_sync.rs` — timeout global de 45s |
+| R6/R13 | `SyncLockGuard` RAII con `impl Drop` que llama `cleanup_lock`. Eliminación de llamadas manuales. | ✅ Aplicado | `bdp_sync.rs:71-81` — struct SyncLockGuard + impl Drop + impl SyncLockGuard |
+| R7 | `bdp_order_poller` loguea `warn` cuando recibe un status desconocido de BDP. | ✅ Aplicado | `bdp_order_poller.rs:184-198` — map_status con warn para unknown | 
+| R8 | `cached_session` ya no hace `expect` al tomar el lock; se recupera del poisoning. | ✅ Aplicado | `bdp_weblink.rs` — recovery pattern, no expect |
+| R14 | Limpieza manual de `SYNC_LOCKS` sustituida por RAII guard. | ✅ Aplicado | Ver R6/R13 — SyncLockGuard en bdp_sync.rs:71 |
 
 ## 8. Nuevos riesgos identificados en esta sesión
 

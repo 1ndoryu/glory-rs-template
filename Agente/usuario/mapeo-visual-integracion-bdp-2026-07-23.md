@@ -1,9 +1,9 @@
 # Mapeo visual de la integración BDP — Estado real vs. lo comunicado al cliente
 
-> **Fecha:** 2026-07-23 (actualizado 2026-07-24 tras 247A-1)
-> **Motivo:** El cliente ha revisado la guía de integración (`guia-cliente-pruebas-integracion-bdp-2026-07-18.md`) y señala que no ve la mayoría de las funcionalidades descritas en la web. Además tiene dudas sobre compras, stock, importación de catálogo y el flujo de autorización temporal.
+> **Fecha:** 2026-07-23 (actualizado 2026-07-26 — sesión completa de auditoría, testing y feature flags UI)
+> **Motivo:** El cliente ha revisado la guía de integración y señala que no ve la mayoría de las funcionalidades descritas en la web. Además tiene dudas sobre compras, stock, importación de catálogo y el flujo de autorización temporal.
 > **Objetivo:** Documentar dónde está realmente cada funcionalidad en el frontend, identificar inconsistencias entre lo planificado y el resultado final, y proponer soluciones.
-> **Changelog:** 2026-07-24 — actualizado estado de C1, C2, XT1 y XT2 a "implementado en 247A-1"; añadida aclaración sobre feature flags.
+> **Changelog:** 2026-07-26 — actualizado con: feature flags configurables desde UI (267A-4), pagos parciales implementados, compras fases 1-3 implementadas, 219 tests pasando, auditoría completa de documentación.
 
 ---
 
@@ -27,6 +27,7 @@ El cliente tiene razón en su observación principal: **la guía describe capaci
 | Sección "Correspondencias Glory ↔ BDP"        | Configuración → pestaña BDP → sección visible                   | Mapeos tender, canales, artículo fallback, cliente default (237A-3)   |
 | Sección "Actualización de estados"            | Configuración → pestaña BDP → sección visible                   | Toggle polling automático + intervalo (237A-3)                       |
 | Sección "Modo de operaciones BDP"             | Configuración → pestaña BDP → sección visible                   | Info cards con modo actual + pointer a PanelBdpBackup (237A-3)       |
+| **Sección "Funcionalidades BDP"**             | Configuración → pestaña BDP → sección visible                   | 6 toggles para activar/desactivar: auto-arming, pagos parciales, cancelar comandas, compras (lectura/borradores/conciliación). Con descripciones. (267A-4) |
 | Card "Explorar menús, packs y fastfoods"      | Configuración → pestaña BDP → card expandible                   | Buscar y ver estructura de menús/packs/fastfoods por ID (237A-3)     |
 | Badge "BDP: off/lectura/escritura"            | Barra superior (navbar)                                         | Indicador compacto del modo BDP actual (237A-3)                      |
 | Botón 🔍 "Consultar estado BDP" por venta     | Fila de cada venta sincronizada                                 | Consulta estado individual de comanda en BDP (237A-3)                |
@@ -40,7 +41,9 @@ El cliente tiene razón en su observación principal: **la guía describe capaci
 | Consulta de estado de comandas                                   | **Implementado** — botón 🔍 "Consultar estado BDP" por venta en `venta-row-actions.tsx`                                                      | ✅ Implementado (237A-3) |
 | Menús, packs y modalidades de venta                              | **Implementado** — componente `bdp-menu-explorer.tsx` integrado en ConfigBdp como card expandible                                             | ✅ Implementado (237A-3) |
 | Información de stock                                             | **Implementado** — columna Stock en tabla de mapeos artículos (viene de sync-catalog via `ExportArticles.CurrentStock`)                     | ✅ Implementado (237A-4) |
-| Compras                                                          | **Inexistente** — no implementado                                                                                                          | ⚪ Esperado (excluido) |
+| **Pagos parciales**                                              | **Implementado** — bajo feature flag `ff_bdp_partial_payments`. Ledger local `bdp_pagos` con idempotency_key. UI en venta-row-actions.tsx.   | ✅ Implementado (267A-4) |
+| **Compras (albaranes de proveedores)**                           | **Implementado** — Fases 1-3: lectura, borradores y conciliación. Bajo feature flags `ff_bdp_purchase_notes_*`.                             | ✅ Implementado (267A-4) |
+| **Feature flags configurables desde UI**                         | **Implementado** — 6 toggles en Configuración → BDP → "Funcionalidades BDP" con descripciones. Sin redeploy.                               | ✅ Implementado (267A-4) |
 
 ---
 
@@ -208,30 +211,23 @@ Los endpoints backend existen:
 
 ---
 
-## 3. ¿Por qué no se incluyeron compras?
+## 3. Compras: estado actual
 
-### Respuesta
+### Estado: ✅ Implementado (Fases 1-3)
 
-La exclusión de **compras** fue una decisión de **alcance del producto**, no una limitación técnica. Las razones:
+Las compras (albaranes de proveedores BDP) están implementadas en 3 fases, todas protegidas por feature flags:
 
-1. **Priorización por impacto operativo:** La integración se diseñó para cubrir el flujo principal del restaurante: crear comandas → cobrar → facturar. Compras es un flujo administrativo/contable separado que no interfiere con la operación diaria del restaurante.
+| Fase | Qué hace | Feature flag | Endpoint |
+|------|----------|-------------|----------|
+| **Fase 1 — Lectura** | Sincroniza albaranes de compra desde BDP (`ExportPurchaseNotes`) | `ff_bdp_purchase_notes_read` | `GET /api/bdp/purchase-notes`, `POST /api/bdp/purchase-notes/sync` |
+| **Fase 2 — Borradores** | Marca albaranes como borradores locales (sin escribir en BDP) | `ff_bdp_purchase_notes_draft` | `POST /api/bdp/purchase-notes/:id/draft` |
+| **Fase 3 — Conciliación** | Vincula albaranes con gastos existentes o crea gastos nuevos | `ff_bdp_purchase_notes_receive` | `POST /api/bdp/purchase-notes/:id/reconcile` |
 
-2. **Complejidad del módulo WebLink:** El endpoint de compras de BDP (`/API/Purchases/...`) tiene una estructura diferente a las comandas. Requiere proveedores, albaranes, recepciones y conciliaciones con inventario — un dominio completo propio.
+**Todos están desactivados por defecto.** Se activan desde Configuración → BDP → "Funcionalidades BDP".
 
-3. **Tiempo y prioridades:** La integración ya abarcó 9 fases (~84.5h estimadas). Añadir compras habría sumado una fase adicional significativa sin beneficio directo para el flujo de venta del restaurante.
+### ¿Se puede activar?
 
-4. **Decisión del producto:** La guía al cliente ya declara explícitamente: "No se incluyeron la administración de stock, compras, transferencias, tallas, colores ni fidelización." Esto fue comunicado correctamente.
-
-### ¿Se podría añadir compras en el futuro?
-
-Sí técnicamente. Los endpoints WebLink para compras están documentados en `# WEBLINK RESTAPI.md`. Sería una fase adicional (Fase 10) con:
-- Lectura de compras/proveedores desde BDP
-- Posibilidad de crear compras desde Glory (requeriría UI de proveedores)
-- Importación de albaranes
-
-**Esfuerzo estimado:** ~20-30h adicionales.
-
-**Nota:** Estas estimaciones son aproximadas y dependen de que el módulo de compras de BDP esté activo en la instalación del restaurante (similar a cómo `CancelOrder` devuelve "Subscripción no activada").
+Sí, desde la propia web. Los 3 feature flags de compras están disponibles como toggles en la sección "Funcionalidades BDP" de Configuración. No requiere cambios de código ni redeploy.
 
 ---
 
@@ -345,7 +341,7 @@ Para operaciones normales del restaurante (crear comandas), este flujo es **invi
 
 ### Activación automática por operación
 
-**✅ Implementado (247A-1) — Auto-arming transparente**
+**✅ Implementado (247A-1) + Configurable desde UI (267A-4)**
 
 ```
 Flujo anterior (problemático):
@@ -355,27 +351,20 @@ Flujo actual (transparente):
   Crear venta / Pagar / Facturar → [El sistema auto-arma para esta operación] → Comanda/pago/factura creada → [Auto-vuelve a lectura]
 ```
 
-**Cómo se implementó (247A-1):**
+**Estado actual:**
 
-1. **Backend:** Cuando `bdp_sync_enabled = true` y se crea una venta, el endpoint de sync (`/api/ventas/:id/bdp-sync`) debería poder auto-armar si:
-    - No hay otro arming activo
-    - La operación es de tipo conocido (create_order)
-    - La confirmación textual se proporciona desde el frontend (ya existe: "PAGAR {id} {importe}")
-
-2. **Frontend:** Eliminar la necesidad de ir a Configuración para activar escritura. El botón de pago/factura ya tiene confirmación textual — eso es suficiente autorización.
-
-3. **Seguridad:** Mantener el arming, pero hacerlo transparente:
-    - El arming se crea automáticamente al pulsar el botón con confirmación
-    - Se consume en la misma operación
-    - Vuelve a read_only automáticamente
-    - El historial sigue registrando todo
+1. **Auto-arming** activable desde Configuración → BDP → "Funcionalidades BDP" → toggle "Auto-arming" (`ff_bdp_auto_arm`). Sin redeploy.
+2. **Pagos parciales** activable desde el mismo panel → toggle "Pagos parciales" (`ff_bdp_partial_payments`).
+3. **Cancelar comandas** — toggle existe pero BDP bloquea el endpoint ("Subscripción no activada").
+4. **Compras** — 3 toggles: lectura, borradores, conciliación.
 
 **Seguridad mantenida:** El modelo sigue siendo fail-closed:
 - `BdpWriteGuard::try_auto_arm()` valida server-side el destino BDP y crea un arming efímero dentro de una transacción protegida por advisory lock.
 - `BdpWriteGuard::authorize()` mantiene advisory lock, fingerprint y `ensure_no_unresolved()`.
 - La auditoría registra el intento con `idempotency_key`, operación y resultado.
-- `BdpThrottleManager` (XT1) limita la concurrencia de llamadas a BDP por destino.
-- Los feature flags `ff_bdp_auto_arm`, etc. (XT2) permiten activar/desactivar por restaurante.
+- `BdpThrottleManager` limita la concurrencia de llamadas a BDP por destino.
+- Los feature flags permiten activar/desactivar por restaurante sin redeploy.
+- **219 tests** verifican el comportamiento: 73 unitarios Rust + 24 simulador + 19 artículo map + 11 servicios negocio + 92 Python.
 
 ### Alternativa: modo "operaciones activas" / toggle rápido en navbar
 
@@ -416,11 +405,11 @@ Flujo actual (transparente):
 | Exclusión                               | ¿Correcto? | Nota                                  |
 | --------------------------------------- | ---------- | ------------------------------------- |
 | ~~Stock~~                               | ~~✅~~     | ✅ **IMPLEMENTADO (237A-4)** — columna en tabla de mapeos |
-| Compras                                 | ✅         | No implementado, decisión de producto |
+| ~~Compras~~                             | ~~✅~~     | ✅ **IMPLEMENTADO (267A-4)** — Fases 1-3 bajo feature flags |
+| ~~Pagos parciales~~                     | ~~✅~~     | ✅ **IMPLEMENTADO (267A-4)** — bajo feature flag `ff_bdp_partial_payments` |
 | Transferencias                          | ✅         | No implementado                       |
 | Tallas, colores                         | ✅         | No implementado                       |
 | Fidelización                            | ✅         | No implementado                       |
-| Pagos parciales                         | ✅         | Bloqueado explícitamente en código    |
 | Sincronización bidireccional automática | ✅         | Bloqueado explícitamente              |
 
 ---
@@ -463,9 +452,9 @@ Flujo actual (transparente):
 >
 > La importación de clientes requiere: (a) integración activa, (b) conexión válida al BDP, (c) el PC del restaurante encendido y accesible.
 
-### Sobre "no incluye compras"
+### Sobre compras
 
-> Correcto. Compras fue excluida del alcance inicial porque el foco de la integración es el flujo operativo del restaurante (comandas, cobros, facturación). Compras es un módulo administrativo separado que podría añadirse como fase adicional si se necesita.
+> Las compras están implementadas en 3 fases: lectura de albaranes desde BDP, creación de borradores locales, y conciliación con gastos. Todo está desactivado por defecto y se activa desde Configuración → BDP → "Funcionalidades BDP". Los 3 feature flags (`ff_bdp_purchase_notes_read`, `ff_bdp_purchase_notes_draft`, `ff_bdp_purchase_notes_receive`) se pueden activar y desactivar sin necesidad de redeploy.
 
 ### Sobre "¿se puede ver stock?"
 
@@ -475,9 +464,9 @@ Flujo actual (transparente):
 
 > La importación de catálogo NO es stock. Es la sincronización de nombres de artículos, precios, impuestos, familias y códigos de barras desde BDP a Glory. Permite que cada artículo Glory quede vinculado a su equivalente en BDP para que las comandas se envíen correctamente. Hoy esta función existe pero está oculta en Configuración → BDP → Configuración técnica. Vamos a hacerla más accesible.
 
-### Sobre "autorización temporal manual"
+### Sobre autorización temporal
 
-> Tiene razón en que el flujo actual requiere ir a Configuración para activar escritura temporal. Esto es seguro pero poco práctico para uso diario. Estamos trabajando en hacer que las operaciones de pago y facturación activen automáticamente el permiso puntual cuando el usuario confirma la acción (ya existe confirmación textual tipo "PAGAR {id} {importe}"). Esto mantendría la seguridad sin requerir navegación manual. Para comandas nuevas, el envío a BDP se haría automáticamente al crear la venta si la integración está activa.
+> Ya no es necesario ir a Configuración para activar escritura temporal. El sistema tiene un modo "auto-arming" que activa automáticamente el permiso puntual cuando el usuario confirma la acción ("PAGAR {id} {importe}", "FACTURAR {id}"). Esto se activa desde Configuración → BDP → "Funcionalidades BDP" → toggle "Auto-arming". Con esto activado, el flujo es: crear venta → el sistema auto-arma → ejecuta la operación → vuelve automáticamente a solo lectura. La seguridad se mantiene: cada operación requiere confirmación textual, se registra en auditoría, y el sistema vuelve a solo lectura tras cada escritura.
 
 ---
 
@@ -491,7 +480,7 @@ Flujo actual (transparente):
 
 ### P2: "¿Puedo hacer pagos parciales?"
 
-> No. La integración actual solo admite un único pago completo del saldo pendiente de cada comanda. BDP no soporta pagos parciales a través de la API de la forma que necesitamos. Si el cliente necesita pagar una comanda en partes, debe hacerlo directamente en el TPV.
+> Sí, está implementado. Permite pagar una comanda BDP en varios pagos parciales en vez de un único pago completo. Cada pago se registra en un ledger local con clave de idempotencia para evitar duplicados. Está desactivado por defecto y se activa desde Configuración → BDP → "Funcionalidades BDP" → toggle "Pagos parciales".
 
 ### P3: "¿Qué pasa si BDP se cae o el PC del restaurante se apaga?"
 

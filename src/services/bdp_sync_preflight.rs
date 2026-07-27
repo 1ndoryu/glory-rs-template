@@ -461,7 +461,12 @@ impl BdpSyncPreflightService {
         articles: Option<&Value>,
         response: &mut BdpSyncDryRunResponse,
     ) {
-        let Some(article) = articles.and_then(first_article) else {
+        /* [R12] Pasar iva_por_defecto de config como fallback */
+        let default_iva = {
+            use rust_decimal::prelude::ToPrimitive;
+            config.iva_por_defecto.to_f64().unwrap_or(10.0)
+        };
+        let Some(article) = articles.and_then(|a| first_article(a, default_iva)) else {
             response.checks.push(BdpSyncDryRunCheck::error(
                 "CreateOrder OnlyCheck",
                 "/API/Orders/Create",
@@ -594,7 +599,7 @@ fn build_only_check_order(
     }
 }
 
-fn first_article(value: &Value) -> Option<BdpDryRunArticle> {
+fn first_article(value: &Value, default_iva_pct: f64) -> Option<BdpDryRunArticle> {
     value_array(
         value,
         &[
@@ -609,7 +614,8 @@ fn first_article(value: &Value) -> Option<BdpDryRunArticle> {
         let id = number_i64(item, &["ArtCode", "Id", "Code"])?;
         let name = text_field(item, &["ArtDescription", "Description", "Name"])?;
         let price = number_f64(item, &["Price1", "Price", "Total"])?;
-        let vat_pct = number_f64(item, &["TAVPer", "VatPct"]).unwrap_or(10.0);
+        /* [R12] Usar iva_por_defecto de config como fallback en vez de 10.0 hardcodeado */
+        let vat_pct = number_f64(item, &["TAVPer", "VatPct"]).unwrap_or(default_iva_pct);
         (id > 0 && price > 0.0).then_some(BdpDryRunArticle {
             id,
             name,
@@ -766,7 +772,7 @@ mod tests {
             }]
         });
 
-        let article = first_article(&value).unwrap();
+        let article = first_article(&value, 10.0).unwrap();
 
         assert_eq!(article.id, 1001);
         assert_eq!(article.name, "COCA-COLA");
@@ -785,7 +791,7 @@ mod tests {
             }]
         });
 
-        let article = first_article(&value).unwrap();
+        let article = first_article(&value, 10.0).unwrap();
 
         assert_eq!(article.price, 12.0);
         assert_eq!(article.vat_pct, 10.0);
@@ -802,10 +808,25 @@ mod tests {
             }]
         });
 
-        let article = first_article(&value).unwrap();
+        let article = first_article(&value, 10.0).unwrap();
 
         assert_eq!(article.id, 1001);
         assert_eq!(article.name, "CAFE BOMBON");
+    }
+
+    /* [R12] Test: first_article usa el IVA por defecto del config cuando BDP no lo devuelve */
+    #[test]
+    fn first_article_uses_default_iva_when_missing() {
+        let value = json!({
+            "ArticleListData": [{
+                "ArtCode": 1001,
+                "ArtDescription": "SIN IVA",
+                "Price1": 5.0
+            }]
+        });
+
+        let article = first_article(&value, 21.0).unwrap();
+        assert_eq!(article.vat_pct, 21.0, "Debe usar el default_iva_pct pasado como parámetro");
     }
 
     #[test]

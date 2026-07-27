@@ -74,6 +74,13 @@ export function useConfiguracion() {
       bdp_poll_interval_secs: config.bdp_poll_interval_secs,
       bdp_poll_enabled: config.bdp_poll_enabled,
       bdp_auto_sync_customers: config.bdp_auto_sync_customers,
+      /* [267A-4] Feature flags BDP — se envían al backend para persistir */
+      ff_bdp_auto_arm: config.ff_bdp_auto_arm,
+      ff_bdp_partial_payments: config.ff_bdp_partial_payments,
+      ff_bdp_cancel_order: config.ff_bdp_cancel_order,
+      ff_bdp_purchase_notes_read: config.ff_bdp_purchase_notes_read,
+      ff_bdp_purchase_notes_draft: config.ff_bdp_purchase_notes_draft,
+      ff_bdp_purchase_notes_receive: config.ff_bdp_purchase_notes_receive,
       google_review_url: config.google_review_url || undefined,
       telefono_restaurante: config.telefono_restaurante || undefined,
       url_reservas: config.url_reservas || undefined,

@@ -190,8 +190,9 @@
 
 ### D5: Pagos parciales
 
-**Estado:** ❌ **EXCLUIDO POR DISEÑO** — bloqueado en `bdp_sync.rs` línea 1084
-**Nota:** Solo se admite pago completo del saldo pendiente.
+**Estado:** ✅ **IMPLEMENTADO** — backend + frontend + reconciliación de ambiguos.
+**Nota:** Implementado bajo feature flag `ff_bdp_partial_payments`. Ledger local en tabla `bdp_pagos` con idempotency_key. Endpoint `GET /api/ventas/:id/bdp-payments`. UI en `venta-row-actions.tsx`. Ver `Agente/planes/plan-pagos-parciales-bdp-2026-07-25.md` para detalles.
+**Pendiente:** tests de servicio con simulador BDP, activación en producción.
 
 ---
 

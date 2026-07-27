@@ -76,6 +76,12 @@ export interface ActualizarConfiguracionRequest {
   auto_venta_reserva?: boolean | null;
   /** @nullable */
   bdp_auto_sync_customers?: boolean | null;
+  /** @nullable */ ff_bdp_auto_arm?: boolean | null;
+  /** @nullable */ ff_bdp_cancel_order?: boolean | null;
+  /** @nullable */ ff_bdp_partial_payments?: boolean | null;
+  /** @nullable */ ff_bdp_purchase_notes_draft?: boolean | null;
+  /** @nullable */ ff_bdp_purchase_notes_read?: boolean | null;
+  /** @nullable */ ff_bdp_purchase_notes_receive?: boolean | null;
   /** @nullable */
   bdp_default_article_code?: string | null;
   /** @nullable */
@@ -877,6 +883,12 @@ export interface CombinacionExport {
 export interface ConfiguracionRestaurante {
   auto_venta_reserva: boolean;
   bdp_auto_sync_customers: boolean;
+  ff_bdp_auto_arm: boolean;
+  ff_bdp_cancel_order: boolean;
+  ff_bdp_partial_payments: boolean;
+  ff_bdp_purchase_notes_draft: boolean;
+  ff_bdp_purchase_notes_read: boolean;
+  ff_bdp_purchase_notes_receive: boolean;
   bdp_base_url: string;
   bdp_default_article_code: string;
   bdp_default_article_name: string;

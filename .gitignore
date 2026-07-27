@@ -58,5 +58,4 @@ prerendered/
 /frontend/public/legacy-assets/
 /frontend/public/legacy-assets/colors/
 /temp/
-tools/bdp-weblink-simulator/__pycache__/server.cpython-312.pyc
-tools/bdp-weblink-simulator/__pycache__/test_server.cpython-312.pyc
+tools/bdp-weblink-simulator/__pycache__/

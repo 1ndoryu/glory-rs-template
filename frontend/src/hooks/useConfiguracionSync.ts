@@ -54,6 +54,13 @@ export function useConfiguracionSync(datos: ConfigServerData | undefined) {
       bdp_poll_interval_secs: Number(d.bdp_poll_interval_secs ?? 60),
       bdp_poll_enabled: Boolean(d.bdp_poll_enabled ?? false),
       bdp_auto_sync_customers: Boolean(d.bdp_auto_sync_customers ?? false),
+      /* [267A-4] Feature flags BDP — sincronizados desde servidor */
+      ff_bdp_auto_arm: Boolean(d.ff_bdp_auto_arm ?? false),
+      ff_bdp_partial_payments: Boolean(d.ff_bdp_partial_payments ?? false),
+      ff_bdp_cancel_order: Boolean(d.ff_bdp_cancel_order ?? false),
+      ff_bdp_purchase_notes_read: Boolean(d.ff_bdp_purchase_notes_read ?? false),
+      ff_bdp_purchase_notes_draft: Boolean(d.ff_bdp_purchase_notes_draft ?? false),
+      ff_bdp_purchase_notes_receive: Boolean(d.ff_bdp_purchase_notes_receive ?? false),
       bdp_sync_mode: String(d.bdp_sync_mode ?? 'read_only'),
       bdp_backup_retention_days: Number(d.bdp_backup_retention_days ?? 30),
       bdp_auto_backup_before_write: Boolean(d.bdp_auto_backup_before_write ?? false),

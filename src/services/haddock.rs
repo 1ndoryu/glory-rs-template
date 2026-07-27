@@ -349,15 +349,16 @@ impl HaddockService {
         .to_string()
     }
 
-    /* [064A-15] Conversión Decimal→f64 con log en caso de fallo.
-     * rust_decimal::to_string() es fiable, pero si algún edge case falla,
-     * logueamos warning en vez de enviar silenciosamente 0.0 a Haddock. */
+    /* [R16] Conversión Decimal→f64 para serialización JSON a Haddock.
+     * Se convierte vía string para máxima precisión; es el enfoque más fiable
+     * para Decimal→f64. El redondeo monetario se aplica en los call-sites
+     * que lo necesiten, no aquí (vat_pct es un porcentaje, no moneda). */
     fn decimal_to_f64(d: &rust_decimal::Decimal) -> f64 {
         use std::str::FromStr;
         match f64::from_str(&d.to_string()) {
             Ok(v) => v,
             Err(e) => {
-                warn!("[064A-15] Error convirtiendo Decimal '{d}' a f64: {e} — usando 0.0");
+                warn!("[R16] Error convirtiendo Decimal '{d}' a f64: {e}");
                 0.0
             }
         }

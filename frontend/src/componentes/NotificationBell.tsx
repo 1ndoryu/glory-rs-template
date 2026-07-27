@@ -48,11 +48,10 @@ export function NotificationBell() {
                     {noLeidas > 0 && (
                         <Button
                             variant="ghost"
-                            size="sm"
                             className="h-auto px-2 py-1 text-xs"
                             onClick={handleMarcarTodas}
                         >
-                            <CheckCheck className="mr-1 h-3 w-3" />
+                            <CheckCheck className="mr-1 h-4 w-4" />
                             Marcar todas
                         </Button>
                     )}

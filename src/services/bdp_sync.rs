@@ -526,7 +526,7 @@ impl BdpSyncService {
         }
     }
 
-    pub(crate) fn marketplace_order_id(venta_id: Uuid) -> String {
+    pub fn marketplace_order_id(venta_id: Uuid) -> String {
         let venta_hex = venta_id.simple().to_string();
         format!("G{}", &venta_hex[..14])
     }
@@ -726,7 +726,8 @@ impl BdpSyncService {
                             id: code,
                             name: config.bdp_default_article_name.clone(),
                             price: 0.0,
-                            vat_pct: 10.0,
+                            /* [R12] Usar iva_por_defecto de config en vez de 10.0 hardcodeado */
+                            vat_pct: Self::decimal_to_f64(&config.iva_por_defecto),
                         };
                     }
                 }
@@ -742,7 +743,8 @@ impl BdpSyncService {
             .await
         {
             Ok(value) => {
-                if let Some(article) = Self::extract_first_article(&value) {
+                let default_iva = Self::decimal_to_f64(&config.iva_por_defecto);
+                if let Some(article) = Self::extract_first_article(&value, default_iva) {
                     return article;
                 }
             }
@@ -756,7 +758,8 @@ impl BdpSyncService {
             id: 0,
             name: config.bdp_default_article_name.clone(),
             price: 0.0,
-            vat_pct: 10.0,
+            /* [R12] Usar iva_por_defecto de config en vez de 10.0 hardcodeado */
+            vat_pct: Self::decimal_to_f64(&config.iva_por_defecto),
         }
     }
 
@@ -940,7 +943,8 @@ impl BdpSyncService {
         }
     }
 
-    fn extract_first_article(value: &Value) -> Option<ResolvedArticle> {
+    /* [R12] Parámetro default_iva_pct: IVA fallback del config, no 10.0 hardcodeado. */
+    fn extract_first_article(value: &Value, default_iva_pct: f64) -> Option<ResolvedArticle> {
         let items = value
             .get("ArticlesListData")
             .or_else(|| value.get("ArticleListData"))
@@ -977,11 +981,12 @@ impl BdpSyncService {
             .or_else(|| item.get("Price1").and_then(Value::as_i64).map(|i| i as f64))
             .unwrap_or(0.0);
 
+        /* [R12] Usar default_iva_pct de config en vez de 10.0 hardcodeado */
         let vat_pct = item
             .get("TAVPer")
             .or_else(|| item.get("VatPct"))
             .and_then(Value::as_f64)
-            .unwrap_or(10.0);
+            .unwrap_or(default_iva_pct);
 
         (id > 0).then_some(ResolvedArticle {
             id,
@@ -1062,12 +1067,16 @@ impl BdpSyncService {
         .await
     }
 
+    /* [R16] Conversión Decimal → f64 para serialización JSON a BDP.
+     * Se convierte vía string para máxima precisión; es el enfoque más fiable
+     * para Decimal→f64. El redondeo monetario se aplica en los call-sites
+     * que lo necesiten, no aquí (vat_pct es un porcentaje, no moneda). */
     fn decimal_to_f64(d: &rust_decimal::Decimal) -> f64 {
         use std::str::FromStr;
         match f64::from_str(&d.to_string()) {
             Ok(v) => v,
             Err(e) => {
-                warn!("[065A-5] Error convirtiendo Decimal '{d}' a f64: {e}");
+                warn!("[R16] Error convirtiendo Decimal '{d}' a f64: {e}");
                 0.0
             }
         }
@@ -1540,26 +1549,44 @@ impl BdpSyncService {
                 .map_err(|e| format!("Error confirmando tx reconciliación factura: {e}"))?;
             return Ok(invoice_number);
         }
-        let total = order
-            .get("Total")
-            .and_then(Value::as_f64)
-            .ok_or_else(|| "Factura bloqueada: GetOrder no devolvió Total".to_string())?;
-        let paid: f64 = order
+        /* [D9] Parsear Total como string directamente a Decimal para evitar
+         * pérdida de precisión por conversión f64 intermedia. BDP puede
+         * devolver tanto números como strings. */
+        let total_decimal = match order.get("Total") {
+            Some(serde_json::Value::Number(n)) => {
+                n.as_f64()
+                    .and_then(Decimal::from_f64)
+                    .ok_or_else(|| "Factura bloqueada: Total de BDP no es convertible a Decimal".to_string())?
+            }
+            Some(serde_json::Value::String(s)) => {
+                s.parse::<Decimal>()
+                    .map_err(|_| format!("Factura bloqueada: Total '{s}' no es un Decimal válido"))?
+            }
+            _ => return Err("Factura bloqueada: GetOrder no devolvió Total".into()),
+        };
+        /* [D9] Parsear pagos de BDP sin unwrap_or(0.0) */
+        let paid: Decimal = order
             .get("Payments")
             .and_then(Value::as_array)
             .ok_or_else(|| "Factura bloqueada: GetOrder no devolvió Payments".to_string())?
             .iter()
-            .map(|payment| payment.get("Amount").and_then(Value::as_f64).unwrap_or(0.0))
+            .map(|payment| {
+                payment
+                    .get("Amount")
+                    .and_then(Value::as_f64)
+                    .and_then(Decimal::from_f64)
+                    .unwrap_or(Decimal::ZERO)
+            })
             .sum();
-        let total_decimal = Decimal::from_f64(total).unwrap_or(Decimal::ZERO);
         let local_paid = BdpPagoRepository::total_pagado(pool, venta.id)
             .await
             .map_err(|e| format!("Factura bloqueada: no se pudo calcular saldo local: {e}"))?;
-        let tolerance = Decimal::from_f64(BDP_PAYMENT_TOLERANCE).unwrap_or(Decimal::new(5, 3));
+        let tolerance = Decimal::new(5, 3); /* 0.005 */
         if (total_decimal - local_paid).abs() > tolerance {
             return Err("Factura bloqueada: la orden conserva saldo pendiente local".into());
         }
-        if (total - paid).abs() > BDP_PAYMENT_TOLERANCE {
+        let bdp_pending = total_decimal - paid;
+        if bdp_pending.abs() > tolerance {
             return Err("Factura bloqueada: la orden conserva saldo pendiente en BDP".into());
         }
 
@@ -2316,10 +2343,25 @@ mod tests {
             "ErrorMessage": ""
         });
 
-        let article = BdpSyncService::extract_first_article(&json).unwrap();
+        let article = BdpSyncService::extract_first_article(&json, 10.0).unwrap();
         assert_eq!(article.id, 1001);
         assert_eq!(article.name, "CAFE BOMBON");
         assert!((article.price - 5.0).abs() < 0.01);
+    }
+
+    /* [R12] Test: extract_first_article usa default_iva_pct cuando BDP no devuelve TAVPer */
+    #[test]
+    fn extract_first_article_uses_default_iva_when_missing() {
+        let json = serde_json::json!({
+            "ArticlesListData": [{
+                "ArtCode": 1002,
+                "ArtDescription": "SIN IVA",
+                "Price1": 3.0
+            }]
+        });
+
+        let article = BdpSyncService::extract_first_article(&json, 21.0).unwrap();
+        assert_eq!(article.vat_pct, 21.0, "Debe usar default_iva_pct pasado como parámetro");
     }
 
     #[test]

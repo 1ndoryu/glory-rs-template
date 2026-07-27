@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { ErrorResponse } from '@/api/generated/gestionRestauranteAPI.schemas';
 import {
@@ -181,35 +182,43 @@ function BdpExplorador() {
                 onChange={(e) => setBusqueda(e.target.value)}
                 className="max-w-xs"
               />
-              <select
+              <Select
                 value={tipo}
-                onChange={(e) => setTipo(e.target.value as ExploreType)}
-                className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                onValueChange={(v) => setTipo(v as ExploreType)}
               >
-                {TIPOS.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full sm:w-44">
+                  <SelectValue placeholder="Tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIPOS.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </>
         ) : (
           <div className="flex flex-wrap gap-3 items-end">
-            <select
+            <Select
               value={tipo}
-              onChange={(e) => {
-                setTipo(e.target.value as ExploreType);
+              onValueChange={(v) => {
+                setTipo(v as ExploreType);
                 setBuscado(false);
               }}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
             >
-              {TIPOS.filter((t) => t.value !== 'all').map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full sm:w-44">
+                <SelectValue placeholder="Tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                {TIPOS.filter((t) => t.value !== 'all').map((t) => (
+                  <SelectItem key={t.value} value={t.value}>
+                    {t.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Input
               type="number"
               min={1}
@@ -221,7 +230,7 @@ function BdpExplorador() {
                 setBuscado(false);
               }}
             />
-            <Button size="sm" onClick={buscar} disabled={isLoading}>
+            <Button onClick={buscar} disabled={isLoading}>
               {isLoading ? (
                 <Loader2 className="size-3.5 animate-spin mr-1" />
               ) : (

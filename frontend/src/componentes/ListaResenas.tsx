@@ -144,11 +144,10 @@ export default function ListaResenas() {
                       ) : r.puntuacion && r.puntuacion >= 4 && googleUrl ? (
                         <Button
                           variant="outline"
-                          size="sm"
                           onClick={() => window.open(googleUrl, '_blank')}
                           className="gap-1"
                         >
-                          <ExternalLink className="size-3" />
+                          <ExternalLink className="size-4" />
                           Enviar a Google
                         </Button>
                       ) : r.respondida_at ? (

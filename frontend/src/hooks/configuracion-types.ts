@@ -34,6 +34,13 @@ export interface EstadoConfiguracion {
   bdp_poll_interval_secs: number;
   bdp_poll_enabled: boolean;
   bdp_auto_sync_customers: boolean;
+  /* [267A-4] Feature flags BDP */
+  ff_bdp_auto_arm: boolean;
+  ff_bdp_partial_payments: boolean;
+  ff_bdp_cancel_order: boolean;
+  ff_bdp_purchase_notes_read: boolean;
+  ff_bdp_purchase_notes_draft: boolean;
+  ff_bdp_purchase_notes_receive: boolean;
   /* [BKP-005] Configuración de backup BDP */
   bdp_sync_mode: string;
   bdp_backup_retention_days: number;
@@ -77,6 +84,12 @@ export const DEFAULTS: EstadoConfiguracion = {
   bdp_poll_interval_secs: 60,
   bdp_poll_enabled: false,
   bdp_auto_sync_customers: false,
+  ff_bdp_auto_arm: false,
+  ff_bdp_partial_payments: false,
+  ff_bdp_cancel_order: false,
+  ff_bdp_purchase_notes_read: false,
+  ff_bdp_purchase_notes_draft: false,
+  ff_bdp_purchase_notes_receive: false,
   bdp_sync_mode: 'read_only',
   bdp_backup_retention_days: 30,
   bdp_auto_backup_before_write: true,

@@ -12,7 +12,6 @@ export function BdpDemoToggle({ demoMode, onToggle }: BdpDemoToggleProps) {
   return (
     <Button
       variant="outline"
-      size="sm"
       onClick={() => onToggle(!demoMode)}
       className={demoMode ? 'bg-amber-100 hover:bg-amber-200' : ''}
       aria-pressed={demoMode}

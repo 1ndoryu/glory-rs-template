@@ -11,6 +11,7 @@
 /* [147A-F5.2] Columna BDP + filtro + polling manual — equivalentes a los de Haddock. */
 import useListaVentas from '../hooks/useListaVentas';
 import { Button } from '@/components/ui/button';
+import { TooltipButton } from '@/components/ui/tooltip-button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -96,15 +97,15 @@ function ListaVentas() {
         </div>
         <div className="flex gap-2">
           {bdpSyncEnabled && (
-            <Button
+            <TooltipButton
               variant="outline"
-              size="sm"
+              tooltip="Sincronizar manualmente las ventas desde BDP"
               onClick={() => bdpPollMutation.mutate()}
               disabled={bdpPollMutation.isPending}
             >
               <RefreshCw className={`size-4 mr-1.5 ${bdpPollMutation.isPending ? 'animate-spin' : ''}`} />
               Polling BDP
-            </Button>
+            </TooltipButton>
           )}
           <Button onClick={() => setModalAbierto(true)}>+ Nueva Venta</Button>
         </div>

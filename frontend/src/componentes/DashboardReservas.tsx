@@ -35,13 +35,13 @@ function AccionesRapidas() {
     return (
         <>
             <div className="flex flex-wrap gap-2">
-                <Button size="sm" onClick={() => setModalVenta(true)} className="bg-green-600 hover:bg-green-700 text-white">
+                <Button onClick={() => setModalVenta(true)} className="bg-green-600 hover:bg-green-700 text-white">
                     + Venta
                 </Button>
-                <Button size="sm" onClick={() => setModalGasto(true)} variant="default">
+                <Button onClick={() => setModalGasto(true)} variant="default">
                     + Gasto
                 </Button>
-                <Button size="sm" onClick={() => setModalReserva(true)} variant="secondary">
+                <Button onClick={() => setModalReserva(true)} variant="secondary">
                     + Reserva
                 </Button>
             </div>
