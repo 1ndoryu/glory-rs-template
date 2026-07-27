@@ -15,6 +15,7 @@ pub fn routes() -> Router<AppState> {
         .route("/robots.txt", get(robots_txt))
         .route("/sitemap.xml", get(sitemap_xml))
         .route("/llms.txt", get(llms_txt))
+        .route("/blog/feed.xml", get(blog_feed_xml))
 }
 
 /* [SEO-C] llms.txt: resumen del sitio en formato Markdown para crawlers de IA.
@@ -134,4 +135,64 @@ async fn sitemap_xml(State(state): State<AppState>) -> impl IntoResponse {
         [(header::CONTENT_TYPE, "application/xml; charset=utf-8")],
         xml,
     )
+}
+
+/* [277A-14] RSS feed para el blog: /blog/feed.xml
+ * Genera Atom feed con posts publicados para suscriptores y agregadores. */
+async fn blog_feed_xml(State(state): State<AppState>) -> impl IntoResponse {
+    let posts = BlogRepository::list_all(&state.pool).await.unwrap_or_default();
+    let published: Vec<_> = posts.into_iter().filter(|p| p.status == "published").collect();
+
+    let entries: String = published
+        .iter()
+        .map(|post| {
+            let link = format!("{SITE_URL}/blog/{}", post.slug);
+            let published = post
+                .published_at
+                .map(|d| d.to_rfc3339())
+                .unwrap_or_default();
+            let updated = post.updated_at.to_rfc3339();
+            let summary = post.excerpt.as_deref().unwrap_or("");
+            format!(
+                "  <entry>\n\
+                 \x20   <title>{}</title>\n\
+                 \x20   <link href=\"{}\"/>\n\
+                 \x20   <id>{}</id>\n\
+                 \x20   <published>{}</published>\n\
+                 \x20   <updated>{}</updated>\n\
+                 \x20   <summary>{}</summary>\n\
+                 \x20   <author><name>Nakomi Studio</name></author>\n\
+                 \x20 </entry>",
+                html_escape_atom(&post.title),
+                link,
+                link,
+                published,
+                updated,
+                html_escape_atom(summary),
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let feed = format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
+         <feed xmlns=\"http://www.w3.org/2005/Atom\">\n\
+         \x20 <title>Nakomi Studio Blog</title>\n\
+         \x20 <link href=\"{SITE_URL}/blog\" rel=\"alternate\"/>\n\
+         \x20 <link href=\"{SITE_URL}/blog/feed.xml\" rel=\"self\"/>\n\
+         \x20 <id>{SITE_URL}/blog</id>\n\
+         \x20 <subtitle>Artículos sobre desarrollo web, diseño, tecnología e inteligencia artificial.</subtitle>\n\
+         \x20 <updated>{}</updated>\n\
+         {entries}\n\
+         </feed>",
+        chrono::Utc::now().to_rfc3339(),
+    );
+
+    ([(header::CONTENT_TYPE, "application/atom+xml; charset=utf-8")], feed)
+}
+
+fn html_escape_atom(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }

@@ -87,6 +87,7 @@ struct SeoMeta {
     og_image: Option<String>,
     canonical: String,
     og_type: &'static str,
+    json_ld: Option<String>,
 }
 
 impl SeoMeta {
@@ -176,6 +177,15 @@ fn html_escape(s: &str) -> String {
         .replace('"', "&quot;")
 }
 
+/* Escapa caracteres especiales para interpolación segura en strings JSON */
+fn json_escape(s: &str) -> String {
+    s.replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r")
+        .replace('\t', "\\t")
+}
+
 /* [277A-13] Rutas estáticas conocidas por el prerender. */
 const KNOWN_STATIC: &[&str] = &[
     "/", "/servicios", "/proyectos", "/nosotros",
@@ -188,10 +198,10 @@ async fn resolve_seo_meta(path: &str, pool: &PgPool, app_url: &str, cache: &SeoC
     let canonical = format!("{app_url}{path}");
 
     if KNOWN_STATIC.contains(&path) {
-        return resolve_static_with_cache(path, pool, &canonical, cache).await;
+        return resolve_static_with_cache(path, pool, &canonical, app_url, cache).await;
     }
 
-    resolve_dynamic_meta(path, pool, &canonical).await
+    resolve_dynamic_meta(path, pool, &canonical, app_url).await
 }
 
 /* [277A-13] Resuelve SEO meta para páginas estáticas con cache.
@@ -203,6 +213,7 @@ async fn resolve_static_with_cache(
     path: &str,
     pool: &PgPool,
     canonical: &str,
+    app_url: &str,
     cache: &SeoCache,
 ) -> Option<SeoMeta> {
     /* 1. Check cache */
@@ -216,6 +227,7 @@ async fn resolve_static_with_cache(
                     og_image: cached.meta.og_image.clone(),
                     canonical: canonical.to_string(),
                     og_type: cached.meta.og_type,
+                    json_ld: cached.meta.json_ld.clone(),
                 });
             }
         }
@@ -224,7 +236,8 @@ async fn resolve_static_with_cache(
     /* 2. Consultar DB */
     let db_setting = SeoSettingsRepository::find_by_path(pool, path).await.ok().flatten();
 
-    /* 3. Construir SeoMeta */
+    /* 3. Construir SeoMeta con JSON-LD */
+    let json_ld = static_json_ld(path, app_url);
     let meta = if let Some(ref setting) = db_setting {
         SeoMeta {
             title: setting.title.clone(),
@@ -232,9 +245,12 @@ async fn resolve_static_with_cache(
             og_image: setting.og_image_url.clone(),
             canonical: canonical.to_string(),
             og_type: "website",
+            json_ld,
         }
     } else {
-        hardcoded_fallback(path, canonical)?
+        let mut fb = hardcoded_fallback(path, canonical)?;
+        fb.json_ld = json_ld;
+        fb
     };
 
     /* 4. Guardar en cache */
@@ -247,6 +263,7 @@ async fn resolve_static_with_cache(
                 og_image: meta.og_image.clone(),
                 canonical: meta.canonical.clone(),
                 og_type: meta.og_type,
+                json_ld: meta.json_ld.clone(),
             },
             fetched_at: Instant::now(),
         });
@@ -276,11 +293,12 @@ fn hardcoded_fallback(path: &str, canonical: &str) -> Option<SeoMeta> {
         og_image: None,
         canonical: canonical.to_string(),
         og_type: "website",
+        json_ld: None,
     })
 }
 
 /* Rutas dinámicas: /servicios/:slug y /proyectos/:slug consultan la BD */
-async fn resolve_dynamic_meta(path: &str, pool: &PgPool, canonical: &str) -> Option<SeoMeta> {
+async fn resolve_dynamic_meta(path: &str, pool: &PgPool, canonical: &str, app_url: &str) -> Option<SeoMeta> {
     if let Some(slug) = path.strip_prefix("/servicios/") {
         let slug = slug.trim_end_matches('/');
         if slug.is_empty() {
@@ -295,12 +313,14 @@ async fn resolve_dynamic_meta(path: &str, pool: &PgPool, canonical: &str) -> Opt
         .await
         .ok()??;
 
+        let json_ld = dynamic_service_json_ld(&json_escape(&row.0), &json_escape(row.1.as_deref().unwrap_or("")), slug, app_url);
         Some(SeoMeta {
             title: format!("{} — Nakomi Studio", row.0),
             description: row.1.unwrap_or_default(),
             og_image: None,
             canonical: canonical.to_string(),
             og_type: "website",
+            json_ld: Some(json_ld),
         })
     } else if let Some(slug) = path.strip_prefix("/proyectos/") {
         let slug = slug.trim_end_matches('/');
@@ -325,6 +345,7 @@ async fn resolve_dynamic_meta(path: &str, pool: &PgPool, canonical: &str) -> Opt
             og_image: row.2,
             canonical: canonical.to_string(),
             og_type: "article",
+            json_ld: None,
         })
     } else if let Some(slug) = path.strip_prefix("/blog/") {
         let slug = slug.trim_end_matches('/');
@@ -343,12 +364,14 @@ async fn resolve_dynamic_meta(path: &str, pool: &PgPool, canonical: &str) -> Opt
         .await
         .ok()??;
 
+        let json_ld = dynamic_blog_json_ld(&json_escape(&row.0), &json_escape(row.1.as_deref().unwrap_or("")), slug, app_url);
         Some(SeoMeta {
             title: format!("{} — Nakomi Studio", row.0),
             description: row.1.unwrap_or_default(),
             og_image: row.2,
             canonical: canonical.to_string(),
             og_type: "article",
+            json_ld: Some(json_ld),
         })
     } else {
         None
@@ -387,7 +410,59 @@ fn inject_seo_into_html(html: &str, meta: &SeoMeta, app_url: &str) -> String {
     let og = meta.og_tags(app_url);
     result = result.replace("</head>", &format!("{og}</head>"));
 
+    /* [277A-14] Inyectar JSON-LD structured data si existe */
+    if let Some(ref json_ld) = meta.json_ld {
+        let script = format!(
+            "<script type=\"application/ld+json\">{json_ld}</script>\n"
+        );
+        result = result.replace("</head>", &format!("{script}</head>"));
+    }
+
     result
+}
+
+/* [277A-14] Genera JSON-LD para rutas estáticas conocidas.
+ * organization+website para home, organization para catálogos,
+ * breadcrumb para detalle. */
+fn static_json_ld(path: &str, app_url: &str) -> Option<String> {
+    let site = app_url;
+    let org = format!(
+        "{{\"@context\":\"https://schema.org\",\"@type\":[\"ProfessionalService\",\"LocalBusiness\"],\"name\":\"Nakomi Studio\",\"url\":\"{site}\",\"description\":\"Estudio creativo especializado en desarrollo web, aplicaciones, agentes de IA e identidad de marca.\",\"address\":{{\"@type\":\"PostalAddress\",\"addressLocality\":\"Copenhagen\",\"addressCountry\":\"DK\"}},\"sameAs\":[\"https://github.com/1ndoryu\",\"https://www.linkedin.com/company/nakomi-studio\"]}}"
+    );
+    match path {
+        "/" => {
+            let web = format!(
+                "{{\"@context\":\"https://schema.org\",\"@type\":\"WebSite\",\"name\":\"Nakomi Studio\",\"url\":\"{site}\"}}"
+            );
+            Some(format!("{{\"@context\":\"https://schema.org\",\"@graph\":[{org},{web}]}}"))
+        }
+        "/servicios" | "/proyectos" => Some(org),
+        "/nosotros" => {
+            let breadcrumb = format!(
+                "{{\"@context\":\"https://schema.org\",\"@type\":\"BreadcrumbList\",\"itemListElement\":[{{\"@type\":\"ListItem\",\"position\":1,\"name\":\"Inicio\",\"item\":\"{site}\"}},{{\"@type\":\"ListItem\",\"position\":2,\"name\":\"Nosotros\",\"item\":\"{site}/nosotros\"}}]}}"
+            );
+            Some(format!("{{\"@context\":\"https://schema.org\",\"@graph\":[{breadcrumb}]}}"))
+        }
+        _ => None,
+    }
+}
+
+/* [277A-14] Genera JSON-LD dinámico para servicios desde DB */
+fn dynamic_service_json_ld(title: &str, desc: &str, slug: &str, app_url: &str) -> String {
+    let breadcrumb = format!(
+        "{{\"@context\":\"https://schema.org\",\"@type\":\"BreadcrumbList\",\"itemListElement\":[{{\"@type\":\"ListItem\",\"position\":1,\"name\":\"Inicio\",\"item\":\"{app_url}\"}},{{\"@type\":\"ListItem\",\"position\":2,\"name\":\"Servicios\",\"item\":\"{app_url}/servicios\"}},{{\"@type\":\"ListItem\",\"position\":3,\"name\":\"{title}\",\"item\":\"{app_url}/servicios/{slug}\"}}]}}"
+    );
+    let service = format!(
+        "{{\"@context\":\"https://schema.org\",\"@type\":\"Service\",\"name\":\"{title}\",\"description\":\"{desc}\",\"url\":\"{app_url}/servicios/{slug}\",\"provider\":{{\"@type\":\"ProfessionalService\",\"name\":\"Nakomi Studio\",\"url\":\"{app_url}\"}}}}"
+    );
+    format!("{{\"@context\":\"https://schema.org\",\"@graph\":[{breadcrumb},{service}]}}")
+}
+
+/* [277A-14] Genera JSON-LD para blog posts desde DB */
+fn dynamic_blog_json_ld(title: &str, desc: &str, slug: &str, app_url: &str) -> String {
+    format!(
+        "{{\"@context\":\"https://schema.org\",\"@type\":\"BlogPosting\",\"headline\":\"{title}\",\"description\":\"{desc}\",\"url\":\"{app_url}/blog/{slug}\",\"author\":{{\"@type\":\"Organization\",\"name\":\"Nakomi Studio\",\"url\":\"{app_url}\"}},\"publisher\":{{\"@type\":\"Organization\",\"name\":\"Nakomi Studio\",\"url\":\"{app_url}\"}}}}"
+    )
 }
 
 /// Middleware SEO: para crawlers, inyecta meta tags dinámicos en index.html.

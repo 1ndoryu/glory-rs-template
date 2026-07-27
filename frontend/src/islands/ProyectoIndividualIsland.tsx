@@ -8,7 +8,7 @@ import '../styles/variables.css';
 import './ProyectoIndividualIsland.css';
 import {LayoutPagina} from '../components/layout/LayoutPagina';
 import {SEOHead} from '../components/seo/SEOHead';
-import {breadcrumbSchema} from '../components/seo/schemas';
+import {breadcrumbSchema, projectSchema} from '../components/seo/schemas';
 import {SeccionHeroProyecto} from '../components/proyectos/SeccionHeroProyecto';
 import {SeccionGaleriaProyecto} from '../components/proyectos/SeccionGaleriaProyecto';
 import {SeccionProyectosRelacionados} from '../components/proyectos/SeccionProyectosRelacionados';
@@ -114,11 +114,17 @@ export const ProyectoIndividualIsland = ({titulo = 'Proyecto', descripcion = '',
                 title={detalle.titulo}
                 description={detalle.descripcion}
                 path={`/proyectos/${slug || ''}`}
-                jsonLd={breadcrumbSchema([
-                    {name: 'Inicio', url: '/'},
-                    {name: 'Proyectos', url: '/proyectos'},
-                    {name: detalle.titulo, url: `/proyectos/${slug}`},
-                ])}
+                jsonLd={{
+                    '@context': 'https://schema.org',
+                    '@graph': [
+                        breadcrumbSchema([
+                            {name: 'Inicio', url: '/'},
+                            {name: 'Proyectos', url: '/proyectos'},
+                            {name: detalle.titulo, url: `/proyectos/${slug}`},
+                        ]),
+                        projectSchema(detalle.titulo, detalle.descripcion, slug, detalle.imagenPortada),
+                    ],
+                }}
             />
 
             {/* Hero + Portada + Case Introduction (integrados en un componente) */}

@@ -4,6 +4,8 @@
 
 const SITE_URL = 'https://nakomi.studio';
 const LOGO_URL = `${SITE_URL}/favicon.svg`;
+/* [277A-14] OG image: usar Kamples portada como placeholder hasta crear og-nakomi.jpg (1200×630).
+ * TODO: Crear og-nakomi.jpg con logo + tagline y actualizar aquí y en SEOHead.tsx. */
 const OG_IMAGE = `${SITE_URL}/assets/Proyectos%20portadas/Kamples%20portada.jpg`;
 
 export const organizationSchema = {
@@ -148,3 +150,39 @@ export const personSchema = (nombre: string, cargo: string, bio: string, avatar:
         url: SITE_URL,
     },
 });
+
+/* [277A-14] Project schema para proyectos del portfolio */
+export const projectSchema = (titulo: string, descripcion: string, slug: string, imagen?: string) => ({
+    '@context': 'https://schema.org',
+    '@type': 'CreativeWork',
+    name: titulo,
+    description: descripcion,
+    url: `${SITE_URL}/proyectos/${slug}`,
+    ...(imagen && {image: imagen.startsWith('http') ? imagen : `${SITE_URL}${imagen}`}),
+    creator: {
+        '@type': 'ProfessionalService',
+        name: 'Nakomi Studio',
+        url: SITE_URL,
+    },
+});
+
+/* [277A-14] SoftwareApplication schema para Kamples */
+export const kamplesSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'Kamples',
+    url: 'https://kamples.app',
+    applicationCategory: 'BusinessApplication',
+    operatingSystem: 'Web',
+    description: 'Plataforma de gestión de proyectos y productividad para equipos creativos. Open source.',
+    offers: {
+        '@type': 'Offer',
+        price: '0',
+        priceCurrency: 'USD',
+    },
+    creator: {
+        '@type': 'ProfessionalService',
+        name: 'Nakomi Studio',
+        url: SITE_URL,
+    },
+};
