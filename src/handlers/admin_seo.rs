@@ -12,7 +12,7 @@ use crate::repositories::{BlogRepository, ProjectRepository, ServiceRepository};
 use crate::AppState;
 
 pub fn routes() -> Router<AppState> {
-    Router::new().route("/api/admin/seo/audit", get(seo_audit))
+    Router::new().route("/admin/seo/audit", get(seo_audit))
 }
 
 fn require_admin(auth: &AuthUser) -> Result<(), AppError> {
