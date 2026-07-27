@@ -10,6 +10,8 @@ interface CatalogPageShellProps {
     seoTitle: string;
     seoDescription: string;
     path: string;
+    /* [277A-10] JSON-LD structured data opcional */
+    jsonLd?: Record<string, unknown>;
     children: ReactNode;
 }
 
@@ -22,11 +24,12 @@ export const CatalogPageShell = ({
     seoTitle,
     seoDescription,
     path,
+    jsonLd,
     children,
 }: CatalogPageShellProps): JSX.Element => {
     return (
         <LayoutPagina className="catalogPage" id={id}>
-            <SEOHead title={seoTitle} description={seoDescription} path={path} />
+            <SEOHead title={seoTitle} description={seoDescription} path={path} jsonLd={jsonLd} />
 
             <section className="catalogPageHero">
                 <div className="catalogPageHeroContent">

@@ -340,8 +340,30 @@ pub async fn delete_order_phase_handler(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/* [277A-10] Endpoint público para verificar si el usuario califica para descuento de primer pedido.
+ * El frontend usa esto para mostrar el banner "50% OFF" antes del checkout. */
+async fn check_first_order_discount(
+    State(state): State<AppState>,
+    auth: AuthUser,
+) -> Result<Json<serde_json::Value>, AppError> {
+    auth.require_role(&[UserRole::Client, UserRole::Admin])?;
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM orders WHERE client_id = $1",
+    )
+    .bind(auth.user_id)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| AppError::Internal(format!("Error verificando órdenes: {e}")))?;
+
+    Ok(Json(serde_json::json!({
+        "qualifies": count == 0,
+        "discount_percent": if count == 0 { 50 } else { 0 },
+    })))
+}
+
 pub fn routes() -> Router<AppState> {
     Router::new()
+        .route("/orders/first-order-discount", get(check_first_order_discount))
         .route("/orders", post(create_order).get(list_orders))
         .route("/orders/:order_id", get(get_order))
         .route(

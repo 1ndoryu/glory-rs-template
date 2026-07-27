@@ -262,3 +262,14 @@ export async function apiGetOrderActivity(orderId: string): Promise<ActivityEntr
     const {data} = await instance.get<ActivityEntry[]>(`/api/orders/${orderId}/activity`);
     return data;
 }
+
+/* [277A-10] Verificar si el usuario califica para descuento de primer pedido (50% OFF) */
+export interface FirstOrderDiscount {
+    qualifies: boolean;
+    discount_percent: number;
+}
+
+export async function apiCheckFirstOrderDiscount(): Promise<FirstOrderDiscount> {
+    const {data} = await instance.get<FirstOrderDiscount>('/api/orders/first-order-discount');
+    return data;
+}

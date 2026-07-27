@@ -8,7 +8,8 @@ import {useTranslation} from 'react-i18next';
 
 const SITE_NAME = 'Nakomi Studio';
 const SITE_URL = 'https://nakomi.studio';
-/* Imagen de portada real — usar hasta crear un og-image.jpg dedicado 1200×630 */
+/* [277A-10] OG image por defecto: imagen de proyecto como placeholder.
+ * Idealmente reemplazar por og-image.jpg dedicado 1200×630 con branding Nakomi. */
 const DEFAULT_IMAGE = `${SITE_URL}/assets/Proyectos%20portadas/Kamples%20portada.jpg`;
 
 interface SEOHeadProps {

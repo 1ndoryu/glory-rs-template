@@ -18,7 +18,7 @@ import '../styles/variables.css';
 import './ServicioIndividualIsland.css';
 import {LayoutPagina} from '../components/layout/LayoutPagina';
 import {SEOHead} from '../components/seo/SEOHead';
-import {serviceSchema} from '../components/seo/schemas';
+import {serviceSchema, breadcrumbSchema} from '../components/seo/schemas';
 import {SeccionHeroServicio} from '../components/servicios/SeccionHeroServicio';
 import {SeccionGaleriaServicio} from '../components/servicios/SeccionGaleriaServicio';
 import {SeccionSkillsServicio} from '../components/servicios/SeccionSkillsServicio';
@@ -117,7 +117,17 @@ export const ServicioIndividualIsland = ({titulo, descripcion, precio_desde, slu
                 title={tituloFinal}
                 description={descripcionFinal}
                 path={`/servicios/${servicioId}`}
-                jsonLd={tituloFinal && descripcionFinal && servicioId ? serviceSchema(tituloFinal, descripcionFinal, servicioId) : undefined}
+                jsonLd={tituloFinal && descripcionFinal && servicioId ? {
+                    '@context': 'https://schema.org',
+                    '@graph': [
+                        breadcrumbSchema([
+                            {name: 'Inicio', url: '/'},
+                            {name: 'Servicios', url: '/servicios'},
+                            {name: tituloFinal, url: `/servicios/${servicioId}`},
+                        ]),
+                        serviceSchema(tituloFinal, descripcionFinal, servicioId),
+                    ],
+                } : undefined}
             />
             <SeccionHeroServicio titulo={tituloFinal} descripcion={descripcionFinal} imagen={imagenFinal} />
             <SeccionGaleriaServicio />

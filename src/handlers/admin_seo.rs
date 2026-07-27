@@ -75,19 +75,20 @@ struct GeoCheck {
     detail: Option<String>,
 }
 
-/// Páginas estáticas conocidas del middleware prerender
-fn static_pages() -> Vec<(&'static str, &'static str, &'static str, &'static str)> {
+/* [277A-10] Páginas estáticas conocidas del middleware prerender.
+ * Cada tupla: (path, label, title, description, og_has_custom_image, json_ld_type) */
+fn static_pages() -> Vec<(&'static str, &'static str, &'static str, &'static str, bool, Option<&'static str>)> {
     vec![
-        ("/", "Inicio", "Nakomi Studio — Agencia Creativa Digital", "Diseño web, desarrollo de software y soluciones digitales para tu negocio."),
-        ("/servicios", "Servicios", "Nuestros Servicios — Nakomi Studio", "Servicios de desarrollo web, diseño UI/UX, branding y soluciones digitales."),
-        ("/proyectos", "Proyectos", "Portfolio — Nakomi Studio", "Explora nuestros proyectos y casos de éxito en desarrollo web y diseño digital."),
-        ("/nosotros", "Nosotros", "Sobre Nosotros — Nakomi Studio", "Conoce al equipo detrás de Nakomi Studio y nuestra misión."),
-        ("/blog", "Blog", "Blog — Nakomi Studio", "Artículos sobre desarrollo web, diseño, tecnología e inteligencia artificial."),
-        ("/soluciones/hosting", "Hosting", "Hosting Administrado — Nakomi Studio", "Hosting web administrado con SSL, backups automáticos y soporte técnico."),
-        ("/soluciones/hosting-wordpress", "Hosting WordPress", "Hosting WordPress — Nakomi Studio", "WordPress hosting optimizado con WP-CLI, backups automáticos y soporte experto."),
-        ("/soluciones/vps", "VPS", "Servidores VPS — Nakomi Studio", "Servidores VPS dedicados con acceso root, bootstrap inicial y precios transparentes."),
-        ("/contacto", "Contacto", "Contacto — Nakomi Studio", "Contacta con Nakomi Studio para tu proyecto web, app o solución digital."),
-        ("/politica-privacidad", "Privacidad", "Política de Privacidad — Nakomi Studio", "Política de privacidad y protección de datos de Nakomi Studio."),
+        ("/", "Inicio", "Nakomi Studio — Agencia Creativa Digital", "Estudio creativo basado en Copenhague. Diseño web, apps e IA construidos con Rust para rendimiento real. Operamos en español, inglés y japonés.", true, Some("Organization+WebSite")),
+        ("/servicios", "Servicios", "Nuestros Servicios — Nakomi Studio", "Servicios de desarrollo web, diseño UI/UX, branding y soluciones digitales a medida.", true, Some("Organization")),
+        ("/proyectos", "Proyectos", "Nuestros Proyectos y Casos de Éxito — Nakomi Studio", "Explora nuestros proyectos y casos de éxito en desarrollo web, diseño digital y soluciones de software.", true, Some("Organization")),
+        ("/nosotros", "Nosotros", "Sobre Nosotros — Nakomi Studio", "Conoce al equipo de Nakomi Studio: diseñadores y desarrolladores basados en Copenhague, especializados en web, apps e IA.", true, Some("BreadcrumbList+Person")),
+        ("/blog", "Blog", "Blog — Nakomi Studio", "Artículos sobre desarrollo web, diseño, tecnología e inteligencia artificial.", true, None),
+        ("/soluciones/hosting", "Hosting", "Hosting Administrado — Nakomi Studio", "Hosting web administrado con SSL, backups automáticos y soporte técnico.", true, Some("FAQPage")),
+        ("/soluciones/hosting-wordpress", "Hosting WordPress", "Hosting WordPress — Nakomi Studio", "WordPress hosting optimizado con WP-CLI, backups automáticos y soporte experto.", true, Some("FAQPage")),
+        ("/soluciones/vps", "VPS", "Servidores VPS — Nakomi Studio", "Servidores VPS dedicados con acceso root, bootstrap inicial y precios transparentes.", true, Some("FAQPage")),
+        ("/contacto", "Contacto", "Contacto — Nakomi Studio", "Contacta con Nakomi Studio para tu proyecto web, app o solución digital.", true, None),
+        ("/politica-privacidad", "Privacidad", "Política de Privacidad — Nakomi Studio", "Política de privacidad y protección de datos de Nakomi Studio.", true, None),
     ]
 }
 
@@ -143,10 +144,11 @@ async fn seo_audit(
     let mut pages: Vec<SeoPageEntry> = Vec::new();
 
     /* Páginas estáticas */
-    for (path, label, title, desc) in static_pages() {
+    for (path, label, title, desc, og_custom, json_type) in static_pages() {
         let title_opt = Some(title.to_string());
         let desc_opt = Some(desc.to_string());
-        let (status, issues) = evaluate_page(&title_opt, &desc_opt, true, &None);
+        let json_opt = json_type.map(|s| s.to_string());
+        let (status, issues) = evaluate_page(&title_opt, &desc_opt, !og_custom, &json_opt);
         pages.push(SeoPageEntry {
             path: path.to_string(),
             label: label.to_string(),
@@ -155,8 +157,8 @@ async fn seo_audit(
             title_len: title.len(),
             description: Some(desc.to_string()),
             description_len: desc.len(),
-            og_image_is_default: true,
-            json_ld_type: None,
+            og_image_is_default: !og_custom,
+            json_ld_type: json_opt,
             status,
             issues,
         });

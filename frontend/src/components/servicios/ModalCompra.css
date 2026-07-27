@@ -204,3 +204,31 @@
     padding: 2px var(--spacing-xs);
     border-radius: var(--radius-sm);
 }
+
+/* [277A-10] Banner 50% OFF primer pedido */
+.modalCompraPrimerPedido {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border: 1px solid #f59e0b;
+    border-radius: var(--radius-md);
+    width: 100%;
+}
+
+.modalCompraPrimerPedidoBadge {
+    font-size: var(--text-sm);
+    font-weight: 700;
+    color: #92400e;
+    background: #f59e0b;
+    padding: 2px var(--spacing-xs);
+    border-radius: var(--radius-sm);
+}
+
+.modalCompraPrimerPedidoTexto {
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: #92400e;
+}

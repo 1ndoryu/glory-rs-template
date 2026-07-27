@@ -11,6 +11,8 @@ import {Modal, ModalBody} from '../ui/Modal';
 import {Button} from '../ui/Button';
 import {Input} from '../ui/Input';
 import {useModalCompra} from '../../hooks/useModalCompra';
+import {useQuery} from '@tanstack/react-query';
+import {apiCheckFirstOrderDiscount} from '../../api/orders';
 import {PAYMENT_MODE_LABELS, type PaymentMode} from '../../api/orders';
 import type {PlanServicio} from '../../data/planes/tipos';
 import './ModalCompra.css';
@@ -57,6 +59,16 @@ export const ModalCompra: React.FC<ModalCompraProps> = ({plan, servicioSlug, abi
         hostingDomain, setHostingDomain, checkoutPendiente, isHosting, isVps,
         navegarAlPanelPendiente, handleContinuar, handleAuth, reintentar
     } = useModalCompra({plan, servicioSlug, onClose: onCerrar});
+
+    /* [277A-10] Verificar si califica para descuento 50% primer pedido */
+    const {data: firstOrderDiscount} = useQuery({
+        queryKey: ['first-order-discount'],
+        queryFn: apiCheckFirstOrderDiscount,
+        staleTime: 10 * 60 * 1000,
+        retry: 0,
+        enabled: !isHosting && !isVps,
+    });
+    const qualifiesFirstOrder = firstOrderDiscount?.qualifies && !isHosting && !isVps;
 
     /* [084A-12] Precio dinámico según modo de pago o meses seleccionados */
     const baseCents = parsePrecioCents(plan.precio);
@@ -145,15 +157,26 @@ export const ModalCompra: React.FC<ModalCompraProps> = ({plan, servicioSlug, abi
                             ))}
                         </div>
                     )}
+                    {/* [277A-10] Banner 50% OFF primer pedido */}
+                    {qualifiesFirstOrder && (
+                        <div className="modalCompraPrimerPedido">
+                            <span className="modalCompraPrimerPedidoBadge">50% OFF</span>
+                            <span className="modalCompraPrimerPedidoTexto">Descuento en tu primer servicio</span>
+                        </div>
+                    )}
                     {/* [084A-12] Resumen de precio con descuento aplicado */}
                     {baseCents != null && (
                         <div className="modalCompraPrecioResumen">
-                            {tieneDescuento ? (
+                            {tieneDescuento || qualifiesFirstOrder ? (
                                 <>
                                     <span className="modalCompraPrecioOriginal">{plan.precio}</span>
-                                    <span className="modalCompraPrecioFinal">{precioFinal}</span>
+                                    <span className="modalCompraPrecioFinal">
+                                        {qualifiesFirstOrder
+                                            ? formatPrecioDescontado(Math.round(baseCents * 0.5))
+                                            : precioFinal}
+                                    </span>
                                     <span className="modalCompraPrecioAhorro">
-                                        Ahorras {descuento}%
+                                        Ahorras {qualifiesFirstOrder ? 50 : descuento}%
                                     </span>
                                 </>
                             ) : (

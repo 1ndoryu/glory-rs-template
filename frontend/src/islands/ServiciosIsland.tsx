@@ -6,6 +6,7 @@
 import '../styles/variables.css';
 import {useTranslation} from 'react-i18next';
 import {CatalogPageShell} from '../components/layout/CatalogPageShell';
+import {organizationSchema} from '../components/seo/schemas';
 import {BarraFiltros} from '../components/servicios/BarraFiltros';
 import {GridServicios} from '../components/servicios/GridServicios';
 import {useServicios} from '../hooks/useServicios';
@@ -21,9 +22,10 @@ export const ServiciosIsland = ({titulo}: ServiciosIslandProps): JSX.Element => 
     return (
         <CatalogPageShell
             id="paginaServicios"
-            seoTitle="Servicios"
+            seoTitle="Nuestros Servicios de Desarrollo Web y Diseño"
             seoDescription="Descubre nuestros servicios de desarrollo web, diseño UI/UX y soluciones digitales a medida."
             path="/servicios"
+            jsonLd={organizationSchema}
             title={titulo || t('services_page.title')}
             description={t('services_page.description')}
         >

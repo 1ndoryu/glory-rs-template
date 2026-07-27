@@ -10,6 +10,7 @@ import {spaClick} from '../navegacionSPA';
 import '../styles/variables.css';
 import './ProyectosIsland.css';
 import {CatalogPageShell} from '../components/layout/CatalogPageShell';
+import {organizationSchema} from '../components/seo/schemas';
 import {mapAdminProjectsToProyectos} from '../data/showcase';
 import {BarraFiltros} from '../components/servicios/BarraFiltros';
 import {Badge} from '../components/ui/Badge';
@@ -88,9 +89,10 @@ export const ProyectosIsland = ({titulo}: ProyectosIslandProps): JSX.Element => 
     return (
         <CatalogPageShell
             id="paginaProyectos"
-            seoTitle="Proyectos"
-            seoDescription="Portfolio de proyectos de desarrollo web y diseño digital de Nakomi Studio."
+            seoTitle="Nuestros Proyectos y Casos de Éxito"
+            seoDescription="Explora nuestros proyectos y casos de éxito en desarrollo web, diseño digital y soluciones de software."
             path="/proyectos"
+            jsonLd={organizationSchema}
             title={titulo || t('projects_page.title')}
             description={t('projects_page.description')}
         >
