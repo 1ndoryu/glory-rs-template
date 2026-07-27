@@ -54,6 +54,9 @@ export function ModalAsignar({ orderId, orderNumber, abierto, onCerrar, onAsigna
         <Modal abierto={abierto} onCerrar={onCerrar} className="modalMedio">
 
             <ModalBody>
+                <div className="modalAsignarHeader">
+                    <span className="modalAsignarOrden">Orden #{orderNumber}</span>
+                </div>
                 {isLoading ? (
                     <div className="modalAsignarCargando">
                         <Loader2 className="modalAsignarSpinner" size={24} />
