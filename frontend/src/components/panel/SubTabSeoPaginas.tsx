@@ -33,10 +33,12 @@ const TYPE_OPTIONS = [
     {id: 'project', label: 'Proyectos'},
 ] as const;
 
-/* Mapa de rutas dinámicas → secciones del panel */
-const DYNAMIC_CMS_ROUTES: Record<string, string> = {
-    service: '/panel?seccion=servicios',
-    project: '/panel?seccion=proyectos',
+/* [277A-17] Mapa de page_type → sección del panel para navegación CMS.
+ * Usa el custom event 'panel-cambiar-tab' que PanelIsland escucha,
+ * en vez de window.location.href que causaba un reload innecesario. */
+const DYNAMIC_CMS_SECTIONS: Record<string, string> = {
+    service: 'contenido',
+    project: 'contenido',
 };
 
 export const SubTabSeoPaginas: React.FC<Props> = ({pages}) => {
@@ -80,9 +82,9 @@ export const SubTabSeoPaginas: React.FC<Props> = ({pages}) => {
     };
 
     const handleGoToCms = (pageType: string) => {
-        const route = DYNAMIC_CMS_ROUTES[pageType];
-        if (route) {
-            window.location.href = route;
+        const section = DYNAMIC_CMS_SECTIONS[pageType];
+        if (section) {
+            window.dispatchEvent(new CustomEvent('panel-cambiar-tab', {detail: section}));
         }
     };
 
