@@ -89,8 +89,8 @@
     color: var(--text-tertiary);
 }
 
-/* Menú contextual */
-.equipoListaAcciones {
+/* Menú contextual por fila (acciones individuales) */
+.equipoListaFila .equipoListaAcciones {
     flex-shrink: 0;
     opacity: 0;
     transition: opacity 0.2s;
