@@ -165,8 +165,8 @@
     opacity: 0.7;
 }
 
-/* Menú contextual */
-.listaBlogAcciones {
+/* Menú contextual por fila (acciones individuales) */
+.listaBlogFila .listaBlogAcciones {
     flex-shrink: 0;
     opacity: 0;
     transition: opacity 0.2s;
