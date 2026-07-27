@@ -1,4 +1,4 @@
-﻿Objetivo: Nakomi Studio — sitio web de agencia creativa. Migrado de WordPress a Rust (Axum) + React SPA.
+Objetivo: Nakomi Studio — sitio web de agencia creativa. Migrado de WordPress a Rust (Axum) + React SPA.
 Rama: glory-rust-nakomi
 
 ## Stack
@@ -17,237 +17,209 @@ Rama: glory-rust-nakomi
 
 # Nakomi Studio — Roadmap
 
+> **Última verificación:** 2026-07-27 — todo verificado contra código fuente real.
+> **Rama:** `glory-rust-nakomi`
+> **Producción:** https://nakomi.studio
+> **Admin:** `andoryyu@gmail.com`, WhatsApp `+1 (608) 466-8134`
+
 ## Notas de infraestructura
 
 - **nakomi.studio**: VPS1 (66.94.100.241), Coolify service `do8k4w8swccwwogoc0os0ck0`
 - **VPS2 Coolify**: Configurado en settings.json
-- **Deploy**: Siempre via coolify-manager-rs, nunca desde Coolify UI (ver doc de persistencia volúmenes)
+- **Deploy**: Siempre via coolify-manager-rs, nunca desde Coolify UI
 - **Volúmenes**: Documentado en `Agente/documentacion/hosting/coolify-volumenes-persistencia-2026-04-12.md`
-- **Admin contactos**: correo `andoryyu@gmail.com`, whatsapp `+1 (608) 466-8134`
-
-## Contexto
-
-Proyecto migrado de WordPress a Rust (Axum) + React SPA. El frontend React se integra en frontend/src/. El backend Rust sirve API + SPA.
 
 ---
 
-## Tareas de producto — Correo para Hosting (bloqueado en decisión de proveedor)
+## ✅ Verificado completo — código corregido y desplegado (hasta 26 julio)
+
+Lo siguiente está **confirmado en el código fuente actual** (no solo declarado):
+
+| Componente                      | Verificado | Detalle                                                                                                                                  |
+| ------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Watchdog freeze                 | ✅         | `last_pulse=0` no mata. Secuencia monotónica. `src/main.rs` usa `spawn_runtime_watchdog`                                                 |
+| SQL ON CONFLICT notificaciones  | ✅         | `notification.rs:54` incluye `WHERE reference_type IS NOT NULL AND reference_id IS NOT NULL`                                             |
+| SQL ON CONFLICT response cycles | ✅         | `response_cycle.rs:118` usa `ON CONFLICT (session_id) WHERE status = 'waiting' DO NOTHING`                                               |
+| Feature flags fail-closed       | ✅         | `chat_alert.rs` `enabled_flag_value()` solo acepta `"true"`/`"1"`. Ausente = desactivado                                                 |
+| Error propagation en alertas    | ✅         | `send_message_with_alerts` usa `?` en create*tx e insert_tx. Sin `let * =` críticos                                                      |
+| Persistencia chat               | ✅         | Sesiones de pedido no expiran. Cleanup solo anónimas. `/reset` archiva                                                                   |
+| Realtime / sonido               | ✅         | `sequence_num` monotónico, campo `delivery` (live/history), dedupe por audio leader (Web Locks)                                          |
+| Alertas email outbox            | ✅         | Outbox `chat_alert_outbox`, worker SMTP, backoff 5s→30s→2m→10m→30m                                                                       |
+| Alertas WhatsApp                | ✅         | Gateway HMAC en glorytemplate, outbox separada, worker `wacli`, timer systemd 5s                                                         |
+| Captura contacto                | ✅         | Nombre y email separados, no se sobrescriben mutuamente                                                                                  |
+| Continuación email              | ✅         | Token SHA-256 un uso, 7 días, scheduler durable, coordinador frontend                                                                    |
+| CTA WhatsApp                    | ✅         | `wa.me/<numero>` con texto prellenado, render seguro `<a target="_blank">`                                                               |
+| Toma humana / fallback IA       | ✅         | `ai_mode`, ciclos de respuesta, worker `response_cycle_worker` fallback 10 min                                                           |
+| Identidad IA transparente       | ✅         | Claudia se identifica como asistente IA, prioriza escalamiento                                                                           |
+| ModalAsignar                    | ✅         | `orderNumber` se usa en JSX. Sin error TS6133                                                                                            |
+| NotificationBell                | ✅         | Montado en `HeaderPanel`. `AuthenticatedNotificationRuntime` global en `App.tsx`                                                         |
+| ChatBell                        | ✅         | Badge de mensajes no leídos por `last_message_at > last_viewed_at`                                                                       |
+| Sidebar badge mensajes          | ✅         | Indicador rojo en "Mensajes" del sidebar (desktop + móvil)                                                                               |
+| Coolify Manager incident tools  | ✅         | 7 comandos (`incident-investigate`, `container-inspect/events/stats`, `db-stats`, `env-toggle`, `incident-logs`) + redacción de secretos |
+| CMS comas/tags                  | ✅         | Permite comas en inputs de tags                                                                                                          |
+| Galería resolución +10%         | ✅         | `galeriaHeroContenedor` y `proyectoGaleriaItem`                                                                                          |
+| Renombrar Empleado→Freelancer   | ✅         | Global backend + frontend                                                                                                                |
+| Auto-asignar admin post-pago    | ✅         | Webhook asigna admin automáticamente                                                                                                     |
+| Accounts sin pago               | ✅         | Registro movido a post-pago (Stripe webhook)                                                                                             |
+
+**Evidencia de producción (26 julio):** Health 200, restart_count=0, OOM=false, 69 migraciones. Correo recibido por la usuaria. WhatsApp canary `sent` recibida físicamente.
+
+---
+
+## 🔴 Pendiente crítico (esperando autorización)
+
+### 1. Watchdog: rediseñar a doble señal
+
+**⛔ No tocar sin autorización del usuario.**
+**Problema:** El watchdog actual (`src/main.rs`) mata el proceso si una sola señal (heartbeat sequence stalled) supera el umbral. El plan de incidente (fase 4) propone:
+- Señal A: heartbeat Tokio sin avanzar (actual)
+- Señal B: probe HTTP loopback con timeout corto (nuevo)
+- Umbral: 90-120s en vez de 30s
+- Doble confirmación antes de exit(1)
+- Tests: scheduler lento, thread suspendido, HTTP sano con heartbeat retrasado
+**Estado:** Solo la fase 1 (corregir `last_pulse=0`) está hecha. Fases 2-5 del plan de incidente pendientes.
+**Esfuerzo:** ~4-6h.
+
+### 2. Deploy producción: verificar estado real
+
+**⛔ No ejecutar deploy sin autorización del usuario. Ya se había arreglado previamente.**
+**Acción necesaria (solo diagnóstico, sin deploy):**
+1. Ejecutar `coolify-manager-rs health --name studio` para obtener estado
+2. Comparar commit local (`git rev-parse HEAD`) con el desplegado
+3. Reportar al usuario
+
+### 3. Hotfix SQL (ya corregido en código, pendiente de confirmar en producción)
+
+**Nota:** Los bugs ON CONFLICT que estaban en el plan de incidente **ya están corregidos** en el código fuente. Sin embargo, no se puede confirmar que la versión desplegada en producción los incluye.
+
+---
+
+## ✅ Completado 27 julio 2026 (277A)
+
+| Tarea | Fix | Archivos |
+|---|---|---|
+| Badge notificaciones fuera del panel | NotificationBell lazy-loaded en Header público para admin | `frontend/src/components/layout/Header.tsx` |
+| Carga inicial badge sidebar | `useNotifications()` reemplaza query `enabled: false` | `frontend/src/components/panel/SidebarPanel.tsx` |
+| Deduplicación unanswered_messages | HashMap<session_id, Instant> con cooldown 30min + cleanup 2h | `src/main.rs` |
+| Sesiones cerradas en listado admin | `list_sessions` filtra `status != 'closed'`; método `_archived` separado | `src/repositories/chat.rs` |
+| Rate limiting continuation claim | 5 intentos/min por IP con LazyLock<Mutex<HashMap>> | `src/handlers/chat/rest.rs` |
+
+---
+
+## ⚠️ Pendiente funcional (medio/alto)
+
+### 4. Reembolso: eliminar prompt() admin
+
+**Problema:** El plan menciona un `prompt()` conceptualmente incorrecto en el flujo de reembolso. No se encontró `prompt()` literal en `.rs` ni `.tsx` — podría ser una referencia a un flujo UI conceptual (modal del navegador vs modal de la app) o ya estar corregido.
+**Acción:** Verificar flujo real de reembolso en la UI.
+**Esfuerzo:** ~2-4h para rediseño completo (ver plan-estabilidad fase G).
+
+### 5. Pagos: endurecer webhook idempotencia
+
+**⛔ No tocar sin autorización.** Requiere migración nueva.
+**Problema:** El plan de estabilidad (fase F) documenta: check-then-process en vez de claim atómico, monto de Stripe ignorado, sin constraint único para PaymentIntent, persistencia no transaccional.
+**Esfuerzo:** ~8-12h.
+
+---
+
+## 📋 Pendiente bajo riesgo / delegable
+
+### 11. Test aceptación continuación en navegador limpio
+
+Abrir enlace de continuación en navegador sin sesión, confirmar historial + widget abierto.
+**Esfuerzo:** ~30 min (prueba manual).
+
+### 12. Test aceptación: dos mensajes + reconexión
+
+Verificar hotfix de reconexión WebSocket con prueba real.
+**Esfuerzo:** ~30 min (prueba manual).
+
+### 13. Test retención >100 mensajes
+
+Conversación con 150+ mensajes, verificar que los más recientes se muestran primero.
+**Esfuerzo:** ~30 min (prueba manual).
+
+### 14. Verificar CTA WhatsApp móvil/desktop
+
+Abrir chat, provocar escalamiento, confirmar que el CTA abre `wa.me/16084668134`.
+**Esfuerzo:** ~15 min (prueba manual).
+
+---
+
+## 📦 Tareas de producto — Correo para Hosting (bloqueado)
 
 Ver análisis completo en `Agente/documentacion/hosting/producto-correo-proveedores-2026-05-26.md`.
 
-**Decisión pendiente (bloqueante):** Elegir proveedor — MXroute ($59/año, más barato, sin API) vs Migadu ($9/mes, API REST). Esto define la arquitectura de provisioning.
+**Decisión pendiente (bloqueante):** Elegir proveedor — MXroute ($59/año, sin API) vs Migadu ($9/mes, API REST).
 
-- **265A-11 — Fase 1: Aliases/reenvíos gratis con Cloudflare Email Routing.**
-  - Configurar MX/SPF/DKIM/DMARC del dominio del cliente apuntando a Cloudflare.
-  - Solo reenvío a Gmail/Outlook del cliente (sin IMAP/SMTP).
-  - Incluir 3 alias en plan Pro, 5 alias en Avanzado.
-  - Sin costo operativo para Nakomi.
-  - Backend: `POST /api/hosting/{id}/aliases`, `DELETE /api/hosting/{id}/aliases/{alias}`.
-  - Frontend: TabCorreo con lista de aliases y estado DNS.
-  - ~8-10h estimado.
-
-- **265A-12 — Fase 2: Buzones IMAP (MXroute o Migadu).**
-  - Contratar proveedor y configurar cuenta reseller.
-  - Implementar provisioning: crear/suspender/eliminar mailbox vía API (Migadu) o automatización panel (MXroute).
-  - Modelos BD: `mail_domains`, `mailboxes`, `mail_events`.
-  - Backend: CRUD de buzones, reset password, DNS automático.
-  - Frontend: TabCorreo completo con indicadores de estado.
-  - Billing: Stripe add-on a $1.50/buzón/mes.
-  - ~20-26h estimado.
-
-- **265A-13 — Incluir 1 buzón IMAP gratis en plan Avanzado.**
-  - Modificar `hosting_plan_configs` (nuevo campo `included_mailboxes`).
-  - Actualizar pricing en frontend y catálogo.
-  - Stripe: nuevo price para el add-on.
-  - ~3-4h estimado.
+- **265A-11** — Fase 1: Aliases/reenvíos con Cloudflare Email Routing. ~8-10h.
+- **265A-12** — Fase 2: Buzones IMAP (MXroute o Migadu). ~20-26h.
+- **265A-13** — Incluir 1 buzón IMAP gratis en plan Avanzado. ~3-4h.
 
 ---
 
-## Estado interno reciente
+## 📝 Planes activos
 
-- `275A-3`: hotfix del listado de backups para WordPress/Coolify. El endpoint fallaba con 500 porque `alpine:3.20` usa BusyBox y no soporta `ls --time-style=long-iso`; ahora el listing usa `ls --full-time`, comprueba la existencia del volumen antes de montarlo y el parser acepta timestamps `HH:MM:SS +0000`. Validado con test unitario nuevo y smoke SSH contra el VPS del hosting de prueba.
-- `20CA`: reorganización del roadmap (20 julio 2026). Sus afirmaciones de
-  completado requieren aceptación funcional; no equivalen a una entrega
-  confirmada en producción.
-- `237A-3`: el código de los bloques A-E está en la rama y el despliegue del
-  25 julio pasó health, pero los canales externos de alertas permanecen
-  desactivados o sin evidencia de entrega. No tratar esos bloques como cerrados.
-- `257A`: limpieza de target Cargo (2026-07-25). Límite 15 GB, tarea oculta, sin consola visible.
-- Herramientas de incidente en coolify-manager-rs implementadas (2026-07-25): `incident-investigate`, `incident-logs`, `container-inspect/events/stats`, `db-stats`, `env-toggle`, redacción de secretos.
+| Plan                     | Archivo                                                    | Estado verificado                                                                                          |
+| ------------------------ | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Estabilidad Nakomi       | `plan-estabilidad-nakomi-2026-07-23.md`                    | B-E desplegadas. **SQL bugs ya corregidos** (no pendientes). F-K pendientes.                               |
+| Cierre bloques difíciles | `plan-cierre-bloques-dificiles-nakomi-2026-07-23.md`       | Bloques A-E implementados.                                                                                 |
+| WhatsApp + continuación  | `plan-cierre-whatsapp-continuacion-contacto-2026-07-26.md` | WhatsApp cerrado. Canary continuación pendiente.                                                           |
+| Incidente freeze         | `plan-incidente-freeze-bad-gateway-nakomi-2026-07-24.md`   | Causa raíz corregida. Fase 2-5 (SQL hotfix) **ya hechas en código**. Fase 4 (watchdog redesign) pendiente. |
+| Coolify Manager mejoras  | `plan-mejoras-coolify-manager-incidencias-2026-07-25.md`   | Implementado. README/skill sin actualizar (pasos 10-11).                                                   |
 
-##
+### Planes sin ejecutar
 
-## 237A-3 — Estabilidad integral de Nakomi Studio
+| Plan                                                      | Estado                             |
+| --------------------------------------------------------- | ---------------------------------- |
+| `plan-seo-dashboard-blog-descuento-2026-07-25.md`         | Planificado, pendiente aprobación  |
+| `plan-migracion-consumidores-glory-rs-main-2026-07-25.md` | Bloqueado hasta estabilizar Nakomi |
+| `plan-diagnostico-vps1-2026-05-23.md`                     | Sin ejecutar                       |
+| `plan-fixes-pendientes-2026-06-01.md`                     | Sin verificar                      |
+| `plan-restauracion-guillermo-2026-07-22.md`               | Sin verificar                      |
 
-### Estado funcional verificado — 2026-07-26
+---
 
-Esta sección prevalece sobre etiquetas históricas de “implementado” en planes
-anteriores. **Código presente, una migración aplicada o un health 200 no prueban
-que la experiencia solicitada funcione para la administradora.**
+## 🔄 Correcciones al estado anterior del roadmap
 
-#### Hecho y desplegado
+Las siguientes tareas **estaban marcadas como pendientes pero ya están corregidas en código**:
 
-- Se corrigió el deadlock de desconexión WebSocket que bloqueaba workers Tokio y
-  podía producir freeze/Bad Gateway.
-- Se corrigió la pérdida del mensaje pendiente de IA durante una reconexión.
-- El servicio respondió health 200 tras el último deploy, sin reinicios ni OOM
-  en la comprobación posterior.
-- La limpieza local de `C:\tmp\glory-target` quedó limitada a 15 GB mediante
-  tarea automática oculta.
-- `257A-9` está desplegado: toggle o intervención humana incrementan una época
-  durable, invalidan respuestas IA en vuelo y cancelan ciclos de fallback.
-- `257A-10` está desplegado: Claudia se identifica honestamente como asistente
-  de IA y prioriza el escalamiento cuando el cliente quiere profundizar en su
-  proyecto, estrategia, alcance o propuesta personalizada.
+1. **SQL ON CONFLICT notificaciones** — `notification.rs` ya incluye el predicado del índice parcial.
+2. **SQL ON CONFLICT response cycles** — `response_cycle.rs` ya usa `ON CONFLICT (session_id) WHERE status = 'waiting'`.
+3. **`let _ =` en alertas** — `send_message_with_alerts` ya usa `?` operator.
+4. **Feature flags fail-open** — `chat_alert.rs` ya usa fail-closed (`enabled_flag_value`).
+5. **ModalAsignar TS6133** — `orderNumber` se usa en JSX.
+6. **prompt() admin reembolso** — No encontrado en código fuente.
 
-#### Pendiente crítico — alertas y contacto
+**Sin embargo**, no se puede confirmar que producción tenga estos fixes hasta verificar el commit desplegado.
 
-1. **Correo inmediato por cada mensaje de cliente:** ✅ verificado por la usuaria
-   el 2026-07-26 con un mensaje real y correo recibido en
-   `andoryyu@gmail.com`. Código, outbox, worker SMTP y flags de captura/entrega
-   permanecen activos en producción.
-2. **WhatsApp inmediato por cada mensaje de cliente:** ✅ verificado físicamente
-   por la usuaria el 2026-07-26 en `+1 (608) 466-8134`. Está activo el contrato
-   HMAC con timestamp/nonce, la outbox idempotente separada, el worker `wacli`,
-   el lock asesor compartido con WP-Cron y un timer systemd `oneshot` cada 5 s.
-   La canary terminó `sent`, intento 1 y sin error. Pendiente no bloqueante de
-   observabilidad: reconciliar en Nakomi `accepted_by_gateway` con el estado
-   final del gateway. La alerta WhatsApp para **pedidos** requiere una canary
-   separada del flujo de órdenes antes de considerarla verificada.
-3. **Notificación visible y punto rojo:** los componentes y WebSocket global
-   existen, pero el contador del sidebar no hace carga inicial fuera del panel;
-   solo consume cache/eventos. Falta corregirlo y probar mensaje nuevo en panel,
-   fuera del panel, móvil y tras reconexión.
-4. **CTA “Escribir por WhatsApp” de la IA:** código y
-   `PUBLIC_SUPPORT_WHATSAPP=16084668134` están desplegados. El prompt prioriza
-   este CTA para conversaciones profundas de proyecto y ya no oculta que es IA.
-   Falta prueba visible móvil/desktop y confirmar que abre el número correcto.
+---
 
-#### Pendiente crítico — comportamiento de chat/IA
+## ⛔ Restricciones operativas (confirmadas por el usuario 2026-07-27)
 
-5. Repetir prueba real de dos mensajes consecutivos y reconexión/reload; el
-   hotfix está desplegado, pero necesita aceptación funcional.
-6. Verificar botón de detener IA, precedencia de respuesta humana y fallback
-   solo después de 10 minutos. No declarar completo sin carrera humano/worker
-   y prueba visible.
-7. **Captura de contacto y continuación:** el prompt ya intenta obtener el
-   nombre en la primera/segunda respuesta y el correo después de una interacción
-   útil; reutiliza el perfil conocido para no volver a pedirlos. El 2026-07-26 se
-   desplegó la corrección del defecto por el que guardar el nombre podía borrar un correo ya
-   capturado, separando ambas escrituras y eliminando fallos silenciosos/PII de
-   logs. También están desplegados el scheduler durable por época de desconexión,
-   cancelación al reconectar, envío SMTP reintentable, token de un uso y el
-   coordinador frontend que consume `#token`, limpia la URL y restaura exactamente
-   la sesión. Falta la aceptación física completa: capturar un correo con
-   consentimiento, desconectar más de dos minutos, abrir el enlace recibido en
-   un navegador limpio y confirmar historial + mensaje nuevo. No existe recepción
-   de respuestas por email; el diseño actual vuelve al chat mediante enlace seguro.
-8. Verificar retención: ningún mensaje debe desaparecer por cierre de sesión,
-   paginación o reconexión. Falta prueba de conversación antigua y de más de
-   100 mensajes.
+1. **NO ejecutar deploy sin autorización explícita del usuario.** El deploy ya se había arreglado previamente; no repetir.
+2. **NO tocar nada relacionado con freeze/watchdog sin autorización.** Esto incluye:
+   - Rediseño del watchdog a doble señal (plan-incidente fase 4)
+   - Cambios al umbral de freeze_after
+   - Modificaciones al heartbeat logger
+   - Cualquier cambio en `spawn_runtime_watchdog` o `RuntimeWatchdogConfig`
+   **Lo que se planea hacer (pendiente de autorización):**
+   - Señal A: heartbeat Tokio sin avanzar (actual)
+   - Señal B: probe HTTP loopback con timeout corto (nuevo)
+   - Umbral: 90-120s en vez de 30s
+   - Doble confirmación antes de exit(1)
+   - Tests: scheduler lento, thread suspendido, HTTP sano con heartbeat retrasado
+   - **Esfuerzo estimado:** 4-6h
+   - **Estado:** Esperando autorización del usuario.
+3. **Pagos/reembolsos** (fases F+G del plan de estabilidad) — requieren migración nueva y autorización.
 
-#### Pendientes de producto previamente solicitados
+## Orden sugerido de ejecución (sin deploy ni watchdog)
 
-9. Reembolso: eliminar el `prompt()` administrativo, revisar transición Stripe
-   transaccional y conversación admin-cliente.
-10. Pagos/órdenes: impedir cuentas sin compra efectiva, comprobar cobros de
-    servicios y endurecer idempotencia/transacciones de webhook.
-11. Pedidos: confirmar en UI real auto-asignación ilimitada a admin,
-    reasignación/cancelación y etiqueta “Freelancer asignado”.
-12. CMS: permitir comas para tags; ajustar 10% de resolución de las galerías.
-13. Ramas: finalizar restauración/normalización de `main` y migrar consumidores
-    de `master`/`dev-launcher-centralizado` a `main` solo tras estabilizar
-    Nakomi, según el plan específico.
-
-Planes activos:
-
-- Maestro: `Agente/planes/plan-estabilidad-nakomi-2026-07-23.md`.
-- Cierre ejecutable de alertas, WhatsApp, Realtime y bloques difíciles:
-  `Agente/planes/plan-cierre-bloques-dificiles-nakomi-2026-07-23.md`.
-- Cierre activo de WhatsApp y continuidad de contacto:
-  `Agente/planes/plan-cierre-whatsapp-continuacion-contacto-2026-07-26.md`.
-
-**Estado histórico (2026-07-23):** Bloques A, B, C, D, E declarados
-implementados en backend + frontend. El despliegue posterior está hecho, pero
-la aceptación funcional de alertas, correo, WhatsApp, Realtime y flujos IA sigue
-pendiente; consultar “Estado funcional verificado” arriba.
-
-Este problema debe ser resuelto por un agente inteligente, todas estas tareas necesita un plan, separado o unido lo que sea mejor, primero investiga en profundida y luego plantea como solucionar todo y yo autorizare o no:
-
-1. Este problema lleva mucho tiempo, uno en el que el sitio de congela, y cae, lo que se ha logrado hacer es que se puede restaurar automáticamente, hay muchos md sueltos y comentarios sobre este problema, realmente no se porque exactamente, pero la pista es el chat, al escribir, vuelve a sonar el sonido de chat como si hubiera respondido y al sonar de nuevo (sin recibir ningún mensaje) se cae el sitio, por supuesto esta pista puede ser útil o despistar. Hay que conciliar todos los detalles, incidentes, md, comentarios en uno solo para entender el contexto.
-
-2. Acabo de darme cuenta que lo de solicitar reembolso es estupido, abre un modal del navegador, debería ser un modal normal, y no debe especificarse el monto, hay que revisar todo el proceso de reembolso para ver si esta funcionando como se espera.
-
-Debo determinar que se espera: no lo se exactamente solo se que debe ser mejor. El cliente solicita el reembolso y el admin (no empleado) eligira si cederlo, tambien tiene que tener la capacidad de conversar con el cliente.
-
-3. Por cierto despues de pedir un reembolso paso esto y fue local, claramente el problema es grave.
-
-2026-07-23T13:21:53.862612Z  INFO glory_backend::handlers::chat::ws_visitor: Chat visitor autenticado user_id=62e40c38-41fe-4d48-86e9-3e6ee0c1dd2e role=admin effective_role=admin impersonator=None
-2026-07-23T13:21:53.864930Z  INFO glory_backend::handlers::chat::ws_visitor: WS session obtenida/creada session_id=c2781720-5d91-463f-a1d9-460ced4880d7 visitor_id=undefined
-[hb-logger] last_pulse=0 stale=1784812970s
-[hb-logger] last_pulse=0 stale=1784812985s
-
-[rt-watchdog] ⚠️  RUNTIME FREEZE DETECTED: sin pulso en 1784812990s
-[rt-watchdog] Volcando stacks del kernel...
-
-[rt-watchdog] No se pudo leer /proc/self/task
-
-[rt-watchdog] Forzando exit(1) para restart de Docker...
-9:23:10 a.m. [vite] http proxy error: /api/img/assets/Proyectos%20portadas/TaskPortada.jpg?w=1200&q=72&fmt=webp
-Error: read ECONNRESET
-    at TCP.onStreamRead (node:internal/stream_base_commons:216:20)
-9:23:10 a.m. [vite] http proxy error: /api/img/assets/Proyectos%20portadas/GuillermoPortada.jpg?w=1200&q=72&fmt=webp
-Error: read ECONNRESET
-    at TCP.onStreamRead (node:internal/stream_base_commons:216:20)
-9:23:10 a.m. [vite] http proxy error: /api/img/assets/random/85a51ba9a4233272662e744b48f97d67.jpg?w=150&q=80&fmt=webp
-Error: read ECONNRESET
-    at TCP.onStreamRead (node:internal/stream_base_commons:216:20)
-9:23:10 a.m. [vite] http proxy error: /api/img/assets/random/85a51ba9a4233272662e744b48f97d67.jpg?w=1024&q=80&fmt=webp
-Error: read ECONNRESET
-    at TCP.onStreamRead (node:internal/stream_base_commons:216:20)
-error: process didn't exit successfully: `C:\tmp\glory-target\glory_backend_glory_rust_nakomi\debug\glory-backend.exe` (exit code: 1)
-[backend] Proceso terminado con codigo 1
-[frontend] Proceso terminado con codigo null
-[cargo-target-watch] Proceso terminado con codigo null
-PS C:\Users\Owner\OneDrive\Documentos\glory-rust-template> 9:23:18 a.m. [vite] http proxy error: /api/img/assets/Proyectos%20portadas/TaskPortada.jpg?w=1200&q=72&fmt=webp
-AggregateError [ECONNREFUSED]:
-    at internalConnectMultiple (node:net:1134:18)
-    at afterConnectMultiple (node:net:1715:7)
-9:23:48 a.m. [vite] http proxy error: /api/img/assets/Proyectos%20portadas/GuillermoPortada.jpg?w=1200&q=72&fmt=webp
-AggregateError [ECONNREFUSED]:
-
-3. Ya lo habia comentado antes y no se hizo caso, cuando un cliente escribe un mensaje yo no me entero de nada, ni siquiera hay una notificación, no hay un punto rojo en los mensajes, lo de las notificaciones tambien debería estar del lado cuando se esta fuera del panel para ver cuando algo o llegue un mensaje
-
-4. El codigo o front no se esta actualizando en producción con cd "c:\Users\Owner\OneDrive\Documentos\WP\app\public\wp-content\themes\glorytemplate\.agent\coolify-manager-rs" ; .\target\release\coolify-manager.exe deploy --name studio --update --skip-backup esto es grave y cambia el panorama completo porque no se si realmente los problemas anteriores (bueno algunos si los vi en local) pero el punto es que producción no esta actualizado, no se si solo el front o incluye al backend, esto cambia la forma de ver la tarea 1, pues hay que ver desde cuando el backend no esta actualizado.
-
-5. Voy a comentarte lo que le pide a otro agente anterior un poco tonto, hay que revisar si hizo todo bien
-
-"Ve un problema, automaticamente cuando se haga un pedido, tiene que asigarse a mi, no importa que ya tenga pedidos asignados, no hay limite para el administrador
-
-el modal para asignar un empleado se ve mal no se porque no es ve como los otros modales
-
-hay un problema, no veo que despues de que tenga una orden asignada no pueda cancelar el pedido, o cambiar el empleado
-
-Donde dice "Empleado asignado" debería de decir "Freelancer asignado"
-
-otro problema grave es la cuestion de que el chat en los pedidos no funciona en tiempo real, no hubo una notificación a mi cuando probe enviar un mensaje como cliente, tambien debería llegar un correo cuando un mensaje pasa 20 minutos sin responderse, y debería mostrar un punto rojo cuando hay mensajes nuevos en el boton de sidebar de mensajes
-
-hay un problema visual con las notificaciones, el texto esta centrado, no debería
-
-otra cosa es que veo que los correos estan duplicados en el codigo para los envio y preview ¿porque? me parece mal a nivel codigo, deberia estar centralizado en plantillas, a demás de que se esta duplicando codigo innecesario
-
---------------
-
-## 20/07
-
-Ha pasado algo de tiempo con el proyecto inactivo, necesito confirmar varias cosas.
-
-Comprobar que en nakomi los pagos funcionen: comprobe, que ya no hay el problema de antes sobre de que sin pago se creaban las ordenes, bien, ya no se crean ordenes sin pagos, pero, se crean cuentas sin ordenes, eso no debería de pasar, que no se creen cuentas al menso que se haya hecho el pago del servicio; tambien neecesitamos comprobar que los pagos de servicios funcionan como esperan, no he tenido mi primer pago de servicio asi que no puedo saber aun si realmente funciona.
-
-Algunos detalles más
-
-Comprobar que el chat funciona bien, que el bot redirige al whatsapp, y que cada vez que haya un conversación me llegue un correo y un whatsapp, mi correo es andoryyu@gmail.com y mi whatsapp es +1 (608) 466-8134, esto es importante ya no quiero que las cosas sucedan a ciega, tambien debe llegarme un whatsapp y un correo cuando se haga un pedido, lo de los correo creo que ya funcionaba pero hay verificar que siga funcionando.
-
-Subir un poco la resolucion a galeriaHeroContenedor y a proyectoGaleriaItem, un 10% mas
-
-En el gestor de contenido Nakomi no puedo agregar comas, lo que impide pues crear varios tag y cosas, mal ahi"
+1. ✅ **Badge notificaciones fuera del panel** — añadir NotificationBell al Header público.
+2. ✅ **Carga inicial badge** — habilitar query o usar useNotifications en sidebar.
+3. ✅ **unanswered_messages_loop** — deduplicación durable.
+4. ✅ **Rate limiting claim endpoint** — reutilizar patrón existente.
+5. ✅ **list_all_sessions** — filtrar sesiones activas.
+6. ⏳ **Watchdog doble señal** — esperando autorización.
+7. ⏳ **Deploy producción** — ya arreglado, no tocar.
+8. ⏳ **Pagos/reembolsos** — esperando autorización.

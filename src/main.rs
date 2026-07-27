@@ -20,7 +20,7 @@ use glory_backend::services::storage_enforcement::storage_enforcement_loop;
 use glory_backend::services::vps_monitor::vps_monitor_loop;
 use glory_backend::services::{AssignmentService, ContaboConfig, ContaboService, CoolifyConfig};
 use glory_rs::fixtures::ContentManager;
-use glory_rs::runtime::{spawn_runtime_watchdog, RuntimeHeartbeat, RuntimeWatchdogConfig};
+use glory_rs::runtime::{spawn_runtime_watchdog, HttpProbeConfig, RuntimeHeartbeat, RuntimeWatchdogConfig};
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 8)]
 #[allow(clippy::too_many_lines)]
@@ -83,18 +83,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     socket.listen(1024)?;
     let listener = tokio::net::TcpListener::from_std(socket.into())?;
 
-    /* [237A-4] El watchdog compartido usa una secuencia monotónica y emite el
-     * primer pulso inmediatamente. El estado inicial nunca activa recovery:
-     * solo una secuencia válida que deja de avanzar puede cerrar el proceso. */
+    /* [237A-4][277A-6] Watchdog de runtime con doble señal:
+     * Señal A: heartbeat Tokio (sequence monotónica).
+     * Señal B: HTTP probe loopback (GET localhost:puerto/healthz).
+     * Solo mata si AMBAS fallan durante 120s. Grace period 60s al arrancar.
+     * Rollback: GLORY_HTTP_WATCHDOG=false desactiva todo. */
     let runtime_watchdog_disabled = std::env::var("GLORY_HTTP_WATCHDOG")
         .is_ok_and(|value| value.eq_ignore_ascii_case("false") || value == "0");
     if runtime_watchdog_disabled {
         tracing::warn!("[rt-watchdog] Desactivado por GLORY_HTTP_WATCHDOG");
     } else {
-        let runtime_heartbeat = spawn_runtime_watchdog(RuntimeWatchdogConfig::default(), || {
-            eprintln!(
-                "\n[rt-watchdog] ⚠️  RUNTIME FREEZE DETECTED: una secuencia válida dejó de avanzar"
-            );
+        let watchdog_config = RuntimeWatchdogConfig {
+            /* [277A-6] HTTP probe loopback: verifica que el servidor HTTP sigue vivo */
+            http_probe: Some(HttpProbeConfig {
+                port: config.port,
+                path: "/healthz".to_string(),
+                timeout: Duration::from_secs(3),
+            }),
+            /* Grace period: 60s para que el servidor termine de arrancar */
+            grace_period: Duration::from_secs(60),
+            ..RuntimeWatchdogConfig::default()
+        };
+        tracing::info!(
+            "[rt-watchdog] Doble señal activada: heartbeat + HTTP probe en 127.0.0.1:{}/healthz (grace 60s, threshold 120s)",
+            config.port
+        );
+        let runtime_heartbeat = spawn_runtime_watchdog(&watchdog_config, || {
             eprintln!("[rt-watchdog] Volcando stacks del kernel...\n");
             dump_kernel_stacks();
             eprintln!("\n[rt-watchdog] Forzando exit(1) para restart de Docker...");
@@ -614,27 +628,42 @@ async fn session_cleanup_loop(pool: sqlx::PgPool) {
     }
 }
 
-/* [20CA-8] Background loop: detecta mensajes sin responder >20min y envía
- * notificación in-app a admins. Ejecuta cada 5 minutos.
+/* [20CA-8][277A-3] Background loop: detecta mensajes sin responder >20min y
+ * envía notificación in-app a admins. Ejecuta cada 5 minutos.
  * Un mensaje "sin responder" es el último de la sesión y fue enviado por
- * el visitante/cliente (no staff/system), y nadie lo ha visto. */
+ * el visitante/cliente (no staff/system), y nadie lo ha visto.
+ * [277A-3] Deduplicación por timestamp: en vez de HashSet limpiado cada tick,
+ * se guarda el instante de la última notificación por sesión. Solo se vuelve
+ * a notificar si pasaron al menos 30 minutos desde la última notificación
+ * para esa misma sesión. Esto evita el bug anterior donde notified.clear()
+ * cada 5 min causaba notificaciones repetidas. */
 async fn unanswered_messages_loop(pool: sqlx::PgPool) {
     use glory_backend::models::CreateNotification;
     use glory_backend::repositories::{ChatRepository, NotificationRepository, UserRepository};
+    use std::collections::HashMap;
 
     const THRESHOLD_MINUTES: i64 = 20;
     const CHECK_INTERVAL: std::time::Duration = std::time::Duration::from_mins(5);
-    let mut notified: std::collections::HashSet<uuid::Uuid> = std::collections::HashSet::new();
+    /* Mínimo 30 min entre notificaciones para la misma sesión */
+    const RE_NOTIFY_AFTER: std::time::Duration = std::time::Duration::from_mins(30);
+    let mut last_notified: HashMap<uuid::Uuid, std::time::Instant> = HashMap::new();
 
     loop {
         tokio::time::sleep(CHECK_INTERVAL).await;
-        notified.clear();
+
+        /* Limpiar entradas antiguas (>2h) para no crecer indefinidamente */
+        last_notified.retain(|_, t| t.elapsed() < std::time::Duration::from_hours(2));
 
         match ChatRepository::find_unanswered_sessions(&pool, THRESHOLD_MINUTES).await {
             Ok(results) => {
+                let now = std::time::Instant::now();
                 let new_ids: Vec<_> = results
                     .into_iter()
-                    .filter(|sid| !notified.contains(sid))
+                    .filter(|sid| {
+                        last_notified
+                            .get(sid)
+                            .is_none_or(|t| now.duration_since(*t) >= RE_NOTIFY_AFTER)
+                    })
                     .collect();
 
                 if new_ids.is_empty() {
@@ -676,8 +705,10 @@ async fn unanswered_messages_loop(pool: sqlx::PgPool) {
                     let _ = NotificationRepository::create(&pool, &notif).await;
                 }
 
+                /* Registrar timestamp de notificación por sesión */
+                let now = std::time::Instant::now();
                 for sid in &new_ids {
-                    notified.insert(*sid);
+                    last_notified.insert(*sid, now);
                 }
             }
             Err(e) => {
