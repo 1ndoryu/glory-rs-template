@@ -68,17 +68,10 @@ Lo siguiente está **confirmado en el código fuente actual** (no solo declarado
 
 ## 🔴 Pendiente crítico (esperando autorización)
 
-### 1. Watchdog: rediseñar a doble señal
+### 1. Watchdog: doble señal — IMPLEMENTADO, pendiente deploy
 
-**⛔ No tocar sin autorización del usuario.**
-**Problema:** El watchdog actual (`src/main.rs`) mata el proceso si una sola señal (heartbeat sequence stalled) supera el umbral. El plan de incidente (fase 4) propone:
-- Señal A: heartbeat Tokio sin avanzar (actual)
-- Señal B: probe HTTP loopback con timeout corto (nuevo)
-- Umbral: 90-120s en vez de 30s
-- Doble confirmación antes de exit(1)
-- Tests: scheduler lento, thread suspendido, HTTP sano con heartbeat retrasado
-**Estado:** Solo la fase 1 (corregir `last_pulse=0`) está hecha. Fases 2-5 del plan de incidente pendientes.
-**Esfuerzo:** ~4-6h.
+**Estado:** Implementado (277A-6). Doble señal (heartbeat + HTTP probe loopback), umbral 120s, grace period 60s. Tests pasan (8/8). Commits: `a944de64` (main.rs) + `4d95fb4` (framework).
+**Pendiente:** Deploy a producción + verificación canary.
 
 ### 2. Deploy producción: verificar estado real
 
@@ -103,22 +96,23 @@ Lo siguiente está **confirmado en el código fuente actual** (no solo declarado
 | Deduplicación unanswered_messages | HashMap<session_id, Instant> con cooldown 30min + cleanup 2h | `src/main.rs` |
 | Sesiones cerradas en listado admin | `list_sessions` filtra `status != 'closed'`; método `_archived` separado | `src/repositories/chat.rs` |
 | Rate limiting continuation claim | 5 intentos/min por IP con LazyLock<Mutex<HashMap>> | `src/handlers/chat/rest.rs` |
+| **Watchdog doble señal** | Heartbeat + HTTP probe loopback, umbral 120s, grace 60s | `glory-rs/backend/src/runtime/watchdog.rs`, `src/main.rs` |
+| **Pagos/reembolsos (Fase F+G)** | Idempotency keys, retry con backoff, constraint único, validación monto | 9 archivos (ver 277A-7) |
 
 ---
 
 ## ⚠️ Pendiente funcional (medio/alto)
 
-### 4. Reembolso: eliminar prompt() admin
+### 4. Reembolso: verificar UI frontend
 
-**Problema:** El plan menciona un `prompt()` conceptualmente incorrecto en el flujo de reembolso. No se encontró `prompt()` literal en `.rs` ni `.tsx` — podría ser una referencia a un flujo UI conceptual (modal del navegador vs modal de la app) o ya estar corregido.
-**Acción:** Verificar flujo real de reembolso en la UI.
-**Esfuerzo:** ~2-4h para rediseño completo (ver plan-estabilidad fase G).
+**Problema:** El `prompt()` no se encontró en código fuente. El handler ya acepta JSON con `reason` y `admin_response`.
+**Acción:** Verificar que el frontend muestra un modal proper (no prompt nativo) para solicitudes de reembolso.
+**Esfuerzo:** ~1-2h.
 
-### 5. Pagos: endurecer webhook idempotencia
+### 5. Pagos/reembolsos — migración pendiente en producción
 
-**⛔ No tocar sin autorización.** Requiere migración nueva.
-**Problema:** El plan de estabilidad (fase F) documenta: check-then-process en vez de claim atómico, monto de Stripe ignorado, sin constraint único para PaymentIntent, persistencia no transaccional.
-**Esfuerzo:** ~8-12h.
+**Estado:** Código implementado y commiteado (277A-7). **Requiere deploy** para aplicar la migración SQL.
+**Incluye:** Idempotency-Key en Stripe, retry de reembolsos con backoff exponencial (1h→4h→16h→64h→72h cap), constraint único de pago activo por orden, validación de monto en checkout webhook, recovery de refunds stuck en Processing (>30min).
 
 ---
 
@@ -195,23 +189,11 @@ Las siguientes tareas **estaban marcadas como pendientes pero ya están corregid
 
 ---
 
-## ⛔ Restricciones operativas (confirmadas por el usuario 2026-07-27)
+## ⛔ Restricciones operativas
 
-1. **NO ejecutar deploy sin autorización explícita del usuario.** El deploy ya se había arreglado previamente; no repetir.
-2. **NO tocar nada relacionado con freeze/watchdog sin autorización.** Esto incluye:
-   - Rediseño del watchdog a doble señal (plan-incidente fase 4)
-   - Cambios al umbral de freeze_after
-   - Modificaciones al heartbeat logger
-   - Cualquier cambio en `spawn_runtime_watchdog` o `RuntimeWatchdogConfig`
-   **Lo que se planea hacer (pendiente de autorización):**
-   - Señal A: heartbeat Tokio sin avanzar (actual)
-   - Señal B: probe HTTP loopback con timeout corto (nuevo)
-   - Umbral: 90-120s en vez de 30s
-   - Doble confirmación antes de exit(1)
-   - Tests: scheduler lento, thread suspendido, HTTP sano con heartbeat retrasado
-   - **Esfuerzo estimado:** 4-6h
-   - **Estado:** Esperando autorización del usuario.
-3. **Pagos/reembolsos** (fases F+G del plan de estabilidad) — requieren migración nueva y autorización.
+1. **NO ejecutar deploy sin autorización explícita del usuario.**
+2. **Watchdog doble señal** — implementado, pendiente deploy.
+3. **Pagos/reembolsos (F+G)** — implementado, pendiente deploy (migración SQL incluida).
 
 ## Orden sugerido de ejecución (sin deploy ni watchdog)
 
