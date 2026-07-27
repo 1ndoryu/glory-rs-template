@@ -1,0 +1,193 @@
+/* [277A-13] Estilos del modal de edición SEO.
+ * Reutiliza tokens del sistema de diseño existente. */
+
+.modalSeoOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-md);
+}
+
+.modalSeoContenedor {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    width: 100%;
+    max-width: 560px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+
+.modalSeoHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-bottom: 1px solid var(--border-light);
+}
+
+.modalSeoTitulo {
+    font-size: var(--text-base);
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.modalSeoCerrar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    color: var(--text-tertiary);
+    transition: background 0.15s, color 0.15s;
+}
+
+.modalSeoCerrar:hover {
+    background: var(--bg-item-hover);
+    color: var(--text-primary);
+}
+
+.modalSeoCuerpo {
+    padding: var(--spacing-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.modalSeoCampo {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.modalSeoLabel {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.modalSeoContador {
+    font-size: var(--text-2xs);
+    font-weight: 400;
+    padding: 1px 6px;
+    border-radius: var(--radius-sm);
+}
+
+.modalSeoContador--ok {
+    background: var(--bg-item-active);
+    color: var(--text-tertiary);
+}
+
+.modalSeoContador--warning {
+    background: var(--bg-item-hover);
+    color: var(--text-primary);
+}
+
+.modalSeoContador--error {
+    background: var(--bg-item-hover);
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.modalSeoInput,
+.modalSeoTextarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+    font-family: var(--font-primary);
+    background: var(--bg-primary);
+    color: var(--brand-black);
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+}
+
+.modalSeoInput:focus,
+.modalSeoTextarea:focus {
+    outline: none;
+    border-color: var(--border-default);
+}
+
+.modalSeoInput--disabled {
+    background: var(--bg-item-hover);
+    color: var(--text-tertiary);
+    cursor: not-allowed;
+}
+
+.modalSeoTextarea {
+    resize: vertical;
+    min-height: 72px;
+}
+
+.modalSeoAyuda {
+    font-size: var(--text-2xs);
+    color: var(--text-tertiary);
+    min-height: 16px;
+}
+
+.modalSeoCampo--readonly {
+    opacity: 0.7;
+}
+
+.modalSeoFooter {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-top: 1px solid var(--border-light);
+}
+
+.modalSeoBtn {
+    padding: 8px 16px;
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    font-family: var(--font-primary);
+    cursor: pointer;
+    transition: background 0.15s, opacity 0.15s;
+    border: 1px solid var(--border-default);
+}
+
+.modalSeoBtn--cancelar {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.modalSeoBtn--cancelar:hover {
+    background: var(--bg-item-hover);
+}
+
+.modalSeoBtn--guardar {
+    background: var(--brand-black);
+    color: var(--bg-primary);
+    border-color: var(--brand-black);
+}
+
+.modalSeoBtn--guardar:hover {
+    opacity: 0.85;
+}
+
+.modalSeoBtn--guardar:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.modalSeoError {
+    padding: var(--spacing-sm) var(--spacing-lg) var(--spacing-md);
+    font-size: var(--text-xs);
+    color: var(--text-primary);
+}

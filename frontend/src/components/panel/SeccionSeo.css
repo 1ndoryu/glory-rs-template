@@ -1,8 +1,8 @@
 /* [SEO-A] Estilos mínimos para SeccionSeo.
  * Reutiliza: .contenidoContenedor, .contenidoSubTabs, .contenidoSubTab,
  * .contenidoSubTab--activo, .contenidoPanel de SeccionContenido.css.
- * Reutiliza: .correosTabla, .correosTablaWrapper, .correosFila, .correosFiltro,
- * .correosBadge, .correosTag, .correosAsunto, .correosTotal de SeccionCorreo.css.
+ * Reutiliza: .correosTabla, .correosTablaWrapper, .correosFila,
+ * .correosBadge, .correosTag, .correosAsunto de SeccionCorreo.css.
  * Reutiliza: .listaServiciosFila, .listaServiciosFilaInfo, .listaServiciosNombre,
  * .listaServiciosBadge de ListaServicios.css.
  * Solo se definen clases nuevas específicas de SEO. */
@@ -118,6 +118,74 @@
     margin-left: var(--spacing-xs);
 }
 
+/* [270A-2] Overrides tabla SEO: headers sin bold, celdas con fuente reducida */
+.contenidoPanel .correosTabla th {
+    font-weight: normal;
+}
+
+.contenidoPanel .seoPaginaTitle,
+.contenidoPanel .correosAsunto {
+    font-size: var(--text-xs);
+}
+
+/* [270A-1] Búsqueda de páginas — reemplaza el anterior select + icono filtro */
+.seoPaginasFiltros {
+    display: flex;
+    gap: var(--spacing-sm);
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+}
+
+.seoPaginasBusqueda {
+    position: relative;
+    flex: 1;
+    min-width: 200px;
+    max-width: 400px;
+}
+
+.seoPaginasFiltroTipo {
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    font-family: var(--font-primary);
+    font-size: var(--text-sm);
+    color: var(--brand-black);
+    background: var(--bg-primary);
+    min-width: 160px;
+}
+
+.seoPaginasBusquedaIcono {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--brand-black);
+    opacity: 0.4;
+    flex-shrink: 0;
+    pointer-events: none;
+}
+
+.seoPaginasBusquedaInput {
+    width: 100%;
+    padding: 10px 12px 10px 36px;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+    font-family: var(--font-primary);
+    background: var(--bg-primary);
+    color: var(--brand-black);
+    transition: border-color 0.2s;
+}
+
+.seoPaginasBusquedaInput:focus {
+    outline: none;
+    border-color: var(--border-default);
+}
+
+.seoPaginasBusquedaInput::placeholder {
+    color: var(--text-muted);
+}
+
 /* Blog sub-tab: meta info */
 .seoBlogMeta {
     font-size: var(--text-xs);
@@ -128,6 +196,33 @@
 .seoBlogMetaVacio {
     color: var(--text-tertiary);
     opacity: 0.7;
+}
+
+/* [277A-13] Columna acciones en tabla SEO */
+.seoPaginaAcciones {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.seoPaginaAccionBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    background: var(--bg-primary);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.seoPaginaAccionBtn:hover {
+    background: var(--bg-item-hover);
+    color: var(--text-primary);
+    border-color: var(--border-default);
 }
 
 /* GEO checklist */

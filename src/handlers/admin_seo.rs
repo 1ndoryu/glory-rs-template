@@ -2,17 +2,20 @@
  * páginas públicas del sitio. Retorna resumen, detalle por página, estado del
  * blog y checks GEO. Solo accesible para admin. */
 
-use axum::{extract::State, routing::get, Json, Router};
-use serde::Serialize;
+use axum::{extract::{Query, State}, routing::{get, put}, Json, Router};
+
+use serde::{Deserialize, Serialize};
 
 use crate::errors::AppError;
 use crate::middleware::AuthUser;
 use crate::models::UserRole;
-use crate::repositories::{BlogRepository, ProjectRepository, ServiceRepository};
+use crate::repositories::{BlogRepository, ProjectRepository, SeoSettingsRepository, ServiceRepository};
 use crate::AppState;
 
 pub fn routes() -> Router<AppState> {
-    Router::new().route("/admin/seo/audit", get(seo_audit))
+    Router::new()
+        .route("/admin/seo/audit", get(seo_audit))
+        .route("/admin/seo/settings", get(list_seo_settings).put(update_seo_setting))
 }
 
 fn require_admin(auth: &AuthUser) -> Result<(), AppError> {
@@ -143,25 +146,49 @@ async fn seo_audit(
 
     let mut pages: Vec<SeoPageEntry> = Vec::new();
 
-    /* Páginas estáticas */
-    for (path, label, title, desc, og_custom, json_type) in static_pages() {
-        let title_opt = Some(title.to_string());
-        let desc_opt = Some(desc.to_string());
-        let json_opt = json_type.map(|s| s.to_string());
-        let (status, issues) = evaluate_page(&title_opt, &desc_opt, !og_custom, &json_opt);
-        pages.push(SeoPageEntry {
-            path: path.to_string(),
-            label: label.to_string(),
-            page_type: "static".to_string(),
-            title: Some(title.to_string()),
-            title_len: title.len(),
-            description: Some(desc.to_string()),
-            description_len: desc.len(),
-            og_image_is_default: !og_custom,
-            json_ld_type: json_opt,
-            status,
-            issues,
-        });
+    /* Páginas estáticas: leer de DB (seo_settings) con fallback a hardcoded */
+    let db_settings = SeoSettingsRepository::list_all(pool).await.unwrap_or_default();
+    if db_settings.is_empty() {
+        /* Fallback: si la tabla está vacía (migración no aplicada), usar hardcoded */
+        for (path, label, title, desc, og_custom, json_type) in static_pages() {
+            let title_opt = Some(title.to_string());
+            let desc_opt = Some(desc.to_string());
+            let json_opt = json_type.map(ToString::to_string);
+            let (status, issues) = evaluate_page(&title_opt, &desc_opt, !og_custom, &json_opt);
+            pages.push(SeoPageEntry {
+                path: path.to_string(),
+                label: label.to_string(),
+                page_type: "static".to_string(),
+                title: Some(title.to_string()),
+                title_len: title.len(),
+                description: Some(desc.to_string()),
+                description_len: desc.len(),
+                og_image_is_default: !og_custom,
+                json_ld_type: json_opt,
+                status,
+                issues,
+            });
+        }
+    } else {
+        for setting in &db_settings {
+            let title_opt = Some(setting.title.clone());
+            let desc_opt = Some(setting.description.clone());
+            let og_custom = setting.og_image_url.is_some();
+            let (status, issues) = evaluate_page(&title_opt, &desc_opt, !og_custom, &setting.json_ld_type);
+            pages.push(SeoPageEntry {
+                path: setting.path.clone(),
+                label: setting.label.clone(),
+                page_type: "static".to_string(),
+                title: Some(setting.title.clone()),
+                title_len: setting.title.len(),
+                description: Some(setting.description.clone()),
+                description_len: setting.description.len(),
+                og_image_is_default: !og_custom,
+                json_ld_type: setting.json_ld_type.clone(),
+                status,
+                issues,
+            });
+        }
     }
 
     /* Servicios dinámicos */
@@ -317,4 +344,41 @@ async fn seo_audit(
         blog_posts: blog_entries,
         geo_checks,
     }))
+}
+
+/* [277A-13] GET /api/admin/seo/settings — lista todos los SEO settings editables */
+async fn list_seo_settings(
+    State(state): State<AppState>,
+    auth: AuthUser,
+) -> Result<Json<Vec<crate::repositories::SeoSetting>>, AppError> {
+    require_admin(&auth)?;
+    let settings = SeoSettingsRepository::list_all(&state.pool).await?;
+    Ok(Json(settings))
+}
+
+#[derive(Deserialize)]
+struct UpdateSeoSettingBody {
+    title: String,
+    description: String,
+    og_image_url: Option<String>,
+}
+
+/* [277A-13] PUT /api/admin/seo/settings?path=/ruta — actualiza un SEO setting */
+async fn update_seo_setting(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Query(params): Query<std::collections::HashMap<String, String>>,
+    Json(body): Json<UpdateSeoSettingBody>,
+) -> Result<Json<crate::repositories::SeoSetting>, AppError> {
+    require_admin(&auth)?;
+    let path = params.get("path")
+        .ok_or_else(|| AppError::BadRequest("Missing 'path' query param".into()))?;
+    let setting = SeoSettingsRepository::upsert(
+        &state.pool,
+        path,
+        &body.title,
+        &body.description,
+        body.og_image_url.as_deref(),
+    ).await?;
+    Ok(Json(setting))
 }

@@ -55,3 +55,33 @@ export async function apiGetSeoAudit(): Promise<SeoAuditResponse> {
     const {data} = await instance.get<SeoAuditResponse>('/api/admin/seo/audit');
     return data;
 }
+
+/* [277A-13] SEO Settings editables desde panel admin */
+export interface SeoSetting {
+    path: string;
+    label: string;
+    title: string;
+    description: string;
+    og_image_url: string | null;
+    json_ld_type: string | null;
+    updated_at: string;
+}
+
+export interface UpdateSeoSettingBody {
+    title: string;
+    description: string;
+    og_image_url?: string | null;
+}
+
+export async function apiGetSeoSettings(): Promise<SeoSetting[]> {
+    const {data} = await instance.get<SeoSetting[]>('/api/admin/seo/settings');
+    return data;
+}
+
+export async function apiUpdateSeoSetting(path: string, body: UpdateSeoSettingBody): Promise<SeoSetting> {
+    const {data} = await instance.put<SeoSetting>(
+        `/api/admin/seo/settings?path=${encodeURIComponent(path)}`,
+        body,
+    );
+    return data;
+}

@@ -577,6 +577,7 @@ pub fn create_app(pool: sqlx::PgPool, config: crate::config::AppConfig) -> Route
             pool: pool_for_prerender,
             static_dir: dir.clone(),
             app_url: std::env::var("APP_URL").unwrap_or_else(|_| "http://localhost:5173".into()),
+            seo_cache: crate::middleware::prerender::SeoCache::new(),
         };
 
         /* [185A-1] CompressionLayer aqui cubre /assets/ y SPA fallback (HTML).
@@ -612,7 +613,6 @@ fn spa_shell_routes() -> Router<AppState> {
         .route("/blog", get(spa_index))
         .route("/blog/:slug", get(spa_index))
         .route("/contacto", get(spa_index))
-        .route("/politica-privacidad", get(spa_index))
         .route("/usuario/:username", get(spa_index))
         .route("/panel", get(spa_index))
         .route("/panel/", get(spa_index))

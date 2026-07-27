@@ -19,7 +19,33 @@ use sqlx::PgPool;
 use std::fmt::Write;
 
 use crate::models::Project;
-use crate::repositories::ProjectRepository;
+use crate::repositories::{ProjectRepository, SeoSettingsRepository};
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use tokio::sync::RwLock;
+
+/* [277A-13] Cache entry para SEO settings de páginas estáticas.
+ * Evita consultar la DB en cada request de crawler. TTL: 5 minutos. */
+struct CachedSeoEntry {
+    meta: SeoMeta,
+    fetched_at: Instant,
+}
+
+#[derive(Clone)]
+pub struct SeoCache {
+    entries: Arc<RwLock<HashMap<String, CachedSeoEntry>>>,
+    ttl: Duration,
+}
+
+impl SeoCache {
+    pub fn new() -> Self {
+        Self {
+            entries: Arc::new(RwLock::new(HashMap::new())),
+            ttl: Duration::from_secs(300),
+        }
+    }
+}
 
 /// Estado necesario para inyectar meta SEO dinámico
 #[derive(Clone)]
@@ -27,6 +53,7 @@ pub struct PrerenderState {
     pub pool: PgPool,
     pub static_dir: String,
     pub app_url: String,
+    pub seo_cache: SeoCache,
 }
 
 const CRAWLER_AGENTS: &[&str] = &[
@@ -149,85 +176,107 @@ fn html_escape(s: &str) -> String {
         .replace('"', "&quot;")
 }
 
-/* Construye SeoMeta a partir del path + consulta a BD para rutas dinámicas */
-async fn resolve_seo_meta(path: &str, pool: &PgPool, app_url: &str) -> Option<SeoMeta> {
+/* [277A-13] Rutas estáticas conocidas por el prerender. */
+const KNOWN_STATIC: &[&str] = &[
+    "/", "/servicios", "/proyectos", "/nosotros",
+    "/soluciones/hosting", "/soluciones/hosting-wordpress", "/soluciones/vps",
+    "/blog", "/contacto", "/politica-privacidad",
+];
+
+/* Construye SeoMeta: estáticas con cache+DB fallback, dinámicas consultan BD. */
+async fn resolve_seo_meta(path: &str, pool: &PgPool, app_url: &str, cache: &SeoCache) -> Option<SeoMeta> {
     let canonical = format!("{app_url}{path}");
 
-    match path {
-        "/" => Some(SeoMeta {
-            title: "Nakomi Studio — Agencia Creativa Digital".into(),
-            description:
-                "Diseño web, desarrollo de software y soluciones digitales para tu negocio.".into(),
-            og_image: None,
-            canonical,
-            og_type: "website",
-        }),
-        "/servicios" => Some(SeoMeta {
-            title: "Nuestros Servicios — Nakomi Studio".into(),
-            description:
-                "Servicios de desarrollo web, diseño UI/UX, branding y soluciones digitales.".into(),
-            og_image: None,
-            canonical,
-            og_type: "website",
-        }),
-        "/proyectos" => Some(SeoMeta {
-            title: "Portfolio — Nakomi Studio".into(),
-            description:
-                "Explora nuestros proyectos y casos de éxito en desarrollo web y diseño digital."
-                    .into(),
-            og_image: None,
-            canonical,
-            og_type: "website",
-        }),
-        "/nosotros" => Some(SeoMeta {
-            title: "Sobre Nosotros — Nakomi Studio".into(),
-            description: "Conoce al equipo detrás de Nakomi Studio y nuestra misión.".into(),
-            og_image: None,
-            canonical,
-            og_type: "website",
-        }),
-        "/soluciones/hosting" => Some(SeoMeta {
-            title: "Hosting Administrado — Nakomi Studio".into(),
-            description: "Hosting web administrado con SSL, backups automáticos y soporte técnico."
-                .into(),
-            og_image: None,
-            canonical,
-            og_type: "website",
-        }),
-        "/soluciones/hosting-wordpress" => Some(SeoMeta {
-            title: "Hosting WordPress — Nakomi Studio".into(),
-            description: "WordPress hosting optimizado con WP-CLI, backups automáticos y soporte experto."
-                .into(),
-            og_image: None,
-            canonical,
-            og_type: "website",
-        }),
-        "/soluciones/vps" => Some(SeoMeta {
-            title: "Servidores VPS — Nakomi Studio".into(),
-            description: "Servidores VPS dedicados con acceso root, bootstrap inicial y precios transparentes."
-                .into(),
-            og_image: None,
-            canonical,
-            og_type: "website",
-        }),
-        "/blog" => Some(SeoMeta {
-            title: "Blog — Nakomi Studio".into(),
-            description: "Artículos sobre desarrollo web, diseño, tecnología e inteligencia artificial."
-                .into(),
-            og_image: None,
-            canonical,
-            og_type: "website",
-        }),
-        "/contacto" => Some(SeoMeta {
-            title: "Contacto — Nakomi Studio".into(),
-            description: "Contacta con Nakomi Studio para tu proyecto web, app o solución digital."
-                .into(),
-            og_image: None,
-            canonical,
-            og_type: "website",
-        }),
-        _ => resolve_dynamic_meta(path, pool, &canonical).await,
+    if KNOWN_STATIC.contains(&path) {
+        return resolve_static_with_cache(path, pool, &canonical, cache).await;
     }
+
+    resolve_dynamic_meta(path, pool, &canonical).await
+}
+
+/* [277A-13] Resuelve SEO meta para páginas estáticas con cache.
+ * 1. Check cache → si hit y no expirado, retornar.
+ * 2. Consultar tabla seo_settings.
+ * 3. Si hay datos en DB, usarlos. Si no, fallback hardcoded.
+ * 4. Guardar en cache. */
+async fn resolve_static_with_cache(
+    path: &str,
+    pool: &PgPool,
+    canonical: &str,
+    cache: &SeoCache,
+) -> Option<SeoMeta> {
+    /* 1. Check cache */
+    {
+        let entries = cache.entries.read().await;
+        if let Some(cached) = entries.get(path) {
+            if cached.fetched_at.elapsed() < cache.ttl {
+                return Some(SeoMeta {
+                    title: cached.meta.title.clone(),
+                    description: cached.meta.description.clone(),
+                    og_image: cached.meta.og_image.clone(),
+                    canonical: canonical.to_string(),
+                    og_type: cached.meta.og_type,
+                });
+            }
+        }
+    }
+
+    /* 2. Consultar DB */
+    let db_setting = SeoSettingsRepository::find_by_path(pool, path).await.ok().flatten();
+
+    /* 3. Construir SeoMeta */
+    let meta = if let Some(ref setting) = db_setting {
+        SeoMeta {
+            title: setting.title.clone(),
+            description: setting.description.clone(),
+            og_image: setting.og_image_url.clone(),
+            canonical: canonical.to_string(),
+            og_type: "website",
+        }
+    } else {
+        hardcoded_fallback(path, canonical)?
+    };
+
+    /* 4. Guardar en cache */
+    {
+        let mut entries = cache.entries.write().await;
+        entries.insert(path.to_string(), CachedSeoEntry {
+            meta: SeoMeta {
+                title: meta.title.clone(),
+                description: meta.description.clone(),
+                og_image: meta.og_image.clone(),
+                canonical: meta.canonical.clone(),
+                og_type: meta.og_type,
+            },
+            fetched_at: Instant::now(),
+        });
+    }
+
+    Some(meta)
+}
+
+/* Fallback hardcoded para cuando la migración seo_settings no se ha aplicado */
+fn hardcoded_fallback(path: &str, canonical: &str) -> Option<SeoMeta> {
+    let (title, description) = match path {
+        "/" => ("Nakomi Studio — Agencia Creativa Digital", "Estudio creativo basado en Copenhague. Diseño web, apps e IA construidos con Rust para rendimiento real."),
+        "/servicios" => ("Nuestros Servicios — Nakomi Studio", "Servicios de desarrollo web, diseño UI/UX, branding y soluciones digitales a medida."),
+        "/proyectos" => ("Nuestros Proyectos y Casos de Éxito — Nakomi Studio", "Explora nuestros proyectos y casos de éxito en desarrollo web, diseño digital y soluciones de software."),
+        "/nosotros" => ("Sobre Nosotros — Nakomi Studio", "Conoce al equipo de Nakomi Studio: diseñadores y desarrolladores basados en Copenhague, especializados en web, apps e IA."),
+        "/soluciones/hosting" => ("Hosting Administrado — Nakomi Studio", "Hosting web administrado con SSL, backups automáticos y soporte técnico."),
+        "/soluciones/hosting-wordpress" => ("Hosting WordPress — Nakomi Studio", "WordPress hosting optimizado con WP-CLI, backups automáticos y soporte experto."),
+        "/soluciones/vps" => ("Servidores VPS — Nakomi Studio", "Servidores VPS dedicados con acceso root, bootstrap inicial y precios transparentes."),
+        "/blog" => ("Blog — Nakomi Studio", "Artículos sobre desarrollo web, diseño, tecnología e inteligencia artificial."),
+        "/contacto" => ("Contacto — Nakomi Studio", "Contacta con Nakomi Studio para tu proyecto web, app o solución digital."),
+        "/politica-privacidad" => ("Política de Privacidad — Nakomi Studio", "Política de privacidad y protección de datos de Nakomi Studio."),
+        _ => return None,
+    };
+    Some(SeoMeta {
+        title: title.into(),
+        description: description.into(),
+        og_image: None,
+        canonical: canonical.to_string(),
+        og_type: "website",
+    })
 }
 
 /* Rutas dinámicas: /servicios/:slug y /proyectos/:slug consultan la BD */
@@ -426,8 +475,8 @@ pub async fn prerender(
         return next.run(request).await;
     };
 
-    /* Resolver meta SEO para esta ruta */
-    let Some(meta) = resolve_seo_meta(path, &state.pool, &state.app_url).await else {
+    /* Resolver meta SEO para esta ruta (con cache DB para estáticas) */
+    let Some(meta) = resolve_seo_meta(path, &state.pool, &state.app_url, &state.seo_cache).await else {
         /* Ruta desconocida: el SPA se encarga */
         return next.run(request).await;
     };
