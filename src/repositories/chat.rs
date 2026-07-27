@@ -135,10 +135,29 @@ impl ChatRepository {
         .await
     }
 
-    /// Todas las sesiones con historial (panel staff).
+    /// Sesiones activas con historial (panel staff).
+    /// [277A-4] Solo sesiones no cerradas. Las cerradas se cargan bajo demanda
+    /// mediante list_all_sessions_incl_archived() para no hidratar todo el
+    /// historial en cada reconexión de admin.
     pub async fn list_sessions(pool: &PgPool) -> Result<Vec<ChatSession>, sqlx::Error> {
         /* [074A-30] Filtrar sesiones sin mensajes — no tiene sentido mostrarlas.
-         * [237A-5] Las cerradas forman el archivo auditable y no se ocultan. */
+         * [277A-4] Solo sesiones activas/open para reducir carga en WS admin. */
+        sqlx::query_as::<_, ChatSession>(
+            "SELECT id, visitor_id, visitor_name, user_id, order_id, status, \
+               assigned_staff_id, ai_enabled, created_at, updated_at, \
+               visitor_ip, visitor_user_agent, last_viewed_at, visitor_last_connected_at, \
+               visitor_country, is_escalated \
+             FROM chat_sessions \
+             WHERE status != 'closed' \
+             AND EXISTS (SELECT 1 FROM chat_messages WHERE session_id = chat_sessions.id) \
+             ORDER BY updated_at DESC",
+        )
+        .fetch_all(pool)
+        .await
+    }
+
+    /// Todas las sesiones incluyendo archivadas (para búsqueda/admin).
+    pub async fn list_all_sessions_incl_archived(pool: &PgPool) -> Result<Vec<ChatSession>, sqlx::Error> {
         sqlx::query_as::<_, ChatSession>(
             "SELECT id, visitor_id, visitor_name, user_id, order_id, status, \
                assigned_staff_id, ai_enabled, created_at, updated_at, \

@@ -230,11 +230,43 @@ ROUTES (REST — montadas bajo /api)
 /* [237A-7j] Canje de token de continuación de chat.
  * Endpoint público (sin JWT): el visitante llega desde un enlace de email.
  * Valida el token, lo marca como usado y retorna session_id + visitor_id
- * para que el frontend pueda reconectar al widget con la sesión original. */
+ * para que el frontend pueda reconectar al widget con la sesión original.
+ * [277A-5] Rate limiting por IP: máximo 5 intentos por minuto por IP.
+ * Tokens de 64 hex chars tienen 256 bits de entropía, pero rate limiting
+ * previene abuso y fuerza bruta. */
 pub async fn claim_continuation_token(
     State(state): State<AppState>,
+    axum::extract::ConnectInfo(addr): axum::extract::ConnectInfo<std::net::SocketAddr>,
     Json(req): Json<JsonValue>,
 ) -> Result<Json<ContinuationClaimResponse>, AppError> {
+    /* [277A-5] Rate limit por IP: 5 intentos/min */
+    {
+        use std::collections::HashMap;
+        use std::sync::LazyLock;
+        use std::time::Instant;
+        use tokio::sync::Mutex;
+
+        static CLAIM_RATE_MAP: LazyLock<Mutex<HashMap<std::net::IpAddr, (u32, Instant)>>> =
+            LazyLock::new(|| Mutex::new(HashMap::new()));
+
+        let ip = addr.ip();
+        let now = Instant::now();
+        let mut map = CLAIM_RATE_MAP.lock().await;
+        let entry = map.entry(ip).or_insert((0, now));
+
+        if now.duration_since(entry.1) >= std::time::Duration::from_secs(60) {
+            *entry = (1, now);
+        } else {
+            entry.0 += 1;
+            if entry.0 > 5 {
+                tracing::warn!("[continuation-claim] Rate limit excedido para IP {ip}");
+                return Err(AppError::BadRequest(
+                    "Demasiados intentos. Espera un minuto.".into(),
+                ));
+            }
+        }
+    }
+
     let token = req["token"]
         .as_str()
         .ok_or_else(|| AppError::Validation("token es requerido".into()))?;

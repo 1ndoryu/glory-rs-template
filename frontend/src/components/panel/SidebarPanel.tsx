@@ -7,8 +7,8 @@
 import React, {useState, useCallback, useRef} from 'react';
 import {useQuery} from '@tanstack/react-query';
 import {useTranslation} from 'react-i18next';
-import {FolderOpen, Receipt, User, CreditCard, ClipboardList, PackageOpen, ArrowRightLeft, MessageSquare, RotateCcw, UserCog, Server, Settings, FileEdit, AlertTriangle, Wallet, Banknote, Menu, Network, Globe, Mail, ReceiptText} from 'lucide-react';
-import { useClickOutside } from '../../hooks/useClickOutside';
+import {FolderOpen, Receipt, User, CreditCard, ClipboardList, PackageOpen, ArrowRightLeft, MessageSquare, RotateCcw, UserCog, Server, Settings, FileEdit, AlertTriangle, Wallet, Banknote, Menu, Network, Globe, Mail, ReceiptText} from 'lucide-react';import {useClickOutside} from '../../hooks/useClickOutside';
+import {useNotifications} from '../../hooks/useNotifications';
 import {obtenerTabsPorRol, type SeccionPanel} from '../../data/panel';
 import {useCurrentProfile} from '../../hooks/useCurrentProfile';
 import {useAuthStore} from '../../stores/authStore';
@@ -82,19 +82,10 @@ export const SidebarPanel: React.FC<SidebarPanelProps> = ({seccionActiva, onCamb
     });
     const pendingBillingCount = billingItems.filter(item => item.status === 'pending').length;
 
-    /* [237A-7d] Badge de mensajes no leídos: lee del cache de React Query
-     * que se actualiza via WS global (AuthenticatedNotificationRuntime). */
-    const { data: unreadNotifData } = useQuery<
-        { count: number },
-        unknown,
-        { count: number },
-        readonly ['notifications', 'unread']
-    >({
-        queryKey: ['notifications', 'unread'] as const,
-        enabled: false,
-        staleTime: Infinity,
-    });
-    const unreadNotifCount = unreadNotifData?.count ?? 0;
+    /* [277A-2] Badge de notificaciones: usa useNotifications() que hace fetch
+     * REST inicial + polling 30s + actualización via WS. Antes usaba un query
+     * con enabled=false que nunca cargaba el conteo al recargar la página. */
+    const { unreadCount: unreadNotifCount } = useNotifications();
 
     /* [114A-9] Nav inferior móvil: muestra 4 items + botón "Más" para overflow */
     const MAX_BOTTOM_NAV = 4;

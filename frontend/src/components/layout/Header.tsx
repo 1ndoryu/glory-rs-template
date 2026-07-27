@@ -8,7 +8,7 @@
  * [054A-19] Lógica extraída a useHeader (SRP). Links internos usan GloryLink.
  * [064A-61] Menú móvil rediseñado: overlay modal centrado, soporte submenús,
  * botón volver, acciones inline. accionCabecera oculto en mobile via CSS. */
-import React, {useState} from 'react';
+import React, {useState, lazy, Suspense} from 'react';
 import {useQuery} from '@tanstack/react-query';
 import {useTranslation} from 'react-i18next';
 import {ChevronDown, ChevronRight, ArrowLeft, Menu, X, LogOut} from 'lucide-react';
@@ -26,6 +26,9 @@ import OptimizedImage from '../ui/OptimizedImage';
 import {useHeader} from '../../hooks/useHeader';
 import {AppLauncher} from './AppLauncher';
 import '../../styles/header.css';
+
+/* [277A-1] NotificationBell en header público: admin ve badge fuera del panel */
+const NotificationBell = lazy(() => import('../panel/NotificationBell'));
 
 /* [044A-2] Mapeo de labels estáticos (español) a claves i18n.
  * navegacion.ts mantiene los labels originales como keys de referencia. */
@@ -62,6 +65,7 @@ export const Header: React.FC = () => {
     const hrefAccion = logueado ? (enPanel ? '/' : '/panel') : null;
 
     /* [074A-22] Avatar con dropdown para cerrar sesión */
+    const authUser = useAuthStore(s => s.user);
     const logout = useAuthStore(s => s.logout);
     const {avatarUrl} = useCurrentProfile();
     const [perfilAbierto, setPerfilAbierto] = useState(false);
@@ -143,6 +147,12 @@ export const Header: React.FC = () => {
                 <div className="accionCabecera" role="group" aria-label={t('accessibility.user_actions')}>
                     {logueado ? (
                         <>
+                            {/* [277A-1] Campana de notificaciones para admin fuera del panel */}
+                            {authUser?.role === 'admin' && (
+                                <Suspense fallback={null}>
+                                    <NotificationBell />
+                                </Suspense>
+                            )}
                             {/* [074A-22] Navegación Panel/Volver (solo navegación, sin logout) */}
                             <GloryLink to={hrefAccion!} className="enlaceAcceder">
                                 {textoAccion}
