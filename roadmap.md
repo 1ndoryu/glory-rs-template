@@ -98,21 +98,34 @@ Lo siguiente está **confirmado en el código fuente actual** (no solo declarado
 | Rate limiting continuation claim | 5 intentos/min por IP con LazyLock<Mutex<HashMap>> | `src/handlers/chat/rest.rs` |
 | **Watchdog doble señal** | Heartbeat + HTTP probe loopback, umbral 120s, grace 60s | `glory-rs/backend/src/runtime/watchdog.rs`, `src/main.rs` |
 | **Pagos/reembolsos (Fase F+G)** | Idempotency keys, retry con backoff, constraint único, validación monto | 9 archivos (ver 277A-7) |
+| **SEO audit 404** | Ruta duplicada `/api/api/admin/seo/audit` → `/admin/seo/audit` | `src/handlers/admin_seo.rs` |
+| **SEO: hreflang incorrecto** | Eliminado — apuntaba misma URL para todos los idiomas | `frontend/src/components/seo/SEOHead.tsx` |
+| **SEO: dateModified blog** | Pasar `updated_at` del hook al `blogPostSchema()` | `useBlogSingle.ts`, `BlogSingleIsland.tsx` |
+| **SEO: FAQ schema hosting/VPS** | FAQPage schema con 4 preguntas por tipo de hosting/VPS | `SolucionHostingIsland.tsx`, `SolucionVpsIsland.tsx` |
+| **SEO: descuento 50% backend** | `first_order_discount_percent` ya implementado en `order.rs` | Verificado en código |
 
 ---
 
 ## ⚠️ Pendiente funcional (medio/alto)
 
-### 4. Reembolso: verificar UI frontend
-
-**Problema:** El `prompt()` no se encontró en código fuente. El handler ya acepta JSON con `reason` y `admin_response`.
-**Acción:** Verificar que el frontend muestra un modal proper (no prompt nativo) para solicitudes de reembolso.
-**Esfuerzo:** ~1-2h.
-
-### 5. Pagos/reembolsos — migración pendiente en producción
+### 4. Pagos/reembolsos — migración pendiente en producción
 
 **Estado:** Código implementado y commiteado (277A-7). **Requiere deploy** para aplicar la migración SQL.
 **Incluye:** Idempotency-Key en Stripe, retry de reembolsos con backoff exponencial (1h→4h→16h→64h→72h cap), constraint único de pago activo por orden, validación de monto en checkout webhook, recovery de refunds stuck en Processing (>30min).
+
+### 5. SEO: frontend descuento 50% (banner + badge)
+
+**Estado:** Backend ya implementado (`first_order_discount_percent` en `order.rs`). Falta:
+- Banner en checkout: "50% OFF en tu primer servicio"
+- Badge en cards de planes del sitio público
+- Endpoint API para que el frontend consulte si califica (~30min)
+**Esfuerzo:** ~2-3h.
+
+### 6. SEO: breadcrumbSchema en páginas de detalle
+
+**Estado:** Schema definido en `schemas.ts` pero no integrado en ninguna página.
+**Páginas:** `/servicios/:slug`, `/proyectos/:slug`, `/blog/:slug`, `/soluciones/hosting`, `/soluciones/vps`
+**Esfuerzo:** ~2-3h.
 
 ---
 
