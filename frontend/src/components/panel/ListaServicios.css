@@ -137,14 +137,15 @@
     opacity: 0.7;
 }
 
-/* Menú contextual por fila (acciones individuales) */
-.listaServiciosFila .listaServiciosAcciones {
+/* Menú contextual por fila — usa clase separada listaServiciosMenu
+ * para no colisionar con listaServiciosAcciones (barra superior). */
+.listaServiciosMenu {
     flex-shrink: 0;
     opacity: 0;
     transition: opacity 0.2s;
 }
 
-.listaServiciosFila:hover .listaServiciosAcciones {
+.listaServiciosFila:hover .listaServiciosMenu {
     opacity: 1;
 }
 

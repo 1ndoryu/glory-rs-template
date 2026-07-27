@@ -133,7 +133,7 @@ function FilaServicio({
                 </span>
             </div>
 
-            <div className="listaServiciosAcciones" onClick={e => e.stopPropagation()}>
+            <div className="listaServiciosMenu" onClick={e => e.stopPropagation()}>
                 <MenuContextual
                     abierto={menuActivo === svc.id}
                     onToggle={() => setMenuActivo(prev => prev === svc.id ? null : svc.id)}

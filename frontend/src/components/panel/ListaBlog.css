@@ -165,14 +165,15 @@
     opacity: 0.7;
 }
 
-/* Menú contextual por fila (acciones individuales) */
-.listaBlogFila .listaBlogAcciones {
+/* Menú contextual por fila — usa clase separada listaBlogMenu
+ * para no colisionar con listaBlogAcciones (barra superior). */
+.listaBlogMenu {
     flex-shrink: 0;
     opacity: 0;
     transition: opacity 0.2s;
 }
 
-.listaBlogFila:hover .listaBlogAcciones {
+.listaBlogFila:hover .listaBlogMenu {
     opacity: 1;
 }
 

@@ -89,14 +89,15 @@
     color: var(--text-tertiary);
 }
 
-/* Menú contextual por fila (acciones individuales) */
-.equipoListaFila .equipoListaAcciones {
+/* Menú contextual por fila — usa clase separada equipoListaMenu
+ * para no colisionar con equipoListaAcciones (barra superior). */
+.equipoListaMenu {
     flex-shrink: 0;
     opacity: 0;
     transition: opacity 0.2s;
 }
 
-.equipoListaFila:hover .equipoListaAcciones {
+.equipoListaFila:hover .equipoListaMenu {
     opacity: 1;
 }
 

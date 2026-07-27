@@ -147,7 +147,7 @@ function FilaBlogPost({
                 )}
             </div>
 
-            <div className="listaBlogAcciones" onClick={e => e.stopPropagation()}>
+            <div className="listaBlogMenu" onClick={e => e.stopPropagation()}>
                 <MenuContextual
                     abierto={menuActivo === post.id}
                     onToggle={() => setMenuActivo(prev => prev === post.id ? null : post.id)}

@@ -84,7 +84,7 @@ export const ListaEquipo: React.FC<ListaEquipoProps> = ({miembros, cargando, onE
                             <span className="equipoListaOrden">#{m.sort_order}</span>
                         </div>
 
-                        <div className="equipoListaAcciones" onClick={e => e.stopPropagation()}>
+                        <div className="equipoListaMenu" onClick={e => e.stopPropagation()}>
                             <MenuContextual
                                 abierto={menuActivo === m.id}
                                 onToggle={() => setMenuActivo(prev => prev === m.id ? null : m.id)}
