@@ -50,14 +50,16 @@ impl SeoSettingsRepository {
         title: &str,
         description: &str,
         og_image_url: Option<&str>,
+        json_ld_type: Option<&str>,
     ) -> Result<SeoSetting, sqlx::Error> {
         sqlx::query_as::<_, SeoSetting>(
-            "INSERT INTO seo_settings (path, label, title, description, og_image_url)
-             VALUES ($1, $1, $2, $3, $4)
+            "INSERT INTO seo_settings (path, label, title, description, og_image_url, json_ld_type)
+             VALUES ($1, $1, $2, $3, $4, $5)
              ON CONFLICT (path) DO UPDATE SET
                  title = EXCLUDED.title,
                  description = EXCLUDED.description,
                  og_image_url = EXCLUDED.og_image_url,
+                 json_ld_type = EXCLUDED.json_ld_type,
                  updated_at = NOW()
              RETURNING path, label, title, description, og_image_url, json_ld_type, updated_at",
         )
@@ -65,6 +67,7 @@ impl SeoSettingsRepository {
         .bind(title)
         .bind(description)
         .bind(og_image_url)
+        .bind(json_ld_type)
         .fetch_one(pool)
         .await
     }

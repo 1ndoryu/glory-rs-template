@@ -71,6 +71,7 @@ export interface UpdateSeoSettingBody {
     title: string;
     description: string;
     og_image_url?: string | null;
+    json_ld_type?: string | null;
 }
 
 export async function apiGetSeoSettings(): Promise<SeoSetting[]> {

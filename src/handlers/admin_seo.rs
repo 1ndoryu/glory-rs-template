@@ -361,6 +361,7 @@ struct UpdateSeoSettingBody {
     title: String,
     description: String,
     og_image_url: Option<String>,
+    json_ld_type: Option<String>,
 }
 
 /* [277A-13] PUT /api/admin/seo/settings?path=/ruta — actualiza un SEO setting */
@@ -379,6 +380,7 @@ async fn update_seo_setting(
         &body.title,
         &body.description,
         body.og_image_url.as_deref(),
+        body.json_ld_type.as_deref(),
     ).await?;
     Ok(Json(setting))
 }

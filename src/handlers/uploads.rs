@@ -3,8 +3,9 @@
  * Solo admin. Whitelist MIME para imágenes. Max 5 MB. */
 
 use axum::extract::{DefaultBodyLimit, Multipart, State};
-use axum::routing::post;
+use axum::routing::{get, post};
 use axum::{Json, Router};
+use serde::Serialize;
 use std::path::PathBuf;
 use tokio::fs;
 use uuid::Uuid;
@@ -25,10 +26,18 @@ const ALLOWED_IMAGE_MIMES: &[&str] = &[
     "image/svg+xml",
 ];
 
-#[derive(serde::Serialize, utoipa::ToSchema)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct UploadResponse {
     pub url: String,
     pub file_name: String,
+}
+
+/* [277A-18] Entrada para listado de uploads existentes */
+#[derive(Serialize)]
+pub struct UploadEntry {
+    pub url: String,
+    pub file_name: String,
+    pub size_bytes: u64,
 }
 
 /// Upload de imagen para CMS (admin-only)
@@ -112,11 +121,49 @@ pub async fn upload_image(
     }))
 }
 
+/* [277A-18] GET /api/admin/uploads — lista imágenes subidas en uploads/content/ */
+async fn list_uploads(auth: AuthUser) -> Result<Json<Vec<UploadEntry>>, AppError> {
+    auth.require_role(&[UserRole::Admin])?;
+
+    let upload_path = PathBuf::from(UPLOAD_DIR);
+    if !upload_path.exists() {
+        return Ok(Json(vec![]));
+    }
+
+    let mut entries: Vec<UploadEntry> = Vec::new();
+    let mut dir = fs::read_dir(&upload_path)
+        .await
+        .map_err(|e| AppError::Internal(format!("Error leyendo directorio: {e}")))?;
+
+    while let Some(entry) = dir.next_entry().await.map_err(|e| AppError::Internal(format!("Error leyendo entrada: {e}")))? {
+        let metadata = entry.metadata().await.ok();
+        let name = entry.file_name().to_string_lossy().to_string();
+        /* Solo incluir archivos de imagen por extensión */
+        let ext = name.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
+        if !matches!(ext.as_str(), "jpg" | "jpeg" | "png" | "webp" | "gif" | "svg") {
+            continue;
+        }
+        let size = metadata.map(|m| m.len()).unwrap_or(0);
+        entries.push(UploadEntry {
+            url: format!("/{UPLOAD_DIR}/{name}"),
+            file_name: name,
+            size_bytes: size,
+        });
+    }
+
+    /* Ordenar por nombre (más recientes primero si usan UUID) */
+    entries.sort_by(|a, b| b.file_name.cmp(&a.file_name));
+    /* Limitar a 50 imágenes */
+    entries.truncate(50);
+
+    Ok(Json(entries))
+}
+
 /* [204A-15] DefaultBodyLimit de 5 MB para que axum no rechace antes del handler.
  * Sin esto, axum limita a 2 MB por defecto y devuelve 400 silencioso. */
 #[allow(clippy::cast_possible_truncation)] /* 5 MB: safe on all platforms */
 pub fn routes() -> Router<AppState> {
     Router::new()
-        .route("/admin/uploads", post(upload_image))
+        .route("/admin/uploads", get(list_uploads).post(upload_image))
         .layer(DefaultBodyLimit::max(MAX_IMAGE_SIZE as usize))
 }
