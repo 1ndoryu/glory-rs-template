@@ -1,0 +1,26 @@
+/* [277A-22] Estilos compartidos para todas las listas del panel CMS.
+ * Elimina duplicación de listaProyectosAcciones, listaServiciosAcciones,
+ * listaBlogAcciones, equipoListaAcciones — todos hacían lo mismo.
+ *
+ * Barra superior: búsqueda + botón crear.
+ * Menú contextual: acciones por fila (editar, eliminar) que aparecen en hover. */
+
+/* Barra de acciones superior (búsqueda + botón crear) */
+.listaBarraAcciones {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    width: 100%;
+    justify-content: space-between;
+}
+
+/* Menú contextual por fila (aparece en hover) */
+.listaMenuContextual {
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.listaFila:hover .listaMenuContextual {
+    opacity: 1;
+}

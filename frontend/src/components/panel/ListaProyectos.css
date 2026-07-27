@@ -14,14 +14,7 @@
     font-size: var(--text-sm);
 }
 
-/* listaProyectosAcciones: búsqueda + botón crear. */
-.listaProyectosAcciones {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    width: 100%;
-    justify-content: space-between;
-}
+/* listaProyectosAcciones → ahora usa .listaBarraAcciones de ListaShared.css */
 
 /* [124A-CMS3] Lista vertical (antes era grid) */
 .listaProyectosLista {
@@ -159,18 +152,7 @@
     opacity: 0.7;
 }
 
-/* Falso positivo (css-especificacion-diseno-local): solo layout/behavior
- * (flex-shrink, opacity, transition) para show/hover del menú contextual.
- * No define colores, tipografía ni espaciado visual. */
-.listaProyectosMenu {
-    flex-shrink: 0;
-    opacity: 0;
-    transition: opacity 0.2s;
-}
-
-.listaProyectosFila:hover .listaProyectosMenu {
-    opacity: 1;
-}
+/* listaProyectosMenu → ahora usa .listaMenuContextual de ListaShared.css */
 
 /* Responsive */
 @media (max-width: 640px) {

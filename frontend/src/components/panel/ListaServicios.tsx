@@ -27,6 +27,7 @@ import OptimizedImage from '../ui/OptimizedImage';
 import {MenuContextual, type MenuContextualItem} from '../ui/ContextMenu';
 import {useBusquedaLista} from '../../hooks/useBusquedaLista';
 import type {AdminService} from '../../api/admin-services';
+import './ListaShared.css';
 import './ListaServicios.css';
 
 interface ListaServiciosProps {
@@ -104,7 +105,7 @@ function FilaServicio({
         <div
             ref={setNodeRef}
             style={style}
-            className={`listaServiciosFila ${!svc.is_active ? 'listaServiciosFila--inactivo' : ''}`}
+            className={`listaFila listaServiciosFila ${!svc.is_active ? 'listaServiciosFila--inactivo' : ''}`}
         >
             <div className="listaServiciosGrip" {...attributes} {...listeners}>
                 <GripVertical size={16} />
@@ -133,7 +134,7 @@ function FilaServicio({
                 </span>
             </div>
 
-            <div className="listaServiciosMenu" onClick={e => e.stopPropagation()}>
+            <div className="listaMenuContextual" onClick={e => e.stopPropagation()}>
                 <MenuContextual
                     abierto={menuActivo === svc.id}
                     onToggle={() => setMenuActivo(prev => prev === svc.id ? null : svc.id)}
@@ -186,7 +187,7 @@ export const ListaServicios: React.FC<ListaServiciosProps> = ({
 
     return (
         <div className="listaServicios">
-            <div className="listaServiciosAcciones">
+            <div className="listaBarraAcciones">
                 <div className="listaBusqueda">
                     <Search size={14} className="listaBusquedaIcono" />
                     <Input

@@ -11,6 +11,7 @@ import {Input} from '../ui/Input';
 import OptimizedImage from '../ui/OptimizedImage';
 import {MenuContextual, type MenuContextualItem} from '../ui/ContextMenu';
 import {useBusquedaLista} from '../../hooks/useBusquedaLista';
+import './ListaShared.css';
 import './ListaEquipo.css';
 
 interface ListaEquipoProps {
@@ -35,7 +36,7 @@ export const ListaEquipo: React.FC<ListaEquipoProps> = ({miembros, cargando, onE
 
     return (
         <div className="equipoListaContenedor">
-            <div className="equipoListaAcciones">
+            <div className="listaBarraAcciones">
                 <div className="listaBusqueda">
                     <Search size={14} className="listaBusquedaIcono" />
                     <Input
@@ -66,7 +67,7 @@ export const ListaEquipo: React.FC<ListaEquipoProps> = ({miembros, cargando, onE
                 }
 
                 return (
-                    <article key={m.id} className="equipoListaFila">
+                    <article key={m.id} className="listaFila equipoListaFila">
                         <div className="equipoListaAvatar">
                             {m.avatar && <OptimizedImage src={m.avatar} alt={m.name} loading="lazy" />}
                         </div>
@@ -84,7 +85,7 @@ export const ListaEquipo: React.FC<ListaEquipoProps> = ({miembros, cargando, onE
                             <span className="equipoListaOrden">#{m.sort_order}</span>
                         </div>
 
-                        <div className="equipoListaMenu" onClick={e => e.stopPropagation()}>
+                        <div className="listaMenuContextual" onClick={e => e.stopPropagation()}>
                             <MenuContextual
                                 abierto={menuActivo === m.id}
                                 onToggle={() => setMenuActivo(prev => prev === m.id ? null : m.id)}

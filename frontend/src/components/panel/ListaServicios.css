@@ -14,12 +14,7 @@
     font-size: var(--text-sm);
 }
 
-/* listaServiciosAcciones: búsqueda + botón crear. */
-.listaServiciosAcciones {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-}
+/* listaServiciosAcciones → ahora usa .listaBarraAcciones de ListaShared.css */
 
 /* [124A-CMS7] Lista vertical */
 .listaServiciosLista {
@@ -137,17 +132,7 @@
     opacity: 0.7;
 }
 
-/* Menú contextual por fila — usa clase separada listaServiciosMenu
- * para no colisionar con listaServiciosAcciones (barra superior). */
-.listaServiciosMenu {
-    flex-shrink: 0;
-    opacity: 0;
-    transition: opacity 0.2s;
-}
-
-.listaServiciosFila:hover .listaServiciosMenu {
-    opacity: 1;
-}
+/* Menú contextual → ahora usa .listaMenuContextual de ListaShared.css */
 
 /* Responsive */
 @media (max-width: 640px) {

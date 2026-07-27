@@ -14,12 +14,7 @@
     font-size: var(--text-sm);
 }
 
-/* listaBlogAcciones: búsqueda + botón crear. */
-.listaBlogAcciones {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-}
+/* listaBlogAcciones → ahora usa .listaBarraAcciones de ListaShared.css */
 
 /* [124A-CMS7] Lista vertical */
 .listaBlogLista {
@@ -165,17 +160,7 @@
     opacity: 0.7;
 }
 
-/* Menú contextual por fila — usa clase separada listaBlogMenu
- * para no colisionar con listaBlogAcciones (barra superior). */
-.listaBlogMenu {
-    flex-shrink: 0;
-    opacity: 0;
-    transition: opacity 0.2s;
-}
-
-.listaBlogFila:hover .listaBlogMenu {
-    opacity: 1;
-}
+/* Menú contextual → ahora usa .listaMenuContextual de ListaShared.css */
 
 /* Responsive */
 @media (max-width: 640px) {

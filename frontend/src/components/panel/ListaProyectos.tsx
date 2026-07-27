@@ -27,6 +27,7 @@ import OptimizedImage from '../ui/OptimizedImage';
 import { MenuContextual, type MenuContextualItem } from '../ui/ContextMenu';
 import { useBusquedaLista } from '../../hooks/useBusquedaLista';
 import type { AdminProject } from '../../api/admin-projects';
+import './ListaShared.css';
 import './ListaProyectos.css';
 
 interface ListaProyectosProps {
@@ -107,7 +108,7 @@ function FilaProyecto({
         <div
             ref={setNodeRef}
             style={style}
-            className={`listaProyectosFila ${proyecto.status === 'archived' ? 'listaProyectosFila--inactivo' : ''}`}
+            className={`listaFila listaProyectosFila ${proyecto.status === 'archived' ? 'listaProyectosFila--inactivo' : ''}`}
         >
             <div className="listaProyectosGrip" {...attributes} {...listeners}>
                 <GripVertical size={16} />
@@ -146,7 +147,7 @@ function FilaProyecto({
                 )}
             </div>
 
-            <div className="listaProyectosMenu" onClick={e => e.stopPropagation()}>
+            <div className="listaMenuContextual" onClick={e => e.stopPropagation()}>
                 <MenuContextual
                     abierto={menuActivo === proyecto.id}
                     onToggle={() => setMenuActivo(prev => prev === proyecto.id ? null : proyecto.id)}
@@ -201,7 +202,7 @@ export const ListaProyectos: React.FC<ListaProyectosProps> = ({
 
     return (
         <div className="listaProyectos">
-            <div className="listaProyectosAcciones">
+            <div className="listaBarraAcciones">
                 <div className="listaBusqueda">
                     <Search size={14} className="listaBusquedaIcono" />
                     <Input

@@ -27,6 +27,7 @@ import OptimizedImage from '../ui/OptimizedImage';
 import {MenuContextual, type MenuContextualItem} from '../ui/ContextMenu';
 import {useBusquedaLista} from '../../hooks/useBusquedaLista';
 import type {AdminBlogPost} from '../../api/admin-blog';
+import './ListaShared.css';
 import './ListaBlog.css';
 
 interface ListaBlogProps {
@@ -105,7 +106,7 @@ function FilaBlogPost({
         <div
             ref={setNodeRef}
             style={style}
-            className={`listaBlogFila ${post.status === 'archived' ? 'listaBlogFila--inactivo' : ''}`}
+            className={`listaFila listaBlogFila ${post.status === 'archived' ? 'listaBlogFila--inactivo' : ''}`}
         >
             <div className="listaBlogGrip" {...attributes} {...listeners}>
                 <GripVertical size={16} />
@@ -147,7 +148,7 @@ function FilaBlogPost({
                 )}
             </div>
 
-            <div className="listaBlogMenu" onClick={e => e.stopPropagation()}>
+            <div className="listaMenuContextual" onClick={e => e.stopPropagation()}>
                 <MenuContextual
                     abierto={menuActivo === post.id}
                     onToggle={() => setMenuActivo(prev => prev === post.id ? null : post.id)}
@@ -200,7 +201,7 @@ export const ListaBlog: React.FC<ListaBlogProps> = ({
 
     return (
         <div className="listaBlog">
-            <div className="listaBlogAcciones">
+            <div className="listaBarraAcciones">
                 <div className="listaBusqueda">
                     <Search size={14} className="listaBusquedaIcono" />
                     <Input

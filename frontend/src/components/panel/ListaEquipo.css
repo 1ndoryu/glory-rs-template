@@ -7,10 +7,7 @@
     gap: var(--spacing-md);
 }
 
-.equipoListaAcciones {
-    display: flex;
-    justify-content: flex-end;
-}
+/* equipoListaAcciones → ahora usa .listaBarraAcciones de ListaShared.css */
 
 .equipoListaCargando,
 .equipoListaVacia {
@@ -89,17 +86,7 @@
     color: var(--text-tertiary);
 }
 
-/* Menú contextual por fila — usa clase separada equipoListaMenu
- * para no colisionar con equipoListaAcciones (barra superior). */
-.equipoListaMenu {
-    flex-shrink: 0;
-    opacity: 0;
-    transition: opacity 0.2s;
-}
-
-.equipoListaFila:hover .equipoListaMenu {
-    opacity: 1;
-}
+/* Menú contextual → ahora usa .listaMenuContextual de ListaShared.css */
 
 /* Responsive */
 @media (max-width: 640px) {
