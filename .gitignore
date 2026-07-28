@@ -46,8 +46,6 @@ glory-rust-template.code-workspace
 .sentinel-report.md
 .cargo/config.toml
 
-glory-rs/
-
 backups/
 
 # Locks de procesos en runtime (estado volatile, no versionar)
