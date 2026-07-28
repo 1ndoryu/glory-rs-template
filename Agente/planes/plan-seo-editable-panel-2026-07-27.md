@@ -1,4 +1,4 @@
-# Plan: SEO Editable — Panel con Acciones + DB-backed Settings
+ha# Plan: SEO Editable — Panel con Acciones + DB-backed Settings
 
 > **Fecha:** 2026-07-27
 > **Objetivo:** Que todo el contenido SEO estático sea editable desde el panel admin, que el prerender lea de la DB, y que no haya problemas de SEO en contenido estático.
