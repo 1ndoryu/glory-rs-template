@@ -24,6 +24,10 @@ desktop.ini
 
 # Logs
 *.log
+/logs/
+
+# Local runtime scratch space
+/temp/
 
 # Python local envs / caches
 **/.venv/
