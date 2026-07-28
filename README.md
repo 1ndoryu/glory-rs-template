@@ -34,9 +34,10 @@ Pensado para máxima velocidad de desarrollo, seguridad por defecto y escalabili
 ## Inicio rápido
 
 ```bash
-# 1. Clonar y configurar
-git clone https://github.com/1ndoryu/glory-rs.git
-cd glory-rs
+# 1. Clonar el proyecto con el framework fijado
+git clone --recurse-submodules --branch glory-rust-nakomi https://github.com/1ndoryu/glory-rs-template.git nakomi
+cd nakomi
+git submodule update --init --recursive
 cp .env.example .env
 # Editar .env con tus credenciales de PostgreSQL
 

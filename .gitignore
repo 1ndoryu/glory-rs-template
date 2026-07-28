@@ -40,8 +40,7 @@ frontend/openapi-debug.json
 /App/React/
 /App/logs/
 
-# Submodule / build artifacts
-/glory-rs/
+# Build artifacts
 .sentinel-report.md
 frontend/tsconfig.tsbuildinfo
 /uploads
