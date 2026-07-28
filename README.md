@@ -34,9 +34,10 @@ Pensado para máxima velocidad de desarrollo, seguridad por defecto y escalabili
 ## Inicio rápido
 
 ```bash
-# 1. Clonar y configurar
-git clone https://github.com/1ndoryu/glory-rs.git
-cd glory-rs
+# 1. Clonar el template con el framework fijado
+git clone --recurse-submodules --branch main https://github.com/1ndoryu/glory-rs-template.git nuevo-proyecto
+cd nuevo-proyecto
+git submodule update --init --recursive
 cp .env.example .env
 # Editar .env con tus credenciales de PostgreSQL
 
