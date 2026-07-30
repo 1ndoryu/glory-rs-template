@@ -34,10 +34,7 @@ pub async fn upload_media(
 
         match name.as_str() {
             "file" => {
-                let file_name = field
-                    .file_name()
-                    .unwrap_or("upload")
-                    .to_string();
+                let file_name = field.file_name().unwrap_or("upload").to_string();
 
                 let data = field
                     .bytes()
@@ -46,10 +43,13 @@ pub async fn upload_media(
 
                 /* Limitar tamano del archivo */
                 if data.len() > MAX_FILE_SIZE {
-                    return Err(AppError::BadRequest("Archivo excede el limite de 10MB".into()));
+                    return Err(AppError::BadRequest(
+                        "Archivo excede el limite de 10MB".into(),
+                    ));
                 }
 
-                file_size = data.len() as i64;
+                file_size = i64::try_from(data.len())
+                    .map_err(|_| AppError::BadRequest("Archivo demasiado grande".into()))?;
 
                 /* Determinar tipo por extension */
                 let ext = file_name.rsplit('.').next().unwrap_or("");
@@ -123,12 +123,8 @@ pub async fn list_media(
     State(state): State<AppState>,
     Query(params): Query<MediaQueryParams>,
 ) -> Result<Json<Vec<Media>>, AppError> {
-    let media = MediaService::list(
-        &state.pool,
-        params.file_type.as_deref(),
-        params.article_id,
-    )
-    .await?;
+    let media =
+        MediaService::list(&state.pool, params.file_type.as_deref(), params.article_id).await?;
     Ok(Json(media))
 }
 

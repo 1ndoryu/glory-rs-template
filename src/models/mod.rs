@@ -1,6 +1,6 @@
 pub mod article;
-mod note;
 pub mod media;
+mod note;
 pub mod product;
 pub mod project;
 pub mod settings;

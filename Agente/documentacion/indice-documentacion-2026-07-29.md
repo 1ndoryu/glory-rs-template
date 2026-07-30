@@ -12,7 +12,7 @@
 | ¿Cómo se separan módulos, datos, seguridad y contratos? | `Agente/documentacion/arquitectura/manual-arquitectura-wandorius-2026-07-29.md` |
 | ¿Cómo debe verse y comportarse visualmente el OS?       | `Agente/documentacion/design-system/manual-identidad-visual-os-2026-07-29.md`   |
 | ¿Cómo funciona el OS en teléfonos sin duplicar apps?    | `Agente/planes/plan-experiencia-movil-launcher-2026-07-29.md`                  |
-| ¿Cómo se adopta el quality gate?                        | `Agente/planes/plan-escalabilidad-sentinel-wandorius-2026-07-29.md`             |
+| ¿Cómo funciona el quality gate?                        | `Agente/planes/completados/plan-escalabilidad-sentinel-wandorius-2026-07-29.md` |
 | ¿Qué reglas automáticas faltan?                         | `Agente/prevencion/prevencion-wandorius-sentinel-varsense-2026-07-29.md`        |
 
 ## Regla de autoridad
@@ -29,7 +29,7 @@
 - Manual de arquitectura: creado.
 - Manual visual: creado a partir del concepto aprobado y la interfaz real.
 - Plan maestro: activo; debe ejecutarse por checklist.
-- Plan Sentinel: primera implementación futura; pendiente de autorización del usuario.
+- Quality gate Sentinel/VarSense: implementado y archivado; CI y self-check usan el mismo core.
 - Plan móvil: activo y bloqueado por runtime/workspace; tablet conserva desktop.
 - Plan visual antiguo: referencia histórica del concepto aprobado.
 - Plan wandori.us original: superado; no es especificación activa.

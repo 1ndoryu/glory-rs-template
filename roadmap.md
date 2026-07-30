@@ -13,7 +13,7 @@
 - Identidad: `Agente/documentacion/design-system/manual-identidad-visual-os-2026-07-29.md`
 - Plan maestro: `Agente/planes/plan-escritorio-persistente-cuentas-admin-apps-2026-07-29.md`
 - Plan móvil: `Agente/planes/plan-experiencia-movil-launcher-2026-07-29.md`
-- Plan Sentinel: `Agente/planes/plan-escalabilidad-sentinel-wandorius-2026-07-29.md`
+- Quality gate: `Agente/planes/completados/plan-escalabilidad-sentinel-wandorius-2026-07-29.md`
 - Prevención: `Agente/prevencion/prevencion-wandorius-sentinel-varsense-2026-07-29.md`
 
 ## Estado y reglas
@@ -22,31 +22,13 @@
 - `/admin`, JWT en Web Storage, uploads públicos y comercio actual son legado.
 - Ejecutar una tarea por vez y en este orden; no saltar dependencias.
 - El plan maestro contiene checklists/gates. El roadmap conserva solo pendientes.
-- La implementación de 297A-6 está autorizada; continuar en orden hasta completar el runner y sus gates.
+- El quality gate 297A-6 está operativo; toda tarea futura debe cerrarse con `npm run task:check -- {ID}`.
 
-## Siguiente bloque en ejecución
+## Siguiente bloque habilitado
 
-**297A-6 — Quality gate Sentinel/VarSense.** Capacidades CLI, configuración y distribución completadas; sigue el runner compacto.
+**297A-7 — ADRs y seguridad inmediata.** Quality gate completado; siguen decisiones y cierre de exposición legacy.
 
 ## Pendientes ordenados
-
-### 297A-6 — Quality gate Sentinel/VarSense
-
-**Bloquea todo desarrollo posterior.**
-
-- [x] Revisar/aprobar el plan especializado y el contrato del script.
-- [x] Completar contratos CLI: ayuda/versión/schema JSON/config, severidades y exit codes fiables.
-- [x] Añadir alcance incremental a Sentinel, soporte Vanilla TS y huérfanos bloqueantes a VarSense.
-- [x] Definir distribución versionada reproducible local/CI sin rutas absolutas a repositorios hermanos.
-- [x] Implementar config canónica Sentinel/VarSense.
-- [ ] Implementar el comando único `npm run task:check -- {ID}`.
-- [ ] Integrar scope automático, cache segura, reportes Markdown/JSON, exit codes y redacción de secretos.
-- [ ] Mostrar máximo tres hallazgos y cuatro recordatorios contextuales con el próximo comando exacto.
-- [ ] Corregir baseline por rollout: seguridad → lifecycle → desktop → API/visual.
-- [ ] Integrar quality gate en self-check y CI.
-- [ ] Validar la salida con un agente de bajo contexto antes de declararla estable.
-
-**Salida:** cada tarea futura termina con una evaluación reproducible; cero errores de baseline y CI bloqueante.
 
 ### 297A-7 — ADRs y seguridad inmediata
 

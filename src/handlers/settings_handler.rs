@@ -51,7 +51,13 @@ pub async fn track_events(
         .and_then(|v| v.to_str().ok())
         .map(String::from);
 
-    AnalyticsService::track_events(&state.pool, &req.events, ip_hash.as_deref(), user_agent.as_deref()).await?;
+    AnalyticsService::track_events(
+        &state.pool,
+        &req.events,
+        ip_hash.as_deref(),
+        user_agent.as_deref(),
+    )
+    .await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -60,8 +66,8 @@ pub async fn get_analytics_stats(
     State(state): State<AppState>,
     _auth: AuthUser,
 ) -> Result<Json<AnalyticsStats>, AppError> {
-    let stats = AnalyticsService::get_stats(&state.pool).await?;
-    Ok(Json(stats))
+    let analytics = AnalyticsService::get_stats(&state.pool).await?;
+    Ok(Json(analytics))
 }
 
 pub fn routes() -> Router<AppState> {

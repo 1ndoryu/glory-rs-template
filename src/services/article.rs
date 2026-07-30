@@ -2,7 +2,10 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::errors::AppError;
-use crate::models::article::{Article, CreateArticleRequest, PaginatedArticles, UpdateArticleRequest};
+use crate::models::article::{
+    Article, CreateArticleRequest, PaginatedArticles, UpdateArticleRequest,
+};
+use crate::repositories::article::{CreateArticleParams, UpdateArticleParams};
 use crate::repositories::ArticleRepository;
 
 pub struct ArticleService;
@@ -13,13 +16,15 @@ impl ArticleService {
 
         let article = ArticleRepository::create(
             pool,
-            &req.title,
-            &slug,
-            &req.content,
-            &req.excerpt,
-            req.cover_image.as_deref(),
-            &req.status,
-            req.is_pinned,
+            CreateArticleParams {
+                title: &req.title,
+                slug: &slug,
+                content: &req.content,
+                excerpt: &req.excerpt,
+                cover_image: req.cover_image.as_deref(),
+                status: &req.status,
+                is_pinned: req.is_pinned,
+            },
         )
         .await?;
 
@@ -56,16 +61,22 @@ impl ArticleService {
         })
     }
 
-    pub async fn update(pool: &PgPool, id: Uuid, req: UpdateArticleRequest) -> Result<Article, AppError> {
+    pub async fn update(
+        pool: &PgPool,
+        id: Uuid,
+        req: UpdateArticleRequest,
+    ) -> Result<Article, AppError> {
         ArticleRepository::update(
             pool,
             id,
-            req.title.as_deref(),
-            req.content.as_ref(),
-            req.excerpt.as_deref(),
-            req.cover_image.as_deref(),
-            req.status.as_deref(),
-            req.is_pinned,
+            UpdateArticleParams {
+                title: req.title.as_deref(),
+                content: req.content.as_ref(),
+                excerpt: req.excerpt.as_deref(),
+                cover_image: req.cover_image.as_deref(),
+                status: req.status.as_deref(),
+                is_pinned: req.is_pinned,
+            },
         )
         .await?
         .ok_or_else(|| AppError::NotFound("Articulo no encontrado".into()))
@@ -83,7 +94,13 @@ impl ArticleService {
         let base = title
             .to_lowercase()
             .chars()
-            .map(|c| if c.is_alphanumeric() || c == '-' { c } else { '-' })
+            .map(|c| {
+                if c.is_alphanumeric() || c == '-' {
+                    c
+                } else {
+                    '-'
+                }
+            })
             .collect::<String>()
             .split('-')
             .filter(|s| !s.is_empty())

@@ -44,8 +44,10 @@ impl AppConfig {
                 .ok(),
             upload_dir: std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "uploads".to_string()),
             resend_api_key: std::env::var("RESEND_API_KEY").ok(),
-            email_from: std::env::var("EMAIL_FROM").unwrap_or_else(|_| "noreply@wandori.us".to_string()),
-            frontend_dist: std::env::var("FRONTEND_DIST").unwrap_or_else(|_| "frontend/dist".to_string()),
+            email_from: std::env::var("EMAIL_FROM")
+                .unwrap_or_else(|_| "noreply@wandori.us".to_string()),
+            frontend_dist: std::env::var("FRONTEND_DIST")
+                .unwrap_or_else(|_| "frontend/dist".to_string()),
         })
     }
 }

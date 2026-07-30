@@ -7,7 +7,7 @@ applyTo: '**'
 ## 1. Prioridad actual
 
 1. Leer `roadmap.md` y ejecutar solo el primer bloque habilitado.
-2. **Primero Sentinel/VarSense:** planificar y, solo tras autorización explícita del usuario, implantar el quality gate y su script unificado.
+2. **Primero Sentinel/VarSense:** cerrar cada tarea con el quality gate unificado antes de avanzar.
 3. No iniciar seguridad, runtime, workspace, móvil, programas o comercio hasta cerrar su dependencia documental/técnica.
 4. Identidad visual aprobada; cambios materiales requieren actualizar manual y aprobación visual.
 5. Deploy fuera de alcance hasta instrucción explícita.
@@ -19,7 +19,7 @@ applyTo: '**'
 - Arquitectura: `Agente/documentacion/arquitectura/manual-arquitectura-wandorius-2026-07-29.md`.
 - Identidad OS: `Agente/documentacion/design-system/manual-identidad-visual-os-2026-07-29.md`.
 - Móvil: `Agente/planes/plan-experiencia-movil-launcher-2026-07-29.md`.
-- Foundation/Sentinel: `Agente/planes/plan-escalabilidad-sentinel-wandorius-2026-07-29.md`.
+- Quality gate: `Agente/planes/completados/plan-escalabilidad-sentinel-wandorius-2026-07-29.md`.
 - Reglas pendientes: `Agente/prevencion/prevencion-wandorius-sentinel-varsense-2026-07-29.md`.
 - Índice: `Agente/documentacion/indice-documentacion-2026-07-29.md`.
 
@@ -86,9 +86,9 @@ No dupliques decisiones: actualiza primero la fuente correspondiente y luego sus
 10. Revisar `git status`/`diff`; stage explícito (nunca `git add .`), commit `{ID}: descripción`, pull/rebase y push.
 11. Releer roadmap como última acción y elegir solo el siguiente bloque habilitado.
 
-## 7. Quality gate por tarea — contrato previsto
+## 7. Quality gate por tarea
 
-Se implementará **solo tras autorización del usuario** un orquestador Node multiplataforma con un único comando público:
+El orquestador Node multiplataforma se ejecuta con un único comando público:
 
 ```text
 npm run task:check -- 297A-N
@@ -119,12 +119,12 @@ El script decide alcance automáticamente, es incremental local y full en CI. De
 - Comentarios `[ID]` explican por qué/gotchas; registrar lección si existe.
 - Funcionalidad agnóstica/reutilizable pertenece a Glory; lógica wandori.us permanece aquí.
 
-## 9. Validación actual mientras no exista quality gate
+## 9. Validación
 
-- Rust: `cargo fmt --check`, `cargo check`, `cargo clippy -- -D warnings`, `cargo test`.
-- Frontend: `npx tsc --noEmit` y prueba renderizada.
-- CSS: VarSense + verificación visual responsive.
-- Cierre: `npm run self-check -- -TareaId {ID}`.
+- Cierre normal: `npm run task:check -- {ID}`; el alcance se calcula automáticamente.
+- Compatibilidad: `npm run self-check -- -TareaId {ID}` llama al mismo core y no duplica validaciones.
+- CI usa el mismo core en modo full y publica `.quality-reports/`.
+- UI todavía exige prueba visual real; el gate no sustituye navegador ni casos negativos.
 - Un fallo preexistente se registra y corrige en bloque separado antes de cerrar; no se oculta con suppressions.
 
 ## 10. Git, terminal y deploy

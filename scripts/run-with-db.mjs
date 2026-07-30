@@ -30,4 +30,10 @@ child.on('error', (err) => {
   console.error('[run-with-db] Error:', err.message);
   process.exit(1);
 });
-child.on('exit', (code) => process.exit(code ?? 0));
+child.on('exit', (code, signal) => {
+  if (signal || code === null) {
+    console.error(`[run-with-db] Cargo terminó sin exit code (${signal ?? 'unknown signal'}).`);
+    process.exit(2);
+  }
+  process.exit(code);
+});

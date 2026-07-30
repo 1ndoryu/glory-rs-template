@@ -5,19 +5,32 @@ use crate::models::article::Article;
 
 pub struct ArticleRepository;
 
+pub struct CreateArticleParams<'a> {
+    pub title: &'a str,
+    pub slug: &'a str,
+    pub content: &'a serde_json::Value,
+    pub excerpt: &'a str,
+    pub cover_image: Option<&'a str>,
+    pub status: &'a str,
+    pub is_pinned: bool,
+}
+
+pub struct UpdateArticleParams<'a> {
+    pub title: Option<&'a str>,
+    pub content: Option<&'a serde_json::Value>,
+    pub excerpt: Option<&'a str>,
+    pub cover_image: Option<&'a str>,
+    pub status: Option<&'a str>,
+    pub is_pinned: Option<bool>,
+}
+
 impl ArticleRepository {
     pub async fn create(
         pool: &PgPool,
-        title: &str,
-        slug: &str,
-        content: &serde_json::Value,
-        excerpt: &str,
-        cover_image: Option<&str>,
-        status: &str,
-        is_pinned: bool,
+        params: CreateArticleParams<'_>,
     ) -> Result<Article, sqlx::Error> {
         let id = Uuid::new_v4();
-        let published_at = if status == "published" {
+        let published_at = if params.status == "published" {
             Some(chrono::Utc::now())
         } else {
             None
@@ -29,13 +42,13 @@ impl ArticleRepository {
              RETURNING id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at",
         )
         .bind(id)
-        .bind(title)
-        .bind(slug)
-        .bind(content)
-        .bind(excerpt)
-        .bind(cover_image)
-        .bind(status)
-        .bind(is_pinned)
+        .bind(params.title)
+        .bind(params.slug)
+        .bind(params.content)
+        .bind(params.excerpt)
+        .bind(params.cover_image)
+        .bind(params.status)
+        .bind(params.is_pinned)
         .bind(published_at)
         .fetch_one(pool)
         .await
@@ -111,21 +124,14 @@ impl ArticleRepository {
     pub async fn update(
         pool: &PgPool,
         id: Uuid,
-        title: Option<&str>,
-        content: Option<&serde_json::Value>,
-        excerpt: Option<&str>,
-        cover_image: Option<&str>,
-        status: Option<&str>,
-        is_pinned: Option<bool>,
+        params: UpdateArticleParams<'_>,
     ) -> Result<Option<Article>, sqlx::Error> {
         /* Si se cambia a published y no tenia published_at, setearlo */
-        let current = Self::find_by_id(pool, id).await?;
-        let current = match current {
-            Some(a) => a,
-            None => return Ok(None),
+        let Some(current) = Self::find_by_id(pool, id).await? else {
+            return Ok(None);
         };
 
-        let new_status = status.unwrap_or(&current.status);
+        let new_status = params.status.unwrap_or(&current.status);
         let published_at = if new_status == "published" && current.published_at.is_none() {
             Some(chrono::Utc::now())
         } else {
@@ -145,12 +151,12 @@ impl ArticleRepository {
              WHERE id = $8 \
              RETURNING id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at",
         )
-        .bind(title)
-        .bind(content)
-        .bind(excerpt)
-        .bind(cover_image)
-        .bind(status)
-        .bind(is_pinned)
+        .bind(params.title)
+        .bind(params.content)
+        .bind(params.excerpt)
+        .bind(params.cover_image)
+        .bind(params.status)
+        .bind(params.is_pinned)
         .bind(published_at)
         .bind(id)
         .fetch_optional(pool)

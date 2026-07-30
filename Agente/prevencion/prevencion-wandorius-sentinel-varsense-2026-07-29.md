@@ -1,7 +1,7 @@
 # Prevención canónica: Glory Sentinel y VarSense para wandori.us
 
 > **Fecha:** 2026-07-29  
-> **Estado:** pendiente  
+> **Estado:** activo; infraestructura 297A-6 completada y reglas de dominio en rollout
 > **Autoridad:** inventario único de reglas automatizables del proyecto  
 > **Arquitectura:** `Agente/documentacion/arquitectura/manual-arquitectura-wandorius-2026-07-29.md`  
 > **Identidad:** `Agente/documentacion/design-system/manual-identidad-visual-os-2026-07-29.md`
@@ -91,14 +91,14 @@
 
 ## Checklist 7 — Configuración y CI
 
-- [ ] Crear `sentinel.config.json` canónico en raíz.
-- [ ] Crear/normalizar config VarSense canónica.
-- [ ] Eliminar excepciones amplias por directorio.
+- [x] Crear `sentinel.config.json` canónico en raíz.
+- [x] Crear/normalizar config VarSense canónica.
+- [x] Excluir solo artefactos, dependencias y código generado; el runner se autosupervisa.
 - [ ] Registrar excepción por regla, archivo, tarea, motivo y fecha de retirada.
-- [ ] Añadir scripts `check:sentinel` y `check:varsense`.
-- [ ] Integrar ambos en `npm run self-check` y CI.
-- [ ] Reporte registra commit/config/fecha para comprobar vigencia.
-- [ ] CI falla ante errores nuevos de alta confianza.
+- [x] Integrar ambos mediante el único script `task:check`, sin comandos paralelos duplicados.
+- [x] Integrar ambos en `npm run self-check` y CI.
+- [x] Reporte registra herramientas/config/fecha para comprobar vigencia.
+- [x] CI falla ante errores nuevos de alta confianza.
 
 ## Criterio de cierre
 

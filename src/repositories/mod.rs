@@ -1,7 +1,7 @@
 pub mod analytics_repo;
 pub mod article;
-mod note;
 pub mod media_repo;
+mod note;
 pub mod product_repo;
 pub mod project_repo;
 pub mod settings_repo;

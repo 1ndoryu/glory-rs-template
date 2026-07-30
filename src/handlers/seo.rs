@@ -3,6 +3,7 @@ use axum::http::header;
 use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::Router;
+use std::fmt::Write;
 
 use crate::errors::AppError;
 use crate::AppState;
@@ -25,17 +26,21 @@ pub async fn sitemap(State(state): State<AppState>) -> Result<impl IntoResponse,
 
     /* Paginas estaticas */
     for path in &["/", "/about", "/gallery", "/projects"] {
-        xml.push_str(&format!(
+        write!(
+            xml,
             "\n  <url>\n    <loc>{SITE_URL}{path}</loc>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>"
-        ));
+        )
+        .expect("escribir en String no puede fallar");
     }
 
     /* Articulos */
     for (slug, date) in &articles {
-        xml.push_str(&format!(
+        write!(
+            xml,
             "\n  <url>\n    <loc>{SITE_URL}/article/{slug}</loc>\n    <lastmod>{}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.6</priority>\n  </url>",
             date.format("%Y-%m-%d")
-        ));
+        )
+        .expect("escribir en String no puede fallar");
     }
 
     xml.push_str("\n</urlset>");
@@ -45,9 +50,7 @@ pub async fn sitemap(State(state): State<AppState>) -> Result<impl IntoResponse,
 
 /// robots.txt
 pub async fn robots() -> impl IntoResponse {
-    let content = format!(
-        "User-agent: *\nAllow: /\n\nSitemap: {SITE_URL}/sitemap.xml\n"
-    );
+    let content = format!("User-agent: *\nAllow: /\n\nSitemap: {SITE_URL}/sitemap.xml\n");
     ([(header::CONTENT_TYPE, "text/plain")], content)
 }
 

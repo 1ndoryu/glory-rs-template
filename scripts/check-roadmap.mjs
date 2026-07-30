@@ -29,12 +29,12 @@ function parsePendingTasks(filePath) {
     const line = lines[index];
     const lower = line.toLowerCase();
 
-    if (lower.includes('pendiente') && line.startsWith('#')) {
+    if (lower.includes('pendientes ordenados') && /^##\s/.test(line)) {
       inPending = true;
       continue;
     }
 
-    if (inPending && line.startsWith('#') && !lower.includes('pendiente')) {
+    if (inPending && /^##\s/.test(line) && !/^###\s/.test(line)) {
       inPending = false;
       continue;
     }
@@ -42,17 +42,7 @@ function parsePendingTasks(filePath) {
     if (!inPending) continue;
 
     const trimmed = line.trim();
-    if (!trimmed) continue;
-    if (trimmed.includes('sin tareas pendientes')) continue;
-    if (trimmed.startsWith('(') && trimmed.endsWith(')')) continue;
-
-    if (trimmed.startsWith('-') || trimmed.startsWith('###') || trimmed.startsWith('--')) {
-      const normalized = trimmed.replace(/^[-#\s]+/, '');
-      if (trimmed.includes('COMPLETADO') || trimmed.includes('✅') || /^~~.*~~$/.test(normalized)) {
-        continue;
-      }
-      tasks.push({ line: index + 1, text: trimmed });
-    }
+    if (/^- \[ \]/.test(trimmed)) tasks.push({ line: index + 1, text: trimmed });
   }
 
   return tasks;

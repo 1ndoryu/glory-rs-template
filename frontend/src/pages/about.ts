@@ -4,6 +4,7 @@
 import { api } from '../api/client';
 import { updateMeta, setPageJsonLd } from '../features/seo/meta';
 import { showProfile } from '../store';
+import { appendSanitizedHtml } from '../utils/sanitize-html';
 
 export async function renderAbout(): Promise<HTMLElement> {
   showProfile.set(true);
@@ -18,7 +19,7 @@ export async function renderAbout(): Promise<HTMLElement> {
     const content = settings.about_content || '';
 
     if (content) {
-      page.innerHTML = content;
+      appendSanitizedHtml(page, content);
     } else {
       /* API sin contenido — mostrar texto de ejemplo */
       const titulo = document.createElement('h1');

@@ -10,6 +10,7 @@ use hmac::{Hmac, Mac};
 use sha2::Sha256;
 
 use crate::errors::AppError;
+use crate::repositories::product_repo::{OrderRepository, ProductRepository};
 use crate::services::email::EmailService;
 use crate::AppState;
 
@@ -34,9 +35,7 @@ fn verify_stripe_signature(
     }
 
     if timestamp.is_empty() || signature.is_empty() {
-        return Err(AppError::BadRequest(
-            "Firma de Stripe invalida".into(),
-        ));
+        return Err(AppError::BadRequest("Firma de Stripe invalida".into()));
     }
 
     /* Verificar que el timestamp no sea muy viejo (5 min max) */
@@ -66,6 +65,70 @@ fn verify_stripe_signature(
     Ok(())
 }
 
+async fn handle_completed(state: &AppState, session: &serde_json::Value) -> Result<(), AppError> {
+    let order_id_raw = session["metadata"]["order_id"].as_str().unwrap_or("");
+    if order_id_raw.is_empty() {
+        tracing::warn!("Webhook sin order_id en metadata");
+        return Ok(());
+    }
+    let Ok(order_id) = uuid::Uuid::parse_str(order_id_raw) else {
+        tracing::warn!("order_id invalido: {order_id_raw}");
+        return Ok(());
+    };
+
+    let payment_intent = session["payment_intent"].as_str();
+    OrderRepository::mark_paid(&state.pool, order_id, payment_intent).await?;
+    let Some(order) =
+        sqlx::query_as::<_, crate::models::product::Order>("SELECT * FROM orders WHERE id = $1")
+            .bind(order_id)
+            .fetch_optional(&state.pool)
+            .await?
+    else {
+        tracing::warn!("Orden pagada no encontrada: {order_id}");
+        return Ok(());
+    };
+    let Some(product) = ProductRepository::find_by_id(&state.pool, order.product_id).await? else {
+        tracing::warn!("Producto de orden no encontrado: {}", order.product_id);
+        return Ok(());
+    };
+
+    if let (Some(api_key), Some(download_path)) = (&state.resend_api_key, &product.download_path) {
+        let customer_email = session["customer_email"]
+            .as_str()
+            .or_else(|| session["customer_details"]["email"].as_str())
+            .unwrap_or(&order.customer_email);
+        let download_url = format!("{}{download_path}", state.site_url);
+        EmailService::send_download_link(
+            api_key,
+            &state.email_from,
+            customer_email,
+            &product.name,
+            &download_url,
+        )
+        .await?;
+        OrderRepository::mark_delivered(&state.pool, order_id).await?;
+        tracing::info!("Orden {order_id} pagada y descarga enviada a {customer_email}");
+    }
+    Ok(())
+}
+
+async fn handle_expired(state: &AppState, session: &serde_json::Value) -> Result<(), AppError> {
+    let Some(order_id_raw) = session["metadata"]["order_id"].as_str() else {
+        tracing::warn!("Webhook expirado sin order_id");
+        return Ok(());
+    };
+    let Ok(order_id) = uuid::Uuid::parse_str(order_id_raw) else {
+        tracing::warn!("order_id expirado invalido: {order_id_raw}");
+        return Ok(());
+    };
+    sqlx::query("UPDATE orders SET status = 'failed' WHERE id = $1")
+        .bind(order_id)
+        .execute(&state.pool)
+        .await?;
+    tracing::info!("Orden {order_id} expirada");
+    Ok(())
+}
+
 /// Endpoint del webhook de Stripe.
 /// Recibe eventos y procesa `checkout.session.completed`.
 pub async fn stripe_webhook(
@@ -77,135 +140,20 @@ pub async fn stripe_webhook(
         .stripe_webhook_secret
         .as_ref()
         .ok_or_else(|| AppError::Internal("Webhook secret no configurado".into()))?;
-
-    /* Verificar firma */
     let signature_header = headers
         .get("stripe-signature")
-        .and_then(|v| v.to_str().ok())
+        .and_then(|value| value.to_str().ok())
         .ok_or_else(|| AppError::BadRequest("Missing stripe-signature header".into()))?;
-
     verify_stripe_signature(&body, signature_header, webhook_secret)?;
 
-    /* Parsear evento */
     let event: serde_json::Value = serde_json::from_str(&body)
-        .map_err(|e| AppError::BadRequest(format!("JSON invalido: {e}")))?;
-
-    let event_type = event["type"]
-        .as_str()
-        .unwrap_or("");
-
-    match event_type {
-        "checkout.session.completed" => {
-            let session = &event["data"]["object"];
-
-            let order_id_str = session["metadata"]["order_id"]
-                .as_str()
-                .unwrap_or("");
-            let payment_intent = session["payment_intent"]
-                .as_str()
-                .unwrap_or("");
-            let customer_email = session["customer_email"]
-                .as_str()
-                .or_else(|| session["customer_details"]["email"].as_str())
-                .unwrap_or("");
-
-            if order_id_str.is_empty() {
-                tracing::warn!("Webhook sin order_id en metadata");
-                return Ok(StatusCode::OK);
-            }
-
-            let order_id = match uuid::Uuid::parse_str(order_id_str) {
-                Ok(id) => id,
-                Err(_) => {
-                    tracing::warn!("order_id invalido: {order_id_str}");
-                    return Ok(StatusCode::OK);
-                }
-            };
-
-            /* Marcar orden como pagada */
-            let _ = crate::repositories::product_repo::OrderRepository::mark_paid(
-                &state.pool,
-                order_id,
-                Some(payment_intent),
-            )
-            .await;
-
-            /* Buscar la orden y el producto para enviar email de descarga */
-            let order = sqlx::query_as::<_, crate::models::product::Order>(
-                "SELECT * FROM orders WHERE id = $1",
-            )
-            .bind(order_id)
-            .fetch_optional(&state.pool)
-            .await
-            .ok()
-            .flatten();
-
-            if let Some(order) = order {
-                let product = crate::repositories::product_repo::ProductRepository::find_by_id(
-                    &state.pool,
-                    order.product_id,
-                )
-                .await
-                .ok()
-                .flatten();
-
-                if let Some(product) = product {
-                    /* Enviar email de descarga si hay Resend configurado */
-                    if let (Some(ref api_key), Some(ref download_path)) =
-                        (&state.resend_api_key, &product.download_path)
-                    {
-                        let download_url = format!(
-                            "{}{}",
-                            state.site_url,
-                            download_path
-                        );
-
-                        let email = if customer_email.is_empty() {
-                            &order.customer_email
-                        } else {
-                            customer_email
-                        };
-
-                        let _ = EmailService::send_download_link(
-                            api_key,
-                            &state.email_from,
-                            email,
-                            &product.name,
-                            &download_url,
-                        )
-                        .await;
-
-                        let _ = crate::repositories::product_repo::OrderRepository::mark_delivered(
-                            &state.pool,
-                            order_id,
-                        )
-                        .await;
-
-                        tracing::info!(
-                            "Orden {order_id} pagada y descarga enviada a {email}"
-                        );
-                    }
-                }
-            }
-        }
-        "checkout.session.expired" => {
-            let session = &event["data"]["object"];
-            let order_id_str = session["metadata"]["order_id"]
-                .as_str()
-                .unwrap_or("");
-            if let Ok(order_id) = uuid::Uuid::parse_str(order_id_str) {
-                let _ = sqlx::query("UPDATE orders SET status = 'failed' WHERE id = $1")
-                    .bind(order_id)
-                    .execute(&state.pool)
-                    .await;
-                tracing::info!("Orden {order_id} expirada");
-            }
-        }
-        _ => {
-            /* Evento no manejado — ignorar silenciosamente */
-        }
+        .map_err(|error| AppError::BadRequest(format!("JSON invalido: {error}")))?;
+    let session = &event["data"]["object"];
+    match event["type"].as_str().unwrap_or("") {
+        "checkout.session.completed" => handle_completed(&state, session).await?,
+        "checkout.session.expired" => handle_expired(&state, session).await?,
+        event_type => tracing::debug!("Evento Stripe no manejado: {event_type}"),
     }
-
     Ok(StatusCode::OK)
 }
 

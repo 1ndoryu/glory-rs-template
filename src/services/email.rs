@@ -40,8 +40,6 @@ impl EmailService {
   <p style="font-size: 12px; color: #999;">wandori.us</p>
 </body>
 </html>"#,
-            product_name = product_name,
-            download_url = download_url,
         );
 
         let body = SendEmailRequest {

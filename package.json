@@ -5,8 +5,10 @@
   "scripts": {
     "dev": "node glory-rs/scripts/dev.mjs",
     "check": "npm run check:back && npm run check:front",
-    "self-check": "powershell -ExecutionPolicy Bypass -File scripts/self-check.ps1",
+    "self-check": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/self-check.ps1",
     "quality:setup": "node scripts/quality/setup.mjs",
+    "quality:test": "node --test scripts/quality/tests/*.test.mjs",
+    "task:check": "node scripts/quality/task-check.mjs",
     "check:back": "node scripts/run-with-db.mjs check && node scripts/run-with-db.mjs clippy",
     "check:front": "npm --prefix frontend run type-check",
     "fmt": "cargo fmt",

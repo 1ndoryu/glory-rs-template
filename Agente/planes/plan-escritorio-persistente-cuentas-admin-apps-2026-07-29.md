@@ -3,8 +3,8 @@
 > **Epic:** 297A-4  
 > **Fecha:** 2026-07-29  
 > **Prioridad:** máxima  
-> **Estado:** pendiente; identidad visual aprobada  
-> **Siguiente bloque:** 297A-6 — quality gate Sentinel/VarSense (pendiente de autorización)
+> **Estado:** en ejecución; identidad visual y quality gate aprobados
+> **Siguiente bloque:** 297A-7 — ADRs y seguridad inmediata
 
 ## 1. Autoridad y alcance
 
@@ -12,7 +12,7 @@ Este es el único plan que define el orden de implementación del producto. No r
 
 - Arquitectura: `Agente/documentacion/arquitectura/manual-arquitectura-wandorius-2026-07-29.md`
 - Identidad visual: `Agente/documentacion/design-system/manual-identidad-visual-os-2026-07-29.md`
-- Quality gate: `Agente/planes/plan-escalabilidad-sentinel-wandorius-2026-07-29.md`
+- Quality gate: `Agente/planes/completados/plan-escalabilidad-sentinel-wandorius-2026-07-29.md`
 - Reglas pendientes: `Agente/prevencion/prevencion-wandorius-sentinel-varsense-2026-07-29.md`
 - Resumen de pendientes: `roadmap.md`
 
@@ -46,8 +46,8 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 
 | Orden | Tarea | Entregable | Estado |
 |---:|---|---|---|
-| 1 | 297A-6 | Sentinel/VarSense + script quality gate | revisión |
-| 2 | 297A-7 | ADRs + seguridad inmediata | bloqueado |
+| 1 | 297A-6 | Sentinel/VarSense + script quality gate | completado |
+| 2 | 297A-7 | ADRs + seguridad inmediata | habilitado |
 | 3 | 297A-8 | sesiones + Cuenta base | bloqueado |
 | 4 | 297A-9 | runtime desktop/tablet | bloqueado |
 | 5 | 297A-10 | recursos + migraciones | bloqueado |
@@ -61,46 +61,42 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 
 ## 4. 297A-6 — Quality gate Sentinel/VarSense
 
-**Estado:** planificado; no implementar hasta autorización explícita del usuario.  
-**Bloquea:** todas las tareas posteriores.
+**Estado:** completado el 29 de julio de 2026.
+**Desbloquea:** 297A-7 y la supervisión reproducible de todos los bloques posteriores.
 
 ### 4.1 Contrato y preflight
 
-- [ ] Revisar/aprobar `plan-escalabilidad-sentinel-wandorius-2026-07-29.md`.
-- [ ] Confirmar binarios/CLI/config reales de Sentinel y VarSense.
-- [ ] Definir severidades, excludes y política de baseline.
-- [ ] Definir alcance automático: incremental local y full en CI/config/migraciones.
-- [ ] Definir límites de tiempo y códigos de salida.
+- [x] Revisar/aprobar el plan especializado.
+- [x] Confirmar CLI/config/versiones fijadas de Sentinel y VarSense.
+- [x] Definir severidades, excludes y baseline bloqueante en cero errores.
+- [x] Definir alcance incremental local y full en CI/config/migraciones.
+- [x] Definir timeouts y códigos 0/1/2/130.
 
 ### 4.2 Script unificado
 
-- [ ] Crear orquestador Node multiplataforma, sin reglas duplicadas.
-- [ ] Exponer un único comando público `npm run task:check -- {ID}`.
-- [ ] Preflight no instala ni muta; falla con diagnóstico accionable.
-- [ ] Ejecutar Sentinel y VarSense con sus configs canónicas.
-- [ ] Ejecutar validaciones del stack afectado.
-- [ ] Generar reporte Markdown + JSON con task ID, commit/config y tiempos.
-- [ ] Redactar secretos y limitar output/logs.
-- [ ] Mostrar máximo tres hallazgos y cinco recordatorios contextuales.
-- [ ] Imprimir siempre la acción y el comando siguiente exactos.
-- [ ] Exit no cero ante error de herramienta, regla bloqueante o test fallido.
+- [x] Crear orquestador Node multiplataforma, sin reglas duplicadas.
+- [x] Exponer `npm run task:check -- {ID}` como único comando público.
+- [x] Implementar preflight no mutante, adapters, alcance, timeout y cancelación.
+- [x] Ejecutar Sentinel, VarSense y validaciones del stack afectado.
+- [x] Generar reportes Markdown/JSON y logs redactados.
+- [x] Limitar terminal a tres hallazgos y cuatro recordatorios contextuales.
+- [x] Imprimir siempre el comando siguiente exacto.
+- [x] Distinguir fallo de calidad, infraestructura y cancelación.
 
 ### 4.3 Rollout
 
-- [ ] Configurar seguridad y fallos silenciosos primero.
-- [ ] Corregir baseline sin suppressions amplias.
-- [ ] Añadir lifecycle/desktop.
-- [ ] Añadir API/backend/analytics.
-- [ ] Añadir identidad/VarSense.
-- [ ] Integrar script en self-check y CI.
-- [ ] Probar una fixture regresiva por categoría.
+- [x] Activar seguridad y fallos silenciosos de alta confianza.
+- [x] Corregir baseline bloqueante sin suppressions amplias.
+- [x] Integrar self-check y CI en el mismo core.
+- [x] Probar contratos, secretos, timeout, output compacto y fixtures core/CLI.
+- [ ] Ampliar reglas lifecycle/desktop, API y visual durante sus tareas dueñas; inventario canónico en `Agente/prevencion/`.
 
 ### 4.4 Salida
 
-- [ ] CLI/LSP/editor coinciden en fixtures.
-- [ ] Baseline tiene cero errores.
-- [ ] Reporte identifica claramente tarea y causa de fallo.
-- [ ] Una regresión de seguridad, arquitectura o CSS bloquea CI.
+- [x] CLI/LSP/editor comparten core y adapters probados por fixtures.
+- [x] Baseline tiene cero errores bloqueantes.
+- [x] Reporte identifica tarea, causa y siguiente comando.
+- [x] CI ejecuta full gate y publica reportes incluso al fallar.
 
 **Criterio de salida:** cada bloque futuro tiene supervisión automática reproducible y 297A-7 queda habilitada.
 

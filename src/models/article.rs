@@ -25,7 +25,11 @@ pub struct Article {
 /// Request para crear un articulo
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 pub struct CreateArticleRequest {
-    #[validate(length(min = 1, max = 500, message = "El titulo debe tener entre 1 y 500 caracteres"))]
+    #[validate(length(
+        min = 1,
+        max = 500,
+        message = "El titulo debe tener entre 1 y 500 caracteres"
+    ))]
     pub title: String,
     pub content: JsonValue,
     #[serde(default)]

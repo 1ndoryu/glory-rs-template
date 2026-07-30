@@ -21,9 +21,7 @@ pub async fn create_project(
 }
 
 /// Listar proyectos (publico — solo visibles)
-pub async fn list_projects(
-    State(state): State<AppState>,
-) -> Result<Json<Vec<Project>>, AppError> {
+pub async fn list_projects(State(state): State<AppState>) -> Result<Json<Vec<Project>>, AppError> {
     let projects = ProjectService::list_visible(&state.pool).await?;
     Ok(Json(projects))
 }

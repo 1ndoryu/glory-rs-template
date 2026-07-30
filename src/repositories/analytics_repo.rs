@@ -68,19 +68,20 @@ impl AnalyticsRepository {
         .collect();
 
         /* Eventos recientes */
-        let recent_events = sqlx::query_as::<_, (String, Option<String>, chrono::DateTime<chrono::Utc>)>(
-            "SELECT event_type, target_type, created_at \
+        let recent_events =
+            sqlx::query_as::<_, (String, Option<String>, chrono::DateTime<chrono::Utc>)>(
+                "SELECT event_type, target_type, created_at \
              FROM analytics_events ORDER BY created_at DESC LIMIT 20",
-        )
-        .fetch_all(pool)
-        .await?
-        .into_iter()
-        .map(|(event_type, target_type, created_at)| RecentEvent {
-            event_type,
-            target_type,
-            created_at,
-        })
-        .collect();
+            )
+            .fetch_all(pool)
+            .await?
+            .into_iter()
+            .map(|(event_type, target_type, created_at)| RecentEvent {
+                event_type,
+                target_type,
+                created_at,
+            })
+            .collect();
 
         Ok(AnalyticsStats {
             total_page_views: page_views,

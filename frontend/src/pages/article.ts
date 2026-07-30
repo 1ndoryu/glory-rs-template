@@ -7,6 +7,7 @@ import { api } from '../api/client';
 import { trackImageDownload } from '../features/analytics/tracker';
 import { updateArticleMeta, setArticleJsonLd, resetMeta } from '../features/seo/meta';
 import { showProfile } from '../store';
+import { appendSanitizedHtml } from '../utils/sanitize-html';
 import type { Article, Product } from '../api/types';
 
 function formatDate(iso: string): string {
@@ -112,7 +113,7 @@ export async function renderArticle(params: Record<string, string>): Promise<HTM
 
     const contenido = document.createElement('div');
     contenido.className = 'articulo-contenido';
-    contenido.innerHTML = tiptapToHtml(article.content);
+    appendSanitizedHtml(contenido, tiptapToHtml(article.content));
 
     contenido.querySelectorAll('img').forEach((img) => {
       img.addEventListener('contextmenu', () => {

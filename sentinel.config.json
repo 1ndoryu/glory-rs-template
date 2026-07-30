@@ -11,6 +11,8 @@
     "**/dist/**",
     "**/out/**",
     "**/target/**",
+    "**/.quality-tools/**",
+    "**/.quality-reports/**",
     "frontend/src/api/generated/**"
   ],
   "directoryExceptions": [

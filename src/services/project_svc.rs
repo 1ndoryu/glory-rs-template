@@ -2,7 +2,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::errors::AppError;
-use crate::models::project::{Project, CreateProjectRequest, UpdateProjectRequest};
+use crate::models::project::{CreateProjectRequest, Project, UpdateProjectRequest};
 use crate::repositories::project_repo::ProjectRepository;
 
 pub struct ProjectService;
@@ -28,7 +28,11 @@ impl ProjectService {
         Ok(ProjectRepository::list_visible(pool).await?)
     }
 
-    pub async fn update(pool: &PgPool, id: Uuid, req: UpdateProjectRequest) -> Result<Project, AppError> {
+    pub async fn update(
+        pool: &PgPool,
+        id: Uuid,
+        req: UpdateProjectRequest,
+    ) -> Result<Project, AppError> {
         ProjectRepository::update(
             pool,
             id,

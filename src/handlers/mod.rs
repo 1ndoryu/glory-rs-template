@@ -3,8 +3,8 @@
 pub mod articles;
 mod auth;
 mod health;
-mod notes;
 pub mod media_handler;
+mod notes;
 pub mod products_handler;
 pub mod projects_handler;
 pub mod seo;
@@ -75,8 +75,7 @@ pub struct ApiDoc;
 
 /// Crea el router principal con CORS, tracing, Swagger UI y todas las rutas
 pub fn create_router(pool: sqlx::PgPool, config: crate::config::AppConfig) -> Router {
-    let site_url = std::env::var("SITE_URL")
-        .unwrap_or_else(|_| "https://wandori.us".to_string());
+    let site_url = std::env::var("SITE_URL").unwrap_or_else(|_| "https://wandori.us".to_string());
 
     let state = AppState {
         pool,

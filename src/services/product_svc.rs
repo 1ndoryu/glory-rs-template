@@ -28,7 +28,10 @@ impl ProductService {
             .ok_or_else(|| AppError::NotFound("Producto no encontrado".into()))
     }
 
-    pub async fn list_by_article(pool: &PgPool, article_id: Uuid) -> Result<Vec<Product>, AppError> {
+    pub async fn list_by_article(
+        pool: &PgPool,
+        article_id: Uuid,
+    ) -> Result<Vec<Product>, AppError> {
         Ok(ProductRepository::find_by_article(pool, article_id).await?)
     }
 

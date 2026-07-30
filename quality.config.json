@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "maxFindings": 3,
+  "maxReminders": 4,
+  "maxTerminalLines": 20,
+  "timeoutsMs": {
+    "sentinel": 120000,
+    "varsense": 120000,
+    "rust": 300000,
+    "frontend": 120000
+  },
+  "fullPatterns": [
+    "Cargo.toml",
+    "Cargo.lock",
+    "package.json",
+    "frontend/package.json",
+    "frontend/tsconfig.json",
+    "frontend/vite.config.ts",
+    "sentinel.config.json",
+    "varsense.config.json",
+    "quality.config.json",
+    "quality-tools.json",
+    ".github/",
+    "scripts/quality/",
+    "migrations/"
+  ],
+  "profiles": {
+    "rust": [".rs", "Cargo.toml", "Cargo.lock", "migrations/"],
+    "frontend": ["frontend/"],
+    "css": [".css", ".scss", ".less"],
+    "docs": [".md", "AGENTS.md", "roadmap.md", "Agente/"],
+    "auth": ["auth", "session", "login", "middleware"],
+    "commerce": ["product", "order", "stripe", "checkout", "upload"],
+    "desktop": ["frontend/src/features/desktop/"],
+    "mobile": ["mobile", "responsive"],
+    "workspace": ["workspace", "overlay", "layout"]
+  }
+}

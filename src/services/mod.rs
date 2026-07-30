@@ -1,8 +1,8 @@
 pub mod article;
 mod auth;
 pub mod email;
-mod note;
 pub mod media_svc;
+mod note;
 pub mod product_svc;
 pub mod project_svc;
 pub mod settings_svc;
