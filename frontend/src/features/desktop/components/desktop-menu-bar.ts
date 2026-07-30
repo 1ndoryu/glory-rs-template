@@ -4,7 +4,7 @@
  * Configuración: abre la app de settings.
  * [Plan §2.3] Los menús proyectan CommandRegistry/AppRegistry. */
 
-import { createElement, FileUser, type IconNode } from 'lucide';
+import { createElement, FileUser, Folder, type IconNode } from 'lucide';
 import { AppRegistry, type Capability } from '../../runtime/app-registry';
 import { authStore } from '../../../store';
 import { api } from '../../../api/client';
@@ -150,7 +150,9 @@ function createArchiveMenu(): HTMLElement {
   return menu;
 }
 
-/* === Menú Aplicaciones — apps del AppRegistry === */
+/* === Menú Aplicaciones — derivado de workspaceStore ===
+ * [Plan 297A-11] Fuente única de verdad: los hijos del root del workspace
+ * definen qué aparece en el menú. AppRegistry solo resuelve implementaciones. */
 function createApplicationsMenu(): HTMLElement {
   const menu = document.createElement('div');
   menu.className = 'desktop-context-menu';
@@ -158,22 +160,59 @@ function createApplicationsMenu(): HTMLElement {
   menu.setAttribute('aria-label', 'Aplicaciones');
   menu.hidden = true;
 
-  const capability: Capability = authStore.get().isAuthenticated ? 'admin' : 'public';
-  const apps = AppRegistry.getAvailable(capability);
+  /* Placeholder mientras carga el workspace */
+  const loading = createMenuItem('cargando…', { disabled: true });
+  menu.appendChild(loading);
 
-  for (const app of apps) {
-    menu.appendChild(createMenuItem(app.title, {
-      icon: app.icon,
-      onClick: () => {
-        /* Import dinámico para evitar circular deps */
-        void import('../../runtime/route-app-adapter').then(m => m.openAppWindow(app.id));
-      },
-    }));
-  }
+  /* Cargar workspaceStore dinámicamente para evitar circular deps */
+  void import('../../runtime/workspace/workspace-store').then(({ workspaceStore }) => {
+    loading.remove();
+    const ws = workspaceStore.get();
 
-  if (apps.length === 0) {
-    menu.appendChild(createMenuItem('sin aplicaciones', { disabled: true }));
-  }
+    const capability: Capability = authStore.get().isAuthenticated ? 'admin' : 'public';
+
+    /* Hijos directos del root que sean app o folder (no resources individuales) */
+    const launcherItems = Object.values(ws.nodes)
+      .filter(n => n.parentId === 'desktop' && (n.type === 'app' || n.type === 'folder'))
+      .sort((a, b) => (a.mobileOrder ?? 0) - (b.mobileOrder ?? 0));
+
+    for (const node of launcherItems) {
+      /* Resolver icono desde AppRegistry si tiene refId, si no usar Folder */
+      const icon: IconNode = node.type === 'app' && node.refId
+        ? (AppRegistry.get(node.refId)?.icon ?? Folder)
+        : Folder;
+
+      /* Filtrar por capacidad: si es una app, verificar su requires */
+      if (node.type === 'app' && node.refId) {
+        const appDef = AppRegistry.get(node.refId);
+        if (appDef) {
+          const hierarchy: Capability[] = ['public', 'authenticated', 'admin'];
+          if (hierarchy.indexOf(appDef.requires) > hierarchy.indexOf(capability)) continue;
+        }
+      }
+
+      menu.appendChild(createMenuItem(node.label, {
+        icon,
+        onClick: () => {
+          /* Construir params según el tipo de nodo */
+          const params: Record<string, string> | undefined =
+            node.type === 'folder' ? { folderId: node.id }
+            : node.refId ? undefined
+            : undefined;
+
+          const appId = node.type === 'app' && node.refId ? node.refId : 'finder';
+          void import('../../runtime/route-app-adapter').then(m => m.openAppWindow(appId, params));
+        },
+      }));
+    }
+
+    if (launcherItems.length === 0) {
+      menu.appendChild(createMenuItem('sin aplicaciones', { disabled: true }));
+    }
+  }).catch(() => {
+    loading.remove();
+    menu.appendChild(createMenuItem('error al cargar', { disabled: true }));
+  });
 
   return menu;
 }
