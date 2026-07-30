@@ -9,6 +9,7 @@ import {
   Folder,
   FolderCode,
   Gamepad2,
+  PanelLeft,
   Settings,
   ShieldUser,
   X,
@@ -20,7 +21,7 @@ import { createDesktopWindow } from './components/desktop-window';
 import { windowStore, focusWindow, restoreWindow, closeWindow, minimizeWindow, setWorkspaceBounds } from '../runtime/window-manager';
 import { openAppWindow } from '../runtime/route-app-adapter';
 import { navigate } from '../../router';
-import { authStore } from '../../store';
+import { authStore, showSidebar } from '../../store';
 import { dispatchEvent } from '../analytics/dispatcher';
 import { enableDragResize } from './utils/drag-resize';
 import { openContextMenu } from './components/desktop-context-menu';
@@ -330,7 +331,14 @@ function createReactiveTaskbar(): { element: HTMLElement; taskList: HTMLElement 
   const navControl = document.createElement('button');
   navControl.type = 'button';
   navControl.className = 'desktop-taskbar__nav-control';
-  navControl.setAttribute('aria-label', 'Mostrar navegación');
+  navControl.setAttribute('aria-label', showSidebar.get() ? 'Ocultar navegación' : 'Mostrar navegación');
+  const navIcon = createElement(PanelLeft);
+  navIcon.classList.add('desktop-taskbar__icon');
+  navControl.appendChild(navIcon);
+  navControl.addEventListener('click', () => {
+    showSidebar.update(v => !v);
+    navControl.setAttribute('aria-label', showSidebar.get() ? 'Ocultar navegación' : 'Mostrar navegación');
+  });
 
   const taskList = document.createElement('div');
   taskList.className = 'desktop-taskbar__tasks';

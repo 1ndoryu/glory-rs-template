@@ -169,3 +169,6 @@ export const redesLayoutStore = createStore<RedesLayout>('inline');
 /* Control de visibilidad del profile header */
 export const showProfile = createStore<boolean>(true);
 
+/* Control de visibilidad del sidebar (toggle desde taskbar nav control) */
+export const showSidebar = createStore<boolean>(true);
+

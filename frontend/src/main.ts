@@ -29,7 +29,7 @@ import { initResourceTypeRegistry } from './features/runtime/resource-type-regis
 import { setActorCategory } from './features/analytics/dispatcher';
 import { loadSavedFonts } from './features/settings/font-panel';
 import { initTracking, trackPageView } from './features/analytics/tracker';
-import { authStore, showProfile, siteConfig } from './store';
+import { authStore, showProfile, showSidebar, siteConfig } from './store';
 import { api } from './api/client';
 
 
@@ -86,6 +86,12 @@ async function initApp(): Promise<void> {
   /* Sidebar — menu + entradas */
   const sidebar = createSidebar();
   app.appendChild(sidebar);
+
+  /* [Plan §2.2] navigation.toggleExternalNav: toggle sidebar */
+  showSidebar.subscribe((visible) => {
+    sidebar.style.display = visible ? '' : 'none';
+    app.style.gridTemplateColumns = visible ? '' : '1fr';
+  });
 
   /* Columna derecha: superficie exclusiva del escritorio */
   const columnaDerecha = document.createElement('div');
