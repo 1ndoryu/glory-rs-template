@@ -13,6 +13,7 @@
 | ¿Cómo debe verse y comportarse visualmente el OS?       | `Agente/documentacion/design-system/manual-identidad-visual-os-2026-07-29.md`   |
 | ¿Cómo funciona el OS en teléfonos sin duplicar apps?    | `Agente/planes/plan-experiencia-movil-launcher-2026-07-29.md`                  |
 | ¿Cómo funciona el quality gate?                        | `Agente/planes/completados/plan-escalabilidad-sentinel-wandorius-2026-07-29.md` |
+| ¿Cómo funcionan comandos, menús, drag y estadísticas?  | `Agente/planes/plan-contratos-interaccion-comandos-medicion-2026-07-29.md`      |
 | ¿Qué reglas automáticas faltan?                         | `Agente/prevencion/prevencion-wandorius-sentinel-varsense-2026-07-29.md`        |
 
 ## Regla de autoridad
@@ -29,6 +30,7 @@
 - Manual de arquitectura: creado.
 - Manual visual: creado a partir del concepto aprobado y la interfaz real.
 - Plan maestro: activo; debe ejecutarse por checklist.
+- Contratos de interacción y medición: activos; se cierran dentro de las tareas dueñas 297A-9–17.
 - Quality gate Sentinel/VarSense: implementado y archivado; CI y self-check usan el mismo core.
 - Plan móvil: activo y bloqueado por runtime/workspace; tablet conserva desktop.
 - Plan visual antiguo: referencia histórica del concepto aprobado.

@@ -20,6 +20,7 @@ applyTo: '**'
 - Identidad OS: `Agente/documentacion/design-system/manual-identidad-visual-os-2026-07-29.md`.
 - Móvil: `Agente/planes/plan-experiencia-movil-launcher-2026-07-29.md`.
 - Quality gate: `Agente/planes/completados/plan-escalabilidad-sentinel-wandorius-2026-07-29.md`.
+- Interacción/comandos/medición: `Agente/planes/plan-contratos-interaccion-comandos-medicion-2026-07-29.md`.
 - Reglas pendientes: `Agente/prevencion/prevencion-wandorius-sentinel-varsense-2026-07-29.md`.
 - Índice: `Agente/documentacion/indice-documentacion-2026-07-29.md`.
 
