@@ -11,11 +11,15 @@ import type { Project } from '../api/types';
 
 /* === Lista de proyectos === */
 export async function renderProjectList(container: HTMLElement): Promise<void> {
-  container.innerHTML = '<p class="cargando">cargando...</p>';
+  container.textContent = '';
+  const loading = document.createElement('p');
+  loading.className = 'cargando';
+  loading.textContent = 'cargando...';
+  container.appendChild(loading);
 
   try {
     const projects = await api.get<Project[]>('/api/admin/projects');
-    container.innerHTML = '';
+    container.textContent = '';
 
     for (const project of projects) {
       const item = document.createElement('div');
@@ -55,7 +59,11 @@ export async function renderProjectList(container: HTMLElement): Promise<void> {
     btnNuevo.addEventListener('click', () => openProjectEditor(undefined, container));
     container.appendChild(btnNuevo);
   } catch {
-    container.innerHTML = '<p class="vacio">error al cargar</p>';
+    container.textContent = '';
+    const error = document.createElement('p');
+    error.className = 'vacio';
+    error.textContent = 'error al cargar';
+    container.appendChild(error);
   }
 }
 

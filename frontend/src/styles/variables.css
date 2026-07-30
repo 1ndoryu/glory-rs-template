@@ -3,7 +3,7 @@
  * Todo se configura desde estas variables.
  * [Auditoría v2 §3.4] @layer order para gestión de specificity. */
 
-@layer base, components, overrides;
+@layer base, components;
 
 :root {
   /* === COLOR — Solo blanco y negro === */

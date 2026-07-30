@@ -3,6 +3,7 @@
  * Se renderiza como cabecera de la columna derecha. */
 
 import { profileImage, socialLinksStore, redesLayoutStore } from '../../store';
+import { reconcileChildren } from '../../utils/reconcile';
 
 export function createProfile(): HTMLElement {
   const profile = document.createElement('header');
@@ -38,16 +39,24 @@ export function createProfile(): HTMLElement {
   redes.className = 'profile-redes';
 
   function renderRedes(): void {
-    redes.innerHTML = '';
-    for (const link of socialLinksStore.get()) {
-      const a = document.createElement('a');
-      a.href = link.url;
-      a.textContent = link.nombre;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      a.setAttribute('data-external', 'true');
-      redes.appendChild(a);
-    }
+    const links = socialLinksStore.get();
+    reconcileChildren(
+      redes,
+      links,
+      (link) => link.nombre,
+      (link) => {
+        const a = document.createElement('a');
+        a.href = link.url;
+        a.textContent = link.nombre;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.setAttribute('data-external', 'true');
+        return a;
+      },
+      (el, link) => {
+        if (el.getAttribute('href') !== link.url) el.setAttribute('href', link.url);
+      },
+    );
   }
 
   socialLinksStore.subscribe(() => renderRedes());

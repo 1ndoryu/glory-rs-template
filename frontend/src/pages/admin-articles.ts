@@ -18,11 +18,15 @@ function formatDate(iso: string): string {
 
 /* === Lista de artículos === */
 export async function renderArticleList(container: HTMLElement): Promise<void> {
-  container.innerHTML = '<p class="cargando">cargando...</p>';
+  container.textContent = '';
+  const loading = document.createElement('p');
+  loading.className = 'cargando';
+  loading.textContent = 'cargando...';
+  container.appendChild(loading);
 
   try {
     const data = await api.get<PaginatedArticles>('/api/admin/articles?per_page=50');
-    container.innerHTML = '';
+    container.textContent = '';
 
     for (const article of data.items) {
       const item = document.createElement('div');
@@ -72,7 +76,11 @@ export async function renderArticleList(container: HTMLElement): Promise<void> {
       container.appendChild(vacio);
     }
   } catch {
-    container.innerHTML = '<p class="vacio">error al cargar</p>';
+    container.textContent = '';
+    const error = document.createElement('p');
+    error.className = 'vacio';
+    error.textContent = 'error al cargar';
+    container.appendChild(error);
   }
 }
 

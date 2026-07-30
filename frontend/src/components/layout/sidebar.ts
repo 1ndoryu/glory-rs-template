@@ -5,6 +5,7 @@
 import { navigate, getCurrentPath, onNavigate } from '../../router';
 import { getArticles } from '../../pages/home';
 import type { Article } from '../../api/types';
+import { reconcileChildren } from '../../utils/reconcile';
 
 interface NavItem {
   etiqueta: string;
@@ -61,27 +62,33 @@ export function createSidebar(): HTMLElement {
   entradas.className = 'sidebar-entradas';
 
   function renderNav(path: string): void {
-    nav.innerHTML = '';
-    for (const item of navItems) {
-      const a = document.createElement('a');
-      a.href = item.ruta;
-      a.className = 'sidebar-nav-link';
-      a.textContent = item.etiqueta;
-      if (path === item.ruta || (item.ruta !== '/' && path.startsWith(item.ruta))) {
-        a.classList.add('activo');
-      }
-      a.addEventListener('click', (e) => {
-        e.preventDefault();
-        navigate(item.ruta);
-      });
-      nav.appendChild(a);
-    }
+    reconcileChildren(
+      nav,
+      navItems,
+      (item) => item.ruta,
+      (item) => {
+        const a = document.createElement('a');
+        a.href = item.ruta;
+        a.className = 'sidebar-nav-link';
+        a.textContent = item.etiqueta;
+        if (path === item.ruta || (item.ruta !== '/' && path.startsWith(item.ruta))) {
+          a.classList.add('activo');
+        }
+        a.addEventListener('click', (e) => {
+          e.preventDefault();
+          navigate(item.ruta);
+        });
+        return a;
+      },
+      (el, item) => {
+        const isActive = path === item.ruta || (item.ruta !== '/' && path.startsWith(item.ruta));
+        el.classList.toggle('activo', isActive);
+      },
+    );
   }
 
   /* Cargar y renderizar entradas en el sidebar (usa cache) */
   async function renderEntries(path: string): Promise<void> {
-    entradas.innerHTML = '';
-
     const articles = await getCachedArticles();
     const sorted = [...articles].sort((a, b) => {
       if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
@@ -90,20 +97,29 @@ export function createSidebar(): HTMLElement {
       return new Date(dateB).getTime() - new Date(dateA).getTime();
     });
 
-    for (const article of sorted) {
-      const a = document.createElement('a');
-      a.href = `/article/${article.slug}`;
-      a.className = 'sidebar-entrada-link';
-      a.textContent = article.title;
-      if (path === `/article/${article.slug}`) {
-        a.classList.add('activo');
-      }
-      a.addEventListener('click', (e) => {
-        e.preventDefault();
-        navigate(`/article/${article.slug}`);
-      });
-      entradas.appendChild(a);
-    }
+    reconcileChildren(
+      entradas,
+      sorted,
+      (article) => article.slug,
+      (article) => {
+        const a = document.createElement('a');
+        a.href = `/article/${article.slug}`;
+        a.className = 'sidebar-entrada-link';
+        a.textContent = article.title;
+        if (path === `/article/${article.slug}`) {
+          a.classList.add('activo');
+        }
+        a.addEventListener('click', (e) => {
+          e.preventDefault();
+          navigate(`/article/${article.slug}`);
+        });
+        return a;
+      },
+      (el, article) => {
+        const isActive = path === `/article/${article.slug}`;
+        el.classList.toggle('activo', isActive);
+      },
+    );
   }
 
   renderNav(getCurrentPath());
