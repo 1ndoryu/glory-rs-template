@@ -1,18 +1,16 @@
 /* wandori.us — Login Page
- * Pagina de login minimalista. Solo email + password. */
+ * Pagina de login minimalista. Solo email + password.
+ * [Auditoría v4 §1.2] Migrado a createEl(). */
 
 import { AuthService } from '../services';
 import { navigate } from '../router';
 import { showToast } from '../components/ui/toast';
 import { createInput } from '../components/ui/input';
+import { createEl } from '../utils/dom';
 
 export function renderLogin(): HTMLElement {
-  const page = document.createElement('div');
-  page.className = 'login-formulario';
-
-  const titulo = document.createElement('h1');
-  titulo.className = 'login-titulo';
-  titulo.textContent = 'login';
+  const page = createEl('div', { className: 'login-formulario' });
+  const titulo = createEl('h1', { className: 'login-titulo', textContent: 'login' });
 
   let email = '';
   let password = '';
@@ -31,13 +29,9 @@ export function renderLogin(): HTMLElement {
     onInput: (v) => { password = v; },
   });
 
-  const btnLogin = document.createElement('button');
-  btnLogin.className = 'boton boton-grande';
-  btnLogin.textContent = 'entrar';
+  const btnLogin = createEl('button', { className: 'boton boton-grande', textContent: 'entrar' });
   btnLogin.style.alignSelf = 'flex-start';
-
-  const errorMsg = document.createElement('p');
-  errorMsg.className = 'campo-mensaje-error';
+  const errorMsg = createEl('p', { className: 'campo-mensaje-error' });
   errorMsg.style.display = 'none';
 
   btnLogin.addEventListener('click', async () => {
