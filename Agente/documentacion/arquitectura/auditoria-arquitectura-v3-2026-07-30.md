@@ -2,8 +2,9 @@
 
 > **Fecha:** 2026-07-30
 > **Alcance:** frontend TypeScript/Vite del OS desktop (post-fixes v2)
-> **Resultado:** 12 hallazgos nuevos. 1 alto, 4 medios, 4 bajos, 3 informativos.
+> **Resultado:** 16 hallazgos. 2 altos, 5 medios, 5 bajos, 4 informativos.
 > **Contexto:** Aplicados todos los fixes de auditoría v2 (4 críticos, 3 altos, 12 medios, 4 bajos).
+> **Revisión:** Corregido tras verificación contra código real (métricas actualizadas, omisiones añadidas).
 
 ## 1. Métricas actualizadas
 
@@ -13,7 +14,7 @@
 |---|---|---|---|
 | `window-manager.ts` | 314 | 300 | 🔴 +5% |
 | `font-panel.ts` | 304 | 300 | 🔴 +1% |
-| `desktop-menu-bar.ts` | 291 | 300 | 🟡 |
+| `desktop-menu-bar.ts` | 294 | 300 | 🟡 |
 | `finder-preview.ts` | 286 | 300 | 🟡 |
 | `icon-drag.ts` | 262 | 300 | 🟢 |
 | `app-registration.ts` | 243 | 300 | 🟢 |
@@ -28,9 +29,9 @@
 
 | Archivo | Líneas | Límite | Estado |
 |---|---|---|---|
-| `components.css` | 330 | 300 | 🔴 +10% |
-| `pages.css` | 312 | 300 | 🔴 +4% |
-| `layout.css` | 310 | 300 | 🔴 +3% |
+| `components.css` | 336 | 300 | 🔴 +12% |
+| `pages.css` | 318 | 300 | 🔴 +6% |
+| `layout.css` | 316 | 300 | 🔴 +5% |
 | `desktop-shell.css` | 250 | 300 | 🟢 |
 | `desktop-window.css` | 147 | 300 | 🟢 |
 | `variables.css` | 130 | 300 | 🟢 |
@@ -43,9 +44,9 @@
 | Patrón | Cantidad | Evaluación |
 |---|---|---|
 | `innerHTML` usages | 33 | 🟡 Patrón de re-render completo |
-| Type assertions (`as`) | 15 | 🟢 Mayoría seguras |
+| Type assertions (`as`) | 14 | 🟢 Mayoría seguras (querySelector, event targets) |
 | `.subscribe()` calls | 18 | 🟢 Infraestructura de eventos |
-| Console warn/error | 4 | 🟢 Mínimo, solo errores reales |
+| Console warn/error | 5 | 🟢 Mínimo (incluye error boundary de v3) |
 | Imports profundos (3+ niveles) | 13 | 🟡 Acoplamiento vertical |
 | CSS `@layer` declarado | 1 | 🟡 Solo reset+base envueltos |
 
@@ -140,27 +141,23 @@ AppRegistry.registerLazy({
 
 ---
 
-### 2.6 🔵 BAJO — Type assertions frágiles en desktop-menu-bar.ts
+### 2.6 ✅ RESUELTO — Type assertions frágiles en desktop-menu-bar.ts
 
-**Archivo:** `features/desktop/components/desktop-menu-bar.ts` (líneas 50-51, 225)
+**Archivo:** `features/desktop/components/desktop-menu-bar.ts`
 
-**Problema:** Usa `(menu as HTMLElement & { _onOpen?: () => void })._onOpen` para almacenar callbacks en el DOM. Esto es un pattern no tipado y frágil.
+**Problema:** Usaba `(menu as HTMLElement & { _onOpen?: () => void })._onOpen` para almacenar callbacks en el DOM.
 
-**Solución:** Usar un `WeakMap<HTMLElement, () => void>` para almacenar callbacks de apertura.
-
-**Esfuerzo:** 15 min
+**Resolución:** Reemplazado por `WeakMap<HTMLElement, () => void>` tipado. (`215ed075`)
 
 ---
 
-### 2.7 🔵 BAJO — CSS legacy sin envolver en @layer
+### 2.7 ✅ RESUELTO — CSS legacy sin envolver en @layer
 
-**Archivos:** `components.css` (330), `pages.css` (312), `layout.css` (310)
+**Archivos:** `components.css` (336), `pages.css` (318), `layout.css` (316)
 
-**Problema:** Estos 3 archivos suman 952 líneas de CSS legacy del sitio que no pertenecen al OS desktop. Están sin `@layer`, lo que les da la mayor specificity. Si alguna regla del OS necesita sobreescribir una regla legacy, necesita `!important` o mayor specificity.
+**Problema:** Estos 3 archivos CSS legacy del sitio no pertenecen al OS desktop y estaban sin `@layer`.
 
-**Solución:** Envolver en `@layer components`.
-
-**Esfuerzo:** 30 min (incluido en 2.4)
+**Resolución:** Envueltos en `@layer components`. (`215ed075`)
 
 ---
 
@@ -176,19 +173,75 @@ AppRegistry.registerLazy({
 
 ---
 
-### 2.9 🔵 BAJO — No hay error boundaries en app render
+### 2.9 ✅ RESUELTO — No hay error boundaries en app render
 
-**Archivo:** `features/runtime/route-app-adapter.ts`, `app-registration.ts`
+**Archivo:** `features/runtime/app-registry.ts`
 
-**Problema:** Si una app lanza un error durante `render()`, la ventana queda vacía sin feedback al usuario. No hay try/catch alrededor de `AppRegistry.instantiate()`.
+**Problema:** Si una app lanzaba un error durante `render()`, la ventana quedaba vacía sin feedback.
 
-**Solución:** Envolver `instantiate` en try/catch y mostrar un fallback de error en la ventana.
-
-**Esfuerzo:** 15 min
+**Resolución:** `AppRegistry.instantiate()` envuelto en try/catch con fallback visual. (`215ed075`)
 
 ---
 
-### 2.10 ⚪ INFO — Store event typing infraestructura no aprovechada
+### 2.10 🟡 MEDIO — Reconcile aplicado solo a 1 de ~12 subscribers
+
+**Archivos afectados:** reactive-taskbar.ts, finder-preview.ts, trash-preview.ts, sidebar.ts, profile.ts, desktop-menu-bar.ts
+
+**Problema:** Se creó `reconcileChildren` y se aplicó a `workspace-icon-grid.ts`, pero los otros ~12 subscribers que usan `innerHTML = ''` siguen con el patrón antiguo. Solo el grid del escritorio se reconcilia; el taskbar, Finder, trash, sidebar, profile, y menu-bar siguen destruyendo y recreando todo el DOM.
+
+**Solución:** Aplicar `reconcileChildren` a los subscribers restantes que manejan listas (reactive-taskbar, finder-preview, trash-preview, sidebar). Los que renderizan contenido único (profile, font-panel tabs) pueden quedarse con innerHTML.
+
+**Esfuerzo:** 2-3 horas
+
+---
+
+### 2.11 🔵 BAJO — innerHTML sin sanitizar en páginas admin
+
+**Archivos:** `admin-articles.ts` (línea 21, 75), `admin-projects.ts` (línea 14, 58), `admin.ts` (línea 144, 192)
+
+**Problema:** Estas páginas usan `innerHTML` con strings literales del código para estados de carga/error. Aunque los datos vienen del backend, no hay sanitización para contenido dinámico futuro.
+
+**Solución:** Usar `textContent` para textos simples, o `appendSanitizedHtml` (ya existe en el proyecto) para contenido rico.
+
+**Esfuerzo:** 30 min
+
+---
+
+### 2.12 🔵 BAJO — @layer overrides declarado pero nunca usado
+
+**Archivo:** `variables.css` — `@layer base, components, overrides;`
+
+**Problema:** La capa `overrides` se declara pero ningún CSS la usa. Es una dead declaration.
+
+**Solución:** Documentar que es reservada para futuro uso, o eliminarla hasta que se necesite.
+
+**Esfuerzo:** 5 min
+
+---
+
+### 2.13 🔵 BAJO — Closures stale en reconcile de icon grid
+
+**Archivo:** `workspace-icon-grid.ts`
+
+**Problema:** Los event listeners (mousedown, contextmenu, drag) en nodos reusados por `reconcileChildren` referencian el objeto `node` del momento de creación. Si un nodo cambia de `refId`, `type`, o `resourceKind` entre actualizaciones del workspace, los handlers usarán datos obsoletos.
+
+**Solución:** Usar un closure que lea del store en el momento del evento, o recrear listeners en `updateElement`.
+
+**Esfuerzo:** 30 min
+
+---
+
+### 2.14 ⚪ INFO — Desktop CSS sin @layer (decisión arquitectónica)
+
+**Archivos:** `desktop-shell.css`, `desktop-window.css`, `desktop-menu.css`, `desktop-apps.css`, etc.
+
+**Situación:** Los CSS del OS desktop permanecen sin `@layer`, lo que les da la mayor specificity por defecto. Esto es intencional: el chrome del OS debe ganar sobre los estilos legacy. Jerarquía: unlayered (OS) > `@layer components` (legacy) > `@layer base` (reset).
+
+**Acción:** Documentar esta decisión. No requiere cambio.
+
+---
+
+### 2.15 ⚪ INFO — Store event typing infraestructura no aprovechada
 
 **Archivo:** `store.ts`, `stores.ts`
 
@@ -218,18 +271,22 @@ AppRegistry.registerLazy({
 
 ---
 
-## 3. Prioridad de fixes
+## 3. Prioridad de fixes (corregida en revisión)
 
-| # | Severidad | Fix | Esfuerzo | Bloquea |
+| # | Severidad | Fix | Estado | Esfuerzo |
 |---|---|---|---|---|
-| 1 | 🟠 ALTO | Reconcile utility para reemplazar innerHTML | 2-4h | Performance con muchas ventanas |
-| 2 | 🟡 MEDIO | Split window-manager.ts (314→2 módulos) | 30 min | Límite de tamaño |
-| 3 | 🟡 MEDIO | Split font-panel.ts (304→2 módulos) | 45 min | Límite de tamaño |
-| 4 | 🟡 MEDIO | Envolver CSS legacy en @layer components | 1h | Specificity management |
-| 5 | 🟡 MEDIO | Migrar apps a registerLazy | 1-2h | Bundle size |
-| 6 | 🔵 BAJO | WeakMap para callbacks en menu-bar | 15 min | Type safety |
-| 7 | 🔵 BAJO | Error boundary en instantiate | 15 min | UX en errores |
-| 8 | 🔵 BAJO | Path aliases para imports profundos | 30 min | DX |
+| 1 | 🟠 ALTO | Reconcile utility + aplicar a icon grid | ✅ Hecho | — |
+| 2 | 🟡 MEDIO | Aplicar reconcile a los otros ~11 subscribers | ⬜ Pendiente | 2-3h |
+| 3 | 🟡 MEDIO | Split window-manager.ts (314→2 módulos) | ⬜ Pendiente | 30 min |
+| 4 | 🟡 MEDIO | Split font-panel.ts (304→2 módulos) | ⬜ Pendiente | 45 min |
+| 5 | 🟡 MEDIO | Migrar apps a registerLazy | ⬜ Pendiente | 1-2h |
+| 6 | 🔵 BAJO | innerHTML sin sanitizar en admin pages | ⬜ Pendiente | 30 min |
+| 7 | 🔵 BAJO | Closures stale en reconcile grid | ⬜ Pendiente | 30 min |
+| 8 | 🔵 BAJO | @layer overrides dead declaration | ⬜ Pendiente | 5 min |
+| 9 | 🔵 BAJO | WeakMap para callbacks en menu-bar | ✅ Hecho | — |
+| 10 | 🔵 BAJO | Error boundary en instantiate | ✅ Hecho | — |
+| 11 | 🔵 BAJO | Envolver CSS legacy en @layer components | ✅ Hecho | — |
+| 12 | 🔵 BAJO | Path aliases para imports profundos | ⬜ Pendiente | 30 min |
 
 ---
 
@@ -239,16 +296,16 @@ AppRegistry.registerLazy({
 |---|---|---|---|
 | v1 | 10 | 10 | 0 |
 | v2 | 28 | 28 | 0 |
-| **v3** | **12** | **0** | **12** |
+| **v3** | **16** | **6** | **10** |
 
-### Distribución v3
+### Distribución v3 (corregida)
 
-| Categoría | Cantidad |
-|---|---|
-| 🟠 Alto | 1 |
-| 🟡 Medio | 4 |
-| 🔵 Bajo | 4 |
-| ⚪ Info | 3 |
+| Categoría | Total | Completados | Pendientes |
+|---|---|---|---|
+| 🟠 Alto | 2 | 1 | 1 (reconcile otros subscribers) |
+| 🟡 Medio | 5 | 1 | 4 (splits + lazy loading) |
+| 🔵 Bajo | 5 | 3 | 2 (closures stale + path aliases) |
+| ⚪ Info | 4 | 0 | 4 (infraestructura lista sin consumidores) |
 
 ---
 
