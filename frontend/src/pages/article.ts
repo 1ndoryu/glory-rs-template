@@ -1,13 +1,14 @@
 /* wandori.us — Article Page
  * Renderiza un articulo individual a partir de su slug.
- * Convierte TipTap JSON a HTML.
- * Oculta el profile header cuando se esta viendo un articulo. */
+ * [Auditoría v4 §1.2] Migrado a createEl(). */
 
+import { safeRun } from '../utils/safe-async';
 import { ArticleService, ProductService } from '../services';
 import { trackImageDownload } from '../features/analytics/tracker';
 import { updateArticleMeta, setArticleJsonLd, resetMeta } from '../features/seo/meta';
 import { showProfile } from '../store';
 import { appendSanitizedHtml } from '../utils/sanitize-html';
+import { createEl } from '../utils/dom';
 import type { Product } from '../api/types';
 
 function formatDate(iso: string): string {
@@ -16,7 +17,6 @@ function formatDate(iso: string): string {
   return `${d.getDate()} ${meses[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-/* Convertir TipTap JSON a HTML basico */
 function tiptapToHtml(content: Record<string, unknown>): string {
   if (!content || typeof content !== 'object') return '';
   const doc = content as { type?: string; content?: Array<Record<string, unknown>> };
@@ -44,13 +44,9 @@ function tiptapToHtml(content: Record<string, unknown>): string {
     }
 
     const inner = children.map(renderNode).join('');
-
     switch (type) {
       case 'paragraph': return `<p>${inner}</p>`;
-      case 'heading': {
-        const level = attrs.level || '2';
-        return `<h${level}>${inner}</h${level}>`;
-      }
+      case 'heading': return `<h${attrs.level || '2'}>${inner}</h${attrs.level || '2'}>`;
       case 'bulletList': return `<ul>${inner}</ul>`;
       case 'orderedList': return `<ol>${inner}</ol>`;
       case 'listItem': return `<li>${inner}</li>`;
@@ -58,101 +54,52 @@ function tiptapToHtml(content: Record<string, unknown>): string {
       case 'codeBlock': return `<pre><code>${inner}</code></pre>`;
       case 'horizontalRule': return '<hr>';
       case 'hardBreak': return '<br>';
-      case 'image':
-        return `<img src="${attrs.src}" alt="${attrs.alt || ''}" loading="lazy" />`;
-      default:
-        return inner;
+      case 'image': return `<img src="${attrs.src}" alt="${attrs.alt || ''}" loading="lazy" />`;
+      default: return inner;
     }
   }
-
   return doc.content.map(renderNode).join('');
 }
 
 export async function renderArticle(params: Record<string, string>): Promise<HTMLElement> {
   resetMeta();
-  /* Ocultar profile header al ver un articulo */
   showProfile.set(false);
 
   const { slug } = params;
-  const page = document.createElement('div');
-  page.className = 'articulo';
-
-  const cargando = document.createElement('p');
-  cargando.className = 'cargando';
-  cargando.textContent = 'cargando...';
-  page.appendChild(cargando);
+  const page = createEl('div', { className: 'articulo' });
+  page.appendChild(createEl('p', { className: 'cargando', textContent: 'cargando...' }));
 
   try {
     const article = await ArticleService.getBySlug(slug);
     page.innerHTML = '';
 
-    updateArticleMeta({
-      title: article.title,
-      excerpt: article.excerpt,
-      cover_image: article.cover_image || undefined,
-      slug: article.slug,
-    });
+    updateArticleMeta({ title: article.title, excerpt: article.excerpt, cover_image: article.cover_image || undefined, slug: article.slug });
+    setArticleJsonLd({ title: article.title, excerpt: article.excerpt, cover_image: article.cover_image || undefined, slug: article.slug, published_at: article.published_at, created_at: article.created_at });
 
-    setArticleJsonLd({
-      title: article.title,
-      excerpt: article.excerpt,
-      cover_image: article.cover_image || undefined,
-      slug: article.slug,
-      published_at: article.published_at,
-      created_at: article.created_at,
-    });
-
-    const titulo = document.createElement('h1');
-    titulo.className = 'articulo-titulo';
-    titulo.textContent = article.title;
-
-    const fecha = document.createElement('time');
-    fecha.className = 'articulo-fecha';
-    const dateStr = article.published_at || article.created_at;
-    fecha.textContent = formatDate(dateStr);
-
-    const contenido = document.createElement('div');
-    contenido.className = 'articulo-contenido';
+    const titulo = createEl('h1', { className: 'articulo-titulo', textContent: article.title });
+    const fecha = createEl('time', { className: 'articulo-fecha', textContent: formatDate(article.published_at || article.created_at) });
+    const contenido = createEl('div', { className: 'articulo-contenido' });
     appendSanitizedHtml(contenido, tiptapToHtml(article.content));
-
-    contenido.querySelectorAll('img').forEach((img) => {
-      img.addEventListener('contextmenu', () => {
-        trackImageDownload(img.src);
-      });
-    });
+    contenido.querySelectorAll('img').forEach((img) => { img.addEventListener('contextmenu', () => trackImageDownload(img.src)); });
 
     page.append(titulo, fecha, contenido);
 
-    /* Producto asociado */
     try {
       const product = await ProductService.getByArticleId(article.id);
       if (product && product.is_active) {
-        const btnCompra = document.createElement('button');
-        btnCompra.className = 'articulo-boton-compra boton';
-        btnCompra.textContent = `comprar — $${(product.price_cents / 100).toFixed(2)} ${product.currency}`;
+        const btnCompra = createEl('button', { className: 'articulo-boton-compra boton', textContent: `comprar — $${(product.price_cents / 100).toFixed(2)} ${product.currency}` });
         btnCompra.addEventListener('click', () => openCheckoutModal(product));
         page.appendChild(btnCompra);
       }
     } catch { /* No hay productos */ }
-
   } catch {
-    /* Articulo no encontrado — demo */
     page.innerHTML = '';
     const demoTitle = slug.replace(/-/g, ' ');
     updateArticleMeta({ title: demoTitle, slug });
-
-    const titulo = document.createElement('h1');
-    titulo.className = 'articulo-titulo';
-    titulo.textContent = demoTitle;
-
-    const fecha = document.createElement('time');
-    fecha.className = 'articulo-fecha';
-    fecha.textContent = '15 jul 2026';
-
-    const contenido = document.createElement('div');
-    contenido.className = 'articulo-contenido';
+    const titulo = createEl('h1', { className: 'articulo-titulo', textContent: demoTitle });
+    const fecha = createEl('time', { className: 'articulo-fecha', textContent: '15 jul 2026' });
+    const contenido = createEl('div', { className: 'articulo-contenido' });
     contenido.innerHTML = '<p>hay algo en el ruido blanco de los servidores que me recuerda al mar. no el mar turistico de postal, sino el otro, el que nadie ve de madrugada cuando la ciudad duerme y solo quedan las luces del puerto.</p><p>escribi este texto pensando en eso. en como las maquinas tienen su propio silencio, y como ese silencio a veces dice mas que cualquier palabra.</p>';
-
     page.append(titulo, fecha, contenido);
   }
 
@@ -164,37 +111,21 @@ async function openCheckoutModal(product: Product): Promise<void> {
   const { createInput } = await import('../components/ui/input');
   const { showToast } = await import('../components/ui/toast');
 
-  const container = document.createElement('div');
+  const container = createEl('div');
   container.style.display = 'flex';
   container.style.flexDirection = 'column';
   container.style.gap = 'var(--espacio-lg)';
 
-  const desc = document.createElement('p');
-  desc.textContent = product.description || product.name;
-
+  const desc = createEl('p', { textContent: product.description || product.name });
   let email = '';
-  const emailInput = createInput({
-    label: 'email para recibir el archivo',
-    type: 'email',
-    placeholder: 'tu@email.com',
-    onInput: (v) => { email = v; },
-  });
-
-  const btnPagar = document.createElement('button');
-  btnPagar.className = 'boton boton-grande';
-  btnPagar.textContent = 'proceder al pago';
+  const emailInput = createInput({ label: 'email para recibir el archivo', type: 'email', placeholder: 'tu@email.com', onInput: (v) => { email = v; } });
+  const btnPagar = createEl('button', { className: 'boton boton-grande', textContent: 'proceder al pago' });
   btnPagar.addEventListener('click', async () => {
     if (!email) { showToast('ingresa tu email'); return; }
-    try {
-      const response = await fetch(`/api/products/${product.id}/checkout`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-        credentials: 'include',
-      });
-      const { checkout_url } = await response.json() as { checkout_url: string };
-      window.location.href = checkout_url;
-    } catch { showToast('error al iniciar el pago'); }
+    const result = await safeRun(ProductService.createCheckout(product.id, email), 'error al iniciar el pago');
+    if (result.ok) {
+      window.location.href = result.value.checkout_url;
+    }
   });
 
   container.append(desc, emailInput, btnPagar);

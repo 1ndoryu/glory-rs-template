@@ -2,6 +2,7 @@
  * Lista y editor de artículos para el panel de administración.
  * [Auditoría v4 §1.2] Migrado a createEl(). */
 
+import { safeRun } from '../utils/safe-async';
 import { ArticleService } from '../services';
 import { showToast } from '../components/ui/toast';
 import { createModal } from '../components/ui/modal';
@@ -103,9 +104,9 @@ export async function openEditor(article?: Article): Promise<void> {
     { label: 'lista ordenada', action: () => { editor.chain().focus().toggleOrderedList().run(); } },
     { label: 'cita', action: () => { editor.chain().focus().toggleBlockquote().run(); } },
     { label: 'linea', action: () => { editor.chain().focus().setHorizontalRule().run(); } },
-    { label: 'imagen', action: async () => { try { const r = await pickAndUpload('image/*', article?.id); if (r) editor.chain().focus().setImage({ src: r.url }).run(); } catch { showToast('error al subir imagen'); } } },
-    { label: 'audio', action: async () => { try { const r = await pickAndUpload('audio/*', article?.id); if (r) editor.chain().focus().insertContent(`<audio controls src="${r.url}"></audio>`).run(); } catch { showToast('error al subir audio'); } } },
-    { label: 'video', action: async () => { try { const r = await pickAndUpload('video/*', article?.id); if (r) editor.chain().focus().insertContent(`<video controls src="${r.url}" style="width:100%"></video>`).run(); } catch { showToast('error al subir video'); } } },
+    { label: 'imagen', action: () => { void safeRun(pickAndUpload('image/*', article?.id), 'error al subir imagen').then(r => { if (r.ok && r.value) editor.chain().focus().setImage({ src: r.value.url }).run(); }); } },
+    { label: 'audio', action: () => { void safeRun(pickAndUpload('audio/*', article?.id), 'error al subir audio').then(r => { if (r.ok && r.value) editor.chain().focus().insertContent(`<audio controls src="${r.value.url}"></audio>`).run(); }); } },
+    { label: 'video', action: () => { void safeRun(pickAndUpload('video/*', article?.id), 'error al subir video').then(r => { if (r.ok && r.value) editor.chain().focus().insertContent(`<video controls src="${r.value.url}" style="width:100%"></video>`).run(); }); } },
   ];
 
   for (const btn of toolbarButtons) {
@@ -125,16 +126,14 @@ export async function openEditor(article?: Article): Promise<void> {
 
   const coverBtn = createEl('button', { className: 'boton', textContent: coverImage ? 'cambiar portada' : 'subir portada' });
   coverBtn.addEventListener('click', async () => {
-    try {
-      const result = await pickAndUpload('image/*');
-      if (result) {
-        coverImage = result.url;
-        coverPreview.src = result.url;
-        coverPreview.classList.remove('oculto');
-        coverBtn.textContent = 'cambiar portada';
-        coverQuitar.classList.remove('oculto');
-      }
-    } catch { showToast('error al subir portada'); }
+    const result = await safeRun(pickAndUpload('image/*'), 'error al subir portada');
+    if (result.ok && result.value) {
+      coverImage = result.value.url;
+      coverPreview.src = result.value.url;
+      coverPreview.classList.remove('oculto');
+      coverBtn.textContent = 'cambiar portada';
+      coverQuitar.classList.remove('oculto');
+    }
   });
   if (!coverImage) coverQuitar.classList.add('oculto');
   coverQuitar.addEventListener('click', () => {
@@ -152,14 +151,17 @@ export async function openEditor(article?: Article): Promise<void> {
   btnGuardar.addEventListener('click', async () => {
     if (!title.trim()) { showToast('el titulo es obligatorio'); return; }
     const payload = { title, excerpt, content: editor.getJSON(), cover_image: coverImage || undefined, status, is_pinned: isPinned };
-    try {
-      if (article) { await ArticleService.update(article.id, payload); showToast('articulo actualizado'); }
-      else { await ArticleService.create(payload as any); showToast('articulo creado'); }
+    const fn = article
+      ? ArticleService.update(article.id, payload)
+      : ArticleService.create(payload as any);
+    const result = await safeRun(fn, 'error al guardar');
+    if (result.ok) {
+      showToast(article ? 'articulo actualizado' : 'articulo creado');
       clearArticleCache();
       modal.close();
       const lista = document.getElementById('admin-articulos');
       if (lista) renderArticleList(lista);
-    } catch { showToast('error al guardar'); }
+    }
   });
 
   container.append(titleInput, excerptInput, coverContainer, toolbar, editorContainer, statusSelect, pinBtn, btnGuardar);

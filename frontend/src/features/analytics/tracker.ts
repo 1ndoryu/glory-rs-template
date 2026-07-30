@@ -2,6 +2,7 @@
  * Mide cada interacción del usuario: pageviews, clicks, copias, descargas.
  * Envía eventos al backend de forma asíncrona sin bloquear la UI. */
 
+import { tryCatch } from '../../utils/result';
 import { AnalyticsService } from '../../services';
 import type { AnalyticsEvent } from '../../api/types';
 
@@ -45,13 +46,11 @@ async function flush(): Promise<void> {
   const events = [...eventQueue];
   eventQueue = [];
 
-  try {
-    await AnalyticsService.trackEvents(events);
-  } catch {
-    /* Silencioso: analytics no debe romper la experiencia */
-    /* Re-intentar en la próxima ronda */
-    eventQueue = [...events, ...eventQueue];
-  }
+  const result = await tryCatch(AnalyticsService.trackEvents(events));
+    if (!result.ok) {
+      /* Silencioso: analytics no debe romper la experiencia */
+      eventQueue = [...events, ...eventQueue];
+    }
 }
 
 /* === Helpers de tracking === */
