@@ -53,7 +53,7 @@ export function createFontPanel(): HTMLElement {
         profileImage.set(result.value.file_path);
         imgPreview.src = result.value.file_path;
         imgPreview.classList.remove('oculto');
-        SettingsService.save({ profile_image: result.value.file_path }).catch(() => {});
+        SettingsService.save({ profile_image: result.value.file_path }).catch(() => { /* fire-and-forget save */ });
         showToast('imagen actualizada');
       }
     });
@@ -62,7 +62,7 @@ export function createFontPanel(): HTMLElement {
     entradasCheck.checked = siteConfig.get().showEntriesOnHome;
     entradasCheck.addEventListener('change', () => {
       siteConfig.update(s => ({ ...s, showEntriesOnHome: entradasCheck.checked }));
-      SettingsService.save({ show_entries_on_home: String(entradasCheck.checked) }).catch(() => {});
+      SettingsService.save({ show_entries_on_home: String(entradasCheck.checked) }).catch(() => { /* fire-and-forget save */ });
     });
     const entradasLabel = createEl('label', { className: 'checkbox-personalizado' }, entradasCheck, 'mostrar entradas en inicio');
 

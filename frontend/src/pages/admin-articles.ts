@@ -2,7 +2,8 @@
  * Lista y editor de artículos para el panel de administración.
  * [Auditoría v4 §1.2] Migrado a createEl(). */
 
-import { safeRun } from '../utils/safe-async';
+import { safeRun, safeClick } from '../utils/safe-async';
+import { tryCatch } from '../utils/result';
 import { ArticleService } from '../services';
 import { showToast } from '../components/ui/toast';
 import { createModal } from '../components/ui/modal';
@@ -23,9 +24,15 @@ export async function renderArticleList(container: HTMLElement): Promise<void> {
   container.textContent = '';
   container.appendChild(createEl('p', { className: 'cargando', textContent: 'cargando...' }));
 
-  try {
-    const data = await ArticleService.listByStatus('all');
+  const listResult = await tryCatch(ArticleService.listByStatus('all'));
+  if (!listResult.ok) {
     container.textContent = '';
+    container.appendChild(createEl('p', { className: 'vacio', textContent: 'error al cargar' }));
+    return;
+  }
+
+  const data = listResult.value;
+  container.textContent = '';
 
     for (const article of data.items) {
       const titulo = createEl('span', { textContent: article.title + (article.status === 'draft' ? ' (borrador)' : '') + (article.is_pinned ? ' · fijado' : '') });
@@ -36,15 +43,17 @@ export async function renderArticleList(container: HTMLElement): Promise<void> {
       btnEditar.addEventListener('click', () => openEditor(article));
 
       const btnEliminar = createEl('button', { className: 'boton boton-pequeno', textContent: 'eliminar' });
-      btnEliminar.addEventListener('click', async () => {
+      btnEliminar.addEventListener('click', safeClick(async () => {
         const ok = await showConfirm(`eliminar "${article.title}"?`);
         if (ok) {
-          await ArticleService.delete(article.id);
-          showToast('articulo eliminado');
-          clearArticleCache();
-          renderArticleList(container);
+          const delResult = await safeRun(ArticleService.delete(article.id), 'error al eliminar');
+          if (delResult.ok) {
+            showToast('articulo eliminado');
+            clearArticleCache();
+            renderArticleList(container);
+          }
         }
-      });
+      }));
 
       const acciones = createEl('div', { className: 'admin-acciones' }, btnEditar, btnEliminar);
       container.appendChild(createEl('div', { className: 'admin-item' }, info, acciones));
@@ -53,10 +62,7 @@ export async function renderArticleList(container: HTMLElement): Promise<void> {
     if (data.items.length === 0) {
       container.appendChild(createEl('p', { className: 'vacio', textContent: 'no hay articulos' }));
     }
-  } catch {
-    container.textContent = '';
-    container.appendChild(createEl('p', { className: 'vacio', textContent: 'error al cargar' }));
-  }
+
 }
 
 export async function openEditor(article?: Article): Promise<void> {
@@ -125,7 +131,7 @@ export async function openEditor(article?: Article): Promise<void> {
   const coverQuitar = createEl('button', { className: 'boton', textContent: 'quitar' });
 
   const coverBtn = createEl('button', { className: 'boton', textContent: coverImage ? 'cambiar portada' : 'subir portada' });
-  coverBtn.addEventListener('click', async () => {
+  coverBtn.addEventListener('click', safeClick(async () => {
     const result = await safeRun(pickAndUpload('image/*'), 'error al subir portada');
     if (result.ok && result.value) {
       coverImage = result.value.url;
@@ -134,7 +140,7 @@ export async function openEditor(article?: Article): Promise<void> {
       coverBtn.textContent = 'cambiar portada';
       coverQuitar.classList.remove('oculto');
     }
-  });
+  }));
   if (!coverImage) coverQuitar.classList.add('oculto');
   coverQuitar.addEventListener('click', () => {
     coverImage = '';
@@ -148,7 +154,7 @@ export async function openEditor(article?: Article): Promise<void> {
   coverContainer.append(coverLabel, coverPreview, coverBtns);
 
   const btnGuardar = createEl('button', { className: 'boton boton-grande', textContent: article ? 'guardar' : 'crear' });
-  btnGuardar.addEventListener('click', async () => {
+  btnGuardar.addEventListener('click', safeClick(async () => {
     if (!title.trim()) { showToast('el titulo es obligatorio'); return; }
     const payload = { title, excerpt, content: editor.getJSON(), cover_image: coverImage || undefined, status, is_pinned: isPinned };
     const fn = article
@@ -162,7 +168,7 @@ export async function openEditor(article?: Article): Promise<void> {
       const lista = document.getElementById('admin-articulos');
       if (lista) renderArticleList(lista);
     }
-  });
+  }));
 
   container.append(titleInput, excerptInput, coverContainer, toolbar, editorContainer, statusSelect, pinBtn, btnGuardar);
   const modal = createModal({ titulo: article ? 'editar articulo' : 'nuevo articulo', contenido: container, ancho: '720px', onClose: () => editor.destroy() });

@@ -6,6 +6,7 @@ import { ProjectService } from '../services';
 import { updateMeta, setPageJsonLd } from '../features/seo/meta';
 import { showProfile } from '../store';
 import { createEl, createExternalLink } from '../utils/dom';
+import { tryCatch } from '../utils/result';
 
 export async function renderProjects(): Promise<HTMLElement> {
   showProfile.set(true);
@@ -18,40 +19,8 @@ export async function renderProjects(): Promise<HTMLElement> {
 
   page.append(titulo, cargando);
 
-  try {
-    const projects = await ProjectService.list();
-    page.innerHTML = '';
-    page.appendChild(titulo);
-
-    const visibles = projects.filter(p => p.is_visible).sort((a, b) => a.sort_order - b.sort_order);
-
-    if (visibles.length === 0) {
-      page.appendChild(createEl('p', { className: 'vacio', textContent: 'no hay proyectos todavia' }));
-      return page;
-    }
-
-    const lista = createEl('div');
-
-    for (const project of visibles) {
-      const info = createEl('div', {},
-        createEl('span', { className: 'proyecto-titulo', textContent: project.title }),
-      );
-
-      if (project.description) {
-        info.appendChild(createEl('p', { className: 'proyecto-descripcion', textContent: project.description }));
-      }
-
-      const item = createEl('div', { className: 'proyecto-item' }, info);
-
-      if (project.url) {
-        item.appendChild(createExternalLink(project.url, 'ver', 'proyecto-link'));
-      }
-
-      lista.appendChild(item);
-    }
-
-    page.appendChild(lista);
-  } catch {
+  const projectsResult = await tryCatch(ProjectService.list());
+  if (!projectsResult.ok) {
     /* API no disponible — mostrar proyectos de ejemplo */
     page.innerHTML = '';
     page.appendChild(titulo);
@@ -75,7 +44,41 @@ export async function renderProjects(): Promise<HTMLElement> {
       lista.appendChild(item);
     }
     page.appendChild(lista);
+    return page;
   }
+
+  const projects = projectsResult.value;
+  page.innerHTML = '';
+  page.appendChild(titulo);
+
+  const visibles = projects.filter(p => p.is_visible).sort((a, b) => a.sort_order - b.sort_order);
+
+  if (visibles.length === 0) {
+    page.appendChild(createEl('p', { className: 'vacio', textContent: 'no hay proyectos todavia' }));
+    return page;
+  }
+
+  const lista = createEl('div');
+
+  for (const project of visibles) {
+    const info = createEl('div', {},
+      createEl('span', { className: 'proyecto-titulo', textContent: project.title }),
+    );
+
+    if (project.description) {
+      info.appendChild(createEl('p', { className: 'proyecto-descripcion', textContent: project.description }));
+    }
+
+    const item = createEl('div', { className: 'proyecto-item' }, info);
+
+    if (project.url) {
+      item.appendChild(createExternalLink(project.url, 'ver', 'proyecto-link'));
+    }
+
+    lista.appendChild(item);
+  }
+
+  page.appendChild(lista);
 
   return page;
 }

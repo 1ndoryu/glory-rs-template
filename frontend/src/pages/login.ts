@@ -2,7 +2,7 @@
  * Pagina de login minimalista. Solo email + password.
  * [Auditoría v4 §1.2] Migrado a createEl(). */
 
-import { safeRun } from '../utils/safe-async';
+import { safeRun, safeClick } from '../utils/safe-async';
 import { AuthService } from '../services';
 import { navigate } from '../router';
 import { showToast } from '../components/ui/toast';
@@ -35,7 +35,7 @@ export function renderLogin(): HTMLElement {
   const errorMsg = createEl('p', { className: 'campo-mensaje-error' });
   errorMsg.style.display = 'none';
 
-  btnLogin.addEventListener('click', async () => {
+  btnLogin.addEventListener('click', safeClick(async () => {
     if (!email || !password) {
       showToast('completa todos los campos');
       return;
@@ -51,7 +51,7 @@ export function renderLogin(): HTMLElement {
       showToast('sesion iniciada');
       navigate('/admin');
     }
-  });
+  }));
 
   /* Enter para submit */
   page.addEventListener('keydown', (e) => {

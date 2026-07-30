@@ -8,6 +8,7 @@ import { trackImageDownload } from '../features/analytics/tracker';
 import { updateMeta, setPageJsonLd } from '../features/seo/meta';
 import { showProfile } from '../store';
 import { createEl } from '../utils/dom';
+import { tryCatch } from '../utils/result';
 
 export async function renderGallery(): Promise<HTMLElement> {
   showProfile.set(true);
@@ -21,46 +22,8 @@ export async function renderGallery(): Promise<HTMLElement> {
 
   page.append(titulo, cargando);
 
-  try {
-    const mediaResponse = await MediaService.list();
-    const media = (mediaResponse as any).items as import('../api/types').Media[];
-    page.innerHTML = '';
-    page.appendChild(titulo);
-
-    if (media.length === 0) {
-      page.appendChild(createEl('p', { className: 'vacio', textContent: 'no hay imagenes todavia' }));
-      return page;
-    }
-
-    const grid = createEl('div', { className: 'galeria-grid' });
-
-    for (const item of media) {
-      const img = createEl('img', { src: item.file_path, alt: item.alt_text || '', loading: 'lazy' });
-
-      img.addEventListener('click', () => {
-        const fullImg = createEl('img', { src: item.file_path, alt: item.alt_text || '' });
-        fullImg.style.width = '100%';
-        fullImg.style.border = 'var(--borde)';
-
-        const btnDescargar = createEl('button', { className: 'boton', textContent: 'descargar' });
-        btnDescargar.addEventListener('click', () => {
-          trackImageDownload(item.file_path);
-          const a = document.createElement('a');
-          a.href = item.file_path;
-          a.download = item.file_path.split('/').pop() || 'imagen';
-          a.click();
-        });
-
-        const container = createEl('div', {}, fullImg, btnDescargar);
-        createModal({ titulo: 'imagen', contenido: container, ancho: '800px' });
-      });
-
-      const card = createEl('div', { className: 'galeria-item' }, img);
-      grid.appendChild(card);
-    }
-
-    page.appendChild(grid);
-  } catch {
+  const mediaResult = await tryCatch(MediaService.list());
+  if (!mediaResult.ok) {
     /* API no disponible — mostrar imagenes de ejemplo */
     page.innerHTML = '';
     page.appendChild(titulo);
@@ -83,7 +46,47 @@ export async function renderGallery(): Promise<HTMLElement> {
     }
 
     page.appendChild(grid);
+    return page;
   }
+
+  const mediaResponse = mediaResult.value;
+  const media = (mediaResponse as any).items as import('../api/types').Media[];
+  page.innerHTML = '';
+  page.appendChild(titulo);
+
+  if (media.length === 0) {
+    page.appendChild(createEl('p', { className: 'vacio', textContent: 'no hay imagenes todavia' }));
+    return page;
+  }
+
+  const grid = createEl('div', { className: 'galeria-grid' });
+
+  for (const item of media) {
+    const img = createEl('img', { src: item.file_path, alt: item.alt_text || '', loading: 'lazy' });
+
+    img.addEventListener('click', () => {
+      const fullImg = createEl('img', { src: item.file_path, alt: item.alt_text || '' });
+      fullImg.style.width = '100%';
+      fullImg.style.border = 'var(--borde)';
+
+      const btnDescargar = createEl('button', { className: 'boton', textContent: 'descargar' });
+      btnDescargar.addEventListener('click', () => {
+        trackImageDownload(item.file_path);
+        const a = document.createElement('a');
+        a.href = item.file_path;
+        a.download = item.file_path.split('/').pop() || 'imagen';
+        a.click();
+      });
+
+      const container = createEl('div', {}, fullImg, btnDescargar);
+      createModal({ titulo: 'imagen', contenido: container, ancho: '800px' });
+    });
+
+    const card = createEl('div', { className: 'galeria-item' }, img);
+    grid.appendChild(card);
+  }
+
+  page.appendChild(grid);
 
   return page;
 }

@@ -2,7 +2,7 @@
  * Renderiza un articulo individual a partir de su slug.
  * [Auditoría v4 §1.2] Migrado a createEl(). */
 
-import { safeRun } from '../utils/safe-async';
+import { safeRun, safeClick } from '../utils/safe-async';
 import { ArticleService, ProductService } from '../services';
 import { trackImageDownload } from '../features/analytics/tracker';
 import { updateArticleMeta, setArticleJsonLd, resetMeta } from '../features/seo/meta';
@@ -120,13 +120,13 @@ async function openCheckoutModal(product: Product): Promise<void> {
   let email = '';
   const emailInput = createInput({ label: 'email para recibir el archivo', type: 'email', placeholder: 'tu@email.com', onInput: (v) => { email = v; } });
   const btnPagar = createEl('button', { className: 'boton boton-grande', textContent: 'proceder al pago' });
-  btnPagar.addEventListener('click', async () => {
+  btnPagar.addEventListener('click', safeClick(async () => {
     if (!email) { showToast('ingresa tu email'); return; }
     const result = await safeRun(ProductService.createCheckout(product.id, email), 'error al iniciar el pago');
     if (result.ok) {
       window.location.href = result.value.checkout_url;
     }
-  });
+  }));
 
   container.append(desc, emailInput, btnPagar);
   createModal({ titulo: product.name, contenido: container, ancho: '440px' });

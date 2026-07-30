@@ -6,6 +6,7 @@
 import { createEl } from '../../../../utils/dom';
 import { ArticleService } from '../../../../services';
 import { appendSanitizedHtml } from '../../../../utils/sanitize-html';
+import { tryCatch } from '../../../../utils/result';
 
 export interface ReaderOptions {
   slug?: string;
@@ -35,33 +36,35 @@ async function loadArticle(
   dateEl: HTMLTimeElement,
   body: HTMLElement,
 ): Promise<void> {
-  try {
-    const article = await ArticleService.getBySlug(slug);
-    const content = typeof article.content === 'string' ? article.content : JSON.stringify(article.content);
-
-    titleEl.textContent = article.title;
-
-    if (article.published_at) {
-      const d = new Date(article.published_at);
-      dateEl.dateTime = article.published_at;
-      dateEl.textContent = d.toLocaleDateString('es', {
-        day: 'numeric', month: 'long', year: 'numeric',
-      });
-    }
-
-    if (article.cover_image) {
-      body.appendChild(createEl('img', {
-        className: 'desktop-reader__image', src: article.cover_image, alt: article.title, loading: 'lazy',
-      }));
-    }
-
-    if (content) {
-      appendSanitizedHtml(body, content);
-    } else {
-      body.appendChild(createEl('p', { className: 'desktop-reader__empty', textContent: 'Este artículo no tiene contenido.' }));
-    }
-  } catch {
+  const articleResult = await tryCatch(ArticleService.getBySlug(slug));
+  if (!articleResult.ok) {
     titleEl.textContent = 'Error al cargar';
     body.appendChild(createEl('p', { className: 'desktop-reader__empty', textContent: `No se pudo cargar el artículo "${slug}".` }));
+    return;
+  }
+
+  const article = articleResult.value;
+  const content = typeof article.content === 'string' ? article.content : JSON.stringify(article.content);
+
+  titleEl.textContent = article.title;
+
+  if (article.published_at) {
+    const d = new Date(article.published_at);
+    dateEl.dateTime = article.published_at;
+    dateEl.textContent = d.toLocaleDateString('es', {
+      day: 'numeric', month: 'long', year: 'numeric',
+    });
+  }
+
+  if (article.cover_image) {
+    body.appendChild(createEl('img', {
+      className: 'desktop-reader__image', src: article.cover_image, alt: article.title, loading: 'lazy',
+    }));
+  }
+
+  if (content) {
+    appendSanitizedHtml(body, content);
+  } else {
+    body.appendChild(createEl('p', { className: 'desktop-reader__empty', textContent: 'Este artículo no tiene contenido.' }));
   }
 }

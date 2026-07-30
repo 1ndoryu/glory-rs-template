@@ -8,7 +8,7 @@ import { navigate } from '../router';
 import { showToast } from '../components/ui/toast';
 import { createTextarea } from '../components/ui/textarea';
 import { createFontPanel } from '../features/settings/font-panel';
-import { safeClick, safeRun } from '../utils/safe-async';
+import { safeClick, safeRun, safeEffect } from '../utils/safe-async';
 import { renderArticleList, openEditor } from './admin-articles';
 import { renderProjectList } from './admin-projects';
 import { createEl } from '../utils/dom';
@@ -95,11 +95,12 @@ function renderSitioTab(): HTMLElement {
   });
   container.appendChild(aboutArea);
 
-  SettingsService.getAll().then(s => {
+  safeEffect(async () => {
+    const s = await SettingsService.getAll();
     aboutContent = s.about_content || '';
     const textarea = aboutArea.querySelector('textarea');
     if (textarea) textarea.value = aboutContent;
-  }).catch(() => {});
+  })();
 
   const btnGuardarSitio = createEl('button', { className: 'boton', textContent: 'guardar' });
   btnGuardarSitio.addEventListener('click', safeClick(async () => {
