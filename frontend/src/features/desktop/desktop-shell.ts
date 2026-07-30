@@ -24,9 +24,10 @@ import { dispatchEvent } from '../analytics/dispatcher';
 import { enableDragResize } from './utils/drag-resize';
 import { openContextMenu } from './components/desktop-context-menu';
 import { selectSingle, clearSelection, selectBackground } from '../runtime/selection-store';
-import { workspaceStore } from '../runtime/workspace/workspace-store';
+import { workspaceStore, reorderDesktopNodes } from '../runtime/workspace/workspace-store';
 import type { ResolvedNode } from '../runtime/workspace/types';
 import { AppRegistry } from '../runtime/app-registry';
+import { enableIconDrag } from './utils/icon-drag';
 
 export interface DesktopShell {
   element: HTMLElement;
@@ -66,8 +67,14 @@ function createWorkspaceIconGrid(extraActions?: Record<string, () => void>): HTM
   grid.className = 'desktop-icon-grid';
   grid.setAttribute('aria-label', 'Objetos del escritorio');
 
+  const dragCleanups = new Map<string, () => void>();
+
   workspaceStore.subscribe((ws) => {
+    /* Cleanup drags anteriores */
+    for (const cleanup of dragCleanups.values()) cleanup();
+    dragCleanups.clear();
     grid.innerHTML = '';
+
     const desktopNodes = Object.values(ws.nodes)
       .filter((n) => n.parentId === 'desktop')
       .sort((a, b) => (a.mobileOrder ?? 0) - (b.mobileOrder ?? 0));
@@ -106,6 +113,27 @@ function createWorkspaceIconGrid(extraActions?: Record<string, () => void>): HTM
           y: e.clientY,
         });
       });
+
+      /* [Plan 297A-11 §9.4] Drag para reordenar iconos */
+      const cleanup = enableIconDrag({
+        iconEl,
+        nodeId: node.id,
+        gridEl: grid,
+        onReorder: (draggedId, targetIndex) => {
+          const currentIds = Object.values(ws.nodes)
+            .filter((n) => n.parentId === 'desktop')
+            .sort((a, b) => (a.mobileOrder ?? 0) - (b.mobileOrder ?? 0))
+            .map((n) => n.id);
+          const fromIndex = currentIds.indexOf(draggedId);
+          if (fromIndex < 0 || fromIndex === targetIndex) return;
+          /* Reordenar: quitar de posición original e insertar en target */
+          const reordered = [...currentIds];
+          reordered.splice(fromIndex, 1);
+          reordered.splice(targetIndex, 0, draggedId);
+          reorderDesktopNodes(reordered);
+        },
+      });
+      dragCleanups.set(node.id, cleanup);
 
       grid.appendChild(iconEl);
     }

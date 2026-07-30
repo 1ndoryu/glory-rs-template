@@ -208,6 +208,18 @@ export function resetOverlay(): void {
   overlayStore.set(EMPTY_OVERLAY);
 }
 
+/** Reordenar nodos del desktop: asigna mobileOrder según el nuevo orden. */
+export function reorderDesktopNodes(orderedIds: NodeId[]): void {
+  overlayStore.update((prev) => {
+    const overrides = { ...prev.fieldOverrides };
+    for (let i = 0; i < orderedIds.length; i++) {
+      const id = orderedIds[i];
+      overrides[id] = { ...overrides[id], mobileOrder: i };
+    }
+    return { ...prev, fieldOverrides: overrides };
+  });
+}
+
 /** Obtener nodos hijos directos de un padre. */
 export function getChildren(parentId: NodeId | 'desktop'): ResolvedNode[] {
   const ws = workspaceStore.get();
