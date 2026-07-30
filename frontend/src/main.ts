@@ -23,6 +23,7 @@ import './features/runtime/app-registration';
 import './features/runtime/command-registration';
 import { initKeyboardShortcuts } from './features/runtime/command-registration';
 import { initRouteAppAdapter } from './features/runtime/route-app-adapter';
+import { AppRegistry } from './features/runtime/app-registry';
 import { loadSavedFonts } from './features/settings/font-panel';
 import { initTracking, trackPageView } from './features/analytics/tracker';
 import { authStore, showProfile, siteConfig } from './store';
@@ -110,12 +111,15 @@ async function initApp(): Promise<void> {
   /* Configurar outlet del router */
   setOutlet(contenido);
 
-  /* Control de visibilidad del contenido principal:
-   * Se oculta en home cuando las entradas están desactivadas */
+  /* Control de visibilidad del contenido principal (legacy outlet):
+   * Se oculta cuando la ruta es manejada por una app del runtime (ventana propia),
+   * o en home cuando las entradas están desactivadas. */
   function updateContenidoVisibility(): void {
-    const isHome = window.location.pathname === '/';
+    const path = window.location.pathname;
+    const isHome = path === '/';
     const showEntries = siteConfig.get().showEntriesOnHome;
-    desktop.contentWindow.style.display = (isHome && !showEntries) ? 'none' : '';
+    const isAppRoute = !!AppRegistry.findByRoute(path);
+    desktop.contentWindow.style.display = (isAppRoute || (isHome && !showEntries)) ? 'none' : '';
   }
   siteConfig.subscribe(() => updateContenidoVisibility());
   updateContenidoVisibility();
