@@ -62,13 +62,53 @@ pub struct UpdateArticleRequest {
     pub is_pinned: Option<bool>,
 }
 
-/// Response paginada de articulos
+/// Response paginada de articulos (admin — incluye campos internos)
 #[derive(Debug, Serialize, ToSchema)]
 pub struct PaginatedArticles {
     pub items: Vec<Article>,
     pub total: i64,
     pub page: i64,
     pub per_page: i64,
+}
+
+/// [297A-10] Response paginada pública — sin campos internos
+#[derive(Debug, Serialize, ToSchema)]
+pub struct PaginatedArticlesPublic {
+    pub items: Vec<ArticlePublic>,
+    pub total: i64,
+    pub page: i64,
+    pub per_page: i64,
+}
+
+/// [297A-10] DTO público para artículos — no expone campos internos del sistema.
+/// Usado en endpoints públicos. Admin usa el struct `Article` completo.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ArticlePublic {
+    pub id: Uuid,
+    pub title: String,
+    pub slug: String,
+    pub content: JsonValue,
+    pub excerpt: String,
+    pub cover_image: Option<String>,
+    pub published_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl From<Article> for ArticlePublic {
+    fn from(a: Article) -> Self {
+        Self {
+            id: a.id,
+            title: a.title,
+            slug: a.slug,
+            content: a.content,
+            excerpt: a.excerpt,
+            cover_image: a.cover_image,
+            published_at: a.published_at,
+            created_at: a.created_at,
+            updated_at: a.updated_at,
+        }
+    }
 }
 
 /// Query params para listar articulos

@@ -8,7 +8,8 @@ use validator::Validate;
 use crate::errors::AppError;
 use crate::middleware::AdminUser;
 use crate::models::article::{
-    Article, ArticleQueryParams, CreateArticleRequest, PaginatedArticles, UpdateArticleRequest,
+    Article, ArticlePublic, ArticleQueryParams, CreateArticleRequest,
+    PaginatedArticles, PaginatedArticlesPublic, UpdateArticleRequest,
 };
 use crate::services::article::ArticleService;
 use crate::AppState;
@@ -63,16 +64,16 @@ pub async fn get_article(
     path = "/api/articles/slug/{slug}",
     params(("slug" = String, Path, description = "Slug del articulo")),
     responses(
-        (status = 200, description = "Articulo encontrado", body = Article),
+        (status = 200, description = "Articulo encontrado", body = ArticlePublic),
         (status = 404, description = "No encontrado", body = crate::errors::ErrorResponse)
     )
 )]
 pub async fn get_article_by_slug(
     State(state): State<AppState>,
     Path(slug): Path<String>,
-) -> Result<Json<Article>, AppError> {
+) -> Result<Json<ArticlePublic>, AppError> {
     let article = ArticleService::get_by_slug(&state.pool, &slug).await?;
-    Ok(Json(article))
+    Ok(Json(ArticlePublic::from(article)))
 }
 
 /// Listar articulos publicados (publico)
@@ -82,16 +83,21 @@ pub async fn get_article_by_slug(
     path = "/api/articles",
     params(ArticleQueryParams),
     responses(
-        (status = 200, description = "Lista de articulos", body = PaginatedArticles)
+        (status = 200, description = "Lista de articulos", body = PaginatedArticlesPublic)
     )
 )]
 pub async fn list_articles(
     State(state): State<AppState>,
     Query(params): Query<ArticleQueryParams>,
-) -> Result<Json<PaginatedArticles>, AppError> {
+) -> Result<Json<PaginatedArticlesPublic>, AppError> {
     let articles =
         ArticleService::list(&state.pool, Some("published"), params.page, params.per_page).await?;
-    Ok(Json(articles))
+    Ok(Json(PaginatedArticlesPublic {
+        items: articles.items.into_iter().map(ArticlePublic::from).collect(),
+        total: articles.total,
+        page: articles.page,
+        per_page: articles.per_page,
+    }))
 }
 
 /// Listar todos los articulos incluyendo borradores (admin)
