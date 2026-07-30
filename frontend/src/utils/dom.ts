@@ -26,6 +26,7 @@ export interface DomAttrs {
   rows?: string;
   accept?: string;
   disabled?: string;
+  download?: string;
   'aria-label'?: string;
   ariaLabel?: string;
   'aria-haspopup'?: string;
@@ -78,6 +79,7 @@ export function createEl<K extends keyof HTMLElementTagNameMap>(
     if (attrs.value) el.setAttribute('value', attrs.value);
     if (attrs.name) el.setAttribute('name', attrs.name);
     if (attrs.disabled) el.setAttribute('disabled', attrs.disabled);
+    if (attrs.download) el.setAttribute('download', attrs.download);
 
     /* Soportar kebab-case y camelCase para aria-* */
     setAttr(el, 'aria-label', attrs['aria-label'] ?? attrs.ariaLabel);

@@ -34,6 +34,7 @@ import { initTracking, trackPageView } from './features/analytics/tracker';
 import { authStore, showProfile, showSidebar, siteConfig } from './store';
 import { AuthService } from './services';
 import { fetchWorkspaceRelease } from './features/runtime/workspace/workspace-store';
+import { createEl } from './utils/dom';
 
 
 /* Pages */
@@ -99,13 +100,11 @@ async function initApp(): Promise<void> {
   });
 
   /* Columna derecha: superficie exclusiva del escritorio */
-  const columnaDerecha = document.createElement('div');
-  columnaDerecha.className = 'columna-derecha';
+  const columnaDerecha = createEl('div', { className: 'columna-derecha' });
 
   /* Perfil y outlet conservan sus contratos; el shell solo cambia su presentación. */
   const profile = createProfile();
-  const contenido = document.createElement('main');
-  contenido.className = 'contenido-principal';
+  const contenido = createEl('main', { className: 'contenido-principal' });
 
   const desktop = createDesktopShell(profile, contenido);
   columnaDerecha.appendChild(desktop.element);

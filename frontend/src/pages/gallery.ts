@@ -72,9 +72,7 @@ export async function renderGallery(): Promise<HTMLElement> {
       const btnDescargar = createEl('button', { className: 'boton', textContent: 'descargar' });
       btnDescargar.addEventListener('click', () => {
         trackImageDownload(item.file_path);
-        const a = document.createElement('a');
-        a.href = item.file_path;
-        a.download = item.file_path.split('/').pop() || 'imagen';
+        const a = createEl('a', { href: item.file_path, download: item.file_path.split('/').pop() || 'imagen' });
         a.click();
       });
 
