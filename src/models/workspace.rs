@@ -19,7 +19,7 @@ pub struct WorkspaceRelease {
 /// Request para publicar un nuevo release.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct PublishReleaseRequest {
-    /// Árbol del workspace a publicar (formato JSON del WorkspaceTree frontend).
+    /// Árbol del workspace a publicar (formato JSON del `WorkspaceTree` frontend).
     pub tree: JsonValue,
 }
 

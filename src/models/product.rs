@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use validator::Validate;
 
-/// Producto vendible. [297A-10] article_id ahora es opcional (independiente de artículo).
+/// Producto vendible. [297A-10] `article_id` ahora es opcional (independiente de artículo).
 #[derive(Debug, Clone, FromRow, Serialize, ToSchema)]
 pub struct Product {
     pub id: Uuid,
@@ -18,9 +18,9 @@ pub struct Product {
     pub currency: String,
     pub stripe_product_id: Option<String>,
     pub stripe_price_id: Option<String>,
-    /// Legacy: download_path directo. Se mantiene hasta fase contract.
+    /// Legacy: `download_path` directo. Se mantiene hasta fase contract.
     pub download_path: Option<String>,
-    /// Legacy: is_active. Se mantiene hasta fase contract.
+    /// Legacy: `is_active`. Se mantiene hasta fase contract.
     pub is_active: bool,
     pub created_at: DateTime<Utc>,
 }

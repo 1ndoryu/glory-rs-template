@@ -8,7 +8,7 @@ use validator::Validate;
 
 /// Articulo del blog almacenado en base de datos.
 /// [297A-10] Incluye campos legacy (status) y envelope (editorial, visibility, lifecycle)
-/// durante la fase de transición. system_alias identifica artículos de sistema como 'about'.
+/// durante la fase de transición. `system_alias` identifica artículos de sistema como 'about'.
 #[derive(Debug, Clone, FromRow, Serialize, ToSchema)]
 pub struct Article {
     pub id: Uuid,

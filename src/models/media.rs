@@ -15,7 +15,7 @@ pub enum AssetProcessingState {
     Rejected,
 }
 
-/// Archivo multimedia (imagen, audio, video). [297A-10] Añade asset_state.
+/// Archivo multimedia (imagen, audio, video). [297A-10] Añade `asset_state`.
 #[derive(Debug, Clone, FromRow, Serialize, ToSchema)]
 pub struct Media {
     pub id: Uuid,
