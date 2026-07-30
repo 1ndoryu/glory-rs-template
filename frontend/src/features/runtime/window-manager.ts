@@ -101,6 +101,7 @@ export function openWindow(
   controller: AbortController,
   initialBounds?: Partial<WindowBounds>,
   params?: Record<string, string>,
+  titleOverride?: string,
 ): string {
   const instanceId = generateWindowId();
   const existing = windowStore.get();
@@ -119,7 +120,7 @@ export function openWindow(
   const entry: WindowEntry = {
     instanceId,
     appId: app.id,
-    title: app.title,
+    title: titleOverride ?? app.title,
     state: 'open',
     bounds,
     zIndex: nextZIndex++,

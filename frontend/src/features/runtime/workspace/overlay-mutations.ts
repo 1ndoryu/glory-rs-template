@@ -70,14 +70,24 @@ export function reorderDesktopNodes(orderedIds: NodeId[]): void {
 }
 
 export function createFolder(parentId: NodeId | 'desktop', label: string): NodeId {
-  const id = `folder-${Date.now()}`;
   const ws = workspaceStore.get();
   const siblings = Object.values(ws.nodes).filter((n) => n.parentId === parentId);
+
+  /* Evitar nombres duplicados en el mismo padre — añadir sufijo numérico */
+  let uniqueLabel = label;
+  const existingLabels = new Set(siblings.map(n => n.label));
+  if (existingLabels.has(uniqueLabel)) {
+    let counter = 2;
+    while (existingLabels.has(`${label} (${counter})`)) counter++;
+    uniqueLabel = `${label} (${counter})`;
+  }
+
+  const id = `folder-${Date.now()}`;
   addOverlayNode({
     id,
     parentId,
     type: 'folder',
-    label,
+    label: uniqueLabel,
     mobileOrder: siblings.length,
     requires: 'public',
   });

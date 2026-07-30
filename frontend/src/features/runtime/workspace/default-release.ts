@@ -14,9 +14,8 @@ export const DEFAULT_RELEASE: WorkspaceTree = {
     gallery: {
       id: 'gallery',
       parentId: 'desktop',
-      type: 'app',
+      type: 'folder',
       label: 'Galería',
-      refId: 'finder',
       position: { col: 0, row: 0 },
       mobileOrder: 0,
       requires: 'public',

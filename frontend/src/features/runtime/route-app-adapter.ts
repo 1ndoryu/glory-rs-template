@@ -87,7 +87,15 @@ export async function openAppWindow(
   const view = await AppRegistry.instantiate(appId, ctx);
   if (!view) return;
 
-  /* Abrir ventana con el contenido */
-  openWindow(app, view, controller, undefined, params);
+  /* Para Finder non-singleton, usar el nombre de la carpeta como título de ventana */
+  let titleOverride: string | undefined;
+  if (appId === 'finder' && params?.folderId) {
+    const { workspaceStore } = await import('./workspace/workspace-store');
+    const ws = workspaceStore.get();
+    const folderNode = ws.nodes[params.folderId];
+    titleOverride = folderNode?.label ?? (params.folderId === 'desktop' ? 'Escritorio' : 'Galería');
+  }
+
+  openWindow(app, view, controller, undefined, params, titleOverride);
   dispatchEvent({ type: 'app_opened', appId });
 }
