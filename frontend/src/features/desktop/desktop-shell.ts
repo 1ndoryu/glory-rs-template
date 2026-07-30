@@ -132,6 +132,7 @@ export function createDesktopShell(
     initialBounds: { x: 44, y: 42, w: 470, h: 360 },
     focused: true,
     cssClass: 'desktop-profile-window',
+    layout: 'full-bleed',
   });
 
   /* Ventana de contenido (para páginas legacy) */
@@ -205,6 +206,7 @@ export function createDesktopShell(
           title: win.title,
           content: win.content,
           className: win.cssClass ?? `desktop-window--${win.appId}`,
+          layout: win.layout,
           active: win.focused,
           resizable: true,
           onClose: () => {

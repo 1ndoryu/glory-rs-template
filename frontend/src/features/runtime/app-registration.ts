@@ -20,6 +20,7 @@ AppRegistry.register({
   singleton: true,
   requires: 'public',
   routePatterns: ['/gallery'],
+  layout: 'full-bleed',
   render: (_ctx: RenderContext): MountedView => {
     dispatchEvent({ type: 'app_opened', appId: 'finder' });
 
@@ -48,6 +49,7 @@ AppRegistry.register({
   singleton: false,
   requires: 'public',
   routePatterns: ['/article/:slug'],
+  layout: 'full-bleed',
   render: (_ctx: RenderContext): MountedView => {
     dispatchEvent({ type: 'app_opened', appId: 'reader' });
 

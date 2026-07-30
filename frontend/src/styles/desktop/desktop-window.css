@@ -56,9 +56,13 @@
   flex: 1 1 0;
   min-width: 0;
   min-height: 0;
-  padding: var(--espacio-md);
   overflow: auto;
   background: var(--sistema-superficie);
+}
+
+/* [Plan §2.3] Layout del body: padded por default, full-bleed para apps como Finder */
+.desktop-window__body--padded {
+  padding: var(--espacio-md);
 }
 
 /* Scrollbar más gruesa para distinguir del borde de resize */
@@ -134,6 +138,5 @@
 
 .desktop-settings-window .desktop-window__body {
   max-height: calc(100vh - var(--sistema-barra-alto) - var(--sistema-titulo-alto) - var(--espacio-3xl));
-  padding: var(--espacio-lg);
   overflow-y: auto;
 }

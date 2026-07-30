@@ -6,6 +6,7 @@ export interface DesktopWindowOptions {
   className?: string;
   active?: boolean;
   resizable?: boolean;
+  layout?: 'padded' | 'full-bleed';
   onClose?: () => void;
   onMinimize?: () => void;
 }
@@ -61,6 +62,9 @@ export function createDesktopWindow(options: DesktopWindowOptions): HTMLElement 
 
   const body = document.createElement('div');
   body.className = 'desktop-window__body';
+  if (options.layout !== 'full-bleed') {
+    body.classList.add('desktop-window__body--padded');
+  }
   body.appendChild(options.content);
 
   titleBar.append(closeControl, title, minimizeControl);

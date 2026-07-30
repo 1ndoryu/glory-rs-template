@@ -27,6 +27,8 @@ export interface AppDefinition {
   readonly requires: Capability;
   /** Patrones de ruta que esta app maneja. */
   readonly routePatterns?: string[];
+  /** Layout del body de la ventana. Default: 'padded'. */
+  readonly layout?: 'padded' | 'full-bleed';
   /** Función que devuelve el contenido de la app (sin chrome). */
   readonly render: AppRenderFn;
 }

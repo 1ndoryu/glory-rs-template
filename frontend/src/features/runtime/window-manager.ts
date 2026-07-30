@@ -42,6 +42,8 @@ export interface WindowEntry {
   readonly icon?: IconNode;
   /** CSS class override para shell windows (ej: 'desktop-profile-window'). */
   readonly cssClass?: string;
+  /** Layout del body: 'padded' (default) o 'full-bleed'. */
+  readonly layout?: 'padded' | 'full-bleed';
 }
 
 /* === Store reactivo === */
@@ -118,6 +120,7 @@ export function openWindow(
     content: view.element,
     controller,
     app,
+    layout: app.layout,
   };
 
   windowStore.set([...updated, entry]);
@@ -156,6 +159,7 @@ export function registerShellWindow(options: {
   initialBounds?: Partial<WindowBounds>;
   focused?: boolean;
   cssClass?: string;
+  layout?: 'padded' | 'full-bleed';
 }): string {
   const existing = windowStore.get();
   /* No registrar dos veces */
@@ -180,6 +184,7 @@ export function registerShellWindow(options: {
     content: options.content,
     icon: options.icon,
     cssClass: options.cssClass,
+    layout: options.layout,
   };
 
   windowStore.set([...updated, entry]);
