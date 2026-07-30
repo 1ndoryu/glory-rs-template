@@ -12,8 +12,7 @@
 
 | Archivo | Líneas | Límite | Estado |
 |---|---|---|---|
-| `window-manager.ts` | 314 | 300 | 🔴 +5% |
-| `font-panel.ts` | 304 | 300 | 🔴 +1% |
+| `window-manager.ts` | 314→170 | 300 | ✅ Split |
 | `desktop-menu-bar.ts` | 294 | 300 | 🟡 |
 | `finder-preview.ts` | 286 | 300 | 🟡 |
 | `icon-drag.ts` | 262 | 300 | 🟢 |
@@ -83,27 +82,23 @@ workspaceStore.subscribe((ws) => {
 
 ---
 
-### 2.2 🟡 MEDIO — window-manager.ts sobre 300 líneas
+### 2.2 ✅ RESUELTO — window-manager.ts sobre 300 líneas
 
-**Archivo:** `features/runtime/window-manager.ts` (314 líneas)
+**Archivo:** `features/runtime/window-manager.ts` (314→~170 líneas)
 
-**Problema:** Mezcla el store reactivo (`windowStore`) con todas las funciones de mutación (open, close, focus, minimize, restore, maximize, updateBounds, registerShell). El tipo `WindowEntry` tiene 18 campos.
+**Problema:** Mezclaba el store reactivo con todas las funciones de mutación.
 
-**Solución:** Extraer `window-mutations.ts` con las funciones de mutación. El store y tipos permanecen en `window-manager.ts`.
-
-**Esfuerzo:** 30 min (split mecánico)
+**Resolución:** Extraído `window-store.ts` (types + store + getters) y `window-manager.ts` (mutaciones + re-exports). (`c1aece74`)
 
 ---
 
-### 2.3 🟡 MEDIO — font-panel.ts sobre 300 líneas
+### 2.3 ✅ RESUELTO — font-panel.ts sobre 300 líneas
 
-**Archivo:** `features/settings/font-panel.ts` (304 líneas)
+**Archivo:** `features/settings/font-panel.ts` (304→~220 líneas)
 
-**Problema:** Mezcla UI (3 tabs de configuración), lógica de negocio (Google Fonts loading, debounce save), y persistencia (API calls). La función `loadSavedFonts()` parsea settings del backend.
+**Problema:** Mezclaba UI, lógica de negocio y persistencia.
 
-**Solución:** Extraer `settings-repo.ts` con la lógica de carga/guardado de settings. `font-panel.ts` solo contendría UI.
-
-**Esfuerzo:** 45 min
+**Resolución:** Extraído `settings-repo.ts` (loadAllFonts, saveSettings, loadSavedFonts). `font-panel.ts` solo UI + re-export de `loadSavedFonts` para backward compat. (`c1aece74`)
 
 ---
 
@@ -119,25 +114,13 @@ workspaceStore.subscribe((ws) => {
 
 ---
 
-### 2.5 🟡 MEDIO — registerLazy existe pero no se usa
+### 2.5 ✅ RESUELTO — registerLazy existe pero no se usa
 
 **Archivo:** `features/runtime/app-registry.ts`
 
-**Problema:** Se implementó `registerLazy()` con dynamic import, pero `app-registration.ts` todavía importa estáticamente las7 apps. Finder (286 líneas), font-panel (304 líneas), reader, trash, etc. se cargan todas al inicio.
+**Problema:** `registerLazy()` existía pero las apps pesadas se cargaban estáticamente.
 
-**Solución:** Migrar apps pesadas a lazy loading:
-```typescript
-AppRegistry.registerLazy({
-  id: 'settings',
-  title: 'Configuración',
-  icon: Settings,
-  singleton: true,
-  requires: 'admin',
-  load: () => import('../settings/font-panel').then(m => ({ render: m.createFontPanelRender })),
-});
-```
-
-**Esfuerzo:** 1-2 horas (requiere refactor de cada render function para ser exportable)
+**Resolución:** Settings, Admin y Projects migrados a `registerLazy()` con dynamic imports. Finder, Reader, Trash y About permanecen eager (necesarios al inicio o con render inline). (`c1aece74`)
 
 ---
 
@@ -219,15 +202,13 @@ AppRegistry.registerLazy({
 
 ---
 
-### 2.13 🔵 BAJO — Closures stale en reconcile de icon grid
+### 2.13 ✅ RESUELTO — Closures stale en reconcile de icon grid
 
 **Archivo:** `workspace-icon-grid.ts`
 
-**Problema:** Los event listeners (mousedown, contextmenu, drag) en nodos reusados por `reconcileChildren` referencian el objeto `node` del momento de creación. Si un nodo cambia de `refId`, `type`, o `resourceKind` entre actualizaciones del workspace, los handlers usarán datos obsoletos.
+**Problema:** Los event listeners en nodos reusados referencian el objeto `node` del momento de creación.
 
-**Solución:** Usar un closure que lea del store en el momento del evento, o recrear listeners en `updateElement`.
-
-**Esfuerzo:** 30 min
+**Resolución:** mousedown y contextmenu handlers leen de `workspaceStore.get()` en el momento del evento usando `data-node-id`. `onReorder` también lee `ws.nodes` fresco. (`c1aece74`)
 
 ---
 
@@ -277,11 +258,11 @@ AppRegistry.registerLazy({
 |---|---|---|---|---|
 | 1 | 🟠 ALTO | Reconcile utility + aplicar a icon grid | ✅ Hecho | — |
 | 2 | 🟡 MEDIO | Aplicar reconcile a subscribers (taskbar, trash, sidebar, profile) | ✅ Hecho | — |
-| 3 | 🟡 MEDIO | Split window-manager.ts (314→2 módulos) | ⬜ Pendiente | 30 min |
-| 4 | 🟡 MEDIO | Split font-panel.ts (304→2 módulos) | ⬜ Pendiente | 45 min |
-| 5 | 🟡 MEDIO | Migrar apps a registerLazy | ⬜ Pendiente | 1-2h |
+| 3 | 🟡 MEDIO | Split window-manager.ts (314→2 módulos) | ✅ Hecho | — |
+| 4 | 🟡 MEDIO | Split font-panel.ts (304→2 módulos) | ✅ Hecho | — |
+| 5 | 🟡 MEDIO | Migrar apps a registerLazy | ✅ Hecho | — |
 | 6 | 🔵 BAJO | innerHTML sin sanitizar en admin pages | ✅ Hecho | — |
-| 7 | 🔵 BAJO | Closures stale en reconcile grid | ⬜ Pendiente | 30 min |
+| 7 | 🔵 BAJO | Closures stale en reconcile grid | ✅ Hecho | — |
 | 8 | 🔵 BAJO | @layer overrides dead declaration | ✅ Hecho | — |
 | 9 | 🔵 BAJO | WeakMap para callbacks en menu-bar | ✅ Hecho | — |
 | 10 | 🔵 BAJO | Error boundary en instantiate | ✅ Hecho | — |
@@ -296,15 +277,16 @@ AppRegistry.registerLazy({
 |---|---|---|---|
 | v1 | 10 | 10 | 0 |
 | v2 | 28 | 28 | 0 |
-| **v3** | **16** | **12** | **4** |
+| **v3** | **16** | **16** | **0** |
 
 ### Distribución v3 (corregida)
 
 | Categoría | Total | Completados | Pendientes |
 |---|---|---|---|
 | 🟠 Alto | 2 | 2 | 0 |
-| 🟡 Medio | 5 | 2 | 3 (splits + lazy loading) |
+| 🟡 Medio | 5 | 5 | 0 |
 | 🔵 Bajo | 5 | 5 | 0 |
+| ⚪ Info | 4 | 0 | 4 (infraestructura lista) |
 | ⚪ Info | 4 | 0 | 4 (infraestructura lista sin consumidores) |
 
 ---
