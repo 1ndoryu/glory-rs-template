@@ -8,9 +8,27 @@
 
 ---
 
-## 0. Diagnóstico — Qué falta detectar
+## 0. Estado actual (actualizado 2026-07-30)
 
-**Estado actual de Sentinel (7 reglas):**
+| Capa | Reglas | Cobertura |
+|---|---|---|
+| Sentinel CLI (v0.4.0) | 7 built-in | Seguridad + sintaxis |
+| Sentinel config | 7 reglas (excluye dom.ts, frontend dir) | innerhtml, catch-vacio, hardcoded-secret |
+| **Custom scripts (standalone)** | **13 reglas P0/P1/P2** | **Arquitectura profunda** |
+| VarSense | 4 detectores | CSS tokens + clases |
+| **Total** | **24 reglas activas** | **~65% de hallazgos detectables** |
+
+**Implementadas como scripts standalone (check-sentinel-extended.sh):**
+- P0: archivo-max-lineas
+- P1: any-type-prohibido, export-default-prohibido, console-log-produccion, subscribe-sin-cleanup, api-call-en-logica, import-store-directo, store-mutation-in-view
+- P2: interface-grande, catch-silencioso, modulo-rexport-mutations, export-no-usado
+- Custom: DOM abstraction check, singleton-state check, window-refs check
+
+**Pendientes (requieren AST o CLI update):** stale-closure-read, tipo-duplicado, keybinding-duplicado, app-registry-side-effects, modulo-responsabilidades, css-layer-faltante, css-vars-para-posicion, calse-css-sin-token, innerhtml-variable (mejora), barras-decorativas (mejora)
+
+---
+
+**Diagnóstico original de Sentinel (7 reglas):**
 
 | Regla | Tipo | Severidad | Efectividad |
 |---|---|---|---|
