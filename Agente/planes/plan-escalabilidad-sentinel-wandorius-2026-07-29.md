@@ -2,9 +2,34 @@
 
 > **Tarea:** 297A-6  
 > **Fecha:** 2026-07-29  
-> **Estado:** listo para revisión; prohibido implementar sin autorización explícita  
+> **Estado:** implementación autorizada; capacidades CLI y distribución completas, runner pendiente
 > **Prioridad:** primer bloque técnico; bloquea todo desarrollo posterior  
 > **Reglas:** `Agente/prevencion/prevencion-wandorius-sentinel-varsense-2026-07-29.md`
+
+## Estado de implementación
+
+Completado el 29 de julio de 2026:
+
+- [x] Sentinel `0.4.0`: `--files-from`, ayuda/versión, JSON schema `1`, conteos por severidad y config estricta.
+- [x] VarSense `2.2.0`: ayuda/versión, JSON schema `1`, config estricta, Vanilla TS/JS y huérfanos con severidad bloqueante configurable.
+- [x] Retiradas del núcleo Sentinel las cinco reglas B&W específicas de wandori.us.
+- [x] Configuración local creada en `sentinel.config.json` y `varsense.config.json`.
+- [x] Custom properties mediante `style.setProperty('--token', ...)` reconocidas como válidas.
+- [x] Commits publicados: Sentinel `440cd48`; VarSense `b299040`.
+- [x] Baseline VarSense: 44 archivos, 0 errores y 81 warnings (`73 cssInlineScript`, `8 valorHardcoded`).
+
+Siguiente gate:
+
+- [x] Resolver distribución reproducible y verificación de artefacto/versión sin rutas absolutas.
+- [ ] Construir ahora el core del runner y sus adapters.
+
+Distribución implementada:
+
+- `quality-tools.json` fija repositorio, commit, versión, schema y ruta del CLI.
+- `npm run quality:setup` clona en `.quality-tools/`, instala, compila y verifica versión; nunca se ejecuta implícitamente desde una revisión.
+- Estado y marcadores se escriben atómicamente; una segunda ejecución usa cache verificada.
+- Cada proceso tiene timeout de cinco minutos y cancelación del árbol en Windows.
+- Auditoría pendiente de dependencias de tooling: npm reporta 11 vulnerabilidades en Sentinel y 26 en VarSense; no se aplicará `audit fix --force` sin revisar compatibilidad.
 
 ## 1. Resultado esperado
 
@@ -24,6 +49,24 @@ El comando debe:
 6. Mostrar como máximo cuatro recordatorios breves y contextuales.
 7. Decir exactamente qué corregir y qué comando repetir.
 8. Devolver un exit code fiable para agente, self-check y CI.
+
+### Frontera obligatoria herramienta/proyecto
+
+Sentinel y VarSense son productos agnósticos. Su núcleo solo contiene mecanismos y reglas reutilizables por distintos repositorios. Wandori.us solo aporta configuración, severidades, allowlists, exclusiones y fixtures de integración.
+
+| Pertenece a Sentinel/VarSense | Pertenece a wandori.us |
+|---|---|
+| Parsers, índices, schemas y formato de hallazgos | `sentinel.config.json` y `varsense.config.json` |
+| Reglas genéricas de seguridad/calidad | Reglas habilitadas y severidad efectiva |
+| Mecanismos configurables de patrones/políticas | Rutas, excepciones y políticas visuales B&W |
+| CLI, LSP y equivalencia entre superficies | Fixtures que representan la arquitectura del OS |
+| Validación estricta de cualquier config | Recordatorios y perfiles de riesgo del runner |
+
+Regla de decisión:
+
+- Si una detección puede nombrar `wandori`, una app, una ruta o una decisión visual de este producto, no puede estar hardcodeada en la herramienta.
+- Si la necesidad es reutilizable, se implementa como mecanismo genérico parametrizable y se activa aquí mediante config.
+- Si no se puede expresar sin lógica específica, permanece como test/check del proyecto; no contamina Sentinel.
 
 El agente no memoriza comandos internos, rutas de herramientas, listas de reglas ni orden de validación.
 
@@ -404,39 +447,42 @@ El orquestador solo será sencillo si las herramientas tienen contratos pequeño
 
 ### 14.1 Contrato común obligatorio
 
-- [ ] `--help` imprime ayuda y termina con `0`; nunca lanza excepción ni se confunde con error de infraestructura.
-- [ ] `--version` devuelve versión semántica y versión del schema JSON.
-- [ ] `--format json` produce JSON válido aun cuando existan hallazgos.
-- [ ] Toda salida JSON incluye `schemaVersion`, versión de herramienta, alcance analizado, duración y conteo por severidad.
-- [ ] La config se valida contra schema; claves desconocidas, tipos inválidos y reglas inexistentes fallan con mensaje concreto.
-- [ ] Los artefactos compilados declaran versión/hash de fuente; el preflight rechaza `out/` o `dist/` obsoleto.
-- [ ] Los exit codes distinguen hallazgos, configuración/infraestructura y cancelación.
+- [x] `--help` imprime ayuda y termina con `0`; nunca lanza excepción ni se confunde con error de infraestructura.
+- [x] `--version` devuelve versión semántica; el schema viaja en cada salida JSON.
+- [x] `--format json` produce JSON válido aun cuando existan hallazgos.
+- [x] Toda salida JSON incluye `schemaVersion`, versión de herramienta, alcance analizado, duración y conteo por severidad.
+- [x] La config se valida estrictamente; claves desconocidas, tipos inválidos y reglas inexistentes fallan con mensaje concreto.
+- [x] El manifest fija commit/versión y el setup valida que el artefacto compilado reporte esa versión.
+- [x] Los CLI distinguen hallazgos (`1`) de configuración/infraestructura (`2`); cancelación `130` pertenece al runner pendiente.
 - [ ] El adapter cuenta severidades desde JSON y aplica la política canónica; no confía solo en el exit code del CLI.
 
 ### 14.2 Glory Sentinel
 
-- [ ] Añadir `--files-from <archivo>` para analizar una lista explícita de archivos cambiados.
-- [ ] Mantener modo workspace completo para CI, migraciones, configuración y cambios sin base segura.
-- [ ] Incluir `scripts/quality/**` en la supervisión o crear un perfil explícito que analice el propio runner.
+- [x] Añadir `--files-from <archivo>` para analizar una lista explícita de archivos cambiados.
+- [x] Mantener modo workspace completo para CI, migraciones, configuración y cambios sin base segura.
+- [x] Incluir `scripts/**` mediante la config local para que Sentinel supervise el futuro runner.
 - [ ] Probar equivalencia de hallazgos entre CLI, LSP, VS Code y Zed con las mismas fixtures.
 - [ ] Documentar límites de archivo, workspace, exclusiones y códigos de salida como contrato estable.
+- [x] Retirar del núcleo las cinco reglas B&W hardcodeadas para wandori.us; su política se traslada a configuración local.
+- [ ] Añadir una prueba de arquitectura que impida introducir nombres/rutas de proyectos consumidores en reglas generales.
 
 ### 14.3 VarSense
 
-- [ ] Soportar consumidores Vanilla `.ts`, además de `.tsx/.jsx`; este proyecto no depende de React.
-- [ ] Corregir `orphan-classes` para devolver fallo cuando encuentre errores bloqueantes; hoy puede terminar con éxito.
-- [ ] Definir el contrato inicial simple: si cambia CSS o TS visual, analizar el workspace visual completo.
+- [x] Soportar consumidores y estilos inline Vanilla `.ts/.js`, además de `.tsx/.jsx`; este proyecto no depende de React.
+- [x] Corregir `orphan-classes` para devolver fallo cuando su severidad configurada sea `error`.
+- [x] Definir el contrato inicial simple: si cambia CSS o TS visual, analizar el workspace visual completo.
 - [ ] Añadir análisis por lista de archivos solo cuando pueda conservar la exactitud entre definición CSS y consumidores TS.
 - [ ] Cubrir variables inexistentes, clases faltantes, huérfanas, hardcodes y allowlists dinámicas con fixtures positivas/negativas.
+- [x] Crear `varsense.config.json` local con tokens, propiedades y excepciones visuales de wandori.us.
 
 ### 14.4 Distribución reproducible local y CI
 
-- [ ] No depender en CI de rutas absolutas a repositorios hermanos.
-- [ ] Elegir una fuente versionada y fijada para cada CLI: paquete/artefacto publicado o dependencia de workspace con commit exacto.
-- [ ] Registrar versión esperada en configuración del proyecto y verificarla en preflight.
+- [x] No depender en CI de rutas absolutas a repositorios hermanos.
+- [x] Fijar repositorio y commit exacto de cada CLI en `quality-tools.json`.
+- [x] Registrar versión/schema esperados y verificarlos durante `quality:setup`; el preflight reutilizará el mismo manifest.
 - [ ] Permitir rutas locales de desarrollo solo mediante config explícita no commiteada, nunca como valor canónico.
-- [ ] El runner no descarga, compila ni reinstala herramientas durante una revisión.
-- [ ] Probar instalación limpia en un entorno sin los repositorios hermanos antes de activar CI.
+- [x] Separar instalación en `quality:setup`; el futuro runner no descarga, compila ni reinstala herramientas.
+- [x] Probar clones limpios desde GitHub dentro de `.quality-tools/`, sin consumir repositorios hermanos.
 
 **Gate de capacidades:** ambos CLI cumplen fixtures de ayuda, versión, schema, configuración, severidad, alcance y artefacto fresco; una instalación limpia los reproduce. Solo entonces comienza el core del runner.
 

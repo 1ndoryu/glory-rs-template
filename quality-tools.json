@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "installRoot": ".quality-tools",
+  "tools": {
+    "sentinel": {
+      "repository": "https://github.com/1ndoryu/glory-sentinel.git",
+      "commit": "440cd481e92cf8a86ff9398f758fa4c8baacd202",
+      "version": "0.4.0",
+      "outputSchemaVersion": "1",
+      "buildScript": "compile",
+      "cli": "out/cli/index.js"
+    },
+    "varsense": {
+      "repository": "https://github.com/1ndoryu/varsense.git",
+      "commit": "b299040d2daa4b4dd3c3aeb4cca7dd5998b29901",
+      "version": "2.2.0",
+      "outputSchemaVersion": "1",
+      "buildScript": "compile",
+      "cli": "dist/cli/index.js"
+    }
+  }
+}

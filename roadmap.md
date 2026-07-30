@@ -34,11 +34,11 @@
 
 **Bloquea todo desarrollo posterior.**
 
-- [ ] Revisar/aprobar el plan especializado y el contrato del script.
-- [ ] Completar contratos CLI: ayuda/versión/schema JSON/config, severidades y exit codes fiables.
-- [ ] Añadir alcance incremental a Sentinel, soporte Vanilla TS y huérfanos bloqueantes a VarSense.
-- [ ] Definir distribución versionada reproducible local/CI sin rutas absolutas a repositorios hermanos.
-- [ ] Implementar config canónica Sentinel/VarSense.
+- [x] Revisar/aprobar el plan especializado y el contrato del script.
+- [x] Completar contratos CLI: ayuda/versión/schema JSON/config, severidades y exit codes fiables.
+- [x] Añadir alcance incremental a Sentinel, soporte Vanilla TS y huérfanos bloqueantes a VarSense.
+- [x] Definir distribución versionada reproducible local/CI sin rutas absolutas a repositorios hermanos.
+- [x] Implementar config canónica Sentinel/VarSense.
 - [ ] Implementar el comando único `npm run task:check -- {ID}`.
 - [ ] Integrar scope automático, cache segura, reportes Markdown/JSON, exit codes y redacción de secretos.
 - [ ] Mostrar máximo tres hallazgos y cuatro recordatorios contextuales con el próximo comando exacto.

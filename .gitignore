@@ -35,6 +35,8 @@ desktop.ini
 *.pyc
 
 /scripts/*
+!/scripts/quality/
+!/scripts/quality/**
 !/scripts/branch-db.mjs
 !/scripts/run-with-db.mjs
 !/scripts/dev.mjs
@@ -51,4 +53,6 @@ desktop.ini
 frontend/tsconfig.tsbuildinfo
 glory-rust-template.code-workspace
 .sentinel-report.md
+.quality-tools/
+.quality-reports/
 .cargo/config.toml

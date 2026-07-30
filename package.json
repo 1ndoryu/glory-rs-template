@@ -1,11 +1,12 @@
 {
   "name": "glory-rs",
   "private": true,
-  "description": "Comandos unificados para el monorepo Rust + React",
+  "description": "Comandos unificados para el monorepo Rust + Vanilla TypeScript",
   "scripts": {
     "dev": "node glory-rs/scripts/dev.mjs",
     "check": "npm run check:back && npm run check:front",
     "self-check": "powershell -ExecutionPolicy Bypass -File scripts/self-check.ps1",
+    "quality:setup": "node scripts/quality/setup.mjs",
     "check:back": "node scripts/run-with-db.mjs check && node scripts/run-with-db.mjs clippy",
     "check:front": "npm --prefix frontend run type-check",
     "fmt": "cargo fmt",

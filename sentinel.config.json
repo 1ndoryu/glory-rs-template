@@ -1,0 +1,42 @@
+{
+  "includePatterns": [
+    "**/*.rs",
+    "frontend/**/*.ts",
+    "frontend/**/*.css",
+    "scripts/**/*.mjs",
+    "scripts/**/*.ps1"
+  ],
+  "excludePatterns": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/out/**",
+    "**/target/**",
+    "frontend/src/api/generated/**"
+  ],
+  "directoryExceptions": [
+    "migrations"
+  ],
+  "rules": {
+    "barras-decorativas": {
+      "severidad": "warning"
+    },
+    "catch-vacio": {
+      "severidad": "error"
+    },
+    "hardcoded-secret": {
+      "severidad": "error"
+    },
+    "innerhtml-variable": {
+      "severidad": "error"
+    },
+    "unwrap-produccion-rs": {
+      "severidad": "error"
+    },
+    "panic-produccion-rs": {
+      "severidad": "error"
+    },
+    "git-add-all": {
+      "severidad": "error"
+    }
+  }
+}
