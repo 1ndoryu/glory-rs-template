@@ -2,7 +2,8 @@
 
 > **Fecha:** 2026-07-30
 > **Alcance:** frontend TypeScript/Vite del OS desktop (runtime, desktop, store, estilos)
-> **Resultado:** 3 problemas críticos, 5 altos, 8 medios, 5 bajos, 5 informativos
+> **Resultado:** 4 problemas críticos, 3 altos, 12 medios, 5 bajos, 5 informativos
+> **Revisión:** Corregida el 2026-07-30 — 3 hallazgos rebajados de severidad, 7 omisiones añadidas, 2 soluciones corregidas
 > **Auditoría anterior:** `auditoria-arquitectura-frontend-2026-07-30.md` (primera iteración)
 > **Plan asociado:** `plan-refactorizacion-arquitectura-2026-07-30.md` (completado parcialmente)
 
@@ -80,49 +81,38 @@ Pero esto no existe. El workspace actual solo tiene folders y app shortcuts. Los
 
 ---
 
-## 4. ALTO — `_paramKey` es frágil para dedup de ventanas
+## 4. ~~ALTO~~ → BAJO — `_paramKey` es frágil para dedup de ventanas
 
-**Severidad:** ALTO
+**Severidad:** ~~ALTO~~ → BAJO (corregido en revisión)
 **Archivo:** `route-app-adapter.ts`
 
 ```typescript
 const paramKey = Object.values(params).join(':');
 ```
 
-Problemas:
-1. `Object.values` no garantiza orden — `{ folderId: 'a', view: 'grid' }` y `{ view: 'grid', folderId: 'a' }` producen keys diferentes
-2. Si un valor contiene `:`, dos parámetros distintos pueden colisionar: `{ a: 'x:y' }` vs `{ a: 'x', b: 'y' }`
-3. No escala a más de 2 parámetros
+~~Problemas:~~
+~~1. `Object.values` no garantiza orden~~ **CORRECCIÓN:** `Object.values()` SÍ garantiza orden de inserción para claves string desde ES2015+. Esto no es un problema real.
+2. Si un valor contiene `:`, dos parámetros distintos pueden colisionar: `{ a: 'x:y' }` vs `{ a: 'x', b: 'y' }` — válido pero improbable con el uso actual (un solo parámetro `folderId` o `resourceId`).
 
-**Fix:** Usar `Object.entries(params).sort().map(([k,v]) => `${k}=${v}`).join('&')` para una key determinística y sin colisiones.
+**Fix (opcional, bajo riesgo):** Usar `Object.entries(params).sort().map(([k,v]) => `${k}=${v}`).join('&')` para una key determinística. Solo necesario si se añaden más parámetros.
 
 ---
 
-## 5. ALTO — windowStore subscribe en desktop-shell.ts recrea DOM en cada cambio
+## 5. ~~ALTO~~ → BAJO — windowStore subscribe actualiza estilos inline en cada cambio
 
-**Severidad:** ALTO
+**Severidad:** ~~ALTO~~ → BAJO (corregido en revisión)
 **Archivo:** `desktop-shell.ts` (líneas ~100-140)
 
-El `windowStore.subscribe()` en desktop-shell tiene este patrón:
-```typescript
-windowStore.subscribe((windows) => {
-  for (const win of windows) {
-    if (!renderedWindows.has(win.instanceId)) {
-      // Crear ventana completa con DOM + drag + resize
-    }
-  }
-  // ... actualizar posiciones
-});
-```
+~~El subscribe recrea DOM en cada cambio — O(n) por cada pixel de drag/resize.~~
 
-Cada vez que **cualquier** propiedad de **cualquier** ventana cambia (bounds, zIndex, focused), el subscribe se dispara y recorre todas las ventanas para actualizar estilos inline. Para 5+ ventanas, esto es O(n) por cada pixel de drag/resize.
+**CORRECCIÓN:** Esto es **incorrecto**. Análisis del código real:
+1. `enableDragResize` actualiza el DOM directamente durante el arrastre (pointermove → `windowEl.style.left/top/width/height`)
+2. Solo en `pointerup` se llama `commitBounds()` → `updateWindowBounds()` → `windowStore.set()`
+3. El subscribe se dispara UNA VEZ por release, no por pixel
+4. El subscribe NO recrea DOM — solo crea para ventanas nuevas y actualiza inline styles para existentes
+5. El loop de actualización hace `el.style.left/top/width/height/display/zIndex/classList` —7 operaciones por ventana, O(n) pero con n<20 es negligible
 
-El `enableDragResize` actualiza el DOM directamente durante el arrastre (correcto), pero luego `commitBounds()` dispara `windowStore.set()` → subscribe → re-aplica los mismos bounds al DOM. Es redundante.
-
-**Fix:** 
-1. El subscribe solo debería crear/eliminar ventanas, no actualizar bounds en cada tick
-2. Las actualizaciones de bounds durante drag deberían ser solo DOM (ya lo son), con commit al final
-3. Separar subscribe de creación vs subscribe de actualización
+La redundancia existe (bounds se escriben dos veces: una en DOM durante drag, otra en subscribe después del commit) pero no es un problema de performance. Es un patrón estándar de stores reactivos.
 
 ---
 
@@ -139,43 +129,43 @@ Igual que el menú "Archivo" que hace `api.get()` una vez, el menú "Aplicacione
 
 ---
 
-## 7. ALTO — Shell windows (Perfil) tienen código path especial en todo el stack
+## 7. MEDIO — Shell windows (Perfil) tienen path especial con campos opcionales
 
-**Severidad:** ALTO
+**Severidad:** ~~ALTO~~ → MEDIO (corregido en revisión)
 **Archivos:** `window-manager.ts`, `desktop-shell.ts`, `reactive-taskbar.ts`
 
-Perfil es una `registerShellWindow()` — un path especial que bypassa AppRegistry. Esto crea una duplicación conceptual:
-- `registerShellWindow` vs `openWindow` — dos APIs para crear ventanas
-- Shell windows no tienen `app` ni `controller` — campos opcionales que requieren checks
-- Taskbar muestra iconos de shell windows con fallback `win.icon ?? win.app?.icon ?? FileUser`
-- `closeWindow` hace `target.controller?.abort()` — shell windows no tienen controller
+Perfil es una `registerShellWindow()` — un path especial que bypassa AppRegistry.
 
-Perfil debería ser una app normal en AppRegistry (singleton, requires 'public'). La única razón para ser shell window era que se abre al arrancar, pero eso puede hacerse con `openAppWindow('profile')` en main.ts.
+~~Fix: Registrar Perfil como app en AppRegistry. Eliminar `registerShellWindow`.~~
 
-**Fix:** Registrar Perfil como app en AppRegistry. Eliminar `registerShellWindow`.
+**CORRECCIÓN:** Este fix es **incorrecto**. Perfil NO puede ser una AppRegistry app porque:
+1. Su contenido (`profile`) se crea en `main.ts` y se pasa como elemento existente — no se genera en un `render()` function
+2. AppRegistry apps aparecerían en el menú "Aplicaciones" — Perfil no debería aparecer ahí (ya está como icono en el desktop)
+3. Perfil no tiene ruta, toolbar, ni comportamiento de app
+4. `registerShellWindow` es la abstracción correcta para contenido creado por el shell
+
+**Fix real (bajo riesgo):** Limpiar el API — hacer `icon` y `cssClass` requeridos en la interface de shell windows, eliminar la necesidad de campos opcionales confusos. No eliminar el concepto.
 
 ---
 
-## 8. ALTO — Tipo `WorkspaceResourceKind` vs `ResourceKind` incompatibles
+## 8. MEDIO — `WorkspaceResourceKind` vs `ResourceKind` son tipos duplicados
 
-**Severidad:** ALTO
+**Severidad:** ~~ALTO~~ → MEDIO (corregido en revisión)
 **Archivos:** `workspace/types.ts`, `resource-type-registry.ts`
 
 ```typescript
 // workspace/types.ts
-type WorkspaceResourceKind = 'article' | 'about' | 'project' | 'product' | 'image' | 'audio' | 'video' | 'document' | 'generic';
+type WorkspaceResourceKind = 'article' | 'about' | 'project' | ... | 'generic'; // 9 valores
 
 // resource-type-registry.ts  
-type ResourceKind = 'article' | 'about' | 'project' | 'product' | 'image' | 'audio' | 'video' | 'document' | 'folder' | 'shortcut' | 'generic';
+type ResourceKind = 'article' | 'about' | 'project' | ... | 'folder' | 'shortcut' | 'generic'; // 11 valores
 ```
 
-Diferencias:
-- `ResourceKind` tiene `'folder'` y `'shortcut'` que `WorkspaceResourceKind` no tiene
-- `WorkspaceResourceKind` no tiene `'folder'` ni `'shortcut'`
+~~El cast `as ResourceKind` es inseguro.~~
 
-En `workspace-icon-grid.ts` hay un cast `as ResourceKind` para resolver tipos. Esto funciona runtime pero pierde type safety.
+**CORRECCIÓN:** El cast es **siempre seguro**. `WorkspaceResourceKind` es un SUBSET de `ResourceKind` — todo valor de `WorkspaceResourceKind` es un valor válido de `ResourceKind`. El `as ResourceKind` no puede fallar en runtime.
 
-**Fix:** Unificar en un solo tipo. `ResourceKind` debería incluir todos los tipos del workspace, o `WorkspaceResourceKind` debería ser un subset tipado de `ResourceKind`.
+El problema real es **duplicación de tipos** — dos definiciones que deberían ser una. `ResourceKind` debería importarse desde `types.ts` y reutilizarse en `resource-type-registry.ts`, o `WorkspaceResourceKind` debería declararse como `type WorkspaceResourceKind = Exclude<ResourceKind, 'folder' | 'shortcut'>`.
 
 ---
 
@@ -406,7 +396,28 @@ Finder usa `selectSingle()` en mousedown pero no implementa Ctrl+clic (`toggleSe
 
 ---
 
-## 24. INFORMATIVO — Analytics dispatcher no tiene backend
+## 24. CRÍTICO — `MountedView.destroy()` nunca se ejecuta
+
+**Severidad:** CRÍTICO (añadido en revisión)
+**Archivos:** `window-manager.ts`, `core/lifecycle.ts`
+
+```typescript
+// lifecycle.ts — el contrato
+closeWindow(instanceId) {
+  target.controller?.abort();  // ✅ Esto funciona
+  target.content.dispatchEvent(new CustomEvent('view:destroy')); // ❌ Nadie escucha esto
+  // ❌ target.app?.destroy() NO se llama — WindowEntry no almacena el MountedView
+}
+```
+
+`MountedView` tiene un campo `destroy?: () => void` que cada app puede definir. Pero `openWindow()` recibe `MountedView` y extrae solo `view.element` para almacenarlo en `WindowEntry.content`. El callback `destroy` se descarta. Cuando `closeWindow()` se ejecuta:
+1. `controller.abort()` funciona — la AbortSignal se dispara
+2. `CustomEvent('view:destroy')` se despacha pero ninguna app lo escucha
+3. `MountedView.destroy()` nunca se invoca — no hay referencia a él en WindowEntry
+
+Las apps que definen `destroy` (Finder, Reader, Settings, About, Trash, Projects) creen que su cleanup se ejecuta, pero no es así. Actualmente todas solo llaman `dispatchEvent({ type: 'app_closed' })` en destroy, así que el impacto actual es bajo (analytics no se registra al cerrar). Pero si alguna app almacena recursos que necesitan cleanup manual, se filtrarán.
+
+**Fix:** Almacenar `view` (o al menos `view.destroy`) en `WindowEntry`, e invocarlo en `closeWindow()` antes del abort. — Analytics dispatcher no tiene backend
 
 **Severidad:** INFO
 **Archivo:** `analytics/dispatcher.ts`
@@ -415,7 +426,111 @@ El dispatcher de eventos (`app_opened`, `app_closed`, `window_focused`) registra
 
 ---
 
-## 25. INFORMATIVO — Sin tests unitarios
+## 25. MEDIO — desktop-taskbar.ts es código muerto (hermano de desktop-concept.ts)
+
+**Severidad:** MEDIO (añadido en revisión)
+**Archivo:** `frontend/src/features/desktop/components/desktop-taskbar.ts`
+
+`desktop-taskbar.ts` solo se importa desde `desktop-concept.ts`. Es la versión estática/legacy de la taskbar (297A-2). La versión activa es `reactive-taskbar.ts`. Debe eliminarse junto con `desktop-concept.ts`.
+
+---
+
+## 26. MEDIO — Admin bypassa AppRegistry con hardcoded navigate()
+
+**Severidad:** MEDIO (añadido en revisión)
+**Archivos:** `workspace-icon-grid.ts`, `default-release.ts`
+
+`default-release.ts` declara `admin` como `type: 'app', refId: 'admin'`, pero NO hay `AppRegistry.register({ id: 'admin' })` en `app-registration.ts`. En `workspace-icon-grid.ts` hay un caso especial hardcodeado:
+```typescript
+if (node.id === 'admin') { navigate('/admin'); return; }
+```
+
+Esto bypassa todo el sistema de ventanas del OS — Admin se abre como navegación de página SPA, no como ventana. Es inconsistente con el resto de apps que abren ventanas.
+
+**Fix:** Registrar Admin como AppRegistry app que renderiza el contenido de `pages/admin.ts` dentro de una ventana, igual que About y Projects. Eliminar el hardcoded `navigate('/admin')`.
+
+---
+
+## 27. MEDIO — Snake no tiene implementación — workspace node muerto
+
+**Severidad:** MEDIO (añadido en revisión)
+**Archivo:** `default-release.ts`
+
+`default-release.ts` declara `snake` como `type: 'app', refId: 'snake'`, pero no hay AppRegistry registration para 'snake'. Cuando el usuario hace clic en el icono de Snake, `openAppWindow('snake')` devuelve silenciosamente sin hacer nada. El icono aparece en el escritorio pero no funciona.
+
+**Fix:** O registrar Snake como app (si hay plan para implementarlo), o eliminar el nodo del DEFAULT_RELEASE.
+
+---
+
+## 28. MEDIO — merge.ts detecta huérfanos solo 1 nivel profundo
+
+**Severidad:** MEDIO (añadido en revisión)
+**Archivo:** `workspace/merge.ts`
+
+```typescript
+for (const id of tombstoneSet) {
+  for (const node of Object.values(result)) {
+    if (node.parentId === id) {
+      tombstoneSet.add(node.id);
+      delete result[node.id];
+    }
+  }
+}
+```
+
+El loop itera sobre `Object.values(result)` una sola vez. Si una carpeta tombstoneada contiene una subcarpeta que a su vez contiene items, los items de la subcarpeta sobreviven como huérfanos (parentId apunta a un nodo que ya no existe). En el workspace actual (1 nivel de carpetas) esto no ocurre, pero romperá cuando haya carpetas anidadas.
+
+**Fix:** Repetir el loop hasta que no se eliminen más nodos (punto fijo), o usar BFS/DFS recursivo.
+
+---
+
+## 29. MEDIO — Sistemas de drag incompatibles entre Finder y desktop
+
+**Severidad:** MEDIO (añadido en revisión)
+**Archivos:** `finder-preview.ts`, `utils/icon-drag.ts`
+
+Finder usa **HTML5 Drag and Drop API** (`draggable`, `dragstart`, `dragover`, `drop`). El desktop icon grid usa **Pointer Events** (`pointerdown`, `pointermove`, `pointerup` con ghost element). Son sistemas incompatibles — no se puede arrastrar un archivo desde Finder al escritorio ni viceversa.
+
+**Fix:** Unificar en un solo sistema de drag. Pointer Events es más flexible y funciona en táctil. Migrar Finder a Pointer Events, o crear un módulo de drag compartido.
+
+---
+
+## 30. MEDIO — Estilos inline de ventanas impiden diseño responsive
+
+**Severidad:** MEDIO (añadido en revisión)
+**Archivo:** `desktop-shell.ts`
+
+El subscribe de ventanas posiciona con estilos inline:
+```typescript
+el.style.left = `${win.bounds.x}px`;
+el.style.top = `${win.bounds.y}px`;
+el.style.width = `${win.bounds.w}px`;
+el.style.height = `${win.bounds.h}px`;
+```
+
+Esto bypassa CSS completamente. No se pueden usar media queries para ajustar ventanas en tablet/mobile. Las ventanas desktop necesitan CSS custom properties (`--win-x`, `--win-y`, `--win-w`, `--win-h`) que CSS pueda referenciar.
+
+---
+
+## 31. MEDIO — contentWindow (outlet legacy) coexiste con sistema de ventanas
+
+**Severidad:** MEDIO (añadido en revisión)
+**Archivos:** `desktop-shell.ts`, `main.ts`
+
+`desktop-shell.ts` exporta un `contentWindow` — el outlet legacy del router SPA. `main.ts` hace toggle de su visibilidad cuando la ruta es manejada por una app del runtime. Esto crea DOS superficies de rendering: el outlet legacy (para páginas que no son apps) y el sistema de ventanas. Es un artefacto transitorio que debería documentarse para eliminación cuando todas las páginas tengan app equivalente.
+
+---
+
+## 32. INFORMATIVO — Triple recompute de workspaceStore al iniciar
+
+**Severidad:** INFORMATIVO (añadido en revisión)
+**Archivo:** `workspace-store.ts`
+
+`workspace-store.ts` se suscribe a `releaseStore`, `overlayStore` y `authStore`, todos llaman `recompute()`. Al inicio, los tres stores emiten su valor inicial, causando que `mergeWorkspace()` se ejecute 3 veces. No es un problema de performance (merge es rápido), pero es innecesario.
+
+---
+
+## 33. INFORMATIVO
 
 **Severidad:** INFO
 
@@ -465,28 +580,32 @@ Si una app throw en su `render()`, el error no se captura. No hay try/catch en `
 
 ---
 
-## Prioridad de fixes
+## Prioridad de fixes (corregida en revisión)
 
 | # | Severidad | Fix | Esfuerzo |
 |---|---|---|---|
-| 1 | CRÍTICO | Eliminar desktop-concept.ts | 5 min |
+| 1 | CRÍTICO | Eliminar desktop-concept.ts + desktop-taskbar.ts | 5 min |
 | 2 | CRÍTICO | Finder navega en ventana existente (no abre nueva) | 2h |
 | 3 | CRÍTICO | Implementar flujo de recursos en workspace | 1 día |
-| 4 | ALTO | _paramKey determinístico | 15 min |
-| 5 | ALTO | Separar subscripción de creación vs actualización en windowStore | 2h |
-| 6 | ALTO | Menú Aplicaciones reactivo (re-consultar al abrir) | 30 min |
-| 7 | ALTO | Perfil como app normal (eliminar registerShellWindow) | 1h |
-| 8 | ALTO | Unificar WorkspaceResourceKind y ResourceKind | 30 min |
-| 9 | MEDIO | Reader carga contenido real desde API | 3h |
-| 10 | MEDIO | About como app del workspace | 2h |
-| 11 | MEDIO | Romper ciclo overlay-mutations ↔ workspace-store | 1h |
-| 12 | MEDIO | mergeWorkspace sin mutar durante iteración | 30 min |
-| 13 | MEDIO | Unificar menú dropdown compartido | 3h |
+| 3b | CRÍTICO | Almacenar MountedView.destroy en WindowEntry e invocarlo en closeWindow | 30 min |
+| 4 | MEDIO | Unificar WorkspaceResourceKind → ResourceKind en types.ts | 30 min |
+| 5 | MEDIO | Admin como AppRegistry app (eliminar navigate hardcoded) | 1h |
+| 6 | MEDIO | Snake: registrar app o eliminar nodo muerto | 15 min |
+| 7 | MEDIO | merge.ts: orphans recursivos (loop hasta punto fijo) | 30 min |
+| 8 | MEDIO | Menú Aplicaciones reactivo (re-consultar al abrir) | 30 min |
+| 9 | MEDIO | Unificar sistemas de drag (Finder HTML5 → Pointer Events) | 3h |
+| 10 | MEDIO | Window bounds via CSS custom properties (no inline) | 2h |
+| 11 | MEDIO | Reader carga contenido real desde API | 3h |
+| 12 | MEDIO | Romper ciclo overlay-mutations ↔ workspace-store | 1h |
+| 13 | MEDIO | Unificar menú dropdown (3 implementaciones → 1 componente) | 3h |
 | 14 | MEDIO | Grid responsive | 2h |
 | 15 | MEDIO | Implementar maximizeWindow | 1h |
 | 16 | MEDIO | Conectar Ctrl+C/X/V al workspace clipboard | 1h |
-| 17 | MEDIO | Consolidar CSS tokens | 2h |
-| 18 | MEDIO | Inline rename al crear carpeta | 2h |
+| 17 | MEDIO | Inline rename al crear carpeta | 2h |
+| 18 | MEDIO | Documentar contentWindow legacy para eliminación | 5 min |
+| 19 | BAJO | _paramKey determinístico (solo si se añaden más params) | 15 min |
+| 20 | BAJO | Shell window API cleanup (campos requeridos) | 30 min |
+| 21 | MEDIO | Consolidar CSS tokens legacy vs OS | 2h |
 
 ---
 
@@ -527,15 +646,35 @@ Si una app throw en su `render()`, el error no se captura. No hay try/catch en `
 
 ---
 
-## Conclusión
+## Conclusión (revisada)
 
 La arquitectura base es **sólida y escalable** para el caso de escritorio. Los principios de fuente única (workspaceStore, AppRegistry, CommandRegistry) están bien implementados después de las correcciones de 297A-11.
 
-Los problemas críticos son:
-1. **Código muerto** (desktop-concept.ts) — limpieza trivial
-2. **Finder abre ventana nueva por carpeta** — rompe la metáfora de file browser
-3. **Sin flujo de recursos** — el workspace solo tiene shortcuts, no archivos reales
+### Correcciones de la revisión
 
-Los problemas altos son refinamientos arquitectónicos que bloquean features futuras (mobile, maximize, clipboard real).
+3 hallazgos fueron **rebajados de severidad** tras verificar contra el código real:
+- `_paramKey` (ALTO→BAJO): `Object.values()` sí garantiza orden para claves string desde ES2015+
+- `windowStore subscribe` (ALTO→BAJO): NO recrea DOM por pixel — `enableDragResize` actualiza DOM directo y solo commitea al store en pointerup
+- `registerShellWindow` (ALTO→MEDIO): El concepto es correcto, Perfil no puede ser AppRegistry app porque su contenido se pre-crea en main.ts
+- `WorkspaceResourceKind vs ResourceKind` (ALTO→MEDIO): El cast `as ResourceKind` es siempre seguro porque WorkspaceResourceKind es subset de ResourceKind
 
-La prioridad recomendada es: eliminar código muerto → fix Finder navigation → implementar recursos → luego los altos.
+7 hallazgos fueron **añadidos** que la primera revisión omitió:
+- `MountedView.destroy()` nunca se ejecuta (CRÍTICO)
+- `desktop-taskbar.ts` es código muerto hermano de desktop-concept.ts
+- Admin bypassa AppRegistry con `navigate('/admin')` hardcodeado
+- Snake tiene workspace node pero ninguna implementación
+- `merge.ts` detecta huérfanos solo 1 nivel profundo
+- Sistemas de drag incompatibles (HTML5 vs Pointer Events)
+- Estilos inline de ventanas impiden diseño responsive
+- Triple recompute de workspaceStore al iniciar
+
+### Problemas críticos (revisados)
+
+1. **Código muerto** (desktop-concept.ts + desktop-taskbar.ts) — limpieza trivial, 5 min
+2. **Finder abre ventana nueva por carpeta** — rompe metáfora de file browser, 2h
+3. **Sin flujo de recursos** — workspace solo tiene shortcuts, no archivos reales, 1 día
+4. **MountedView.destroy() nunca se ejecuta** — cleanup de apps roto, 30 min
+
+### Escalabilidad confirmada
+
+Agregar una nueva app sigue costando ~30 minutos (2 archivos nuevos, 2 editados). El modelo de workspace overlay es correcto. Los problemas son de completitud (features no implementadas) no de diseño.
