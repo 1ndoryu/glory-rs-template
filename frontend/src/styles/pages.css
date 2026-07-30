@@ -1,5 +1,8 @@
 /* wandori.us — Páginas
- * Estilos específicos por página. */
+ * Estilos específicos por página.
+ * [Auditoría v3 §2.4] @layer components. */
+
+@layer components {
 
 /* === HOME — Lista de artículos === */
 .entrada {
@@ -310,3 +313,6 @@
     grid-template-columns: 1fr;
   }
 }
+
+} /* @layer components */
+

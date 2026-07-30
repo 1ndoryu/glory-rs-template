@@ -12,6 +12,9 @@ import { api } from '../../../api/client';
 /* === Estado del menú abierto === */
 let openEntry: HTMLElement | null = null;
 
+/** [Auditoría v3 §2.6] WeakMap tipado para callbacks de apertura — reemplaza _onOpen en DOM. */
+const onOpenCallbacks = new WeakMap<HTMLElement, () => void>();
+
 function closeOpenMenu(): void {
   if (openEntry) {
     openEntry.classList.remove('desktop-menu-bar__entry--open');
@@ -47,8 +50,8 @@ function toggleEntry(entry: HTMLElement): void {
   const btn = entry.querySelector('.desktop-menu-bar__item') as HTMLButtonElement | null;
 
   /* Refresh reactive menus before showing */
-  if (menu && (menu as HTMLElement & { _onOpen?: () => void })._onOpen) {
-    (menu as HTMLElement & { _onOpen?: () => void })._onOpen!();
+  if (menu && onOpenCallbacks.has(menu)) {
+    onOpenCallbacks.get(menu)!();
   }
 
   entry.classList.add('desktop-menu-bar__entry--open');
@@ -222,9 +225,9 @@ function createApplicationsMenu(): HTMLElement {
   refresh();
 
   /* Exponer refresh para que toggleEntry lo llame al abrir */
-  (menu as HTMLElement & { _onOpen?: () => void })._onOpen = () => {
+  onOpenCallbacks.set(menu, () => {
     if (loaded) refresh();
-  };
+  });
 
   return menu;
 }

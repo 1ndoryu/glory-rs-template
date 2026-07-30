@@ -1,7 +1,10 @@
 /* wandori.us — Componentes UI
  * Todos los componentes son minimalistas B&W.
  * Botones = texto subrayado. Inputs = 1px border. Modales = overlay + panel.
- * PROHIBIDO: sombras, colores, bordes redondeados, hover effects. */
+ * PROHIBIDO: sombras, colores, bordes redondeados, hover effects.
+ * [Auditoría v3 §2.4] @layer components — specificity management. */
+
+@layer components {
 
 /* === UTILIDADES — Clases reutilizables para reemplazar inline styles === */
 .oculto { display: none !important; }
@@ -328,3 +331,6 @@
   font-size: var(--tamano-grande);
   padding: 0 var(--espacio-sm);
 }
+
+} /* @layer components */
+

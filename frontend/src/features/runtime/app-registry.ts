@@ -127,11 +127,20 @@ class AppRegistryClass {
     return undefined;
   }
 
-  /** Instanciar el contenido de una app con un RenderContext. */
+  /** Instanciar el contenido de una app con un RenderContext.
+   * [Auditoría v3 §2.9] Error boundary: si la app lanza, devuelve fallback. */
   async instantiate(appId: string, ctx: RenderContext): Promise<MountedView | null> {
     const app = this.apps.get(appId);
     if (!app) return null;
-    return app.render(ctx);
+    try {
+      return await app.render(ctx);
+    } catch (err) {
+      console.error(`[AppRegistry] app '${appId}' threw during render:`, err);
+      const errorEl = document.createElement('div');
+      errorEl.style.cssText = 'padding:var(--espacio-xl);color:var(--color-texto-secundario);font-size:var(--tamano-pequeno);font-style:italic;';
+      errorEl.textContent = `Error al cargar ${app.title}.`;
+      return { element: errorEl };
+    }
   }
 }
 

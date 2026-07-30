@@ -1,7 +1,10 @@
 /* wandori.us — Layout
  * Dos columnas: nav 20% | perfil + contenido 80%.
  * Grid, no fixed positioning. Sin subrayados en links.
- * Responsive: se apilan en mobile. */
+ * Responsive: se apilan en mobile.
+ * [Auditoría v3 §2.4] @layer components. */
+
+@layer components {
 
 #app {
   display: grid;
@@ -308,3 +311,6 @@
   }
 
 }
+
+} /* @layer components */
+
