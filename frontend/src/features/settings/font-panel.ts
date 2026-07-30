@@ -1,7 +1,7 @@
 /* wandori.us — Font Panel
  * Panel principal de configuración. Orquesta tabs y delega a módulos.
  * La persistencia vive en settings-repo.ts.
- * [Auditoría v3 §2.3] Split para mantener bajo límite de 300 líneas. */
+ * [Auditoría v4 §1.2] Migrado a createEl(). */
 
 import { fontStore, profileImage, siteConfig, type FontConfig } from '../../store';
 import { MediaService, SettingsService } from '../../services';
@@ -9,14 +9,14 @@ import { showToast } from '../../components/ui/toast';
 import { createArrowSelect, createSizeSlider } from './font-helpers';
 import { renderSocialLinksSection } from './social-links';
 import { loadAllFonts, saveSettings } from './settings-repo';
+import { createEl } from '../../utils/dom';
 
 type SizeKey = 'tamanoTexto' | 'tamanoTitulo' | 'tamanoPequeno' | 'tamanoGrande' | 'tamanoTituloGrande' | 'menuSize' | 'menuSpacing' | 'menuLineHeight' | 'entradaTitleSize' | 'entradaSize' | 'navWidth' | 'profileWidth' | 'profileHeight' | 'sidebarSepHeight' | 'redesSize' | 'redesGap';
 type NumberKey = SizeKey | 'menuOpacity' | 'entradaOpacity';
 
 export function createFontPanel(): HTMLElement {
   loadAllFonts();
-  const panel = document.createElement('div');
-  panel.className = 'font-panel';
+  const panel = createEl('div', { className: 'font-panel' });
 
   function updateSize(key: NumberKey, value: number): void {
     fontStore.update(s => ({ ...s, [key]: value }));
@@ -31,31 +31,22 @@ export function createFontPanel(): HTMLElement {
 
   /* === Tab: Perfil === */
   function renderTabPerfil(): HTMLElement {
-    const tab = document.createElement('div');
-    tab.className = 'config-tab-content';
+    const tab = createEl('div', { className: 'config-tab-content' });
     const cfg = fontStore.get();
 
-    const imgPreview = document.createElement('img');
-    imgPreview.className = 'config-imagen-preview';
-    imgPreview.src = profileImage.get();
+    const imgPreview = createEl('img', { className: 'config-imagen-preview', src: profileImage.get() });
     imgPreview.onerror = () => { imgPreview.classList.add('oculto'); };
 
-    const imgInput = document.createElement('input');
-    imgInput.type = 'file';
+    const imgInput = createEl('input', { type: 'file' });
     imgInput.accept = 'image/*';
     imgInput.classList.add('oculto');
 
-    const btnImg = document.createElement('button');
-    btnImg.className = 'boton';
-    btnImg.textContent = 'cambiar imagen';
+    const btnImg = createEl('button', { className: 'boton', textContent: 'cambiar imagen' });
     btnImg.addEventListener('click', () => imgInput.click());
 
     imgInput.addEventListener('change', async () => {
       const file = imgInput.files?.[0];
       if (!file) return;
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('alt_text', 'profile');
       try {
         const media = await MediaService.upload(file);
         profileImage.set(media.file_path);
@@ -66,18 +57,13 @@ export function createFontPanel(): HTMLElement {
       } catch { showToast('error al subir imagen'); }
     });
 
-    const entradasLabel = document.createElement('label');
-    entradasLabel.className = 'checkbox-personalizado';
-    const entradasCheck = document.createElement('input');
-    entradasCheck.type = 'checkbox';
+    const entradasCheck = createEl('input', { type: 'checkbox' });
     entradasCheck.checked = siteConfig.get().showEntriesOnHome;
     entradasCheck.addEventListener('change', () => {
       siteConfig.update(s => ({ ...s, showEntriesOnHome: entradasCheck.checked }));
       SettingsService.save({ show_entries_on_home: String(entradasCheck.checked) }).catch(() => {});
     });
-    const entradasTexto = document.createElement('span');
-    entradasTexto.textContent = 'mostrar entradas en inicio';
-    entradasLabel.append(entradasCheck, entradasTexto);
+    const entradasLabel = createEl('label', { className: 'checkbox-personalizado' }, entradasCheck, 'mostrar entradas en inicio');
 
     const imgSizeSlider = createSizeSlider('Tamaño', 40, 600, cfg.profileWidth, (v) => {
       updateSize('profileWidth', v);
@@ -86,26 +72,16 @@ export function createFontPanel(): HTMLElement {
     const imgWidthSlider = createSizeSlider('Ancho', 40, 600, cfg.profileWidth, (v) => updateSize('profileWidth', v));
     const imgHeightSlider = createSizeSlider('Alto', 40, 600, cfg.profileHeight, (v) => updateSize('profileHeight', v));
 
-    const borderLabel = document.createElement('label');
-    borderLabel.className = 'checkbox-personalizado';
-    const borderCheck = document.createElement('input');
-    borderCheck.type = 'checkbox';
+    const borderCheck = createEl('input', { type: 'checkbox' });
     borderCheck.checked = cfg.profileBorder;
     borderCheck.addEventListener('change', () => {
       fontStore.update(s => ({ ...s, profileBorder: borderCheck.checked }));
       saveSettings();
     });
-    const borderTexto = document.createElement('span');
-    borderTexto.textContent = 'borde';
-    borderLabel.append(borderCheck, borderTexto);
+    const borderLabel = createEl('label', { className: 'checkbox-personalizado' }, borderCheck, 'borde');
 
-    const imgLabel = document.createElement('label');
-    imgLabel.className = 'campo-etiqueta';
-    imgLabel.textContent = 'Imagen';
-
-    const separador = document.createElement('div');
-    separador.className = 'config-tab-separador';
-
+    const imgLabel = createEl('label', { className: 'campo-etiqueta', textContent: 'Imagen' });
+    const separador = createEl('div', { className: 'config-tab-separador' });
     const socialElements = renderSocialLinksSection(cfg, updateSize as (k: string, v: number) => void);
 
     tab.append(imgLabel, imgPreview, btnImg, imgInput, imgSizeSlider, imgWidthSlider, imgHeightSlider, borderLabel, entradasLabel, separador, ...socialElements);
@@ -114,10 +90,9 @@ export function createFontPanel(): HTMLElement {
 
   /* === Tab: Fuentes === */
   function renderTabFuentes(): HTMLElement {
-    const tab = document.createElement('div');
-    tab.className = 'config-tab-content';
+    const tab = createEl('div', { className: 'config-tab-content' });
     const cfg = fontStore.get();
-    const sep = (): HTMLElement => { const s = document.createElement('div'); s.className = 'config-tab-separador'; return s; };
+    const sep = (): HTMLElement => createEl('div', { className: 'config-tab-separador' });
 
     const menuArrow = createArrowSelect('Fuente del menú', cfg.menu, (v) => updateFont('menu', v));
     const menuSizeSlider = createSizeSlider('Tamaño', 10, 24, cfg.menuSize, (v) => updateSize('menuSize', v));
@@ -134,15 +109,11 @@ export function createFontPanel(): HTMLElement {
     const pequenoSize = createSizeSlider('Tamaño pequeño', 10, 18, cfg.tamanoPequeno, (v) => updateSize('tamanoPequeno', v));
     const grandeSize = createSizeSlider('Tamaño grande', 14, 28, cfg.tamanoGrande, (v) => updateSize('tamanoGrande', v));
 
-    const navTitleLabel = document.createElement('label');
-    navTitleLabel.className = 'campo-etiqueta';
-    navTitleLabel.textContent = 'Títulos nav';
+    const navTitleLabel = createEl('label', { className: 'campo-etiqueta', textContent: 'Títulos nav' });
     const navTitleSizeSlider = createSizeSlider('Tamaño', 10, 20, cfg.entradaTitleSize, (v) => updateSize('entradaTitleSize', v));
     const navTitleOpacitySlider = createSizeSlider('Opacidad', 0, 1, cfg.entradaOpacity, (v) => updateSize('entradaOpacity', v), '', 0.05);
 
-    const entradaLabel = document.createElement('label');
-    entradaLabel.className = 'campo-etiqueta';
-    entradaLabel.textContent = 'Entradas';
+    const entradaLabel = createEl('label', { className: 'campo-etiqueta', textContent: 'Entradas' });
     const entradaSizeSlider = createSizeSlider('Tamaño texto', 10, 24, cfg.entradaSize, (v) => updateSize('entradaSize', v));
 
     tab.append(
@@ -157,8 +128,7 @@ export function createFontPanel(): HTMLElement {
 
   /* === Tab: Tamaños === */
   function renderTabTamanos(): HTMLElement {
-    const tab = document.createElement('div');
-    tab.className = 'config-tab-content';
+    const tab = createEl('div', { className: 'config-tab-content' });
     const cfg = fontStore.get();
     tab.append(
       createSizeSlider('Ancho del nav', 200, 500, cfg.navWidth, (v) => updateSize('navWidth', v)),
@@ -168,10 +138,8 @@ export function createFontPanel(): HTMLElement {
   }
 
   /* === Tabs UI === */
-  const tabsNav = document.createElement('div');
-  tabsNav.className = 'config-tabs-nav';
-  const tabsContent = document.createElement('div');
-  tabsContent.className = 'config-tabs-content';
+  const tabsNav = createEl('div', { className: 'config-tabs-nav' });
+  const tabsContent = createEl('div', { className: 'config-tabs-content' });
 
   const tabDefs: Array<{ name: string; render: () => HTMLElement }> = [
     { name: 'Perfil', render: renderTabPerfil },
@@ -187,9 +155,7 @@ export function createFontPanel(): HTMLElement {
   }
 
   for (const def of tabDefs) {
-    const btn = document.createElement('button');
-    btn.className = 'boton';
-    btn.textContent = def.name;
+    const btn = createEl('button', { className: 'boton', textContent: def.name });
     btn.addEventListener('click', () => switchTab(def.name));
     tabsNav.appendChild(btn);
   }

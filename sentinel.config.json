@@ -44,6 +44,41 @@
     },
     "css-especificacion-diseno-local": {
       "severidad": "information"
+    },
+    "export-no-usado": {
+      "severidad": "warning",
+      "excludePatterns": ["**/index.ts", "**/mod.rs", "**/lib.rs"]
+    },
+    "subscribe-sin-cleanup": {
+      "severidad": "error",
+      "excludePatterns": ["**/stores.ts", "**/main.ts", "**/store.ts"]
+    },
+    "archivo-max-lineas": {
+      "severidad": "warning",
+      "maxLineas": 300,
+      "excludePatterns": ["**/package.json", "**/Cargo.toml", "**/*.json", "**/*.sql", "**/*.md"]
+    },
+    "api-call-en-logica": {
+      "severidad": "warning",
+      "excludePatterns": ["**/api/client.ts", "**/services/*.ts"]
+    },
+    "import-store-directo": {
+      "severidad": "warning",
+      "excludePatterns": ["**/stores.ts", "**/store.ts", "**/index.ts"]
+    },
+    "interface-grande": {
+      "severidad": "warning",
+      "maxCampos": 10
+    },
+    "console-log-produccion": {
+      "severidad": "warning",
+      "excludePatterns": ["**/scripts/**", "**/*.mjs", "**/*.config.ts"]
+    },
+    "any-type-prohibido": {
+      "severidad": "error"
+    },
+    "catch-silencioso": {
+      "severidad": "error"
     }
   }
 }

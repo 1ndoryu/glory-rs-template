@@ -4,10 +4,10 @@
  * [Auditoría v2 — fix ciclo de imports] */
 
 import { createStore, authStore } from '../../../store';
-import { DEFAULT_RELEASE } from './default-release';
+import { DEFAULT_RELEASE, ADMIN_NODES } from './default-release';
 import { mergeWorkspace } from './merge';
 import type {
-  WorkspaceTree,
+  NodeId, WorkspaceNode, WorkspaceTree,
   WorkspaceOverlay,
   ResolvedWorkspace,
 } from './types';
@@ -67,7 +67,21 @@ function scheduleRecompute(): void {
     const overlay = overlayStore.get();
     const auth = authStore.get();
     const capability: 'public' | 'authenticated' | 'admin' = auth.isAuthenticated ? 'admin' : 'public';
-    workspaceStore.set(mergeWorkspace(release, overlay, capability));
+
+    /* [Auditoría v4 §5.4] Inyectar nodos admin dinámicamente */
+    if (capability === 'admin') {
+      const adminNodeMap: Record<NodeId, WorkspaceNode> = {};
+      for (const [id, node] of Object.entries(ADMIN_NODES)) {
+        adminNodeMap[id] = { ...node, requires: 'admin' as const };
+      }
+      const augmentedRelease: WorkspaceTree = {
+        version: release.version,
+        nodes: { ...release.nodes, ...adminNodeMap },
+      };
+      workspaceStore.set(mergeWorkspace(augmentedRelease, overlay, capability));
+    } else {
+      workspaceStore.set(mergeWorkspace(release, overlay, capability));
+    }
   });
 }
 

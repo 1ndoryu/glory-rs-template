@@ -20,6 +20,9 @@ export interface DomAttrs {
   loading?: string;
   value?: string;
   name?: string;
+  min?: string;
+  max?: string;
+  step?: string;
   disabled?: string;
   'aria-label'?: string;
   'aria-haspopup'?: string;

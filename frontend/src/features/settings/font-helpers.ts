@@ -1,8 +1,10 @@
 /* wandori.us — Font Helpers
  * Componentes reutilizables para el panel de configuración:
- * ArrowSelect (selector con flechas + dropdown) y SizeSlider. */
+ * ArrowSelect (selector con flechas + dropdown) y SizeSlider.
+ * [Auditoría v4 §1.2] Migrado a createEl(). */
 
 import { GOOGLE_FONTS } from './font-constants';
+import { createEl } from '../../utils/dom';
 
 /* === ArrowSelect — selector con flechas ← → y dropdown === */
 export function createArrowSelect(
@@ -10,32 +12,15 @@ export function createArrowSelect(
   currentValue: string,
   onChange: (value: string) => void,
 ): HTMLElement {
-  const container = document.createElement('div');
-  container.className = 'campo';
+  const label = createEl('label', { className: 'campo-etiqueta', textContent: etiqueta });
 
-  const label = document.createElement('label');
-  label.className = 'campo-etiqueta';
-  label.textContent = etiqueta;
+  const btnPrev = createEl('button', { className: 'arrow-select-btn', textContent: '←', 'aria-label': 'fuente anterior' });
+  const nombre = createEl('span', { className: 'arrow-select-nombre', textContent: currentValue });
+  const btnNext = createEl('button', { className: 'arrow-select-btn', textContent: '→', 'aria-label': 'fuente siguiente' });
 
-  const row = document.createElement('div');
-  row.className = 'arrow-select';
-
-  const btnPrev = document.createElement('button');
-  btnPrev.className = 'arrow-select-btn';
-  btnPrev.textContent = '←';
-  btnPrev.setAttribute('aria-label', 'fuente anterior');
-
-  const nombre = document.createElement('span');
-  nombre.className = 'arrow-select-nombre';
   nombre.style.fontFamily = `'${currentValue}', system-ui`;
-  nombre.textContent = currentValue;
 
-  const btnNext = document.createElement('button');
-  btnNext.className = 'arrow-select-btn';
-  btnNext.textContent = '→';
-  btnNext.setAttribute('aria-label', 'fuente siguiente');
-
-  row.append(btnPrev, nombre, btnNext);
+  const row = createEl('div', { className: 'arrow-select' }, btnPrev, nombre, btnNext);
 
   let idx = GOOGLE_FONTS.indexOf(currentValue);
   if (idx === -1) idx = 0;
@@ -61,13 +46,10 @@ export function createArrowSelect(
   });
 
   /* Dropdown de fuentes */
-  const dropdown = document.createElement('div');
-  dropdown.className = 'arrow-select-dropdown oculto';
+  const dropdown = createEl('div', { className: 'arrow-select-dropdown oculto' });
 
   for (const font of GOOGLE_FONTS) {
-    const item = document.createElement('button');
-    item.className = 'boton arrow-select-item';
-    item.textContent = font;
+    const item = createEl('button', { className: 'boton arrow-select-item', textContent: font });
     item.style.fontFamily = `'${font}', system-ui`;
     if (font === currentValue) item.classList.add('activo');
     item.addEventListener('click', () => {
@@ -80,9 +62,7 @@ export function createArrowSelect(
     dropdown.appendChild(item);
   }
 
-  const selectWrapper = document.createElement('div');
-  selectWrapper.className = 'arrow-select-wrapper';
-  selectWrapper.append(row, dropdown);
+  const selectWrapper = createEl('div', { className: 'arrow-select-wrapper' }, row, dropdown);
 
   nombre.addEventListener('click', () => {
     dropdown.classList.toggle('oculto');
@@ -101,9 +81,9 @@ export function createArrowSelect(
       observer.disconnect();
     }
   });
+  const container = createEl('div', { className: 'campo' }, label, selectWrapper);
   observer.observe(container.parentNode || document.body, { childList: true });
 
-  container.append(label, selectWrapper);
   return container;
 }
 
@@ -117,26 +97,16 @@ export function createSizeSlider(
   suffix = 'px',
   step?: number,
 ): HTMLElement {
-  const container = document.createElement('div');
-  container.className = 'campo';
+  const etiqueta = createEl('label', { className: 'campo-etiqueta', textContent: label });
+  const valor = createEl('span', { className: 'slider-valor', textContent: `${value}${suffix}` });
+  const header = createEl('div', { className: 'slider-header' }, etiqueta, valor);
 
-  const etiqueta = document.createElement('label');
-  etiqueta.className = 'campo-etiqueta';
-  etiqueta.textContent = label;
-
-  const valor = document.createElement('span');
-  valor.className = 'slider-valor';
-  valor.textContent = `${value}${suffix}`;
-
-  const header = document.createElement('div');
-  header.className = 'slider-header';
-  header.append(etiqueta, valor);
-
-  const input = document.createElement('input');
-  input.type = 'range';
-  input.className = 'slider-input';
-  input.min = String(min);
-  input.max = String(max);
+  const input = createEl('input', {
+    type: 'range',
+    className: 'slider-input',
+    min: String(min),
+    max: String(max),
+  });
   input.value = String(value);
   if (step !== undefined) input.step = String(step);
 
@@ -146,6 +116,5 @@ export function createSizeSlider(
     onChange(v);
   });
 
-  container.append(header, input);
-  return container;
+  return createEl('div', { className: 'campo' }, header, input);
 }
