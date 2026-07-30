@@ -1,10 +1,13 @@
 .desktop-window {
   position: absolute;
   z-index: var(--z-sistema-ventana);
+  display: flex;
+  flex-direction: column;
   min-width: var(--sistema-ventana-ancho-min);
   border: var(--borde);
   background: var(--sistema-superficie);
   color: var(--sistema-texto);
+  overflow: hidden;
 }
 
 .desktop-window__titlebar {
@@ -50,6 +53,7 @@
 
 .desktop-window__body {
   position: relative;
+  flex: 1 1 0;
   min-width: 0;
   min-height: 0;
   overflow: auto;
