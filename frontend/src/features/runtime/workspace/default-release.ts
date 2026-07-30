@@ -82,5 +82,15 @@ export const DEFAULT_RELEASE: WorkspaceTree = {
       mobileOrder: 6,
       requires: 'admin',
     },
+    trash: {
+      id: 'trash',
+      parentId: 'desktop',
+      type: 'app',
+      label: 'Papelera',
+      refId: 'trash',
+      position: { col: 1, row: 0 },
+      mobileOrder: 7,
+      requires: 'public',
+    },
   },
 };

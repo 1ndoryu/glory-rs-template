@@ -3,11 +3,12 @@
  * Cada app define su id, título, icono, capacidades y render function.
  * Las apps solo devuelven contenido; el shell crea la ventana. */
 
-import { Folder, FileUser, Settings, FileText, FolderCode } from 'lucide';
+import { Folder, FileUser, Settings, FileText, FolderCode, Trash2 } from 'lucide';
 import { AppRegistry } from './app-registry';
 import { createFinderPreview } from '../desktop/apps/finder/finder-preview';
 import { createReaderPreview } from '../desktop/apps/reader/reader-preview';
 import { createFontPanel } from '../settings/font-panel';
+import { createTrashPreview } from '../desktop/apps/trash/trash-preview';
 import { dispatchEvent } from '../analytics/dispatcher';
 import type { MountedView, RenderContext } from '../../core/lifecycle';
 
@@ -110,6 +111,28 @@ AppRegistry.register({
       element: container,
       destroy: () => {
         dispatchEvent({ type: 'app_closed', appId: 'about' });
+      },
+    };
+  },
+});
+
+/* === Trash (Papelera) — Papelera del workspace === */
+AppRegistry.register({
+  id: 'trash',
+  title: 'Papelera',
+  icon: Trash2,
+  iconType: 'application',
+  singleton: true,
+  requires: 'public',
+  render: (_ctx: RenderContext): MountedView => {
+    dispatchEvent({ type: 'app_opened', appId: 'trash' });
+
+    const content = createTrashPreview();
+
+    return {
+      element: content,
+      destroy: () => {
+        dispatchEvent({ type: 'app_closed', appId: 'trash' });
       },
     };
   },

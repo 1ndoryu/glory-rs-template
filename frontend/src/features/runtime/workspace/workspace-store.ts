@@ -113,11 +113,58 @@ function saveOverlay(overlay: WorkspaceOverlay): void {
 
 /* === Fetch release from API === */
 
-/** Cargar el release activo desde el backend. Llamar al arrancar. */
+/** Rebase overlay ante un release nuevo.
+ * Limpia tombstones/overrides de nodos que ya no existen en el nuevo release.
+ * Conserva addedItems (son del overlay, no del release).
+ * [Plan 297A-11 §9.4] Rebase ante release nuevo y referencias huérfanas. */
+function rebaseOverlay(
+  newRelease: WorkspaceTree,
+  currentOverlay: WorkspaceOverlay,
+): WorkspaceOverlay {
+  const releaseIds = new Set(Object.keys(newRelease.nodes));
+
+  /* Tombstones: solo conservar los que apuntan a nodos que aún existen en el nuevo release */
+  const validTombstones = currentOverlay.tombstones.filter((id) => releaseIds.has(id));
+
+  /* Overrides: solo conservar los que apuntan a nodos que aún existen */
+  const validOverrides: Record<NodeId, Partial<Pick<WorkspaceNode, 'position' | 'label' | 'parentId' | 'mobileOrder'>>> = {};
+  for (const [id, overrides] of Object.entries(currentOverlay.fieldOverrides)) {
+    if (releaseIds.has(id)) {
+      validOverrides[id] = overrides;
+    }
+  }
+
+  /* Si nada cambió, devolver el overlay original (evita trigger innecesario) */
+  if (
+    validTombstones.length === currentOverlay.tombstones.length
+    && Object.keys(validOverrides).length === Object.keys(currentOverlay.fieldOverrides).length
+  ) {
+    return currentOverlay;
+  }
+
+  return {
+    version: currentOverlay.version,
+    addedItems: currentOverlay.addedItems,
+    fieldOverrides: validOverrides,
+    tombstones: validTombstones,
+  };
+}
+
+/** Cargar el release activo desde el backend. Llamar al arrancar.
+ * Si el release cambió, rebasea el overlay local. */
 export async function fetchWorkspaceRelease(): Promise<void> {
   try {
     const data = await api.get<{ version: number; tree: WorkspaceTree }>('/api/workspace/release');
     if (data?.tree?.nodes) {
+      const currentRelease = releaseStore.get();
+      if (data.tree.version !== currentRelease.version) {
+        /* Release nuevo — rebase overlay antes de actualizar */
+        const currentOverlay = overlayStore.get();
+        const rebased = rebaseOverlay(data.tree, currentOverlay);
+        if (rebased !== currentOverlay) {
+          overlayStore.set(rebased);
+        }
+      }
       releaseStore.set(data.tree);
     }
   } catch {
@@ -262,6 +309,15 @@ export function reorderDesktopNodes(orderedIds: NodeId[]): void {
     }
     return { ...prev, fieldOverrides: overrides };
   });
+}
+
+/** Obtener nodos en la papelera (tombstoned) con sus datos del release. */
+export function getTombstonedNodes(): WorkspaceNode[] {
+  const release = releaseStore.get();
+  const overlay = overlayStore.get();
+  return overlay.tombstones
+    .map((id) => release.nodes[id])
+    .filter((n): n is WorkspaceNode => n !== undefined);
 }
 
 /** Obtener nodos hijos directos de un padre. */
