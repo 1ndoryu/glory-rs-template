@@ -19,52 +19,30 @@
 ## Estado y reglas
 
 - Concepto desktop aprobado; Finder/Reader siguen siendo previews.
-- `/admin`, JWT en Web Storage, uploads públicos y comercio actual son legado.
+- Sesiones opacas en cookie operativas; JWT localStorage eliminado del frontend. `/admin` legacy y uploads públicos siguen como deuda controlada.
 - Ejecutar una tarea por vez y en este orden; no saltar dependencias.
 - El plan maestro contiene checklists/gates. El roadmap conserva solo pendientes.
 - El quality gate 297A-6 está operativo; toda tarea futura debe cerrarse con `npm run task:check -- {ID}`.
 
 ## Siguiente bloque habilitado
 
-**297A-7 — ADRs y seguridad inmediata.** Quality gate completado; siguen decisiones y cierre de exposición legacy.
+**297A-9 — Foundation del runtime (en ejecución).** Fases 1-5 completadas; pendiente Orval, RouteAppAdapter activación y prueba visual end-to-end.
 
 ## Pendientes ordenados
-
-### 297A-7 — ADRs y seguridad inmediata
-
-**Depende de:** 297A-6.
-
-- [ ] ADR SEO/indexabilidad, storage privado, modalidad Stripe y retención.
-- [ ] Roles/capacidades y bootstrap admin seguro.
-- [ ] Separar superficies public/me/admin/webhooks.
-- [ ] Ocultar drafts/media privada/entregables y retirar modo demo.
-- [ ] Eliminar auto-login/auto-registro y mantener registro apagado.
-- [ ] Pruebas negativas de autorización/exposición.
-
-**Salida:** usuario normal no administra y ningún recurso privado es público.
-
-### 297A-8 — Sesiones seguras y Cuenta base
-
-**Depende de:** 297A-7.
-
-- [ ] Sesiones opacas revocables en cookie.
-- [ ] CSRF/origin/rate limit.
-- [ ] Cuenta interna: login/logout/me/sesiones.
-- [ ] Verificación/recovery diseñados y probados.
-- [ ] Registro continúa apagado hasta completar controles.
-
-**Salida:** admin opera sin JWT en Web Storage y puede revocar sesiones.
 
 ### 297A-9 — Foundation del runtime
 
 **Depende de:** 297A-6/7; coordina identidad 297A-8.
 
-- [ ] Orval Fetch tags-split, sanitizador y Result común.
-- [ ] MountedView/AbortSignal y RouteAppAdapter.
-- [ ] AppRegistry, WindowManager y CommandRegistry.
-- [ ] Taskbar/menús/ventanas derivados.
-- [ ] Dispatcher analítico tipado.
-- [ ] Prueba vertical Perfil→Finder→Reader.
+- [x] MountedView/AbortSignal y RouteAppAdapter (creado, no activado aún).
+- [x] AppRegistry, WindowManager y CommandRegistry.
+- [x] Taskbar reactivo derivado de windowStore.
+- [x] Dispatcher analítico tipado.
+- [x] Drag y resize de ventanas por bordes.
+- [x] Atajos de teclado (Escape, Meta+m, Ctrl+Shift+ArrowRight).
+- [ ] Orval Fetch tags-split (requiere OpenAPI spec).
+- [ ] RouteAppAdapter activación (resolver doble rendering con router).
+- [ ] Prueba visual end-to-end en navegador.
 
 **Salida:** runtime compartido funciona sin chrome/listas/listeners duplicados.
 

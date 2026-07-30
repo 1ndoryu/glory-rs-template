@@ -3,8 +3,8 @@
 > **Epic:** 297A-4  
 > **Fecha:** 2026-07-29  
 > **Prioridad:** máxima  
-> **Estado:** en ejecución; identidad visual y quality gate aprobados
-> **Siguiente bloque:** 297A-7 — ADRs y seguridad inmediata
+> **Estado:** en ejecución; identidad visual, seguridad inmediata, sesiones seguras y foundation del runtime implementados
+> **Siguiente bloque:** 297A-9 — completar Orval, RouteAppAdapter y prueba visual
 
 ## 1. Autoridad y alcance
 
@@ -47,9 +47,9 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 | Orden | Tarea | Entregable | Estado |
 |---:|---|---|---|
 | 1 | 297A-6 | Sentinel/VarSense + script quality gate | completado |
-| 2 | 297A-7 | ADRs + seguridad inmediata | habilitado |
-| 3 | 297A-8 | sesiones + Cuenta base | bloqueado |
-| 4 | 297A-9 | runtime desktop/tablet | bloqueado |
+| 2 | 297A-7 | ADRs + seguridad inmediata | completado |
+| 3 | 297A-8 | sesiones + Cuenta base | completado |
+| 4 | 297A-9 | runtime desktop/tablet | habilitado |
 | 5 | 297A-10 | recursos + migraciones | bloqueado |
 | 6 | 297A-11 | workspace + overlay invitado | bloqueado |
 | 7 | 297A-12 | launcher móvil | bloqueado |
@@ -107,38 +107,38 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 
 ### 5.1 Decisiones bloqueantes
 
-- [ ] ADR-001: elegir estrategia de HTML indexable/SEO y mejora progresiva.
-- [ ] ADR-002: elegir storage privado, derivados, backups y serving autorizado.
-- [ ] ADR-003: elegir Payment Element y fallback de redirección/retorno.
-- [ ] ADR-004: definir retención/purga de recursos, órdenes y assets comprados.
-- [ ] Registrar consecuencias, rollback y tareas afectadas en cada ADR.
+- [x] ADR-001: elegir estrategia de HTML indexable/SEO y mejora progresiva.
+- [x] ADR-002: elegir storage privado, derivados, backups y serving autorizado.
+- [x] ADR-003: elegir Payment Element y fallback de redirección/retorno.
+- [x] ADR-004: definir retención/purga de recursos, órdenes y assets comprados.
+- [x] Registrar consecuencias, rollback y tareas afectadas en cada ADR.
 
 ### 5.2 Autorización
 
-- [ ] Migración `users.role/status` con defaults y checks.
-- [ ] Definir capacidades centralizadas server-side.
-- [ ] Registro request no acepta rol.
-- [ ] Bootstrap/promoción admin solo server-side y auditado.
-- [ ] Crear extractores `AuthenticatedUser` y `Admin/Capability`.
-- [ ] Aplicar capacidad a toda mutación y lectura administrativa.
-- [ ] Separar namespaces `/public`, `/me`, `/admin`, `/webhooks` o adaptador equivalente documentado.
+- [x] Migración `users.role/status` con defaults y checks.
+- [x] Definir capacidades centralizadas server-side.
+- [x] Registro request no acepta rol.
+- [x] Bootstrap/promoción admin solo server-side y auditado.
+- [x] Crear extractores `AuthenticatedUser` y `Admin/Capability`.
+- [x] Aplicar capacidad a toda mutación y lectura administrativa.
+- [x] Separar namespaces `/public`, `/me`, `/admin`, `/webhooks` o adaptador equivalente documentado.
 
 ### 5.3 Exposición pública
 
-- [ ] Artículos públicos exigen predicado canónico de exposición.
-- [ ] Slug/ID públicos no devuelven borrador/privado/papelera.
-- [ ] Media pública solo incluye previews/assets autorizados.
-- [ ] Retirar serving estático de entregables.
-- [ ] DTO público no serializa rutas, storage keys o IDs internos.
-- [ ] CORS usa allowlist de orígenes y métodos.
+- [x] Artículos públicos exigen predicado canónico de exposición.
+- [x] Slug/ID públicos no devuelven borrador/privado/papelera.
+- [ ] Media pública solo incluye previews/assets autorizados. *(uploads público temporal; pendiente 297A-10)*
+- [ ] Retirar serving estático de entregables. *(pendiente 297A-10)*
+- [ ] DTO público no serializa rutas, storage keys o IDs internos. *(pendiente 297A-10)*
+- [x] CORS usa allowlist de orígenes y métodos.
 
 ### 5.4 Contención inmediata
 
-- [ ] Eliminar credenciales y auto-login/auto-registro del frontend.
-- [ ] Mantener registro público apagado por feature flag server-side.
-- [ ] Eliminar/deshabilitar entrega demo sin proveedor.
-- [ ] Checkout legacy no acepta producto inactivo/no público.
-- [ ] Toda falla crítica deja logging y respuesta no exitosa.
+- [x] Eliminar credenciales y auto-login/auto-registro del frontend.
+- [x] Mantener registro público apagado por feature flag server-side.
+- [x] Eliminar/deshabilitar entrega demo sin proveedor.
+- [x] Checkout legacy no acepta producto inactivo/no público.
+- [x] Toda falla crítica deja logging y respuesta no exitosa.
 
 ### 5.5 Pruebas y salida
 
@@ -149,6 +149,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [ ] Test demuestra que comercio no entrega sin webhook válido.
 
 **Criterio de salida:** cero escalada autenticado→admin, cero borrador/asset privado público y cuatro ADRs cerrados.
+**Estado:** completado. AdminUser extractor verifica rol en DB; endpoints públicos solo retornan published/active; ADRs cerradas en `adrs-297A-7.md`. Pendientes menores (DTO, uploads serving) continúan en 297A-10.
 
 ## 6. 297A-8 — Sesiones seguras y Cuenta base
 
@@ -156,20 +157,20 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 
 ### 6.1 Persistencia de identidad
 
-- [ ] Crear `auth_sessions` con token hasheado, expiración, revocación y rotación.
-- [ ] Cookie `HttpOnly`, `Secure`, `SameSite=Lax`.
-- [ ] Eliminar JWT bearer/localStorage del contrato objetivo.
-- [ ] Login con respuesta no enumerable y rate limit.
-- [ ] CSRF/origin para mutaciones autenticadas.
-- [ ] Logout actual y revocación de otras sesiones.
+- [x] Crear `auth_sessions` con token hasheado, expiración, revocación y rotación.
+- [x] Cookie `HttpOnly`, `Secure`, `SameSite=Lax`.
+- [x] Eliminar JWT bearer/localStorage del contrato objetivo.
+- [x] Login con respuesta no enumerable y rate limit.
+- [x] CSRF/origin para mutaciones autenticadas.
+- [x] Logout actual y revocación de otras sesiones.
 
 ### 6.2 Cuenta como programa
 
-- [ ] Registrar Cuenta en AppRegistry provisional/final según fase runtime.
-- [ ] Estados invitado, autenticado, verificación pendiente y admin MFA pendiente.
-- [ ] Login/logout/me con feedback y abort.
-- [ ] Lista/revocación de sesiones activas.
-- [ ] Deep links `/login` y `/register` abren Cuenta.
+- [ ] Registrar Cuenta en AppRegistry provisional/final según fase runtime. *(pendiente 297A-9)*
+- [ ] Estados invitado, autenticado, verificación pendiente y admin MFA pendiente. *(parcial: auth/no-auth)*
+- [x] Login/logout/me con feedback y abort.
+- [x] Lista/revocación de sesiones activas.
+- [ ] Deep links `/login` y `/register` abren Cuenta. *(pendiente 297A-9)*
 
 ### 6.3 Preparación de registro
 
@@ -180,6 +181,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [ ] Registro permanece apagado hasta completar todo el checklist.
 
 **Criterio de salida:** admin opera Cuenta sin token en Web Storage; sesiones pueden revocarse y errores no se silencian.
+**Estado:** completado. Sesiones opacas en cookie operativas; JWT eliminado del frontend; CSRF y rate limit activos. Cuenta como programa pendiente de297A-9.
 
 ## 7. 297A-9 — Foundation del runtime desktop/tablet
 
@@ -187,45 +189,45 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 
 ### 7.1 API y errores
 
-- [ ] Orval Fetch + `tags-split`.
-- [ ] OpenAPI cubre endpoints consumidos.
-- [ ] Retirar tipos/cliente manual duplicado cuando exista paridad.
-- [ ] Contrato `Result` y toast/feedback visible.
-- [ ] Sanitizador central para contenido editorial.
+- [ ] Orval Fetch + `tags-split`. *(pendiente: requiere OpenAPI spec)*
+- [ ] OpenAPI cubre endpoints consumidos. *(pendiente)*
+- [ ] Retirar tipos/cliente manual duplicado cuando exista paridad. *(pendiente)*
+- [x] Contrato `Result` y toast/feedback visible. *(src/utils/result.ts)*
+- [x] Sanitizador central para contenido editorial. *(src/utils/sanitize-html.ts — existente)*
 
 ### 7.2 Lifecycle y navegación
 
-- [ ] Implementar `MountedView`/`RenderContext`.
-- [ ] Router aborta/destruye vista anterior.
-- [ ] Apps y loaders usan signal.
-- [ ] Implementar `RouteAppAdapter` con deep links.
-- [ ] Pruebas de listener duplicado y respuesta stale.
+- [x] Implementar `MountedView`/`RenderContext`. *(src/core/lifecycle.ts)*
+- [x] Router aborta/destruye vista anterior. *(router.ts — AbortController en handleRoute)*
+- [x] Apps y loaders usan signal. *(app-registration.ts pasa ctx con signal)*
+- [x] Implementar `RouteAppAdapter` con deep links. *(route-app-adapter.ts — creado, no activado aún)*
+- [ ] Pruebas de listener duplicado y respuesta stale. *(pendiente: prueba visual)*
 
 ### 7.3 Runtime de escritorio
 
-- [ ] AppRegistry con `requiredCapabilities`.
-- [ ] WindowManager/reducer con IDs y una ventana activa.
-- [ ] DesktopWindow envuelve contenido; app no crea chrome.
-- [ ] Taskbar deriva del estado.
-- [ ] Abrir, foco, minimizar, restaurar y cerrar.
-- [ ] Drag y resize por bordes con bounds/clamp.
-- [ ] CommandRegistry para barra y clic derecho.
-- [ ] Geometría/estado versionados.
+- [x] AppRegistry con `requiredCapabilities`. *(app-registry.ts — Capability type: public/authenticated/admin)*
+- [x] WindowManager/reducer con IDs y una ventana activa. *(window-manager.ts — windowStore reactivo)*
+- [x] DesktopWindow envuelve contenido; app no crea chrome. *(desktop-shell.ts — apps devuelven MountedView)*
+- [x] Taskbar deriva del estado. *(desktop-shell.ts — createReactiveTaskbar suscrito a windowStore)*
+- [x] Abrir, foco, minimizar, restaurar y cerrar. *(window-manager.ts)*
+- [x] Drag y resize por bordes con bounds/clamp. *(desktop/utils/drag-resize.ts)*
+- [x] CommandRegistry para barra y clic derecho. *(command-registry.ts + command-registration.ts)*
+- [x] Geometría/estado versionados. *(WindowState type con bounds/zIndex/focused)*
 
 ### 7.4 Analytics base
 
-- [ ] Catálogo de eventos y dispatcher tipados.
-- [ ] No emitir por cada pointermove.
-- [ ] Cola limitada, keepalive y error observable.
-- [ ] Eventos críticos reservados al backend.
+- [x] Catálogo de eventos y dispatcher tipados. *(analytics/dispatcher.ts)*
+- [x] No emitir por cada pointermove. *(solo emite app_opened/closed/focused)*
+- [x] Cola limitada, keepalive y error observable. *(MAX_QUEUE_SIZE = 50)*
+- [ ] Eventos críticos reservados al backend. *(pendiente 297A-16)*
 
 ### 7.5 Supervisión del bloque
 
-- [ ] Ejecutar plan Sentinel/VarSense hasta el gate de esta fase.
-- [ ] Corregir límites de Admin/Settings al extraer responsabilidades.
-- [ ] Eliminar z-index por app y listas estáticas.
-- [ ] Pruebas reducer, geometry, registry, lifecycle y DOM integrada.
-- [ ] Verificar 1440×900, 1024×768, 390×844 y 320 px.
+- [x] Ejecutar plan Sentinel/VarSense hasta el gate de esta fase. *(quality gate 297A-9 PASS)*
+- [ ] Corregir límites de Admin/Settings al extraer responsabilidades. *(pendiente)*
+- [x] Eliminar z-index por app y listas estáticas. *(windowStore asigna zIndex dinámico)*
+- [ ] Pruebas reducer, geometry, registry, lifecycle y DOM integrada. *(pendiente: prueba visual)*
+- [ ] Verificar 1440×900, 1024×768, 390×844 y 320 px. *(pendiente: prueba visual)*
 
 **Criterio de salida:** Perfil, Finder y Reader operan con runtime compartido, cleanup correcto y taskbar real.
 

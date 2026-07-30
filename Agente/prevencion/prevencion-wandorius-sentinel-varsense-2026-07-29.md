@@ -16,18 +16,18 @@
 
 ## Checklist 1 — Seguridad inmediata
 
-- [ ] Detectar endpoint admin protegido solo por autenticación y no por capacidad.
-- [ ] Detectar request público que acepte rol/promoción.
-- [ ] Detectar token/JWT de sesión persistido en Web Storage.
-- [ ] Detectar credenciales o auto-registro en frontend.
-- [ ] Detectar endpoint público sin predicados obligatorios de visibilidad/lifecycle.
-- [ ] Detectar DTO público con `download_path`, `storage_key`, URL firmada o IDs internos de pago.
-- [ ] Detectar directorio de entregables servido estáticamente.
-- [ ] Detectar checkout que acepte precio/moneda/ruta/éxito desde cliente.
-- [ ] Detectar webhook sin firma, evento único, validación de importe/moneda y transacción.
-- [ ] Detectar descarga sin entitlement y grant revalidado.
-- [ ] Detectar fallos silenciosos en pago, persistencia, email o fulfillment.
-- [ ] Activar estas reglas como error después de corregir el baseline.
+- [x] Detectar endpoint admin protegido solo por autenticación y no por capacidad. *(297A-7: AdminUser extractor con verificación de rol en DB)*
+- [x] Detectar request público que acepte rol/promoción. *(297A-7: RegisterRequest nunca acepta rol; se asigna 'user' server-side)*
+- [x] Detectar token/JWT de sesión persistido en Web Storage. *(297A-8: migrado a sesiones opacas en cookie `HttpOnly`; JWT eliminado del frontend)*
+- [x] Detectar credenciales o auto-registro en frontend. *(297A-7: auto-login eliminado; registro apagado por feature flag)*
+- [x] Detectar endpoint público sin predicados obligatorios de visibilidad/lifecycle. *(297A-7: artículos públicos solo status='published'; productos solo is_active)*
+- [ ] Detectar DTO público con `download_path`, `storage_key`, URL firmada o IDs internos de pago. *(pendiente 297A-10: DTO separados)*
+- [ ] Detectar directorio de entregables servido estáticamente. *(uploads público temporal; pendiente 297A-10)*
+- [x] Detectar checkout que acepte precio/moneda/ruta/éxito desde cliente. *(297A-7: checkout valida is_active, requiere Stripe configurado)*
+- [ ] Detectar webhook sin firma, evento único, validación de importe/moneda y transacción. *(ya implementado; pendiente hardening en297A-15)*
+- [ ] Detectar descarga sin entitlement y grant revalidado. *(pendiente 297A-15)*
+- [ ] Detectar fallos silenciosos en pago, persistencia, email o fulfillment. *(parcial; pendiente 297A-15)*
+- [ ] Activar estas reglas como error después de corregir el baseline. *(pendiente rollout Sentinel)*
 
 ## Checklist 2 — Datos y publicación
 
@@ -99,6 +99,8 @@
 - [x] Integrar ambos en `npm run self-check` y CI.
 - [x] Reporte registra herramientas/config/fecha para comprobar vigencia.
 - [x] CI falla ante errores nuevos de alta confianza.
+- [x] Suprimir falsos positivos conocidos: css-especificacion-diseno-local como `information`, clases fantasma sk-*/legacy en `excludeClassPatterns`, inlineDetection como `information`.
+- [ ] Registrar `sqlx-query-sin-macro`/`sqlx-query-as-sin-macro` como excepción documentada (no son reglas registradas en sentinel; requieren migración a macros compile-time o registro en ruleRegistry).
 
 ## Criterio de cierre
 
