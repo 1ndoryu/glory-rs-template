@@ -1,3 +1,3 @@
 mod auth;
 
-pub use auth::AuthUser;
+pub use auth::{AdminUser, AuthUser};

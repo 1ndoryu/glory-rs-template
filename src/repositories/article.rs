@@ -179,4 +179,16 @@ impl ArticleRepository {
                 .await?;
         Ok(exists)
     }
+
+    /// Listar slugs y fechas de artículos publicados (para sitemap)
+    pub async fn list_published_slugs(
+        pool: &PgPool,
+    ) -> Result<Vec<(String, chrono::DateTime<chrono::Utc>)>, sqlx::Error> {
+        sqlx::query_as::<_, (String, chrono::DateTime<chrono::Utc>)>(
+            "SELECT slug, COALESCE(published_at, created_at) as date \
+             FROM articles WHERE status = 'published' ORDER BY published_at DESC",
+        )
+        .fetch_all(pool)
+        .await
+    }
 }

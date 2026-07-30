@@ -6,18 +6,14 @@ use axum::Router;
 use std::fmt::Write;
 
 use crate::errors::AppError;
+use crate::repositories::ArticleRepository;
 use crate::AppState;
 
 const SITE_URL: &str = "https://wandori.us";
 
 /// Genera sitemap.xml dinamicamente desde articulos publicados
 pub async fn sitemap(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
-    let articles = sqlx::query_as::<_, (String, chrono::DateTime<chrono::Utc>)>(
-        "SELECT slug, COALESCE(published_at, created_at) as date \
-         FROM articles WHERE status = 'published' ORDER BY published_at DESC",
-    )
-    .fetch_all(&state.pool)
-    .await?;
+    let articles = ArticleRepository::list_published_slugs(&state.pool).await?;
 
     let mut xml = String::from(
         r#"<?xml version="1.0" encoding="UTF-8"?>

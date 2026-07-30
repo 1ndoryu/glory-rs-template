@@ -78,12 +78,7 @@ async fn handle_completed(state: &AppState, session: &serde_json::Value) -> Resu
 
     let payment_intent = session["payment_intent"].as_str();
     OrderRepository::mark_paid(&state.pool, order_id, payment_intent).await?;
-    let Some(order) =
-        sqlx::query_as::<_, crate::models::product::Order>("SELECT * FROM orders WHERE id = $1")
-            .bind(order_id)
-            .fetch_optional(&state.pool)
-            .await?
-    else {
+    let Some(order) = OrderRepository::find_by_id(&state.pool, order_id).await? else {
         tracing::warn!("Orden pagada no encontrada: {order_id}");
         return Ok(());
     };
@@ -121,10 +116,7 @@ async fn handle_expired(state: &AppState, session: &serde_json::Value) -> Result
         tracing::warn!("order_id expirado invalido: {order_id_raw}");
         return Ok(());
     };
-    sqlx::query("UPDATE orders SET status = 'failed' WHERE id = $1")
-        .bind(order_id)
-        .execute(&state.pool)
-        .await?;
+    OrderRepository::mark_failed(&state.pool, order_id).await?;
     tracing::info!("Orden {order_id} expirada");
     Ok(())
 }

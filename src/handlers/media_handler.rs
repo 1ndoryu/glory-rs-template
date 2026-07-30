@@ -5,7 +5,7 @@ use axum::{Json, Router};
 use uuid::Uuid;
 
 use crate::errors::AppError;
-use crate::middleware::AuthUser;
+use crate::middleware::AdminUser;
 use crate::models::media::{CreateMediaRequest, Media, MediaQueryParams};
 use crate::services::media_svc::MediaService;
 use crate::AppState;
@@ -16,7 +16,7 @@ const MAX_FILE_SIZE: usize = 10 * 1024 * 1024;
 /// Subir archivo (admin)
 pub async fn upload_media(
     State(state): State<AppState>,
-    _auth: AuthUser,
+    _auth: AdminUser,
     mut multipart: Multipart,
 ) -> Result<(StatusCode, Json<Media>), AppError> {
     let mut file_path = String::new();
@@ -131,7 +131,7 @@ pub async fn list_media(
 /// Eliminar archivo media (admin)
 pub async fn delete_media(
     State(state): State<AppState>,
-    _auth: AuthUser,
+    _auth: AdminUser,
     axum::extract::Path(id): axum::extract::Path<Uuid>,
 ) -> Result<StatusCode, AppError> {
     MediaService::delete(&state.pool, id).await?;

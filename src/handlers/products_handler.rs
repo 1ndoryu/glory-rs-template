@@ -6,16 +6,15 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::errors::AppError;
-use crate::middleware::AuthUser;
+use crate::middleware::AdminUser;
 use crate::models::product::{CheckoutRequest, CreateProductRequest, Order, Product};
-use crate::services::email::EmailService;
 use crate::services::product_svc::ProductService;
 use crate::AppState;
 
 /// Crear producto (admin)
 pub async fn create_product(
     State(state): State<AppState>,
-    _auth: AuthUser,
+    _auth: AdminUser,
     Json(req): Json<CreateProductRequest>,
 ) -> Result<(StatusCode, Json<Product>), AppError> {
     req.validate()
@@ -37,7 +36,7 @@ pub async fn list_products_by_article(
 /// Eliminar producto (admin)
 pub async fn delete_product(
     State(state): State<AppState>,
-    _auth: AuthUser,
+    _auth: AdminUser,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, AppError> {
     ProductService::delete(&state.pool, id).await?;
@@ -112,11 +111,12 @@ async fn create_stripe_checkout(
         .as_str()
         .ok_or_else(|| AppError::Internal("Stripe no retorno ID de sesion".into()))?;
 
-    sqlx::query("UPDATE orders SET stripe_session_id = $1 WHERE id = $2")
-        .bind(session_id)
-        .bind(order.id)
-        .execute(&state.pool)
-        .await?;
+    crate::repositories::product_repo::OrderRepository::update_stripe_session(
+        &state.pool,
+        order.id,
+        session_id,
+    )
+    .await?;
     tracing::info!(
         "Stripe checkout creado: session={session_id}, order={}",
         order.id
@@ -129,41 +129,26 @@ async fn create_stripe_checkout(
     })))
 }
 
-async fn create_demo_checkout(
-    state: &AppState,
-    product: &Product,
-    order: &Order,
-    email: &str,
-) -> Result<Json<serde_json::Value>, AppError> {
-    if let (Some(api_key), Some(download_path)) = (&state.resend_api_key, &product.download_path) {
-        let download_url = format!("{}{download_path}", state.site_url);
-        EmailService::send_download_link(
-            api_key,
-            &state.email_from,
-            email,
-            &product.name,
-            &download_url,
-        )
-        .await?;
-        crate::repositories::product_repo::OrderRepository::mark_delivered(&state.pool, order.id)
-            .await?;
-    }
-
-    Ok(Json(serde_json::json!({
-        "checkout_url": format!("{}/checkout/demo?order={}", state.site_url, order.id),
-        "order_id": order.id,
-        "message": "modo demo — si hay email configurado, recibiras tu descarga por correo."
-    })))
-}
-
 /// Iniciar checkout de Stripe.
-/// Si hay `STRIPE_SECRET_KEY`, crea una Checkout Session real; si no, usa modo demo.
+/// [297A-7] Solo acepta productos activos. Modo demo deshabilitado.
 pub async fn checkout(
     State(state): State<AppState>,
     Path(product_id): Path<Uuid>,
     Json(req): Json<CheckoutRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let product = ProductService::get(&state.pool, product_id).await?;
+
+    /* [297A-7] Checkout solo acepta productos activos */
+    if !product.is_active {
+        return Err(AppError::BadRequest("Producto no disponible".into()));
+    }
+
+    /* [297A-7] Modo demo deshabilitado — requiere Stripe configurado */
+    let stripe_key = state
+        .stripe_secret_key
+        .as_ref()
+        .ok_or_else(|| AppError::Internal("Pasarela de pago no configurada".into()))?;
+
     let order = crate::repositories::product_repo::OrderRepository::create(
         &state.pool,
         product.id,
@@ -172,11 +157,7 @@ pub async fn checkout(
     )
     .await?;
 
-    if let Some(stripe_key) = &state.stripe_secret_key {
-        create_stripe_checkout(&state, stripe_key, &product, &order, &req.email).await
-    } else {
-        create_demo_checkout(&state, &product, &order, &req.email).await
-    }
+    create_stripe_checkout(&state, stripe_key, &product, &order, &req.email).await
 }
 
 pub fn routes() -> Router<AppState> {

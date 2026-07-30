@@ -5,7 +5,7 @@ use axum::{Json, Router};
 use uuid::Uuid;
 
 use crate::errors::AppError;
-use crate::middleware::AuthUser;
+use crate::middleware::AdminUser;
 use crate::models::project::{CreateProjectRequest, Project, UpdateProjectRequest};
 use crate::services::project_svc::ProjectService;
 use crate::AppState;
@@ -13,7 +13,7 @@ use crate::AppState;
 /// Crear proyecto (admin)
 pub async fn create_project(
     State(state): State<AppState>,
-    _auth: AuthUser,
+    _auth: AdminUser,
     Json(req): Json<CreateProjectRequest>,
 ) -> Result<(StatusCode, Json<Project>), AppError> {
     let project = ProjectService::create(&state.pool, req).await?;
@@ -29,7 +29,7 @@ pub async fn list_projects(State(state): State<AppState>) -> Result<Json<Vec<Pro
 /// Listar todos los proyectos (admin)
 pub async fn list_all_projects(
     State(state): State<AppState>,
-    _auth: AuthUser,
+    _auth: AdminUser,
 ) -> Result<Json<Vec<Project>>, AppError> {
     let projects = ProjectService::list_all(&state.pool).await?;
     Ok(Json(projects))
@@ -38,7 +38,7 @@ pub async fn list_all_projects(
 /// Actualizar proyecto (admin)
 pub async fn update_project(
     State(state): State<AppState>,
-    _auth: AuthUser,
+    _auth: AdminUser,
     Path(id): Path<Uuid>,
     Json(req): Json<UpdateProjectRequest>,
 ) -> Result<Json<Project>, AppError> {
@@ -49,7 +49,7 @@ pub async fn update_project(
 /// Eliminar proyecto (admin)
 pub async fn delete_project(
     State(state): State<AppState>,
-    _auth: AuthUser,
+    _auth: AdminUser,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, AppError> {
     ProjectService::delete(&state.pool, id).await?;
@@ -58,10 +58,15 @@ pub async fn delete_project(
 
 pub fn routes() -> Router<AppState> {
     Router::new()
-        .route("/projects", get(list_projects).post(create_project))
+        /* Públicos */
+        .route("/projects", get(list_projects))
+        /* Admin */
         .route(
-            "/projects/{id}",
+            "/admin/projects",
+            get(list_all_projects).post(create_project),
+        )
+        .route(
+            "/admin/projects/{id}",
             axum::routing::put(update_project).delete(delete_project),
         )
-        .route("/admin/projects", get(list_all_projects))
 }

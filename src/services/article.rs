@@ -31,13 +31,42 @@ impl ArticleService {
         Ok(article)
     }
 
+    /// Buscar artículo por ID (admin — incluye borradores)
     pub async fn get(pool: &PgPool, id: Uuid) -> Result<Article, AppError> {
         ArticleRepository::find_by_id(pool, id)
             .await?
             .ok_or_else(|| AppError::NotFound("Articulo no encontrado".into()))
     }
 
+    /// Buscar artículo publicado por ID (público)
+    pub async fn get_published(pool: &PgPool, id: Uuid) -> Result<Article, AppError> {
+        let article = ArticleRepository::find_by_id(pool, id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Articulo no encontrado".into()))?;
+
+        if article.status != "published" {
+            return Err(AppError::NotFound("Articulo no encontrado".into()));
+        }
+
+        Ok(article)
+    }
+
+    /// Buscar artículo por slug — solo artículos publicados para endpoints públicos
     pub async fn get_by_slug(pool: &PgPool, slug: &str) -> Result<Article, AppError> {
+        let article = ArticleRepository::find_by_slug(pool, slug)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Articulo no encontrado".into()))?;
+
+        /* [297A-7] Endpoints públicos no exponen borradores */
+        if article.status != "published" {
+            return Err(AppError::NotFound("Articulo no encontrado".into()));
+        }
+
+        Ok(article)
+    }
+
+    /// Buscar artículo por slug para admin — incluye borradores
+    pub async fn get_by_slug_admin(pool: &PgPool, slug: &str) -> Result<Article, AppError> {
         ArticleRepository::find_by_slug(pool, slug)
             .await?
             .ok_or_else(|| AppError::NotFound("Articulo no encontrado".into()))

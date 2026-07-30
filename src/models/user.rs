@@ -5,12 +5,31 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 
+/// Rol del usuario en el sistema
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "user_role", rename_all = "lowercase")]
+pub enum UserRole {
+    User,
+    Admin,
+}
+
+/// Estado del usuario
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "user_status", rename_all = "lowercase")]
+pub enum UserStatus {
+    Active,
+    Suspended,
+    Deleted,
+}
+
 /// Modelo de usuario almacenado en base de datos
 #[derive(Debug, Clone, FromRow)]
 pub struct User {
     pub id: Uuid,
     pub email: String,
     pub password_hash: String,
+    pub role: UserRole,
+    pub status: UserStatus,
     pub created_at: DateTime<Utc>,
 }
 
@@ -33,6 +52,8 @@ impl From<User> for UserResponse {
 }
 
 /// Request body para registrar un nuevo usuario
+/// Nota: el rol se asigna siempre como 'user' en el servidor.
+/// El request NUNCA acepta rol para prevenir escalada.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 pub struct RegisterRequest {
     #[validate(email(message = "Formato de email inválido"))]

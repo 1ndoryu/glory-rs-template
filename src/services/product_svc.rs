@@ -28,7 +28,18 @@ impl ProductService {
             .ok_or_else(|| AppError::NotFound("Producto no encontrado".into()))
     }
 
+    /// Listar productos activos de un artículo (público)
     pub async fn list_by_article(
+        pool: &PgPool,
+        article_id: Uuid,
+    ) -> Result<Vec<Product>, AppError> {
+        let products = ProductRepository::find_by_article(pool, article_id).await?;
+        /* [297A-7] Solo exponer productos activos al público */
+        Ok(products.into_iter().filter(|p| p.is_active).collect())
+    }
+
+    /// Listar todos los productos de un artículo (admin)
+    pub async fn list_by_article_admin(
         pool: &PgPool,
         article_id: Uuid,
     ) -> Result<Vec<Product>, AppError> {

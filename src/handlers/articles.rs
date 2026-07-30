@@ -6,7 +6,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::errors::AppError;
-use crate::middleware::AuthUser;
+use crate::middleware::AdminUser;
 use crate::models::article::{
     Article, ArticleQueryParams, CreateArticleRequest, PaginatedArticles, UpdateArticleRequest,
 };
@@ -27,7 +27,7 @@ use crate::AppState;
 )]
 pub async fn create_article(
     State(state): State<AppState>,
-    _auth: AuthUser,
+    _auth: AdminUser,
     Json(req): Json<CreateArticleRequest>,
 ) -> Result<(StatusCode, Json<Article>), AppError> {
     req.validate()
@@ -37,7 +37,7 @@ pub async fn create_article(
     Ok((StatusCode::CREATED, Json(article)))
 }
 
-/// Obtener articulo por ID
+/// Obtener articulo por ID (admin — incluye borradores)
 #[utoipa::path(
     get,
     path = "/api/articles/{id}",
@@ -45,10 +45,12 @@ pub async fn create_article(
     responses(
         (status = 200, description = "Articulo encontrado", body = Article),
         (status = 404, description = "No encontrado", body = crate::errors::ErrorResponse)
-    )
+    ),
+    security(("bearer_auth" = []))
 )]
 pub async fn get_article(
     State(state): State<AppState>,
+    _auth: AdminUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Article>, AppError> {
     let article = ArticleService::get(&state.pool, id).await?;
@@ -73,7 +75,8 @@ pub async fn get_article_by_slug(
     Ok(Json(article))
 }
 
-/// Listar articulos (publico, con filtro de estado opcional)
+/// Listar articulos publicados (publico)
+/// [297A-7] Solo artículos con status='published'
 #[utoipa::path(
     get,
     path = "/api/articles",
@@ -84,6 +87,26 @@ pub async fn get_article_by_slug(
 )]
 pub async fn list_articles(
     State(state): State<AppState>,
+    Query(params): Query<ArticleQueryParams>,
+) -> Result<Json<PaginatedArticles>, AppError> {
+    let articles =
+        ArticleService::list(&state.pool, Some("published"), params.page, params.per_page).await?;
+    Ok(Json(articles))
+}
+
+/// Listar todos los articulos incluyendo borradores (admin)
+#[utoipa::path(
+    get,
+    path = "/api/admin/articles",
+    params(ArticleQueryParams),
+    responses(
+        (status = 200, description = "Lista de articulos", body = PaginatedArticles)
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn list_articles_admin(
+    State(state): State<AppState>,
+    _auth: AdminUser,
     Query(params): Query<ArticleQueryParams>,
 ) -> Result<Json<PaginatedArticles>, AppError> {
     let articles = ArticleService::list(
@@ -111,7 +134,7 @@ pub async fn list_articles(
 )]
 pub async fn update_article(
     State(state): State<AppState>,
-    _auth: AuthUser,
+    _auth: AdminUser,
     Path(id): Path<Uuid>,
     Json(req): Json<UpdateArticleRequest>,
 ) -> Result<Json<Article>, AppError> {
@@ -136,7 +159,7 @@ pub async fn update_article(
 )]
 pub async fn delete_article(
     State(state): State<AppState>,
-    _auth: AuthUser,
+    _auth: AdminUser,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, AppError> {
     ArticleService::delete(&state.pool, id).await?;
@@ -145,10 +168,16 @@ pub async fn delete_article(
 
 pub fn routes() -> Router<AppState> {
     Router::new()
-        .route("/articles", post(create_article).get(list_articles))
+        /* Públicos: solo artículos publicados */
+        .route("/articles", get(list_articles))
         .route("/articles/slug/{slug}", get(get_article_by_slug))
+        /* Admin: CRUD completo */
         .route(
-            "/articles/{id}",
+            "/admin/articles",
+            post(create_article).get(list_articles_admin),
+        )
+        .route(
+            "/admin/articles/{id}",
             get(get_article).put(update_article).delete(delete_article),
         )
 }

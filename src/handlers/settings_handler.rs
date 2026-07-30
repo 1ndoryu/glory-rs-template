@@ -5,7 +5,7 @@ use axum::{Json, Router};
 use std::collections::HashMap;
 
 use crate::errors::AppError;
-use crate::middleware::AuthUser;
+use crate::middleware::AdminUser;
 use crate::models::settings::{AnalyticsStats, TrackEventsRequest, UpdateSettingsRequest};
 use crate::services::settings_svc::{AnalyticsService, SettingsService};
 use crate::AppState;
@@ -21,7 +21,7 @@ pub async fn get_settings(
 /// Actualizar settings (admin)
 pub async fn update_settings(
     State(state): State<AppState>,
-    _auth: AuthUser,
+    _auth: AdminUser,
     Json(req): Json<UpdateSettingsRequest>,
 ) -> Result<StatusCode, AppError> {
     SettingsService::update_batch(&state.pool, &req.settings).await?;
@@ -64,7 +64,7 @@ pub async fn track_events(
 /// Obtener estadisticas (admin)
 pub async fn get_analytics_stats(
     State(state): State<AppState>,
-    _auth: AuthUser,
+    _auth: AdminUser,
 ) -> Result<Json<AnalyticsStats>, AppError> {
     let analytics = AnalyticsService::get_stats(&state.pool).await?;
     Ok(Json(analytics))
@@ -72,7 +72,10 @@ pub async fn get_analytics_stats(
 
 pub fn routes() -> Router<AppState> {
     Router::new()
-        .route("/settings", get(get_settings).post(update_settings))
+        /* Públicos */
+        .route("/settings", get(get_settings))
         .route("/analytics/events", post(track_events))
-        .route("/analytics/stats", get(get_analytics_stats))
+        /* Admin */
+        .route("/admin/settings", post(update_settings))
+        .route("/admin/analytics/stats", get(get_analytics_stats))
 }

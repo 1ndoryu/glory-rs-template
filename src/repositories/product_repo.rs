@@ -139,4 +139,39 @@ impl OrderRepository {
             .await?;
         Ok(())
     }
+
+    /// Marcar orden como fallida (webhook expirado)
+    pub async fn mark_failed(pool: &PgPool, id: Uuid) -> Result<(), sqlx::Error> {
+        sqlx::query("UPDATE orders SET status = 'failed' WHERE id = $1")
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Buscar orden por ID
+    pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Order>, sqlx::Error> {
+        sqlx::query_as::<_, Order>(
+            "SELECT id, product_id, stripe_session_id, stripe_payment_intent, \
+             customer_email, status, paid_at, delivered_at, created_at \
+             FROM orders WHERE id = $1",
+        )
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+    }
+
+    /// Actualizar `stripe_session_id` de una orden
+    pub async fn update_stripe_session(
+        pool: &PgPool,
+        id: Uuid,
+        stripe_session_id: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query("UPDATE orders SET stripe_session_id = $1 WHERE id = $2")
+            .bind(stripe_session_id)
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
 }

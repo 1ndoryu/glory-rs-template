@@ -1,7 +1,7 @@
 #![allow(clippy::needless_for_each)] // Generado por utoipa OpenApi derive
 
 pub mod articles;
-mod auth;
+pub mod auth;
 mod health;
 pub mod media_handler;
 mod notes;
@@ -12,8 +12,10 @@ pub mod settings_handler;
 pub mod stripe_webhook;
 
 use axum::extract::DefaultBodyLimit;
+use axum::http::{header, HeaderValue, Method};
 use axum::Router;
-use tower_http::cors::{Any, CorsLayer};
+use tower::ServiceBuilder;
+use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
 use utoipa::OpenApi;
@@ -86,24 +88,48 @@ pub fn create_router(pool: sqlx::PgPool, config: crate::config::AppConfig) -> Ro
         stripe_secret_key: config.stripe_secret_key,
         stripe_webhook_secret: config.stripe_webhook_secret,
         site_url,
+        login_rate_limit: std::sync::Arc::new(std::sync::Mutex::new(
+            std::collections::HashMap::new(),
+        )),
     };
 
-    /* CORS: en desarrollo se permite todo. En producción, restringir orígenes */
+    /* [297A-7] CORS con allowlist de orígenes */
+    let allowed_origins: Vec<HeaderValue> = std::env::var("CORS_ORIGINS")
+        .unwrap_or_else(|_| {
+            "https://wandori.us,http://localhost:5173,http://localhost:3000".to_string()
+        })
+        .split(',')
+        .map(|s| s.trim().parse())
+        .filter_map(Result::ok)
+        .collect();
+
     let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+        .allow_origin(AllowOrigin::list(allowed_origins))
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::DELETE,
+            Method::PATCH,
+        ])
+        .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]);
 
     /* Servir archivos subidos estaticamente */
+    /* [297A-7] Nota: uploads se mantiene público temporalmente para compatibilidad.
+     * En 297A-10 se migrará a serving autorizado. */
     let uploads_service = ServeDir::new(&state.upload_dir);
 
     Router::new()
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .nest("/api", api_routes())
         .nest_service("/uploads", uploads_service)
-        .layer(TraceLayer::new_for_http())
-        .layer(cors)
-        .layer(DefaultBodyLimit::max(20 * 1024 * 1024)) /* 20MB para uploads de media */
+        .layer(
+            ServiceBuilder::new()
+                .layer(TraceLayer::new_for_http())
+                .layer(cors)
+                .layer(DefaultBodyLimit::max(20 * 1024 * 1024)) /* 20MB para uploads de media */
+                .into_inner(),
+        )
         .with_state(state)
 }
 
