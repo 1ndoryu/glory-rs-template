@@ -2,6 +2,7 @@
  * Pagina de inicio. Las entradas son condicionales (configurable).
  * [Auditoría v4 §1.2] Migrado a createEl(). */
 
+import { tryCatch } from '../utils/result';
 import { ArticleService } from '../services';
 import { navigate } from '../router';
 import { trackArticleClick } from '../features/analytics/tracker';
@@ -73,6 +74,6 @@ export async function renderHome(): Promise<HTMLElement> {
 }
 
 export async function getArticles(): Promise<Article[]> {
-  try { const data = await ArticleService.list(1, 50); return data.items; }
-  catch { return []; }
+  const result = await tryCatch(ArticleService.list(1, 50));
+  return result.ok ? result.value.items : [];
 }

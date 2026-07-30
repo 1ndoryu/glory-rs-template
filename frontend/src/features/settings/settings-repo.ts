@@ -3,10 +3,10 @@
  * Extraído de font-panel.ts para reducir tamaño bajo límite de 300 líneas.
  * [Auditoría v3 §2.3] */
 
+import { safeRun } from '../../utils/safe-async';
 import { createEl } from '../../utils/dom';
 import { fontStore, profileImage, siteConfig, socialLinksStore, redesLayoutStore, type FontConfig } from '../../store';
 import { SettingsService } from '../../services';
-import { showToast } from '../../components/ui/toast';
 import { GOOGLE_FONTS } from './font-constants';
 
 let fontsLoaded = false;
@@ -30,24 +30,20 @@ export function saveSettings(): void {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
     const c = fontStore.get();
-    try {
-      await SettingsService.save({
-        font_menu: c.menu, font_titulo: c.titulo, font_texto: c.texto,
-          tamano_texto: String(c.tamanoTexto), tamano_titulo: String(c.tamanoTitulo),
-          tamano_pequeno: String(c.tamanoPequeno), tamano_grande: String(c.tamanoGrande),
-          tamano_titulo_grande: String(c.tamanoTituloGrande),
-          menu_size: String(c.menuSize), menu_spacing: String(c.menuSpacing),
-          menu_line_height: String(c.menuLineHeight), menu_opacity: String(c.menuOpacity),
-          entrada_title_size: String(c.entradaTitleSize), entrada_size: String(c.entradaSize),
-          entrada_opacity: String(c.entradaOpacity), nav_width: String(c.navWidth),
-          profile_width: String(c.profileWidth), profile_height: String(c.profileHeight),
-          profile_border: String(c.profileBorder), sidebar_sep_height: String(c.sidebarSepHeight),
-          redes_size: String(c.redesSize), redes_gap: String(c.redesGap),
-        });
-    } catch (err) {
-      console.error('Error guardando settings:', err);
-      showToast('error al guardar configuración');
-    }
+    const result = await safeRun(SettingsService.save({
+      font_menu: c.menu, font_titulo: c.titulo, font_texto: c.texto,
+        tamano_texto: String(c.tamanoTexto), tamano_titulo: String(c.tamanoTitulo),
+        tamano_pequeno: String(c.tamanoPequeno), tamano_grande: String(c.tamanoGrande),
+        tamano_titulo_grande: String(c.tamanoTituloGrande),
+        menu_size: String(c.menuSize), menu_spacing: String(c.menuSpacing),
+        menu_line_height: String(c.menuLineHeight), menu_opacity: String(c.menuOpacity),
+        entrada_title_size: String(c.entradaTitleSize), entrada_size: String(c.entradaSize),
+        entrada_opacity: String(c.entradaOpacity), nav_width: String(c.navWidth),
+        profile_width: String(c.profileWidth), profile_height: String(c.profileHeight),
+        profile_border: String(c.profileBorder), sidebar_sep_height: String(c.sidebarSepHeight),
+        redes_size: String(c.redesSize), redes_gap: String(c.redesGap),
+      }), 'error al guardar configuración');
+    if (!result.ok) console.error('Error guardando settings:', result.error);
   }, 500);
 }
 
