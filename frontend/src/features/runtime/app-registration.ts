@@ -124,6 +124,46 @@ AppRegistry.register({
   iconType: 'application',
   singleton: true,
   requires: 'public',
+  menus: [
+    {
+      label: 'Archivo',
+      items: [
+        {
+          id: 'trash:restore-all',
+          label: 'Restaurar todo',
+          icon: Folder,
+          execute: () => {
+            void import('../../components/ui/confirm').then(({ showConfirm }) => {
+              void showConfirm('¿Restaurar todos los elementos?').then((ok: boolean) => {
+                if (ok) {
+                  void import('./workspace/workspace-store').then(({ getTombstonedNodes, restoreNode }) => {
+                    for (const node of getTombstonedNodes()) restoreNode(node.id);
+                  });
+                }
+              });
+            });
+          },
+        },
+        { id: '---', label: '---', execute: () => {} },
+        {
+          id: 'trash:empty',
+          label: 'Vaciar papelera',
+          icon: Trash2,
+          execute: () => {
+            void import('../../components/ui/confirm').then(({ showConfirm }) => {
+              void showConfirm('¿Vaciar la papelera? Los elementos no se pueden recuperar.').then((ok: boolean) => {
+                if (ok) {
+                  void import('./workspace/workspace-store').then(({ resetOverlay }) => {
+                    resetOverlay();
+                  });
+                }
+              });
+            });
+          },
+        },
+      ],
+    },
+  ],
   render: (_ctx: RenderContext): MountedView => {
     dispatchEvent({ type: 'app_opened', appId: 'trash' });
 

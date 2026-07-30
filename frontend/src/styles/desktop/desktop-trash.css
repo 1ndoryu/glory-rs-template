@@ -1,5 +1,6 @@
 /* wandori.us — Papelera (Trash) App
- * Estilos para la ventana de papelera del workspace.
+ * Estilos para la lista de papelera del workspace.
+ * Las acciones (Vaciar, Restaurar) viven en el app toolbar declarativo.
  * [Plan 297A-11 §9.3] */
 
 .trash-app {
@@ -7,47 +8,6 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
-}
-
-.trash-app__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-bottom: var(--espacio-md);
-  border-bottom: var(--borde);
-  margin-bottom: var(--espacio-md);
-}
-
-.trash-app__title {
-  margin: 0;
-  font-size: var(--tamano-titulo);
-  font-family: var(--fuente-titulo);
-  font-weight: var(--peso-medio);
-}
-
-.trash-app__empty-btn {
-  display: flex;
-  align-items: center;
-  gap: var(--espacio-xs);
-  padding: var(--espacio-xs) var(--espacio-sm);
-  border: var(--borde);
-  border-radius: 0;
-  background: transparent;
-  color: var(--sistema-texto);
-  cursor: pointer;
-  font-family: var(--fuente-sistema);
-  font-size: var(--sistema-texto-tamano);
-}
-
-.trash-app__empty-btn:hover {
-  background: var(--sistema-texto);
-  color: var(--sistema-superficie);
-}
-
-.trash-app__empty-btn svg {
-  width: var(--espacio-md);
-  height: var(--espacio-md);
-  stroke-width: var(--sistema-icono-trazo);
 }
 
 .trash-app__empty {

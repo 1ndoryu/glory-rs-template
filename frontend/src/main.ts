@@ -14,6 +14,7 @@ import './styles/desktop/desktop-apps.css';
 import './styles/desktop/desktop-window.css';
 import './styles/desktop/desktop-responsive.css';
 import './styles/desktop/desktop-context-menu.css';
+import './styles/desktop/desktop-app-toolbar.css';
 import './styles/desktop/desktop-trash.css';
 
 /* Core */

@@ -6,6 +6,30 @@
 import type { IconNode } from 'lucide';
 import type { AppRenderFn, MountedView, RenderContext } from '../../core/lifecycle';
 
+/** Un item individual del menú de una app. */
+export interface AppMenuItem {
+  /** ID único del item. */
+  readonly id: string;
+  /** Etiqueta visible. */
+  readonly label: string;
+  /** Icono Lucide opcional. */
+  readonly icon?: IconNode;
+  /** Atajo de teclado visible (ej: 'Ctrl+Z'). */
+  readonly shortcut?: string;
+  /** Si está deshabilitado. */
+  readonly disabled?: boolean;
+  /** Acción al seleccionar. */
+  readonly execute: () => void;
+}
+
+/** Grupo de menú (equivalente a "Archivo", "Editar", etc.). */
+export interface AppMenu {
+  /** Etiqueta del grupo. */
+  readonly label: string;
+  /** Items del menú. */
+  readonly items: AppMenuItem[];
+}
+
 /** Capacidad que una app requiere para estar disponible. */
 export type Capability =
   | 'public'        /* Visible para todos */
@@ -29,6 +53,8 @@ export interface AppDefinition {
   readonly routePatterns?: string[];
   /** Layout del body de la ventana. Default: 'padded'. */
   readonly layout?: 'padded' | 'full-bleed';
+  /** Menús de la barra de herramientas de la app. Cada grupo es un dropdown. */
+  readonly menus?: AppMenu[];
   /** Función que devuelve el contenido de la app (sin chrome). */
   readonly render: AppRenderFn;
 }
