@@ -2,7 +2,7 @@
  * Sube archivos al backend via /api/media.
  * Retorna la URL del archivo subido. */
 
-import { api } from '../api/client';
+import { MediaService } from '../services';
 import type { Media } from '../api/types';
 
 export interface UploadResult {
@@ -26,7 +26,7 @@ export async function uploadFile(
   if (articleId) formData.append('article_id', articleId);
   if (altText) formData.append('alt_text', altText);
 
-  const media = await api.upload<Media>('/api/media', formData);
+  const media = await MediaService.upload(file, articleId);
   return { url: media.file_path, media };
 }
 

@@ -1,10 +1,9 @@
 /* wandori.us — Projects Page
  * Lista minimalista de proyectos con links. */
 
-import { api } from '../api/client';
+import { ProjectService } from '../services';
 import { updateMeta, setPageJsonLd } from '../features/seo/meta';
 import { showProfile } from '../store';
-import type { Project } from '../api/types';
 
 export async function renderProjects(): Promise<HTMLElement> {
   showProfile.set(true);
@@ -24,7 +23,7 @@ export async function renderProjects(): Promise<HTMLElement> {
   page.append(titulo, cargando);
 
   try {
-    const projects = await api.get<Project[]>('/api/projects');
+    const projects = await ProjectService.list();
     page.innerHTML = '';
     page.appendChild(titulo);
 

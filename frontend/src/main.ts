@@ -32,7 +32,7 @@ import { setActorCategory } from './features/analytics/dispatcher';
 import { loadSavedFonts } from './features/settings/font-panel';
 import { initTracking, trackPageView } from './features/analytics/tracker';
 import { authStore, showProfile, showSidebar, siteConfig } from './store';
-import { api } from './api/client';
+import { AuthService } from './services';
 import { fetchWorkspaceRelease } from './features/runtime/workspace/workspace-store';
 
 
@@ -71,8 +71,7 @@ async function initApp(): Promise<void> {
    * Las cookies HttpOnly se envían automáticamente con credentials: 'include'.
    * Si /auth/me responde con usuario válido, marcamos como autenticado. */
   try {
-    const user = await api.get<{ id: string; email: string }>('/api/auth/me');
-    authStore.set({ isAuthenticated: true, userId: user.id });
+    await AuthService.me();
     setActorCategory('authenticated');
   } catch {
     /* No hay sesión válida — permanecer como invitado */

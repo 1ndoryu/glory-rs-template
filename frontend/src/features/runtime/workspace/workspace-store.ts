@@ -3,7 +3,7 @@
  * para romper el ciclo de importación con overlay-mutations.
  * [Plan 297A-11 §9.1–9.4] [Auditoría v2] */
 
-import { api } from '../../../api/client';
+import { WorkspaceService } from '../../../services';
 import { rebaseOverlay } from './merge';
 import type {
   NodeId,
@@ -21,7 +21,7 @@ import { releaseStore, overlayStore, workspaceStore, EMPTY_OVERLAY } from './sto
 
 export async function fetchWorkspaceRelease(): Promise<void> {
   try {
-    const data = await api.get<{ version: number; tree: WorkspaceTree }>('/api/workspace/release');
+    const data = await WorkspaceService.getActiveRelease();
     if (data?.tree?.nodes) {
       const currentRelease = releaseStore.get();
       if (data.tree.version !== currentRelease.version) {
@@ -54,7 +54,7 @@ export async function publishWorkspace(): Promise<{ version: number } | null> {
     };
   }
   const tree: WorkspaceTree = { version: resolved.releaseVersion + 1, nodes };
-  const result = await api.post<{ version: number; tree: WorkspaceTree }>('/api/admin/workspace/publish', { tree });
+  const result = await WorkspaceService.publish(tree);
   if (result?.version) {
     releaseStore.set(result.tree);
     overlayStore.set(EMPTY_OVERLAY);

@@ -2,18 +2,16 @@
  * Editor de enlaces sociales con guardado debounced. */
 
 import { socialLinksStore, redesLayoutStore, type RedesLayout } from '../../store';
-import { api } from '../../api/client';
+import { SettingsService } from '../../services';
 import { createSizeSlider } from './font-helpers';
 
 let socialSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
 function saveSocialLinks(): void {
   const links = socialLinksStore.get();
-  api.post('/api/settings', {
-    settings: {
+  SettingsService.save({
       social_links: JSON.stringify(links),
       redes_layout: redesLayoutStore.get(),
-    },
   }).catch((err) => {
     console.error('Error guardando enlaces:', err);
   });

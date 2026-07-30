@@ -4,7 +4,7 @@
  * [Auditoría v3 §2.3] Split para mantener bajo límite de 300 líneas. */
 
 import { fontStore, profileImage, siteConfig, type FontConfig } from '../../store';
-import { api } from '../../api/client';
+import { MediaService, SettingsService } from '../../services';
 import { showToast } from '../../components/ui/toast';
 import { createArrowSelect, createSizeSlider } from './font-helpers';
 import { renderSocialLinksSection } from './social-links';
@@ -57,11 +57,11 @@ export function createFontPanel(): HTMLElement {
       formData.append('file', file);
       formData.append('alt_text', 'profile');
       try {
-        const media = await api.upload<{ file_path: string }>('/api/media', formData);
+        const media = await MediaService.upload(file);
         profileImage.set(media.file_path);
         imgPreview.src = media.file_path;
         imgPreview.classList.remove('oculto');
-        api.post('/api/settings', { settings: { profile_image: media.file_path } }).catch(() => {});
+        SettingsService.save({ profile_image: media.file_path }).catch(() => {});
         showToast('imagen actualizada');
       } catch { showToast('error al subir imagen'); }
     });
@@ -73,7 +73,7 @@ export function createFontPanel(): HTMLElement {
     entradasCheck.checked = siteConfig.get().showEntriesOnHome;
     entradasCheck.addEventListener('change', () => {
       siteConfig.update(s => ({ ...s, showEntriesOnHome: entradasCheck.checked }));
-      api.post('/api/settings', { settings: { show_entries_on_home: String(entradasCheck.checked) } }).catch(() => {});
+      SettingsService.save({ show_entries_on_home: String(entradasCheck.checked) }).catch(() => {});
     });
     const entradasTexto = document.createElement('span');
     entradasTexto.textContent = 'mostrar entradas en inicio';

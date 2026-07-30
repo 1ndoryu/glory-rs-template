@@ -1,12 +1,10 @@
 /* wandori.us — Login Page
  * Pagina de login minimalista. Solo email + password. */
 
-import { api } from '../api/client';
-import { authStore } from '../store';
+import { AuthService } from '../services';
 import { navigate } from '../router';
 import { showToast } from '../components/ui/toast';
 import { createInput } from '../components/ui/input';
-import type { LoginRequest } from '../api/types';
 
 export function renderLogin(): HTMLElement {
   const page = document.createElement('div');
@@ -52,15 +50,7 @@ export function renderLogin(): HTMLElement {
     errorMsg.style.display = 'none';
 
     try {
-      /* [297A-8] Login crea sesión en cookie HttpOnly.
-       * El frontend NO almacena token. Llamamos a /auth/me para confirmar. */
-      await api.post('/api/auth/login', {
-        email,
-        password,
-      } as LoginRequest);
-
-      const user = await api.get<{ id: string; email: string }>('/api/auth/me');
-      authStore.set({ isAuthenticated: true, userId: user.id });
+      await AuthService.login(email, password);
       showToast('sesion iniciada');
       navigate('/admin');
     } catch {

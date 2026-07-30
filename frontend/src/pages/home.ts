@@ -2,12 +2,12 @@
  * Pagina de inicio. Las entradas son condicionales (configurable).
  * Cuando no hay entradas, el profile (foto+nombre+links) esta centrado. */
 
-import { api } from '../api/client';
+import { ArticleService } from '../services';
 import { navigate } from '../router';
 import { trackArticleClick } from '../features/analytics/tracker';
 import { resetMeta, setSiteJsonLd } from '../features/seo/meta';
 import { siteConfig, showProfile } from '../store';
-import type { Article, PaginatedArticles } from '../api/types';
+import type { Article } from '../api/types';
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -134,7 +134,7 @@ export async function renderHome(): Promise<HTMLElement> {
   let articles: Article[] = [];
 
   try {
-    const data = await api.get<PaginatedArticles>('/api/articles?per_page=20');
+    const data = await ArticleService.list(1, 20);
     articles = data.items;
   } catch {
     articles = [];
@@ -159,7 +159,7 @@ export async function renderHome(): Promise<HTMLElement> {
 /* Obtener articulos para el sidebar (exportado) */
 export async function getArticles(): Promise<Article[]> {
   try {
-    const data = await api.get<PaginatedArticles>('/api/articles?per_page=50');
+    const data = await ArticleService.list(1, 50);
     return data.items;
   } catch {
     return [];

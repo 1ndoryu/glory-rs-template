@@ -1,7 +1,7 @@
 /* wandori.us — Admin Projects
  * Lista y editor de proyectos para el panel de administración. */
 
-import { api } from '../api/client';
+import { ProjectService } from '../services';
 import { showToast } from '../components/ui/toast';
 import { createModal } from '../components/ui/modal';
 import { showConfirm } from '../components/ui/confirm';
@@ -18,7 +18,7 @@ export async function renderProjectList(container: HTMLElement): Promise<void> {
   container.appendChild(loading);
 
   try {
-    const projects = await api.get<Project[]>('/api/admin/projects');
+    const projects = await ProjectService.listAll();
     container.textContent = '';
 
     for (const project of projects) {
@@ -42,7 +42,7 @@ export async function renderProjectList(container: HTMLElement): Promise<void> {
       btnEliminar.addEventListener('click', async () => {
         const ok = await showConfirm(`eliminar "${project.title}"?`);
         if (ok) {
-          await api.delete(`/api/admin/projects/${project.id}`);
+          await ProjectService.delete(project.id);
           showToast('proyecto eliminado');
           renderProjectList(container);
         }
@@ -86,8 +86,8 @@ async function openProjectEditor(project: Project | undefined, listContainer: HT
   btnGuardar.addEventListener('click', async () => {
     if (!title.trim()) { showToast('el titulo es obligatorio'); return; }
     try {
-      if (project) { await api.put(`/api/admin/projects/${project.id}`, { title, description, url }); showToast('proyecto actualizado'); }
-      else { await api.post('/api/admin/projects', { title, description, url }); showToast('proyecto creado'); }
+      if (project) { await ProjectService.update(project.id, { title, description, url }); showToast('proyecto actualizado'); }
+      else { await ProjectService.create({ title, description, url }); showToast('proyecto creado'); }
       modal.close();
       renderProjectList(listContainer);
     } catch { showToast('error al guardar'); }

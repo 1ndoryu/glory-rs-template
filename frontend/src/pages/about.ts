@@ -1,7 +1,7 @@
 /* wandori.us — About Page
  * Pagina "about me" con contenido editable desde settings. */
 
-import { api } from '../api/client';
+import { SettingsService } from '../services';
 import { updateMeta, setPageJsonLd } from '../features/seo/meta';
 import { showProfile } from '../store';
 import { appendSanitizedHtml } from '../utils/sanitize-html';
@@ -15,7 +15,7 @@ export async function renderAbout(): Promise<HTMLElement> {
   page.className = 'about-contenido';
 
   try {
-    const settings = await api.get<Record<string, string>>('/api/settings');
+    const settings = await SettingsService.getAll();
     const content = settings.about_content || '';
 
     if (content) {

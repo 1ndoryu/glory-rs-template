@@ -1,7 +1,7 @@
 /* wandori.us — Gallery Page
  * Muestra todas las imagenes de todos los articulos en un grid. */
 
-import { api } from '../api/client';
+import { MediaService } from '../services';
 import { createModal } from '../components/ui/modal';
 import { trackImageDownload } from '../features/analytics/tracker';
 import { updateMeta, setPageJsonLd } from '../features/seo/meta';
@@ -26,7 +26,8 @@ export async function renderGallery(): Promise<HTMLElement> {
   page.append(titulo, cargando);
 
   try {
-    const media = await api.get<Media[]>('/api/media?type=image');
+    const mediaResponse = await MediaService.list();
+    const media = (mediaResponse as any).items as Media[];
     page.innerHTML = '';
 
     page.appendChild(titulo);

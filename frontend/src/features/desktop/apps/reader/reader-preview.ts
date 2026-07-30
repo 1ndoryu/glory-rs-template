@@ -3,7 +3,7 @@
  * [Auditoría v2] Reemplaza el preview hardcodeado de 297A-2.
  */
 
-import { api } from '../../../../api/client';
+import { ArticleService } from '../../../../services';
 import { appendSanitizedHtml } from '../../../../utils/sanitize-html';
 
 export interface ReaderOptions {
@@ -56,12 +56,13 @@ async function loadArticle(
   body: HTMLElement,
 ): Promise<void> {
   try {
-    const data = await api.get<{
-      title: string;
-      content: string;
-      published_at: string | null;
-      cover_image: string | null;
-    }>(`/api/articles/${slug}`);
+    const article = await ArticleService.getBySlug(slug);
+    const data = {
+      title: article.title,
+      content: typeof article.content === 'string' ? article.content : JSON.stringify(article.content),
+      published_at: article.published_at,
+      cover_image: article.cover_image,
+    };
 
     titleEl.textContent = data.title;
 

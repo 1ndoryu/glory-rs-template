@@ -2,7 +2,7 @@
  * Panel de administración. Orquesta tabs y delega a módulos.
  * Solo accesible si autenticado. */
 
-import { api } from '../api/client';
+import { AuthService, SettingsService, AnalyticsService } from '../services';
 import { authStore, showProfile } from '../store';
 import { navigate } from '../router';
 import { showToast } from '../components/ui/toast';
@@ -10,7 +10,6 @@ import { createTextarea } from '../components/ui/textarea';
 import { createFontPanel } from '../features/settings/font-panel';
 import { renderArticleList, openEditor } from './admin-articles';
 import { renderProjectList } from './admin-projects';
-import type { AnalyticsStats } from '../api/types';
 
 /* === Render principal del admin === */
 export async function renderAdmin(): Promise<HTMLElement> {
@@ -29,7 +28,7 @@ export async function renderAdmin(): Promise<HTMLElement> {
   btnLogout.className = 'boton';
   btnLogout.textContent = 'salir';
   btnLogout.addEventListener('click', async () => {
-    try { await api.post('/api/auth/logout', {}); } catch { /* ignorar */ }
+    try { await AuthService.logout(); } catch { /* ignorar */ }
     authStore.set({ isAuthenticated: false, userId: null });
     showToast('sesion cerrada');
     navigate('/');
@@ -119,7 +118,7 @@ function renderSitioTab(): HTMLElement {
   });
   container.appendChild(aboutArea);
 
-  api.get<Record<string, string>>('/api/settings').then(s => {
+  SettingsService.getAll().then(s => {
     aboutContent = s.about_content || '';
     const textarea = aboutArea.querySelector('textarea');
     if (textarea) textarea.value = aboutContent;
@@ -130,7 +129,7 @@ function renderSitioTab(): HTMLElement {
   btnGuardarSitio.textContent = 'guardar';
   btnGuardarSitio.addEventListener('click', async () => {
     try {
-      await api.post('/api/admin/settings', { settings: { about_content: aboutContent } });
+      await SettingsService.save({ about_content: aboutContent });
       showToast('contenido actualizado');
     } catch { showToast('error al guardar'); }
   });
@@ -144,7 +143,7 @@ function renderEstadisticasTab(contentArea: HTMLElement): void {
   statsContainer.innerHTML = '<p class="cargando">cargando...</p>';
   contentArea.appendChild(statsContainer);
 
-  api.get<AnalyticsStats>('/api/admin/analytics/stats').then(stats => {
+  AnalyticsService.getStats().then(stats => {
     statsContainer.innerHTML = '';
 
     const grid = document.createElement('div');

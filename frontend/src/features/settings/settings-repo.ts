@@ -4,7 +4,7 @@
  * [Auditoría v3 §2.3] */
 
 import { fontStore, profileImage, siteConfig, socialLinksStore, redesLayoutStore, type FontConfig } from '../../store';
-import { api } from '../../api/client';
+import { SettingsService } from '../../services';
 import { showToast } from '../../components/ui/toast';
 import { GOOGLE_FONTS } from './font-constants';
 
@@ -33,8 +33,7 @@ export function saveSettings(): void {
   saveTimer = setTimeout(async () => {
     const c = fontStore.get();
     try {
-      await api.post('/api/settings', {
-        settings: {
+      await SettingsService.save({
           font_menu: c.menu, font_titulo: c.titulo, font_texto: c.texto,
           tamano_texto: String(c.tamanoTexto), tamano_titulo: String(c.tamanoTitulo),
           tamano_pequeno: String(c.tamanoPequeno), tamano_grande: String(c.tamanoGrande),
@@ -46,8 +45,7 @@ export function saveSettings(): void {
           profile_width: String(c.profileWidth), profile_height: String(c.profileHeight),
           profile_border: String(c.profileBorder), sidebar_sep_height: String(c.sidebarSepHeight),
           redes_size: String(c.redesSize), redes_gap: String(c.redesGap),
-        },
-      });
+        });
     } catch (err) {
       console.error('Error guardando settings:', err);
       showToast('error al guardar configuración');
@@ -69,7 +67,7 @@ export async function loadSavedFonts(): Promise<void> {
   };
 
   try {
-    const settings = await api.get<Record<string, string>>('/api/settings');
+    const settings = await SettingsService.getAll();
     if (settings && Object.keys(settings).length > 0) {
       config = {
         menu: settings.font_menu || config.menu,

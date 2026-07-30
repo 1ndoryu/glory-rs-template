@@ -7,3 +7,5 @@ export { ProjectService } from './project.service';
 export { ProductService } from './product.service';
 export { MediaService } from './media.service';
 export { WorkspaceService } from './workspace.service';
+export { SettingsService } from './settings.service';
+export { AnalyticsService } from './analytics.service';

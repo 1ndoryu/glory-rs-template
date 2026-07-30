@@ -3,12 +3,12 @@
  * Convierte TipTap JSON a HTML.
  * Oculta el profile header cuando se esta viendo un articulo. */
 
-import { api } from '../api/client';
+import { ArticleService, ProductService } from '../services';
 import { trackImageDownload } from '../features/analytics/tracker';
 import { updateArticleMeta, setArticleJsonLd, resetMeta } from '../features/seo/meta';
 import { showProfile } from '../store';
 import { appendSanitizedHtml } from '../utils/sanitize-html';
-import type { Article, Product } from '../api/types';
+import type { Product } from '../api/types';
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -83,7 +83,7 @@ export async function renderArticle(params: Record<string, string>): Promise<HTM
   page.appendChild(cargando);
 
   try {
-    const article = await api.get<Article>(`/api/articles/slug/${slug}`);
+    const article = await ArticleService.getBySlug(slug);
     page.innerHTML = '';
 
     updateArticleMeta({
@@ -125,9 +125,8 @@ export async function renderArticle(params: Record<string, string>): Promise<HTM
 
     /* Producto asociado */
     try {
-      const products = await api.get<Product[]>(`/api/articles/${article.id}/products`);
-      for (const product of products) {
-        if (!product.is_active) continue;
+      const product = await ProductService.getByArticleId(article.id);
+      if (product && product.is_active) {
         const btnCompra = document.createElement('button');
         btnCompra.className = 'articulo-boton-compra boton';
         btnCompra.textContent = `comprar — $${(product.price_cents / 100).toFixed(2)} ${product.currency}`;
@@ -187,10 +186,13 @@ async function openCheckoutModal(product: Product): Promise<void> {
   btnPagar.addEventListener('click', async () => {
     if (!email) { showToast('ingresa tu email'); return; }
     try {
-      const { checkout_url } = await api.post<{ checkout_url: string }>(
-        `/api/products/${product.id}/checkout`,
-        { email },
-      );
+      const response = await fetch(`/api/products/${product.id}/checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+        credentials: 'include',
+      });
+      const { checkout_url } = await response.json() as { checkout_url: string };
       window.location.href = checkout_url;
     } catch { showToast('error al iniciar el pago'); }
   });

@@ -7,7 +7,7 @@
 import { createElement, FileUser, Folder, type IconNode } from 'lucide';
 import { AppRegistry, type Capability } from '../../runtime/app-registry';
 import { authStore } from '../../../store';
-import { api } from '../../../api/client';
+import { ArticleService } from '../../../services';
 
 /* === Estado del menú abierto === */
 let openEntry: HTMLElement | null = null;
@@ -132,11 +132,11 @@ function createArchiveMenu(): HTMLElement {
   menu.appendChild(loading);
 
   /* Cargar artículos desde la API */
-  void api.get<{ items: Array<{ title: string; slug: string; published_at: string | null }> }>('/api/articles?per_page=20')
-    .then((data) => {
+  void ArticleService.list(1, 20)
+    .then((data: any) => {
       loading.remove();
 
-      if (data.items.length === 0) {
+      if (!data || data.items?.length === 0) {
         menu.appendChild(createMenuItem('sin artículos', { disabled: true }));
         return;
       }

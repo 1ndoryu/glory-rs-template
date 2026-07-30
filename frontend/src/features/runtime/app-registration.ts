@@ -10,7 +10,7 @@ import { createReaderPreview, type ReaderOptions } from '../desktop/apps/reader/
 import { createTrashPreview } from '../desktop/apps/trash/trash-preview';
 import { dispatchEvent } from '../analytics/dispatcher';
 import type { MountedView, RenderContext } from '../../core/lifecycle';
-import { api } from '../../api/client';
+import { SettingsService } from '../../services';
 import { appendSanitizedHtml } from '../../utils/sanitize-html';
 
 /* === Finder — Explorador de archivos del OS === */
@@ -131,7 +131,7 @@ AppRegistry.register({
     void (async () => {
       try {
         if (ctx.signal.aborted) return;
-        const settings = await api.get<Record<string, string>>('/api/settings');
+        const settings = await SettingsService.getAll();
         if (ctx.signal.aborted) return;
         const content = settings.about_content || '';
         if (content) {
