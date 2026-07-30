@@ -8,7 +8,11 @@
 
 ## 1. Objetivo
 
-Resolver la falla arquitectónica crítica de Finder (no es un file browser real) y reducir la deuda técnica del frontend. La auditoría profunda (§7) identificó que Finder es un preview hardcodeado que ignora el workspace model — esto bloquea la experiencia base del OS.
+Resolver las 2 fallas arquitectónicas críticas del frontend:
+1. **Finder no es un file browser** — tiene datos hardcodeados, no lee workspaceStore.
+2. **Modelo de datos incompleto** — `WorkspaceNodeType` falta `'resource'`, no hay forma de representar archivos reales (artículos, imágenes, productos) en el workspace tree. `ResourceTypeRegistry` existe pero no se usa.
+
+La auditoría profunda (§7, §8) identificó que el pipeline completo `backend → workspace → Finder` está roto: un artículo publicado no puede aparecer como nodo en una carpeta.
 
 ## 2. Dependencias
 
@@ -22,16 +26,20 @@ Resolver la falla arquitectónica crítica de Finder (no es un file browser real
 
 **Gate:** Finder abre carpeta del escritorio mostrando sus hijos del workspaceStore. Clic derecho funciona dentro de Finder. Múltiples carpetas abren ventanas distintas.
 
+- [ ] Añadir `'resource'` a `WorkspaceNodeType` en `types.ts` (alinear con manual §6.2).
+- [ ] Añadir `resourceKind?: ResourceKind` a `WorkspaceNode`.
 - [ ] Añadir `params?: Record<string, string>` a `RenderContext` en `lifecycle.ts`.
 - [ ] Añadir `params?` a `openAppWindow()` en `route-app-adapter.ts` y pasarlos a `AppRegistry.instantiate()`.
 - [ ] Añadir `params?` a `openWindow()` en `window-manager.ts` y `WindowEntry`.
 - [ ] Reescribir `finder-preview.ts` como `WorkspaceFileBrowser` que recibe `folderId` y renderiza hijos de `workspaceStore`.
+- [ ] Finder renderiza hijos usando `ResourceTypeRegistry` (iconos, thumbnails, acciones según tipo).
+- [ ] Doble clic en recurso → `openAppWindow(entry.appId, { resourceId: node.refId })`.
 - [ ] Hacer Finder `singleton: false` en `app-registration.ts`.
 - [ ] Actualizar activación de carpetas en `desktop-shell.ts`: `openAppWindow('finder', { folderId: node.id })`.
 - [ ] Actualizar `finder:new-folder` para crear en el contexto actual (no hardcoded 'desktop').
 - [ ] Añadir context menu dentro de Finder (items y fondo vacío).
-- [ ] Hacer items de Finder clickeables (abrir recurso/app) y arrastrables.
-- [ ] Verificar: abrir carpeta → ver hijos, clic derecho → menú, arrastrar → mover, crear carpeta → dentro de la actual.
+- [ ] Hacer items de Finder arrastrables (drag → mover nodo a otro padre).
+- [ ] Verificar: abrir carpeta → ver hijos, doble clic abre app correcta, clic derecho → menú, arrastrar → mover, crear carpeta → dentro de la actual.
 
 ### Fase 1: Split de `command-registration.ts` (725 → 6 módulos)
 

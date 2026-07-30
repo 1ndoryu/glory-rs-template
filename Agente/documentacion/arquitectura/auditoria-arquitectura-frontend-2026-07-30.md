@@ -2,7 +2,7 @@
 
 > **Fecha:** 2026-07-30 (actualizado)
 > **Alcance:** frontend TypeScript/Vite del OS desktop
-> **Resultado:** 3 violaciones de tamaño, 5 problemas de escalabilidad, 1 falla arquitectónica crítica (Finder), 4 fortalezas identificadas
+> **Resultado:** 3 violaciones de tamaño, 5 problemas de escalabilidad, 2 fallas arquitectónicas críticas (Finder + modelo de datos), 4 fortalezas identificadas
 > **Plan asociado:** `Agente/planes/plan-refactorizacion-architectura-2026-07-30.md`
 
 ## 1. Métricas del codebase
@@ -222,9 +222,45 @@ const folderDocuments = ['El silencio de las máquinas', 'Fragmentos de código'
 
 Estos arrays son **literales de código**, no leen de `workspaceStore`, `default-release.ts`, ni del backend. Finder ignora completamente el modelo de datos del workspace.
 
-### 7.3 El gap conceptual: `type: 'folder'` vs `type: 'app'`
+### 7.3 El gap conceptual: tipos de nodo incompletos
 
-En `default-release.ts`, "Galería" es un nodo `type: 'app'` con `refId: 'finder'`:
+El manual de arquitectura (§6.2) define **4 tipos** de nodo:
+
+```typescript
+type WorkspaceNodeKind = 'app' | 'folder' | 'resource' | 'shortcut';
+```
+
+Pero `types.ts` solo implementa **3**:
+
+```typescript
+type WorkspaceNodeType = 'folder' | 'shortcut' | 'app';
+// ❌ Falta 'resource'
+```
+
+**`resource` está ausente de la implementación.** Esto significa que no hay forma de representar un archivo real (artículo, imagen, producto) dentro del árbol del workspace. Los artículos publicados, imágenes y productos existen en el backend como `Resource`, pero no pueden colocarse como nodos en una carpeta del escritorio.
+
+#### Distinción `resource` vs `shortcut` (también ignorada)
+
+| Tipo | Qué es | Ejemplo | Quién lo crea |
+|---|---|---|---|
+| `resource` | Ubicación canónica de un archivo en el workspace | Admin coloca un artículo en "Blog / julio 2026" | Admin al publicar |
+| `shortcut` | Alias/puntero creado por el usuario en su overlay | Usuario arrastra un artículo a su escritorio | Usuario/invitado |
+
+La auditoría actual ignora esta distinción. Un artículo publicado debería ser un `resource` en el release; un usuario puede crear un `shortcut` hacia él en su overlay.
+
+#### El pipeline roto: backend → workspace → Finder
+
+```
+Admin publica artículo (backend: Resource { kind: Article, visibility: public })
+        ↓
+??? no hay mecanismo para crear WorkspaceNode { type: 'resource', refId: articleId, resourceKind: 'article' }
+        ↓
+Finder no puede mostrar el artículo porque no existe como nodo en el workspace
+```
+
+El `ResourceTypeRegistry` (ya implementado en `resource-type-registry.ts`) mapea `ResourceKind → appId + actions + preview`, pero **ningún componente lo usa**. Finder debería consultar este registry para saber cómo renderizar y abrir cada tipo de archivo.
+
+#### En `default-release.ts`, "Galería" es un nodo `type: 'app'` con `refId: 'finder'`:
 
 ```typescript
 gallery: { id: 'gallery', type: 'app', refId: 'finder', ... }
@@ -257,14 +293,27 @@ const onActivate = node.refId
 
 ### 7.5 Diseño propuesto: Finder como file browser real
 
-**Principio:** Finder es el explorador de archivos del OS. Debe leer de `workspaceStore` y mostrar los hijos de un nodo dado. Cada carpeta del escritorio abre una ventana de Finder apuntando a esa carpeta.
+**Principio:** Finder es el explorador de archivos del OS. Debe leer de `workspaceStore`, mostrar los hijos de un nodo dado, y usar `ResourceTypeRegistry` para renderizar y abrir cada tipo de archivo. Cada carpeta del escritorio abre una ventana de Finder apuntando a esa carpeta.
+
+#### Cambio 0: Añadir 'resource' a WorkspaceNodeType (prerrequisito)
+
+```typescript
+// types.ts — alinear con manual §6.2
+type WorkspaceNodeType = 'folder' | 'shortcut' | 'app' | 'resource';
+
+// WorkspaceNode necesita resourceKind para nodos de tipo 'resource'
+interface WorkspaceNode {
+  // ... campos existentes ...
+  readonly resourceKind?: ResourceKind;  // 'article' | 'image' | 'product' | ...
+}
+```
+
+Sin este cambio, no hay forma de representar archivos reales en el workspace tree.
 
 #### Cambio 1: Finder lee de workspaceStore
 
 ```typescript
-// En vez de datos hardcodeados:
 export function createFinderPreview(options: FinderPreviewOptions): HTMLElement {
-  // Suscribirse a workspaceStore y mostrar hijos de options.folderId
   workspaceStore.subscribe((ws) => {
     const children = Object.values(ws.nodes)
       .filter(n => n.parentId === options.folderId);
@@ -273,29 +322,64 @@ export function createFinderPreview(options: FinderPreviewOptions): HTMLElement 
 }
 ```
 
-#### Cambio 2: Finder no es singleton
+#### Cambio 2: Finder usa ResourceTypeRegistry para renderizar hijos
+
+```typescript
+function renderChildren(grid: HTMLElement, children: ResolvedNode[], options: FinderOptions): void {
+  grid.innerHTML = '';
+  for (const node of children) {
+    const icon = resolveNodeIcon(node);     // Lucide icon
+    const thumbnail = resolveThumbnail(node); // preview URL si es media
+
+    const item = createFinderItem({ node, icon, thumbnail });
+
+    // Doble clic: abrir en la app correcta
+    item.addEventListener('dblclick', () => {
+      if (node.type === 'folder') {
+        openAppWindow('finder', { folderId: node.id });
+      } else if (node.type === 'resource' && node.resourceKind) {
+        const entry = resolveResourceType(node.resourceKind);
+        openAppWindow(entry?.appId ?? 'finder', { resourceId: node.refId });
+      } else if (node.type === 'app' && node.refId) {
+        openAppWindow(node.refId);
+      }
+    });
+
+    // Menú contextual: acciones según ResourceTypeEntry
+    item.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      const actions = node.resourceKind
+        ? getResourceActions(node.resourceKind)
+        : ['properties'];
+      openContextMenu({ context: 'finder-item', targets: [{ id: node.id }], ... });
+    });
+
+    grid.appendChild(item);
+  }
+}
+```
+
+#### Cambio 3: Finder no es singleton
 
 ```typescript
 AppRegistry.register({
   id: 'finder',
   singleton: false,  // Permitir múltiples ventanas (una por carpeta abierta)
-  // ...
 });
 ```
 
-#### Cambio 3: Carpetas abren Finder con contexto
+#### Cambio 4: Carpetas abren Finder con contexto
 
 ```typescript
 // desktop-shell.ts — folder activation
 : node.type === 'folder'
-  ? () => openFinderWindow(node.id)  // Pasa el nodeId de la carpeta
+  ? () => openAppWindow('finder', { folderId: node.id })
   : undefined
 ```
 
-#### Cambio 4: finder:new-folder crea en el contexto actual
+#### Cambio 5: finder:new-folder crea en el contexto actual
 
 ```typescript
-// Command recibe el folderId del Finder activo
 execute: (ctx?: CommandContext): CommandResult => {
   const currentFolderId = getActiveFinderFolderId() ?? 'desktop';
   createFolder(currentFolderId, 'Nueva carpeta');
@@ -303,13 +387,13 @@ execute: (ctx?: CommandContext): CommandResult => {
 }
 ```
 
-#### Cambio 5: Finder items son arrastrables
+#### Cambio 6: Finder items son arrastrables
 
 Los hijos renderizados en Finder deben usar `enableIconDrag` o un drag handler que:
 - Al arrastrar al escritorio → mueve el nodo a `parentId: 'desktop'`
 - Al arrastrar a otra carpeta → mueve el nodo a ese `parentId`
 
-#### Cambio 6: Context menu dentro de Finder
+#### Cambio 7: Context menu dentro de Finder
 
 ```typescript
 grid.addEventListener('contextmenu', (e) => {
@@ -324,13 +408,32 @@ grid.addEventListener('contextmenu', (e) => {
 
 ### 7.6 Implicaciones para el modelo de datos
 
-El workspace model actual (`types.ts`) ya soporta carpetas con hijos via `parentId`. El gap no está en el modelo sino en **ninguna parte del código lee los hijos de una carpeta para renderizarlos**.
+El workspace model actual (`types.ts`) tiene 3 problemas:
 
-`workspaceStore.get().nodes` contiene todos los nodos. `getChildren(parentId)` ya existe en `workspace-store.ts`. Lo que falta es:
+1. **Falta `type: 'resource'`** — no hay forma de representar archivos reales en el árbol
+2. **Falta `resourceKind`** — un nodo shortcut no sabe qué tipo de recurso apunta
+3. **`ResourceTypeRegistry` no se usa** — existe el mapeo `ResourceKind → appId + actions` pero ningún componente lo consulta
 
-1. Un componente `WorkspaceFileBrowser` que reciba un `folderId` y renderice sus hijos
-2. Finder use ese componente en vez de datos hardcodeados
-3. Que los hijos renderidos sean interactivos (abrir, arrastrar, menú contextual)
+El pipeline completo debe ser:
+
+```
+Backend publica recurso → crea WorkspaceNode { type: 'resource', refId, resourceKind }
+    ↓
+workspaceStore merge → ResolvedNode disponible
+    ↓
+Finder lee hijos → por cada hijo consulta ResourceTypeRegistry
+    ↓
+Renderiza con icono/thumbnail correcto → doble clic abre app correcta con params
+```
+
+Lo que falta:
+
+1. Añadir `'resource'` a `WorkspaceNodeType` y `resourceKind` a `WorkspaceNode`
+2. Backend endpoint para crear nodos de workspace al publicar recursos
+3. Un componente `WorkspaceFileBrowser` que reciba un `folderId` y renderice sus hijos
+4. Finder use `ResourceTypeRegistry` para renderizar cada tipo de archivo
+5. Que los hijos renderidos sean interactivos (abrir, arrastrar, menú contextual)
+6. `RenderContext.params` para pasar `folderId`, `resourceId`, etc.
 
 ### 7.7 Impacto en roadmap
 
@@ -434,20 +537,23 @@ Esto permite `openAppWindow('finder', { folderId: 'mi-carpeta-123' })`.
 
 | # | Tarea | Impacto | Bloquea |
 |---|---|---|---|
-| 1 | Añadir `params` a RenderContext y openAppWindow | Crítico | Finder real, Editor, todos los flujos |
-| 2 | Reescribir Finder como file browser que lee workspaceStore | Crítico | Experiencia base del OS |
-| 3 | Finder no-singleton con folderId como parámetro | Alto | Abrir múltiples carpetas |
-| 4 | Context menu dentro de Finder (items + fondo) | Alto | Interacción básica |
-| 5 | Drag de items Finder → escritorio/otra carpeta | Medio | Flujo de archivos |
-| 6 | Split de los 3 archivos grandes | Medio | Escalabilidad del código |
+| 1 | Añadir `'resource'` a `WorkspaceNodeType` + `resourceKind` a `WorkspaceNode` | Crítico | No se pueden representar archivos en el workspace |
+| 2 | Añadir `params` a `RenderContext` y `openAppWindow` | Crítico | Finder con contexto, Editor, todos los flujos |
+| 3 | Reescribir Finder como file browser que lee `workspaceStore` | Crítico | Experiencia base del OS |
+| 4 | Finder usa `ResourceTypeRegistry` para renderizar hijos (iconos, thumbnails, acciones) | Crítico | Abrir imágenes, artículos, productos desde Finder |
+| 5 | Finder no-singleton con `folderId` como parámetro | Alto | Abrir múltiples carpetas simultáneamente |
+| 6 | Context menu dentro de Finder (items + fondo) | Alto | Interacción básica (eliminar, copiar, renombrar) |
+| 7 | Drag de items Finder → escritorio/otra carpeta | Medio | Flujo de archivos entre carpetas |
+| 8 | Split de los 3 archivos grandes | Medio | Escalabilidad del código |
 
 ### Futuro (297A-12+)
 
 | # | Tarea | Impacto |
 |---|---|---|
-| 7 | Lazy loading de apps | Bundle size |
-| 8 | CSS layers | Conflictos de specificity |
-| 9 | Store event typing | Overlay remoto |
+| 9 | Backend: endpoint para crear `resource` nodes al publicar recursos | Pipeline completo |
+| 10 | Lazy loading de apps | Bundle size |
+| 11 | CSS layers | Conflictos de specificity |
+| 12 | Store event typing | Overlay remoto |
 
 ---
 
