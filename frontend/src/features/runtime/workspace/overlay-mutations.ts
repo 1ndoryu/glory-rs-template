@@ -2,7 +2,7 @@
  * Funciones que mutan el overlay del workspace. */
 
 import type { NodeId, WorkspaceNode, ResolvedNode } from './types';
-import { overlayStore, workspaceStore, releaseStore, EMPTY_OVERLAY } from './workspace-store';
+import { overlayStore, workspaceStore, releaseStore, EMPTY_OVERLAY } from './stores';
 
 export function moveNodePosition(nodeId: NodeId, position: { col: number; row: number }): void {
   overlayStore.update((prev) => ({

@@ -40,10 +40,13 @@
   position: absolute;
   top: var(--espacio-xl);
   right: var(--espacio-lg);
+  bottom: var(--espacio-xl);
   z-index: var(--z-sistema-iconos);
   display: grid;
-  grid-template-columns: repeat(2, var(--sistema-icono-celda));
+  grid-template-columns: repeat(auto-fill, var(--sistema-icono-celda));
+  grid-auto-rows: max-content;
   gap: var(--espacio-xl) var(--espacio-md);
+  align-content: start;
 }
 
 .desktop-icon {

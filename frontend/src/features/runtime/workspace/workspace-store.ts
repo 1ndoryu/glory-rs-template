@@ -1,52 +1,21 @@
 /* wandori.us — Workspace Store
- * Store reactivo del workspace. Re-exporta merge, mutations y clipboard.
- * Este módulo contiene: stores, subscriptions, persistence y API.
- * [Plan 297A-11 §9.1–9.4] */
+ * API y re-exports del workspace. Los stores viven en stores.ts
+ * para romper el ciclo de importación con overlay-mutations.
+ * [Plan 297A-11 §9.1–9.4] [Auditoría v2] */
 
-import { createStore, authStore } from '../../../store';
 import { api } from '../../../api/client';
-import { DEFAULT_RELEASE } from './default-release';
-import { mergeWorkspace, rebaseOverlay } from './merge';
+import { rebaseOverlay } from './merge';
 import type {
   NodeId,
   WorkspaceNode,
   WorkspaceTree,
-  WorkspaceOverlay,
-  ResolvedWorkspace,
 } from './types';
 
-/* === Constants === */
-const OVERLAY_KEY = 'wandorius:workspace-overlay';
-const OVERLAY_VERSION = 1;
+/* Re-export stores y constantes desde stores.ts */
+export { releaseStore, overlayStore, workspaceStore, EMPTY_OVERLAY } from './stores';
 
-export const EMPTY_OVERLAY: WorkspaceOverlay = {
-  version: OVERLAY_VERSION,
-  addedItems: {},
-  fieldOverrides: {},
-  tombstones: [],
-};
-
-/* === Persistence === */
-
-function loadOverlay(): WorkspaceOverlay {
-  try {
-    const raw = localStorage.getItem(OVERLAY_KEY);
-    if (!raw) return EMPTY_OVERLAY;
-    const parsed = JSON.parse(raw) as WorkspaceOverlay;
-    if (parsed.version !== OVERLAY_VERSION) return EMPTY_OVERLAY;
-    return parsed;
-  } catch {
-    return EMPTY_OVERLAY;
-  }
-}
-
-function saveOverlay(overlay: WorkspaceOverlay): void {
-  try {
-    localStorage.setItem(OVERLAY_KEY, JSON.stringify(overlay));
-  } catch {
-    /* localStorage full or unavailable */
-  }
-}
+/* Import local para funciones API */
+import { releaseStore, overlayStore, workspaceStore, EMPTY_OVERLAY } from './stores';
 
 /* === API === */
 
@@ -93,36 +62,6 @@ export async function publishWorkspace(): Promise<{ version: number } | null> {
   }
   return null;
 }
-
-/* === Stores === */
-
-export const releaseStore = createStore<WorkspaceTree>(DEFAULT_RELEASE);
-export const overlayStore = createStore<WorkspaceOverlay>(loadOverlay());
-export const workspaceStore = createStore<ResolvedWorkspace>(
-  mergeWorkspace(DEFAULT_RELEASE, loadOverlay(), 'public'),
-);
-
-overlayStore.subscribe((overlay) => {
-  saveOverlay(overlay);
-});
-
-let recomputeScheduled = false;
-function scheduleRecompute(): void {
-  if (recomputeScheduled) return;
-  recomputeScheduled = true;
-  queueMicrotask(() => {
-    recomputeScheduled = false;
-    const release = releaseStore.get();
-    const overlay = overlayStore.get();
-    const auth = authStore.get();
-    const capability: 'public' | 'authenticated' | 'admin' = auth.isAuthenticated ? 'admin' : 'public';
-    workspaceStore.set(mergeWorkspace(release, overlay, capability));
-  });
-}
-
-releaseStore.subscribe(() => scheduleRecompute());
-overlayStore.subscribe(() => scheduleRecompute());
-authStore.subscribe(() => scheduleRecompute());
 
 /* Re-export submodules for backward compatibility */
 export { moveNodePosition, moveNodeToParent, addOverlayNode, tombstoneNode, restoreNode, resetOverlay, reorderDesktopNodes, createFolder, getTombstonedNodes, getChildren } from './overlay-mutations';
