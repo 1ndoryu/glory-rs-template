@@ -21,9 +21,8 @@ INSERT INTO workspace_releases (version, tree) VALUES (
             "gallery": {
                 "id": "gallery",
                 "parentId": "desktop",
-                "type": "app",
+                "type": "folder",
                 "label": "Galería",
-                "refId": "finder",
                 "position": {"col": 0, "row": 0},
                 "mobileOrder": 0,
                 "requires": "public"
