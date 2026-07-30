@@ -39,7 +39,7 @@ impl ArticleRepository {
         sqlx::query_as::<_, Article>(
             "INSERT INTO articles (id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at) \
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) \
-             RETURNING id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at",
+             RETURNING id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at, system_alias",
         )
         .bind(id)
         .bind(params.title)
@@ -56,7 +56,7 @@ impl ArticleRepository {
 
     pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Article>, sqlx::Error> {
         sqlx::query_as::<_, Article>(
-            "SELECT id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at \
+            "SELECT id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at, system_alias \
              FROM articles WHERE id = $1",
         )
         .bind(id)
@@ -66,7 +66,7 @@ impl ArticleRepository {
 
     pub async fn find_by_slug(pool: &PgPool, slug: &str) -> Result<Option<Article>, sqlx::Error> {
         sqlx::query_as::<_, Article>(
-            "SELECT id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at \
+            "SELECT id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at, system_alias \
              FROM articles WHERE slug = $1",
         )
         .bind(slug)
@@ -84,7 +84,7 @@ impl ArticleRepository {
 
         let articles = if let Some(status_filter) = status {
             sqlx::query_as::<_, Article>(
-                "SELECT id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at \
+                "SELECT id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at, system_alias \
                  FROM articles WHERE status = $1 \
                  ORDER BY is_pinned DESC, COALESCE(published_at, created_at) DESC \
                  LIMIT $2 OFFSET $3",
@@ -96,7 +96,7 @@ impl ArticleRepository {
             .await?
         } else {
             sqlx::query_as::<_, Article>(
-                "SELECT id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at \
+                "SELECT id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at, system_alias \
                  FROM articles \
                  ORDER BY is_pinned DESC, COALESCE(published_at, created_at) DESC \
                  LIMIT $1 OFFSET $2",
@@ -149,7 +149,7 @@ impl ArticleRepository {
                 published_at = $7, \
                 updated_at = NOW() \
              WHERE id = $8 \
-             RETURNING id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at",
+             RETURNING id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at, system_alias",
         )
         .bind(params.title)
         .bind(params.content)

@@ -6,7 +6,9 @@ use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 use validator::Validate;
 
-/// Articulo del blog almacenado en base de datos
+/// Articulo del blog almacenado en base de datos.
+/// [297A-10] Incluye campos legacy (status) y envelope (editorial, visibility, lifecycle)
+/// durante la fase de transición. system_alias identifica artículos de sistema como 'about'.
 #[derive(Debug, Clone, FromRow, Serialize, ToSchema)]
 pub struct Article {
     pub id: Uuid,
@@ -15,11 +17,14 @@ pub struct Article {
     pub content: JsonValue,
     pub excerpt: String,
     pub cover_image: Option<String>,
+    /// Legacy: 'draft' | 'published'. Se mantiene hasta fase contract.
     pub status: String,
     pub is_pinned: bool,
     pub published_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    /// [297A-10] Alias de sistema (e.g. 'about') para artículos especiales.
+    pub system_alias: Option<String>,
 }
 
 /// Request para crear un articulo

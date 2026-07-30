@@ -18,7 +18,7 @@ impl MediaRepository {
         sqlx::query_as::<_, Media>(
             "INSERT INTO media (id, article_id, file_path, file_type, file_size, alt_text) \
              VALUES ($1, $2, $3, $4, $5, $6) \
-             RETURNING id, article_id, file_path, file_type, file_size, alt_text, created_at",
+             RETURNING id, article_id, file_path, file_type, file_size, alt_text, created_at, asset_state",
         )
         .bind(id)
         .bind(article_id)
@@ -35,40 +35,37 @@ impl MediaRepository {
         file_type: Option<&str>,
         article_id: Option<Uuid>,
     ) -> Result<Vec<Media>, sqlx::Error> {
+        let cols = "id, article_id, file_path, file_type, file_size, alt_text, created_at, asset_state";
         match (file_type, article_id) {
             (Some(ft), Some(aid)) => {
-                sqlx::query_as::<_, Media>(
-                    "SELECT id, article_id, file_path, file_type, file_size, alt_text, created_at \
-                     FROM media WHERE file_type = $1 AND article_id = $2 ORDER BY created_at DESC",
-                )
+                sqlx::query_as::<_, Media>(&format!(
+                    "SELECT {cols} FROM media WHERE file_type = $1 AND article_id = $2 ORDER BY created_at DESC"
+                ))
                 .bind(ft)
                 .bind(aid)
                 .fetch_all(pool)
                 .await
             }
             (Some(ft), None) => {
-                sqlx::query_as::<_, Media>(
-                    "SELECT id, article_id, file_path, file_type, file_size, alt_text, created_at \
-                     FROM media WHERE file_type = $1 ORDER BY created_at DESC",
-                )
+                sqlx::query_as::<_, Media>(&format!(
+                    "SELECT {cols} FROM media WHERE file_type = $1 ORDER BY created_at DESC"
+                ))
                 .bind(ft)
                 .fetch_all(pool)
                 .await
             }
             (None, Some(aid)) => {
-                sqlx::query_as::<_, Media>(
-                    "SELECT id, article_id, file_path, file_type, file_size, alt_text, created_at \
-                     FROM media WHERE article_id = $1 ORDER BY created_at DESC",
-                )
+                sqlx::query_as::<_, Media>(&format!(
+                    "SELECT {cols} FROM media WHERE article_id = $1 ORDER BY created_at DESC"
+                ))
                 .bind(aid)
                 .fetch_all(pool)
                 .await
             }
             (None, None) => {
-                sqlx::query_as::<_, Media>(
-                    "SELECT id, article_id, file_path, file_type, file_size, alt_text, created_at \
-                     FROM media ORDER BY created_at DESC",
-                )
+                sqlx::query_as::<_, Media>(&format!(
+                    "SELECT {cols} FROM media ORDER BY created_at DESC"
+                ))
                 .fetch_all(pool)
                 .await
             }

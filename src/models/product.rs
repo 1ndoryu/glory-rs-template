@@ -6,25 +6,28 @@ use uuid::Uuid;
 
 use validator::Validate;
 
-/// Producto vendible ligado a un articulo
+/// Producto vendible. [297A-10] article_id ahora es opcional (independiente de artículo).
 #[derive(Debug, Clone, FromRow, Serialize, ToSchema)]
 pub struct Product {
     pub id: Uuid,
-    pub article_id: Uuid,
+    /// [297A-10] Opcional: producto independiente de artículo.
+    pub article_id: Option<Uuid>,
     pub name: String,
     pub description: String,
     pub price_cents: i32,
     pub currency: String,
     pub stripe_product_id: Option<String>,
     pub stripe_price_id: Option<String>,
+    /// Legacy: download_path directo. Se mantiene hasta fase contract.
     pub download_path: Option<String>,
+    /// Legacy: is_active. Se mantiene hasta fase contract.
     pub is_active: bool,
     pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 pub struct CreateProductRequest {
-    pub article_id: Uuid,
+    pub article_id: Option<Uuid>,
     pub name: String,
     #[serde(default)]
     pub description: String,

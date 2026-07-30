@@ -6,9 +6,10 @@ use crate::models::product::{Order, Product};
 pub struct ProductRepository;
 
 impl ProductRepository {
+    /// [297A-10] article_id es opcional — producto independiente de artículo.
     pub async fn create(
         pool: &PgPool,
-        article_id: Uuid,
+        article_id: Option<Uuid>,
         name: &str,
         description: &str,
         price_cents: i32,
