@@ -1,6 +1,6 @@
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use axum::routing::{get, post};
+use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use uuid::Uuid;
 use validator::Validate;
@@ -172,11 +172,62 @@ pub async fn delete_article(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Obtener articulo publicado por alias de sistema (publico)
+/// [297A-10] Usado para artículos de sistema como 'about'.
+#[utoipa::path(
+    get,
+    path = "/api/articles/alias/{alias}",
+    params(("alias" = String, Path, description = "Alias de sistema del articulo (e.g. 'about')")),
+    responses(
+        (status = 200, description = "Articulo encontrado", body = ArticlePublic),
+        (status = 404, description = "No encontrado", body = crate::errors::ErrorResponse)
+    )
+)]
+pub async fn get_article_by_alias(
+    State(state): State<AppState>,
+    Path(alias): Path<String>,
+) -> Result<Json<ArticlePublic>, AppError> {
+    let article = ArticleService::get_by_alias(&state.pool, &alias).await?;
+    Ok(Json(ArticlePublic::from(article)))
+}
+
+/// Asignar alias de sistema a un articulo (admin)
+#[derive(Debug, serde::Deserialize, utoipa::ToSchema, validator::Validate)]
+pub struct SetAliasRequest {
+    #[validate(length(max = 100, message = "El alias no puede exceder 100 caracteres"))]
+    pub alias: Option<String>,
+}
+
+#[utoipa::path(
+    put,
+    path = "/api/admin/articles/{id}/alias",
+    params(("id" = Uuid, Path, description = "ID del articulo")),
+    request_body = SetAliasRequest,
+    responses(
+        (status = 200, description = "Alias asignado"),
+        (status = 404, description = "No encontrado", body = crate::errors::ErrorResponse),
+        (status = 401, description = "No autorizado", body = crate::errors::ErrorResponse)
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn set_article_alias(
+    State(state): State<AppState>,
+    _auth: AdminUser,
+    Path(id): Path<Uuid>,
+    Json(req): Json<SetAliasRequest>,
+) -> Result<StatusCode, AppError> {
+    req.validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+    ArticleService::set_alias(&state.pool, id, req.alias.as_deref()).await?;
+    Ok(StatusCode::OK)
+}
+
 pub fn routes() -> Router<AppState> {
     Router::new()
         /* Públicos: solo artículos publicados */
         .route("/articles", get(list_articles))
         .route("/articles/slug/{slug}", get(get_article_by_slug))
+        .route("/articles/alias/{alias}", get(get_article_by_alias))
         /* Admin: CRUD completo */
         .route(
             "/admin/articles",
@@ -186,4 +237,5 @@ pub fn routes() -> Router<AppState> {
             "/admin/articles/{id}",
             get(get_article).put(update_article).delete(delete_article),
         )
+        .route("/admin/articles/{id}/alias", put(set_article_alias))
 }

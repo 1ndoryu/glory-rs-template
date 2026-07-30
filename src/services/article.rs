@@ -94,6 +94,43 @@ impl ArticleService {
             .ok_or_else(|| AppError::NotFound("Articulo no encontrado".into()))
     }
 
+    /// [297A-10] Buscar artículo publicado por alias de sistema (público).
+    pub async fn get_by_alias(pool: &PgPool, alias: &str) -> Result<Article, AppError> {
+        let article = ArticleRepository::find_by_system_alias(pool, alias)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Articulo no encontrado".into()))?;
+        if article.status != "published" {
+            return Err(AppError::NotFound("Articulo no encontrado".into()));
+        }
+        Ok(article)
+    }
+
+    /// [297A-10] Buscar artículo por alias de sistema (admin — incluye borradores).
+    pub async fn get_by_alias_admin(pool: &PgPool, alias: &str) -> Result<Article, AppError> {
+        ArticleRepository::find_by_system_alias(pool, alias)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Articulo no encontrado".into()))
+    }
+
+    /// [297A-10] Asignar alias de sistema a un artículo (admin).
+    /// Verifica que el alias no esté en uso por otro artículo.
+    pub async fn set_alias(pool: &PgPool, id: Uuid, alias: Option<&str>) -> Result<(), AppError> {
+        /* Verificar unicidad si se asigna un alias */
+        if let Some(a) = alias {
+            if let Some(existing) = ArticleRepository::find_by_system_alias(pool, a).await? {
+                if existing.id != id {
+                    return Err(AppError::Conflict(
+                        format!("El alias '{}' ya está asignado al artículo '{}'", a, existing.title),
+                    ));
+                }
+            }
+        }
+        if !ArticleRepository::set_system_alias(pool, id, alias).await? {
+            return Err(AppError::NotFound("Articulo no encontrado".into()));
+        }
+        Ok(())
+    }
+
     pub async fn list(
         pool: &PgPool,
         status: Option<&str>,

@@ -181,6 +181,36 @@ impl ArticleRepository {
         Ok(exists)
     }
 
+    /// [297A-10] Buscar artículo por alias de sistema (e.g. 'about').
+    pub async fn find_by_system_alias(
+        pool: &PgPool,
+        alias: &str,
+    ) -> Result<Option<Article>, sqlx::Error> {
+        sqlx::query_as::<_, Article>(
+            "SELECT id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at, system_alias \
+             FROM articles WHERE system_alias = $1",
+        )
+        .bind(alias)
+        .fetch_optional(pool)
+        .await
+    }
+
+    /// [297A-10] Asignar alias de sistema a un artículo (admin).
+    pub async fn set_system_alias(
+        pool: &PgPool,
+        id: Uuid,
+        alias: Option<&str>,
+    ) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query(
+            "UPDATE articles SET system_alias = $1, updated_at = NOW() WHERE id = $2",
+        )
+        .bind(alias)
+        .bind(id)
+        .execute(pool)
+        .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
     /// Listar slugs y fechas de artículos publicados (para sitemap)
     pub async fn list_published_slugs(
         pool: &PgPool,
