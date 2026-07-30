@@ -6,6 +6,7 @@
 import { createStore, type Store } from '../../store';
 import type { MountedView } from '../../core/lifecycle';
 import type { AppDefinition } from './app-registry';
+import type { IconNode } from 'lucide';
 
 export type WindowState = 'open' | 'minimized' | 'maximized';
 
@@ -33,10 +34,14 @@ export interface WindowEntry {
   focused: boolean;
   /** Contenido que la app devolvió. */
   readonly content: HTMLElement;
-  /** AbortController de esta instancia — se aborta al cerrar. */
-  readonly controller: AbortController;
-  /** Definición de la app (referencia). */
-  readonly app: AppDefinition;
+  /** AbortController de esta instancia — se aborta al cerrar. Shell windows no tienen controller. */
+  readonly controller?: AbortController;
+  /** Definición de la app (referencia). Shell windows no tienen app. */
+  readonly app?: AppDefinition;
+  /** Icono override para shell windows (sin AppDefinition). */
+  readonly icon?: IconNode;
+  /** CSS class override para shell windows (ej: 'desktop-profile-window'). */
+  readonly cssClass?: string;
 }
 
 /* === Store reactivo === */
@@ -125,8 +130,8 @@ export function closeWindow(instanceId: string): void {
   const target = windows.find(w => w.instanceId === instanceId);
   if (!target) return;
 
-  /* Abortar el signal de la app */
-  target.controller.abort();
+  /* Abortar el signal de la app (shell windows no tienen controller) */
+  target.controller?.abort();
   /* Ejecutar cleanup de la app si existe */
   target.content.dispatchEvent(new CustomEvent('view:destroy'));
 
@@ -139,6 +144,46 @@ export function closeWindow(instanceId: string): void {
   }
 
   windowStore.set(remaining);
+}
+
+/** Registrar una shell window (perfil, etc.) directamente en windowStore.
+ * Las shell windows no tienen AppDefinition ni AbortController. */
+export function registerShellWindow(options: {
+  instanceId: string;
+  title: string;
+  icon: IconNode;
+  content: HTMLElement;
+  initialBounds?: Partial<WindowBounds>;
+  focused?: boolean;
+  cssClass?: string;
+}): string {
+  const existing = windowStore.get();
+  /* No registrar dos veces */
+  if (existing.find(w => w.instanceId === options.instanceId)) return options.instanceId;
+
+  const defaults: WindowBounds = { x: 40, y: 40, w: 470, h: 360 };
+  const raw: WindowBounds = { ...defaults, ...options.initialBounds };
+  const bounds = clampWindowBounds(raw.x, raw.y, raw.w, raw.h);
+
+  const updated = options.focused !== false
+    ? existing.map(w => ({ ...w, focused: false }))
+    : existing;
+
+  const entry: WindowEntry = {
+    instanceId: options.instanceId,
+    appId: options.instanceId,
+    title: options.title,
+    state: 'open',
+    bounds,
+    zIndex: nextZIndex++,
+    focused: options.focused !== false,
+    content: options.content,
+    icon: options.icon,
+    cssClass: options.cssClass,
+  };
+
+  windowStore.set([...updated, entry]);
+  return options.instanceId;
 }
 
 /** Enfocar una ventana (traer al frente). */
@@ -212,7 +257,7 @@ export function findOpenWindow(appId: string): WindowEntry | undefined {
 export function closeAllWindows(): void {
   const windows = windowStore.get();
   for (const w of windows) {
-    w.controller.abort();
+    w.controller?.abort();
   }
   windowStore.set([]);
 }

@@ -34,7 +34,7 @@ CommandRegistry.register({
   execute: (): CommandResult => {
     const win = getFocusedWindow();
     if (!win) return { status: 'failure', reason: 'no focused window' };
-    win.controller.abort();
+    win.controller?.abort();
     dispatchEvent({ type: 'app_closed', appId: win.appId });
     closeWindow(win.instanceId);
     return { status: 'success' };
