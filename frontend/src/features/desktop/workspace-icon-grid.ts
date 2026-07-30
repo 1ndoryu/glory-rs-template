@@ -8,6 +8,7 @@ import {
   ShieldUser,
   type IconNode,
 } from 'lucide';
+import { createEl } from '../../utils/dom';
 import { createDesktopIcon } from './components/desktop-icon';
 import { openAppWindow } from '../runtime/route-app-adapter';
 import { authStore } from '../../store';
@@ -44,7 +45,6 @@ export function resolveNodeIconType(node: ResolvedNode): 'folder' | 'document' |
   return 'application';
 }
 
-/** Resolver callback de activación para un nodo del desktop. */
 function resolveActivate(
   node: ResolvedNode,
   extraActions?: Record<string, () => void>,
@@ -60,9 +60,7 @@ function resolveActivate(
 }
 
 export function createWorkspaceIconGrid(extraActions?: Record<string, () => void>): HTMLElement {
-  const grid = document.createElement('div');
-  grid.className = 'desktop-icon-grid';
-  grid.setAttribute('aria-label', 'Objetos del escritorio');
+  const grid = createEl('div', { className: 'desktop-icon-grid', ariaLabel: 'Objetos del escritorio' });
 
   const dragCleanups = new Map<string, () => void>();
 
@@ -71,10 +69,8 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
       .filter((n) => n.parentId === 'desktop')
       .sort((a, b) => (a.mobileOrder ?? 0) - (b.mobileOrder ?? 0));
 
-    /* Filtrar nodos sin activación (equivalente al continue original) */
     const activableNodes = desktopNodes.filter(n => resolveActivate(n, extraActions));
 
-    /* Limpiar drag handlers de nodos que ya no existen */
     const activeIds = new Set(activableNodes.map(n => n.id));
     for (const [id, cleanup] of dragCleanups) {
       if (!activeIds.has(id)) {
@@ -87,12 +83,9 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
       grid,
       activableNodes,
       (node) => node.id,
-      /* createElement: crear icono nuevo.
-       * [Auditoría v3 §2.13] Los handlers leen del store en el momento del evento
-       * usando data-node-id, no capturando 'node' del momento de creación. */
       (node) => {
         const onActivate = resolveActivate(node, extraActions);
-        if (!onActivate) return document.createElement('span'); /* placeholder */
+        if (!onActivate) return createEl('span'); /* placeholder */
 
         const iconEl = createDesktopIcon({
           label: node.label,
@@ -103,7 +96,6 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
 
         iconEl.setAttribute('data-node-id', node.id);
 
-        /* mousedown: seleccionar — lee nodeId del atributo */
         iconEl.addEventListener('mousedown', (e) => {
           if (e.button === 0 && e.detail === 1) {
             const nid = iconEl.getAttribute('data-node-id');
@@ -111,7 +103,6 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
           }
         });
 
-        /* contextmenu: abre menú con datos frescos del store */
         iconEl.addEventListener('contextmenu', (e) => {
           e.preventDefault();
           const nid = iconEl.getAttribute('data-node-id');
@@ -153,13 +144,11 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
 
         return iconEl;
       },
-      /* updateElement: actualizar label y icono si cambiaron */
       (el, node) => {
         const label = el.querySelector('.desktop-icon__label');
         if (label && label.textContent !== node.label) {
           label.textContent = node.label;
         }
-        /* Actualizar clase de tipo de icono si cambió */
         const newType = resolveNodeIconType(node);
         el.classList.remove('desktop-icon--folder', 'desktop-icon--document', 'desktop-icon--application');
         el.classList.add(`desktop-icon--${newType}`);
@@ -167,7 +156,6 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
     );
   });
 
-  /* Clic en vacío limpia selección */
   grid.addEventListener('mousedown', (e) => {
     if (e.target === grid) clearSelection();
   });

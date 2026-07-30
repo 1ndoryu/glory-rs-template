@@ -5,37 +5,29 @@
  * [Auditoría v2] */
 
 import { createElement, type IconNode } from 'lucide';
+import { createEl } from '../../../utils/dom';
 
 export interface DropdownMenuItem {
   readonly icon?: IconNode;
   readonly label: string;
   readonly shortcut?: string;
   readonly disabled?: boolean;
-  /** Si es true, renderiza como separador visual (no interactivo). */
   readonly separator?: boolean;
   readonly onClick?: () => void;
 }
 
 export interface DropdownMenuOptions {
-  /** Elementos del menú. */
   readonly items: readonly DropdownMenuItem[];
-  /** Label para accesibilidad. */
   readonly ariaLabel?: string;
-  /** Posicionamiento: 'fixed' para context menus, 'absolute' para toolbars. */
   readonly positioning?: 'fixed' | 'absolute';
-  /** Posición X (solo para positioning: 'fixed'). */
   readonly x?: number;
-  /** Posición Y (solo para positioning: 'fixed'). */
   readonly y?: number;
-  /** Callback al cerrar el menú. */
   readonly onClose?: () => void;
 }
 
-/** Estado global: solo un dropdown abierto a la vez. */
 let activeDropdown: { el: HTMLElement; cleanup: () => void } | null = null;
 let pendingSetup: ReturnType<typeof setTimeout> | null = null;
 
-/** Cerrar el dropdown activo. Cancela timeouts pendientes para evitar listener leak. */
 function closeActiveDropdown(): void {
   if (pendingSetup) {
     clearTimeout(pendingSetup);
@@ -61,38 +53,24 @@ function onGlobalClick(e: MouseEvent): void {
   }
 }
 
-/** Crear un item del menú con icono, label, shortcut y estado disabled.
- * Si item.separator es true, devuelve un separador visual no interactivo. */
 export function createDropdownItem(item: DropdownMenuItem): HTMLElement {
   if (item.separator) {
-    const sep = document.createElement('div');
-    sep.className = 'desktop-context-menu__separator';
-    sep.setAttribute('role', 'separator');
-    return sep;
+    return createEl('div', { className: 'desktop-context-menu__separator', role: 'separator' });
   }
 
-  const el = document.createElement('button');
-  el.type = 'button';
-  el.className = 'desktop-context-menu__item';
-  el.setAttribute('role', 'menuitem');
+  const el = createEl('button', { type: 'button', className: 'desktop-context-menu__item', role: 'menuitem' });
 
   if (item.icon) {
-    const iconEl = document.createElement('span');
-    iconEl.className = 'desktop-context-menu__icon';
-    iconEl.appendChild(createElement(item.icon));
-    el.appendChild(iconEl);
+    const iconWrapper = createEl('span', { className: 'desktop-context-menu__icon' },
+      createElement(item.icon),
+    );
+    el.appendChild(iconWrapper);
   }
 
-  const labelEl = document.createElement('span');
-  labelEl.className = 'desktop-context-menu__label';
-  labelEl.textContent = item.label;
-  el.appendChild(labelEl);
+  el.appendChild(createEl('span', { className: 'desktop-context-menu__label', textContent: item.label }));
 
   if (item.shortcut) {
-    const shortcutEl = document.createElement('span');
-    shortcutEl.className = 'desktop-context-menu__shortcut';
-    shortcutEl.textContent = item.shortcut;
-    el.appendChild(shortcutEl);
+    el.appendChild(createEl('span', { className: 'desktop-context-menu__shortcut', textContent: item.shortcut }));
   }
 
   if (item.disabled) {
@@ -109,26 +87,18 @@ export function createDropdownItem(item: DropdownMenuItem): HTMLElement {
   return el;
 }
 
-/**
- * Abrir un dropdown menu compartido.
- * Cierra cualquier dropdown activo antes de abrir uno nuevo.
- * Maneja Escape, outside click y positioning automáticamente.
- */
 export function openDropdownMenu(options: DropdownMenuOptions): HTMLElement | null {
   closeActiveDropdown();
 
   if (options.items.length === 0) return null;
 
-  const menu = document.createElement('div');
-  menu.className = 'desktop-context-menu';
-  menu.setAttribute('role', 'menu');
+  const menu = createEl('div', { className: 'desktop-context-menu', role: 'menu' });
   if (options.ariaLabel) menu.setAttribute('aria-label', options.ariaLabel);
 
   for (const item of options.items) {
     menu.appendChild(createDropdownItem(item));
   }
 
-  /* Posicionar */
   if (options.positioning === 'fixed') {
     menu.style.position = 'fixed';
     menu.style.left = '0';
@@ -138,7 +108,6 @@ export function openDropdownMenu(options: DropdownMenuOptions): HTMLElement | nu
 
   document.body.appendChild(menu);
 
-  /* Ajustar posición para no salir del viewport (solo fixed) */
   if (options.positioning === 'fixed' && options.x !== undefined && options.y !== undefined) {
     const rect = menu.getBoundingClientRect();
     const taskbarH = 32;

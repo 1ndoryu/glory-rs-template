@@ -5,14 +5,13 @@
  * [Plan §2.3] Los menús proyectan CommandRegistry/AppRegistry. */
 
 import { createElement, FileUser, Folder, type IconNode } from 'lucide';
+import { createEl } from '../../../utils/dom';
 import { AppRegistry, type Capability } from '../../runtime/app-registry';
 import { authStore } from '../../../store';
 import { ArticleService } from '../../../services';
 
-/* === Estado del menú abierto === */
 let openEntry: HTMLElement | null = null;
 
-/** [Auditoría v3 §2.6] WeakMap tipado para callbacks de apertura — reemplaza _onOpen en DOM. */
 const onOpenCallbacks = new WeakMap<HTMLElement, () => void>();
 
 function closeOpenMenu(): void {
@@ -38,7 +37,6 @@ function onEscapeKey(e: KeyboardEvent): void {
   if (e.key === 'Escape') closeOpenMenu();
 }
 
-/* === Toggle menú === */
 function toggleEntry(entry: HTMLElement): void {
   if (openEntry === entry) {
     closeOpenMenu();
@@ -49,7 +47,6 @@ function toggleEntry(entry: HTMLElement): void {
   const menu = entry.querySelector('.desktop-context-menu') as HTMLElement | null;
   const btn = entry.querySelector('.desktop-menu-bar__item') as HTMLButtonElement | null;
 
-  /* Refresh reactive menus before showing */
   if (menu && onOpenCallbacks.has(menu)) {
     onOpenCallbacks.get(menu)!();
   }
@@ -66,44 +63,30 @@ function toggleEntry(entry: HTMLElement): void {
   }, 0);
 }
 
-/* === Crear label de menú === */
 function createMenuLabel(label: string): HTMLButtonElement {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'desktop-menu-bar__item';
-  button.textContent = label;
-  button.setAttribute('aria-haspopup', 'menu');
-  button.setAttribute('aria-expanded', 'false');
-  return button;
+  return createEl('button', {
+    type: 'button', className: 'desktop-menu-bar__item', textContent: label,
+    ariaHaspopup: 'menu', ariaExpanded: 'false',
+  });
 }
 
-/* === Crear item de menú contextual === */
 function createMenuItem(
   label: string,
   options?: { icon?: IconNode; shortcut?: string; disabled?: boolean; onClick?: () => void },
 ): HTMLElement {
-  const item = document.createElement('div');
-  item.className = 'desktop-context-menu__item';
-  item.setAttribute('role', 'menuitem');
+  const children: (string | HTMLElement)[] = [];
 
   if (options?.icon) {
-    const iconEl = document.createElement('span');
-    iconEl.className = 'desktop-context-menu__icon';
-    iconEl.appendChild(createElement(options.icon));
-    item.appendChild(iconEl);
+    children.push(createEl('span', { className: 'desktop-context-menu__icon' }, createElement(options.icon)));
   }
 
-  const labelEl = document.createElement('span');
-  labelEl.className = 'desktop-context-menu__label';
-  labelEl.textContent = label;
-  item.appendChild(labelEl);
+  children.push(createEl('span', { className: 'desktop-context-menu__label', textContent: label }));
 
   if (options?.shortcut) {
-    const shortcutEl = document.createElement('span');
-    shortcutEl.className = 'desktop-context-menu__shortcut';
-    shortcutEl.textContent = options.shortcut;
-    item.appendChild(shortcutEl);
+    children.push(createEl('span', { className: 'desktop-context-menu__shortcut', textContent: options.shortcut }));
   }
+
+  const item = createEl('div', { className: 'desktop-context-menu__item', role: 'menuitem' }, ...children);
 
   if (options?.disabled) {
     item.classList.add('desktop-context-menu__item--disabled');
@@ -119,29 +102,23 @@ function createMenuItem(
   return item;
 }
 
-/* === Menú Archivo — artículos del blog === */
 function createArchiveMenu(): HTMLElement {
-  const menu = document.createElement('div');
-  menu.className = 'desktop-context-menu';
-  menu.setAttribute('role', 'menu');
-  menu.setAttribute('aria-label', 'Archivo');
+  const menu = createEl('div', { className: 'desktop-context-menu', role: 'menu', ariaLabel: 'Archivo' });
   menu.hidden = true;
 
-  /* Placeholder mientras carga */
   const loading = createMenuItem('cargando…', { disabled: true });
   menu.appendChild(loading);
 
-  /* Cargar artículos desde la API */
   void ArticleService.list(1, 20)
-    .then((data: any) => {
+    .then(({ items }) => {
       loading.remove();
 
-      if (!data || data.items?.length === 0) {
+      if (items.length === 0) {
         menu.appendChild(createMenuItem('sin artículos', { disabled: true }));
         return;
       }
 
-      for (const article of data.items) {
+      for (const article of items) {
         menu.appendChild(createMenuItem(article.title, {
           icon: FileUser,
           onClick: () => {
@@ -158,21 +135,12 @@ function createArchiveMenu(): HTMLElement {
   return menu;
 }
 
-/* === Menú Aplicaciones — derivado de workspaceStore ===
- * [Plan 297A-11] Fuente única de verdad: los hijos del root del workspace
- * definen qué aparece en el menú. AppRegistry solo resuelve implementaciones.
- * Se re-consulta workspaceStore cada vez que se abre para reflejar cambios. */
 function createApplicationsMenu(): HTMLElement {
-  const menu = document.createElement('div');
-  menu.className = 'desktop-context-menu';
-  menu.setAttribute('role', 'menu');
-  menu.setAttribute('aria-label', 'Aplicaciones');
+  const menu = createEl('div', { className: 'desktop-context-menu', role: 'menu', ariaLabel: 'Aplicaciones' });
   menu.hidden = true;
 
-  /* Flag para saber si ya se cargó el workspace */
   let loaded = false;
 
-  /** Re-construir los items del menú desde workspaceStore. */
   function refresh(): void {
     menu.innerHTML = '';
 
@@ -221,10 +189,8 @@ function createApplicationsMenu(): HTMLElement {
     });
   }
 
-  /* Cargar por primera vez */
   refresh();
 
-  /* Exponer refresh para que toggleEntry lo llame al abrir */
   onOpenCallbacks.set(menu, () => {
     if (loaded) refresh();
   });
@@ -232,13 +198,9 @@ function createApplicationsMenu(): HTMLElement {
   return menu;
 }
 
-/* === Crear entrada de menú === */
 function createMenuEntry(label: string, menu: HTMLElement): HTMLElement {
-  const entry = document.createElement('div');
-  entry.className = 'desktop-menu-bar__entry';
-
   const btn = createMenuLabel(label);
-  entry.append(btn, menu);
+  const entry = createEl('div', { className: 'desktop-menu-bar__entry' }, btn, menu);
 
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -248,39 +210,23 @@ function createMenuEntry(label: string, menu: HTMLElement): HTMLElement {
   return entry;
 }
 
-/* === Barra principal === */
 export function createDesktopMenuBar(): HTMLElement {
-  const bar = document.createElement('header');
-  bar.className = 'desktop-menu-bar';
+  const brand = createEl('span', { className: 'desktop-menu-bar__brand', ariaLabel: 'Menú del sistema' });
 
-  const menus = document.createElement('div');
-  menus.className = 'desktop-menu-bar__menus';
-
-  /* Brand logo (cículo negro de marca) */
-  const brand = document.createElement('span');
-  brand.className = 'desktop-menu-bar__brand';
-  brand.setAttribute('aria-label', 'Menú del sistema');
-
-  /* Archivo — artículos */
   const archiveEntry = createMenuEntry('Archivo', createArchiveMenu());
-
-  /* Aplicaciones — apps del OS */
   const appsEntry = createMenuEntry('Aplicaciones', createApplicationsMenu());
 
-  /* Configuración — abre la app settings directamente */
-  const settingsEntry = document.createElement('div');
-  settingsEntry.className = 'desktop-menu-bar__entry';
   const settingsBtn = createMenuLabel('Configuración');
   settingsBtn.addEventListener('click', () => {
     void import('../../runtime/route-app-adapter').then(m => m.openAppWindow('settings'));
   });
-  settingsEntry.appendChild(settingsBtn);
+  const settingsEntry = createEl('div', { className: 'desktop-menu-bar__entry' }, settingsBtn);
 
-  menus.append(brand, archiveEntry, appsEntry, settingsEntry);
+  const menus = createEl('div', { className: 'desktop-menu-bar__menus' },
+    brand, archiveEntry, appsEntry, settingsEntry,
+  );
 
-  /* Reloj */
-  const clock = document.createElement('time');
-  clock.className = 'desktop-menu-bar__clock';
+  const clock = createEl('time', { className: 'desktop-menu-bar__clock' });
 
   function updateClock(): void {
     const now = new Date();
@@ -289,6 +235,5 @@ export function createDesktopMenuBar(): HTMLElement {
   updateClock();
   setInterval(updateClock, 30_000);
 
-  bar.append(menus, clock);
-  return bar;
+  return createEl('header', { className: 'desktop-menu-bar' }, menus, clock);
 }

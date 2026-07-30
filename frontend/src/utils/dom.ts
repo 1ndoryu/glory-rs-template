@@ -25,8 +25,13 @@ export interface DomAttrs {
   step?: string;
   disabled?: string;
   'aria-label'?: string;
+  ariaLabel?: string;
   'aria-haspopup'?: string;
+  ariaHaspopup?: string;
   'aria-expanded'?: string;
+  ariaExpanded?: string;
+  'aria-hidden'?: string;
+  ariaHidden?: string;
   'role'?: string;
   title?: string;
   'data-external'?: string;
@@ -43,10 +48,15 @@ export interface DomAttrs {
  *    createEl('h1', { textContent: 'Título' }),
  *    'texto directo',
  *  ) */
+/** Atajo para setear atributo si existe, chequeando kebab y camelCase. */
+function setAttr(el: HTMLElement, key: string, value: string | undefined): void {
+  if (value !== undefined) el.setAttribute(key, value);
+}
+
 export function createEl<K extends keyof HTMLElementTagNameMap>(
   tag: K,
   attrs?: DomAttrs,
-  ...children: (HTMLElement | string)[]
+  ...children: (Node | string)[]
 ): HTMLElementTagNameMap[K] {
   const el = document.createElement(tag);
 
@@ -66,9 +76,13 @@ export function createEl<K extends keyof HTMLElementTagNameMap>(
     if (attrs.value) el.setAttribute('value', attrs.value);
     if (attrs.name) el.setAttribute('name', attrs.name);
     if (attrs.disabled) el.setAttribute('disabled', attrs.disabled);
-    if (attrs['aria-label']) el.setAttribute('aria-label', attrs['aria-label']);
-    if (attrs['aria-haspopup']) el.setAttribute('aria-haspopup', attrs['aria-haspopup']);
-    if (attrs['aria-expanded']) el.setAttribute('aria-expanded', attrs['aria-expanded']);
+
+    /* Soportar kebab-case y camelCase para aria-* */
+    setAttr(el, 'aria-label', attrs['aria-label'] ?? attrs.ariaLabel);
+    setAttr(el, 'aria-haspopup', attrs['aria-haspopup'] ?? attrs.ariaHaspopup);
+    setAttr(el, 'aria-expanded', attrs['aria-expanded'] ?? attrs.ariaExpanded);
+    setAttr(el, 'aria-hidden', attrs['aria-hidden'] ?? attrs.ariaHidden);
+
     if (attrs['role']) el.setAttribute('role', attrs['role']);
     if (attrs['title']) el.setAttribute('title', attrs['title']);
     if (attrs['data-external']) el.setAttribute('data-external', attrs['data-external']);

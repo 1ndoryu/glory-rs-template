@@ -6,26 +6,20 @@
  * [Auditoría v2] Unificación Finder ↔ desktop.
  */
 
+import { createEl } from '../../../utils/dom';
 import type { NodeId } from '../../runtime/workspace/types';
 
 /** Resultado de un drop. */
 export interface DragDropResult {
-  /** ID del nodo arrastrado. */
   readonly sourceId: string;
-  /** ID del nodo destino (folder, desktop, etc). */
   readonly targetId: string;
-  /** Contexto de origen ('desktop' | 'finder'). */
   readonly sourceContext: string;
-  /** Contexto de destino. */
   readonly targetContext: string;
-  /** Si el target es un reordering (mismo grid). */
   readonly reorderIndex?: number;
 }
 
-/** Callback cuando un drop ocurre (cross-context). */
 export type DragDropHandler = (result: DragDropResult) => void;
 
-/** Estado global de la sesión de drag activa. */
 interface DragSession {
   readonly sourceId: string;
   readonly sourceContext: string;
@@ -40,12 +34,10 @@ interface DragSession {
 let activeSession: DragSession | null = null;
 let globalDropHandler: DragDropHandler | null = null;
 
-/** Registrar el handler global de drops (una sola vez, en desktop-shell). */
 export function onGlobalDrop(handler: DragDropHandler): void {
   globalDropHandler = handler;
 }
 
-/** Encontrar el elemento drop target más cercano bajo las coordenadas. */
 function findDropTarget(x: number, y: number, exclude: HTMLElement | null): HTMLElement | null {
   if (activeSession) activeSession.ghost.style.display = 'none';
   const el = document.elementFromPoint(x, y) as HTMLElement | null;
@@ -58,18 +50,12 @@ function findDropTarget(x: number, y: number, exclude: HTMLElement | null): HTML
   return target;
 }
 
-/**
- * Habilita drag en un elemento usando Pointer Events.
- * El elemento debe tener data-node-id y data-drag-context.
- */
 export function enableDrag(options: {
   el: HTMLElement;
   nodeId: string;
   context: string;
   gridEl: HTMLElement;
-  /** Selector CSS para items arrastrables dentro del grid (para reordering). */
   itemSelector?: string;
-  /** Callback de reordenamiento local (mismo grid). Llamado cuando el drop es en el mismo grid. */
   onReorder?: (draggedId: NodeId, targetIndex: number) => void;
 }): () => void {
   const { el, nodeId, context, gridEl, itemSelector = '.desktop-icon--interactive', onReorder } = options;
@@ -140,13 +126,11 @@ export function enableDrag(options: {
       const isSameGrid = target === gridEl;
 
       if (isSameGrid && onReorder) {
-        /* Reordering dentro del mismo grid */
         const targetIndex = findReorderIndex(e.clientX, e.clientY);
         if (targetIndex >= 0) {
           onReorder(nodeId as NodeId, targetIndex);
         }
       } else if (globalDropHandler && targetId) {
-        /* Drop cross-context: Finder→Desktop, Desktop→Finder, etc */
         globalDropHandler({
           sourceId: nodeId,
           targetId,
@@ -156,7 +140,6 @@ export function enableDrag(options: {
       }
     }
 
-    /* Cleanup */
     el.classList.remove('desktop-icon--dragging');
     activeSession.ghost.remove();
     activeSession.highlightEl?.remove();
@@ -174,10 +157,6 @@ export function enableDrag(options: {
   };
 }
 
-/**
- * Marcar un elemento como drop target.
- * Debe tener data-drop-id y opcionalmente data-drop-context.
- */
 export function makeDropTarget(options: {
   el: HTMLElement;
   dropId: string;
@@ -188,7 +167,6 @@ export function makeDropTarget(options: {
   options.el.setAttribute('data-drop-context', options.context);
 }
 
-/** Actualizar highlight visual del drop target. */
 function updateHighlight(target: HTMLElement | null, x: number, y: number): void {
   if (!activeSession) return;
 
@@ -201,7 +179,6 @@ function updateHighlight(target: HTMLElement | null, x: number, y: number): void
   if (target) {
     target.classList.add('desktop-icon--drop-hover');
 
-    /* Highlight de posición para reordering (solo mismo grid) */
     const isSameGrid = target === activeSession.gridEl;
     if (isSameGrid) {
       const targetIndex = findReorderIndex(x, y);
@@ -216,7 +193,6 @@ function updateHighlight(target: HTMLElement | null, x: number, y: number): void
   activeSession.highlightEl = null;
 }
 
-/** Encontrar índice de reordering en el grid del target. */
 function findReorderIndex(x: number, y: number): number {
   if (!activeSession) return -1;
 
@@ -238,7 +214,6 @@ function findReorderIndex(x: number, y: number): number {
   return closestIndex;
 }
 
-/** Posicionar highlight de reordering. */
 function positionHighlight(targetIndex: number): void {
   if (!activeSession) return;
   const icons = activeSession.gridEl.querySelectorAll<HTMLElement>(activeSession.itemSelector);
@@ -246,8 +221,7 @@ function positionHighlight(targetIndex: number): void {
   if (!target) return;
 
   if (!activeSession.highlightEl) {
-    const hl = document.createElement('div');
-    hl.className = 'desktop-icon-drop-target';
+    const hl = createEl('div', { className: 'desktop-icon-drop-target' });
     activeSession.gridEl.appendChild(hl);
     activeSession.highlightEl = hl;
   }

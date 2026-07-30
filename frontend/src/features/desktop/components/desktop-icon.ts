@@ -1,4 +1,5 @@
 import { createElement, type IconNode } from 'lucide';
+import { createEl } from '../../../utils/dom';
 
 export type DesktopIconType = 'folder' | 'document' | 'application';
 
@@ -15,14 +16,11 @@ export interface DesktopIconOptions {
 export function createDesktopIcon(options: DesktopIconOptions): HTMLElement {
   const onActivate = options.onActivate;
   const icon = onActivate
-    ? document.createElement('button')
-    : document.createElement('div');
-  icon.className = 'desktop-icon';
+    ? createEl('button', { type: 'button', className: 'desktop-icon desktop-icon--interactive' })
+    : createEl('div', { className: 'desktop-icon' });
   icon.setAttribute('aria-label', options.label);
 
-  if (icon instanceof HTMLButtonElement && onActivate) {
-    icon.type = 'button';
-    icon.classList.add('desktop-icon--interactive');
+  if (onActivate && icon instanceof HTMLButtonElement) {
     icon.addEventListener('click', onActivate);
   }
 
@@ -30,16 +28,12 @@ export function createDesktopIcon(options: DesktopIconOptions): HTMLElement {
     icon.classList.add('desktop-icon--selected');
   }
 
-  const pictogram = document.createElement('span');
-  pictogram.className = `desktop-icon__pictogram desktop-icon__pictogram--${options.type}`;
-  pictogram.setAttribute('aria-hidden', 'true');
+  const pictogram = createEl('span', {
+    className: `desktop-icon__pictogram desktop-icon__pictogram--${options.type} desktop-icon__pictogram--lucide`,
+    ariaHidden: 'true',
+  }, createElement(options.lucideIcon));
 
-  pictogram.classList.add('desktop-icon__pictogram--lucide');
-  pictogram.appendChild(createElement(options.lucideIcon));
-
-  const label = document.createElement('span');
-  label.className = 'desktop-icon__label';
-  label.textContent = options.label;
+  const label = createEl('span', { className: 'desktop-icon__label', textContent: options.label });
 
   icon.append(pictogram, label);
   return icon;

@@ -2,12 +2,14 @@
  * Shell reactivo del escritorio. Orquesta: menu bar, workspace, ventanas y taskbar.
  * Icon grid y taskbar están extraídos en módulos separados. */
 
-import {
-  FileUser,
-} from 'lucide';
+import { FileUser } from 'lucide';
+import { createEl } from '../../utils/dom';
 import { createDesktopMenuBar } from './components/desktop-menu-bar';
 import { createDesktopWindow } from './components/desktop-window';
-import { windowStore, focusWindow, restoreWindow, closeWindow, minimizeWindow, toggleMaximizeWindow, setWorkspaceBounds, registerShellWindow } from '../runtime/window-manager';
+import {
+  windowStore, focusWindow, restoreWindow, closeWindow,
+  minimizeWindow, toggleMaximizeWindow, setWorkspaceBounds, registerShellWindow,
+} from '../runtime/window-manager';
 import { authStore } from '../../store';
 import { dispatchEvent } from '../analytics/dispatcher';
 import { enableDragResize } from './utils/drag-resize';
@@ -28,12 +30,8 @@ export function createDesktopShell(
   profile: HTMLElement,
   content: HTMLElement,
 ): DesktopShell {
-  const shell = document.createElement('section');
-  shell.className = 'desktop-shell';
-  shell.setAttribute('aria-label', 'Escritorio');
-
-  const workspace = document.createElement('div');
-  workspace.className = 'desktop-workspace';
+  const shell = createEl('section', { className: 'desktop-shell', ariaLabel: 'Escritorio' });
+  const workspace = createEl('div', { className: 'desktop-workspace' });
 
   /* Profile como shell window */
   const profileInstanceId = 'shell-profile';
@@ -78,12 +76,10 @@ export function createDesktopShell(
       }
     },
   });
-  /* Marcar workspace como drop target para el desktop (raíz) */
   makeDropTarget({ el: workspace, dropId: 'desktop', context: 'desktop' });
 
   workspace.append(iconGrid, contentWindow);
 
-  /* Context menu en workspace vacío */
   workspace.addEventListener('contextmenu', (e) => {
     if (e.target !== workspace && e.target !== iconGrid) return;
     e.preventDefault();
@@ -96,22 +92,17 @@ export function createDesktopShell(
     });
   });
 
-  /* Clic en vacío: clearSelection se maneja dentro de workspace-icon-grid */
-
-  /* Taskbar reactivo */
   const { element: taskbar } = createReactiveTaskbar();
 
-  /* Registrar handler global de drop — mueve nodos entre carpetas/desktop */
   onGlobalDrop((result) => {
-    if (result.sourceId === result.targetId) return; /* Evitar self-drop */
+    if (result.sourceId === result.targetId) return;
     moveNodeToParent(result.sourceId, result.targetId);
   });
 
   shell.append(createDesktopMenuBar(), workspace, taskbar);
 
   /* Window container */
-  const windowContainer = document.createElement('div');
-  windowContainer.className = 'desktop-windows-container';
+  const windowContainer = createEl('div', { className: 'desktop-windows-container' });
   windowContainer.style.position = 'absolute';
   windowContainer.style.inset = '0';
   windowContainer.style.pointerEvents = 'none';
@@ -139,12 +130,8 @@ export function createDesktopShell(
             if (win.app) dispatchEvent({ type: 'app_closed', appId: win.appId });
             closeWindow(win.instanceId);
           },
-          onMinimize: () => {
-            minimizeWindow(win.instanceId);
-          },
-          onMaximize: () => {
-            toggleMaximizeWindow(win.instanceId);
-          },
+          onMinimize: () => { minimizeWindow(win.instanceId); },
+          onMaximize: () => { toggleMaximizeWindow(win.instanceId); },
         });
 
         el.style.position = 'absolute';
@@ -165,9 +152,7 @@ export function createDesktopShell(
           });
         }
 
-        el.addEventListener('mousedown', () => {
-          focusWindow(win.instanceId);
-        });
+        el.addEventListener('mousedown', () => { focusWindow(win.instanceId); });
         windowContainer.appendChild(el);
         renderedWindows.set(win.instanceId, { el, cleanup });
       }

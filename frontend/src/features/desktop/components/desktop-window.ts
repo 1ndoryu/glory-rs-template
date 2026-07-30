@@ -1,4 +1,5 @@
 import { createElement, Maximize2, Minus, X, type IconNode } from 'lucide';
+import { createEl } from '../../../utils/dom';
 import type { AppToolbarGroup, ToolbarItemRef } from '../../runtime/app-registry';
 import { CommandRegistry, type CommandContext } from '../../runtime/command-registry';
 import { authStore } from '../../../store';
@@ -23,12 +24,10 @@ function createWindowControl(
   label: string,
   onActivate?: () => void,
 ): HTMLButtonElement {
-  const control = document.createElement('button');
-  control.type = 'button';
-  control.className = `desktop-window__control ${className}`;
+  const control = createEl('button', { type: 'button', className: `desktop-window__control ${className}`, ariaLabel: label },
+    createElement(icon),
+  );
   control.disabled = !onActivate;
-  control.setAttribute('aria-label', label);
-  control.appendChild(createElement(icon));
 
   if (onActivate) control.addEventListener('click', onActivate);
   return control;
@@ -37,39 +36,29 @@ function createWindowControl(
 /* [297A-2] Receta visual única para todas las futuras aplicaciones.
  * Los controles son decorativos hasta que exista el gestor de ventanas. */
 export function createDesktopWindow(options: DesktopWindowOptions): HTMLElement {
-  const windowElement = document.createElement('section');
-  windowElement.className = 'desktop-window';
-  windowElement.setAttribute('aria-label', `Ventana ${options.title}`);
+  const windowElement = createEl('section', { className: 'desktop-window', ariaLabel: `Ventana ${options.title}` });
 
   if (options.className) windowElement.classList.add(...options.className.split(' '));
   if (options.active) windowElement.classList.add('desktop-window--active');
   if (options.resizable) windowElement.classList.add('desktop-window--resizable');
 
-  const titleBar = document.createElement('header');
-  titleBar.className = 'desktop-window__titlebar';
-
   const closeControl = createWindowControl(
-    X,
-    'desktop-window__control--close',
-    `Cerrar ${options.title}`,
-    options.onClose,
+    X, 'desktop-window__control--close', `Cerrar ${options.title}`, options.onClose,
   );
-
-  const title = document.createElement('span');
-  title.className = 'desktop-window__title';
-  title.textContent = options.title;
 
   const minimizeControl = createWindowControl(
-    Minus,
-    'desktop-window__control--minimize',
-    `Minimizar ${options.title}`,
-    options.onMinimize,
+    Minus, 'desktop-window__control--minimize', `Minimizar ${options.title}`, options.onMinimize,
   );
 
-  titleBar.append(closeControl, title, minimizeControl);
+  const titleBar = createEl('header', { className: 'desktop-window__titlebar' },
+    closeControl,
+    createEl('span', { className: 'desktop-window__title', textContent: options.title }),
+    minimizeControl,
+  );
+
   windowElement.append(titleBar);
 
-  /* App toolbar — siempre presente. Menú 'Ventana' por defecto + toolbar de la app. */
+  /* App toolbar */
   const allGroups: AppToolbarGroup[] = [
     {
       label: 'Ventana',
@@ -82,10 +71,11 @@ export function createDesktopWindow(options: DesktopWindowOptions): HTMLElement 
     },
     ...(options.toolbar ?? []),
   ];
-  windowElement.appendChild(createAppToolbar(allGroups, { onClose: options.onClose, onMinimize: options.onMinimize, onMaximize: options.onMaximize }));
+  windowElement.appendChild(createAppToolbar(allGroups, {
+    onClose: options.onClose, onMinimize: options.onMinimize, onMaximize: options.onMaximize,
+  }));
 
-  const body = document.createElement('div');
-  body.className = 'desktop-window__body';
+  const body = createEl('div', { className: 'desktop-window__body' });
   if (options.layout !== 'full-bleed') {
     body.classList.add('desktop-window__body--padded');
   }
@@ -96,9 +86,7 @@ export function createDesktopWindow(options: DesktopWindowOptions): HTMLElement 
 }
 
 /* === App Toolbar === */
-/* [Auditoría v2] Usa dropdown-menu.ts compartido para open/close/escape/outside-click. */
 
-/** Resolver un ToolbarItemRef a label, icon y command. */
 function resolveToolbarItem(
   ref: ToolbarItemRef,
 ): { id: string; label: string; icon?: IconNode; shortcut?: string } | null {
@@ -118,25 +106,17 @@ function resolveToolbarItem(
   };
 }
 
-/**
- * Crea la barra de herramientas de una app a partir de sus grupos declarativos.
- * Los items referencian comandos del CommandRegistry — fuente única de verdad.
- * [Auditoría v2] Usa openDropdownMenu compartido (dropdown-menu.ts). Elimina
- * toda la lógica de open/close/visibility duplicada.
- */
 export function createAppToolbar(
   groups: AppToolbarGroup[],
   callbacks?: { onClose?: () => void; onMinimize?: () => void; onMaximize?: () => void },
 ): HTMLElement {
-  const toolbar = document.createElement('div');
-  toolbar.className = 'desktop-app-toolbar';
+  const toolbar = createEl('div', { className: 'desktop-app-toolbar' });
 
   const ctx: CommandContext = {
     capability: authStore.get().isAuthenticated ? 'admin' : 'public',
     presentationMode: 'desktop',
   };
 
-  /* Callbacks especiales para window:* comandos */
   const windowCallbackMap: Record<string, 'onClose' | 'onMinimize' | 'onMaximize'> = {
     'window:close': 'onClose',
     'window:minimize': 'onMinimize',
@@ -144,20 +124,14 @@ export function createAppToolbar(
   };
 
   for (const group of groups) {
-    const entry = document.createElement('div');
-    entry.className = 'desktop-app-toolbar__entry';
+    const btn = createEl('button', { type: 'button', className: 'desktop-app-toolbar__item', textContent: group.label, ariaHaspopup: 'menu' });
 
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'desktop-app-toolbar__item';
-    btn.textContent = group.label;
-    btn.setAttribute('aria-haspopup', 'menu');
+    const entry = createEl('div', { className: 'desktop-app-toolbar__entry' }, btn);
 
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       btn.setAttribute('aria-expanded', 'true');
 
-      /* Construir DropdownMenuItem[] filtrando por disponibilidad */
       const items: DropdownMenuItem[] = [];
       for (const ref of group.items) {
         if (ref === '---' || (typeof ref === 'object' && ref.id === '---')) {
@@ -195,7 +169,6 @@ export function createAppToolbar(
         });
       }
 
-      /* Abrir dropdown posicionado bajo el botón (fixed, como context menu) */
       const rect = btn.getBoundingClientRect();
       openDropdownMenu({
         items,
@@ -207,7 +180,6 @@ export function createAppToolbar(
       });
     });
 
-    entry.append(btn);
     toolbar.appendChild(entry);
   }
 

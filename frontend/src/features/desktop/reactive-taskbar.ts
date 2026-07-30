@@ -7,19 +7,16 @@ import {
   PanelLeft,
   X,
 } from 'lucide';
+import { createEl } from '../../utils/dom';
 import { windowStore, closeWindow, restoreWindow, focusWindow } from '../runtime/window-manager';
 import { showSidebar } from '../../store';
 import { dispatchEvent } from '../analytics/dispatcher';
 import { reconcileChildren } from '../../utils/reconcile';
 
 export function createReactiveTaskbar(): { element: HTMLElement; taskList: HTMLElement } {
-  const taskbar = document.createElement('footer');
-  taskbar.className = 'desktop-taskbar';
-  taskbar.setAttribute('aria-label', 'Ventanas abiertas');
+  const taskbar = createEl('footer', { className: 'desktop-taskbar', ariaLabel: 'Ventanas abiertas' });
 
-  const navControl = document.createElement('button');
-  navControl.type = 'button';
-  navControl.className = 'desktop-taskbar__nav-control';
+  const navControl = createEl('button', { type: 'button', className: 'desktop-taskbar__nav-control' });
   navControl.setAttribute('aria-label', showSidebar.get() ? 'Ocultar navegación' : 'Mostrar navegación');
   const navIcon = createElement(PanelLeft);
   navIcon.classList.add('desktop-taskbar__icon');
@@ -29,8 +26,7 @@ export function createReactiveTaskbar(): { element: HTMLElement; taskList: HTMLE
     navControl.setAttribute('aria-label', showSidebar.get() ? 'Ocultar navegación' : 'Mostrar navegación');
   });
 
-  const taskList = document.createElement('div');
-  taskList.className = 'desktop-taskbar__tasks';
+  const taskList = createEl('div', { className: 'desktop-taskbar__tasks' });
 
   taskbar.append(navControl, taskList);
 
@@ -39,28 +35,17 @@ export function createReactiveTaskbar(): { element: HTMLElement; taskList: HTMLE
       taskList,
       windows,
       (win) => win.instanceId,
-      /* createElement */
       (win) => {
-        const item = document.createElement('button');
-        item.type = 'button';
+        const svgIcon = createElement(win.icon ?? win.app?.icon ?? FileUser);
+        svgIcon.classList.add('desktop-taskbar__icon');
 
-        const icon = document.createElement('span');
-        icon.className = 'desktop-taskbar__icon';
-        const iconSvg = createElement(win.icon ?? win.app?.icon ?? FileUser);
-        iconSvg.classList.add('desktop-taskbar__icon');
-        icon.appendChild(iconSvg);
-
-        const label = document.createElement('span');
-        label.className = 'desktop-taskbar__label';
-        label.textContent = win.title;
-
-        const closeBtn = document.createElement('button');
-        closeBtn.type = 'button';
-        closeBtn.className = 'desktop-taskbar__close';
-        closeBtn.setAttribute('aria-label', `Cerrar ${win.title}`);
-        closeBtn.appendChild(createElement(X));
-
-        item.append(icon, label, closeBtn);
+        const item = createEl('button', { type: 'button' },
+          svgIcon,
+          createEl('span', { className: 'desktop-taskbar__label', textContent: win.title }),
+          createEl('button', { type: 'button', className: 'desktop-taskbar__close', ariaLabel: `Cerrar ${win.title}` },
+            createElement(X),
+          ),
+        );
 
         item.addEventListener('click', (e) => {
           const id = item.dataset.key;
@@ -80,7 +65,6 @@ export function createReactiveTaskbar(): { element: HTMLElement; taskList: HTMLE
 
         return item;
       },
-      /* updateElement */
       (el, win) => {
         const activeClass = win.state === 'open' && win.focused ? 'active' : win.state === 'minimized' ? 'minimized' : '';
         el.className = `desktop-taskbar__task desktop-taskbar__task--${activeClass}`;
