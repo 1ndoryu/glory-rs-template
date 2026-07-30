@@ -3,21 +3,28 @@
  * directas esparcidas por el código.
  * [Auditoría v4 §1.2/§2.1] Primer paso hacia una capa de abstracción DOM. */
 
-/** Atributos planos (solo strings) para simplificar el tipado.
- *  Event listeners y estilos se asignan post-creación. */
-export interface DomAttrs {
+/** Atributos comunes a todos los elementos. */
+export interface CoreAttrs {
   className?: string;
   id?: string;
   textContent?: string;
   innerHTML?: string;
+  title?: string;
+  role?: string;
+}
+
+/** Atributos de enlaces. */
+export interface LinkAttrs {
   href?: string;
   target?: string;
   rel?: string;
+  download?: string;
+}
+
+/** Atributos de formularios. */
+export interface FormAttrs {
   type?: string;
   placeholder?: string;
-  alt?: string;
-  src?: string;
-  loading?: string;
   value?: string;
   name?: string;
   min?: string;
@@ -26,7 +33,17 @@ export interface DomAttrs {
   rows?: string;
   accept?: string;
   disabled?: string;
-  download?: string;
+}
+
+/** Atributos de multimedia. */
+export interface MediaAttrs {
+  alt?: string;
+  src?: string;
+  loading?: string;
+}
+
+/** Atributos ARIA para accesibilidad. */
+export interface AriaAttrs {
   'aria-label'?: string;
   ariaLabel?: string;
   'aria-haspopup'?: string;
@@ -35,11 +52,18 @@ export interface DomAttrs {
   ariaExpanded?: string;
   'aria-hidden'?: string;
   ariaHidden?: string;
-  'role'?: string;
-  title?: string;
+}
+
+/** Atributos data-* dinámicos. */
+export interface DataAttrs {
   'data-external'?: string;
   [key: `data-${string}`]: string | undefined;
 }
+
+/** Atributos planos (solo strings) para createEl.
+ *  Intersección de todas las sub-interfaces. Event listeners y estilos
+ *  se asignan post-creación. */
+export type DomAttrs = CoreAttrs & LinkAttrs & FormAttrs & MediaAttrs & AriaAttrs & DataAttrs;
 
 /** Crear un elemento HTML con atributos e hijos.
  *  @param tag - Tag del elemento (ej: 'div', 'span', 'h1')
