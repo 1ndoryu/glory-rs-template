@@ -8,6 +8,11 @@
   background: var(--sistema-superficie);
   color: var(--sistema-texto);
   overflow: hidden;
+  /* Position via CSS custom properties — set by shell/drag-resize */
+  left: var(--win-x, 0);
+  top: var(--win-y, 0);
+  width: var(--win-w, 640px);
+  height: var(--win-h, 480px);
 }
 
 .desktop-window__titlebar {

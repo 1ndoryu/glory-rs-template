@@ -97,8 +97,8 @@ export function enableDragResize(opts: DragResizeOptions): () => void {
         windowEl.offsetWidth,
         windowEl.offsetHeight,
       );
-      windowEl.style.left = `${clamped.x}px`;
-      windowEl.style.top = `${clamped.y}px`;
+      windowEl.style.setProperty('--win-x', `${clamped.x}px`);
+      windowEl.style.setProperty('--win-y', `${clamped.y}px`);
       return;
     }
 
@@ -128,10 +128,10 @@ export function enableDragResize(opts: DragResizeOptions): () => void {
 
       /* Clamp to workspace bounds */
       const clamped = clampWindowBounds(newX, newY, newW, newH);
-      windowEl.style.left = `${clamped.x}px`;
-      windowEl.style.top = `${clamped.y}px`;
-      windowEl.style.width = `${clamped.w}px`;
-      windowEl.style.height = `${clamped.h}px`;
+      windowEl.style.setProperty('--win-x', `${clamped.x}px`);
+      windowEl.style.setProperty('--win-y', `${clamped.y}px`);
+      windowEl.style.setProperty('--win-w', `${clamped.w}px`);
+      windowEl.style.setProperty('--win-h', `${clamped.h}px`);
     }
   }
 
@@ -198,11 +198,14 @@ export function enableDragResize(opts: DragResizeOptions): () => void {
   /* ─── Commit bounds to store ─── */
 
   function commitBounds(): void {
+    /* Read from CSS custom properties set during drag/resize */
+    const cs = getComputedStyle(windowEl);
+    const parse = (v: string) => parseInt(v, 10) || 0;
     updateWindowBounds(instanceId, {
-      x: windowEl.offsetLeft,
-      y: windowEl.offsetTop,
-      w: windowEl.offsetWidth,
-      h: windowEl.offsetHeight,
+      x: parse(cs.getPropertyValue('--win-x')),
+      y: parse(cs.getPropertyValue('--win-y')),
+      w: parse(cs.getPropertyValue('--win-w')),
+      h: parse(cs.getPropertyValue('--win-h')),
     });
   }
 

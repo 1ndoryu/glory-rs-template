@@ -137,10 +137,10 @@ export function createDesktopShell(
         });
 
         el.style.position = 'absolute';
-        el.style.left = `${win.bounds.x}px`;
-        el.style.top = `${win.bounds.y}px`;
-        el.style.width = `${win.bounds.w}px`;
-        el.style.height = `${win.bounds.h}px`;
+        el.style.setProperty('--win-x', `${win.bounds.x}px`);
+        el.style.setProperty('--win-y', `${win.bounds.y}px`);
+        el.style.setProperty('--win-w', `${win.bounds.w}px`);
+        el.style.setProperty('--win-h', `${win.bounds.h}px`);
         el.style.pointerEvents = 'auto';
 
         const titleBar = el.querySelector('.desktop-window__titlebar') as HTMLElement;
@@ -178,10 +178,10 @@ export function createDesktopShell(
       el.style.display = win.state === 'minimized' ? 'none' : '';
       el.style.zIndex = String(win.zIndex);
       el.classList.toggle('desktop-window--active', win.focused);
-      el.style.left = `${win.bounds.x}px`;
-      el.style.top = `${win.bounds.y}px`;
-      el.style.width = `${win.bounds.w}px`;
-      el.style.height = `${win.bounds.h}px`;
+      el.style.setProperty('--win-x', `${win.bounds.x}px`);
+      el.style.setProperty('--win-y', `${win.bounds.y}px`);
+      el.style.setProperty('--win-w', `${win.bounds.w}px`);
+      el.style.setProperty('--win-h', `${win.bounds.h}px`);
     }
   });
 
