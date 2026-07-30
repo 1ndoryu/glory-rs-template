@@ -159,12 +159,36 @@ echo ""
 
 # === P2: interface-grande (>10 campos) ===
 echo "--- P2: Interfaces grandes (>10 campos) ---"
-# Buscar interfaces con más de 10 campos (líneas con ; dentro del bloque)
-LARGE_INTERFACES=""
-while IFS= read -r file; do
-  # Extraer bloques interface y contar campos
-  awk '/^export interface |^interface /{name=$0; count=0; in_iface=1} in_iface && /;/{count++} in_iface && /^}/{if(count>10) print FILENAME":"NR": "name" ("count" campos)"; in_iface=0}' "$file" 2>/dev/null
-  done < <(find "$FRONTEND_SRC" -name '*.ts' ! -name '*.d.ts' ! -name '*.test.ts' ! -path '*/node_modules/*' 2>/dev/null)
+# Buscar interfaces con más de 10 campos.
+# Maneja interfaces multi-línea Y de una sola línea.
+LARGE_INTERFACES=$(find "$FRONTEND_SRC" -name '*.ts' ! -name '*.d.ts' ! -name '*.test.ts' \
+  ! -path '*/node_modules/*' 2>/dev/null \
+  | while IFS= read -r file; do
+      awk '
+        /^export interface |^interface / {
+          name=$0; count=0; in_iface=1
+          # Contar campos en la misma línea (interface de una sola línea)
+          line=$0
+          gsub(/[^;]+/, "", line)
+          count = length(line)
+          # Si la línea tiene }, terminar inmediatamente
+          if ($0 ~ /\}/) {
+            if (count > 10) print FILENAME":"NR": "name" ("count" campos)"
+            in_iface=0
+          }
+          next
+        }
+        in_iface && /;/ {
+          line=$0
+          gsub(/[^;]+/, "", line)
+          count += length(line)
+        }
+        in_iface && /^}/ {
+          if (count > 10) print FILENAME":"NR": "name" ("count" campos)"
+          in_iface=0
+        }
+      ' "$file" 2>/dev/null
+    done)
 
 if [ -n "$LARGE_INTERFACES" ]; then
   echo "$LARGE_INTERFACES"
