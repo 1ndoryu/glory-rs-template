@@ -72,6 +72,11 @@
   font-size: var(--sistema-menu-contexto-texto-tamano);
 }
 
+/* Menús desplegables de la barra superior: por encima de ventanas */
+.desktop-menu-bar__entry .desktop-context-menu {
+  z-index: 9999;
+}
+
 .desktop-context-menu__branch {
   position: relative;
 }
