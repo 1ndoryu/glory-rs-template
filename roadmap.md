@@ -56,7 +56,7 @@
 - [x] Backfill resources desde datos existentes.
 - [x] Services actualizados: crear via transacción envelope + registro con ID compartido.
 - [x] DTO público/admin separado. *(ArticlePublic sin system_alias/status/is_pinned)*
-- [ ] About seeder/alias para página about.
+- [x] About seeder/alias para página about. *(GET /api/articles/alias/{alias}, PUT /admin/articles/{id}/alias)*
 
 **Salida:** organizar referencias no altera publicación y ninguna metadata privada se filtra.
 
