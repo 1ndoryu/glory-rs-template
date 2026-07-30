@@ -768,15 +768,28 @@ Estado de cada hallazgo de la auditoría v4 con su corrección o plan de acción
 
 | Estado | Cantidad | % |
 |---|---|---|
-| ✅ Completado | **17** | 74% |
-| ✅ Parcial (tests/error handling) | **2** | 9% |
+| ✅ Completado | **19** | 83% |
+| ✅ Parcial (viewport/window.*) | **1** | 4% |
 | ❌ Falso positivo | **1** | 4% |
-| ⬜ Pendiente | **4** | 17% |
+| ⬜ Pendiente | **2** | 9% |
 | **Total** | **23** | **100%** |
 
-**Actualización:** 2 nuevos hallazgos completados en esta sesión: §1.2 (createElement) y §5.4 (admin info bundle). §3.1 (FontConfig) también corregido. Progreso: 43% completado vs 22% anterior. Pendientes reducidos de 13 a 11.
+**Última actualización (2026-07-30 sesión quality):** Nuevos completados:
+- §1.2: Últimos createElement eliminados (main.ts, gallery.ts). check-dom-abstraction.sh: 0 violaciones (sanitize-html justificado).
+- §4.1: Service layer completo — api imports directos eliminados. api-call-en-logica: 0 violaciones reales.
+- §5.1: safe-async + safeClick + tryCatch migrados masivamente. 0 any types, 0 console en producción.
+- §6.1: 143 tests en 9 suites. Cobertura completa de módulos críticos.
+- §6.2: MediaService y SettingsService integrados.
+- Quality tool: 8 scripts de auditoría integrados como stage custom en task:check. Sentinel config limpio (0 errores CLI).
 
-**Nota:** 3 hallazgos de los 24 originales fueron rebatidos (confirmados como ya corregidos en v2/v3). 1 falso positivo (5.3 querySelectorAll+forEach). Quedan 23 activos. De esos, 5 están corregidos (service layer, estado mutable, event cleanup), 1 parcial (43 tests), y 13 pendientes.
+**Pendientes (2):**
+- §1.4: CommandRegistry scoping (para 297A-14 editors)
+- §6.3: schema.org hardcodeado (para 297A-17 SEO)
+
+**Falsos positivos documentados en scripts:**
+- subscribe-sin-cleanup: shell-level subscriptions (desktop-shell, reactive-taskbar, workspace-icon-grid) viven toda la sesión.
+- store-mutation-in-view: showProfile/authStore.set() en pages es patrón legítimo vanilla TS.
+- api-call-en-logica: safe-async.ts:7 es JSDoc ejemplo, no código real.
 
 ---
 

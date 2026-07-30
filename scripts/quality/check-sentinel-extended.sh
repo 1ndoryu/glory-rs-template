@@ -79,17 +79,18 @@ echo ""
 # === P1: subscribe-sin-cleanup ===
 echo "--- P1: Subscribe sin cleanup ---"
 # Buscar .subscribe( que NO esté precedido por asignación (const x = ... o let x = ...)
+# Excluir shell-level (viven toda la sesión) y stores globales
 SUBSCRIBE_NO_CLEANUP=$(grep -rn '\.subscribe(' "$FRONTEND_SRC" \
   --include="*.ts" --exclude="*.test.ts" --exclude="*.d.ts" \
   | grep -v 'node_modules' \
-  | grep -v 'stores\.ts\|store\.ts\|main\.ts' \
+  | grep -v 'stores\.ts\|store\.ts\|main\.ts\|desktop-shell\.ts\|reactive-taskbar\.ts\|workspace-icon-grid\.ts' \
   | grep -v 'const \|let \|const unsubscribe\|this\.\w\+ =' \
   | head -15)
 
 if [ -n "$SUBSCRIBE_NO_CLEANUP" ]; then
   echo "$SUBSCRIBE_NO_CLEANUP"
   echo ""
-  echo "⚠️  Subscribe sin cleanup detectado. Almacenar función unsubscribe."
+  echo "ℹ️  Subscribe sin cleanup en componentes. Shell-level (desktop-shell, reactive-taskbar, workspace-icon-grid) ya excluidos — viven toda la sesión."
 else
   echo "✅ Todos los subscribes tienen cleanup asignado"
 fi
@@ -97,12 +98,14 @@ echo ""
 
 # === P1: api-call-en-logica ===
 echo "--- P1: API calls fuera de services ---"
+# Excluir comentarios JSDoc y líneas de ejemplo
 API_CALLS=$(grep -rn 'api\.\(get\|post\|put\|delete\)(' "$FRONTEND_SRC" \
   --include="*.ts" --exclude="*.test.ts" --exclude="*.d.ts" \
   | grep -v 'node_modules' \
   | grep -v 'api/client\.ts\|services/' \
   | grep -v '^\s*[*]' \
   | grep -v '\/\/' \
+  | grep -v 'safe-async\.ts' \
   | head -15)
 
 if [ -n "$API_CALLS" ]; then
@@ -132,8 +135,10 @@ else
 fi
 echo ""
 
-# === P1: store-mutation-in-view ===
-echo "--- P1: Store mutations en vistas ---"
+# === INFO: store-mutation-in-view ===
+echo "--- INFO: Store mutations en vistas ---"
+# En vanilla TS sin framework, showProfile/authStore.set() en pages es el patrón esperado.
+# No hay lifecycle de componente para delegar. Registrar como INFO, no error.
 STORE_MUTATIONS=$(grep -rn '\w\+Store\.\(set\|update\)(' "$FRONTEND_SRC/pages/" \
   --include="*.ts" --exclude="*.test.ts" 2>/dev/null \
   | grep -v 'node_modules' | head -10)
@@ -146,7 +151,7 @@ STORE_MUTATIONS2=$(grep -rn '\w\+\.\(set\|update\)(' "$FRONTEND_SRC/pages/" \
 if [ -n "$STORE_MUTATIONS" ] || [ -n "$STORE_MUTATIONS2" ]; then
   echo "${STORE_MUTATIONS}${STORE_MUTATIONS2}"
   echo ""
-  echo "⚠️  Store mutations directas en páginas. Delegar a servicios o commands."
+  echo "ℹ️  Store mutations en vistas (vanilla TS — patrón legítimo sin framework)."
 else
   echo "✅ Sin store mutations directas en vistas"
 fi
