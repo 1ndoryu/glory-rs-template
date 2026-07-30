@@ -2,6 +2,7 @@ import { createElement, Maximize2, Minus, X, type IconNode } from 'lucide';
 import type { AppToolbarGroup, ToolbarItemRef } from '../../runtime/app-registry';
 import { CommandRegistry, type CommandContext } from '../../runtime/command-registry';
 import { authStore } from '../../../store';
+import { openDropdownMenu, type DropdownMenuItem } from './dropdown-menu';
 
 export interface DesktopWindowOptions {
   title: string;
@@ -95,47 +96,7 @@ export function createDesktopWindow(options: DesktopWindowOptions): HTMLElement 
 }
 
 /* === App Toolbar === */
-
-let openToolbarEntry: HTMLElement | null = null;
-
-function closeToolbarMenu(): void {
-  if (openToolbarEntry) {
-    openToolbarEntry.classList.remove('desktop-app-toolbar__entry--open');
-    const menu = openToolbarEntry.querySelector('.desktop-app-toolbar__dropdown') as HTMLElement | null;
-    if (menu) menu.hidden = true;
-    openToolbarEntry = null;
-  }
-  document.removeEventListener('click', onToolbarOutsideClick);
-  document.removeEventListener('keydown', onToolbarEscape);
-}
-
-function onToolbarOutsideClick(e: MouseEvent): void {
-  if (openToolbarEntry && !openToolbarEntry.contains(e.target as Node)) {
-    closeToolbarMenu();
-  }
-}
-
-function onToolbarEscape(e: KeyboardEvent): void {
-  if (e.key === 'Escape') closeToolbarMenu();
-}
-
-function toggleToolbarEntry(entry: HTMLElement): void {
-  if (openToolbarEntry === entry) {
-    closeToolbarMenu();
-    return;
-  }
-  closeToolbarMenu();
-
-  const menu = entry.querySelector('.desktop-app-toolbar__dropdown') as HTMLElement | null;
-  entry.classList.add('desktop-app-toolbar__entry--open');
-  if (menu) menu.hidden = false;
-
-  openToolbarEntry = entry;
-  setTimeout(() => {
-    document.addEventListener('click', onToolbarOutsideClick);
-    document.addEventListener('keydown', onToolbarEscape);
-  }, 0);
-}
+/* [Auditoría v2] Usa dropdown-menu.ts compartido para open/close/escape/outside-click. */
 
 /** Resolver un ToolbarItemRef a label, icon y command. */
 function resolveToolbarItem(
@@ -160,6 +121,8 @@ function resolveToolbarItem(
 /**
  * Crea la barra de herramientas de una app a partir de sus grupos declarativos.
  * Los items referencian comandos del CommandRegistry — fuente única de verdad.
+ * [Auditoría v2] Usa openDropdownMenu compartido (dropdown-menu.ts). Elimina
+ * toda la lógica de open/close/visibility duplicada.
  */
 export function createAppToolbar(
   groups: AppToolbarGroup[],
@@ -173,6 +136,13 @@ export function createAppToolbar(
     presentationMode: 'desktop',
   };
 
+  /* Callbacks especiales para window:* comandos */
+  const windowCallbackMap: Record<string, 'onClose' | 'onMinimize' | 'onMaximize'> = {
+    'window:close': 'onClose',
+    'window:minimize': 'onMinimize',
+    'window:maximize': 'onMaximize',
+  };
+
   for (const group of groups) {
     const entry = document.createElement('div');
     entry.className = 'desktop-app-toolbar__entry';
@@ -182,92 +152,62 @@ export function createAppToolbar(
     btn.className = 'desktop-app-toolbar__item';
     btn.textContent = group.label;
     btn.setAttribute('aria-haspopup', 'menu');
-    btn.setAttribute('aria-expanded', 'false');
-
-    const dropdown = document.createElement('div');
-    dropdown.className = 'desktop-app-toolbar__dropdown';
-    dropdown.setAttribute('role', 'menu');
-    dropdown.hidden = true;
-
-    for (const ref of group.items) {
-      /* Separador */
-      if (ref === '---' || (typeof ref === 'object' && ref.id === '---')) {
-        const sep = document.createElement('div');
-        sep.className = 'desktop-app-toolbar__separator';
-        dropdown.appendChild(sep);
-        continue;
-      }
-
-      const resolved = resolveToolbarItem(ref);
-      if (!resolved) continue;
-
-      /* Verificar disponibilidad desde CommandRegistry */
-      const cmd = CommandRegistry.get(resolved.id);
-      type Avail = { state: 'enabled' } | { state: 'disabled'; reason: string } | { state: 'hidden' };
-      let availability: Avail = { state: 'enabled' };
-      if (cmd?.isAvailable) {
-        availability = cmd.isAvailable(ctx);
-        if (availability.state === 'hidden') continue;
-      }
-
-      const menuItem = document.createElement('button');
-      menuItem.type = 'button';
-      menuItem.className = 'desktop-app-toolbar__menu-item';
-      menuItem.setAttribute('role', 'menuitem');
-
-      if (resolved.icon) {
-        const iconEl = document.createElement('span');
-        iconEl.className = 'desktop-app-toolbar__icon';
-        iconEl.appendChild(createElement(resolved.icon));
-        menuItem.appendChild(iconEl);
-      }
-
-      const labelEl = document.createElement('span');
-      labelEl.className = 'desktop-app-toolbar__label';
-      labelEl.textContent = resolved.label;
-      menuItem.appendChild(labelEl);
-
-      if (resolved.shortcut) {
-        const shortcutEl = document.createElement('span');
-        shortcutEl.className = 'desktop-app-toolbar__shortcut';
-        shortcutEl.textContent = resolved.shortcut;
-        menuItem.appendChild(shortcutEl);
-      }
-
-      /* Callbacks especiales para window:minimize, window:maximize y window:close */
-      const windowCallbackMap: Record<string, 'onClose' | 'onMinimize' | 'onMaximize'> = {
-        'window:close': 'onClose',
-        'window:minimize': 'onMinimize',
-        'window:maximize': 'onMaximize',
-      };
-      const callbackKey = windowCallbackMap[resolved.id];
-      const isWindowCmd = !!callbackKey;
-      const callbackDisabled = isWindowCmd && !callbacks?.[callbackKey];
-
-      if (availability.state !== 'enabled' || callbackDisabled) {
-        menuItem.classList.add('desktop-app-toolbar__menu-item--disabled');
-        menuItem.setAttribute('aria-disabled', 'true');
-      } else {
-        menuItem.addEventListener('click', (e) => {
-          e.stopPropagation();
-          closeToolbarMenu();
-          /* Ejecutar callback especial o command del registry */
-          if (resolved.id === 'window:minimize') { callbacks?.onMinimize?.(); return; }
-          if (resolved.id === 'window:maximize') { callbacks?.onMaximize?.(); return; }
-          if (resolved.id === 'window:close') { callbacks?.onClose?.(); return; }
-          void CommandRegistry.execute(resolved.id, ctx);
-        });
-      }
-
-      dropdown.appendChild(menuItem);
-    }
 
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      toggleToolbarEntry(entry);
+      btn.setAttribute('aria-expanded', 'true');
+
+      /* Construir DropdownMenuItem[] filtrando por disponibilidad */
+      const items: DropdownMenuItem[] = [];
+      for (const ref of group.items) {
+        if (ref === '---' || (typeof ref === 'object' && ref.id === '---')) {
+          items.push({ label: '', separator: true });
+          continue;
+        }
+
+        const resolved = resolveToolbarItem(ref);
+        if (!resolved) continue;
+
+        const cmd = CommandRegistry.get(resolved.id);
+        type Avail = { state: 'enabled' } | { state: 'disabled'; reason: string } | { state: 'hidden' };
+        let availability: Avail = { state: 'enabled' };
+        if (cmd?.isAvailable) {
+          availability = cmd.isAvailable(ctx);
+          if (availability.state === 'hidden') continue;
+        }
+
+        const callbackKey = windowCallbackMap[resolved.id];
+        const isWindowCmd = !!callbackKey;
+        const callbackDisabled = isWindowCmd && !callbacks?.[callbackKey];
+        const disabled = availability.state !== 'enabled' || callbackDisabled;
+
+        items.push({
+          icon: resolved.icon,
+          label: resolved.label,
+          shortcut: resolved.shortcut,
+          disabled,
+          onClick: disabled ? undefined : () => {
+            if (resolved.id === 'window:minimize') { callbacks?.onMinimize?.(); return; }
+            if (resolved.id === 'window:maximize') { callbacks?.onMaximize?.(); return; }
+            if (resolved.id === 'window:close') { callbacks?.onClose?.(); return; }
+            void CommandRegistry.execute(resolved.id, ctx);
+          },
+        });
+      }
+
+      /* Abrir dropdown posicionado bajo el botón (fixed, como context menu) */
+      const rect = btn.getBoundingClientRect();
+      openDropdownMenu({
+        items,
+        positioning: 'fixed',
+        x: rect.left,
+        y: rect.bottom,
+        ariaLabel: group.label,
+        onClose: () => { btn.setAttribute('aria-expanded', 'false'); },
+      });
     });
 
-    entry.append(btn, dropdown);
+    entry.append(btn);
     toolbar.appendChild(entry);
   }
 

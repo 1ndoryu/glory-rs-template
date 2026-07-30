@@ -11,6 +11,8 @@ export interface DropdownMenuItem {
   readonly label: string;
   readonly shortcut?: string;
   readonly disabled?: boolean;
+  /** Si es true, renderiza como separador visual (no interactivo). */
+  readonly separator?: boolean;
   readonly onClick?: () => void;
 }
 
@@ -59,8 +61,16 @@ function onGlobalClick(e: MouseEvent): void {
   }
 }
 
-/** Crear un item del menú con icono, label, shortcut y estado disabled. */
+/** Crear un item del menú con icono, label, shortcut y estado disabled.
+ * Si item.separator es true, devuelve un separador visual no interactivo. */
 export function createDropdownItem(item: DropdownMenuItem): HTMLElement {
+  if (item.separator) {
+    const sep = document.createElement('div');
+    sep.className = 'desktop-context-menu__separator';
+    sep.setAttribute('role', 'separator');
+    return sep;
+  }
+
   const el = document.createElement('button');
   el.type = 'button';
   el.className = 'desktop-context-menu__item';
