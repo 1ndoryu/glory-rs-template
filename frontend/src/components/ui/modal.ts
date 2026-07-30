@@ -1,6 +1,8 @@
 /* wandori.us — Modal
  * Modal overlay B&W. Cierra con click fuera o Escape. */
 
+import { createEl } from '../../utils/dom';
+
 export interface ModalOptions {
   titulo?: string;
   contenido: HTMLElement | HTMLElement[];
@@ -11,24 +13,17 @@ export interface ModalOptions {
 export function createModal(options: ModalOptions): { close: () => void } {
   const { contenido, ancho = '560px', onClose } = options;
 
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-
-  const modal = document.createElement('div');
-  modal.className = 'modal-contenido';
-  modal.style.maxWidth = ancho;
-
-  /* Cuerpo */
-  const cuerpo = document.createElement('div');
-  cuerpo.className = 'modal-cuerpo';
+  const cuerpo = createEl('div', { className: 'modal-cuerpo' });
   if (Array.isArray(contenido)) {
     cuerpo.append(...contenido);
   } else {
     cuerpo.appendChild(contenido);
   }
 
-  modal.appendChild(cuerpo);
-  overlay.appendChild(modal);
+  const modal = createEl('div', { className: 'modal-contenido' }, cuerpo);
+  modal.style.maxWidth = ancho;
+
+  const overlay = createEl('div', { className: 'modal-overlay' }, modal);
   document.body.appendChild(overlay);
   document.body.style.overflow = 'hidden';
 

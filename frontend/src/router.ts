@@ -3,6 +3,7 @@
  * Soporta parámetros dinámicos (:slug), guards de autenticación
  * y AbortSignal para lifecycle de vistas. */
 
+import { createEl } from './utils/dom';
 import type { RenderContext } from './core/lifecycle';
 export type { RenderContext };
 
@@ -10,15 +11,11 @@ export type RouteParams = Record<string, string>;
 
 export interface Route {
   path: string;
-  /** Recibe params y contexto con AbortSignal para teardown. */
   render: (params: RouteParams, ctx: RenderContext) => HTMLElement | Promise<HTMLElement>;
   guard?: () => boolean | Promise<boolean>;
 }
 
 type NavigationListener = (path: string) => void;
-
-/** Interceptor que puede reclamar una ruta y evitar que el router la renderice en el outlet.
- * Devuelve true si el interceptor se encargó de la ruta. */
 type RouteInterceptor = (pathname: string, params: RouteParams) => boolean | Promise<boolean>;
 
 const routes: Route[] = [];
@@ -28,40 +25,33 @@ let outlet: HTMLElement | null = null;
 let currentController: AbortController | null = null;
 let routeInterceptor: RouteInterceptor | null = null;
 
-/* Registrar rutas */
 export function addRoute(route: Route): void {
   routes.push(route);
 }
 
-/* Establecer el contenedor donde se renderizan las páginas */
 export function setOutlet(el: HTMLElement): void {
   outlet = el;
 }
 
-/* Navegar programáticamente */
 export function navigate(path: string): void {
   if (path === currentPath) return;
   history.pushState(null, '', path);
   handleRoute();
 }
 
-/* Obtener ruta actual */
 export function getCurrentPath(): string {
   return currentPath;
 }
 
-/** Registrar un interceptor de rutas. Solo uno puede estar activo. */
 export function setRouteInterceptor(interceptor: RouteInterceptor): void {
   routeInterceptor = interceptor;
 }
 
-/* Suscribirse a cambios de ruta */
 export function onNavigate(listener: NavigationListener): () => void {
   listeners.add(listener);
   return () => { listeners.delete(listener); };
 }
 
-/* Extraer parámetros de una ruta dinámica */
 function matchRoute(pathname: string): { route: Route; params: RouteParams } | null {
   for (const route of routes) {
     const params = matchPath(route.path, pathname);
@@ -89,12 +79,10 @@ function matchPath(pattern: string, pathname: string): RouteParams | null {
   return params;
 }
 
-/* Manejar cambio de ruta */
 async function handleRoute(): Promise<void> {
   const pathname = window.location.pathname;
   currentPath = pathname;
 
-  /* Abortar vista anterior si existe */
   if (currentController) {
     currentController.abort();
     currentController = null;
@@ -103,18 +91,13 @@ async function handleRoute(): Promise<void> {
   const matched = matchRoute(pathname);
 
   if (!matched) {
-    /* 404 — ruta no encontrada */
     if (outlet) {
       outlet.innerHTML = '';
-      const notFound = document.createElement('div');
-      notFound.className = 'vacio';
-      notFound.textContent = 'página no encontrada';
-      outlet.appendChild(notFound);
+      outlet.appendChild(createEl('div', { className: 'vacio', textContent: 'página no encontrada' }));
     }
     return;
   }
 
-  /* Verificar guard si existe */
   if (matched.route.guard) {
     const allowed = await matched.route.guard();
     if (!allowed) {
@@ -123,11 +106,9 @@ async function handleRoute(): Promise<void> {
     }
   }
 
-  /* Si un interceptor reclama esta ruta, dejar que él la maneje */
   if (routeInterceptor) {
     const handled = await routeInterceptor(pathname, matched.params);
     if (handled) {
-      /* Notificar listeners y terminar — el interceptor se encarga */
       for (const listener of listeners) {
         listener(currentPath);
       }
@@ -135,27 +116,22 @@ async function handleRoute(): Promise<void> {
     }
   }
 
-  /* Crear nuevo AbortController para esta vista */
   currentController = new AbortController();
   const ctx: RenderContext = { signal: currentController.signal };
 
-  /* Renderizar la página en el outlet */
   if (outlet) {
     outlet.innerHTML = '';
     const element = await matched.route.render(matched.params, ctx);
     outlet.appendChild(element);
   }
 
-  /* Notificar listeners */
   for (const listener of listeners) {
     listener(currentPath);
   }
 
-  /* Scroll al top */
   window.scrollTo(0, 0);
 }
 
-/* Interceptar clicks en links internos */
 function handleClick(e: MouseEvent): void {
   const target = e.target as HTMLElement;
   const anchor = target.closest('a');
@@ -169,8 +145,6 @@ function handleClick(e: MouseEvent): void {
   navigate(anchor.pathname + anchor.search);
 }
 
-/* Inicializar el router. Retorna cleanup function.
- * [Auditoría v4 §4.3] Eventos globales ahora removibles. */
 export function initRouter(): () => void {
   window.addEventListener('popstate', handleRoute);
   document.addEventListener('click', handleClick);
@@ -180,4 +154,3 @@ export function initRouter(): () => void {
     document.removeEventListener('click', handleClick);
   };
 }
-

@@ -3,6 +3,7 @@
  * Extraído de font-panel.ts para reducir tamaño bajo límite de 300 líneas.
  * [Auditoría v3 §2.3] */
 
+import { createEl } from '../../utils/dom';
 import { fontStore, profileImage, siteConfig, socialLinksStore, redesLayoutStore, type FontConfig } from '../../store';
 import { SettingsService } from '../../services';
 import { showToast } from '../../components/ui/toast';
@@ -14,9 +15,7 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null;
 function loadGoogleFont(fontName: string): void {
   const id = `gf-${fontName.replace(/\s+/g, '-').toLowerCase()}`;
   if (document.getElementById(id)) return;
-  const link = document.createElement('link');
-  link.id = id;
-  link.rel = 'stylesheet';
+  const link = createEl('link', { id, rel: 'stylesheet' });
   link.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(/\s+/g, '+')}:wght@400;500&display=swap`;
   document.head.appendChild(link);
 }
@@ -27,7 +26,6 @@ export function loadAllFonts(): void {
   for (const font of GOOGLE_FONTS) loadGoogleFont(font);
 }
 
-/** Guardar configuración actual con debounce de 500ms. */
 export function saveSettings(): void {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
@@ -53,7 +51,6 @@ export function saveSettings(): void {
   }, 500);
 }
 
-/** Cargar fuentes y settings guardados al inicio. */
 export async function loadSavedFonts(): Promise<void> {
   loadAllFonts();
 

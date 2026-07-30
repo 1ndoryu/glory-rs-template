@@ -2,6 +2,7 @@
  * Menu de navegacion + lista de entradas debajo de proyectos.
  * Responsive: se colapsa en mobile. */
 
+import { createEl } from '../../utils/dom';
 import { navigate, getCurrentPath, onNavigate } from '../../router';
 import { getArticles } from '../../pages/home';
 import type { Article } from '../../api/types';
@@ -19,11 +20,9 @@ const navItems: NavItem[] = [
   { etiqueta: 'proyectos', ruta: '/projects' },
 ];
 
-/* Cache de articulos para evitar re-fetch en cada navegacion */
 let articlesCache: Article[] | null = null;
 let articlesFetching: Promise<Article[]> | null = null;
 
-/** Limpiar cache de articulos — llamar despues de crear/editar/eliminar */
 export function clearArticleCache(): void {
   articlesCache = null;
   articlesFetching = null;
@@ -46,20 +45,11 @@ async function getCachedArticles(): Promise<Article[]> {
 }
 
 export function createSidebar(): HTMLElement {
-  const sidebar = document.createElement('aside');
-  sidebar.className = 'sidebar';
+  const sidebar = createEl('aside', { className: 'sidebar' });
 
-  /* Navegacion */
-  const nav = document.createElement('nav');
-  nav.className = 'sidebar-nav';
-
-  /* Separador invisible — espacio entre nav y entradas */
-  const sep = document.createElement('div');
-  sep.className = 'sidebar-separador';
-
-  /* Lista de entradas */
-  const entradas = document.createElement('div');
-  entradas.className = 'sidebar-entradas';
+  const nav = createEl('nav', { className: 'sidebar-nav' });
+  const sep = createEl('div', { className: 'sidebar-separador' });
+  const entradas = createEl('div', { className: 'sidebar-entradas' });
 
   function renderNav(path: string): void {
     reconcileChildren(
@@ -67,10 +57,7 @@ export function createSidebar(): HTMLElement {
       navItems,
       (item) => item.ruta,
       (item) => {
-        const a = document.createElement('a');
-        a.href = item.ruta;
-        a.className = 'sidebar-nav-link';
-        a.textContent = item.etiqueta;
+        const a = createEl('a', { href: item.ruta, className: 'sidebar-nav-link', textContent: item.etiqueta });
         if (path === item.ruta || (item.ruta !== '/' && path.startsWith(item.ruta))) {
           a.classList.add('activo');
         }
@@ -87,7 +74,6 @@ export function createSidebar(): HTMLElement {
     );
   }
 
-  /* Cargar y renderizar entradas en el sidebar (usa cache) */
   async function renderEntries(path: string): Promise<void> {
     const articles = await getCachedArticles();
     const sorted = [...articles].sort((a, b) => {
@@ -102,10 +88,9 @@ export function createSidebar(): HTMLElement {
       sorted,
       (article) => article.slug,
       (article) => {
-        const a = document.createElement('a');
-        a.href = `/article/${article.slug}`;
-        a.className = 'sidebar-entrada-link';
-        a.textContent = article.title;
+        const a = createEl('a', {
+          href: `/article/${article.slug}`, className: 'sidebar-entrada-link', textContent: article.title,
+        });
         if (path === `/article/${article.slug}`) {
           a.classList.add('activo');
         }

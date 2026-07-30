@@ -23,6 +23,8 @@ export interface DomAttrs {
   min?: string;
   max?: string;
   step?: string;
+  rows?: string;
+  accept?: string;
   disabled?: string;
   'aria-label'?: string;
   ariaLabel?: string;

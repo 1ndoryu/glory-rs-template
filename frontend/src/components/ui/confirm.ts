@@ -1,28 +1,18 @@
 /* wandori.us — Confirm Dialog
  * Dialogo de confirmacion minimalista B&W. */
 
+import { createEl } from '../../utils/dom';
+
 export function showConfirm(message: string): Promise<boolean> {
   return new Promise((resolve) => {
-    const overlay = document.createElement('div');
-    overlay.className = 'confirm-overlay';
+    const msg = createEl('p', { className: 'confirm-mensaje', textContent: message });
 
-    const contenido = document.createElement('div');
-    contenido.className = 'confirm-contenido';
+    const btnSi = createEl('button', { className: 'boton', textContent: 'confirmar' });
+    const btnNo = createEl('button', { className: 'boton', textContent: 'cancelar' });
 
-    const msg = document.createElement('p');
-    msg.className = 'confirm-mensaje';
-    msg.textContent = message;
-
-    const acciones = document.createElement('div');
-    acciones.className = 'confirm-acciones';
-
-    const btnSi = document.createElement('button');
-    btnSi.className = 'boton';
-    btnSi.textContent = 'confirmar';
-
-    const btnNo = document.createElement('button');
-    btnNo.className = 'boton';
-    btnNo.textContent = 'cancelar';
+    const acciones = createEl('div', { className: 'confirm-acciones' }, btnNo, btnSi);
+    const contenido = createEl('div', { className: 'confirm-contenido' }, msg, acciones);
+    const overlay = createEl('div', { className: 'confirm-overlay' }, contenido);
 
     const cleanup = (result: boolean) => {
       overlay.remove();
@@ -42,9 +32,6 @@ export function showConfirm(message: string): Promise<boolean> {
       }
     });
 
-    acciones.append(btnNo, btnSi);
-    contenido.append(msg, acciones);
-    overlay.appendChild(contenido);
     document.body.appendChild(overlay);
     btnNo.focus();
   });

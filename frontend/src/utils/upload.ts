@@ -2,6 +2,7 @@
  * Sube archivos al backend via /api/media.
  * Retorna la URL del archivo subido. */
 
+import { createEl } from '../utils/dom';
 import { MediaService } from '../services';
 import type { Media } from '../api/types';
 
@@ -10,12 +11,6 @@ export interface UploadResult {
   media: Media;
 }
 
-/**
- * Sube un archivo al backend y retorna la URL.
- * @param file - Archivo a subir
- * @param articleId - ID del artículo asociado (opcional)
- * @param altText - Texto alternativo (opcional)
- */
 export async function uploadFile(
   file: File,
   articleId?: string,
@@ -25,19 +20,12 @@ export async function uploadFile(
   return { url: media.file_path, media };
 }
 
-/**
- * Abre un file picker y sube el archivo seleccionado.
- * @param accept - Tipos de archivo aceptados (ej: 'image/*')
- * @param articleId - ID del artículo asociado (opcional)
- */
 export async function pickAndUpload(
   accept: string,
   articleId?: string,
 ): Promise<UploadResult | null> {
   return new Promise((resolve, reject) => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = accept;
+    const input = createEl('input', { type: 'file', accept });
     input.style.display = 'none';
 
     function cleanup(): void {
@@ -60,7 +48,6 @@ export async function pickAndUpload(
       }
     });
 
-    /* Cancelar si el usuario cierra el picker */
     input.addEventListener('cancel', () => {
       cleanup();
       resolve(null);

@@ -2,6 +2,8 @@
  * Actualiza meta tags dinámicamente al navegar entre páginas.
  * Importante para compartir links en redes sociales. */
 
+import { createEl } from '../../utils/dom';
+
 interface MetaOptions {
   title?: string;
   description?: string;
@@ -25,36 +27,27 @@ export function updateMeta(options: MetaOptions): void {
 
   const fullTitle = title ? `${title} — ${SITE_NAME}` : SITE_NAME;
 
-  /* Title */
   document.title = fullTitle;
   setMeta('name', 'title', fullTitle);
   setMeta('property', 'og:title', fullTitle);
   setMeta('name', 'twitter:title', fullTitle);
 
-  /* Description */
   setMeta('name', 'description', description);
   setMeta('property', 'og:description', description);
   setMeta('name', 'twitter:description', description);
 
-  /* Image */
   setMeta('property', 'og:image', image);
   setMeta('name', 'twitter:image', image);
 
-  /* URL */
   setMeta('property', 'og:url', url);
   setMeta('name', 'twitter:url', url);
 
-  /* Type */
   setMeta('property', 'og:type', type);
-
-  /* Twitter card */
   setMeta('name', 'twitter:card', 'summary_large_image');
 
-  /* Canonical link */
   let canonical = document.querySelector('link[rel="canonical"]');
   if (!canonical) {
-    canonical = document.createElement('link');
-    canonical.setAttribute('rel', 'canonical');
+    canonical = createEl('link', { rel: 'canonical' });
     document.head.appendChild(canonical);
   }
   canonical.setAttribute('href', url);
@@ -63,14 +56,13 @@ export function updateMeta(options: MetaOptions): void {
 function setMeta(attr: string, key: string, value: string): void {
   let el = document.querySelector(`meta[${attr}="${key}"]`) as HTMLMetaElement | null;
   if (!el) {
-    el = document.createElement('meta');
+    el = createEl('meta');
     el.setAttribute(attr, key);
     document.head.appendChild(el);
   }
   el.setAttribute('content', value);
 }
 
-/* Configurar meta tags para una página de artículo */
 export function updateArticleMeta(article: {
   title: string;
   excerpt?: string;
@@ -86,18 +78,14 @@ export function updateArticleMeta(article: {
   });
 }
 
-/* === JSON-LD Structured Data === */
-
 function setJsonLd(data: Record<string, unknown>): void {
   removeJsonLd();
 
-  const script = document.createElement('script');
-  script.type = 'application/ld+json';
+  const script = createEl('script', { type: 'application/ld+json' });
   script.textContent = JSON.stringify(data);
   document.head.appendChild(script);
 }
 
-/** Schema para el sitio completo (Website + Person) */
 export function setSiteJsonLd(): void {
   setJsonLd({
     '@context': 'https://schema.org',
@@ -121,7 +109,6 @@ export function setSiteJsonLd(): void {
   });
 }
 
-/** Schema para un artículo individual (Article/BlogPosting) */
 export function setArticleJsonLd(article: {
   title: string;
   excerpt?: string;
@@ -158,7 +145,6 @@ export function setArticleJsonLd(article: {
   setJsonLd(data);
 }
 
-/** Schema para una página estática */
 export function setPageJsonLd(title: string, description: string): void {
   setJsonLd({
     '@context': 'https://schema.org',
@@ -174,12 +160,10 @@ export function setPageJsonLd(title: string, description: string): void {
   });
 }
 
-/** Elimina JSON-LD de la página */
 export function removeJsonLd(): void {
   document.querySelectorAll('script[type="application/ld+json"]').forEach(el => el.remove());
 }
 
-/* Reset a meta tags por defecto */
 export function resetMeta(): void {
   updateMeta({});
   removeJsonLd();

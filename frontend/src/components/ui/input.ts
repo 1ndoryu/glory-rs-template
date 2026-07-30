@@ -1,6 +1,8 @@
 /* wandori.us — Input Component
  * Campo de entrada minimalista. Solo borde inferior 1px. */
 
+import { createEl } from '../../utils/dom';
+
 export interface InputOptions {
   label?: string;
   type?: string;
@@ -14,35 +16,25 @@ export interface InputOptions {
 export function createInput(options: InputOptions): HTMLElement {
   const { label, type = 'text', placeholder, value = '', required, error, onInput } = options;
 
-  const campo = document.createElement('div');
-  campo.className = 'campo' + (error ? ' campo-error' : '');
+  const children: (string | HTMLElement)[] = [];
 
   if (label) {
-    const etiqueta = document.createElement('label');
-    etiqueta.className = 'campo-etiqueta';
-    etiqueta.textContent = label;
-    campo.appendChild(etiqueta);
+    children.push(createEl('label', { className: 'campo-etiqueta', textContent: label }));
   }
 
-  const entrada = document.createElement('input');
-  entrada.className = 'campo-entrada';
-  entrada.type = type;
-  entrada.value = value;
+  const entrada = createEl('input', {
+    className: 'campo-entrada', type, value,
+  });
   if (placeholder) entrada.placeholder = placeholder;
   if (required) entrada.required = true;
 
-  entrada.addEventListener('input', () => {
-    onInput?.(entrada.value);
-  });
+  entrada.addEventListener('input', () => { onInput?.(entrada.value); });
 
-  campo.appendChild(entrada);
+  children.push(entrada);
 
   if (error) {
-    const msg = document.createElement('span');
-    msg.className = 'campo-mensaje-error';
-    msg.textContent = error;
-    campo.appendChild(msg);
+    children.push(createEl('span', { className: 'campo-mensaje-error', textContent: error }));
   }
 
-  return campo;
+  return createEl('div', { className: 'campo' + (error ? ' campo-error' : '') }, ...children);
 }

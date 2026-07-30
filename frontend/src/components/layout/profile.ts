@@ -2,20 +2,15 @@
  * Foto de perfil, nombre y redes sociales.
  * Se renderiza como cabecera de la columna derecha. */
 
+import { createEl } from '../../utils/dom';
 import { profileImage, socialLinksStore, redesLayoutStore } from '../../store';
 import { reconcileChildren } from '../../utils/reconcile';
 
 export function createProfile(): HTMLElement {
-  const profile = document.createElement('header');
-  profile.className = 'profile';
+  const profile = createEl('header', { className: 'profile' });
 
-  /* Foto de perfil */
-  const foto = document.createElement('img');
-  foto.className = 'profile-foto';
-  foto.alt = 'wandorius';
-  const inicial = document.createElement('div');
-  inicial.className = 'profile-foto profile-foto-fallback';
-  inicial.textContent = 'w';
+  const foto = createEl('img', { className: 'profile-foto', alt: 'wandorius' });
+  const inicial = createEl('div', { className: 'profile-foto profile-foto-fallback', textContent: 'w' });
   inicial.style.display = 'none';
 
   foto.onerror = () => {
@@ -29,14 +24,9 @@ export function createProfile(): HTMLElement {
     inicial.style.display = 'none';
   });
 
-  /* Nombre */
-  const nombre = document.createElement('h1');
-  nombre.className = 'profile-nombre';
-  nombre.textContent = 'wandorius';
+  const nombre = createEl('h1', { className: 'profile-nombre', textContent: 'wandorius' });
 
-  /* Redes sociales — reactivas al store */
-  const redes = document.createElement('div');
-  redes.className = 'profile-redes';
+  const redes = createEl('div', { className: 'profile-redes' });
 
   function renderRedes(): void {
     const links = socialLinksStore.get();
@@ -45,13 +35,11 @@ export function createProfile(): HTMLElement {
       links,
       (link) => link.nombre,
       (link) => {
-        const a = document.createElement('a');
-        a.href = link.url;
-        a.textContent = link.nombre;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        a.setAttribute('data-external', 'true');
-        return a;
+        return createEl('a', {
+          href: link.url, textContent: link.nombre,
+          target: '_blank', rel: 'noopener noreferrer',
+          'data-external': 'true',
+        });
       },
       (el, link) => {
         if (el.getAttribute('href') !== link.url) el.setAttribute('href', link.url);

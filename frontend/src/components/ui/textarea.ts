@@ -1,6 +1,8 @@
 /* wandori.us — Textarea Component
  * Area de texto minimalista. B&W. */
 
+import { createEl } from '../../utils/dom';
+
 export interface TextareaOptions {
   label?: string;
   placeholder?: string;
@@ -12,26 +14,20 @@ export interface TextareaOptions {
 export function createTextarea(options: TextareaOptions): HTMLElement {
   const { label, placeholder, value = '', rows = 5, onInput } = options;
 
-  const campo = document.createElement('div');
-  campo.className = 'campo';
+  const children: (string | HTMLElement)[] = [];
 
   if (label) {
-    const etiqueta = document.createElement('label');
-    etiqueta.className = 'campo-etiqueta';
-    etiqueta.textContent = label;
-    campo.appendChild(etiqueta);
+    children.push(createEl('label', { className: 'campo-etiqueta', textContent: label }));
   }
 
-  const textarea = document.createElement('textarea');
-  textarea.className = 'campo-textarea';
-  textarea.value = value;
-  textarea.rows = rows;
+  const textarea = createEl('textarea', {
+    className: 'campo-textarea', value, rows: String(rows),
+  });
   if (placeholder) textarea.placeholder = placeholder;
 
-  textarea.addEventListener('input', () => {
-    onInput?.(textarea.value);
-  });
+  textarea.addEventListener('input', () => { onInput?.(textarea.value); });
 
-  campo.appendChild(textarea);
-  return campo;
+  children.push(textarea);
+
+  return createEl('div', { className: 'campo' }, ...children);
 }
