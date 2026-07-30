@@ -54,8 +54,8 @@
 - [x] Asset states (processing/clean/rejected) en media.
 - [x] Product versions inmutables para entregables.
 - [x] Backfill resources desde datos existentes.
-- [ ] Services actualizados: crear via transacción envelope + registro.
-- [ ] DTO público/admin separado.
+- [x] Services actualizados: crear via transacción envelope + registro con ID compartido.
+- [x] DTO público/admin separado. *(ArticlePublic sin system_alias/status/is_pinned)*
 - [ ] About seeder/alias para página about.
 
 **Salida:** organizar referencias no altera publicación y ninguna metadata privada se filtra.
