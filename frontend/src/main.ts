@@ -31,6 +31,7 @@ import { loadSavedFonts } from './features/settings/font-panel';
 import { initTracking, trackPageView } from './features/analytics/tracker';
 import { authStore, showProfile, showSidebar, siteConfig } from './store';
 import { api } from './api/client';
+import { fetchWorkspaceRelease } from './features/runtime/workspace/workspace-store';
 
 
 /* Pages */
@@ -79,6 +80,9 @@ async function initApp(): Promise<void> {
 
   /* Cargar fuentes y settings antes de renderizar */
   await loadSavedFonts();
+
+  /* [297A-11] Cargar release del workspace desde el backend */
+  await fetchWorkspaceRelease();
 
   /* Limpiar */
   app.innerHTML = '';

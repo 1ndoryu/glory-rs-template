@@ -16,7 +16,7 @@ import {
 } from './window-manager';
 import { AppRegistry } from './app-registry';
 import { dispatchEvent } from '../analytics/dispatcher';
-import { tombstoneNode, restoreNode, resetOverlay, workspaceStore } from './workspace/workspace-store';
+import { tombstoneNode, restoreNode, resetOverlay, workspaceStore, publishWorkspace } from './workspace/workspace-store';
 
 /* === Comandos de ventana === */
 
@@ -451,6 +451,27 @@ CommandRegistry.register({
   execute: (): CommandResult => {
     resetOverlay();
     return { status: 'success' };
+  },
+});
+
+CommandRegistry.register({
+  id: 'workspace:publish',
+  label: 'Publicar escritorio',
+  order: 33,
+  contexts: ['desktop'],
+  requires: 'admin',
+  undoPolicy: 'none',
+  analyticsEvent: 'workspace.published',
+  isAvailable: (ctx) => {
+    if (ctx.capability !== 'admin') return { state: 'hidden' };
+    return { state: 'enabled' };
+  },
+  execute: async (): Promise<CommandResult> => {
+    const result = await publishWorkspace();
+    if (result) {
+      return { status: 'success' };
+    }
+    return { status: 'failure', reason: 'Error al publicar' };
   },
 });
 

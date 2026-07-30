@@ -4,6 +4,7 @@
  * [Plan 297A-11 §9.1–9.4] */
 
 import { createStore, authStore } from '../../../store';
+import { api } from '../../../api/client';
 import { DEFAULT_RELEASE } from './default-release';
 import type {
   NodeId,
@@ -108,6 +109,49 @@ function saveOverlay(overlay: WorkspaceOverlay): void {
   } catch {
     /* localStorage full or unavailable — silent fail */
   }
+}
+
+/* === Fetch release from API === */
+
+/** Cargar el release activo desde el backend. Llamar al arrancar. */
+export async function fetchWorkspaceRelease(): Promise<void> {
+  try {
+    const data = await api.get<{ version: number; tree: WorkspaceTree }>('/api/workspace/release');
+    if (data?.tree?.nodes) {
+      releaseStore.set(data.tree);
+    }
+  } catch {
+    /* API no disponible — usar DEFAULT_RELEASE (ya cargado) */
+  }
+}
+
+/** Publicar el workspace actual como nuevo release (admin). */
+export async function publishWorkspace(): Promise<{ version: number } | null> {
+  /* Construir el tree publicable: merge actual del admin */
+  const resolved = workspaceStore.get();
+  const nodes: Record<NodeId, WorkspaceNode> = {};
+  for (const [id, node] of Object.entries(resolved.nodes)) {
+    nodes[id] = {
+      id: node.id,
+      parentId: node.parentId,
+      type: node.type,
+      label: node.label,
+      refId: node.refId,
+      position: node.position,
+      mobileOrder: node.mobileOrder,
+      requires: node.requires,
+    };
+  }
+  const tree: WorkspaceTree = { version: resolved.releaseVersion + 1, nodes };
+
+  /* Usar el tree devuelto por el backend (version auténtica del servidor) */
+  const result = await api.post<{ version: number; tree: WorkspaceTree }>('/api/admin/workspace/publish', { tree });
+  if (result?.version) {
+    releaseStore.set(result.tree);
+    overlayStore.set(EMPTY_OVERLAY);
+    return { version: result.version };
+  }
+  return null;
 }
 
 /* === Stores === */
