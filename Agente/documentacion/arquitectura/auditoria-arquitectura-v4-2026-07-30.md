@@ -737,7 +737,7 @@ Estado de cada hallazgo de la auditoría v4 con su corrección o plan de acción
 | # | Hallazgo | Severidad | Estado | Evidencia |
 |---|---|---|---|---|
 | 3.1 | `FontConfig` 22 campos | 🟡 Medio | ✅ CORREGIDO | Dividido en 4 sub-interfaces (FontTypography, FontSizes, FontOpacity, LayoutConfig). FontConfig extiende todas para backward compat |
-| 3.2 | `WindowEntry` 18 campos | 🟡 Medio | ⬜ Pendiente | Separar en WindowIdentity/Geometry/Content |
+| 3.2 | `WindowEntry` 18 campos | 🟡 Medio | ✅ CORREGIDO | Dividido en WindowIdentity/Geometry/Content. reactive-taskbar.ts migrado a TaskbarWin (WindowIdentity + Pick<'icon'|'app'>) |
 
 ### 10.4 Violaciones DIP (5 hallazgos)
 

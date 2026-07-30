@@ -8,6 +8,7 @@ import {
   X,
 } from 'lucide';
 import { createEl } from '../../utils/dom';
+import type { WindowIdentity, WindowContent } from '../runtime/window-store';
 import { windowStore, closeWindow, restoreWindow, focusWindow } from '../runtime/window-manager';
 import { showSidebar } from '../../store';
 import { dispatchEvent } from '../analytics/dispatcher';
@@ -30,7 +31,8 @@ export function createReactiveTaskbar(): { element: HTMLElement; taskList: HTMLE
 
   taskbar.append(navControl, taskList);
 
-  windowStore.subscribe((windows) => {
+  type TaskbarWin = WindowIdentity & Pick<WindowContent, 'icon' | 'app'>;
+  windowStore.subscribe((windows: readonly TaskbarWin[]) => {
     reconcileChildren(
       taskList,
       windows,
