@@ -6,6 +6,8 @@
   /* === COLOR — Solo blanco y negro === */
   --color-fondo: #dcdcdc;
   --color-texto: #000000;
+  --color-sidebar-fondo: #1e1e1e;
+  --color-sidebar-texto: #ffffff;
   --color-borde: #000000;
   --color-texto-secundario: #555555;
   --color-texto-deshabilitado: #999999;

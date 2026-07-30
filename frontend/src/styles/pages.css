@@ -234,18 +234,7 @@
   gap: var(--espacio-lg);
 }
 
-.font-grupo {
-  display: flex;
-  flex-direction: column;
-  gap: var(--espacio-xs);
-}
 
-.font-preview {
-  font-size: var(--tamano-grande);
-  margin-top: var(--espacio-sm);
-  padding: var(--espacio-md) 0;
-  border-bottom: var(--borde);
-}
 
 /* === ESTADÍSTICAS === */
 .stats-grid {
@@ -282,7 +271,7 @@
 }
 
 .checkout-icono {
-  font-size: 48px;
+  font-size: var(--sistema-finder-documento-tamano);
   font-family: var(--fuente-titulo);
   width: 80px;
   height: 80px;

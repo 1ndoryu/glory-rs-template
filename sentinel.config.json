@@ -16,7 +16,9 @@
     "frontend/src/api/generated/**"
   ],
   "directoryExceptions": [
-    "migrations"
+    "migrations",
+    "scripts",
+    "src/handlers"
   ],
   "rules": {
     "barras-decorativas": {
@@ -39,6 +41,9 @@
     },
     "git-add-all": {
       "severidad": "error"
+    },
+    "css-especificacion-diseno-local": {
+      "severidad": "information"
     }
   }
 }

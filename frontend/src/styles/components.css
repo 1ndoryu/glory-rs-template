@@ -3,6 +3,24 @@
  * Botones = texto subrayado. Inputs = 1px border. Modales = overlay + panel.
  * PROHIBIDO: sombras, colores, bordes redondeados, hover effects. */
 
+/* === UTILIDADES — Clases reutilizables para reemplazar inline styles === */
+.oculto { display: none !important; }
+.flex-columna { display: flex; flex-direction: column; }
+.flex-fila { display: flex; }
+.flex-wrap { flex-wrap: wrap; }
+.gap-sm { gap: var(--espacio-sm); }
+.gap-md { gap: var(--espacio-md); }
+.gap-lg { gap: var(--espacio-lg); }
+.mt-sm { margin-top: var(--espacio-sm); }
+.mt-md { margin-top: var(--espacio-md); }
+.mt-lg { margin-top: var(--espacio-lg); }
+.mb-sm { margin-bottom: var(--espacio-sm); }
+.mb-md { margin-bottom: var(--espacio-md); }
+.mb-lg { margin-bottom: var(--espacio-lg); }
+.ml-sm { margin-left: var(--espacio-sm); }
+.align-start { align-self: flex-start; }
+.border-bottom { border-bottom: var(--borde); }
+.flex-wrap-center { display: flex; flex-wrap: wrap; justify-content: center; }
 /* === BOTÓN — Siempre texto subrayado === */
 .boton {
   display: inline;
@@ -214,20 +232,6 @@
   gap: var(--espacio-lg);
 }
 
-/* === SEPARADOR === */
-.separador {
-  border: none;
-  border-top: var(--borde);
-  margin: var(--espacio-lg) 0;
-}
-
-/* === TAG / BADGE === */
-.tag {
-  font-size: var(--tamano-pequeno);
-  font-family: var(--fuente-menu);
-  text-transform: lowercase;
-  letter-spacing: 0.05em;
-}
 
 /* === LOADING === */
 .cargando {

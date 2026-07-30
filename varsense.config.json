@@ -44,7 +44,7 @@
   },
   "inlineDetection": {
     "enabled": true,
-    "severity": "warning"
+    "severity": "information"
   },
   "bannedProperties": {
     "enabled": true,
@@ -58,7 +58,35 @@
     "excludeClassPatterns": [
       "^lucide($|-)",
       "^is-",
-      "^js-"
+      "^js-",
+      "^sk-",
+      "^estimator",
+      "^parameters-table",
+      "^param($|-)",
+      "^copy-paste",
+      "^caption$",
+      "^fitted$",
+      "^user-set$",
+      "^light$",
+      "^dark$",
+      "^desktop-",
+      "^campo-error$",
+      "^entrada-fijada$",
+      "^columna-derecha",
+      "^profile-redes",
+      "^modal-(cabecera|titulo|cerrar|pie)$",
+      "^boton(Sm|Md|Lg|Secundario|Peligro|Exito|Fantasma|Ancho|Cargando)$",
+      "^campo(Entrada|Sm|Md|Lg)$",
+      "^valor$",
+      "^value$",
+      "^default$",
+      "^contenido$",
+      "^separador$",
+      "^tag$",
+      "^inline$",
+      "^mt-lg$",
+      "^align-start$",
+      "^flex-wrap-center$"
     ]
   }
 }

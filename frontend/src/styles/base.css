@@ -54,7 +54,7 @@ em {
 
 code {
   font-family: 'SF Mono', 'Fira Code', monospace;
-  font-size: 0.9em;
+  font-size: var(--tamano-pequeno);
   padding: 1px 4px;
   border: var(--borde);
 }
@@ -73,8 +73,7 @@ hr {
   margin: var(--espacio-xl) 0;
 }
 
-/* Links dentro de contenido: subrayados */
-.contenido a,
+/* Links dentro de contenido: sin subrayado */
 .articulo-contenido a {
   text-decoration: none;
 }
