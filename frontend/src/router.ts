@@ -169,10 +169,15 @@ function handleClick(e: MouseEvent): void {
   navigate(anchor.pathname + anchor.search);
 }
 
-/* Inicializar el router */
-export function initRouter(): void {
+/* Inicializar el router. Retorna cleanup function.
+ * [Auditoría v4 §4.3] Eventos globales ahora removibles. */
+export function initRouter(): () => void {
   window.addEventListener('popstate', handleRoute);
   document.addEventListener('click', handleClick);
   handleRoute();
+  return () => {
+    window.removeEventListener('popstate', handleRoute);
+    document.removeEventListener('click', handleClick);
+  };
 }
 

@@ -152,8 +152,8 @@ async function initApp(): Promise<void> {
     });
   });
 
-  /* Tracking de page views */
-  initTracking();
+  /* Tracking de page views — cleanup almacenado para posible teardown */
+  const stopTracking = initTracking();
 
   /* Iniciar atajos de teclado del OS */
   initKeyboardShortcuts();
@@ -164,8 +164,11 @@ async function initApp(): Promise<void> {
   /* Iniciar Resource Type Registry — asociaciones tipo→app */
   initResourceTypeRegistry();
 
-  /* Iniciar router */
-  initRouter();
+  /* Iniciar router — cleanup almacenado */
+  const stopRouter = initRouter();
+
+  /* Exponer cleanups globalmente para posibles teardowns futuros */
+  (window as unknown as Record<string, unknown>).__wandoriusCleanup = { stopTracking, stopRouter };
 }
 
 /* Arrancar cuando el DOM este listo */

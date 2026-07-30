@@ -86,22 +86,26 @@ export function trackPurchase(productId: string): void {
   track({ event_type: 'purchase', target_type: 'product', target_id: productId });
 }
 
-/* Inicializar tracking automático de page views */
-export function initTracking(): void {
-  /* Track copias de texto */
-  document.addEventListener('copy', () => {
-    trackCopy(window.location.pathname);
-  });
-
-  /* Track clicks en links externos */
-  document.addEventListener('click', (e) => {
+/* Inicializar tracking automático de page views. Retorna cleanup function.
+ * [Auditoría v4 §4.3] Eventos globales ahora removibles. */
+export function initTracking(): () => void {
+  function onCopy(): void { trackCopy(window.location.pathname); }
+  function onExternalClick(e: MouseEvent): void {
     const target = e.target as HTMLElement;
     const anchor = target.closest('a');
     if (anchor && anchor.origin !== window.location.origin) {
       trackLinkClick(anchor.href);
     }
-  });
-}
+  }
+  function onBeforeUnload(): void { flush(); }
 
-/* Flush al cerrar la página */
-window.addEventListener('beforeunload', flush);
+  document.addEventListener('copy', onCopy);
+  document.addEventListener('click', onExternalClick);
+  window.addEventListener('beforeunload', onBeforeUnload);
+
+  return () => {
+    document.removeEventListener('copy', onCopy);
+    document.removeEventListener('click', onExternalClick);
+    window.removeEventListener('beforeunload', onBeforeUnload);
+  };
+}
