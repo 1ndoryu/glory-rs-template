@@ -6,14 +6,15 @@ use crate::models::project::Project;
 pub struct ProjectRepository;
 
 impl ProjectRepository {
+    /// [297A-10] Crear proyecto dentro de una transacción.
     pub async fn create(
-        pool: &PgPool,
+        conn: &mut sqlx::PgConnection,
+        id: Uuid,
         title: &str,
         description: &str,
         url: Option<&str>,
         sort_order: i32,
     ) -> Result<Project, sqlx::Error> {
-        let id = Uuid::new_v4();
         sqlx::query_as::<_, Project>(
             "INSERT INTO projects (id, title, description, url, sort_order) \
              VALUES ($1, $2, $3, $4, $5) \
@@ -24,7 +25,7 @@ impl ProjectRepository {
         .bind(description)
         .bind(url)
         .bind(sort_order)
-        .fetch_one(pool)
+        .fetch_one(&mut *conn)
         .await
     }
 

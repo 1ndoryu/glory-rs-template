@@ -6,16 +6,37 @@ use crate::models::article::{
     Article, CreateArticleRequest, PaginatedArticles, UpdateArticleRequest,
 };
 use crate::repositories::article::{CreateArticleParams, UpdateArticleParams};
+use crate::models::resource::{CreateResourceParams, EditorialState, ResourceKind, VisibilityState};
+use crate::repositories::resource_repo::ResourceRepository;
 use crate::repositories::ArticleRepository;
 
 pub struct ArticleService;
 
 impl ArticleService {
+    /// [297A-10] Crear artículo con resource envelope en transacción.
     pub async fn create(pool: &PgPool, req: CreateArticleRequest) -> Result<Article, AppError> {
         let slug = Self::generate_slug(pool, &req.title).await?;
+        let id = uuid::Uuid::new_v4();
 
+        let mut tx = pool.begin().await?;
+
+        /* 1. Insertar resource envelope */
+        ResourceRepository::create(
+            &mut *tx,
+            CreateResourceParams {
+                id,
+                kind: ResourceKind::Article,
+                title: &req.title,
+                editorial: EditorialState::Draft,
+                visibility: VisibilityState::Private,
+            },
+        )
+        .await?;
+
+        /* 2. Insertar artículo */
         let article = ArticleRepository::create(
-            pool,
+            &mut *tx,
+            id,
             CreateArticleParams {
                 title: &req.title,
                 slug: &slug,
@@ -28,6 +49,7 @@ impl ArticleService {
         )
         .await?;
 
+        tx.commit().await?;
         Ok(article)
     }
 

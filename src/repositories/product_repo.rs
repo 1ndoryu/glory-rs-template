@@ -6,9 +6,10 @@ use crate::models::product::{Order, Product};
 pub struct ProductRepository;
 
 impl ProductRepository {
-    /// [297A-10] article_id es opcional — producto independiente de artículo.
+    /// [297A-10] Crear producto dentro de una transacción. article_id es opcional.
     pub async fn create(
-        pool: &PgPool,
+        conn: &mut sqlx::PgConnection,
+        id: Uuid,
         article_id: Option<Uuid>,
         name: &str,
         description: &str,
@@ -16,7 +17,6 @@ impl ProductRepository {
         currency: &str,
         download_path: Option<&str>,
     ) -> Result<Product, sqlx::Error> {
-        let id = Uuid::new_v4();
         sqlx::query_as::<_, Product>(
             "INSERT INTO products (id, article_id, name, description, price_cents, currency, download_path) \
              VALUES ($1, $2, $3, $4, $5, $6, $7) \
@@ -29,7 +29,7 @@ impl ProductRepository {
         .bind(price_cents)
         .bind(currency)
         .bind(download_path)
-        .fetch_one(pool)
+        .fetch_one(&mut *conn)
         .await
     }
 

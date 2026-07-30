@@ -25,11 +25,12 @@ pub struct UpdateArticleParams<'a> {
 }
 
 impl ArticleRepository {
+    /// [297A-10] Crear artículo dentro de una transacción (el service genera el ID y lo comparte con el resource envelope).
     pub async fn create(
-        pool: &PgPool,
+        conn: &mut sqlx::PgConnection,
+        id: Uuid,
         params: CreateArticleParams<'_>,
     ) -> Result<Article, sqlx::Error> {
-        let id = Uuid::new_v4();
         let published_at = if params.status == "published" {
             Some(chrono::Utc::now())
         } else {
@@ -50,7 +51,7 @@ impl ArticleRepository {
         .bind(params.status)
         .bind(params.is_pinned)
         .bind(published_at)
-        .fetch_one(pool)
+        .fetch_one(&mut *conn)
         .await
     }
 

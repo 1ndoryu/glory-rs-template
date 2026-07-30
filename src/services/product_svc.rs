@@ -3,14 +3,36 @@ use uuid::Uuid;
 
 use crate::errors::AppError;
 use crate::models::product::{CreateProductRequest, Product};
+use crate::models::resource::{CreateResourceParams, EditorialState, ResourceKind, VisibilityState};
 use crate::repositories::product_repo::ProductRepository;
+use crate::repositories::resource_repo::ResourceRepository;
 
 pub struct ProductService;
 
 impl ProductService {
+    /// [297A-10] Crear producto con resource envelope en transacción. Defaults: draft, private, inactive.
     pub async fn create(pool: &PgPool, req: CreateProductRequest) -> Result<Product, AppError> {
+        let id = uuid::Uuid::new_v4();
+
+        let mut tx = pool.begin().await?;
+
+        /* 1. Insertar resource envelope (producto: draft + private por defecto) */
+        ResourceRepository::create(
+            &mut *tx,
+            CreateResourceParams {
+                id,
+                kind: ResourceKind::Product,
+                title: &req.name,
+                editorial: EditorialState::Draft,
+                visibility: VisibilityState::Private,
+            },
+        )
+        .await?;
+
+        /* 2. Insertar producto */
         let product = ProductRepository::create(
-            pool,
+            &mut *tx,
+            id,
             req.article_id,
             &req.name,
             &req.description,
@@ -19,6 +41,8 @@ impl ProductService {
             req.download_path.as_deref(),
         )
         .await?;
+
+        tx.commit().await?;
         Ok(product)
     }
 

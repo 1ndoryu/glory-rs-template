@@ -6,15 +6,16 @@ use crate::models::media::Media;
 pub struct MediaRepository;
 
 impl MediaRepository {
+    /// [297A-10] Crear media dentro de una transacción.
     pub async fn create(
-        pool: &PgPool,
+        conn: &mut sqlx::PgConnection,
+        id: Uuid,
         article_id: Option<Uuid>,
         file_path: &str,
         file_type: &str,
         file_size: i64,
         alt_text: &str,
     ) -> Result<Media, sqlx::Error> {
-        let id = Uuid::new_v4();
         sqlx::query_as::<_, Media>(
             "INSERT INTO media (id, article_id, file_path, file_type, file_size, alt_text) \
              VALUES ($1, $2, $3, $4, $5, $6) \
@@ -26,7 +27,7 @@ impl MediaRepository {
         .bind(file_type)
         .bind(file_size)
         .bind(alt_text)
-        .fetch_one(pool)
+        .fetch_one(&mut *conn)
         .await
     }
 
