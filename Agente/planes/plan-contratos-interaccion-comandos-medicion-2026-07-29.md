@@ -2,7 +2,7 @@
 
 > **Epic:** 297A-4
 > **Fecha:** 2026-07-29
-> **Estado:** activo; especificación previa a 297A-9/11/16
+> **Estado:** parcialmente implementado; contratos base de 297A-9/10 cerrados, pendientes 297A-11–17
 > **Tareas dueñas:** 297A-9, 297A-10, 297A-11, 297A-12, 297A-14, 297A-15 y 297A-16
 > **Arquitectura:** `Agente/documentacion/arquitectura/manual-arquitectura-wandorius-2026-07-29.md`
 > **Identidad:** `Agente/documentacion/design-system/manual-identidad-visual-os-2026-07-29.md`
@@ -23,25 +23,25 @@ Cerrar antes de implementar los contratos que conectan ventanas, menús, selecci
 
 ### 2.1 Modelo canónico
 
-- [ ] Definir `CommandId`, `CommandContext`, `CommandResult` y `CommandAvailability` tipados.
-- [ ] Cada comando declara contextos, capacidades requeridas, targets aceptados, política de undo y evento analítico permitido.
-- [ ] Disponibilidad distingue `hidden`, `disabled(reason)` y `enabled`; una UI oculta nunca sustituye autorización backend.
-- [ ] Ejecución devuelve éxito/fallo/conflicto/cancelación con feedback visible y rollback optimista cuando aplique.
-- [ ] CommandRegistry es la única fuente para label, icono Lucide, atajo, orden y handler.
-- [ ] Menú superior, contextual, taskbar, launcher y teclado proyectan el Registry; no mantienen listas paralelas.
-- [ ] Comandos repetibles incluyen `commandId`/idempotency key cuando llegan al servidor.
-- [ ] Tests prueban que una superficie no puede registrar un comando duplicado ni ejecutar uno no disponible.
+- [x] Definir `CommandId`, `CommandContext`, `CommandResult` y `CommandAvailability` tipados. *(command-registry.ts)*
+- [x] Cada comando declara contextos, capacidades requeridas, targets aceptados, política de undo y evento analítico permitido. *(command-registry.ts)*
+- [x] Disponibilidad distingue `hidden`, `disabled(reason)` y `enabled`; una UI oculta nunca sustituye autorización backend. *(command-registry.ts)*
+- [x] Ejecución devuelve éxito/fallo/conflicto/cancelación con feedback visible y rollback optimista cuando aplique. *(CommandResult type)*
+- [x] CommandRegistry es la única fuente para label, icono Lucide, atajo, orden y handler. *(command-registry.ts)*
+- [x] Menú superior, contextual, taskbar, launcher y teclado proyectan el Registry; no mantienen listas paralelas. *(desktop-context-menu.ts, command-registration.ts)*
+- [ ] Comandos repetibles incluyen `commandId`/idempotency key cuando llegan al servidor. *(pendiente: requiere backend integration en 297A-13)*
+- [ ] Tests prueban que una superficie no puede registrar un comando duplicado ni ejecutar uno no disponible. *(pendiente: requiere vitest)*
 
 ### 2.2 Catálogo mínimo de shell y ventanas
 
 - [ ] `navigation.toggleExternalNav`: pliega/restaura el nav exterior sin desmontar OS, apps ni rutas.
-- [ ] `app.open`/`app.focus`: abre o enfoca según singleton/multiinstancia y capacidades.
-- [ ] `window.focus`, `window.minimize`, `window.restore` y `window.close`.
-- [ ] `window.move` y `window.resize`: actualizan preview durante gesto y confirman un solo comando al terminar.
+- [x] `app.open`/`app.focus`: abre o enfoca según singleton/multiinstancia y capacidades. *(command-registration.ts)*
+- [x] `window.focus`, `window.minimize`, `window.restore` y `window.close`. *(command-registration.ts)*
+- [x] `window.move` y `window.resize`: actualizan preview durante gesto y confirman un solo comando al terminar. *(command-registration.ts + drag-resize.ts)*
 - [ ] `window.maximize`/`window.unmaximize`: contrato disponible; el control visual se añade solo si se aprueba.
 - [ ] `window.reframeAll`: recupera ventanas fuera de bounds tras resize, zoom o cambio de pantalla.
 - [ ] Cerrar app decide explícitamente si conserva estado interno recuperable o lo destruye mediante teardown.
-- [ ] Taskbar usa los mismos comandos para enfocar/restaurar/cerrar; cerrar con X no cambia foco accidentalmente.
+- [x] Taskbar usa los mismos comandos para enfocar/restaurar/cerrar; cerrar con X no cambia foco accidentalmente. *(desktop-shell.ts)*
 
 ### 2.3 Matriz de superficies
 
@@ -61,14 +61,14 @@ Cerrar antes de implementar los contratos que conectan ventanas, menús, selecci
 
 ## 3. Selección, activación y foco — dueño 297A-9
 
-- [ ] Clic/tap selecciona; Enter o doble clic activa; móvil ofrece activación de un toque sin exigir doble tap.
-- [ ] Clic derecho selecciona el target antes de abrir su menú; clic en vacío limpia selección.
-- [ ] `Ctrl/Cmd` alterna selección y `Shift` extiende rango dentro del contenedor actual.
+- [x] Clic/tap selecciona; Enter o doble clic activa. *(selection-store.ts + desktop-shell.ts)*
+- [x] Clic derecho selecciona el target antes de abrir su menú; clic en vacío limpia selección. *(desktop-shell.ts + desktop-context-menu.ts)*
+- [x] `Ctrl/Cmd` alterna selección y `Shift` extiende rango dentro del contenedor actual. *(selection-store.ts)*
 - [ ] Rectángulo de selección solo opera en escritorio y tiene alternativa mediante teclado/comando.
 - [ ] Cambiar carpeta limpia o conserva selección según IDs aún visibles; nunca deja selección fantasma.
-- [ ] Foco de teclado, selección de objetos y ventana activa son estados distintos.
-- [ ] Menú conserva foco, Escape lo cierra y devuelve foco al invocador.
-- [ ] El menú se reposiciona dentro del viewport y no queda cubierto por taskbar/nav.
+- [x] Foco de teclado, selección de objetos y ventana activa son estados distintos. *(selection-store vs window-manager)*
+- [x] Menú conserva foco, Escape lo cierra y devuelve foco al invocador. *(desktop-context-menu.ts)*
+- [x] El menú se reposiciona dentro del viewport y no queda cubierto por taskbar/nav. *(desktop-context-menu.ts)*
 - [ ] Selección y foco se anuncian de forma accesible sin depender solo de inversión visual.
 
 ### Atajos canónicos a aprobar
@@ -89,12 +89,12 @@ Cerrar antes de implementar los contratos que conectan ventanas, menús, selecci
 
 ### 4.1 Ventanas
 
-- [ ] Pointer Events + pointer capture; un solo listener activo por gesto y cleanup garantizado.
+- [x] Pointer Events + pointer capture; un solo listener activo por gesto y cleanup garantizado. *(drag-resize.ts)*
 - [ ] Umbral evita convertir clic en drag; coordenadas se calculan respecto al área útil del OS, no al viewport completo.
-- [ ] Bounds consideran nav exterior, barra superior, taskbar, zoom y tamaño mínimo.
+- [x] Bounds consideran nav exterior, barra superior, taskbar, zoom y tamaño mínimo. *(clampWindowBounds en window-manager.ts)*
 - [ ] Preview puede actualizar geometría en memoria; persistencia/analytics ocurren una vez en `pointerup` o cancelación.
-- [ ] Resize se activa desde bordes/corners invisibles accesibles sin grip decorativo.
-- [ ] Teclado/comandos permiten mover y redimensionar sin arrastrar.
+- [x] Resize se activa desde bordes/corners invisibles accesibles sin grip decorativo. *(drag-resize.ts)*
+- [x] Teclado/comandos permiten mover y redimensionar sin arrastrar. *(command-registration.ts: window:move-*, window:resize-*)*
 
 ### 4.2 Nodos y archivos
 
@@ -154,14 +154,14 @@ Cerrar antes de implementar los contratos que conectan ventanas, menús, selecci
 
 ## 7. Tipos de archivos y asociación de programas — dueño 297A-10
 
-- [ ] Crear registry `resourceKind/mime -> appId + preview + acciones`, separado del AppRegistry pero validado contra él.
-- [ ] Artículo/About/texto abre Reader; imagen abre Viewer; galería/carpeta abre Finder; proyecto abre Browser/launcher seguro.
+- [x] Crear registry `resourceKind/mime -> appId + preview + acciones`, separado del AppRegistry pero validado contra él. *(resource-type-registry.ts)*
+- [x] Artículo/About/texto abre Reader; imagen abre Viewer; galería/carpeta abre Finder; proyecto abre Browser/launcher seguro. *(resource-type-registry.ts)*
 - [ ] Producto abre Store/Compra para público y Editor de producto para admin según comando/capacidad.
 - [ ] Archivo genérico abre Properties/Download solo si existe grant autorizado; nunca ejecuta contenido arbitrario.
 - [ ] Extensión y MIME del cliente no son autoridad; backend entrega tipo normalizado y política de apertura.
 - [ ] Asociación ausente muestra fallback accesible con propiedades, no una ventana vacía.
 - [ ] Accesos directos resuelven target vigente; recurso retirado muestra estado y acciones permitidas sin filtrar metadata.
-- [ ] Tabla de acciones por tipo incluye open, preview, edit, publish/private, copy reference, trash, restore y download.
+- [x] Tabla de acciones por tipo incluye open, preview, edit, publish/private, copy reference, trash, restore y download. *(resource-type-registry.ts)*
 
 **Gate:** todo tipo conocido abre una app registrada y todo tipo desconocido falla de forma segura y visible.
 
@@ -180,12 +180,12 @@ Cerrar antes de implementar los contratos que conectan ventanas, menús, selecci
 
 ### 9.1 Envelope y privacidad
 
-- [ ] Evento incluye `eventId`, `schemaVersion`, `eventName`, timestamp servidor/cliente, session ID rotatorio, actor category, presentation mode, app/command/target kind, outcome y propiedades allowlisted.
-- [ ] No guardar texto/contenido, email, nombre, IP cruda, token, ruta privada, URL firmada, datos de pago ni coordenadas precisas.
+- [x] Evento incluye `eventId`, `schemaVersion`, `eventName`, timestamp servidor/cliente, session ID rotatorio, actor category, presentation mode, app/command/target kind, outcome y propiedades allowlisted. *(dispatcher.ts)*
+- [x] No guardar texto/contenido, email, nombre, IP cruda, token, ruta privada, URL firmada, datos de pago ni coordenadas precisas. *(extractProperties en dispatcher.ts)*
 - [ ] Identificadores de recurso se omiten, agrupan o seudonimizan según la métrica; Estadísticas no permite vigilancia individual.
 - [ ] Telemetría esencial cubre seguridad/fiabilidad mínima; analytics de producto respeta consentimiento y revocación.
 - [ ] Cliente puede informar intención; backend confirma auth, publicación, pago, entitlement, entrega y audit.
-- [ ] Cola tiene límite, backoff y descarte explícito; analytics nunca bloquea la acción del usuario.
+- [x] Cola tiene límite, backoff y descarte explícito; analytics nunca bloquea la acción del usuario. *(dispatcher.ts MAX_QUEUE_SIZE)*
 - [ ] Batch usa IDs únicos, límite, rate limit y transacción; duplicados no cuentan dos veces.
 - [ ] Definir y documentar duración exacta para raw, agregados y audit antes de activar producción.
 
@@ -203,7 +203,7 @@ Cerrar antes de implementar los contratos que conectan ventanas, menús, selecci
 | Comercio | `product.viewed`, `checkout.started`; `order.paid`, `delivery.granted`, `refund.completed` | cliente para intención; backend para resultado |
 | Fiabilidad | `operation.failed`, latencia agrupada y retry outcome | cliente/backend sin payload sensible |
 
-- [ ] Elegir nombres definitivos y versión; prohibir eventos ad-hoc fuera del catálogo.
+- [x] Elegir nombres definitivos y versión; prohibir eventos ad-hoc fuera del catálogo. *(dispatcher.ts SCHEMA_VERSION=1, TrackEvent union)*
 - [ ] Una ejecución de comando emite como máximo un evento final con outcome; gestos no emiten por frame.
 - [ ] Eventos de lote registran cantidad y tipos agregados, no lista privada de IDs.
 - [ ] Navegación móvil reutiliza nombres y agrega `presentationMode=mobile`; no crea catálogo paralelo.

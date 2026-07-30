@@ -26,7 +26,9 @@
 
 ## Siguiente bloque habilitado
 
-**297A-9 — Foundation del runtime (completado).** Runtime desktop/tablet operativo con ventanas, taskbar, drag/resize, boundary clamping, RouteAppAdapter activado y contentWindow gestionado. Pendiente: Orval (requiere backend corriendo), responsive (297A-12).
+**297A-10 — Recursos y migraciones (completado).** Resource envelope, product versions, asset states, services con transacción, DTO público/admin y About seeder.
+
+**Plan transversal 297A-4 — parcialmente cerrado.** CommandRegistry enriquecido (§2), selección+foco (§3), context menu (§2.3), keyboard move/resize (§4.1), resource-type-registry (§7), analytics envelope (§9.1/9.2). Pendiente: clipboard/undo (§5, 297A-11), persistencia (§6, 297A-13), mobile (§2.3/3, 297A-12), tests unitarios (§11, requiere vitest).
 
 ## Pendientes ordenados
 
