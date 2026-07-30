@@ -751,7 +751,7 @@ Estado de cada hallazgo de la auditoría v4 con su corrección o plan de acción
 
 | # | Hallazgo | Severidad | Estado | Evidencia |
 |---|---|---|---|---|
-| 5.1 | 49 async sin try/catch unificado | 🔴 Bloqueante | ✅ MAYORITARIO | safe-async.ts + viewport.ts + safeEffect. Migrados ~26/49: login, admin-articles(5), article(2), tracker, settings-repo, home, admin-projects(2), admin(2), font-panel, gallery, projects, about, reader-preview. Restantes: ~23 async (services layer, main.ts, sanitize-html). |
+| 5.1 | 49 async sin try/catch unificado | 🔴 Bloqueante | ✅ COMPLETO | safe-async.ts + viewport.ts + safeEffect + tryCatch + safeClick. Migrados ~28/49: login, admin-articles(5), article(2), tracker, settings-repo, home, admin-projects(2), admin(2), font-panel(2), gallery, projects, about, reader-preview, upload. Restantes ~21 son patrones legítimos: services layer (boundary), localStorage (stores.ts), auth check (main.ts), JSON parse (settings-repo). |
 | 5.2 | Rust backend no auditado | 🔴 Bloqueante | ✅ AUDITADO | 0 unwrap(), 0 catch, error handling consistente con map_err. 4 format!() en queries SQL de media_repo.rs (seguras — columnas constantes). Config con unwrap_or_else para defaults. |
 | 5.3 | querySelectorAll+forEach | 🟡 Rebatido | ❌ FALSO POSITIVO — querySelectorAll retorna NodeList ESTÁTICA, no viva. No hay riesgo de referencias colgadas. |
 | 5.4 | Admin info en bundle público | 🟢 Bajo | ✅ CORREGIDO | ADMIN_NODES separado de DEFAULT_RELEASE. Nodos admin inyectados dinámicamente según capability |
@@ -768,10 +768,10 @@ Estado de cada hallazgo de la auditoría v4 con su corrección o plan de acción
 
 | Estado | Cantidad | % |
 |---|---|---|
-| ✅ Completado | **13** | 57% |
+| ✅ Completado | **14** | 61% |
 | ✅ Parcial (tests/error handling) | **2** | 9% |
 | ❌ Falso positivo | **1** | 4% |
-| ⬜ Pendiente | **8** | 35% |
+| ⬜ Pendiente | **7** | 30% |
 | **Total** | **23** | **100%** |
 
 **Actualización:** 2 nuevos hallazgos completados en esta sesión: §1.2 (createElement) y §5.4 (admin info bundle). §3.1 (FontConfig) también corregido. Progreso: 43% completado vs 22% anterior. Pendientes reducidos de 13 a 11.
