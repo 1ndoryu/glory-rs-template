@@ -157,8 +157,102 @@ else
 fi
 echo ""
 
+# === P2: interface-grande (>10 campos) ===
+echo "--- P2: Interfaces grandes (>10 campos) ---"
+# Buscar interfaces con más de 10 campos (líneas con ; dentro del bloque)
+LARGE_INTERFACES=""
+while IFS= read -r file; do
+  # Extraer bloques interface y contar campos
+  awk '/^export interface |^interface /{name=$0; count=0; in_iface=1} in_iface && /;/{count++} in_iface && /^}/{if(count>10) print FILENAME":"NR": "name" ("count" campos)"; in_iface=0}' "$file" 2>/dev/null
+  done < <(find "$FRONTEND_SRC" -name '*.ts' ! -name '*.d.ts' ! -name '*.test.ts' ! -path '*/node_modules/*' 2>/dev/null)
+
+if [ -n "$LARGE_INTERFACES" ]; then
+  echo "$LARGE_INTERFACES"
+  echo ""
+  echo "ℹ️  Interfaces con >10 campos. Considerar dividir en sub-interfaces (ISP)."
+else
+  echo "✅ Todas las interfaces tienen ≤10 campos"
+fi
+echo ""
+
+# === P2: catch-silencioso (catch con solo comentarios) ===
+echo "--- P2: Catch silencioso ---"
+# Buscar catch { /* ... */ } o catch { // ... } sin código real
+SILENT_CATCH=$(grep -rn 'catch\s*{' "$FRONTEND_SRC" \
+  --include="*.ts" --exclude="*.test.ts" --exclude="*.d.ts" \
+  | grep -v 'node_modules' \
+  | while IFS= read -r line; do
+      file=$(echo "$line" | cut -d: -f1)
+      lineno=$(echo "$line" | cut -d: -f2)
+      # Leer la siguiente línea para ver si es solo comentario
+      nextline=$(sed -n "$((lineno+1))p" "$file" 2>/dev/null)
+      if echo "$nextline" | grep -qE '^\s*(\/\/|\/\*|\*).*'; then
+        nextline2=$(sed -n "$((lineno+2))p" "$file" 2>/dev/null)
+        if echo "$nextline2" | grep -qE '^\s*\}'; then
+          echo "$file:$lineno: catch con solo comentario"
+        fi
+      fi
+    done | head -10)
+
+if [ -n "$SILENT_CATCH" ]; then
+  echo "$SILENT_CATCH"
+  echo ""
+  echo "⚠️  Catch silencioso — registrar, notificar o propagar el error."
+else
+  echo "✅ Sin catch silenciosos"
+fi
+echo ""
+
+# === P2: modulo-rexport-mutations (re-exports + lógica) ===
+echo "--- P2: Módulos con re-exports + lógica ---"
+# Buscar archivos que mezclan 'export { X } from' con 'export function/const'
+MIXED_EXPORTS=$(find "$FRONTEND_SRC" -name '*.ts' ! -name '*.d.ts' ! -name '*.test.ts' \
+  ! -path '*/node_modules/*' ! -path '*/index.ts' 2>/dev/null \
+  | while IFS= read -r file; do
+      has_reexport=$(grep -c 'export {.*} from' "$file" 2>/dev/null)
+      has_logic=$(grep -cE '^export (function|const|class|async)' "$file" 2>/dev/null)
+      if [ "$has_reexport" -gt 0 ] && [ "$has_logic" -gt 0 ]; then
+        echo "$file: $has_reexport re-exports + $has_logic definiciones (SRP: separar)"
+      fi
+    done | head -10)
+
+if [ -n "$MIXED_EXPORTS" ]; then
+  echo "$MIXED_EXPORTS"
+  echo ""
+  echo "ℹ️  Módulos mezclan re-exports con lógica. Considerar separar barrel de lógica."
+else
+  echo "✅ Sin módulos mixtos (re-exports + lógica)"
+fi
+echo ""
+
+# === P2: export-no-usado (exports no importados) ===
+echo "--- P2: Exports no importados ---"
+# Para cada export, verificar si algún otro archivo lo importa
+UNUSED_EXPORTS=$(grep -rn '^export \(function\|const\|class\) \w\+' "$FRONTEND_SRC" \
+  --include="*.ts" --exclude="*.test.ts" --exclude="*.d.ts" \
+  | grep -v 'node_modules' | grep -v 'index\.ts' \
+  | while IFS= read -r line; do
+      name=$(echo "$line" | sed 's/.*export \(function\|const\|class\) \([A-Za-z_]\w*\).*/\2/' 2>/dev/null)
+      file=$(echo "$line" | cut -d: -f1)
+      # Buscar si algún archivo importa este nombre
+      count=$(grep -rl "\b$name\b" "$FRONTEND_SRC" --include="*.ts" --exclude="*.test.ts" 2>/dev/null \
+        | grep -v "$file" | grep -v 'node_modules' | wc -l)
+      if [ "$count" -eq 0 ]; then
+        echo "$file: export '$name' no importado por ningún módulo"
+      fi
+    done | head -10)
+
+if [ -n "$UNUSED_EXPORTS" ]; then
+  echo "$UNUSED_EXPORTS"
+  echo ""
+  echo "⚠️  Exports no importados — posible código muerto."
+else
+  echo "✅ Todos los exports tienen al menos un importador"
+fi
+echo ""
+
 if [ $EXIT_CODE -eq 0 ]; then
-  echo "✅ Todas las verificaciones P0/P1 pasaron"
+  echo "✅ Todas las verificaciones P0/P1/P2 pasaron"
 else
   echo "⚠️  Se encontraron violaciones. Revisar hallazgos arriba."
 fi
