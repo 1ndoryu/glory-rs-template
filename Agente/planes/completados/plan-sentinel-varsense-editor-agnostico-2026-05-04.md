@@ -1,4 +1,7 @@
-# Plan Sentinel + VarSense editor-agnostico - 2026-05-04
+# Plan histórico completado: Sentinel + VarSense editor-agnóstico
+
+> **Estado:** trabajo principal completado y documentado en tareas 085A/105A.  
+> **Uso:** registro histórico; nuevas reglas de wandori.us se ejecutan desde `prevencion-wandorius-sentinel-varsense-2026-07-29.md`.
 
 ## Objetivo
 

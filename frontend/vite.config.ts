@@ -1,13 +1,16 @@
 import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
 
 export default defineConfig({
-  plugins: [react()],
+  /* Sin plugins de framework — vanilla TS puro */
   server: {
     port: 5173,
     /* Proxy API requests al backend Rust en desarrollo */
     proxy: {
       '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+      '/uploads': {
         target: 'http://localhost:3000',
         changeOrigin: true,
       },
@@ -18,6 +21,17 @@ export default defineConfig({
       '/api-docs': {
         target: 'http://localhost:3000',
         changeOrigin: true,
+      },
+    },
+  },
+  build: {
+    target: 'es2022',
+    minify: 'terser',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          tiptap: ['@tiptap/core', '@tiptap/starter-kit'],
+        },
       },
     },
   },

@@ -2,23 +2,23 @@
 name = "glory-backend"
 version = "0.1.0"
 edition = "2021"
-description = "Glory RS — Template para sitios web con Rust + React + OpenAPI"
+description = "wandori.us — Blog/portfolio con Rust + Vanilla TypeScript + OpenAPI"
 license = "MIT"
 authors = ["1ndoryu"]
 
 [dependencies]
 # Web framework
-axum = { version = "0.7", features = ["macros"] }
+axum = { version = "0.7", features = ["macros", "multipart"] }
 tokio = { version = "1", features = ["full"] }
 tower = "0.4"
-tower-http = { version = "0.5", features = ["cors", "trace"] }
+tower-http = { version = "0.5", features = ["cors", "trace", "fs"] }
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 # Database
-sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres", "migrate", "uuid", "chrono"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres", "migrate", "uuid", "chrono", "json"] }
 
 # OpenAPI
 utoipa = { version = "4", features = ["axum_extras", "uuid", "chrono"] }
@@ -40,6 +40,14 @@ thiserror = "2"
 # Auth
 jsonwebtoken = "9"
 argon2 = "0.5"
+
+# HTTP client (para Resend email API)
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+# Stripe webhook verification
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
 
 # Utils
 uuid = { version = "1", features = ["serde", "v4"] }

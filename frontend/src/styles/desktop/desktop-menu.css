@@ -1,0 +1,106 @@
+/* [297A-2] Barra global y menús contextuales del sistema.
+ * La fase visual mantiene Archivo abierto para validar la jerarquía de dos niveles. */
+
+.desktop-menu-bar {
+  position: relative;
+  z-index: var(--z-sistema-barra);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--espacio-md);
+  min-width: 0;
+  padding: 0 var(--espacio-sm);
+  border-bottom: var(--sistema-borde-doble);
+  background: var(--sistema-superficie);
+}
+
+.desktop-menu-bar__menus {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-md);
+  min-width: 0;
+}
+
+.desktop-menu-bar__entry {
+  position: relative;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+}
+
+.desktop-menu-bar__brand {
+  display: block;
+  width: var(--sistema-logo-tamano);
+  height: var(--sistema-logo-tamano);
+  border-radius: 50%;
+  background: var(--sistema-texto);
+}
+
+.desktop-menu-bar__item {
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--sistema-texto);
+  font-family: var(--fuente-sistema);
+  opacity: 1;
+}
+
+.desktop-menu-bar__entry--open > .desktop-menu-bar__item {
+  text-decoration: underline;
+  text-underline-offset: var(--espacio-xs);
+}
+
+.desktop-menu-bar__item,
+.desktop-menu-bar__clock {
+  white-space: nowrap;
+}
+
+.desktop-menu-bar__clock {
+  justify-self: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.desktop-context-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: var(--sistema-menu-contexto-ancho);
+  border: var(--borde);
+  background: var(--sistema-superficie);
+  font-size: var(--sistema-menu-contexto-texto-tamano);
+}
+
+.desktop-context-menu__branch {
+  position: relative;
+}
+
+.desktop-context-menu__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espacio-md);
+  min-height: var(--sistema-titulo-alto);
+  padding: var(--espacio-xs) var(--espacio-sm);
+  background: var(--sistema-superficie);
+  color: var(--sistema-texto);
+}
+
+.desktop-context-menu__item--selected {
+  background: var(--color-seleccion);
+  color: var(--color-seleccion-texto);
+}
+
+.desktop-context-menu__chevron {
+  flex: 0 0 auto;
+  width: var(--espacio-md);
+  height: var(--espacio-md);
+  stroke-width: var(--sistema-icono-trazo);
+}
+
+.desktop-context-menu--nested {
+  top: -1px;
+  left: 100%;
+  width: var(--sistema-menu-contexto-submenu-ancho);
+}

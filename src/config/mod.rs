@@ -8,13 +8,19 @@ pub enum ConfigError {
     InvalidPort(#[from] std::num::ParseIntError),
 }
 
-/// Configuración de la aplicación cargada desde variables de entorno
+/// Configuracion de la aplicacion cargada desde variables de entorno
 #[derive(Debug, Clone)]
 pub struct AppConfig {
     pub database_url: String,
     pub jwt_secret: String,
     pub host: String,
     pub port: u16,
+    pub stripe_secret_key: Option<String>,
+    pub stripe_webhook_secret: Option<String>,
+    pub upload_dir: String,
+    pub resend_api_key: Option<String>,
+    pub email_from: String,
+    pub frontend_dist: String,
 }
 
 impl AppConfig {
@@ -30,6 +36,16 @@ impl AppConfig {
             port: std::env::var("PORT")
                 .unwrap_or_else(|_| "3000".to_string())
                 .parse()?,
+            stripe_secret_key: std::env::var("GLORY_STRIPE_SECRET_KEY")
+                .or_else(|_| std::env::var("STRIPE_SECRET_KEY"))
+                .ok(),
+            stripe_webhook_secret: std::env::var("GLORY_STRIPE_WEBHOOK_SECRET")
+                .or_else(|_| std::env::var("STRIPE_WEBHOOK_SECRET"))
+                .ok(),
+            upload_dir: std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "uploads".to_string()),
+            resend_api_key: std::env::var("RESEND_API_KEY").ok(),
+            email_from: std::env::var("EMAIL_FROM").unwrap_or_else(|_| "noreply@wandori.us".to_string()),
+            frontend_dist: std::env::var("FRONTEND_DIST").unwrap_or_else(|_| "frontend/dist".to_string()),
         })
     }
 }

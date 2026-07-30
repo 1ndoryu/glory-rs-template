@@ -1,0 +1,125 @@
+/* wandori.us — Design System Variables
+ * Ultra-minimalista B&W. Sin colores, sin sombras, sin bordes redondeados.
+ * Todo se configura desde estas variables. */
+
+:root {
+  /* === COLOR — Solo blanco y negro === */
+  --color-fondo: #dcdcdc;
+  --color-texto: #000000;
+  --color-borde: #000000;
+  --color-texto-secundario: #555555;
+  --color-texto-deshabilitado: #999999;
+  --color-fondo-overlay: rgba(0, 0, 0, 0.3);
+  --color-seleccion: #000000;
+  --color-seleccion-texto: #ffffff;
+
+  /* === BORDES — Siempre 1px, nunca redondeados === */
+  --borde: 1px solid var(--color-borde);
+  --radio: 0;
+
+  /* === TIPOGRAFÍA — Configurable por el usuario === */
+  --fuente-menu: 'Inter', system-ui, sans-serif;
+  --fuente-titulo: 'Inter', system-ui, sans-serif;
+  --fuente-texto: 'Inter', system-ui, sans-serif;
+
+  --tamano-texto: 15px;
+  --tamano-pequeno: 13px;
+  --tamano-grande: 18px;
+  --tamano-titulo: 24px;
+  --tamano-titulo-grande: 32px;
+
+  --linea-altura: 1.6;
+  --linea-altura-titulo: 1.2;
+
+  --menu-size: 15px;
+  --menu-spacing: 0px;
+  --menu-line-height: 2;
+  --menu-opacity: 1;
+  --entrada-title-size: 13px;
+  --entrada-size: 13px;
+  --entrada-opacity: 1;
+  --nav-width: calc(20% + 60px);
+  --profile-width: 120px;
+  --profile-height: 120px;
+  --profile-border: var(--borde);
+  --sidebar-sep-height: 24px;
+  --redes-size: 13px;
+  --redes-gap: 8px;
+
+  /* === WANDORI.OS — Macintosh minimalista === */
+  --sistema-fondo: #ffffff;
+  --sistema-superficie: #ffffff;
+  --sistema-texto: #000000;
+  --fuente-sistema: 'JetBrains Mono', ui-monospace, monospace;
+  --fuente-sistema-pixel: var(--fuente-sistema);
+  --sistema-texto-tamano: 13px;
+  --sistema-barra-alto: 34px;
+  --sistema-tareas-alto: 38px;
+  --sistema-tarea-ancho: 180px;
+  --sistema-tarea-ancho-mobile: 132px;
+  --sistema-menu-contexto-ancho: 180px;
+  --sistema-menu-contexto-submenu-ancho: 280px;
+  --sistema-menu-contexto-texto-tamano: 11px;
+  --sistema-finder-ancho: 620px;
+  --sistema-finder-alto: 500px;
+  --sistema-finder-documento-tamano: 48px;
+  --sistema-reader-ancho: 680px;
+  --sistema-reader-imagen-alto: 320px;
+  --sistema-titulo-alto: 28px;
+  --sistema-control-tamano: 18px;
+  --sistema-control-icono-tamano: 12px;
+  --sistema-logo-tamano: 14px;
+  --sistema-escritorio-alto-min: 560px;
+  --sistema-escritorio-alto-mobile: 680px;
+  --sistema-perfil-ancho: 470px;
+  --sistema-perfil-ancho-tablet: 420px;
+  --sistema-perfil-foto-min: 88px;
+  --sistema-perfil-foto-max: 160px;
+  --sistema-perfil-foto-mobile: 96px;
+  --sistema-contenido-ancho: 720px;
+  --sistema-ventana-ancho-min: 240px;
+  --sistema-icono-celda: 88px;
+  --sistema-icono-celda-mobile: 72px;
+  --sistema-icono-ancho: 44px;
+  --sistema-icono-alto: 32px;
+  --sistema-icono-trazo: 1;
+  --sistema-iconos-reserva: 220px;
+  --sistema-iconos-reserva-tablet: 190px;
+  --sistema-iconos-offset-mobile: 330px;
+  --sistema-iconos-offset-mobile-pequeno: 390px;
+  --sistema-trama-tamano: 8px;
+  --sistema-nombre-espaciado: 0.08em;
+  --sistema-borde-doble: 1px solid var(--sistema-texto);
+  --sistema-trama-escritorio: radial-gradient(circle, rgba(0, 0, 0, 0.12) 0.5px, transparent 0.75px);
+  --sistema-trama-minimizada: repeating-linear-gradient(135deg, transparent 0, transparent 3px, var(--sistema-texto) 3px, var(--sistema-texto) 4px);
+
+  --peso-normal: 400;
+  --peso-medio: 500;
+
+  /* === ESPACIADO === */
+  --espacio-xs: 4px;
+  --espacio-sm: 8px;
+  --espacio-md: 16px;
+  --espacio-lg: 24px;
+  --espacio-xl: 32px;
+  --espacio-2xl: 48px;
+  --espacio-3xl: 64px;
+
+  /* === LAYOUT === */
+  --sidebar-ancho: 280px;
+  --sidebar-alto-max: 700px;
+  --sidebar-ancho-max: 900px;
+  --contenido-max: 720px;
+
+  /* === Z-INDEX === */
+  --z-sidebar: 100;
+  --z-header: 200;
+  --z-modal: 1000;
+  --z-toast: 2000;
+  --z-sistema-iconos: 1;
+  --z-sistema-ventana: 10;
+  --z-sistema-barra: 20;
+
+  /* === TRANSICIONES — Mínimas, funcionales === */
+  --transicion: 0.15s ease;
+}

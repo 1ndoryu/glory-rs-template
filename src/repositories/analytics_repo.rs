@@ -1,0 +1,94 @@
+use sqlx::PgPool;
+use uuid::Uuid;
+
+use crate::models::settings::{AnalyticsStats, RecentEvent, TopArticle, TrackEvent};
+
+pub struct AnalyticsRepository;
+
+impl AnalyticsRepository {
+    pub async fn insert_events(
+        pool: &PgPool,
+        events: &[TrackEvent],
+        ip_hash: Option<&str>,
+        user_agent: Option<&str>,
+    ) -> Result<(), sqlx::Error> {
+        for event in events {
+            let id = Uuid::new_v4();
+            sqlx::query(
+                "INSERT INTO analytics_events (id, event_type, target_type, target_id, metadata, ip_hash, user_agent) \
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)",
+            )
+            .bind(id)
+            .bind(&event.event_type)
+            .bind(&event.target_type)
+            .bind(event.target_id)
+            .bind(&event.metadata)
+            .bind(ip_hash)
+            .bind(user_agent)
+            .execute(pool)
+            .await?;
+        }
+        Ok(())
+    }
+
+    pub async fn get_stats(pool: &PgPool) -> Result<AnalyticsStats, sqlx::Error> {
+        let (page_views,): (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'page_view'")
+                .fetch_one(pool)
+                .await?;
+
+        let (clicks,): (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'click'")
+                .fetch_one(pool)
+                .await?;
+
+        let (downloads,): (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'download'")
+                .fetch_one(pool)
+                .await?;
+
+        let (purchases,): (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM analytics_events WHERE event_type = 'purchase'")
+                .fetch_one(pool)
+                .await?;
+
+        /* Top articulos por page views */
+        let top_articles = sqlx::query_as::<_, (Uuid, String, i64)>(
+            "SELECT a.id, a.title, COUNT(e.id) as views \
+             FROM analytics_events e \
+             JOIN articles a ON a.id::text = e.target_id::text \
+             WHERE e.event_type = 'page_view' AND e.target_type = 'article' \
+             GROUP BY a.id, a.title \
+             ORDER BY views DESC LIMIT 10",
+        )
+        .fetch_all(pool)
+        .await?
+        .into_iter()
+        .map(|(id, title, views)| TopArticle { id, title, views })
+        .collect();
+
+        /* Eventos recientes */
+        let recent_events = sqlx::query_as::<_, (String, Option<String>, chrono::DateTime<chrono::Utc>)>(
+            "SELECT event_type, target_type, created_at \
+             FROM analytics_events ORDER BY created_at DESC LIMIT 20",
+        )
+        .fetch_all(pool)
+        .await?
+        .into_iter()
+        .map(|(event_type, target_type, created_at)| RecentEvent {
+            event_type,
+            target_type,
+            created_at,
+        })
+        .collect();
+
+        Ok(AnalyticsStats {
+            total_page_views: page_views,
+            total_clicks: clicks,
+            total_downloads: downloads,
+            total_purchases: purchases,
+            top_articles,
+            recent_events,
+        })
+    }
+}

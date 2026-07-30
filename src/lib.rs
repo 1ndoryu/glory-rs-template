@@ -14,9 +14,15 @@ pub mod services;
 
 use sqlx::PgPool;
 
-/// Estado compartido de la aplicación — accesible desde handlers y middleware
+/// Estado compartido de la aplicacion — accesible desde handlers y middleware
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
     pub jwt_secret: String,
+    pub upload_dir: String,
+    pub resend_api_key: Option<String>,
+    pub email_from: String,
+    pub stripe_secret_key: Option<String>,
+    pub stripe_webhook_secret: Option<String>,
+    pub site_url: String,
 }

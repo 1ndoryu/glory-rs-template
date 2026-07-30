@@ -1,0 +1,323 @@
+/* wandori.us — Páginas
+ * Estilos específicos por página. */
+
+/* === HOME — Lista de artículos === */
+.entrada {
+  margin-bottom: var(--espacio-2xl);
+  padding-bottom: var(--espacio-2xl);
+  border-bottom: var(--borde);
+}
+
+.entrada:last-child {
+  border-bottom: none;
+}
+
+.entrada-fijada {
+  /* Marcador visual sutil para artículos fijados */
+}
+
+.entrada-fijada::before {
+  content: '·';
+  margin-right: var(--espacio-xs);
+}
+
+.entrada-titulo {
+  font-family: var(--fuente-titulo);
+  font-size: var(--tamano-titulo);
+  font-weight: var(--peso-normal);
+  margin-bottom: var(--espacio-sm);
+}
+
+.entrada-titulo a {
+  text-decoration: none;
+}
+
+.entrada-fecha {
+  font-family: var(--fuente-menu);
+  font-size: var(--tamano-pequeno);
+  color: var(--color-texto-secundario);
+  text-transform: lowercase;
+  margin-bottom: var(--espacio-md);
+}
+
+.entrada-extracto {
+  font-size: var(--tamano-texto);
+  color: var(--color-texto-secundario);
+  line-height: var(--linea-altura);
+}
+
+.entrada-imagen {
+  width: 100%;
+  margin: var(--espacio-md) 0;
+}
+
+/* === ARTÍCULO INDIVIDUAL === */
+.articulo {
+  max-width: var(--contenido-max);
+}
+
+.articulo-titulo {
+  font-family: var(--fuente-titulo);
+  font-size: var(--tamano-titulo-grande);
+  margin-bottom: var(--espacio-sm);
+}
+
+.articulo-fecha {
+  font-family: var(--fuente-menu);
+  font-size: var(--tamano-pequeno);
+  color: var(--color-texto-secundario);
+  text-transform: lowercase;
+  margin-bottom: var(--espacio-xl);
+}
+
+.articulo-contenido {
+  font-size: var(--entrada-size);
+  line-height: var(--linea-altura);
+}
+
+.articulo-contenido p {
+  margin-bottom: var(--espacio-md);
+}
+
+.articulo-contenido img {
+  border: var(--borde);
+  margin: var(--espacio-lg) 0;
+}
+
+.articulo-contenido video {
+  border: var(--borde);
+  margin: var(--espacio-lg) 0;
+  width: 100%;
+}
+
+.articulo-contenido audio {
+  width: 100%;
+  margin: var(--espacio-lg) 0;
+}
+
+/* Botón de compra en artículo */
+.articulo-boton-compra {
+  display: inline-block;
+  margin-top: var(--espacio-md);
+  text-decoration: none;
+  font-family: var(--fuente-menu);
+  font-size: var(--tamano-pequeno);
+  text-transform: lowercase;
+}
+
+/* === ABOUT === */
+.about-contenido {
+  max-width: var(--contenido-max);
+  line-height: var(--linea-altura);
+}
+
+/* === GALERÍA === */
+.galeria-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--espacio-md);
+}
+
+.galeria-item {
+  border: var(--borde);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.galeria-item img {
+  width: 100%;
+  display: block;
+}
+
+/* === PROYECTOS === */
+.proyecto-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: var(--espacio-sm) 0;
+  border-bottom: var(--borde);
+}
+
+.proyecto-item:last-child {
+  border-bottom: none;
+}
+
+.proyecto-titulo {
+  font-family: var(--fuente-titulo);
+  font-size: var(--tamano-texto);
+}
+
+.proyecto-link {
+  font-size: var(--tamano-pequeno);
+  text-decoration: none;
+}
+
+.proyecto-descripcion {
+  font-size: var(--tamano-pequeno);
+  color: var(--color-texto-secundario);
+  margin-top: var(--espacio-xs);
+}
+
+/* === LOGIN === */
+.login-formulario {
+  max-width: 360px;
+  margin: var(--espacio-3xl) auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-lg);
+}
+
+.login-titulo {
+  font-family: var(--fuente-titulo);
+  font-size: var(--tamano-titulo);
+  text-align: center;
+}
+
+/* === ADMIN === */
+.admin-pagina {
+  width: 100%;
+}
+
+.admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--espacio-xl);
+}
+
+.admin-lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-md);
+}
+
+.admin-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--espacio-sm) 0;
+  border-bottom: var(--borde);
+}
+
+.admin-acciones {
+  display: flex;
+  gap: var(--espacio-md);
+}
+
+/* === CONFIGURADOR FUENTES === */
+.config-tabs-nav {
+  display: flex;
+  gap: var(--espacio-lg);
+  margin-bottom: var(--espacio-lg);
+  border-bottom: var(--borde);
+  padding-bottom: var(--espacio-sm);
+}
+
+.config-tabs-content {
+  min-height: 200px;
+}
+
+.config-tab-separador {
+  width: 100%;
+  height: var(--espacio-lg);
+}
+
+.config-tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-lg);
+}
+
+.font-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-lg);
+}
+
+.font-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-xs);
+}
+
+.font-preview {
+  font-size: var(--tamano-grande);
+  margin-top: var(--espacio-sm);
+  padding: var(--espacio-md) 0;
+  border-bottom: var(--borde);
+}
+
+/* === ESTADÍSTICAS === */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--espacio-md);
+  margin-bottom: var(--espacio-lg);
+}
+
+.stats-item {
+  border: var(--borde);
+  padding: var(--espacio-md);
+}
+
+.stats-valor {
+  font-family: var(--fuente-titulo);
+  font-size: var(--tamano-titulo);
+}
+
+.stats-etiqueta {
+  font-size: var(--tamano-pequeno);
+  color: var(--color-texto-secundario);
+  text-transform: lowercase;
+}
+
+/* === CHECKOUT SUCCESS/CANCEL === */
+.checkout-resultado {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--espacio-3xl) 0;
+  gap: var(--espacio-lg);
+}
+
+.checkout-icono {
+  font-size: 48px;
+  font-family: var(--fuente-titulo);
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: var(--borde);
+}
+
+.checkout-titulo {
+  font-family: var(--fuente-titulo);
+  font-size: var(--tamano-titulo);
+  font-weight: var(--peso-normal);
+}
+
+.checkout-mensaje {
+  font-size: var(--tamano-texto);
+  color: var(--color-texto-secundario);
+  max-width: 400px;
+  line-height: var(--linea-altura);
+}
+
+/* === RESPONSIVE === */
+@media (max-width: 768px) {
+  .galeria-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .galeria-grid {
+    grid-template-columns: 1fr;
+  }
+}
