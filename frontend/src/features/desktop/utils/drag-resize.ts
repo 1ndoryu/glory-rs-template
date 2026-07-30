@@ -46,7 +46,7 @@ export function enableDragResize(opts: DragResizeOptions): () => void {
   let resize: ActiveResize | null = null;
   const MIN_W = 200;
   const MIN_H = 150;
-  const EDGE_SIZE = 8;
+  const EDGE_SIZE = 4;
 
   /* ─── Drag (title bar) ─── */
 

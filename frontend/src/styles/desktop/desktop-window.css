@@ -60,6 +60,25 @@
   background: var(--sistema-superficie);
 }
 
+/* Scrollbar más gruesa para distinguir del borde de resize */
+.desktop-window__body::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.desktop-window__body::-webkit-scrollbar-track {
+  background: var(--sistema-superficie);
+}
+
+.desktop-window__body::-webkit-scrollbar-thumb {
+  background: var(--color-borde);
+  border: 2px solid var(--sistema-superficie);
+}
+
+.desktop-window__body::-webkit-scrollbar-thumb:hover {
+  background: var(--sistema-texto);
+}
+
 .desktop-profile-window .profile {
   display: grid;
   grid-template-columns: minmax(var(--sistema-perfil-foto-min), auto) 1fr;
