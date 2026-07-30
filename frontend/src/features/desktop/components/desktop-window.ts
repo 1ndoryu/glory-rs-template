@@ -65,11 +65,19 @@ export function createDesktopWindow(options: DesktopWindowOptions): HTMLElement 
   titleBar.append(closeControl, title, minimizeControl);
   windowElement.append(titleBar);
 
-  /* App toolbar — barra de menús declarativa de la app */
-  if (options.menus && options.menus.length > 0) {
-    const toolbar = createAppToolbar(options.menus);
-    windowElement.appendChild(toolbar);
-  }
+  /* App toolbar — siempre presente. Menú 'Ventana' por defecto + menús de la app. */
+  const allMenus: AppMenu[] = [
+    {
+      label: 'Ventana',
+      items: [
+        { id: 'win:minimize', label: 'Minimizar', icon: Minus, shortcut: 'Ctrl+M', disabled: !options.onMinimize, execute: () => { options.onMinimize?.(); } },
+        { id: '---', label: '---', execute: () => {} },
+        { id: 'win:close', label: 'Cerrar', icon: X, shortcut: 'Esc', disabled: !options.onClose, execute: () => { options.onClose?.(); } },
+      ],
+    },
+    ...(options.menus ?? []),
+  ];
+  windowElement.appendChild(createAppToolbar(allMenus));
 
   const body = document.createElement('div');
   body.className = 'desktop-window__body';

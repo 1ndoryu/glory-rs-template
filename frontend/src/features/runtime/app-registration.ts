@@ -22,6 +22,23 @@ AppRegistry.register({
   requires: 'public',
   routePatterns: ['/gallery'],
   layout: 'full-bleed',
+  menus: [
+    {
+      label: 'Archivo',
+      items: [
+        {
+          id: 'finder:new-folder',
+          label: 'Nueva carpeta',
+          icon: Folder,
+          execute: () => {
+            void import('./workspace/workspace-store').then(({ createFolder }) => {
+              createFolder('desktop', 'Nueva carpeta');
+            });
+          },
+        },
+      ],
+    },
+  ],
   render: (_ctx: RenderContext): MountedView => {
     dispatchEvent({ type: 'app_opened', appId: 'finder' });
 
@@ -187,6 +204,22 @@ AppRegistry.register({
   singleton: true,
   requires: 'public',
   routePatterns: ['/projects'],
+  menus: [
+    {
+      label: 'Archivo',
+      items: [
+        {
+          id: 'projects:new',
+          label: 'Nuevo proyecto',
+          icon: FolderCode,
+          execute: () => {
+            /* Abre el admin legacy — el editor de proyectos del OS vendrá en 297A-14 */
+            void import('../../router').then((r) => r.navigate('/admin'));
+          },
+        },
+      ],
+    },
+  ],
   render: (ctx: RenderContext): MountedView => {
     dispatchEvent({ type: 'app_opened', appId: 'projects' });
 
