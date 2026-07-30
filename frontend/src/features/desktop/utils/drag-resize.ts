@@ -3,7 +3,7 @@
  * Usa pointer events (no mouse) para soporte táctil.
  * Actualiza el DOM directamente durante el arrastre y commitea al windowStore al soltar. */
 
-import { updateWindowBounds, focusWindow } from '../../runtime/window-manager';
+import { updateWindowBounds, focusWindow, clampWindowBounds } from '../../runtime/window-manager';
 
 export interface DragResizeOptions {
   /** Elemento raíz de la ventana (section.desktop-window). */
@@ -51,8 +51,9 @@ export function enableDragResize(opts: DragResizeOptions): () => void {
     if (!isDragging) return;
     const dx = e.clientX - startX;
     const dy = e.clientY - startY;
-    windowEl.style.left = `${startLeft + dx}px`;
-    windowEl.style.top = `${startTop + dy}px`;
+    const clamped = clampWindowBounds(startLeft + dx, startTop + dy, windowEl.offsetWidth, windowEl.offsetHeight);
+    windowEl.style.left = `${clamped.x}px`;
+    windowEl.style.top = `${clamped.y}px`;
   }
 
   function onDragPointerUp(e: PointerEvent): void {
@@ -84,12 +85,13 @@ export function enableDragResize(opts: DragResizeOptions): () => void {
     const dy = e.clientY - startY;
     const minW = 200;
     const minH = 150;
+    const clamped = clampWindowBounds(startLeft, startTop, startW + dx, startH + dy);
 
     if (resizeEdge === 'right' || resizeEdge === 'corner') {
-      windowEl.style.width = `${Math.max(minW, startW + dx)}px`;
+      windowEl.style.width = `${Math.max(minW, clamped.w)}px`;
     }
     if (resizeEdge === 'bottom' || resizeEdge === 'corner') {
-      windowEl.style.height = `${Math.max(minH, startH + dy)}px`;
+      windowEl.style.height = `${Math.max(minH, clamped.h)}px`;
     }
   }
 

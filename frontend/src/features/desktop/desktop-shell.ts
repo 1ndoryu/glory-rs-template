@@ -17,7 +17,7 @@ import {
 import { createDesktopIcon } from './components/desktop-icon';
 import { createDesktopMenuBar } from './components/desktop-menu-bar';
 import { createDesktopWindow } from './components/desktop-window';
-import { windowStore, focusWindow, restoreWindow, closeWindow, minimizeWindow } from '../runtime/window-manager';
+import { windowStore, focusWindow, restoreWindow, closeWindow, minimizeWindow, setWorkspaceBounds } from '../runtime/window-manager';
 import { openAppWindow } from '../runtime/route-app-adapter';
 import { navigate } from '../../router';
 import { authStore } from '../../store';
@@ -140,6 +140,12 @@ export function createDesktopShell(
   windowContainer.style.inset = '0';
   windowContainer.style.pointerEvents = 'none';
   workspace.appendChild(windowContainer);
+
+  /* Notify window-manager of workspace dimensions for boundary clamping.
+   * ResizeObserver fires immediately once the element is in the DOM, so no sync call needed. */
+  new ResizeObserver(() => {
+    setWorkspaceBounds(windowContainer.clientWidth, windowContainer.clientHeight);
+  }).observe(windowContainer);
 
   const renderedWindows = new Map<string, { el: HTMLElement; cleanup: () => void }>();
 

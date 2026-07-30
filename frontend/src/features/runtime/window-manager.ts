@@ -45,6 +45,28 @@ export const windowStore: Store<WindowEntry[]> = createStore([]);
 let nextZIndex = 10;
 let nextWindowId = 1;
 
+/* === Workspace bounds (set by shell after DOM creation) === */
+let workspaceW = 1200;
+let workspaceH = 800;
+
+/** Called once by desktop-shell after the window container is in the DOM. */
+export function setWorkspaceBounds(w: number, h: number): void {
+  workspaceW = w;
+  workspaceH = h;
+}
+
+/** Shared clamp: keeps a window partially visible within the workspace. */
+export function clampWindowBounds(x: number, y: number, w: number, h: number): { x: number; y: number; w: number; h: number } {
+  const minVisible = 60;
+  const titleH = 24;
+  return {
+    x: Math.max(-w + minVisible, Math.min(workspaceW - minVisible, x)),
+    y: Math.max(0, Math.min(workspaceH - titleH, y)),
+    w: Math.min(w, workspaceW),
+    h: Math.min(h, workspaceH),
+  };
+}
+
 function generateWindowId(): string {
   return `win-${nextWindowId++}`;
 }
@@ -74,7 +96,8 @@ export function openWindow(
     w: 640,
     h: 480,
   };
-  const bounds: WindowBounds = { ...defaults, ...initialBounds };
+  const raw: WindowBounds = { ...defaults, ...initialBounds };
+  const bounds = clampWindowBounds(raw.x, raw.y, raw.w, raw.h);
 
   /* Desenfocar todas las existentes */
   const updated = existing.map(w => ({ ...w, focused: false }));
