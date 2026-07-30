@@ -2,6 +2,7 @@
  * Pagina de login minimalista. Solo email + password.
  * [Auditoría v4 §1.2] Migrado a createEl(). */
 
+import { safeRun } from '../utils/safe-async';
 import { AuthService } from '../services';
 import { navigate } from '../router';
 import { showToast } from '../components/ui/toast';
@@ -43,14 +44,12 @@ export function renderLogin(): HTMLElement {
     btnLogin.textContent = 'entrando...';
     errorMsg.style.display = 'none';
 
-    try {
-      await AuthService.login(email, password);
+    const result = await safeRun(AuthService.login(email, password), 'credenciales incorrectas');
+    btnLogin.textContent = 'entrar';  /* Restaurar texto siempre */
+
+    if (result.ok) {
       showToast('sesion iniciada');
       navigate('/admin');
-    } catch {
-      errorMsg.textContent = 'credenciales incorrectas';
-      errorMsg.style.display = 'block';
-      btnLogin.textContent = 'entrar';
     }
   });
 

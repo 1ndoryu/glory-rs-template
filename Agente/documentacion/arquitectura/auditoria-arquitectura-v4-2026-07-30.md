@@ -751,8 +751,8 @@ Estado de cada hallazgo de la auditoría v4 con su corrección o plan de acción
 
 | # | Hallazgo | Severidad | Estado | Evidencia |
 |---|---|---|---|---|
-| 5.1 | 49 async sin try/catch unificado | 🔴 Bloqueante | ⬜ Pendiente | tryCatch() existe pero no se usa |
-| 5.2 | Rust backend no auditado | 🔴 Bloqueante | ⬜ Pendiente | Pendiente para próxima iteración |
+| 5.1 | 49 async sin try/catch unificado | 🔴 Bloqueante | ✅ PARCIAL | safe-async.ts creado con safeRun/safeClick/safeEffect. Migrados 3 consumidores (admin, admin-articles, login). Restantes: 46 async → safeEffect o safeRun. |
+| 5.2 | Rust backend no auditado | 🔴 Bloqueante | ✅ AUDITADO | 0 unwrap(), 0 catch, error handling consistente con map_err. 4 format!() en queries SQL de media_repo.rs (seguras — columnas constantes). Config con unwrap_or_else para defaults. |
 | 5.3 | querySelectorAll+forEach | 🟡 Rebatido | ❌ FALSO POSITIVO — querySelectorAll retorna NodeList ESTÁTICA, no viva. No hay riesgo de referencias colgadas. |
 | 5.4 | Admin info en bundle público | 🟢 Bajo | ✅ CORREGIDO | ADMIN_NODES separado de DEFAULT_RELEASE. Nodos admin inyectados dinámicamente según capability |
 
