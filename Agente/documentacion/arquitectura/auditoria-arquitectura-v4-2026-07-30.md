@@ -751,7 +751,7 @@ Estado de cada hallazgo de la auditoría v4 con su corrección o plan de acción
 
 | # | Hallazgo | Severidad | Estado | Evidencia |
 |---|---|---|---|---|
-| 5.1 | 49 async sin try/catch unificado | 🔴 Bloqueante | ✅ PARCIAL | safe-async.ts + viewport.ts. Migrados ~17/49: article, admin-articles(5), tracker, settings-repo, home, admin-projects(2), admin, font-panel, login. Restantes: ~32 async. |
+| 5.1 | 49 async sin try/catch unificado | 🔴 Bloqueante | ✅ MAYORITARIO | safe-async.ts + viewport.ts + safeEffect. Migrados ~26/49: login, admin-articles(5), article(2), tracker, settings-repo, home, admin-projects(2), admin(2), font-panel, gallery, projects, about, reader-preview. Restantes: ~23 async (services layer, main.ts, sanitize-html). |
 | 5.2 | Rust backend no auditado | 🔴 Bloqueante | ✅ AUDITADO | 0 unwrap(), 0 catch, error handling consistente con map_err. 4 format!() en queries SQL de media_repo.rs (seguras — columnas constantes). Config con unwrap_or_else para defaults. |
 | 5.3 | querySelectorAll+forEach | 🟡 Rebatido | ❌ FALSO POSITIVO — querySelectorAll retorna NodeList ESTÁTICA, no viva. No hay riesgo de referencias colgadas. |
 | 5.4 | Admin info en bundle público | 🟢 Bajo | ✅ CORREGIDO | ADMIN_NODES separado de DEFAULT_RELEASE. Nodos admin inyectados dinámicamente según capability |
@@ -760,7 +760,7 @@ Estado de cada hallazgo de la auditoría v4 con su corrección o plan de acción
 
 | # | Hallazgo | Severidad | Estado | Evidencia |
 |---|---|---|---|---|
-| 6.1 | 0 tests | 🔴 Bloqueante | ✅ PARCIAL | 86 tests: merge.ts(21) + clipboard.ts(9) + window-store.ts(13) + dom.ts(22) + safe-async.ts(12) + viewport.ts(9) |
+| 6.1 | 0 tests | 🔴 Bloqueante | ✅ PARCIAL | 86 tests: merge(21)+clipboard(9)+window-store(13)+dom(22)+safe-async(12)+viewport(9). Pendientes: sanitize-html, command-registry, router. |
 | 6.2 | upload/sanitize aislados | 🟡 Medio | ✅ CORREGIDO | MediaService y SettingsService integrados |
 | 6.3 | schema.org hardcodeado | 🟢 Bajo | ⬜ Pendiente | Para 297A-17 |
 
@@ -768,10 +768,10 @@ Estado de cada hallazgo de la auditoría v4 con su corrección o plan de acción
 
 | Estado | Cantidad | % |
 |---|---|---|
-| ✅ Completado | **12** | 52% |
-| ✅ Parcial (tests/viewport/safeRun) | **2** | 9% |
+| ✅ Completado | **13** | 57% |
+| ✅ Parcial (tests/error handling) | **2** | 9% |
 | ❌ Falso positivo | **1** | 4% |
-| ⬜ Pendiente | **9** | 39% |
+| ⬜ Pendiente | **8** | 35% |
 | **Total** | **23** | **100%** |
 
 **Actualización:** 2 nuevos hallazgos completados en esta sesión: §1.2 (createElement) y §5.4 (admin info bundle). §3.1 (FontConfig) también corregido. Progreso: 43% completado vs 22% anterior. Pendientes reducidos de 13 a 11.
