@@ -760,7 +760,7 @@ Estado de cada hallazgo de la auditoría v4 con su corrección o plan de acción
 
 | # | Hallazgo | Severidad | Estado | Evidencia |
 |---|---|---|---|---|
-| 6.1 | 0 tests | 🔴 Bloqueante | ✅ PARCIAL | 86 tests: merge(21)+clipboard(9)+window-store(13)+dom(22)+safe-async(12)+viewport(9). Pendientes: sanitize-html, command-registry, router. |
+| 6.1 | 0 tests | 🔴 Bloqueante | ✅ MAYORITARIO | 121 tests: merge(21)+clipboard(9)+window-store(13)+dom(22)+safe-async(12)+viewport(9)+sanitize-html(24)+router(11). Pendientes: command-registry. |
 | 6.2 | upload/sanitize aislados | 🟡 Medio | ✅ CORREGIDO | MediaService y SettingsService integrados |
 | 6.3 | schema.org hardcodeado | 🟢 Bajo | ⬜ Pendiente | Para 297A-17 |
 
@@ -768,10 +768,10 @@ Estado de cada hallazgo de la auditoría v4 con su corrección o plan de acción
 
 | Estado | Cantidad | % |
 |---|---|---|
-| ✅ Completado | **15** | 65% |
+| ✅ Completado | **16** | 70% |
 | ✅ Parcial (tests/error handling) | **2** | 9% |
 | ❌ Falso positivo | **1** | 4% |
-| ⬜ Pendiente | **6** | 26% |
+| ⬜ Pendiente | **5** | 22% |
 | **Total** | **23** | **100%** |
 
 **Actualización:** 2 nuevos hallazgos completados en esta sesión: §1.2 (createElement) y §5.4 (admin info bundle). §3.1 (FontConfig) también corregido. Progreso: 43% completado vs 22% anterior. Pendientes reducidos de 13 a 11.
