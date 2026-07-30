@@ -1,8 +1,8 @@
 # Auditoría de arquitectura y escalabilidad — Frontend wandori.us
 
-> **Fecha:** 2026-07-30
+> **Fecha:** 2026-07-30 (actualizado)
 > **Alcance:** frontend TypeScript/Vite del OS desktop
-> **Resultado:** 3 violaciones de tamaño, 5 problemas de escalabilidad, 4 fortalezas identificadas
+> **Resultado:** 3 violaciones de tamaño, 5 problemas de escalabilidad, 1 falla arquitectónica crítica (Finder), 4 fortalezas identificadas
 > **Plan asociado:** `Agente/planes/plan-refactorizacion-architectura-2026-07-30.md`
 
 ## 1. Métricas del codebase
@@ -193,7 +193,265 @@ Store event typing (#6) es necesario antes de 297A-13 (overlay remoto).
 
 ---
 
-## 7. Referencias
+## 7. Falla arquitectónica crítica: Finder no es un explorador de archivos
+
+> **Severidad:** bloquea la experiencia base del OS. Todos los problemas de Finder/Galería reportados por el usuario tienen una causa raíz común.
+
+### 7.1 Problemas reportados
+
+1. Crear carpeta dentro de Galería → se crea en el escritorio, no dentro de Galería
+2. Clic derecho dentro de Galería → no abre menú contextual
+3. Galería parece una app estática, no una carpeta genuina de archivos
+4. No se pueden arrastrar archivos de Galería al escritorio
+5. No se pueden abrir las imágenes de Galería
+6. Al crear una carpeta en el escritorio y hacer clic → abre Galería pero no navega a esa carpeta
+7. ¿Es escalable añadir nuevas apps? (ej: calculadora)
+
+### 7.2 Causa raíz: Finder es un preview hardcodeado, no un file browser
+
+**`finder-preview.ts`** contiene datos estáticos:
+
+```typescript
+const folderImages = [
+  { src: '/legacy-assets/colors/...', label: 'color_01.jpg', ... },
+  { src: '/legacy-assets/colors/...', label: 'flores_02.jpg', ... },
+  { src: '/legacy-assets/colors/...', label: 'forma_03.png', ... },
+];
+const folderDocuments = ['El silencio de las máquinas', 'Fragmentos de código'];
+```
+
+Estos arrays son **literales de código**, no leen de `workspaceStore`, `default-release.ts`, ni del backend. Finder ignora completamente el modelo de datos del workspace.
+
+### 7.3 El gap conceptual: `type: 'folder'` vs `type: 'app'`
+
+En `default-release.ts`, "Galería" es un nodo `type: 'app'` con `refId: 'finder'`:
+
+```typescript
+gallery: { id: 'gallery', type: 'app', refId: 'finder', ... }
+```
+
+Esto significa que **no existe ningún nodo `type: 'folder'` real en el release**. Los nodos de tipo `'folder'` solo se crean con `createFolder()` y carecen de `refId`.
+
+Cuando el usuario hace clic en un icono del escritorio, `desktop-shell.ts` decide:
+
+```typescript
+const onActivate = node.refId
+  ? () => openAppWindow(node.refId!)      // apps → abre la app
+  : node.type === 'folder'
+    ? () => openAppWindow('finder')         // folders → abre Finder genérico
+    : undefined;                            // otros → ignora
+```
+
+**Problema:** Abrir Finder genérico no navega a la carpeta clickeada. Finder siempre muestra los mismos datos hardcodeados sin importar qué carpeta se abrió.
+
+### 7.4 Análisis de cada problema
+
+| # | Problema | Causa técnica | Código responsable |
+|---|---|---|---|
+| 1 | Carpeta se crea en escritorio | `finder:new-folder` hardcodea `createFolder('desktop', ...)` | `command-registration.ts:642` |
+| 2 | Clic derecho no funciona | Context menu solo se registra en `workspace` e `icon`, nunca dentro de Finder | `desktop-shell.ts:108,210` |
+| 3 | Galería es app estática | Finder preview tiene datos literales, no lee workspaceStore | `finder-preview.ts:10-25` |
+| 4 | No se pueden arrastrar archivos | Items de Finder no tienen drag handlers ni conexión con workspace | `finder-preview.ts` (sin drag) |
+| 5 | No se abren imágenes | Solo documentos tienen click handler → navigate. Imágenes son `<figure>` sin interacción | `finder-preview.ts:45-57` |
+| 6 | Clic en carpeta no navega | `openAppWindow('finder')` es singleton genérico, no pasa nodeId | `desktop-shell.ts:89` |
+
+### 7.5 Diseño propuesto: Finder como file browser real
+
+**Principio:** Finder es el explorador de archivos del OS. Debe leer de `workspaceStore` y mostrar los hijos de un nodo dado. Cada carpeta del escritorio abre una ventana de Finder apuntando a esa carpeta.
+
+#### Cambio 1: Finder lee de workspaceStore
+
+```typescript
+// En vez de datos hardcodeados:
+export function createFinderPreview(options: FinderPreviewOptions): HTMLElement {
+  // Suscribirse a workspaceStore y mostrar hijos de options.folderId
+  workspaceStore.subscribe((ws) => {
+    const children = Object.values(ws.nodes)
+      .filter(n => n.parentId === options.folderId);
+    renderChildren(grid, children, options);
+  });
+}
+```
+
+#### Cambio 2: Finder no es singleton
+
+```typescript
+AppRegistry.register({
+  id: 'finder',
+  singleton: false,  // Permitir múltiples ventanas (una por carpeta abierta)
+  // ...
+});
+```
+
+#### Cambio 3: Carpetas abren Finder con contexto
+
+```typescript
+// desktop-shell.ts — folder activation
+: node.type === 'folder'
+  ? () => openFinderWindow(node.id)  // Pasa el nodeId de la carpeta
+  : undefined
+```
+
+#### Cambio 4: finder:new-folder crea en el contexto actual
+
+```typescript
+// Command recibe el folderId del Finder activo
+execute: (ctx?: CommandContext): CommandResult => {
+  const currentFolderId = getActiveFinderFolderId() ?? 'desktop';
+  createFolder(currentFolderId, 'Nueva carpeta');
+  return { status: 'success' };
+}
+```
+
+#### Cambio 5: Finder items son arrastrables
+
+Los hijos renderizados en Finder deben usar `enableIconDrag` o un drag handler que:
+- Al arrastrar al escritorio → mueve el nodo a `parentId: 'desktop'`
+- Al arrastrar a otra carpeta → mueve el nodo a ese `parentId`
+
+#### Cambio 6: Context menu dentro de Finder
+
+```typescript
+grid.addEventListener('contextmenu', (e) => {
+  const item = (e.target as HTMLElement).closest('.desktop-finder__item');
+  if (item) {
+    openContextMenu({ context: 'finder-item', targets: [...], ... });
+  } else {
+    openContextMenu({ context: 'finder', targets: [{ id: folderId }], ... });
+  }
+});
+```
+
+### 7.6 Implicaciones para el modelo de datos
+
+El workspace model actual (`types.ts`) ya soporta carpetas con hijos via `parentId`. El gap no está en el modelo sino en **ninguna parte del código lee los hijos de una carpeta para renderizarlos**.
+
+`workspaceStore.get().nodes` contiene todos los nodos. `getChildren(parentId)` ya existe en `workspace-store.ts`. Lo que falta es:
+
+1. Un componente `WorkspaceFileBrowser` que reciba un `folderId` y renderice sus hijos
+2. Finder use ese componente en vez de datos hardcodeados
+3. Que los hijos renderidos sean interactivos (abrir, arrastrar, menú contextual)
+
+### 7.7 Impacto en roadmap
+
+Este gap debería resolverse **dentro de 297A-11** (workspace + overlay) porque:
+- 297A-11 ya define el workspace con carpetas y nodos hijos
+- Sin Finder funcional, el overlay invitado no tiene forma de ver sus carpetas
+- El clipboard (copiar/pegar) ya está implementado pero no tiene dónde mostrar resultados
+- La papelera ya lista nodos tombstonados pero no se pueden restaurar visualmente
+
+---
+
+## 8. Escalabilidad de creación de nuevas apps
+
+### 8.1 Proceso actual para añadir una app
+
+Para añadir una calculadora, el proceso sería:
+
+```typescript
+// 1. Crear componente (1 archivo)
+// frontend/src/features/desktop/apps/calculator/calculator-preview.ts
+export function createCalculatorPreview(): HTMLElement { ... }
+
+// 2. Registrar en app-registration.ts (1 bloque)
+AppRegistry.register({
+  id: 'calculator',
+  title: 'Calculadora',
+  icon: Calculator,  // de lucide
+  iconType: 'application',
+  singleton: true,
+  requires: 'public',
+  render: (ctx: RenderContext): MountedView => {
+    return { element: createCalculatorPreview(), destroy: () => {} };
+  },
+});
+
+// 3. Añadir al default-release.ts (1 nodo)
+calculator: {
+  id: 'calculator',
+  parentId: 'desktop',
+  type: 'app',
+  label: 'Calculadora',
+  refId: 'calculator',
+  position: { col: 1, row: 1 },
+  requires: 'public',
+},
+```
+
+**Evaluación:** ✅ Razonablemente simple. Tres archivos, ~30 líneas nuevas. AppDefinition como contrato es sólido.
+
+### 8.2 Problemas de escalabilidad para apps futuras
+
+| Problema | Descripción | Solución |
+|---|---|---|
+| **Bundle size** | Todas las apps se importan en `app-registration.ts` (side-effect en main.ts). 10 apps = todo el código cargado al inicio. | Lazy loading: `render: async (ctx) => { const m = await import('./calculator'); return m.render(ctx); }` |
+| **Singleton vs multi-instancia** | `singleton: true` impide abrir dos Finder distintos (dos carpetas). `singleton: false` permite infinitas ventanas. No hay `maxInstances`. | Añadir `maxInstances?: number` a AppDefinition |
+| **Sin parámetros de instancia** | `openAppWindow('finder')` no puede pasar qué carpeta abrir. El render function solo recibe `RenderContext` (signal). | Añadir `params?: Record<string, string>` a RenderContext y openAppWindow |
+| **Sin hot registration** | Añadir una app requiere modificar 3 archivos. No hay plugin system ni dynamic discovery. | Futuro: `AppRegistry.registerLazy({ id, load: () => import(...) })` |
+
+### 8.3 Gap crítico: RenderContext no tiene parámetros
+
+El `RenderContext` actual:
+
+```typescript
+interface RenderContext {
+  signal: AbortSignal;
+}
+```
+
+No hay forma de pasar parámetros como `folderId`, `articleSlug`, o `productId` al render de una app. Esto bloquea:
+
+- Finder con contexto de carpeta
+- Reader con slug de artículo
+- Editor con ID de recurso
+- Cualquier app que necesite saber qué instancia mostrar
+
+**Solución propuesta:**
+
+```typescript
+interface RenderContext {
+  signal: AbortSignal;
+  params?: Record<string, string>;  // Parámetros de instancia
+}
+```
+
+Y en `openAppWindow`:
+
+```typescript
+export async function openAppWindow(
+  appId: string,
+  params?: Record<string, string>,
+): Promise<void> { ... }
+```
+
+Esto permite `openAppWindow('finder', { folderId: 'mi-carpeta-123' })`.
+
+---
+
+## 9. Actualización de recomendaciones
+
+### Prioridad inmediata (297A-11)
+
+| # | Tarea | Impacto | Bloquea |
+|---|---|---|---|
+| 1 | Añadir `params` a RenderContext y openAppWindow | Crítico | Finder real, Editor, todos los flujos |
+| 2 | Reescribir Finder como file browser que lee workspaceStore | Crítico | Experiencia base del OS |
+| 3 | Finder no-singleton con folderId como parámetro | Alto | Abrir múltiples carpetas |
+| 4 | Context menu dentro de Finder (items + fondo) | Alto | Interacción básica |
+| 5 | Drag de items Finder → escritorio/otra carpeta | Medio | Flujo de archivos |
+| 6 | Split de los 3 archivos grandes | Medio | Escalabilidad del código |
+
+### Futuro (297A-12+)
+
+| # | Tarea | Impacto |
+|---|---|---|
+| 7 | Lazy loading de apps | Bundle size |
+| 8 | CSS layers | Conflictos de specificity |
+| 9 | Store event typing | Overlay remoto |
+
+---
+
+## 10. Referencias
 
 - Manual de arquitectura: `Agente/documentacion/arquitectura/manual-arquitectura-wandorius-2026-07-29.md`
 - AGENTS.md §8: Estándares esenciales (límites de tamaño)

@@ -1,23 +1,37 @@
 # Plan de refactorización arquitectónica — Frontend wandori.us
 
-> **Fecha:** 2026-07-30
+> **Fecha:** 2026-07-30 (actualizado)
 > **Estado:** activo
-> **Auditoría:** `Agente/documentacion/arquitectura/auditoria-arquitectura-frontend-2026-07-30.md`
+> **Auditoría:** `Agente/documentacion/arquitectura/auditoria-arquitectura-frontend-2026-07-30.md` (§7, §8)
 > **Depende de:** 297A-11 parcial (workspace overlay implementado)
 > **Bloquea:** 297A-12 (móvil), 297A-14 (editors), testing unitario
 
 ## 1. Objetivo
 
-Reducir la deuda técnica del frontend antes de expandir a móvil, editors y comercio. Los 3 archivos que exceden el límite de 300 líneas (AGENTS.md §8) se dividen en módulos por responsabilidad. Sin cambios de comportamiento — solo reorganización.
+Resolver la falla arquitectónica crítica de Finder (no es un file browser real) y reducir la deuda técnica del frontend. La auditoría profunda (§7) identificó que Finder es un preview hardcodeado que ignora el workspace model — esto bloquea la experiencia base del OS.
 
 ## 2. Dependencias
 
-- Ninguna tarea del roadmap se modifica.
-- Los splits son mecánicos (mover código, actualizar imports, crear barrel exports).
+- Los cambios de Finder (Fase 0) son **funcionales** — cambian comportamiento.
+- Los splits (Fases 1-3) son **mecánicos** — solo reorganización.
 - TypeScript check debe pasar después de cada fase.
-- No se añade funcionalidad nueva.
 
 ## 3. Fases
+
+### Fase 0: RenderContext con parámetros + Finder real
+
+**Gate:** Finder abre carpeta del escritorio mostrando sus hijos del workspaceStore. Clic derecho funciona dentro de Finder. Múltiples carpetas abren ventanas distintas.
+
+- [ ] Añadir `params?: Record<string, string>` a `RenderContext` en `lifecycle.ts`.
+- [ ] Añadir `params?` a `openAppWindow()` en `route-app-adapter.ts` y pasarlos a `AppRegistry.instantiate()`.
+- [ ] Añadir `params?` a `openWindow()` en `window-manager.ts` y `WindowEntry`.
+- [ ] Reescribir `finder-preview.ts` como `WorkspaceFileBrowser` que recibe `folderId` y renderiza hijos de `workspaceStore`.
+- [ ] Hacer Finder `singleton: false` en `app-registration.ts`.
+- [ ] Actualizar activación de carpetas en `desktop-shell.ts`: `openAppWindow('finder', { folderId: node.id })`.
+- [ ] Actualizar `finder:new-folder` para crear en el contexto actual (no hardcoded 'desktop').
+- [ ] Añadir context menu dentro de Finder (items y fondo vacío).
+- [ ] Hacer items de Finder clickeables (abrir recurso/app) y arrastrables.
+- [ ] Verificar: abrir carpeta → ver hijos, clic derecho → menú, arrastrar → mover, crear carpeta → dentro de la actual.
 
 ### Fase 1: Split de `command-registration.ts` (725 → 6 módulos)
 
@@ -87,10 +101,10 @@ Reducir la deuda técnica del frontend antes de expandir a móvil, editors y com
 | 2 | 4 (`workspace/merge.ts`, `overlay-mutations.ts`, `clipboard.ts`, `index.ts`) | 8+ (todos los que importan workspace-store) | 0 |
 | 3 | 2 (`workspace-icon-grid.ts`, `reactive-taskbar.ts`) | 1 (`desktop-shell.ts`) | 0 |
 
-## 7. Qué NO se hace en este plan
+## 8. Qué NO se hace en este plan
 
-- Lazy loading de apps (pendiente 297A-14).
 - CSS layers (pendiente 297A-14/16).
 - Store event typing (pendiente 297A-13).
 - Command namespaces formales (pendiente 297A-14).
 - Tests unitarios (pendiente configurar vitest).
+- Lazy loading de apps (se puede hacer en paralelo con 297A-14).
