@@ -107,9 +107,10 @@ async function initApp(): Promise<void> {
   });
 
   /* Control de visibilidad del profile:
-   * Se oculta cuando se esta viendo un articulo */
+   * Se oculta cuando se esta viendo un articulo.
+   * Usa setProfileVisible para mantener taskbar sincronizado. */
   showProfile.subscribe((visible) => {
-    desktop.profileWindow.style.display = visible ? '' : 'none';
+    desktop.setProfileVisible(visible);
     /* Cuando no hay profile, centrar el contenido */
     if (visible) {
       columnaDerecha.classList.remove('columna-derecha--sin-profile');

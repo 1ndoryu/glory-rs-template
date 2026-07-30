@@ -30,6 +30,8 @@ export interface DesktopShell {
   element: HTMLElement;
   profileWindow: HTMLElement;
   contentWindow: HTMLElement;
+  /** Controlar visibilidad del profile y actualizar taskbar. */
+  setProfileVisible(visible: boolean): void;
 }
 
 interface DesktopIconItem {
@@ -119,14 +121,16 @@ export function createDesktopShell(
   const workspace = document.createElement('div');
   workspace.className = 'desktop-workspace';
 
-  /* Ventana de perfil — draggable y minimizable */
+  /* Ventana de perfil — draggable, minimizable y cerrable */
+  let profileVisible = true;
   const profileWindow = createDesktopWindow({
     title: 'Perfil',
     content: profile,
     className: 'desktop-profile-window',
     active: true,
     resizable: true,
-    onMinimize: () => { profileWindow.style.display = 'none'; },
+    onClose: () => { setProfileVisible(false); },
+    onMinimize: () => { setProfileVisible(false); },
   });
   /* Activar drag/resize en ventana de perfil */
   const profileTitleBar = profileWindow.querySelector('.desktop-window__titlebar') as HTMLElement;
@@ -174,7 +178,29 @@ export function createDesktopShell(
   });
 
   /* Taskbar reactivo */
-  const taskbar = createReactiveTaskbar();
+  const { element: taskbar, taskList } = createReactiveTaskbar();
+
+  /* Perfil en taskbar — siempre visible, restaura la ventana al hacer click */
+  const profileTask = document.createElement('button');
+  profileTask.type = 'button';
+  profileTask.className = 'desktop-taskbar__task desktop-taskbar__task--profile desktop-taskbar__task--active';
+  const profileIconSvg = createElement(FileUser);
+  profileIconSvg.classList.add('desktop-taskbar__icon');
+  const profileIconWrap = document.createElement('span');
+  profileIconWrap.className = 'desktop-taskbar__icon';
+  profileIconWrap.appendChild(profileIconSvg);
+  const profileLabel = document.createElement('span');
+  profileLabel.className = 'desktop-taskbar__label';
+  profileLabel.textContent = 'Perfil';
+  profileTask.append(profileIconWrap, profileLabel);
+  profileTask.addEventListener('click', () => {
+    setProfileVisible(true);
+  });
+  taskList.prepend(profileTask);
+
+  function updateProfileTaskbar(): void {
+    profileTask.className = `desktop-taskbar__task desktop-taskbar__task--profile${profileVisible ? ' desktop-taskbar__task--active' : ' desktop-taskbar__task--minimized'}`;
+  }
 
   shell.append(createDesktopMenuBar(), workspace, taskbar);
 
@@ -272,14 +298,20 @@ export function createDesktopShell(
     }
   });
 
-  return { element: shell, profileWindow, contentWindow };
+  function setProfileVisible(visible: boolean): void {
+    profileWindow.style.display = visible ? '' : 'none';
+    profileVisible = visible;
+    updateProfileTaskbar();
+  }
+
+  return { element: shell, profileWindow, contentWindow, setProfileVisible };
 }
 
 /**
  * Taskbar reactivo que se suscribe a windowStore.
  * Renderiza una tarea por ventana abierta.
  */
-function createReactiveTaskbar(): HTMLElement {
+function createReactiveTaskbar(): { element: HTMLElement; taskList: HTMLElement } {
   const taskbar = document.createElement('footer');
   taskbar.className = 'desktop-taskbar';
   taskbar.setAttribute('aria-label', 'Ventanas abiertas');
@@ -296,7 +328,9 @@ function createReactiveTaskbar(): HTMLElement {
 
   /* Suscribirse a windowStore */
   windowStore.subscribe((windows) => {
-    taskList.innerHTML = '';
+    /* Limpiar solo entradas de apps (no la del perfil) */
+    const appTasks = taskList.querySelectorAll('.desktop-taskbar__task:not(.desktop-taskbar__task--profile)');
+    appTasks.forEach(el => el.remove());
 
     for (const win of windows) {
       const item = document.createElement('button');
@@ -340,5 +374,5 @@ function createReactiveTaskbar(): HTMLElement {
     }
   });
 
-  return taskbar;
+  return { element: taskbar, taskList };
 }
