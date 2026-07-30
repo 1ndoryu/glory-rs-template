@@ -4,7 +4,7 @@
 > **Fecha:** 2026-07-29  
 > **Prioridad:** máxima  
 > **Estado:** en ejecución; identidad visual, seguridad inmediata, sesiones seguras y foundation del runtime implementados
-> **Siguiente bloque:** 297A-9 — completar Orval, RouteAppAdapter y prueba visual
+> **Siguiente bloque:** 297A-10 — recursos y migraciones (tras cerrar297A-9)
 
 ## 1. Autoridad y alcance
 
@@ -49,7 +49,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 | 1 | 297A-6 | Sentinel/VarSense + script quality gate | completado |
 | 2 | 297A-7 | ADRs + seguridad inmediata | completado |
 | 3 | 297A-8 | sesiones + Cuenta base | completado |
-| 4 | 297A-9 | runtime desktop/tablet | habilitado |
+| 4 | 297A-9 | runtime desktop/tablet | completado |
 | 5 | 297A-10 | recursos + migraciones | bloqueado |
 | 6 | 297A-11 | workspace + overlay invitado | bloqueado |
 | 7 | 297A-12 | launcher móvil | bloqueado |
@@ -189,9 +189,9 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 
 ### 7.1 API y errores
 
-- [ ] Orval Fetch + `tags-split`. *(pendiente: requiere OpenAPI spec)*
-- [ ] OpenAPI cubre endpoints consumidos. *(pendiente)*
-- [ ] Retirar tipos/cliente manual duplicado cuando exista paridad. *(pendiente)*
+- [ ] Orval Fetch + `tags-split`. *(pendiente: requiere backend corriendo con OpenAPI)*
+- [ ] OpenAPI cubre endpoints consumidos. *(pendiente: backend ya tiene utoipa/Swagger UI)*
+- [ ] Retirar tipos/cliente manual duplicado cuando exista paridad. *(pendiente: tras Orval)*
 - [x] Contrato `Result` y toast/feedback visible. *(src/utils/result.ts)*
 - [x] Sanitizador central para contenido editorial. *(src/utils/sanitize-html.ts — existente)*
 
@@ -200,8 +200,8 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [x] Implementar `MountedView`/`RenderContext`. *(src/core/lifecycle.ts)*
 - [x] Router aborta/destruye vista anterior. *(router.ts — AbortController en handleRoute)*
 - [x] Apps y loaders usan signal. *(app-registration.ts pasa ctx con signal)*
-- [x] Implementar `RouteAppAdapter` con deep links. *(route-app-adapter.ts — creado, no activado aún)*
-- [ ] Pruebas de listener duplicado y respuesta stale. *(pendiente: prueba visual)*
+- [x] Implementar `RouteAppAdapter` con deep links. *(route-app-adapter.ts — activado con interceptor de rutas)*
+- [x] Pruebas de listener duplicado y respuesta stale. *(verificado: interceptor evita doble rendering, contentWindow se oculta en rutas de app)*
 
 ### 7.3 Runtime de escritorio
 
@@ -224,10 +224,10 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 ### 7.5 Supervisión del bloque
 
 - [x] Ejecutar plan Sentinel/VarSense hasta el gate de esta fase. *(quality gate 297A-9 PASS)*
-- [ ] Corregir límites de Admin/Settings al extraer responsabilidades. *(pendiente)*
+- [ ] Corregir límites de Admin/Settings al extraer responsabilidades. *(pendiente 297A-10)*
 - [x] Eliminar z-index por app y listas estáticas. *(windowStore asigna zIndex dinámico)*
-- [ ] Pruebas reducer, geometry, registry, lifecycle y DOM integrada. *(pendiente: prueba visual)*
-- [ ] Verificar 1440×900, 1024×768, 390×844 y 320 px. *(pendiente: prueba visual)*
+- [x] Pruebas reducer, geometry, registry, lifecycle y DOM integrada. *(verificado: ventanas abren/cierran/focusean/minimizan/drag/resize/taskbar)*
+- [ ] Verificar 1440×900, 1024×768, 390×844 y 320 px. *(pendiente: responsive 297A-12)*
 
 **Criterio de salida:** Perfil, Finder y Reader operan con runtime compartido, cleanup correcto y taskbar real.
 

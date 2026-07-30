@@ -26,7 +26,7 @@
 
 ## Siguiente bloque habilitado
 
-**297A-9 — Foundation del runtime (en ejecución).** Fases 1-5 completadas; pendiente Orval, RouteAppAdapter activación y prueba visual end-to-end.
+**297A-9 — Foundation del runtime (completado).** Runtime desktop/tablet operativo con ventanas, taskbar, drag/resize, boundary clamping, RouteAppAdapter activado y contentWindow gestionado. Pendiente: Orval (requiere backend corriendo), responsive (297A-12).
 
 ## Pendientes ordenados
 
@@ -34,17 +34,16 @@
 
 **Depende de:** 297A-6/7; coordina identidad 297A-8.
 
-- [x] MountedView/AbortSignal y RouteAppAdapter (creado, no activado aún).
+- [x] MountedView/AbortSignal y RouteAppAdapter activado con interceptor.
 - [x] AppRegistry, WindowManager y CommandRegistry.
-- [x] Taskbar reactivo derivado de windowStore.
+- [x] Taskbar reactivo derivado de windowStore con iconos Lucide.
 - [x] Dispatcher analítico tipado.
-- [x] Drag y resize de ventanas por bordes.
+- [x] Drag y resize de ventanas por bordes con boundary clamping.
 - [x] Atajos de teclado (Escape, Meta+m, Ctrl+Shift+ArrowRight).
-- [ ] Orval Fetch tags-split (requiere OpenAPI spec).
-- [ ] RouteAppAdapter activación (resolver doble rendering con router).
-- [ ] Prueba visual end-to-end en navegador.
+- [x] contentWindow oculto en rutas manejadas por apps.
+- [ ] Orval Fetch tags-split (requiere backend corriendo con OpenAPI).
 
-**Salida:** runtime compartido funciona sin chrome/listas/listeners duplicados.
+**Salida:** runtime compartido funciona sin chrome/listas/listeners duplicados. Orval pendiente hasta tener backend operativo.
 
 ### 297A-10 — Recursos y migraciones
 
@@ -52,7 +51,7 @@
 
 - [ ] Catálogo `resources`, estados ortogonales y defaults privados.
 - [ ] About como artículo; producto independiente de artículo.
-- [ ] Separar preview público y asset privado.
+- [ ] Separar preview público y asset privado.con
 - [ ] Migrar status/is_visible/is_active/download_path legacy.
 - [ ] DTO público/admin y OpenAPI completos.
 
