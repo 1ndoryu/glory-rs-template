@@ -26,7 +26,7 @@ export function clearClipboard(): void {
   clipboard = null;
 }
 
-function wouldCreateCycle(
+export function wouldCreateCycle(
   nodes: Readonly<Record<NodeId, ResolvedNode>>,
   nodeId: NodeId,
   newParentId: NodeId | 'desktop' | null,

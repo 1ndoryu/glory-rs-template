@@ -7,9 +7,8 @@ import type { MountedView } from '../../core/lifecycle';
 import type { AppDefinition, AppToolbarGroup } from './app-registry';
 import type { IconNode } from 'lucide';
 import {
-  windowStore,
-  workspaceW, workspaceH,
-  clampWindowBounds, generateWindowId,
+  windowStore, workspaceW, workspaceH,
+  clampWindowBounds, generateWindowId, generateNextZIndex,
   type WindowEntry, type WindowBounds,
 } from './window-store';
 
@@ -17,9 +16,6 @@ import {
  * Los consumidores existentes importan de 'window-manager' y seguirán funcionando. */
 export { windowStore, setWorkspaceBounds, clampWindowBounds, getWindows, getFocusedWindow, findOpenWindow } from './window-store';
 export type { WindowState, WindowBounds, WindowEntry } from './window-store';
-
-/* z-index counter — mutable module state shared via window-store */
-let nextZIndex = 10;
 
 /** Abrir una nueva ventana para una app. */
 export function openWindow(
@@ -49,7 +45,7 @@ export function openWindow(
     title: titleOverride ?? app.title,
     state: 'open',
     bounds,
-    zIndex: nextZIndex++,
+    zIndex: generateNextZIndex(),
     focused: true,
     content: view.element,
     controller,
@@ -113,7 +109,7 @@ export function registerShellWindow(options: {
     title: options.title,
     state: 'open',
     bounds,
-    zIndex: nextZIndex++,
+    zIndex: generateNextZIndex(),
     focused: options.focused !== false,
     content: options.content,
     icon: options.icon,
@@ -131,7 +127,7 @@ export function focusWindow(instanceId: string): void {
   const windows = windowStore.get();
   const updated = windows.map(w => {
     if (w.instanceId === instanceId) {
-      return { ...w, focused: true, zIndex: nextZIndex++ };
+      return { ...w, focused: true, zIndex: generateNextZIndex() };
     }
     return { ...w, focused: false };
   });
@@ -165,7 +161,7 @@ export function restoreWindow(instanceId: string): void {
   const windows = windowStore.get();
   const updated = windows.map(w => {
     if (w.instanceId === instanceId) {
-      return { ...w, state: 'open' as const, focused: true, zIndex: nextZIndex++ };
+      return { ...w, state: 'open' as const, focused: true, zIndex: generateNextZIndex() };
     }
     return { ...w, focused: false };
   });

@@ -81,9 +81,22 @@ export function clampWindowBounds(x: number, y: number, w: number, h: number): {
 }
 
 let nextWindowId = 1;
+let nextZIndex = 10;
 
 export function generateWindowId(): string {
   return `win-${nextWindowId++}`;
+}
+
+/** Siguiente z-index para apilamiento de ventanas.
+ * [Auditoría v4 §1.3] Movido de window-manager.ts para consolidar estado mutable. */
+export function generateNextZIndex(): number {
+  return nextZIndex++;
+}
+
+/** Resetear contadores (solo para tests — prefijo _ indica API interna). */
+export function _resetWindowCountersForTest(): void {
+  nextWindowId = 1;
+  nextZIndex = 10;
 }
 
 /** Obtener todas las ventanas. */
