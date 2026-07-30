@@ -34,7 +34,7 @@ export function createDesktopWindow(options: DesktopWindowOptions): HTMLElement 
   windowElement.className = 'desktop-window';
   windowElement.setAttribute('aria-label', `Ventana ${options.title}`);
 
-  if (options.className) windowElement.classList.add(options.className);
+  if (options.className) windowElement.classList.add(...options.className.split(' '));
   if (options.active) windowElement.classList.add('desktop-window--active');
   if (options.resizable) windowElement.classList.add('desktop-window--resizable');
 
