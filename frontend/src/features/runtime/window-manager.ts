@@ -46,6 +46,10 @@ export interface WindowEntry {
   readonly layout?: 'padded' | 'full-bleed';
   /** Grupos del toolbar de la app (referencian Command IDs). */
   readonly toolbar?: AppToolbarGroup[];
+  /** Parámetros de instancia (folderId para Finder, resourceId para Reader, etc.). */
+  readonly params?: Readonly<Record<string, string>>;
+  /** Clave derivada de params para buscar ventanas con los mismos parámetros. */
+  readonly _paramKey?: string;
 }
 
 /* === Store reactivo === */
@@ -96,6 +100,7 @@ export function openWindow(
   view: MountedView,
   controller: AbortController,
   initialBounds?: Partial<WindowBounds>,
+  params?: Record<string, string>,
 ): string {
   const instanceId = generateWindowId();
   const existing = windowStore.get();
@@ -124,6 +129,8 @@ export function openWindow(
     app,
     layout: app.layout,
     toolbar: app.toolbar,
+    params,
+    _paramKey: params ? Object.values(params).join(':') : undefined,
   };
 
   windowStore.set([...updated, entry]);

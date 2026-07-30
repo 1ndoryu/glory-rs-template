@@ -11,6 +11,7 @@ import {
   focusWindow,
   findOpenWindow,
   restoreWindow,
+  windowStore,
 } from './window-manager';
 import { dispatchEvent } from '../analytics/dispatcher';
 import { authStore } from '../../store';
@@ -46,10 +47,27 @@ export function initRouteAppAdapter(): void {
   });
 }
 
-/** Abrir ventana para una app por ID. */
-export async function openAppWindow(appId: string): Promise<void> {
+/** Abrir ventana para una app por ID, con parámetros opcionales de instancia. */
+export async function openAppWindow(
+  appId: string,
+  params?: Record<string, string>,
+): Promise<void> {
   const app = AppRegistry.get(appId);
   if (!app) return;
+
+  /* Para apps non-singleton con params (Finder con folderId),
+   * buscar ventana existente con los mismos params y enfocarla. */
+  if (!app.singleton && params) {
+    const paramKey = Object.values(params).join(':');
+    const existing = windowStore.get().find(
+      w => w.appId === appId && w._paramKey === paramKey,
+    );
+    if (existing) {
+      if (existing.state === 'minimized') restoreWindow(existing.instanceId);
+      focusWindow(existing.instanceId);
+      return;
+    }
+  }
 
   /* Singleton ya abierto → enfocar */
   if (app.singleton) {
@@ -63,13 +81,13 @@ export async function openAppWindow(appId: string): Promise<void> {
 
   /* Crear AbortController y RenderContext */
   const controller = new AbortController();
-  const ctx = { signal: controller.signal };
+  const ctx = { signal: controller.signal, params };
 
   /* Instanciar contenido de la app */
   const view = await AppRegistry.instantiate(appId, ctx);
   if (!view) return;
 
   /* Abrir ventana con el contenido */
-  openWindow(app, view, controller);
+  openWindow(app, view, controller, undefined, params);
   dispatchEvent({ type: 'app_opened', appId });
 }

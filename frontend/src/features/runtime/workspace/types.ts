@@ -5,8 +5,11 @@
 
 export type NodeId = string;
 
-/** Tipo de nodo en el workspace. */
-export type WorkspaceNodeType = 'folder' | 'shortcut' | 'app';
+/** Tipo de recurso del backend (alinea con ResourceKind en Rust). */
+export type WorkspaceResourceKind = 'article' | 'about' | 'project' | 'product' | 'image' | 'audio' | 'video' | 'document' | 'generic';
+
+/** Tipo de nodo en el workspace (alinea con manual §6.2). */
+export type WorkspaceNodeType = 'folder' | 'shortcut' | 'app' | 'resource';
 
 /** Posición snap-grid en el escritorio. */
 export interface GridPosition {
@@ -24,8 +27,10 @@ export interface WorkspaceNode {
   readonly type: WorkspaceNodeType;
   /** Etiqueta visible. */
   label: string;
-  /** ID de referencia: appId para 'app', resource UUID para 'shortcut'. */
+  /** ID de referencia: appId para 'app', resource UUID para 'shortcut'/'resource'. */
   readonly refId?: string;
+  /** Tipo de recurso editorial/comercial (solo para type: 'resource'). */
+  readonly resourceKind?: WorkspaceResourceKind;
   /** Posición en grid del desktop. */
   position?: GridPosition;
   /** Orden en vista móvil. */

@@ -144,7 +144,17 @@ export function createDesktopConcept(
 
     finderWindow = createDesktopWindow({
       title: 'Galería',
-      content: createFinderPreview({ onOpenArticle: openArticle }),
+      content: createFinderPreview({
+        folderId: 'desktop',
+        onOpenApp: (appId: string, params?: Record<string, string>) => {
+          if (appId === 'finder' && params?.folderId) {
+            /* Navegación entre carpetas: re-crear Finder con nuevo folderId */
+            finderWindow?.remove();
+            finderWindow = null;
+            openGallery();
+          }
+        },
+      }),
       className: 'desktop-finder-window',
       active: true,
       resizable: true,

@@ -7,6 +7,8 @@
 export interface RenderContext {
   /** Señal que se aborta al destruir la vista (cerrar ventana, navegar, etc.). */
   readonly signal: AbortSignal;
+  /** Parámetros de instancia: folderId para Finder, resourceId para Reader/Editor, etc. */
+  readonly params?: Readonly<Record<string, string>>;
 }
 
 /** Resultado que cada app devuelve al shell. */
@@ -27,7 +29,7 @@ export type AppRenderFn = (ctx: RenderContext) => MountedView | Promise<MountedV
 export function createViewScope(): { ctx: RenderContext; controller: AbortController } {
   const controller = new AbortController();
   return {
-    ctx: { signal: controller.signal },
+    ctx: { signal: controller.signal, params: {} },
     controller,
   };
 }

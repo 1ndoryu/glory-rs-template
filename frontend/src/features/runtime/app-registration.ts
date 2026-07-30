@@ -12,26 +12,33 @@ import { createTrashPreview } from '../desktop/apps/trash/trash-preview';
 import { dispatchEvent } from '../analytics/dispatcher';
 import type { MountedView, RenderContext } from '../../core/lifecycle';
 
-/* === Finder — Galería de imágenes y documentos === */
+/* === Finder — Explorador de archivos del OS === */
 AppRegistry.register({
   id: 'finder',
   title: 'Galería',
   icon: Folder,
   iconType: 'folder',
-  singleton: true,
+  singleton: false,
   requires: 'public',
   routePatterns: ['/gallery'],
   layout: 'full-bleed',
   toolbar: [
     { label: 'Archivo', items: ['finder:new-folder'] },
   ],
-  render: (_ctx: RenderContext): MountedView => {
+  render: (ctx: RenderContext): MountedView => {
     dispatchEvent({ type: 'app_opened', appId: 'finder' });
 
+    const folderId = ctx.params?.folderId ?? 'desktop';
+
     const content = createFinderPreview({
-      onOpenArticle: (title: string) => {
-        const slug = title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-        import('../../router').then(r => r.navigate(`/article/${slug}`));
+      folderId,
+      onOpenApp: (appId: string, params?: Record<string, string>) => {
+        void import('./route-app-adapter').then(m => m.openAppWindow(appId, params));
+      },
+      onCreateFolder: () => {
+        void import('../runtime/command-registry').then(({ CommandRegistry }) => {
+          void CommandRegistry.execute('finder:new-folder');
+        });
       },
     });
 

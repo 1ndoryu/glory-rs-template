@@ -18,6 +18,7 @@ import { createDesktopMenuBar } from './components/desktop-menu-bar';
 import { createDesktopWindow } from './components/desktop-window';
 import { windowStore, focusWindow, restoreWindow, closeWindow, minimizeWindow, setWorkspaceBounds, registerShellWindow } from '../runtime/window-manager';
 import { openAppWindow } from '../runtime/route-app-adapter';
+import { resolveResourceType, type ResourceKind } from '../runtime/resource-type-registry';
 import { navigate } from '../../router';
 import { authStore, showSidebar } from '../../store';
 import { dispatchEvent } from '../analytics/dispatcher';
@@ -81,12 +82,16 @@ function createWorkspaceIconGrid(extraActions?: Record<string, () => void>): HTM
 
     for (const node of desktopNodes) {
       const onActivate = extraActions?.[node.id]
-        ?? (node.refId ? () => {
+        ?? (node.type === 'folder' ? () => {
+          /* Carpetas abren Finder apuntando a su nodeId */
+          void openAppWindow('finder', { folderId: node.id });
+        } : node.type === 'resource' && node.resourceKind ? () => {
+          /* Recursos abren la app asignada por ResourceTypeRegistry */
+          const entry = resolveResourceType(node.resourceKind! as ResourceKind);
+          void openAppWindow(entry?.appId ?? 'finder', { resourceId: node.refId ?? node.id });
+        } : node.refId ? () => {
           if (node.id === 'admin') { navigate('/admin'); return; }
           void openAppWindow(node.refId!);
-        } : node.type === 'folder' ? () => {
-          /* Carpetas sin refId abren Finder como explorador de archivos */
-          void openAppWindow('finder');
         } : undefined);
       if (!onActivate) continue;
 
