@@ -13,6 +13,7 @@ import {
   pasteFromClipboard,
   createFolder,
 } from '../workspace/workspace-store';
+import { getSelectedIds } from '../selection-store';
 
 function resolveWorkspaceNodeId(targetId: string): string | undefined {
   const ws = workspaceStore.get();
@@ -112,18 +113,17 @@ CommandRegistry.register({
   undoPolicy: 'none',
   analyticsEvent: 'workspace.copy',
   isAvailable: (ctx) => {
-    const targetId = ctx.targets?.[0]?.id;
-    if (!targetId) return { state: 'hidden', reason: 'no target' };
-    const nodeId = resolveWorkspaceNodeId(targetId);
-    if (!nodeId) return { state: 'hidden', reason: 'node not found' };
-    return { state: 'enabled' };
+    if (ctx.targets?.length) return { state: 'enabled' };
+    if (getSelectedIds().length > 0) return { state: 'enabled' };
+    return { state: 'hidden', reason: 'no target' };
   },
   execute: (ctx?: CommandContext): CommandResult => {
-    const targetId = ctx?.targets?.[0]?.id;
-    if (!targetId) return { status: 'failure', reason: 'no target' };
-    const nodeId = resolveWorkspaceNodeId(targetId);
-    if (!nodeId) return { status: 'failure', reason: 'node not found' };
-    setClipboard([nodeId], 'copy');
+    /* Usar targets del contexto o selección actual del escritorio */
+    const targetIds = ctx?.targets?.length
+      ? ctx.targets.map(t => resolveWorkspaceNodeId(t.id)).filter(Boolean) as string[]
+      : getSelectedIds().filter(id => resolveWorkspaceNodeId(id));
+    if (targetIds.length === 0) return { status: 'failure', reason: 'no target' };
+    setClipboard(targetIds, 'copy');
     return { status: 'success' };
   },
 });
@@ -137,18 +137,17 @@ CommandRegistry.register({
   undoPolicy: 'none',
   analyticsEvent: 'workspace.cut',
   isAvailable: (ctx) => {
-    const targetId = ctx.targets?.[0]?.id;
-    if (!targetId) return { state: 'hidden', reason: 'no target' };
-    const nodeId = resolveWorkspaceNodeId(targetId);
-    if (!nodeId) return { state: 'hidden', reason: 'node not found' };
-    return { state: 'enabled' };
+    if (ctx.targets?.length) return { state: 'enabled' };
+    if (getSelectedIds().length > 0) return { state: 'enabled' };
+    return { state: 'hidden', reason: 'no target' };
   },
   execute: (ctx?: CommandContext): CommandResult => {
-    const targetId = ctx?.targets?.[0]?.id;
-    if (!targetId) return { status: 'failure', reason: 'no target' };
-    const nodeId = resolveWorkspaceNodeId(targetId);
-    if (!nodeId) return { status: 'failure', reason: 'node not found' };
-    setClipboard([nodeId], 'cut');
+    /* Usar targets del contexto o selección actual del escritorio */
+    const targetIds = ctx?.targets?.length
+      ? ctx.targets.map(t => resolveWorkspaceNodeId(t.id)).filter(Boolean) as string[]
+      : getSelectedIds().filter(id => resolveWorkspaceNodeId(id));
+    if (targetIds.length === 0) return { status: 'failure', reason: 'no target' };
+    setClipboard(targetIds, 'cut');
     return { status: 'success' };
   },
 });

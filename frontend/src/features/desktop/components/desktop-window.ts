@@ -1,4 +1,4 @@
-import { createElement, Minus, X, type IconNode } from 'lucide';
+import { createElement, Maximize2, Minus, X, type IconNode } from 'lucide';
 import type { AppToolbarGroup, ToolbarItemRef } from '../../runtime/app-registry';
 import { CommandRegistry, type CommandContext } from '../../runtime/command-registry';
 import { authStore } from '../../../store';
@@ -13,6 +13,7 @@ export interface DesktopWindowOptions {
   toolbar?: AppToolbarGroup[];
   onClose?: () => void;
   onMinimize?: () => void;
+  onMaximize?: () => void;
 }
 
 function createWindowControl(
@@ -73,13 +74,14 @@ export function createDesktopWindow(options: DesktopWindowOptions): HTMLElement 
       label: 'Ventana',
       items: [
         { id: 'window:minimize', label: 'Minimizar', icon: Minus },
+        { id: 'window:maximize', label: 'Maximizar', icon: Maximize2 },
         '---',
         { id: 'window:close', label: 'Cerrar', icon: X },
       ],
     },
     ...(options.toolbar ?? []),
   ];
-  windowElement.appendChild(createAppToolbar(allGroups, { onClose: options.onClose, onMinimize: options.onMinimize }));
+  windowElement.appendChild(createAppToolbar(allGroups, { onClose: options.onClose, onMinimize: options.onMinimize, onMaximize: options.onMaximize }));
 
   const body = document.createElement('div');
   body.className = 'desktop-window__body';
@@ -161,7 +163,7 @@ function resolveToolbarItem(
  */
 export function createAppToolbar(
   groups: AppToolbarGroup[],
-  callbacks?: { onClose?: () => void; onMinimize?: () => void },
+  callbacks?: { onClose?: () => void; onMinimize?: () => void; onMaximize?: () => void },
 ): HTMLElement {
   const toolbar = document.createElement('div');
   toolbar.className = 'desktop-app-toolbar';
@@ -232,9 +234,15 @@ export function createAppToolbar(
         menuItem.appendChild(shortcutEl);
       }
 
-      /* Callbacks especiales para window:minimize y window:close */
-      const isWindowCmd = resolved.id === 'window:minimize' || resolved.id === 'window:close';
-      const callbackDisabled = isWindowCmd && !callbacks?.[resolved.id === 'window:minimize' ? 'onMinimize' : 'onClose'];
+      /* Callbacks especiales para window:minimize, window:maximize y window:close */
+      const windowCallbackMap: Record<string, 'onClose' | 'onMinimize' | 'onMaximize'> = {
+        'window:close': 'onClose',
+        'window:minimize': 'onMinimize',
+        'window:maximize': 'onMaximize',
+      };
+      const callbackKey = windowCallbackMap[resolved.id];
+      const isWindowCmd = !!callbackKey;
+      const callbackDisabled = isWindowCmd && !callbacks?.[callbackKey];
 
       if (availability.state !== 'enabled' || callbackDisabled) {
         menuItem.classList.add('desktop-app-toolbar__menu-item--disabled');
@@ -245,6 +253,7 @@ export function createAppToolbar(
           closeToolbarMenu();
           /* Ejecutar callback especial o command del registry */
           if (resolved.id === 'window:minimize') { callbacks?.onMinimize?.(); return; }
+          if (resolved.id === 'window:maximize') { callbacks?.onMaximize?.(); return; }
           if (resolved.id === 'window:close') { callbacks?.onClose?.(); return; }
           void CommandRegistry.execute(resolved.id, ctx);
         });

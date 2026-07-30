@@ -7,7 +7,7 @@ import {
 } from 'lucide';
 import { createDesktopMenuBar } from './components/desktop-menu-bar';
 import { createDesktopWindow } from './components/desktop-window';
-import { windowStore, focusWindow, restoreWindow, closeWindow, minimizeWindow, setWorkspaceBounds, registerShellWindow } from '../runtime/window-manager';
+import { windowStore, focusWindow, restoreWindow, closeWindow, minimizeWindow, toggleMaximizeWindow, setWorkspaceBounds, registerShellWindow } from '../runtime/window-manager';
 import { authStore } from '../../store';
 import { dispatchEvent } from '../analytics/dispatcher';
 import { enableDragResize } from './utils/drag-resize';
@@ -130,6 +130,9 @@ export function createDesktopShell(
           },
           onMinimize: () => {
             minimizeWindow(win.instanceId);
+          },
+          onMaximize: () => {
+            toggleMaximizeWindow(win.instanceId);
           },
         });
 

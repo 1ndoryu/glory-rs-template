@@ -3,7 +3,7 @@
  * Patrón estándar: pointerdown inicia, document-level pointermove/pointerup terminan.
  * Así funciona Windows/macOS: soltar fuera de la ventana sigue funcionando. */
 
-import { updateWindowBounds, focusWindow, clampWindowBounds } from '../../runtime/window-manager';
+import { updateWindowBounds, focusWindow, clampWindowBounds, toggleMaximizeWindow } from '../../runtime/window-manager';
 
 export interface DragResizeOptions {
   /** Elemento raíz de la ventana (section.desktop-window). */
@@ -49,6 +49,12 @@ export function enableDragResize(opts: DragResizeOptions): () => void {
   const EDGE_SIZE = 4;
 
   /* ─── Drag (title bar) ─── */
+
+  /* Doble-clic en titlebar = maximizar/restaurar */
+  function onTitleBarDblClick(e: MouseEvent): void {
+    if ((e.target as HTMLElement).closest('button')) return;
+    toggleMaximizeWindow(instanceId);
+  }
 
   function onDragPointerDown(e: PointerEvent): void {
     if ((e.target as HTMLElement).closest('button')) return;
@@ -202,6 +208,7 @@ export function enableDragResize(opts: DragResizeOptions): () => void {
 
   /* ─── Binding ─── */
 
+  dragHandle.addEventListener('dblclick', onTitleBarDblClick);
   dragHandle.addEventListener('pointerdown', onDragPointerDown);
   /* Document-level: catches pointer even outside window */
   document.addEventListener('pointermove', onDocumentPointerMove);
@@ -215,6 +222,7 @@ export function enableDragResize(opts: DragResizeOptions): () => void {
 
   /* Cleanup */
   return () => {
+    dragHandle.removeEventListener('dblclick', onTitleBarDblClick);
     dragHandle.removeEventListener('pointerdown', onDragPointerDown);
     document.removeEventListener('pointermove', onDocumentPointerMove);
     document.removeEventListener('pointerup', onDocumentPointerUp);

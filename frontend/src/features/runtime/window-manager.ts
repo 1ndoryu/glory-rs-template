@@ -52,6 +52,8 @@ export interface WindowEntry {
   readonly _paramKey?: string;
   /** Cleanup callback de la app (MountedView.destroy). Se invoca al cerrar. */
   readonly onDestroy?: () => void;
+  /** Bounds anteriores al maximizar (para restaurar). */
+  preMaximizeBounds?: WindowBounds;
 }
 
 /* === Store reactivo === */
@@ -252,6 +254,34 @@ export function restoreWindow(instanceId: string): void {
     return { ...w, focused: false };
   });
   windowStore.set(updated);
+}
+
+/** Maximizar/restaurar una ventana (toggle). Guarda bounds previos. */
+export function toggleMaximizeWindow(instanceId: string): void {
+  const windows = windowStore.get();
+  const target = windows.find(w => w.instanceId === instanceId);
+  if (!target) return;
+
+  if (target.state === 'maximized') {
+    /* Restaurar bounds anteriores */
+    const restored = target.preMaximizeBounds ?? { x: 40, y: 40, w: 640, h: 480 };
+    const updated = windows.map(w => {
+      if (w.instanceId === instanceId) {
+        return { ...w, state: 'open' as const, bounds: clampWindowBounds(restored.x, restored.y, restored.w, restored.h), preMaximizeBounds: undefined };
+      }
+      return w;
+    });
+    windowStore.set(updated);
+  } else {
+    /* Maximizar: guardar bounds actuales y expandir al workspace */
+    const updated = windows.map(w => {
+      if (w.instanceId === instanceId) {
+        return { ...w, state: 'maximized' as const, bounds: { x: 0, y: 0, w: workspaceW, h: workspaceH }, preMaximizeBounds: { ...w.bounds } };
+      }
+      return w;
+    });
+    windowStore.set(updated);
+  }
 }
 
 /** Actualizar bounds de una ventana (drag/resize/keyboard).
