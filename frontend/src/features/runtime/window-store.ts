@@ -16,44 +16,44 @@ export interface WindowBounds {
   h: number;
 }
 
-export interface WindowEntry {
-  /** ID único de esta instancia de ventana. */
+/* [Auditoría v4 §3.2] ISP: WindowEntry separado en 3 sub-interfaces.
+ * Cada consumidor importa solo lo que necesita. WindowEntry mantiene
+ * la unión completa para backward compatibility. */
+
+/** Identidad de ventana — usado por taskbar, menús, route-adapter. */
+export interface WindowIdentity {
   readonly instanceId: string;
-  /** ID de la app que vive dentro. */
   readonly appId: string;
-  /** Título mostrado en barra y taskbar. */
   title: string;
-  /** Estado visual de la ventana. */
-  state: WindowState;
-  /** Geometría en px (relativa al workspace). */
-  bounds: WindowBounds;
-  /** z-index para orden de apilamiento. */
-  zIndex: number;
-  /** Si esta ventana tiene foco activo. */
   focused: boolean;
-  /** Contenido que la app devolvió. */
-  readonly content: HTMLElement;
-  /** AbortController de esta instancia — se aborta al cerrar. Shell windows no tienen controller. */
-  readonly controller?: AbortController;
-  /** Definición de la app (referencia). Shell windows no tienen app. */
-  readonly app?: AppDefinition;
-  /** Icono override para shell windows (sin AppDefinition). */
-  readonly icon?: IconNode;
-  /** CSS class override para shell windows (ej: 'desktop-profile-window'). */
-  readonly cssClass?: string;
-  /** Layout del body: 'padded' (default) o 'full-bleed'. */
-  readonly layout?: 'padded' | 'full-bleed';
-  /** Grupos del toolbar de la app (referencian Command IDs). */
-  readonly toolbar?: AppToolbarGroup[];
-  /** Parámetros de instancia (folderId para Finder, resourceId para Reader, etc.). */
-  readonly params?: Readonly<Record<string, string>>;
-  /** Clave derivada de params para buscar ventanas con los mismos parámetros. */
-  readonly _paramKey?: string;
-  /** Cleanup callback de la app (MountedView.destroy). Se invoca al cerrar. */
-  readonly onDestroy?: () => void;
-  /** Bounds anteriores al maximizar (para restaurar). */
+  state: WindowState;
+}
+
+/** Geometría de ventana — usado por window-manager. */
+export interface WindowGeometry {
+  bounds: WindowBounds;
+  zIndex: number;
   preMaximizeBounds?: WindowBounds;
 }
+
+/** Contenido de ventana — usado por desktop-shell. */
+export interface WindowContent {
+  readonly content: HTMLElement;
+  readonly controller?: AbortController;
+  readonly app?: AppDefinition;
+  readonly icon?: IconNode;
+  readonly cssClass?: string;
+  readonly layout?: 'padded' | 'full-bleed';
+  readonly toolbar?: AppToolbarGroup[];
+  readonly params?: Readonly<Record<string, string>>;
+  readonly _paramKey?: string;
+  readonly onDestroy?: () => void;
+}
+
+/** Entry completa de una ventana — unión de identidad + geometría + contenido.
+ *  Los consumidores pueden usar las sub-interfaces para no acoplar código
+ *  a campos que no necesitan. */
+export interface WindowEntry extends WindowIdentity, WindowGeometry, WindowContent {}
 
 /* === Store reactivo === */
 export const windowStore: Store<WindowEntry[]> = createStore([]);

@@ -15,7 +15,7 @@ import {
 /* Re-export todo desde window-store para backward compatibility.
  * Los consumidores existentes importan de 'window-manager' y seguirán funcionando. */
 export { windowStore, setWorkspaceBounds, clampWindowBounds, getWindows, getFocusedWindow, findOpenWindow } from './window-store';
-export type { WindowState, WindowBounds, WindowEntry } from './window-store';
+export type { WindowState, WindowBounds, WindowEntry, WindowIdentity, WindowGeometry, WindowContent } from './window-store';
 
 /** Abrir una nueva ventana para una app. */
 export function openWindow(
