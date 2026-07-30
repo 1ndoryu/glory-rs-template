@@ -6,6 +6,7 @@
 
 import { createElement, type IconNode } from 'lucide';
 import { createEl } from '../../../utils/dom';
+import { getViewport } from '../../../utils/viewport';
 
 export interface DropdownMenuItem {
   readonly icon?: IconNode;
@@ -111,8 +112,9 @@ export function openDropdownMenu(options: DropdownMenuOptions): HTMLElement | nu
   if (options.positioning === 'fixed' && options.x !== undefined && options.y !== undefined) {
     const rect = menu.getBoundingClientRect();
     const taskbarH = 32;
-    const maxX = window.innerWidth - rect.width - 4;
-    const maxY = window.innerHeight - rect.height - taskbarH - 4;
+    const vp = getViewport();
+    const maxX = vp.width - rect.width - 4;
+    const maxY = vp.height - rect.height - taskbarH - 4;
     menu.style.left = `${Math.max(0, Math.min(options.x, maxX))}px`;
     menu.style.top = `${Math.max(0, Math.min(options.y, maxY))}px`;
   }

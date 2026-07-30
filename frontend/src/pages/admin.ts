@@ -8,7 +8,7 @@ import { navigate } from '../router';
 import { showToast } from '../components/ui/toast';
 import { createTextarea } from '../components/ui/textarea';
 import { createFontPanel } from '../features/settings/font-panel';
-import { safeClick } from '../utils/safe-async';
+import { safeClick, safeRun } from '../utils/safe-async';
 import { renderArticleList, openEditor } from './admin-articles';
 import { renderProjectList } from './admin-projects';
 import { createEl } from '../utils/dom';
@@ -102,12 +102,10 @@ function renderSitioTab(): HTMLElement {
   }).catch(() => {});
 
   const btnGuardarSitio = createEl('button', { className: 'boton', textContent: 'guardar' });
-  btnGuardarSitio.addEventListener('click', async () => {
-    try {
-      await SettingsService.save({ about_content: aboutContent });
-      showToast('contenido actualizado');
-    } catch { showToast('error al guardar'); }
-  });
+  btnGuardarSitio.addEventListener('click', safeClick(async () => {
+    const result = await safeRun(SettingsService.save({ about_content: aboutContent }), 'error al guardar');
+    if (result.ok) showToast('contenido actualizado');
+  }));
   container.appendChild(btnGuardarSitio);
   return container;
 }

@@ -5,6 +5,7 @@
  * No emite por cada pointermove; eventos críticos reservados al backend. */
 
 import { trackPageView } from './tracker';
+import { getPresentationMode } from '../../utils/viewport';
 
 /* === Schema version del catálogo de eventos === */
 const SCHEMA_VERSION = 1;
@@ -112,13 +113,7 @@ export interface AnalyticsEnvelope {
 const queue: AnalyticsEnvelope[] = [];
 const MAX_QUEUE_SIZE = 50;
 
-/** Determinar modo de presentación desde viewport. */
-function getPresentationMode(): 'desktop' | 'tablet' | 'mobile' {
-  const w = window.innerWidth;
-  if (w < 768) return 'mobile';
-  if (w < 1024) return 'tablet';
-  return 'desktop';
-}
+/* getPresentationMode() movida a utils/viewport.ts — importada arriba */
 
 /**
  * Despacha un evento tipado al sistema de analytics.
