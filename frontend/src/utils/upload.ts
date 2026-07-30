@@ -4,6 +4,7 @@
 
 import { createEl } from '../utils/dom';
 import { MediaService } from '../services';
+import { tryCatch } from '../utils/result';
 import type { Media } from '../api/types';
 
 export interface UploadResult {
@@ -40,11 +41,11 @@ export async function pickAndUpload(
         return;
       }
 
-      try {
-        const result = await uploadFile(file, articleId);
-        resolve(result);
-      } catch (e) {
-        reject(e);
+      const result = await tryCatch(uploadFile(file, articleId));
+      if (result.ok) {
+        resolve(result.value);
+      } else {
+        reject(new Error(result.error));
       }
     });
 

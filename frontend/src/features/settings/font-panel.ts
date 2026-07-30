@@ -3,7 +3,7 @@
  * La persistencia vive en settings-repo.ts.
  * [Auditoría v4 §1.2] Migrado a createEl(). */
 
-import { safeRun } from '../../utils/safe-async';
+import { safeRun, safeClick } from '../../utils/safe-async';
 import { fontStore, profileImage, siteConfig, type FontConfig } from '../../store';
 import { MediaService, SettingsService } from '../../services';
 import { showToast } from '../../components/ui/toast';
@@ -45,7 +45,7 @@ export function createFontPanel(): HTMLElement {
     const btnImg = createEl('button', { className: 'boton', textContent: 'cambiar imagen' });
     btnImg.addEventListener('click', () => imgInput.click());
 
-    imgInput.addEventListener('change', async () => {
+    imgInput.addEventListener('change', safeClick(async () => {
       const file = imgInput.files?.[0];
       if (!file) return;
       const result = await safeRun(MediaService.upload(file), 'error al subir imagen');
@@ -56,7 +56,7 @@ export function createFontPanel(): HTMLElement {
         SettingsService.save({ profile_image: result.value.file_path }).catch(() => { /* fire-and-forget save */ });
         showToast('imagen actualizada');
       }
-    });
+    }));
 
     const entradasCheck = createEl('input', { type: 'checkbox' });
     entradasCheck.checked = siteConfig.get().showEntriesOnHome;
