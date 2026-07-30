@@ -151,6 +151,18 @@ export function createDesktopShell(
       if (existing) {
         if (existing.state === 'minimized') restoreWindow(profileInstanceId);
         focusWindow(profileInstanceId);
+      } else {
+        /* Re-registrar si fue cerrada con la X */
+        registerShellWindow({
+          instanceId: profileInstanceId,
+          title: 'Perfil',
+          icon: FileUser,
+          content: profile,
+          initialBounds: { x: 44, y: 42, w: 470, h: 224 },
+          focused: true,
+          cssClass: 'desktop-profile-window',
+          layout: 'full-bleed',
+        });
       }
     },
   });
