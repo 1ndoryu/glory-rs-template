@@ -15,6 +15,8 @@
 | ¿Cómo funciona el quality gate?                        | `Agente/planes/completados/plan-escalabilidad-sentinel-wandorius-2026-07-29.md` |
 | ¿Cómo funcionan comandos, menús, drag y estadísticas?  | `Agente/planes/plan-contratos-interaccion-comandos-medicion-2026-07-29.md`      |
 | ¿Qué reglas automáticas faltan?                         | `Agente/prevencion/prevencion-wandorius-sentinel-varsense-2026-07-29.md`        |
+| ¿Cómo está la salud arquitectónica del frontend?        | `Agente/documentacion/arquitectura/auditoria-arquitectura-frontend-2026-07-30.md` |
+| ¿Cómo se ejecuta la refactorización de módulos grandes? | `Agente/planes/plan-refactorizacion-arquitectura-2026-07-30.md`                    |
 
 ## Regla de autoridad
 
@@ -36,3 +38,5 @@
 - Plan visual antiguo: referencia histórica del concepto aprobado.
 - Plan wandori.us original: superado; no es especificación activa.
 - Plan Sentinel/VarSense editor-agnóstico: trabajo histórico documentado en tareas completadas.
+- Auditoría arquitectónica frontend: activa; plan de refactorización derivado pendiente.
+- Plan refactorización arquitectura: activo; ejecutar antes de 297A-12.
