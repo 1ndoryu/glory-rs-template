@@ -4,6 +4,7 @@
  * Las apps solo devuelven contenido; el shell crea la ventana. */
 
 import { FileUser, Folder, Settings, FileText, FolderCode, Trash2, ShieldUser } from 'lucide';
+import { createEl } from '../../utils/dom';
 import { AppRegistry } from './app-registry';
 import { createFinderPreview } from '../desktop/apps/finder/finder-preview';
 import { createReaderPreview, type ReaderOptions } from '../desktop/apps/reader/reader-preview';
@@ -13,7 +14,7 @@ import type { MountedView, RenderContext } from '../../core/lifecycle';
 import { SettingsService } from '../../services';
 import { appendSanitizedHtml } from '../../utils/sanitize-html';
 
-/* === Finder — Explorador de archivos del OS === */
+/* === Finder === */
 AppRegistry.register({
   id: 'finder',
   title: 'Galería',
@@ -42,9 +43,6 @@ AppRegistry.register({
         });
       },
       onNavigate: (_folderId: string, label: string) => {
-        /* Actualizar título de la ventana cuando Finder navega entre carpetas.
-         * DOM traversal desde content para encontrar el título de SU ventana.
-         * Null guard: content aún no está en el DOM durante el montaje inicial. */
         const windowEl = content.closest('.desktop-window');
         if (!windowEl) return;
         const titleEl = windowEl.querySelector('.desktop-window__title');
@@ -54,14 +52,12 @@ AppRegistry.register({
 
     return {
       element: content,
-      destroy: () => {
-        dispatchEvent({ type: 'app_closed', appId: 'finder' });
-      },
+      destroy: () => { dispatchEvent({ type: 'app_closed', appId: 'finder' }); },
     };
   },
 });
 
-/* === Reader — Lector de artículos === */
+/* === Reader === */
 AppRegistry.register({
   id: 'reader',
   title: 'Documento',
@@ -82,15 +78,12 @@ AppRegistry.register({
 
     return {
       element: content,
-      destroy: () => {
-        dispatchEvent({ type: 'app_closed', appId: 'reader' });
-      },
+      destroy: () => { dispatchEvent({ type: 'app_closed', appId: 'reader' }); },
     };
   },
 });
 
-/* === Settings — Configuración de fuentes y perfil ===
- * [Auditoría v3 §2.5] Lazy loading: código se carga bajo demanda. */
+/* === Settings === */
 AppRegistry.registerLazy({
   id: 'settings',
   title: 'Configuración',
@@ -109,9 +102,7 @@ AppRegistry.registerLazy({
   })),
 });
 
-/* === About — Página about ===
- * Carga contenido desde la API directamente, sin importar la página legacy.
- * [Auditoría v2] App autónoma del workspace. */
+/* === About === */
 AppRegistry.register({
   id: 'about',
   title: 'About',
@@ -124,10 +115,8 @@ AppRegistry.register({
   render: (ctx: RenderContext): MountedView => {
     dispatchEvent({ type: 'app_opened', appId: 'about' });
 
-    const container = document.createElement('article');
-    container.className = 'desktop-about';
+    const container = createEl('article', { className: 'desktop-about' });
 
-    /* Cargar contenido desde la API */
     void (async () => {
       try {
         if (ctx.signal.aborted) return;
@@ -137,27 +126,21 @@ AppRegistry.register({
         if (content) {
           appendSanitizedHtml(container, content);
         } else {
-          const p = document.createElement('p');
-          p.textContent = 'Contenido about no configurado.';
-          container.appendChild(p);
+          container.appendChild(createEl('p', { textContent: 'Contenido about no configurado.' }));
         }
       } catch {
-        const p = document.createElement('p');
-        p.textContent = 'Error al cargar contenido about.';
-        container.appendChild(p);
+        container.appendChild(createEl('p', { textContent: 'Error al cargar contenido about.' }));
       }
     })();
 
     return {
       element: container,
-      destroy: () => {
-        dispatchEvent({ type: 'app_closed', appId: 'about' });
-      },
+      destroy: () => { dispatchEvent({ type: 'app_closed', appId: 'about' }); },
     };
   },
 });
 
-/* === Trash (Papelera) — Papelera del workspace === */
+/* === Trash === */
 AppRegistry.register({
   id: 'trash',
   title: 'Papelera',
@@ -175,15 +158,12 @@ AppRegistry.register({
 
     return {
       element: content,
-      destroy: () => {
-        dispatchEvent({ type: 'app_closed', appId: 'trash' });
-      },
+      destroy: () => { dispatchEvent({ type: 'app_closed', appId: 'trash' }); },
     };
   },
 });
 
-/* === Admin — Panel de administración ===
- * [Auditoría v3 §2.5] Lazy loading. */
+/* === Admin === */
 AppRegistry.registerLazy({
   id: 'admin',
   title: 'Admin',
@@ -195,7 +175,7 @@ AppRegistry.registerLazy({
   load: () => import('../../pages/admin').then(m => ({
     render: (ctx: RenderContext): MountedView => {
       dispatchEvent({ type: 'app_opened', appId: 'admin' });
-      const container = document.createElement('div');
+      const container = createEl('div');
       void m.renderAdmin().then(el => {
         if (!ctx.signal.aborted) container.appendChild(el);
       });
@@ -207,8 +187,7 @@ AppRegistry.registerLazy({
   })),
 });
 
-/* === Projects — Página de proyectos ===
- * [Auditoría v3 §2.5] Lazy loading. */
+/* === Projects === */
 AppRegistry.registerLazy({
   id: 'projects',
   title: 'Proyectos',
@@ -223,7 +202,7 @@ AppRegistry.registerLazy({
   load: () => import('../../pages/projects').then(m => ({
     render: (ctx: RenderContext): MountedView => {
       dispatchEvent({ type: 'app_opened', appId: 'projects' });
-      const container = document.createElement('div');
+      const container = createEl('div');
       void m.renderProjects().then(el => {
         if (!ctx.signal.aborted) container.appendChild(el);
       });

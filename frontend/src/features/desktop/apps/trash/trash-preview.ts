@@ -3,24 +3,16 @@
  * [Plan 297A-11 §9.3] Papelera personal separada de recursos. */
 
 import { createElement, RotateCcw } from 'lucide';
+import { createEl } from '../../../../utils/dom';
 import { getTombstonedNodes, restoreNode, workspaceStore } from '../../../runtime/workspace/workspace-store';
 import { reconcileChildren } from '../../../../utils/reconcile';
 
-/* [297A-11] Contenido de la papelera — acciones en menú declarativo (app.menus).
- * Solo renderiza la lista de items tombstoneados. */
 export function createTrashPreview(): HTMLElement {
-  const container = document.createElement('div');
-  container.className = 'trash-app';
-
-  /* Contenedor para la lista reconciliada */
-  const list = document.createElement('ul');
-  list.className = 'trash-app__list';
-
-  /* Mensaje de vacío (fuera del reconcile) */
-  const emptyMsg = document.createElement('div');
-  emptyMsg.className = 'trash-app__empty';
-  emptyMsg.textContent = 'La papelera está vacía.';
+  const container = createEl('div', { className: 'trash-app' });
+  const list = createEl('ul', { className: 'trash-app__list' });
+  const emptyMsg = createEl('div', { className: 'trash-app__empty', textContent: 'La papelera está vacía.' });
   emptyMsg.style.display = 'none';
+
   container.append(emptyMsg, list);
 
   function render(): void {
@@ -39,32 +31,18 @@ export function createTrashPreview(): HTMLElement {
       list,
       tombstoned,
       (node) => node.id,
-      /* createElement */
       (node) => {
-        const item = document.createElement('li');
-        item.className = 'trash-app__item';
+        const restoreBtn = createEl('button', { type: 'button', className: 'trash-app__restore-btn', ariaLabel: `Restaurar ${node.label}` },
+          createElement(RotateCcw),
+        );
+        restoreBtn.addEventListener('click', () => { restoreNode(node.id); });
 
-        const label = document.createElement('span');
-        label.className = 'trash-app__item-label';
-        label.textContent = node.label;
-
-        const type = document.createElement('span');
-        type.className = 'trash-app__item-type';
-        type.textContent = node.type;
-
-        const restoreBtn = document.createElement('button');
-        restoreBtn.type = 'button';
-        restoreBtn.className = 'trash-app__restore-btn';
-        restoreBtn.setAttribute('aria-label', `Restaurar ${node.label}`);
-        restoreBtn.appendChild(createElement(RotateCcw));
-        restoreBtn.addEventListener('click', () => {
-          restoreNode(node.id);
-        });
-
-        item.append(label, type, restoreBtn);
-        return item;
+        return createEl('li', { className: 'trash-app__item' },
+          createEl('span', { className: 'trash-app__item-label', textContent: node.label }),
+          createEl('span', { className: 'trash-app__item-type', textContent: node.type }),
+          restoreBtn,
+        );
       },
-      /* updateElement */
       (el, node) => {
         const label = el.querySelector('.trash-app__item-label');
         if (label && label.textContent !== node.label) label.textContent = node.label;
@@ -74,10 +52,7 @@ export function createTrashPreview(): HTMLElement {
     );
   }
 
-  /* Suscribirse a workspaceStore — subscribe() dispara inmediatamente con valor actual. */
-  workspaceStore.subscribe(() => {
-    render();
-  });
+  workspaceStore.subscribe(() => { render(); });
 
   return container;
 }
