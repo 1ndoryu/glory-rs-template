@@ -1,102 +1,25 @@
 /* wandori.us — Window Manager
- * Máquina de estados reactiva para ventanas del escritorio.
- * Usa el store pub/sub existente. Cada ventana tiene bounds, estado y AbortController.
- * El taskbar y el shell se suscriben a windowStore para reaccionar a cambios. */
+ * Funciones de mutación para ventanas del escritorio.
+ * Los tipos, store y getters viven en window-store.ts.
+ * [Auditoría v3 §2.2] Split para mantener bajo límite de 300 líneas. */
 
-import { createStore, type Store } from '../../store';
 import type { MountedView } from '../../core/lifecycle';
 import type { AppDefinition, AppToolbarGroup } from './app-registry';
 import type { IconNode } from 'lucide';
+import {
+  windowStore,
+  workspaceW, workspaceH,
+  clampWindowBounds, generateWindowId,
+  type WindowEntry, type WindowBounds,
+} from './window-store';
 
-export type WindowState = 'open' | 'minimized' | 'maximized';
+/* Re-export todo desde window-store para backward compatibility.
+ * Los consumidores existentes importan de 'window-manager' y seguirán funcionando. */
+export { windowStore, setWorkspaceBounds, clampWindowBounds, getWindows, getFocusedWindow, findOpenWindow } from './window-store';
+export type { WindowState, WindowBounds, WindowEntry } from './window-store';
 
-export interface WindowBounds {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-export interface WindowEntry {
-  /** ID único de esta instancia de ventana. */
-  readonly instanceId: string;
-  /** ID de la app que vive dentro. */
-  readonly appId: string;
-  /** Título mostrado en barra y taskbar. */
-  title: string;
-  /** Estado visual de la ventana. */
-  state: WindowState;
-  /** Geometría en px (relativa al workspace). */
-  bounds: WindowBounds;
-  /** z-index para orden de apilamiento. */
-  zIndex: number;
-  /** Si esta ventana tiene foco activo. */
-  focused: boolean;
-  /** Contenido que la app devolvió. */
-  readonly content: HTMLElement;
-  /** AbortController de esta instancia — se aborta al cerrar. Shell windows no tienen controller. */
-  readonly controller?: AbortController;
-  /** Definición de la app (referencia). Shell windows no tienen app. */
-  readonly app?: AppDefinition;
-  /** Icono override para shell windows (sin AppDefinition). */
-  readonly icon?: IconNode;
-  /** CSS class override para shell windows (ej: 'desktop-profile-window'). */
-  readonly cssClass?: string;
-  /** Layout del body: 'padded' (default) o 'full-bleed'. */
-  readonly layout?: 'padded' | 'full-bleed';
-  /** Grupos del toolbar de la app (referencian Command IDs). */
-  readonly toolbar?: AppToolbarGroup[];
-  /** Parámetros de instancia (folderId para Finder, resourceId para Reader, etc.). */
-  readonly params?: Readonly<Record<string, string>>;
-  /** Clave derivada de params para buscar ventanas con los mismos parámetros. */
-  readonly _paramKey?: string;
-  /** Cleanup callback de la app (MountedView.destroy). Se invoca al cerrar. */
-  readonly onDestroy?: () => void;
-  /** Bounds anteriores al maximizar (para restaurar). */
-  preMaximizeBounds?: WindowBounds;
-}
-
-/* === Store reactivo === */
-export const windowStore: Store<WindowEntry[]> = createStore([]);
-
+/* z-index counter — mutable module state shared via window-store */
 let nextZIndex = 10;
-let nextWindowId = 1;
-
-/* === Workspace bounds (set by shell after DOM creation) === */
-let workspaceW = 1200;
-let workspaceH = 800;
-
-/** Called once by desktop-shell after the window container is in the DOM. */
-export function setWorkspaceBounds(w: number, h: number): void {
-  workspaceW = w;
-  workspaceH = h;
-}
-
-/** Shared clamp: keeps a window partially visible within the workspace. */
-export function clampWindowBounds(x: number, y: number, w: number, h: number): { x: number; y: number; w: number; h: number } {
-  const minVisible = 60;
-  const titleH = 24;
-  return {
-    x: Math.max(-w + minVisible, Math.min(workspaceW - minVisible, x)),
-    y: Math.max(0, Math.min(workspaceH - titleH, y)),
-    w: Math.min(w, workspaceW),
-    h: Math.min(h, workspaceH),
-  };
-}
-
-function generateWindowId(): string {
-  return `win-${nextWindowId++}`;
-}
-
-/** Obtener todas las ventanas. */
-export function getWindows(): WindowEntry[] {
-  return windowStore.get();
-}
-
-/** Obtener la ventana con foco. */
-export function getFocusedWindow(): WindowEntry | undefined {
-  return windowStore.get().find(w => w.focused);
-}
 
 /** Abrir una nueva ventana para una app. */
 export function openWindow(
@@ -118,7 +41,6 @@ export function openWindow(
   const raw: WindowBounds = { ...defaults, ...initialBounds };
   const bounds = clampWindowBounds(raw.x, raw.y, raw.w, raw.h);
 
-  /* Desenfocar todas las existentes */
   const updated = existing.map(w => ({ ...w, focused: false }));
 
   const entry: WindowEntry = {
@@ -149,14 +71,11 @@ export function closeWindow(instanceId: string): void {
   const target = windows.find(w => w.instanceId === instanceId);
   if (!target) return;
 
-  /* Ejecutar cleanup de la app (MountedView.destroy) si existe */
   target.onDestroy?.();
-  /* Abortar el signal de la app (shell windows no tienen controller) */
   target.controller?.abort();
 
   const remaining = windows.filter(w => w.instanceId !== instanceId);
 
-  /* Si era la ventana enfocada, enfocar la siguiente por z-index */
   if (target.focused && remaining.length > 0) {
     const topWindow = remaining.reduce((a, b) => (a.zIndex > b.zIndex ? a : b));
     topWindow.focused = true;
@@ -165,8 +84,7 @@ export function closeWindow(instanceId: string): void {
   windowStore.set(remaining);
 }
 
-/** Registrar una shell window (perfil, etc.) directamente en windowStore.
- * Las shell windows no tienen AppDefinition ni AbortController. */
+/** Registrar una shell window (perfil, etc.) directamente en windowStore. */
 export function registerShellWindow(options: {
   instanceId: string;
   title: string;
@@ -179,7 +97,6 @@ export function registerShellWindow(options: {
   toolbar?: AppToolbarGroup[];
 }): string {
   const existing = windowStore.get();
-  /* No registrar dos veces */
   if (existing.find(w => w.instanceId === options.instanceId)) return options.instanceId;
 
   const defaults: WindowBounds = { x: 40, y: 40, w: 470, h: 360 };
@@ -234,7 +151,6 @@ export function minimizeWindow(instanceId: string): void {
     return w;
   });
 
-  /* Enfocar la siguiente ventana visible */
   const visible = updated.filter(w => w.state === 'open');
   if (visible.length > 0) {
     const top = visible.reduce((a, b) => (a.zIndex > b.zIndex ? a : b));
@@ -256,14 +172,13 @@ export function restoreWindow(instanceId: string): void {
   windowStore.set(updated);
 }
 
-/** Maximizar/restaurar una ventana (toggle). Guarda bounds previos. */
+/** Maximizar/restaurar una ventana (toggle). */
 export function toggleMaximizeWindow(instanceId: string): void {
   const windows = windowStore.get();
   const target = windows.find(w => w.instanceId === instanceId);
   if (!target) return;
 
   if (target.state === 'maximized') {
-    /* Restaurar bounds anteriores */
     const restored = target.preMaximizeBounds ?? { x: 40, y: 40, w: 640, h: 480 };
     const updated = windows.map(w => {
       if (w.instanceId === instanceId) {
@@ -273,7 +188,6 @@ export function toggleMaximizeWindow(instanceId: string): void {
     });
     windowStore.set(updated);
   } else {
-    /* Maximizar: guardar bounds actuales y expandir al workspace */
     const updated = windows.map(w => {
       if (w.instanceId === instanceId) {
         return { ...w, state: 'maximized' as const, bounds: { x: 0, y: 0, w: workspaceW, h: workspaceH }, preMaximizeBounds: { ...w.bounds } };
@@ -284,8 +198,7 @@ export function toggleMaximizeWindow(instanceId: string): void {
   }
 }
 
-/** Actualizar bounds de una ventana (drag/resize/keyboard).
- * [Plan §4] Aplica boundary clamping automáticamente. */
+/** Actualizar bounds de una ventana (drag/resize/keyboard). */
 export function updateWindowBounds(instanceId: string, bounds: Partial<WindowBounds>): void {
   const windows = windowStore.get();
   const updated = windows.map(w => {
@@ -297,11 +210,6 @@ export function updateWindowBounds(instanceId: string, bounds: Partial<WindowBou
     return w;
   });
   windowStore.set(updated);
-}
-
-/** Verificar si una app singleton ya está abierta. */
-export function findOpenWindow(appId: string): WindowEntry | undefined {
-  return windowStore.get().find(w => w.appId === appId);
 }
 
 /** Cerrar todas las ventanas (para cleanup). */
