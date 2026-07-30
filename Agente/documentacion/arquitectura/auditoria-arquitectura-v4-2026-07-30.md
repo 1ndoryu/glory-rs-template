@@ -730,7 +730,7 @@ Estado de cada hallazgo de la auditoría v4 con su corrección o plan de acción
 | # | Hallazgo | Severidad | Estado | Evidencia |
 |---|---|---|---|---|
 | 2.1 | Dependencia de `document` global | 🔴 Bloqueante | ✅ CORREGIDO (con 1.2) | Helper `createEl()` + 26 archivos migrados. Abstracción DOM completa para toda creación de elementos |
-| 2.2 | `router.ts` switch sin register() | 🟡 Medio | ⬜ Pendiente | RouteAppAdapter existe pero router.ts no delega |
+| 2.2 | `router.ts` switch sin register() | 🟡 Medio | ✅ CORREGIDO | addRoute() + matchRoute() dinámico + routeInterceptor. Sin switch. |
 
 ### 10.3 Violaciones ISP (4 hallazgos)
 
@@ -768,10 +768,10 @@ Estado de cada hallazgo de la auditoría v4 con su corrección o plan de acción
 
 | Estado | Cantidad | % |
 |---|---|---|
-| ✅ Completado | **14** | 61% |
+| ✅ Completado | **15** | 65% |
 | ✅ Parcial (tests/error handling) | **2** | 9% |
 | ❌ Falso positivo | **1** | 4% |
-| ⬜ Pendiente | **7** | 30% |
+| ⬜ Pendiente | **6** | 26% |
 | **Total** | **23** | **100%** |
 
 **Actualización:** 2 nuevos hallazgos completados en esta sesión: §1.2 (createElement) y §5.4 (admin info bundle). §3.1 (FontConfig) también corregido. Progreso: 43% completado vs 22% anterior. Pendientes reducidos de 13 a 11.
