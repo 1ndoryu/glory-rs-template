@@ -16,6 +16,7 @@ import {
 } from './window-manager';
 import { AppRegistry } from './app-registry';
 import { dispatchEvent } from '../analytics/dispatcher';
+import { tombstoneNode, restoreNode, resetOverlay, workspaceStore } from './workspace/workspace-store';
 
 /* === Comandos de ventana === */
 
@@ -376,6 +377,79 @@ CommandRegistry.register({
     const dy = newH - win.bounds.h;
     updateWindowBounds(win.instanceId, { y: win.bounds.y - dy, h: newH });
     /* top edge extends, bottom edge stays fixed */
+    return { status: 'success' };
+  },
+});
+
+/* === Comandos de workspace (297A-11) === */
+
+/** Resolver nodeId del workspace desde targetId (que puede ser refId o nodeId). */
+function resolveWorkspaceNodeId(targetId: string): string | undefined {
+  const ws = workspaceStore.get();
+  const node = Object.values(ws.nodes).find(
+    (n) => n.id === targetId || n.refId === targetId,
+  );
+  return node?.id;
+}
+
+CommandRegistry.register({
+  id: 'workspace:trash',
+  label: 'Eliminar',
+  order: 30,
+  contexts: ['icon'],
+  undoPolicy: 'none',
+  analyticsEvent: 'workspace.trash',
+  isAvailable: (ctx) => {
+    const targetId = ctx.targets?.[0]?.id;
+    if (!targetId) return { state: 'hidden', reason: 'no target' };
+    const nodeId = resolveWorkspaceNodeId(targetId);
+    if (!nodeId) return { state: 'hidden', reason: 'node not found in workspace' };
+    return { state: 'enabled' };
+  },
+  execute: (ctx?: CommandContext): CommandResult => {
+    const targetId = ctx?.targets?.[0]?.id;
+    if (!targetId) return { status: 'failure', reason: 'no target' };
+    const nodeId = resolveWorkspaceNodeId(targetId);
+    if (!nodeId) return { status: 'failure', reason: 'node not found' };
+    tombstoneNode(nodeId);
+    return { status: 'success' };
+  },
+});
+
+/* [297A-11] Restaurar nodo de papelera — requiere UI de papelera (pendiente). */
+CommandRegistry.register({
+  id: 'workspace:restore',
+  label: 'Restaurar',
+  order: 31,
+  contexts: ['trash'],
+  undoPolicy: 'none',
+  analyticsEvent: 'workspace.restore',
+  isAvailable: (ctx) => {
+    const nodeId = ctx.targets?.[0]?.id;
+    if (!nodeId) return { state: 'hidden', reason: 'no target' };
+    return { state: 'enabled' };
+  },
+  execute: (ctx?: CommandContext): CommandResult => {
+    const nodeId = ctx?.targets?.[0]?.id;
+    if (!nodeId) return { status: 'failure', reason: 'no target' };
+    restoreNode(nodeId);
+    return { status: 'success' };
+  },
+});
+
+CommandRegistry.register({
+  id: 'workspace:reset',
+  label: 'Restablecer escritorio',
+  order: 32,
+  contexts: ['desktop'],
+  undoPolicy: 'none',
+  analyticsEvent: 'workspace.reset',
+  isAvailable: () => {
+    /* Siempre disponible — reset con overlay vacío es no-op seguro. */
+    return { state: 'enabled' };
+  },
+  execute: (): CommandResult => {
+    resetOverlay();
     return { status: 'success' };
   },
 });
