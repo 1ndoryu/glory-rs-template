@@ -7,10 +7,8 @@ import {
   createElement,
   FileUser,
   Folder,
-  FolderCode,
   Gamepad2,
   PanelLeft,
-  Settings,
   ShieldUser,
   X,
   type IconNode,
@@ -26,6 +24,9 @@ import { dispatchEvent } from '../analytics/dispatcher';
 import { enableDragResize } from './utils/drag-resize';
 import { openContextMenu } from './components/desktop-context-menu';
 import { selectSingle, clearSelection, selectBackground } from '../runtime/selection-store';
+import { workspaceStore } from '../runtime/workspace/workspace-store';
+import type { ResolvedNode } from '../runtime/workspace/types';
+import { AppRegistry } from '../runtime/app-registry';
 
 export interface DesktopShell {
   element: HTMLElement;
@@ -34,75 +35,81 @@ export interface DesktopShell {
   setProfileVisible(visible: boolean): void;
 }
 
-interface DesktopIconItem {
-  id: string;
-  label: string;
-  type: 'folder' | 'document' | 'application';
-  icon: IconNode;
-  selected?: boolean;
-  appId?: string;
-  action?: () => void;
-}
+/** [Plan 297A-11] Iconos de nodos que no están en AppRegistry. */
+const SHELL_ICON_MAP: Record<string, IconNode> = {
+  'profile': FileUser,
+  'snake': Gamepad2,
+  'admin': ShieldUser,
+};
 
-function getDesktopIcons(showAdmin: boolean): DesktopIconItem[] {
-  const items: DesktopIconItem[] = [
-    { id: 'gallery', label: 'Galería', type: 'folder', icon: Folder, selected: true, appId: 'finder' },
-    { id: 'projects', label: 'Proyectos', type: 'folder', icon: FolderCode, appId: 'projects' },
-    { id: 'profile', label: 'Perfil', type: 'document', icon: FileUser },
-    { id: 'about', label: 'About', type: 'document', icon: FileUser, appId: 'about' },
-    { id: 'snake', label: 'Snake', type: 'application', icon: Gamepad2 },
-  ];
-
-  if (showAdmin) {
-    items.push(
-      { id: 'settings', label: 'Configuración', type: 'application', icon: Settings, appId: 'settings' },
-      { id: 'admin', label: 'Admin', type: 'application', icon: ShieldUser, action: () => navigate('/admin') },
-    );
+function resolveNodeIcon(node: ResolvedNode): IconNode {
+  if (node.type === 'app' && node.refId) {
+    const app = AppRegistry.get(node.refId);
+    if (app) return app.icon;
   }
-
-  return items;
+  return SHELL_ICON_MAP[node.id] ?? Folder;
 }
 
-function createIconGrid(showAdmin: boolean, extraActions?: Record<string, () => void>): HTMLElement {
+function resolveNodeIconType(node: ResolvedNode): 'folder' | 'document' | 'application' {
+  if (node.type === 'app' && node.refId) {
+    const app = AppRegistry.get(node.refId);
+    if (app?.iconType) return app.iconType;
+  }
+  if (node.type === 'folder') return 'folder';
+  if (node.type === 'shortcut') return 'document';
+  return 'application';
+}
+
+/** [Plan 297A-11 §9.4] Grid reactivo que se suscribe a workspaceStore. */
+function createWorkspaceIconGrid(extraActions?: Record<string, () => void>): HTMLElement {
   const grid = document.createElement('div');
   grid.className = 'desktop-icon-grid';
   grid.setAttribute('aria-label', 'Objetos del escritorio');
 
-  for (const item of getDesktopIcons(showAdmin)) {
-    const onActivate = extraActions?.[item.id]
-      ?? (item.appId ? () => { void openAppWindow(item.appId!); } : item.action);
-    if (!onActivate) continue;
+  workspaceStore.subscribe((ws) => {
+    grid.innerHTML = '';
+    const desktopNodes = Object.values(ws.nodes)
+      .filter((n) => n.parentId === 'desktop')
+      .sort((a, b) => (a.mobileOrder ?? 0) - (b.mobileOrder ?? 0));
 
-    const iconEl = createDesktopIcon({
-      label: item.label,
-      type: item.type,
-      selected: item.selected,
-      lucideIcon: item.icon,
-      onActivate,
-    });
+    for (const node of desktopNodes) {
+      const onActivate = extraActions?.[node.id]
+        ?? (node.refId ? () => {
+          if (node.id === 'admin') { navigate('/admin'); return; }
+          void openAppWindow(node.refId!);
+        } : undefined);
+      if (!onActivate) continue;
 
-    /* [Plan §3] Selección: clic selecciona el icono (solo clic simple) */
-    iconEl.addEventListener('mousedown', (e) => {
-      if (e.button === 0 && e.detail === 1) {
-        selectSingle(item.id);
-      }
-    });
-
-    /* [Plan §3.2] Context menu: clic derecho abre menú contextual del icono */
-    iconEl.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      selectSingle(item.id);
-      openContextMenu({
-        context: 'icon',
-        targets: [{ id: item.appId ?? item.id, kind: item.appId ? 'app' : 'shortcut' }],
-        capability: showAdmin ? 'admin' : 'public',
-        x: e.clientX,
-        y: e.clientY,
+      const iconEl = createDesktopIcon({
+        label: node.label,
+        type: resolveNodeIconType(node),
+        lucideIcon: resolveNodeIcon(node),
+        onActivate,
       });
-    });
 
-    grid.appendChild(iconEl);
-  }
+      /* [Plan §3] Selección: clic selecciona el icono (solo clic simple) */
+      iconEl.addEventListener('mousedown', (e) => {
+        if (e.button === 0 && e.detail === 1) {
+          selectSingle(node.id);
+        }
+      });
+
+      /* [Plan §3.2] Context menu: clic derecho abre menú contextual del icono */
+      iconEl.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        selectSingle(node.id);
+        openContextMenu({
+          context: 'icon',
+          targets: [{ id: node.refId ?? node.id, kind: node.type === 'app' ? 'app' : 'shortcut' }],
+          capability: authStore.get().isAuthenticated ? 'admin' : 'public',
+          x: e.clientX,
+          y: e.clientY,
+        });
+      });
+
+      grid.appendChild(iconEl);
+    }
+  });
 
   return grid;
 }
@@ -144,8 +151,8 @@ export function createDesktopShell(
   });
   contentWindow.style.display = 'none';
 
-  /* Icon grid */
-  const iconGrid = createIconGrid(authStore.get().isAuthenticated, {
+  /* [Plan 297A-11] Icon grid reactivo desde workspaceStore */
+  const iconGrid = createWorkspaceIconGrid({
     profile: () => {
       const existing = windowStore.get().find(w => w.instanceId === profileInstanceId);
       if (existing) {
