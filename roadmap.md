@@ -22,11 +22,11 @@
 - `/admin`, JWT en Web Storage, uploads públicos y comercio actual son legado.
 - Ejecutar una tarea por vez y en este orden; no saltar dependencias.
 - El plan maestro contiene checklists/gates. El roadmap conserva solo pendientes.
-- No implementar Sentinel/script hasta autorización explícita del usuario.
+- La implementación de 297A-6 está autorizada; continuar en orden hasta completar el runner y sus gates.
 
-## Siguiente bloque para revisión/autorización
+## Siguiente bloque en ejecución
 
-**297A-6 — Quality gate Sentinel/VarSense.** Por ahora solo se planifica; es el primer bloque técnico futuro.
+**297A-6 — Quality gate Sentinel/VarSense.** Capacidades CLI, configuración y distribución completadas; sigue el runner compacto.
 
 ## Pendientes ordenados
 
