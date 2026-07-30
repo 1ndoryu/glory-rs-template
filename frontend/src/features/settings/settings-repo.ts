@@ -34,7 +34,7 @@ export function saveSettings(): void {
     const c = fontStore.get();
     try {
       await SettingsService.save({
-          font_menu: c.menu, font_titulo: c.titulo, font_texto: c.texto,
+        font_menu: c.menu, font_titulo: c.titulo, font_texto: c.texto,
           tamano_texto: String(c.tamanoTexto), tamano_titulo: String(c.tamanoTitulo),
           tamano_pequeno: String(c.tamanoPequeno), tamano_grande: String(c.tamanoGrande),
           tamano_titulo_grande: String(c.tamanoTituloGrande),

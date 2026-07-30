@@ -21,12 +21,7 @@ export async function uploadFile(
   articleId?: string,
   altText?: string,
 ): Promise<UploadResult> {
-  const formData = new FormData();
-  formData.append('file', file);
-  if (articleId) formData.append('article_id', articleId);
-  if (altText) formData.append('alt_text', altText);
-
-  const media = await MediaService.upload(file, articleId);
+  const media = await MediaService.upload(file, { articleId, altText });
   return { url: media.file_path, media };
 }
 
