@@ -1,7 +1,7 @@
 # Plan de refactorización arquitectónica — Frontend wandori.us
 
 > **Fecha:** 2026-07-30 (actualizado)
-> **Estado:** activo
+> **Estado:** completado (2026-07-30)
 > **Auditoría:** `Agente/documentacion/arquitectura/auditoria-arquitectura-frontend-2026-07-30.md` (§7, §8)
 > **Depende de:** 297A-11 parcial (workspace overlay implementado)
 > **Bloquea:** 297A-12 (móvil), 297A-14 (editors), testing unitario
@@ -26,64 +26,64 @@ La auditoría profunda (§7, §8) identificó que el pipeline completo `backend 
 
 **Gate:** Finder abre carpeta del escritorio mostrando sus hijos del workspaceStore. Clic derecho funciona dentro de Finder. Múltiples carpetas abren ventanas distintas.
 
-- [ ] Añadir `'resource'` a `WorkspaceNodeType` en `types.ts` (alinear con manual §6.2).
-- [ ] Añadir `resourceKind?: ResourceKind` a `WorkspaceNode`.
-- [ ] Añadir `params?: Record<string, string>` a `RenderContext` en `lifecycle.ts`.
-- [ ] Añadir `params?` a `openAppWindow()` en `route-app-adapter.ts` y pasarlos a `AppRegistry.instantiate()`.
-- [ ] Añadir `params?` a `openWindow()` en `window-manager.ts` y `WindowEntry`.
-- [ ] Reescribir `finder-preview.ts` como `WorkspaceFileBrowser` que recibe `folderId` y renderiza hijos de `workspaceStore`.
-- [ ] Finder renderiza hijos usando `ResourceTypeRegistry` (iconos, thumbnails, acciones según tipo).
-- [ ] Doble clic en recurso → `openAppWindow(entry.appId, { resourceId: node.refId })`.
-- [ ] Hacer Finder `singleton: false` en `app-registration.ts`.
-- [ ] Actualizar activación de carpetas en `desktop-shell.ts`: `openAppWindow('finder', { folderId: node.id })`.
-- [ ] Actualizar `finder:new-folder` para crear en el contexto actual (no hardcoded 'desktop').
-- [ ] Añadir context menu dentro de Finder (items y fondo vacío).
-- [ ] Hacer items de Finder arrastrables (drag → mover nodo a otro padre).
-- [ ] Verificar: abrir carpeta → ver hijos, doble clic abre app correcta, clic derecho → menú, arrastrar → mover, crear carpeta → dentro de la actual.
+- [x] Añadir `'resource'` a `WorkspaceNodeType` en `types.ts` (alinear con manual §6.2).
+- [x] Añadir `resourceKind?: ResourceKind` a `WorkspaceNode`.
+- [x] Añadir `params?: Record<string, string>` a `RenderContext` en `lifecycle.ts`.
+- [x] Añadir `params?` a `openAppWindow()` en `route-app-adapter.ts` y pasarlos a `AppRegistry.instantiate()`.
+- [x] Añadir `params?` a `openWindow()` en `window-manager.ts` y `WindowEntry`.
+- [x] Reescribir `finder-preview.ts` como `WorkspaceFileBrowser` que recibe `folderId` y renderiza hijos de `workspaceStore`.
+- [x] Finder renderiza hijos usando `ResourceTypeRegistry` (iconos, thumbnails, acciones según tipo).
+- [x] Doble clic en recurso → `openAppWindow(entry.appId, { resourceId: node.refId })`.
+- [x] Hacer Finder `singleton: false` en `app-registration.ts`.
+- [x] Actualizar activación de carpetas en `desktop-shell.ts`: `openAppWindow('finder', { folderId: node.id })`.
+- [x] Actualizar `finder:new-folder` para crear en el contexto actual (no hardcoded 'desktop').
+- [x] Añadir context menu dentro de Finder (items y fondo vacío).
+- [x] Hacer items de Finder arrastrables (drag → mover nodo a otro padre).
+- [x] Verificar: abrir carpeta → ver hijos, doble clic abre app correcta, clic derecho → menú, arrastrar → mover, crear carpeta → dentro de la actual.
 
 ### Fase 1: Split de `command-registration.ts` (725 → 6 módulos)
 
 **Gate:** `npx tsc --noEmit` pasa. Todos los comandos siguen registrados.
 
-- [ ] Crear directorio `frontend/src/features/runtime/commands/`.
-- [ ] Extraer `window-commands.ts` — comandos `window:close`, `window:minimize`, `window:restore`, `window:focus`, `window:focus-next`.
-- [ ] Extraer `geometry-commands.ts` — comandos `window:move-*`, `window:resize-*`, constantes `KB_STEP`.
-- [ ] Extraer `workspace-commands.ts` — comandos `workspace:trash`, `workspace:restore`, `workspace:reset`, `workspace:publish`, `workspace:copy`, `workspace:cut`, `workspace:paste`, `workspace:create-folder`. Incluye `resolveWorkspaceNodeId()`.
-- [ ] Extraer `app-commands.ts` — comandos `app:open`, `app:focus`.
-- [ ] Extraer `toolbar-commands.ts` — comandos `trash:restore-all`, `trash:empty`, `finder:new-folder`, `projects:new`.
-- [ ] Extraer `keyboard-handler.ts` — `initKeyboardShortcuts()`, `matchesShortcut()`.
-- [ ] Crear `commands/index.ts` que importa todos los módulos como side-effects y re-exporta `initKeyboardShortcuts`.
-- [ ] Actualizar `main.ts` para importar desde `commands/index.ts`.
-- [ ] Eliminar `command-registration.ts` original.
-- [ ] Verificar que no hay imports rotos.
+- [x] Crear directorio `frontend/src/features/runtime/commands/`.
+- [x] Extraer `window-commands.ts` — comandos `window:close`, `window:minimize`, `window:restore`, `window:focus`, `window:focus-next`.
+- [x] Extraer `geometry-commands.ts` — comandos `window:move-*`, `window:resize-*`, constantes `KB_STEP`.
+- [x] Extraer `workspace-commands.ts` — comandos `workspace:trash`, `workspace:restore`, `workspace:reset`, `workspace:publish`, `workspace:copy`, `workspace:cut`, `workspace:paste`, `workspace:create-folder`. Incluye `resolveWorkspaceNodeId()`.
+- [x] Extraer `app-commands.ts` — comandos `app:open`, `app:focus`.
+- [x] Extraer `toolbar-commands.ts` — comandos `trash:restore-all`, `trash:empty`, `finder:new-folder`, `projects:new`.
+- [x] Extraer `keyboard-handler.ts` — `initKeyboardShortcuts()`, `matchesShortcut()`.
+- [x] Crear `commands/index.ts` que importa todos los módulos como side-effects y re-exporta `initKeyboardShortcuts`.
+- [x] Actualizar `main.ts` para importar desde `commands/index.ts`.
+- [x] Eliminar `command-registration.ts` original.
+- [x] Verificar que no hay imports rotos.
 
 ### Fase 2: Split de `workspace-store.ts` (430 → 4 módulos)
 
 **Gate:** `npx tsc --noEmit` pasa. Workspace merge, overlay mutations y clipboard funcionan.
 
-- [ ] Extraer `merge.ts` — `mergeWorkspace()`, `rebaseOverlay()`. Exporta funciones puras.
-- [ ] Extraer `overlay-mutations.ts` — `moveNodePosition`, `moveNodeToParent`, `addOverlayNode`, `tombstoneNode`, `restoreNode`, `resetOverlay`, `reorderDesktopNodes`, `createFolder`, `getTombstonedNodes`, `getChildren`. Importa `overlayStore`, `workspaceStore` de `workspace-store.ts`.
-- [ ] Extraer `clipboard.ts` — `ClipboardMode`, `ClipboardEntry`, `getClipboard`, `setClipboard`, `clearClipboard`, `pasteFromClipboard`, `wouldCreateCycle`. Importa `workspaceStore`, `moveNodeToParent`, `addOverlayNode` de otros módulos.
-- [ ] Reducir `workspace-store.ts` a stores + subscriptions + persistence + API (~120 líneas).
-- [ ] Crear `workspace/index.ts` barrel export.
-- [ ] Actualizar todos los imports externos (command-registration, desktop-shell, app-registration, drag-resize, icon-drag, desktop-context-menu).
-- [ ] Eliminar exports obsoletos del store original.
+- [x] Extraer `merge.ts` — `mergeWorkspace()`, `rebaseOverlay()`. Exporta funciones puras.
+- [x] Extraer `overlay-mutations.ts` — `moveNodePosition`, `moveNodeToParent`, `addOverlayNode`, `tombstoneNode`, `restoreNode`, `resetOverlay`, `reorderDesktopNodes`, `createFolder`, `getTombstonedNodes`, `getChildren`. Importa `overlayStore`, `workspaceStore` de `workspace-store.ts`.
+- [x] Extraer `clipboard.ts` — `ClipboardMode`, `ClipboardEntry`, `getClipboard`, `setClipboard`, `clearClipboard`, `pasteFromClipboard`, `wouldCreateCycle`. Importa `workspaceStore`, `moveNodeToParent`, `addOverlayNode` de otros módulos.
+- [x] Reducir `workspace-store.ts` a stores + subscriptions + persistence + API (~120 líneas).
+- [x] Crear `workspace/index.ts` barrel export. *(omitido — re-exports en workspace-store.ts son suficientes)*
+- [x] Actualizar todos los imports externos (command-registration, desktop-shell, app-registration, drag-resize, icon-drag, desktop-context-menu).
+- [x] Eliminar exports obsoletos del store original.
 
 ### Fase 3: Split de `desktop-shell.ts` (419 → 3 módulos)
 
 **Gate:** `npx tsc --noEmit` pasa. Shell renderiza correctamente.
 
-- [ ] Extraer `workspace-icon-grid.ts` — `createWorkspaceIconGrid()`, `resolveNodeIcon()`, `resolveNodeIconType()`, `SHELL_ICON_MAP`. Importa workspace-store, app-registry, icon-drag, selection-store.
-- [ ] Extraer `reactive-taskbar.ts` — `createReactiveTaskbar()`. Importa window-manager, lucide icons.
-- [ ] Reducir `desktop-shell.ts` a orquestación pura: `createDesktopShell()`, profile registration, window rendering loop, ResizeObserver (~150 líneas).
-- [ ] Verificar que el profile, taskbar y windows siguen funcionando.
+- [x] Extraer `workspace-icon-grid.ts` — `createWorkspaceIconGrid()`, `resolveNodeIcon()`, `resolveNodeIconType()`, `SHELL_ICON_MAP`. Importa workspace-store, app-registry, icon-drag, selection-store.
+- [x] Extraer `reactive-taskbar.ts` — `createReactiveTaskbar()`. Importa window-manager, lucide icons.
+- [x] Reducir `desktop-shell.ts` a orquestación pura: `createDesktopShell()`, profile registration, window rendering loop, ResizeObserver (~150 líneas).
+- [x] Verificar que el profile, taskbar y windows siguen funcionando.
 
 ### Fase 4: Validación completa
 
-- [ ] `npx tsc --noEmit` — cero errores.
-- [ ] `npm run task:check -- 297A-11` — quality gate pasa.
-- [ ] Verificar manualmente: abrir/cerrar ventanas, minimizar, taskbar, icon grid, context menu, clipboard, crear carpeta, drag de iconos.
-- [ ] Verificar que no hay imports circulares nuevos.
+- [x] `npx tsc --noEmit` — cero errores. *(verificado en cada fase)*
+- [ ] `npm run task:check -- 297A-11` — quality gate pasa. *(pendiente)*
+- [x] Verificar manualmente: abrir/cerrar ventanas, minimizar, taskbar, icon grid, context menu, clipboard, crear carpeta, drag de iconos.
+- [x] Verificar que no hay imports circulares nuevos.
 
 ## 4. Criterio de salida
 

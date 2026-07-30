@@ -18,7 +18,9 @@
 
 ## Estado y reglas
 
-- Concepto desktop aprobado; Finder/Reader siguen siendo previews.
+- Concepto desktop aprobado; Finder es file browser real (lee workspaceStore); Reader sigue siendo preview.
+- Workspace overlay implementado: release + overlay + merge + clipboard + papelera + crear carpetas.
+- Split de archivos grandes completado: command-registration (725→6), workspace-store (430→4), desktop-shell (419→3).
 - Sesiones opacas en cookie operativas; JWT localStorage eliminado del frontend. `/admin` legacy y uploads públicos siguen como deuda controlada.
 - Ejecutar una tarea por vez y en este orden; no saltar dependencias.
 - El plan maestro contiene checklists/gates. El roadmap conserva solo pendientes.
@@ -66,11 +68,18 @@
 
 **Depende de:** 297A-9/10.
 
+- [x] Árbol, referencias, initial windows y IDs estables. *(default-release.ts + workspace types)*
+- [x] Overlay local: additions/overrides/tombstones. *(workspace-store.ts + overlay-mutations.ts)*
+- [x] Clipboard, ciclos, papelera por capa y reset. *(clipboard.ts + trash app)*
+- [x] Finder como file browser real (lee workspaceStore, breadcrumb, drag/drop, context menu). *(finder-preview.ts rewrite)*
+- [x] WorkspaceNodeType incluye 'resource' + resourceKind. *(types.ts alineado con manual §6.2)*
+- [x] RenderContext con params para parámetros de instancia. *(lifecycle.ts + openAppWindow + openWindow)*
+- [x] Sistema de menús unificado (CommandRegistry como fuente única). *(toolbar refs + createAppToolbar)*
+- [x] App toolbar automático en todas las ventanas. *(createDesktopWindow siempre renderiza toolbar)*
+- [x] Split de archivos grandes: command-registration (725→6), workspace-store (430→4), desktop-shell (419→3).
+- [x] Migración workspace_releases con seed data. *(20260731000000)*
 - [ ] Draft/release/preview/publicar/rollback.
 - [ ] Organizador público separado del workspace admin personal.
-- [ ] Árbol, referencias, initial windows y IDs estables.
-- [ ] Overlay local: additions/overrides/tombstones.
-- [ ] Clipboard, ciclos, papelera por capa y reset.
 
 **Salida:** admin publica el preview exacto; visitante reorganiza sin escribir global.
 
