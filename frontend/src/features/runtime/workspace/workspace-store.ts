@@ -311,6 +311,107 @@ export function reorderDesktopNodes(orderedIds: NodeId[]): void {
   });
 }
 
+/** Validar que asignar parentId no crea un ciclo. */
+function wouldCreateCycle(
+  nodes: Readonly<Record<NodeId, ResolvedNode>>,
+  nodeId: NodeId,
+  newParentId: NodeId | 'desktop' | null,
+): boolean {
+  if (newParentId === 'desktop' || newParentId === null) return false;
+  if (newParentId === nodeId) return true;
+  let current: NodeId | 'desktop' | null = newParentId;
+  const visited = new Set<NodeId>();
+  while (current && current !== 'desktop') {
+    if (current === nodeId) return true;
+    if (visited.has(current)) return true; /* ciclo existente */
+    visited.add(current);
+    current = nodes[current]?.parentId ?? null;
+  }
+  return false;
+}
+
+/* === Clipboard (in-memory) === */
+export type ClipboardMode = 'copy' | 'cut';
+
+export interface ClipboardEntry {
+  nodeIds: NodeId[];
+  mode: ClipboardMode;
+}
+
+let clipboard: ClipboardEntry | null = null;
+
+export function getClipboard(): ClipboardEntry | null {
+  return clipboard;
+}
+
+export function setClipboard(nodeIds: NodeId[], mode: ClipboardMode): void {
+  clipboard = { nodeIds, mode };
+}
+
+export function clearClipboard(): void {
+  clipboard = null;
+}
+
+let copyCounter = 0;
+
+/** Pegar nodos del clipboard en un destino. */
+export function pasteFromClipboard(targetParentId: NodeId | 'desktop'): NodeId[] {
+  if (!clipboard) return [];
+  const ws = workspaceStore.get();
+  const pastedIds: NodeId[] = [];
+
+  if (clipboard.mode === 'cut') {
+    /* Cut: mover nodos al destino */
+    const idsToMove = clipboard.nodeIds.filter((id) => ws.nodes[id]);
+    /* Validar ciclos */
+    for (const id of idsToMove) {
+      if (wouldCreateCycle(ws.nodes, id, targetParentId)) return [];
+    }
+    for (const id of idsToMove) {
+      moveNodeToParent(id, targetParentId);
+    }
+    pastedIds.push(...idsToMove);
+    clipboard = null; /* Cut es one-shot */
+  } else {
+    /* Copy: crear nodos nuevos en el overlay */
+    for (const id of clipboard.nodeIds) {
+      const original = ws.nodes[id];
+      if (!original) continue;
+      const newId = `${id}-copy-${++copyCounter}`;
+      addOverlayNode({
+        id: newId,
+        parentId: targetParentId,
+        type: original.type,
+        label: `${original.label} (copia)`,
+        refId: original.refId,
+        requires: original.requires,
+      });
+      pastedIds.push(newId);
+    }
+  }
+
+  return pastedIds;
+}
+
+/** Crear una carpeta nueva en el overlay. */
+export function createFolder(
+  parentId: NodeId | 'desktop',
+  label: string,
+): NodeId {
+  const id = `folder-${Date.now()}`;
+  const ws = workspaceStore.get();
+  const siblings = Object.values(ws.nodes).filter((n) => n.parentId === parentId);
+  addOverlayNode({
+    id,
+    parentId,
+    type: 'folder',
+    label,
+    mobileOrder: siblings.length,
+    requires: 'public',
+  });
+  return id;
+}
+
 /** Obtener nodos en la papelera (tombstoned) con sus datos del release. */
 export function getTombstonedNodes(): WorkspaceNode[] {
   const release = releaseStore.get();
