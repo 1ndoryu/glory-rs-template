@@ -10,6 +10,7 @@ import { runFrontend } from './adapters/frontend.mjs';
 import { runRust } from './adapters/rust.mjs';
 import { runSentinel } from './adapters/sentinel.mjs';
 import { runVarsense } from './adapters/varsense.mjs';
+import { runCustom } from './adapters/custom.mjs';
 
 process.once('SIGINT', () => {
   cancelAll();
@@ -25,6 +26,8 @@ function stageDefinitions(context, scope, taskId) {
   if (scope.full || scope.profiles.has('rust')) definitions.push({ name: 'rust', run: () => runRust(context) });
   if (scope.full || scope.profiles.has('frontend')) definitions.push({ name: 'frontend', run: () => runFrontend(context) });
   if (scope.full || scope.profiles.has('docs')) definitions.push({ name: 'docs', run: () => runDocs(context, taskId) });
+  /* [Auditoría v4] Custom checks: DOM abstraction, singleton state, window refs */
+  if (scope.full || scope.profiles.has('frontend')) definitions.push({ name: 'custom', run: () => runCustom(context, scope) });
   return definitions;
 }
 

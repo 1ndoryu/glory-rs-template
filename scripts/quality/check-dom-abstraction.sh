@@ -9,10 +9,13 @@ echo ""
 
 FRONTEND_SRC="${1:-frontend/src}"
 
-# Buscar document.createElement en archivos .ts (excluyendo dom.ts y .test.ts)
+# Buscar document.createElement en archivos .ts (excluyendo dom.ts, .test.ts y excepciones documentadas)
+# Excepciones documentadas:
+#   - sanitize-html.ts: createElement(tag) dinámico — el sanitizer DEBE crear elementos por nombre de tag
 FILES=$(grep -rn "document\.createElement" "$FRONTEND_SRC" --include="*.ts" \
   --exclude="dom.ts" --exclude="*.test.ts" --exclude="*.d.ts" \
   | grep -v "node_modules" \
+  | grep -v "sanitize-html.ts" \
   | head -30)
 
 if [ -z "$FILES" ]; then
