@@ -106,17 +106,23 @@ overlayStore.subscribe((overlay) => {
   saveOverlay(overlay);
 });
 
-function recompute(): void {
-  const release = releaseStore.get();
-  const overlay = overlayStore.get();
-  const auth = authStore.get();
-  const capability: 'public' | 'authenticated' | 'admin' = auth.isAuthenticated ? 'admin' : 'public';
-  workspaceStore.set(mergeWorkspace(release, overlay, capability));
+let recomputeScheduled = false;
+function scheduleRecompute(): void {
+  if (recomputeScheduled) return;
+  recomputeScheduled = true;
+  queueMicrotask(() => {
+    recomputeScheduled = false;
+    const release = releaseStore.get();
+    const overlay = overlayStore.get();
+    const auth = authStore.get();
+    const capability: 'public' | 'authenticated' | 'admin' = auth.isAuthenticated ? 'admin' : 'public';
+    workspaceStore.set(mergeWorkspace(release, overlay, capability));
+  });
 }
 
-releaseStore.subscribe(() => recompute());
-overlayStore.subscribe(() => recompute());
-authStore.subscribe(() => recompute());
+releaseStore.subscribe(() => scheduleRecompute());
+overlayStore.subscribe(() => scheduleRecompute());
+authStore.subscribe(() => scheduleRecompute());
 
 /* Re-export submodules for backward compatibility */
 export { moveNodePosition, moveNodeToParent, addOverlayNode, tombstoneNode, restoreNode, resetOverlay, reorderDesktopNodes, createFolder, getTombstonedNodes, getChildren } from './overlay-mutations';

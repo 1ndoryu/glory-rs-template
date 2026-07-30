@@ -50,16 +50,6 @@ export const DEFAULT_RELEASE: WorkspaceTree = {
       mobileOrder: 3,
       requires: 'public',
     },
-    snake: {
-      id: 'snake',
-      parentId: 'desktop',
-      type: 'app',
-      label: 'Snake',
-      refId: 'snake',
-      position: { col: 0, row: 4 },
-      mobileOrder: 4,
-      requires: 'public',
-    },
     /* === Admin-only (added dynamically based on auth) === */
     settings: {
       id: 'settings',
@@ -67,8 +57,8 @@ export const DEFAULT_RELEASE: WorkspaceTree = {
       type: 'app',
       label: 'Configuración',
       refId: 'settings',
-      position: { col: 0, row: 5 },
-      mobileOrder: 5,
+      position: { col: 0, row: 4 },
+      mobileOrder: 4,
       requires: 'admin',
     },
     admin: {
@@ -77,8 +67,8 @@ export const DEFAULT_RELEASE: WorkspaceTree = {
       type: 'app',
       label: 'Admin',
       refId: 'admin',
-      position: { col: 0, row: 6 },
-      mobileOrder: 6,
+      position: { col: 0, row: 5 },
+      mobileOrder: 5,
       requires: 'admin',
     },
     trash: {
@@ -88,7 +78,7 @@ export const DEFAULT_RELEASE: WorkspaceTree = {
       label: 'Papelera',
       refId: 'trash',
       position: { col: 1, row: 0 },
-      mobileOrder: 7,
+      mobileOrder: 6,
       requires: 'public',
     },
   },

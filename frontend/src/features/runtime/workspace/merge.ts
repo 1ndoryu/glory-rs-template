@@ -29,15 +29,19 @@ export function mergeWorkspace(
     result[id] = { ...node, origin: 'release' };
   }
 
+  /* Remove tombstones and all descendants (recursive orphan detection) */
   const tombstoneSet = new Set(overlay.tombstones);
-  for (const tombId of tombstoneSet) {
-    delete result[tombId];
-  }
-  for (const id of tombstoneSet) {
+  let changed = true;
+  while (changed) {
+    changed = false;
     for (const node of Object.values(result)) {
-      if (node.parentId === id) {
+      if (tombstoneSet.has(node.id)) {
+        delete result[node.id];
+        changed = true;
+      } else if (node.parentId !== 'desktop' && node.parentId !== null && tombstoneSet.has(node.parentId)) {
         tombstoneSet.add(node.id);
         delete result[node.id];
+        changed = true;
       }
     }
   }

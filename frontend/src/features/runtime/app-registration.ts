@@ -3,7 +3,7 @@
  * Cada app define su id, título, icono, capacidades y render function.
  * Las apps solo devuelven contenido; el shell crea la ventana. */
 
-import { FileUser, Folder, Settings, FileText, FolderCode, Trash2 } from 'lucide';
+import { FileUser, Folder, Settings, FileText, FolderCode, Trash2, ShieldUser } from 'lucide';
 import { AppRegistry } from './app-registry';
 import { createFinderPreview } from '../desktop/apps/finder/finder-preview';
 import { createReaderPreview } from '../desktop/apps/reader/reader-preview';
@@ -39,6 +39,15 @@ AppRegistry.register({
         void import('../runtime/command-registry').then(({ CommandRegistry }) => {
           void CommandRegistry.execute('finder:new-folder');
         });
+      },
+      onNavigate: (_folderId: string, label: string) => {
+        /* Actualizar título de la ventana cuando Finder navega entre carpetas.
+         * DOM traversal desde content para encontrar el título de SU ventana.
+         * Null guard: content aún no está en el DOM durante el montaje inicial. */
+        const windowEl = content.closest('.desktop-window');
+        if (!windowEl) return;
+        const titleEl = windowEl.querySelector('.desktop-window__title');
+        if (titleEl) titleEl.textContent = label;
       },
     });
 
@@ -146,6 +155,33 @@ AppRegistry.register({
       element: content,
       destroy: () => {
         dispatchEvent({ type: 'app_closed', appId: 'trash' });
+      },
+    };
+  },
+});
+
+/* === Admin — Panel de administración === */
+AppRegistry.register({
+  id: 'admin',
+  title: 'Admin',
+  icon: ShieldUser,
+  iconType: 'application',
+  singleton: true,
+  requires: 'admin',
+  routePatterns: ['/admin'],
+  render: (ctx: RenderContext): MountedView => {
+    dispatchEvent({ type: 'app_opened', appId: 'admin' });
+
+    const container = document.createElement('div');
+    void import('../../pages/admin').then(async m => {
+      if (ctx.signal.aborted) return;
+      container.appendChild(await m.renderAdmin());
+    });
+
+    return {
+      element: container,
+      destroy: () => {
+        dispatchEvent({ type: 'app_closed', appId: 'admin' });
       },
     };
   },

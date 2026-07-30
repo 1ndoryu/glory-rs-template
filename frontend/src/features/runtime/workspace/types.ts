@@ -5,8 +5,11 @@
 
 export type NodeId = string;
 
-/** Tipo de recurso del backend (alinea con ResourceKind en Rust). */
-export type WorkspaceResourceKind = 'article' | 'about' | 'project' | 'product' | 'image' | 'audio' | 'video' | 'document' | 'generic';
+/** Tipo de recurso del workspace/backend.
+ * Unificado con ResourceKind de resource-type-registry.ts para eliminar duplicación.
+ * Los tipos 'folder' y 'shortcut' existen aquí por completitud pero en el workspace
+ * se usan como WorkspaceNodeType, no como resourceKind. */
+export type WorkspaceResourceKind = 'article' | 'about' | 'project' | 'product' | 'image' | 'audio' | 'video' | 'document' | 'folder' | 'shortcut' | 'generic';
 
 /** Tipo de nodo en el workspace (alinea con manual §6.2). */
 export type WorkspaceNodeType = 'folder' | 'shortcut' | 'app' | 'resource';

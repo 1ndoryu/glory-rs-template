@@ -3,6 +3,7 @@
  * Lee hijos de un nodo del workspace y los renderiza usando ResourceTypeRegistry.
  * Soporta: navegación entre carpetas, abrir recursos, context menu, drag.
  * [Plan 297A-11] Reemplaza el preview hardcodeado de 297A-2.
+ * [Auditoría v2] Navega dentro de la misma ventana en vez de abrir una nueva por carpeta.
  */
 
 import {
@@ -24,12 +25,14 @@ import { authStore } from '../../../../store';
 import type { ResolvedNode } from '../../../runtime/workspace/types';
 
 export interface FinderOptions {
-  /** ID del nodo carpeta cuyos hijos se muestran. 'desktop' = raíz. */
+  /** ID del nodo carpeta inicial. 'desktop' = raíz. */
   folderId: string;
-  /** Callback para abrir una app con parámetros. */
+  /** Callback para abrir una app con parámetros (solo para recursos/apps, NO carpetas). */
   onOpenApp: (appId: string, params?: Record<string, string>) => void;
   /** Callback para crear carpeta dentro de este Finder. */
   onCreateFolder?: () => void;
+  /** Callback para notificar cambio de carpeta (actualiza título de ventana). */
+  onNavigate?: (folderId: string, label: string) => void;
 }
 
 /** Mapa de iconos Lucide por tipo de recurso. */
@@ -85,11 +88,15 @@ function buildBreadcrumb(
 
 /**
  * Crear el componente Finder (explorador de archivos).
- * Se suscribe a workspaceStore y renderiza los hijos de folderId.
+ * Mantiene estado interno de carpeta actual — navegar entre carpetas
+ * re-renderiza dentro de la misma ventana en vez de abrir una nueva.
  */
 export function createFinderPreview(options: FinderOptions): HTMLElement {
   const finder = document.createElement('div');
   finder.className = 'desktop-finder';
+
+  /* Estado interno de navegación */
+  let currentFolderId = options.folderId;
 
   /* Breadcrumb path */
   const pathEl = document.createElement('div');
@@ -98,6 +105,18 @@ export function createFinderPreview(options: FinderOptions): HTMLElement {
   /* Grid de items */
   const grid = document.createElement('div');
   grid.className = 'desktop-finder__grid';
+
+  /** Navegar a una carpeta dentro de esta misma ventana Finder. */
+  function navigateTo(folderId: string): void {
+    currentFolderId = folderId;
+    render();
+
+    /* Notificar cambio de título de ventana */
+    const ws = workspaceStore.get();
+    const node = ws.nodes[folderId];
+    const label = node?.label ?? (folderId === 'desktop' ? 'Escritorio' : 'Galería');
+    options.onNavigate?.(folderId, label);
+  }
 
   /* Drop en el grid = mover a este folder */
   grid.addEventListener('dragover', (e: DragEvent) => {
@@ -110,16 +129,18 @@ export function createFinderPreview(options: FinderOptions): HTMLElement {
     e.preventDefault();
     const sourceId = e.dataTransfer?.getData('text/plain');
     if (sourceId) {
-      moveNodeToParent(sourceId, options.folderId);
+      moveNodeToParent(sourceId, currentFolderId);
     }
   });
 
   finder.append(pathEl, grid);
 
-  /* Suscribirse a workspaceStore para re-renderizar cuando cambie */
-  workspaceStore.subscribe((ws) => {
+  /** Renderizar breadcrumb y contenido de la carpeta actual. */
+  function render(): void {
+    const ws = workspaceStore.get();
+
     /* Breadcrumb */
-    const crumbs = buildBreadcrumb(options.folderId, ws.nodes as Readonly<Record<string, ResolvedNode>>);
+    const crumbs = buildBreadcrumb(currentFolderId, ws.nodes as Readonly<Record<string, ResolvedNode>>);
     pathEl.innerHTML = '';
     for (let i = 0; i < crumbs.length; i++) {
       if (i > 0) {
@@ -132,14 +153,15 @@ export function createFinderPreview(options: FinderOptions): HTMLElement {
       crumb.type = 'button';
       crumb.className = 'desktop-finder__path-crumb';
       crumb.textContent = crumbs[i].label;
+      const crumbId = crumbs[i].id;
       crumb.addEventListener('click', () => {
-        options.onOpenApp('finder', { folderId: crumbs[i].id });
+        navigateTo(crumbId);
       });
       pathEl.appendChild(crumb);
     }
 
     /* Hijos de este nodo */
-    const children = getChildren(options.folderId);
+    const children = getChildren(currentFolderId);
     grid.innerHTML = '';
 
     if (children.length === 0) {
@@ -151,7 +173,7 @@ export function createFinderPreview(options: FinderOptions): HTMLElement {
     }
 
     for (const child of children) {
-      const item = createFinderItem(child, options);
+      const item = createFinderItem(child, navigateTo, options);
 
       /* Drag source */
       item.setAttribute('draggable', 'true');
@@ -188,9 +210,12 @@ export function createFinderPreview(options: FinderOptions): HTMLElement {
 
       grid.appendChild(item);
     }
+  }
+
+  /* Suscribirse a workspaceStore para re-renderizar cuando cambie */
+  workspaceStore.subscribe(() => {
+    render();
   });
-
-
 
   return finder;
 }
@@ -198,6 +223,7 @@ export function createFinderPreview(options: FinderOptions): HTMLElement {
 /** Crear un item individual del Finder (carpeta, recurso, o app). */
 function createFinderItem(
   node: ResolvedNode,
+  navigateTo: (folderId: string) => void,
   options: FinderOptions,
 ): HTMLElement {
   const icon = getNodeIcon(node);
@@ -233,7 +259,7 @@ function createFinderItem(
   /* Doble clic: abrir */
   item.addEventListener('dblclick', (e) => {
     e.stopPropagation();
-    activateNode(node, options);
+    activateNode(node, navigateTo, options);
   });
 
   /* Clic simple: seleccionar */
@@ -265,11 +291,15 @@ function createFinderItem(
   return item;
 }
 
-/** Activar un nodo: abrir en la app correcta. */
-function activateNode(node: ResolvedNode, options: FinderOptions): void {
+/** Activar un nodo: carpetas navegan dentro de la ventana, recursos/apps abren en nueva ventana. */
+function activateNode(
+  node: ResolvedNode,
+  navigateTo: (folderId: string) => void,
+  options: FinderOptions,
+): void {
   if (node.type === 'folder') {
-    /* Abrir carpeta en nueva ventana Finder */
-    options.onOpenApp('finder', { folderId: node.id });
+    /* Navegar dentro de la misma ventana Finder */
+    navigateTo(node.id);
   } else if (node.type === 'resource' && node.resourceKind) {
     /* Abrir recurso en la app asignada por ResourceTypeRegistry */
     const entry = resolveResourceType(node.resourceKind);

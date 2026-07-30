@@ -5,13 +5,11 @@
 import {
   FileUser,
   Folder,
-  Gamepad2,
   ShieldUser,
   type IconNode,
 } from 'lucide';
 import { createDesktopIcon } from './components/desktop-icon';
 import { openAppWindow } from '../runtime/route-app-adapter';
-import { navigate } from '../../router';
 import { authStore } from '../../store';
 import { openContextMenu } from './components/desktop-context-menu';
 import { selectSingle, clearSelection } from '../runtime/selection-store';
@@ -23,7 +21,6 @@ import { enableIconDrag } from './utils/icon-drag';
 
 const SHELL_ICON_MAP: Record<string, IconNode> = {
   'profile': FileUser,
-  'snake': Gamepad2,
   'admin': ShieldUser,
 };
 
@@ -70,7 +67,6 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
           const entry = resolveResourceType(node.resourceKind! as ResourceKind);
           void openAppWindow(entry?.appId ?? 'finder', { resourceId: node.refId ?? node.id });
         } : node.refId ? () => {
-          if (node.id === 'admin') { navigate('/admin'); return; }
           void openAppWindow(node.refId!);
         } : undefined);
       if (!onActivate) continue;

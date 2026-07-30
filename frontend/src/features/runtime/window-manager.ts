@@ -50,6 +50,8 @@ export interface WindowEntry {
   readonly params?: Readonly<Record<string, string>>;
   /** Clave derivada de params para buscar ventanas con los mismos parámetros. */
   readonly _paramKey?: string;
+  /** Cleanup callback de la app (MountedView.destroy). Se invoca al cerrar. */
+  readonly onDestroy?: () => void;
 }
 
 /* === Store reactivo === */
@@ -132,6 +134,7 @@ export function openWindow(
     toolbar: app.toolbar,
     params,
     _paramKey: params ? Object.values(params).join(':') : undefined,
+    onDestroy: view.destroy,
   };
 
   windowStore.set([...updated, entry]);
@@ -144,10 +147,10 @@ export function closeWindow(instanceId: string): void {
   const target = windows.find(w => w.instanceId === instanceId);
   if (!target) return;
 
+  /* Ejecutar cleanup de la app (MountedView.destroy) si existe */
+  target.onDestroy?.();
   /* Abortar el signal de la app (shell windows no tienen controller) */
   target.controller?.abort();
-  /* Ejecutar cleanup de la app si existe */
-  target.content.dispatchEvent(new CustomEvent('view:destroy'));
 
   const remaining = windows.filter(w => w.instanceId !== instanceId);
 
