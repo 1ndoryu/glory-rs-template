@@ -6,7 +6,8 @@ use crate::models::product::{Order, Product};
 pub struct ProductRepository;
 
 impl ProductRepository {
-    /// [297A-10] Crear producto dentro de una transacción. article_id es opcional.
+    /// [297A-10] Crear producto dentro de una transacción. `article_id` es opcional.
+    #[allow(clippy::too_many_arguments, clippy::explicit_auto_deref)]
     pub async fn create(
         conn: &mut sqlx::PgConnection,
         id: Uuid,

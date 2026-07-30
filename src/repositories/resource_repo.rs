@@ -7,6 +7,7 @@ pub struct ResourceRepository;
 
 impl ResourceRepository {
     /// Insertar un recurso envelope (llamar dentro de transacción).
+    #[allow(clippy::explicit_auto_deref)]
     pub async fn create(
         tx: &mut sqlx::PgConnection,
         params: CreateResourceParams<'_>,

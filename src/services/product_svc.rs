@@ -3,7 +3,9 @@ use uuid::Uuid;
 
 use crate::errors::AppError;
 use crate::models::product::{CreateProductRequest, Product};
-use crate::models::resource::{CreateResourceParams, EditorialState, ResourceKind, VisibilityState};
+use crate::models::resource::{
+    CreateResourceParams, EditorialState, ResourceKind, VisibilityState,
+};
 use crate::repositories::product_repo::ProductRepository;
 use crate::repositories::resource_repo::ResourceRepository;
 
@@ -11,6 +13,7 @@ pub struct ProductService;
 
 impl ProductService {
     /// [297A-10] Crear producto con resource envelope en transacción. Defaults: draft, private, inactive.
+    #[allow(clippy::explicit_auto_deref)]
     pub async fn create(pool: &PgPool, req: CreateProductRequest) -> Result<Product, AppError> {
         let id = uuid::Uuid::new_v4();
 

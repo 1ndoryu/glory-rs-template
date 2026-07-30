@@ -5,8 +5,10 @@ use crate::errors::AppError;
 use crate::models::article::{
     Article, CreateArticleRequest, PaginatedArticles, UpdateArticleRequest,
 };
+use crate::models::resource::{
+    CreateResourceParams, EditorialState, ResourceKind, VisibilityState,
+};
 use crate::repositories::article::{CreateArticleParams, UpdateArticleParams};
-use crate::models::resource::{CreateResourceParams, EditorialState, ResourceKind, VisibilityState};
 use crate::repositories::resource_repo::ResourceRepository;
 use crate::repositories::ArticleRepository;
 
@@ -14,6 +16,7 @@ pub struct ArticleService;
 
 impl ArticleService {
     /// [297A-10] Crear artículo con resource envelope en transacción.
+    #[allow(clippy::explicit_auto_deref)]
     pub async fn create(pool: &PgPool, req: CreateArticleRequest) -> Result<Article, AppError> {
         let slug = Self::generate_slug(pool, &req.title).await?;
         let id = uuid::Uuid::new_v4();
@@ -119,9 +122,10 @@ impl ArticleService {
         if let Some(a) = alias {
             if let Some(existing) = ArticleRepository::find_by_system_alias(pool, a).await? {
                 if existing.id != id {
-                    return Err(AppError::Conflict(
-                        format!("El alias '{}' ya está asignado al artículo '{}'", a, existing.title),
-                    ));
+                    return Err(AppError::Conflict(format!(
+                        "El alias '{}' ya está asignado al artículo '{}'",
+                        a, existing.title
+                    )));
                 }
             }
         }
@@ -149,6 +153,7 @@ impl ArticleService {
         })
     }
 
+    #[allow(clippy::explicit_auto_deref)]
     pub async fn update(
         pool: &PgPool,
         id: Uuid,

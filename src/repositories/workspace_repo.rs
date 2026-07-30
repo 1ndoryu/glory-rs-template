@@ -34,16 +34,17 @@ impl WorkspaceRepository {
     }
 
     /// Obtener la versión más alta actual (dentro de transacción).
+    #[allow(clippy::explicit_auto_deref)]
     pub async fn get_max_version(tx: &mut sqlx::PgConnection) -> Result<i32, sqlx::Error> {
-        let row: (i32,) = sqlx::query_as(
-            "SELECT COALESCE(MAX(version), 0) FROM workspace_releases",
-        )
-        .fetch_one(&mut *tx)
-        .await?;
+        let row: (i32,) =
+            sqlx::query_as("SELECT COALESCE(MAX(version), 0) FROM workspace_releases")
+                .fetch_one(&mut *tx)
+                .await?;
         Ok(row.0)
     }
 
     /// Publicar un nuevo release (dentro de transacción).
+    #[allow(clippy::explicit_auto_deref)]
     pub async fn create(
         tx: &mut sqlx::PgConnection,
         version: i32,

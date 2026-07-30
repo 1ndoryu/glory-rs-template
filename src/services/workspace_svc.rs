@@ -41,6 +41,7 @@ impl WorkspaceService {
 
     /// Publicar un nuevo release (admin).
     /// [297A-11 §9.2] Publicación transaccional a release inmutable.
+    #[allow(clippy::explicit_auto_deref)]
     pub async fn publish(
         pool: &PgPool,
         tree: serde_json::Value,
@@ -53,7 +54,8 @@ impl WorkspaceService {
         let next_version = max_version + 1;
 
         /* Crear release inmutable */
-        let release = WorkspaceRepository::create(&mut *tx, next_version, &tree, Some(published_by)).await?;
+        let release =
+            WorkspaceRepository::create(&mut *tx, next_version, &tree, Some(published_by)).await?;
 
         tx.commit().await?;
         Ok(release)

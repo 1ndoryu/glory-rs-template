@@ -3,7 +3,9 @@ use uuid::Uuid;
 
 use crate::errors::AppError;
 use crate::models::media::{CreateMediaRequest, Media};
-use crate::models::resource::{CreateResourceParams, EditorialState, ResourceKind, VisibilityState};
+use crate::models::resource::{
+    CreateResourceParams, EditorialState, ResourceKind, VisibilityState,
+};
 use crate::repositories::media_repo::MediaRepository;
 use crate::repositories::resource_repo::ResourceRepository;
 
@@ -11,6 +13,7 @@ pub struct MediaService;
 
 impl MediaService {
     /// [297A-10] Crear media con resource envelope en transacción. Defaults: ready, public.
+    #[allow(clippy::explicit_auto_deref)]
     pub async fn create(pool: &PgPool, req: CreateMediaRequest) -> Result<Media, AppError> {
         let id = uuid::Uuid::new_v4();
 
@@ -22,7 +25,11 @@ impl MediaService {
             CreateResourceParams {
                 id,
                 kind: ResourceKind::Media,
-                title: if req.alt_text.is_empty() { "media file" } else { &req.alt_text },
+                title: if req.alt_text.is_empty() {
+                    "media file"
+                } else {
+                    &req.alt_text
+                },
                 editorial: EditorialState::Ready,
                 visibility: VisibilityState::Public,
             },

@@ -3,7 +3,9 @@ use uuid::Uuid;
 
 use crate::errors::AppError;
 use crate::models::project::{CreateProjectRequest, Project, UpdateProjectRequest};
-use crate::models::resource::{CreateResourceParams, EditorialState, ResourceKind, VisibilityState};
+use crate::models::resource::{
+    CreateResourceParams, EditorialState, ResourceKind, VisibilityState,
+};
 use crate::repositories::project_repo::ProjectRepository;
 use crate::repositories::resource_repo::ResourceRepository;
 
@@ -11,6 +13,7 @@ pub struct ProjectService;
 
 impl ProjectService {
     /// [297A-10] Crear proyecto con resource envelope en transacción. Defaults: draft, private.
+    #[allow(clippy::explicit_auto_deref)]
     pub async fn create(pool: &PgPool, req: CreateProjectRequest) -> Result<Project, AppError> {
         let id = uuid::Uuid::new_v4();
 
