@@ -1,5 +1,7 @@
 import { createElement, Minus, X, type IconNode } from 'lucide';
-import type { AppMenu } from '../../runtime/app-registry';
+import type { AppToolbarGroup, ToolbarItemRef } from '../../runtime/app-registry';
+import { CommandRegistry, type CommandContext } from '../../runtime/command-registry';
+import { authStore } from '../../../store';
 
 export interface DesktopWindowOptions {
   title: string;
@@ -8,7 +10,7 @@ export interface DesktopWindowOptions {
   active?: boolean;
   resizable?: boolean;
   layout?: 'padded' | 'full-bleed';
-  menus?: AppMenu[];
+  toolbar?: AppToolbarGroup[];
   onClose?: () => void;
   onMinimize?: () => void;
 }
@@ -65,19 +67,19 @@ export function createDesktopWindow(options: DesktopWindowOptions): HTMLElement 
   titleBar.append(closeControl, title, minimizeControl);
   windowElement.append(titleBar);
 
-  /* App toolbar — siempre presente. Menú 'Ventana' por defecto + menús de la app. */
-  const allMenus: AppMenu[] = [
+  /* App toolbar — siempre presente. Menú 'Ventana' por defecto + toolbar de la app. */
+  const allGroups: AppToolbarGroup[] = [
     {
       label: 'Ventana',
       items: [
-        { id: 'win:minimize', label: 'Minimizar', icon: Minus, shortcut: 'Ctrl+M', disabled: !options.onMinimize, execute: () => { options.onMinimize?.(); } },
-        { id: '---', label: '---', execute: () => {} },
-        { id: 'win:close', label: 'Cerrar', icon: X, shortcut: 'Esc', disabled: !options.onClose, execute: () => { options.onClose?.(); } },
+        { id: 'window:minimize', label: 'Minimizar', icon: Minus },
+        '---',
+        { id: 'window:close', label: 'Cerrar', icon: X },
       ],
     },
-    ...(options.menus ?? []),
+    ...(options.toolbar ?? []),
   ];
-  windowElement.appendChild(createAppToolbar(allMenus));
+  windowElement.appendChild(createAppToolbar(allGroups, { onClose: options.onClose, onMinimize: options.onMinimize }));
 
   const body = document.createElement('div');
   body.className = 'desktop-window__body';
@@ -133,22 +135,50 @@ function toggleToolbarEntry(entry: HTMLElement): void {
   }, 0);
 }
 
+/** Resolver un ToolbarItemRef a label, icon y command. */
+function resolveToolbarItem(
+  ref: ToolbarItemRef,
+): { id: string; label: string; icon?: IconNode; shortcut?: string } | null {
+  if (ref === '---' || (typeof ref === 'object' && ref.id === '---')) return null;
+  if (typeof ref === 'string') {
+    const cmd = CommandRegistry.get(ref);
+    if (!cmd) return null;
+    return { id: ref, label: cmd.label, icon: cmd.icon, shortcut: cmd.shortcut };
+  }
+  const cmd = CommandRegistry.get(ref.id);
+  if (!cmd && !ref.label) return null;
+  return {
+    id: ref.id,
+    label: ref.label ?? (cmd ? cmd.label : ref.id),
+    icon: (ref.icon === null ? undefined : ref.icon) ?? cmd?.icon,
+    shortcut: cmd?.shortcut,
+  };
+}
+
 /**
- * Crea la barra de herramientas de una app a partir de sus menús declarativos.
- * Reutiliza el mismo patrón visual que desktop-menu-bar pero a nivel de ventana.
+ * Crea la barra de herramientas de una app a partir de sus grupos declarativos.
+ * Los items referencian comandos del CommandRegistry — fuente única de verdad.
  */
-export function createAppToolbar(menus: AppMenu[]): HTMLElement {
+export function createAppToolbar(
+  groups: AppToolbarGroup[],
+  callbacks?: { onClose?: () => void; onMinimize?: () => void },
+): HTMLElement {
   const toolbar = document.createElement('div');
   toolbar.className = 'desktop-app-toolbar';
 
-  for (const menu of menus) {
+  const ctx: CommandContext = {
+    capability: authStore.get().isAuthenticated ? 'admin' : 'public',
+    presentationMode: 'desktop',
+  };
+
+  for (const group of groups) {
     const entry = document.createElement('div');
     entry.className = 'desktop-app-toolbar__entry';
 
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'desktop-app-toolbar__item';
-    btn.textContent = menu.label;
+    btn.textContent = group.label;
     btn.setAttribute('aria-haspopup', 'menu');
     btn.setAttribute('aria-expanded', 'false');
 
@@ -157,13 +187,25 @@ export function createAppToolbar(menus: AppMenu[]): HTMLElement {
     dropdown.setAttribute('role', 'menu');
     dropdown.hidden = true;
 
-    for (const item of menu.items) {
-      if (item.label === '---') {
-        /* Separador */
+    for (const ref of group.items) {
+      /* Separador */
+      if (ref === '---' || (typeof ref === 'object' && ref.id === '---')) {
         const sep = document.createElement('div');
         sep.className = 'desktop-app-toolbar__separator';
         dropdown.appendChild(sep);
         continue;
+      }
+
+      const resolved = resolveToolbarItem(ref);
+      if (!resolved) continue;
+
+      /* Verificar disponibilidad desde CommandRegistry */
+      const cmd = CommandRegistry.get(resolved.id);
+      type Avail = { state: 'enabled' } | { state: 'disabled'; reason: string } | { state: 'hidden' };
+      let availability: Avail = { state: 'enabled' };
+      if (cmd?.isAvailable) {
+        availability = cmd.isAvailable(ctx);
+        if (availability.state === 'hidden') continue;
       }
 
       const menuItem = document.createElement('button');
@@ -171,33 +213,40 @@ export function createAppToolbar(menus: AppMenu[]): HTMLElement {
       menuItem.className = 'desktop-app-toolbar__menu-item';
       menuItem.setAttribute('role', 'menuitem');
 
-      if (item.icon) {
+      if (resolved.icon) {
         const iconEl = document.createElement('span');
         iconEl.className = 'desktop-app-toolbar__icon';
-        iconEl.appendChild(createElement(item.icon));
+        iconEl.appendChild(createElement(resolved.icon));
         menuItem.appendChild(iconEl);
       }
 
       const labelEl = document.createElement('span');
       labelEl.className = 'desktop-app-toolbar__label';
-      labelEl.textContent = item.label;
+      labelEl.textContent = resolved.label;
       menuItem.appendChild(labelEl);
 
-      if (item.shortcut) {
+      if (resolved.shortcut) {
         const shortcutEl = document.createElement('span');
         shortcutEl.className = 'desktop-app-toolbar__shortcut';
-        shortcutEl.textContent = item.shortcut;
+        shortcutEl.textContent = resolved.shortcut;
         menuItem.appendChild(shortcutEl);
       }
 
-      if (item.disabled) {
+      /* Callbacks especiales para window:minimize y window:close */
+      const isWindowCmd = resolved.id === 'window:minimize' || resolved.id === 'window:close';
+      const callbackDisabled = isWindowCmd && !callbacks?.[resolved.id === 'window:minimize' ? 'onMinimize' : 'onClose'];
+
+      if (availability.state !== 'enabled' || callbackDisabled) {
         menuItem.classList.add('desktop-app-toolbar__menu-item--disabled');
         menuItem.setAttribute('aria-disabled', 'true');
       } else {
         menuItem.addEventListener('click', (e) => {
           e.stopPropagation();
           closeToolbarMenu();
-          item.execute();
+          /* Ejecutar callback especial o command del registry */
+          if (resolved.id === 'window:minimize') { callbacks?.onMinimize?.(); return; }
+          if (resolved.id === 'window:close') { callbacks?.onClose?.(); return; }
+          void CommandRegistry.execute(resolved.id, ctx);
         });
       }
 

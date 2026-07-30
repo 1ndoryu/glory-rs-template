@@ -3,7 +3,7 @@
  * Cada app define su id, título, icono, capacidades y render function.
  * Las apps solo devuelven contenido; el shell crea la ventana. */
 
-import { Folder, FileUser, Settings, FileText, FolderCode, Trash2 } from 'lucide';
+import { FileUser, Folder, Settings, FileText, FolderCode, Trash2 } from 'lucide';
 import { AppRegistry } from './app-registry';
 import { createFinderPreview } from '../desktop/apps/finder/finder-preview';
 import { createReaderPreview } from '../desktop/apps/reader/reader-preview';
@@ -22,22 +22,8 @@ AppRegistry.register({
   requires: 'public',
   routePatterns: ['/gallery'],
   layout: 'full-bleed',
-  menus: [
-    {
-      label: 'Archivo',
-      items: [
-        {
-          id: 'finder:new-folder',
-          label: 'Nueva carpeta',
-          icon: Folder,
-          execute: () => {
-            void import('./workspace/workspace-store').then(({ createFolder }) => {
-              createFolder('desktop', 'Nueva carpeta');
-            });
-          },
-        },
-      ],
-    },
+  toolbar: [
+    { label: 'Archivo', items: ['finder:new-folder'] },
   ],
   render: (_ctx: RenderContext): MountedView => {
     dispatchEvent({ type: 'app_opened', appId: 'finder' });
@@ -141,45 +127,8 @@ AppRegistry.register({
   iconType: 'application',
   singleton: true,
   requires: 'public',
-  menus: [
-    {
-      label: 'Archivo',
-      items: [
-        {
-          id: 'trash:restore-all',
-          label: 'Restaurar todo',
-          icon: Folder,
-          execute: () => {
-            void import('../../components/ui/confirm').then(({ showConfirm }) => {
-              void showConfirm('¿Restaurar todos los elementos?').then((ok: boolean) => {
-                if (ok) {
-                  void import('./workspace/workspace-store').then(({ getTombstonedNodes, restoreNode }) => {
-                    for (const node of getTombstonedNodes()) restoreNode(node.id);
-                  });
-                }
-              });
-            });
-          },
-        },
-        { id: '---', label: '---', execute: () => {} },
-        {
-          id: 'trash:empty',
-          label: 'Vaciar papelera',
-          icon: Trash2,
-          execute: () => {
-            void import('../../components/ui/confirm').then(({ showConfirm }) => {
-              void showConfirm('¿Vaciar la papelera? Los elementos no se pueden recuperar.').then((ok: boolean) => {
-                if (ok) {
-                  void import('./workspace/workspace-store').then(({ resetOverlay }) => {
-                    resetOverlay();
-                  });
-                }
-              });
-            });
-          },
-        },
-      ],
-    },
+  toolbar: [
+    { label: 'Archivo', items: ['trash:restore-all', '---', 'trash:empty'] },
   ],
   render: (_ctx: RenderContext): MountedView => {
     dispatchEvent({ type: 'app_opened', appId: 'trash' });
@@ -204,21 +153,8 @@ AppRegistry.register({
   singleton: true,
   requires: 'public',
   routePatterns: ['/projects'],
-  menus: [
-    {
-      label: 'Archivo',
-      items: [
-        {
-          id: 'projects:new',
-          label: 'Nuevo proyecto',
-          icon: FolderCode,
-          execute: () => {
-            /* Abre el admin legacy — el editor de proyectos del OS vendrá en 297A-14 */
-            void import('../../router').then((r) => r.navigate('/admin'));
-          },
-        },
-      ],
-    },
+  toolbar: [
+    { label: 'Archivo', items: ['projects:new'] },
   ],
   render: (ctx: RenderContext): MountedView => {
     dispatchEvent({ type: 'app_opened', appId: 'projects' });

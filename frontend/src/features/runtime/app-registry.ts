@@ -6,28 +6,18 @@
 import type { IconNode } from 'lucide';
 import type { AppRenderFn, MountedView, RenderContext } from '../../core/lifecycle';
 
-/** Un item individual del menú de una app. */
-export interface AppMenuItem {
-  /** ID único del item. */
-  readonly id: string;
-  /** Etiqueta visible. */
-  readonly label: string;
-  /** Icono Lucide opcional. */
-  readonly icon?: IconNode;
-  /** Atajo de teclado visible (ej: 'Ctrl+Z'). */
-  readonly shortcut?: string;
-  /** Si está deshabilitado. */
-  readonly disabled?: boolean;
-  /** Acción al seleccionar. */
-  readonly execute: () => void;
-}
+/** Referencia a un item del toolbar. Puede ser un command ID o un override. */
+export type ToolbarItemRef =
+  | string  /* Command ID (ej: 'workspace:trash') o '---' para separador */
+  | { readonly id: string; readonly label?: string; readonly icon?: IconNode | null };
 
-/** Grupo de menú (equivalente a "Archivo", "Editar", etc.). */
-export interface AppMenu {
-  /** Etiqueta del grupo. */
+/** Grupo del toolbar de una app (equivalente a "Archivo", "Editar", etc.).
+ * Cada item referencia un Command del CommandRegistry por ID. */
+export interface AppToolbarGroup {
+  /** Etiqueta del grupo (dropdown). */
   readonly label: string;
-  /** Items del menú. */
-  readonly items: AppMenuItem[];
+  /** IDs de comandos o overrides. '---' = separador. */
+  readonly items: ToolbarItemRef[];
 }
 
 /** Capacidad que una app requiere para estar disponible. */
@@ -53,8 +43,8 @@ export interface AppDefinition {
   readonly routePatterns?: string[];
   /** Layout del body de la ventana. Default: 'padded'. */
   readonly layout?: 'padded' | 'full-bleed';
-  /** Menús de la barra de herramientas de la app. Cada grupo es un dropdown. */
-  readonly menus?: AppMenu[];
+  /** Grupos del toolbar de la app. Cada grupo es un dropdown con command IDs. */
+  readonly toolbar?: AppToolbarGroup[];
   /** Función que devuelve el contenido de la app (sin chrome). */
   readonly render: AppRenderFn;
 }

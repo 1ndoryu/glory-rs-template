@@ -5,7 +5,7 @@
 
 import { createStore, type Store } from '../../store';
 import type { MountedView } from '../../core/lifecycle';
-import type { AppDefinition, AppMenu } from './app-registry';
+import type { AppDefinition, AppToolbarGroup } from './app-registry';
 import type { IconNode } from 'lucide';
 
 export type WindowState = 'open' | 'minimized' | 'maximized';
@@ -44,8 +44,8 @@ export interface WindowEntry {
   readonly cssClass?: string;
   /** Layout del body: 'padded' (default) o 'full-bleed'. */
   readonly layout?: 'padded' | 'full-bleed';
-  /** Menús de la barra de herramientas de la app. */
-  readonly menus?: AppMenu[];
+  /** Grupos del toolbar de la app (referencian Command IDs). */
+  readonly toolbar?: AppToolbarGroup[];
 }
 
 /* === Store reactivo === */
@@ -123,7 +123,7 @@ export function openWindow(
     controller,
     app,
     layout: app.layout,
-    menus: app.menus,
+    toolbar: app.toolbar,
   };
 
   windowStore.set([...updated, entry]);
@@ -163,7 +163,7 @@ export function registerShellWindow(options: {
   focused?: boolean;
   cssClass?: string;
   layout?: 'padded' | 'full-bleed';
-  menus?: AppMenu[];
+  toolbar?: AppToolbarGroup[];
 }): string {
   const existing = windowStore.get();
   /* No registrar dos veces */
@@ -189,7 +189,7 @@ export function registerShellWindow(options: {
     icon: options.icon,
     cssClass: options.cssClass,
     layout: options.layout,
-    menus: options.menus,
+    toolbar: options.toolbar,
   };
 
   windowStore.set([...updated, entry]);

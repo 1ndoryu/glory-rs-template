@@ -257,7 +257,7 @@ export function createDesktopShell(
           content: win.content,
           className: win.cssClass ?? `desktop-window--${win.appId}`,
           layout: win.layout,
-          menus: win.menus,
+          toolbar: win.toolbar,
           active: win.focused,
           resizable: true,
           onClose: () => {
