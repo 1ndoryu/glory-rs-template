@@ -1,69 +1,48 @@
 /* wandori.us — Gallery Page
- * Muestra todas las imagenes de todos los articulos en un grid. */
+ * Muestra todas las imagenes de todos los articulos en un grid.
+ * [Auditoría v4 §1.2] Migrado a createEl(). */
 
 import { MediaService } from '../services';
 import { createModal } from '../components/ui/modal';
 import { trackImageDownload } from '../features/analytics/tracker';
 import { updateMeta, setPageJsonLd } from '../features/seo/meta';
 import { showProfile } from '../store';
-import type { Media } from '../api/types';
+import { createEl } from '../utils/dom';
 
 export async function renderGallery(): Promise<HTMLElement> {
   showProfile.set(true);
   updateMeta({ title: 'galeria', description: 'todas las imagenes de wandori.us' });
   setPageJsonLd('galeria', 'todas las imagenes de wandori.us');
 
-  const page = document.createElement('div');
+  const page = createEl('div');
 
-  const titulo = document.createElement('h1');
-  titulo.textContent = 'galeria';
-  titulo.style.marginBottom = 'var(--espacio-xl)';
-
-  const cargando = document.createElement('p');
-  cargando.className = 'cargando';
-  cargando.textContent = 'cargando...';
+  const titulo = createEl('h1', { textContent: 'galeria' });
+  const cargando = createEl('p', { className: 'cargando', textContent: 'cargando...' });
 
   page.append(titulo, cargando);
 
   try {
     const mediaResponse = await MediaService.list();
-    const media = (mediaResponse as any).items as Media[];
+    const media = (mediaResponse as any).items as import('../api/types').Media[];
     page.innerHTML = '';
-
     page.appendChild(titulo);
 
     if (media.length === 0) {
-      const vacio = document.createElement('p');
-      vacio.className = 'vacio';
-      vacio.textContent = 'no hay imagenes todavia';
-      page.appendChild(vacio);
+      page.appendChild(createEl('p', { className: 'vacio', textContent: 'no hay imagenes todavia' }));
       return page;
     }
 
-    const grid = document.createElement('div');
-    grid.className = 'galeria-grid';
+    const grid = createEl('div', { className: 'galeria-grid' });
 
     for (const item of media) {
-      const card = document.createElement('div');
-      card.className = 'galeria-item';
-
-      const img = document.createElement('img');
-      img.src = item.file_path;
-      img.alt = item.alt_text || '';
-      img.loading = 'lazy';
+      const img = createEl('img', { src: item.file_path, alt: item.alt_text || '', loading: 'lazy' });
 
       img.addEventListener('click', () => {
-        const fullImg = document.createElement('img');
-        fullImg.src = item.file_path;
-        fullImg.alt = item.alt_text || '';
+        const fullImg = createEl('img', { src: item.file_path, alt: item.alt_text || '' });
         fullImg.style.width = '100%';
         fullImg.style.border = 'var(--borde)';
 
-        /* Boton descargar */
-        const btnDescargar = document.createElement('button');
-        btnDescargar.className = 'boton';
-        btnDescargar.textContent = 'descargar';
-        btnDescargar.style.marginTop = 'var(--espacio-md)';
+        const btnDescargar = createEl('button', { className: 'boton', textContent: 'descargar' });
         btnDescargar.addEventListener('click', () => {
           trackImageDownload(item.file_path);
           const a = document.createElement('a');
@@ -72,17 +51,11 @@ export async function renderGallery(): Promise<HTMLElement> {
           a.click();
         });
 
-        const container = document.createElement('div');
-        container.append(fullImg, btnDescargar);
-
-        createModal({
-          titulo: 'imagen',
-          contenido: container,
-          ancho: '800px',
-        });
+        const container = createEl('div', {}, fullImg, btnDescargar);
+        createModal({ titulo: 'imagen', contenido: container, ancho: '800px' });
       });
 
-      card.appendChild(img);
+      const card = createEl('div', { className: 'galeria-item' }, img);
       grid.appendChild(card);
     }
 
@@ -92,9 +65,7 @@ export async function renderGallery(): Promise<HTMLElement> {
     page.innerHTML = '';
     page.appendChild(titulo);
 
-    const grid = document.createElement('div');
-    grid.className = 'galeria-grid';
-
+    const grid = createEl('div', { className: 'galeria-grid' });
     const demoImages = [
       'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=400&q=80',
       'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=400&q=80',
@@ -105,12 +76,9 @@ export async function renderGallery(): Promise<HTMLElement> {
     ];
 
     for (const src of demoImages) {
-      const card = document.createElement('div');
-      card.className = 'galeria-item';
-      const img = document.createElement('img');
-      img.src = src;
-      img.loading = 'lazy';
-      card.appendChild(img);
+      const card = createEl('div', { className: 'galeria-item' },
+        createEl('img', { src, loading: 'lazy' }),
+      );
       grid.appendChild(card);
     }
 

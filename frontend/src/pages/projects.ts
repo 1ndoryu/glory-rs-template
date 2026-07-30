@@ -1,24 +1,20 @@
 /* wandori.us — Projects Page
- * Lista minimalista de proyectos con links. */
+ * Lista minimalista de proyectos con links.
+ * [Auditoría v4 §1.2] Migrado a createEl(). */
 
 import { ProjectService } from '../services';
 import { updateMeta, setPageJsonLd } from '../features/seo/meta';
 import { showProfile } from '../store';
+import { createEl, createExternalLink } from '../utils/dom';
 
 export async function renderProjects(): Promise<HTMLElement> {
   showProfile.set(true);
   updateMeta({ title: 'proyectos', description: 'proyectos y trabajo de wandorius' });
   setPageJsonLd('proyectos', 'proyectos y trabajo de wandorius');
 
-  const page = document.createElement('div');
-
-  const titulo = document.createElement('h1');
-  titulo.textContent = 'proyectos';
-  titulo.style.marginBottom = 'var(--espacio-xl)';
-
-  const cargando = document.createElement('p');
-  cargando.className = 'cargando';
-  cargando.textContent = 'cargando...';
+  const page = createEl('div');
+  const titulo = createEl('h1', { textContent: 'proyectos' });
+  const cargando = createEl('p', { className: 'cargando', textContent: 'cargando...' });
 
   page.append(titulo, cargando);
 
@@ -30,45 +26,25 @@ export async function renderProjects(): Promise<HTMLElement> {
     const visibles = projects.filter(p => p.is_visible).sort((a, b) => a.sort_order - b.sort_order);
 
     if (visibles.length === 0) {
-      const vacio = document.createElement('p');
-      vacio.className = 'vacio';
-      vacio.textContent = 'no hay proyectos todavia';
-      page.appendChild(vacio);
+      page.appendChild(createEl('p', { className: 'vacio', textContent: 'no hay proyectos todavia' }));
       return page;
     }
 
-    const lista = document.createElement('div');
+    const lista = createEl('div');
 
     for (const project of visibles) {
-      const item = document.createElement('div');
-      item.className = 'proyecto-item';
-
-      const info = document.createElement('div');
-
-      const nombre = document.createElement('span');
-      nombre.className = 'proyecto-titulo';
-      nombre.textContent = project.title;
-
-      info.appendChild(nombre);
+      const info = createEl('div', {},
+        createEl('span', { className: 'proyecto-titulo', textContent: project.title }),
+      );
 
       if (project.description) {
-        const desc = document.createElement('p');
-        desc.className = 'proyecto-descripcion';
-        desc.textContent = project.description;
-        info.appendChild(desc);
+        info.appendChild(createEl('p', { className: 'proyecto-descripcion', textContent: project.description }));
       }
 
-      item.appendChild(info);
+      const item = createEl('div', { className: 'proyecto-item' }, info);
 
       if (project.url) {
-        const link = document.createElement('a');
-        link.className = 'proyecto-link';
-        link.href = project.url;
-        link.textContent = 'ver';
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        link.setAttribute('data-external', 'true');
-        item.appendChild(link);
+        item.appendChild(createExternalLink(project.url, 'ver', 'proyecto-link'));
       }
 
       lista.appendChild(item);
@@ -82,37 +58,20 @@ export async function renderProjects(): Promise<HTMLElement> {
 
     const demoProjects = [
       { title: 'wandori.us', description: 'este sitio. blog/portfolio minimalista construido con rust y vanilla ts.', url: 'https://wandori.us' },
-      { title: 'glory-sentinel', description: 'extension vscode para deteccion de violaciones de diseño en tiempo real.', url: 'https://github.com/1ndoryu/glory-sentinel' },
+      { title: 'glory-sentinel', description: 'extension vscode para deteccion de violaciones de diseno en tiempo real.', url: 'https://github.com/1ndoryu/glory-sentinel' },
       { title: 'coolify-manager-rs', description: 'cli en rust para gestionar deploys en coolify via api.', url: 'https://github.com/1ndoryu/coolify-manager-rs' },
     ];
 
-    const lista = document.createElement('div');
+    const lista = createEl('div');
     for (const project of demoProjects) {
-      const item = document.createElement('div');
-      item.className = 'proyecto-item';
-
-      const info = document.createElement('div');
-      const nombre = document.createElement('span');
-      nombre.className = 'proyecto-titulo';
-      nombre.textContent = project.title;
-      const desc = document.createElement('p');
-      desc.className = 'proyecto-descripcion';
-      desc.textContent = project.description;
-      info.append(nombre, desc);
-
-      item.appendChild(info);
-
+      const info = createEl('div', {},
+        createEl('span', { className: 'proyecto-titulo', textContent: project.title }),
+        createEl('p', { className: 'proyecto-descripcion', textContent: project.description }),
+      );
+      const item = createEl('div', { className: 'proyecto-item' }, info);
       if (project.url) {
-        const link = document.createElement('a');
-        link.className = 'proyecto-link';
-        link.href = project.url;
-        link.textContent = 'ver';
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        link.setAttribute('data-external', 'true');
-        item.appendChild(link);
+        item.appendChild(createExternalLink(project.url, 'ver', 'proyecto-link'));
       }
-
       lista.appendChild(item);
     }
     page.appendChild(lista);
