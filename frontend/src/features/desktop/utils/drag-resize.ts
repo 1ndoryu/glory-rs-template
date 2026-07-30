@@ -1,7 +1,7 @@
 /* wandori.us — Drag & Resize
  * Utilidad de puntero para arrastrar y redimensionar ventanas.
- * Usa pointer events (no mouse) para soporte táctil.
- * Actualiza el DOM directamente durante el arrastre y commitea al windowStore al soltar. */
+ * Patrón estándar: pointerdown inicia, document-level pointermove/pointerup terminan.
+ * Así funciona Windows/macOS: soltar fuera de la ventana sigue funcionando. */
 
 import { updateWindowBounds, focusWindow, clampWindowBounds } from '../../runtime/window-manager';
 
@@ -16,6 +16,25 @@ export interface DragResizeOptions {
   resizable: boolean;
 }
 
+type ResizeEdge = 'right' | 'bottom' | 'corner' | 'left' | 'bottom-left';
+
+interface ActiveDrag {
+  startX: number;
+  startY: number;
+  startLeft: number;
+  startTop: number;
+}
+
+interface ActiveResize {
+  edge: ResizeEdge;
+  startX: number;
+  startY: number;
+  startLeft: number;
+  startTop: number;
+  startW: number;
+  startH: number;
+}
+
 /**
  * Activa drag y resize en una ventana.
  * Devuelve una función de cleanup para remover listeners.
@@ -23,87 +42,155 @@ export interface DragResizeOptions {
 export function enableDragResize(opts: DragResizeOptions): () => void {
   const { windowEl, instanceId, dragHandle, resizable } = opts;
 
-  /* Estado interno del arrastre */
-  let isDragging = false;
-  let isResizing = false;
-  let startX = 0;
-  let startY = 0;
-  let startLeft = 0;
-  let startTop = 0;
-  let startW = 0;
-  let startH = 0;
-  let resizeEdge: 'right' | 'bottom' | 'corner' | null = null;
+  let drag: ActiveDrag | null = null;
+  let resize: ActiveResize | null = null;
+  const MIN_W = 200;
+  const MIN_H = 150;
+  const EDGE_SIZE = 8;
 
-  /* === DRAG por la barra de título === */
+  /* ─── Drag (title bar) ─── */
+
   function onDragPointerDown(e: PointerEvent): void {
-    if ((e.target as HTMLElement).closest('button')) return; /* No arrastrar por botones */
+    if ((e.target as HTMLElement).closest('button')) return;
     e.preventDefault();
-    isDragging = true;
-    startX = e.clientX;
-    startY = e.clientY;
-    startLeft = windowEl.offsetLeft;
-    startTop = windowEl.offsetTop;
-    windowEl.setPointerCapture(e.pointerId);
+    drag = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startLeft: windowEl.offsetLeft,
+      startTop: windowEl.offsetTop,
+    };
     focusWindow(instanceId);
   }
 
-  function onDragPointerMove(e: PointerEvent): void {
-    if (!isDragging) return;
-    const dx = e.clientX - startX;
-    const dy = e.clientY - startY;
-    const clamped = clampWindowBounds(startLeft + dx, startTop + dy, windowEl.offsetWidth, windowEl.offsetHeight);
-    windowEl.style.left = `${clamped.x}px`;
-    windowEl.style.top = `${clamped.y}px`;
-  }
+  /* ─── Resize (edges) ─── */
 
-  function onDragPointerUp(e: PointerEvent): void {
-    if (!isDragging) return;
-    isDragging = false;
-    windowEl.releasePointerCapture(e.pointerId);
-    commitBounds();
-  }
-
-  /* === RESIZE por bordes === */
-  function onResizePointerDown(e: PointerEvent, edge: 'right' | 'bottom' | 'corner'): void {
+  function onResizePointerDown(e: PointerEvent, edge: ResizeEdge): void {
     e.preventDefault();
     e.stopPropagation();
-    isResizing = true;
-    resizeEdge = edge;
-    startX = e.clientX;
-    startY = e.clientY;
-    startLeft = windowEl.offsetLeft;
-    startTop = windowEl.offsetTop;
-    startW = windowEl.offsetWidth;
-    startH = windowEl.offsetHeight;
-    windowEl.setPointerCapture(e.pointerId);
+    resize = {
+      edge,
+      startX: e.clientX,
+      startY: e.clientY,
+      startLeft: windowEl.offsetLeft,
+      startTop: windowEl.offsetTop,
+      startW: windowEl.offsetWidth,
+      startH: windowEl.offsetHeight,
+    };
     focusWindow(instanceId);
   }
 
-  function onResizePointerMove(e: PointerEvent): void {
-    if (!isResizing || !resizeEdge) return;
-    const dx = e.clientX - startX;
-    const dy = e.clientY - startY;
-    const minW = 200;
-    const minH = 150;
-    const clamped = clampWindowBounds(startLeft, startTop, startW + dx, startH + dy);
+  /* ─── Document-level move/up (shared by drag & resize) ─── */
 
-    if (resizeEdge === 'right' || resizeEdge === 'corner') {
-      windowEl.style.width = `${Math.max(minW, clamped.w)}px`;
+  function onDocumentPointerMove(e: PointerEvent): void {
+    if (drag) {
+      const dx = e.clientX - drag.startX;
+      const dy = e.clientY - drag.startY;
+      const clamped = clampWindowBounds(
+        drag.startLeft + dx,
+        drag.startTop + dy,
+        windowEl.offsetWidth,
+        windowEl.offsetHeight,
+      );
+      windowEl.style.left = `${clamped.x}px`;
+      windowEl.style.top = `${clamped.y}px`;
+      return;
     }
-    if (resizeEdge === 'bottom' || resizeEdge === 'corner') {
-      windowEl.style.height = `${Math.max(minH, clamped.h)}px`;
+
+    if (resize) {
+      const dx = e.clientX - resize.startX;
+      const dy = e.clientY - resize.startY;
+      const edge = resize.edge;
+
+      let newX = resize.startLeft;
+      let newY = resize.startTop;
+      let newW = resize.startW;
+      let newH = resize.startH;
+
+      /* Horizontal */
+      if (edge.includes('right')) {
+        newW = Math.max(MIN_W, resize.startW + dx);
+      }
+      if (edge.includes('left')) {
+        newW = Math.max(MIN_W, resize.startW - dx);
+        newX = resize.startLeft + (resize.startW - newW);
+      }
+
+      /* Vertical */
+      if (edge === 'bottom' || edge === 'corner' || edge === 'bottom-left') {
+        newH = Math.max(MIN_H, resize.startH + dy);
+      }
+
+      /* Clamp to workspace bounds */
+      const clamped = clampWindowBounds(newX, newY, newW, newH);
+      windowEl.style.left = `${clamped.x}px`;
+      windowEl.style.top = `${clamped.y}px`;
+      windowEl.style.width = `${clamped.w}px`;
+      windowEl.style.height = `${clamped.h}px`;
     }
   }
 
-  function onResizePointerUp(e: PointerEvent): void {
-    if (!isResizing) return;
-    isResizing = false;
-    resizeEdge = null;
-    windowEl.releasePointerCapture(e.pointerId);
-    commitBounds();
+  function onDocumentPointerUp(): void {
+    if (drag) {
+      drag = null;
+      commitBounds();
+    }
+    if (resize) {
+      resize = null;
+      commitBounds();
+    }
   }
 
-  /** Commitea los bounds actuales al windowStore. */
+  /* ─── Cursor hint on edges ─── */
+
+  function detectEdge(e: MouseEvent): ResizeEdge | null {
+    if (!resizable) return null;
+    const rect = windowEl.getBoundingClientRect();
+    /* Top edge excluded: titlebar lives there (Windows/macOS convention) */
+    const onRight = e.clientX > rect.right - EDGE_SIZE;
+    const onBottom = e.clientY > rect.bottom - EDGE_SIZE;
+    const onLeft = e.clientX < rect.left + EDGE_SIZE;
+
+    if (onBottom && onLeft) return 'bottom-left';
+    if (onBottom && onRight) return 'corner';
+    if (onRight) return 'right';
+    if (onBottom) return 'bottom';
+    if (onLeft) return 'left';
+    return null;
+  }
+
+  function cursorForEdge(edge: ResizeEdge | null): string {
+    switch (edge) {
+      case 'right': return 'ew-resize';
+      case 'left': return 'ew-resize';
+      case 'bottom': return 'ns-resize';
+      case 'corner': return 'nwse-resize';
+      case 'bottom-left': return 'nesw-resize';
+      default: return '';
+    }
+  }
+
+  function onMouseMove(e: MouseEvent): void {
+    if (drag || resize) return;
+    const edge = detectEdge(e);
+    windowEl.style.cursor = cursorForEdge(edge);
+  }
+
+  function onMouseDown(e: MouseEvent): void {
+    if (!resizable) return;
+    if (dragHandle.contains(e.target as Node)) return;
+    const edge = detectEdge(e);
+    if (edge) {
+      /* Cast MouseEvent to the shape PointerEvent needs for our handler */
+      onResizePointerDown(e as unknown as PointerEvent, edge);
+    }
+  }
+
+  function onMouseLeave(): void {
+    if (!drag && !resize) windowEl.style.cursor = '';
+  }
+
+  /* ─── Commit bounds to store ─── */
+
   function commitBounds(): void {
     updateWindowBounds(instanceId, {
       x: windowEl.offsetLeft,
@@ -113,60 +200,12 @@ export function enableDragResize(opts: DragResizeOptions): () => void {
     });
   }
 
-  /* === Cursor en bordes (resize hint) === */
-  function onMouseMove(e: MouseEvent): void {
-    if (isDragging || isResizing) return;
-    if (!resizable) return;
+  /* ─── Binding ─── */
 
-    const rect = windowEl.getBoundingClientRect();
-    const edgeSize = 6;
-    const onRight = e.clientX > rect.right - edgeSize;
-    const onBottom = e.clientY > rect.bottom - edgeSize;
-
-    if (onRight && onBottom) {
-      windowEl.style.cursor = 'nwse-resize';
-    } else if (onRight) {
-      windowEl.style.cursor = 'ew-resize';
-    } else if (onBottom) {
-      windowEl.style.cursor = 'ns-resize';
-    } else {
-      windowEl.style.cursor = '';
-    }
-  }
-
-  function onMouseDown(e: MouseEvent): void {
-    if (!resizable) return;
-    /* No activar resize si el click es en la barra de título (drag handle) */
-    if (dragHandle.contains(e.target as Node)) return;
-    const rect = windowEl.getBoundingClientRect();
-    const edgeSize = 6;
-    const onRight = e.clientX > rect.right - edgeSize;
-    const onBottom = e.clientY > rect.bottom - edgeSize;
-
-    if (onRight || onBottom) {
-      const edge = onRight && onBottom ? 'corner' : onRight ? 'right' : 'bottom';
-      onResizePointerDown(e as unknown as PointerEvent, edge);
-    }
-  }
-
-  function onPointerMove(e: PointerEvent): void {
-    if (isDragging) onDragPointerMove(e);
-    if (isResizing) onResizePointerMove(e);
-  }
-
-  function onPointerUp(e: PointerEvent): void {
-    if (isDragging) onDragPointerUp(e);
-    if (isResizing) onResizePointerUp(e);
-  }
-
-  function onMouseLeave(): void {
-    if (!isDragging && !isResizing) windowEl.style.cursor = '';
-  }
-
-  /* === Binding === */
   dragHandle.addEventListener('pointerdown', onDragPointerDown);
-  windowEl.addEventListener('pointermove', onPointerMove);
-  windowEl.addEventListener('pointerup', onPointerUp);
+  /* Document-level: catches pointer even outside window */
+  document.addEventListener('pointermove', onDocumentPointerMove);
+  document.addEventListener('pointerup', onDocumentPointerUp);
 
   if (resizable) {
     windowEl.addEventListener('mousemove', onMouseMove);
@@ -174,11 +213,11 @@ export function enableDragResize(opts: DragResizeOptions): () => void {
     windowEl.addEventListener('mouseleave', onMouseLeave);
   }
 
-  /* Cleanup — remueve todos los listeners */
+  /* Cleanup */
   return () => {
     dragHandle.removeEventListener('pointerdown', onDragPointerDown);
-    windowEl.removeEventListener('pointermove', onPointerMove);
-    windowEl.removeEventListener('pointerup', onPointerUp);
+    document.removeEventListener('pointermove', onDocumentPointerMove);
+    document.removeEventListener('pointerup', onDocumentPointerUp);
     if (resizable) {
       windowEl.removeEventListener('mousemove', onMouseMove);
       windowEl.removeEventListener('mousedown', onMouseDown);
