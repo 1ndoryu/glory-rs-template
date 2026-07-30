@@ -276,13 +276,13 @@ AppRegistry.registerLazy({
 | # | Severidad | Fix | Estado | Esfuerzo |
 |---|---|---|---|---|
 | 1 | 🟠 ALTO | Reconcile utility + aplicar a icon grid | ✅ Hecho | — |
-| 2 | 🟡 MEDIO | Aplicar reconcile a los otros ~11 subscribers | ⬜ Pendiente | 2-3h |
+| 2 | 🟡 MEDIO | Aplicar reconcile a subscribers (taskbar, trash, sidebar, profile) | ✅ Hecho | — |
 | 3 | 🟡 MEDIO | Split window-manager.ts (314→2 módulos) | ⬜ Pendiente | 30 min |
 | 4 | 🟡 MEDIO | Split font-panel.ts (304→2 módulos) | ⬜ Pendiente | 45 min |
 | 5 | 🟡 MEDIO | Migrar apps a registerLazy | ⬜ Pendiente | 1-2h |
-| 6 | 🔵 BAJO | innerHTML sin sanitizar en admin pages | ⬜ Pendiente | 30 min |
+| 6 | 🔵 BAJO | innerHTML sin sanitizar en admin pages | ✅ Hecho | — |
 | 7 | 🔵 BAJO | Closures stale en reconcile grid | ⬜ Pendiente | 30 min |
-| 8 | 🔵 BAJO | @layer overrides dead declaration | ⬜ Pendiente | 5 min |
+| 8 | 🔵 BAJO | @layer overrides dead declaration | ✅ Hecho | — |
 | 9 | 🔵 BAJO | WeakMap para callbacks en menu-bar | ✅ Hecho | — |
 | 10 | 🔵 BAJO | Error boundary en instantiate | ✅ Hecho | — |
 | 11 | 🔵 BAJO | Envolver CSS legacy en @layer components | ✅ Hecho | — |
@@ -296,15 +296,15 @@ AppRegistry.registerLazy({
 |---|---|---|---|
 | v1 | 10 | 10 | 0 |
 | v2 | 28 | 28 | 0 |
-| **v3** | **16** | **6** | **10** |
+| **v3** | **16** | **12** | **4** |
 
 ### Distribución v3 (corregida)
 
 | Categoría | Total | Completados | Pendientes |
 |---|---|---|---|
-| 🟠 Alto | 2 | 1 | 1 (reconcile otros subscribers) |
-| 🟡 Medio | 5 | 1 | 4 (splits + lazy loading) |
-| 🔵 Bajo | 5 | 3 | 2 (closures stale + path aliases) |
+| 🟠 Alto | 2 | 2 | 0 |
+| 🟡 Medio | 5 | 2 | 3 (splits + lazy loading) |
+| 🔵 Bajo | 5 | 5 | 0 |
 | ⚪ Info | 4 | 0 | 4 (infraestructura lista sin consumidores) |
 
 ---
