@@ -4,12 +4,14 @@
  * Solo crea el contenedor del workspace; las ventanas se derivan del estado. */
 
 import {
+  createElement,
   FileUser,
   Folder,
   FolderCode,
   Gamepad2,
   Settings,
   ShieldUser,
+  X,
   type IconNode,
 } from 'lucide';
 import { createDesktopIcon } from './components/desktop-icon';
@@ -252,6 +254,10 @@ function createReactiveTaskbar(): HTMLElement {
 
       const icon = document.createElement('span');
       icon.className = 'desktop-taskbar__icon';
+      /* Renderizar el icono Lucide de la app */
+      const iconSvg = createElement(win.app.icon);
+      iconSvg.classList.add('desktop-taskbar__icon');
+      icon.appendChild(iconSvg);
 
       const label = document.createElement('span');
       label.className = 'desktop-taskbar__label';
@@ -261,6 +267,7 @@ function createReactiveTaskbar(): HTMLElement {
       closeBtn.type = 'button';
       closeBtn.className = 'desktop-taskbar__close';
       closeBtn.setAttribute('aria-label', `Cerrar ${win.title}`);
+      closeBtn.appendChild(createElement(X));
 
       item.append(icon, label, closeBtn);
 
