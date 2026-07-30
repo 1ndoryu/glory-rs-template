@@ -1,6 +1,9 @@
 /* wandori.us — CSS Reset
  * Elimina TODOS los estilos por defecto del navegador.
- * Obligatorio: ningún elemento debe verse "por defecto". */
+ * Obligatorio: ningún elemento debe verse "por defecto".
+ * [Auditoría v2 §3.4] @layer base — lowest specificity layer. */
+
+@layer base {
 
 *, *::before, *::after {
   box-sizing: border-box;
@@ -88,3 +91,5 @@ h1, h2, h3, h4, h5, h6 {
 ::-webkit-scrollbar-thumb {
   background: var(--color-borde);
 }
+
+} /* @layer base */

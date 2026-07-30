@@ -53,12 +53,51 @@ export interface AppDefinition {
  * Registry central de aplicaciones del OS.
  * Singleton local — se instancia una vez y se importa donde se necesite.
  */
+/** Definición lazy de una app — se carga bajo demanda. */
+export interface LazyAppDefinition extends Omit<AppDefinition, 'render'> {
+  /** Dynamic import que devuelve el módulo con la función render. */
+  readonly load: () => Promise<{ render: AppRenderFn }>;
+}
+
 class AppRegistryClass {
   private apps = new Map<string, AppDefinition>();
+  private lazyApps = new Map<string, LazyAppDefinition>();
+  private loadPromises = new Map<string, Promise<AppDefinition>>();
 
   /** Registrar una app en el catálogo. */
   register(app: AppDefinition): void {
     this.apps.set(app.id, app);
+  }
+
+  /** Registrar una app con lazy loading — el código se carga bajo demanda. */
+  registerLazy(app: LazyAppDefinition): void {
+    this.lazyApps.set(app.id, app);
+    /* Crear wrapper en apps para que get() funcione sin await */
+    this.apps.set(app.id, {
+      ...app,
+      render: async (ctx) => {
+        const resolved = await this.resolveLazy(app.id);
+        return resolved.render(ctx);
+      },
+    });
+  }
+
+  /** Resolver una app lazy: importar el módulo y reemplazar la definición. */
+  private async resolveLazy(id: string): Promise<AppDefinition> {
+    const existing = this.loadPromises.get(id);
+    if (existing) return existing;
+
+    const lazy = this.lazyApps.get(id);
+    if (!lazy) throw new Error(`[AppRegistry] no lazy app: ${id}`);
+
+    const promise = lazy.load().then((mod) => {
+      const resolved: AppDefinition = { ...lazy, render: mod.render };
+      this.apps.set(id, resolved);
+      this.lazyApps.delete(id);
+      return resolved;
+    });
+    this.loadPromises.set(id, promise);
+    return promise;
   }
 
   /** Obtener definición de una app por ID. */

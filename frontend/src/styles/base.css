@@ -1,5 +1,8 @@
 /* wandori.us — Base Typography
- * Estilos base para tipografía y elementos semánticos. */
+ * Estilos base para tipografía y elementos semánticos.
+ * [Auditoría v2 §3.4] @layer base. */
+
+@layer base {
 
 body {
   font-family: var(--fuente-texto);
@@ -77,3 +80,5 @@ hr {
 .articulo-contenido a {
   text-decoration: none;
 }
+
+} /* @layer base */

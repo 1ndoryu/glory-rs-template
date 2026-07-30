@@ -5,38 +5,58 @@
 type Listener<T> = (value: T) => void;
 type Unsubscribe = () => void;
 
+/** Origen del cambio de estado. Permite distinguir causas en suscriptores. */
+export type StoreSource = 'user' | 'api' | 'overlay' | 'init' | 'sync';
+
+/** Listener que recibe el valor y el origen del cambio. */
+export type TypedListener<T> = (value: T, source: StoreSource) => void;
+
 export interface Store<T> {
   get(): T;
-  set(value: T): void;
-  update(fn: (current: T) => T): void;
-  subscribe(listener: Listener<T>): Unsubscribe;
+  set(value: T, source?: StoreSource): void;
+  update(fn: (current: T) => T, source?: StoreSource): void;
+  subscribe(listener: TypedListener<T>): Unsubscribe;
+  /** Suscribirse ignorando el source (compatibilidad con listeners simples). */
+  subscribeSimple(listener: Listener<T>): Unsubscribe;
 }
 
 /* Crear un store reactivo */
 export function createStore<T>(initialValue: T): Store<T> {
   let value = initialValue;
-  const listeners = new Set<Listener<T>>();
+  const listeners = new Set<TypedListener<T>>();
+  const simpleListeners = new Set<Listener<T>>();
 
   return {
     get() {
       return value;
     },
-    set(newValue: T) {
+    set(newValue: T, source: StoreSource = 'user') {
       value = newValue;
       for (const listener of listeners) {
+        listener(value, source);
+      }
+      for (const listener of simpleListeners) {
         listener(value);
       }
     },
-    update(fn: (current: T) => T) {
+    update(fn: (current: T) => T, source: StoreSource = 'user') {
       value = fn(value);
       for (const listener of listeners) {
+        listener(value, source);
+      }
+      for (const listener of simpleListeners) {
         listener(value);
       }
     },
-    subscribe(listener: Listener<T>): Unsubscribe {
+    subscribe(listener: TypedListener<T>): Unsubscribe {
       listeners.add(listener);
-      listener(value); /* Emitir valor actual inmediatamente */
+      listener(value, 'init');
       return () => { listeners.delete(listener); };
+    },
+    subscribeSimple(listener: Listener<T>): Unsubscribe {
+      simpleListeners.add(listener);
+      listener(value);
+      return () => { simpleListeners.delete(listener); };
     },
   };
 }

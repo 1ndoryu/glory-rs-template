@@ -127,6 +127,11 @@ class CommandRegistryClass {
     return this.getAll().filter(c => c.shortcut);
   }
 
+  /** Listar comandos cuyo ID empieza con el prefix dado (namespace). */
+  getByPrefix(prefix: string): readonly Command[] {
+    return this.getAll().filter(cmd => cmd.id.startsWith(prefix));
+  }
+
   /** Listar comandos disponibles para un contexto dado. */
   getByContext(context: string, ctx?: CommandContext): readonly Command[] {
     return this.getAll().filter(cmd => {
