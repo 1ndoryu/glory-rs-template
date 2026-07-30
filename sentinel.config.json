@@ -19,7 +19,8 @@
   "directoryExceptions": [
     "migrations",
     "scripts",
-    "src/handlers"
+    "src/handlers",
+    "frontend"
   ],
   "rules": {
     "barras-decorativas": {

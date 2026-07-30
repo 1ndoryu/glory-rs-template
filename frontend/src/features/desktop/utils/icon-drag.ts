@@ -6,8 +6,11 @@
  * [Auditoría v2] Unificación Finder ↔ desktop.
  */
 
-import { createEl } from '../../../utils/dom';
 import type { NodeId } from '../../runtime/workspace/types';
+import { findReorderIndex, findDropTarget, makeDropTarget, updateHighlight, type HighlightSession } from './icon-reorder';
+
+/* Re-export para compatibilidad — otros módulos importan desde icon-drag */
+export { makeDropTarget };
 
 /** Resultado de un drop. */
 export interface DragDropResult {
@@ -20,15 +23,11 @@ export interface DragDropResult {
 
 export type DragDropHandler = (result: DragDropResult) => void;
 
-interface DragSession {
+interface DragSession extends HighlightSession {
   readonly sourceId: string;
   readonly sourceContext: string;
   readonly ghost: HTMLElement;
-  readonly gridEl: HTMLElement;
-  readonly itemSelector: string;
   readonly onReorder?: (draggedId: NodeId, targetIndex: number) => void;
-  highlightEl: HTMLElement | null;
-  currentTarget: HTMLElement | null;
 }
 
 let activeSession: DragSession | null = null;
@@ -38,17 +37,6 @@ export function onGlobalDrop(handler: DragDropHandler): void {
   globalDropHandler = handler;
 }
 
-function findDropTarget(x: number, y: number, exclude: HTMLElement | null): HTMLElement | null {
-  if (activeSession) activeSession.ghost.style.display = 'none';
-  const el = document.elementFromPoint(x, y) as HTMLElement | null;
-  if (activeSession) activeSession.ghost.style.display = '';
-
-  if (!el) return null;
-
-  const target = el.closest<HTMLElement>('[data-drop-target="true"]');
-  if (!target || target === exclude) return null;
-  return target;
-}
 
 export function enableDrag(options: {
   el: HTMLElement;
@@ -98,7 +86,7 @@ export function enableDrag(options: {
         onReorder,
         highlightEl: null,
         currentTarget: null,
-      };
+      } satisfies DragSession;
     }
 
     if (activeSession) {
@@ -106,8 +94,8 @@ export function enableDrag(options: {
       activeSession.ghost.style.left = `${e.clientX - rect.width / 2}px`;
       activeSession.ghost.style.top = `${e.clientY - rect.height / 2}px`;
 
-      const target = findDropTarget(e.clientX, e.clientY, gridEl);
-      updateHighlight(target, e.clientX, e.clientY);
+      const target = findDropTarget(e.clientX, e.clientY, activeSession.ghost, gridEl);
+      updateHighlight(target, e.clientX, e.clientY, activeSession);
     }
   }
 
@@ -118,7 +106,7 @@ export function enableDrag(options: {
 
     if (!activeSession) return;
 
-    const target = findDropTarget(e.clientX, e.clientY, null);
+    const target = findDropTarget(e.clientX, e.clientY, activeSession.ghost, null);
 
     if (target) {
       const targetId = target.dataset.dropId ?? '';
@@ -126,7 +114,7 @@ export function enableDrag(options: {
       const isSameGrid = target === gridEl;
 
       if (isSameGrid && onReorder) {
-        const targetIndex = findReorderIndex(e.clientX, e.clientY);
+        const targetIndex = findReorderIndex(e.clientX, e.clientY, gridEl, itemSelector);
         if (targetIndex >= 0) {
           onReorder(nodeId as NodeId, targetIndex);
         }
@@ -157,80 +145,3 @@ export function enableDrag(options: {
   };
 }
 
-export function makeDropTarget(options: {
-  el: HTMLElement;
-  dropId: string;
-  context: string;
-}): void {
-  options.el.setAttribute('data-drop-target', 'true');
-  options.el.setAttribute('data-drop-id', options.dropId);
-  options.el.setAttribute('data-drop-context', options.context);
-}
-
-function updateHighlight(target: HTMLElement | null, x: number, y: number): void {
-  if (!activeSession) return;
-
-  if (activeSession.currentTarget && activeSession.currentTarget !== target) {
-    activeSession.currentTarget.classList.remove('desktop-icon--drop-hover');
-  }
-
-  activeSession.currentTarget = target;
-
-  if (target) {
-    target.classList.add('desktop-icon--drop-hover');
-
-    const isSameGrid = target === activeSession.gridEl;
-    if (isSameGrid) {
-      const targetIndex = findReorderIndex(x, y);
-      if (targetIndex >= 0) {
-        positionHighlight(targetIndex);
-        return;
-      }
-    }
-  }
-
-  activeSession.highlightEl?.remove();
-  activeSession.highlightEl = null;
-}
-
-function findReorderIndex(x: number, y: number): number {
-  if (!activeSession) return -1;
-
-  const icons = activeSession.gridEl.querySelectorAll<HTMLElement>(activeSession.itemSelector);
-  let closestIndex = -1;
-  let closestDist = Infinity;
-
-  icons.forEach((icon, i) => {
-    const rect = icon.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    const dist = Math.hypot(x - cx, y - cy);
-    if (dist < closestDist) {
-      closestDist = dist;
-      closestIndex = i;
-    }
-  });
-
-  return closestIndex;
-}
-
-function positionHighlight(targetIndex: number): void {
-  if (!activeSession) return;
-  const icons = activeSession.gridEl.querySelectorAll<HTMLElement>(activeSession.itemSelector);
-  const target = icons[targetIndex];
-  if (!target) return;
-
-  if (!activeSession.highlightEl) {
-    const hl = createEl('div', { className: 'desktop-icon-drop-target' });
-    activeSession.gridEl.appendChild(hl);
-    activeSession.highlightEl = hl;
-  }
-
-  const rect = target.getBoundingClientRect();
-  const gridRect = activeSession.gridEl.getBoundingClientRect();
-  const hl = activeSession.highlightEl;
-  hl.style.left = `${rect.left - gridRect.left}px`;
-  hl.style.top = `${rect.top - gridRect.top}px`;
-  hl.style.width = `${rect.width}px`;
-  hl.style.height = `${rect.height}px`;
-}
