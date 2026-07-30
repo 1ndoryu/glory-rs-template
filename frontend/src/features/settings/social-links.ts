@@ -1,9 +1,11 @@
 /* wandori.us — Social Links Editor
- * Editor de enlaces sociales con guardado debounced. */
+ * Editor de enlaces sociales con guardado debounced.
+ * [Auditoría v4 §1.2] Migrado a createEl() — demo de abstracción DOM. */
 
 import { socialLinksStore, redesLayoutStore, type RedesLayout } from '../../store';
 import { SettingsService } from '../../services';
 import { createSizeSlider } from './font-helpers';
+import { createEl, createContainer } from '../../utils/dom';
 
 let socialSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -29,43 +31,33 @@ export function renderSocialLinksSection(
   cfg: { redesSize: number; redesGap: number },
   updateSize: SizeUpdateFn,
 ): HTMLElement[] {
-  const enlacesLabel = document.createElement('label');
-  enlacesLabel.className = 'campo-etiqueta';
-  enlacesLabel.textContent = 'Enlaces';
+  const enlacesLabel = createEl('label', { className: 'campo-etiqueta', textContent: 'Enlaces' });
 
   const redesSizeSlider = createSizeSlider('Tamaño enlaces', 8, 24, cfg.redesSize, (v) => updateSize('redesSize', v));
   const redesGapSlider = createSizeSlider('Separación enlaces', 0, 20, cfg.redesGap, (v) => updateSize('redesGap', v));
 
-  const enlacesContainer = document.createElement('div');
-  enlacesContainer.className = 'enlaces-editor';
+  const enlacesContainer = createEl('div', { className: 'enlaces-editor' });
 
   /* Toggle layout inline/stacked */
-  const layoutLabel = document.createElement('label');
-  layoutLabel.className = 'checkbox-personalizado';
-  const layoutCheck = document.createElement('input');
-  layoutCheck.type = 'checkbox';
+  const layoutCheck = createEl('input', { type: 'checkbox' });
   layoutCheck.checked = redesLayoutStore.get() === 'stacked';
   layoutCheck.addEventListener('change', () => {
     const layout: RedesLayout = layoutCheck.checked ? 'stacked' : 'inline';
     redesLayoutStore.set(layout);
     saveSocialLinks();
   });
-  const layoutTexto = document.createElement('span');
-  layoutTexto.textContent = 'uno por linea';
-  layoutLabel.append(layoutCheck, layoutTexto);
+  const layoutLabel = createEl('label', { className: 'checkbox-personalizado' }, layoutCheck, 'uno por linea');
 
   function renderEnlaces(): void {
     enlacesContainer.innerHTML = '';
     const links = socialLinksStore.get();
 
     for (let i = 0; i < links.length; i++) {
-      const row = document.createElement('div');
-      row.className = 'enlace-row';
-
-      const nombreInput = document.createElement('input');
-      nombreInput.className = 'campo-entrada enlace-nombre';
+      const nombreInput = createEl('input', {
+        className: 'campo-entrada enlace-nombre',
+        placeholder: 'nombre',
+      });
       nombreInput.value = links[i].nombre;
-      nombreInput.placeholder = 'nombre';
       nombreInput.addEventListener('input', () => {
         socialLinksStore.update(arr => {
           const copy = [...arr];
@@ -75,10 +67,11 @@ export function renderSocialLinksSection(
         debouncedSaveSocial();
       });
 
-      const urlInput = document.createElement('input');
-      urlInput.className = 'campo-entrada enlace-url';
+      const urlInput = createEl('input', {
+        className: 'campo-entrada enlace-url',
+        placeholder: 'https://...',
+      });
       urlInput.value = links[i].url;
-      urlInput.placeholder = 'https://...';
       urlInput.addEventListener('input', () => {
         socialLinksStore.update(arr => {
           const copy = [...arr];
@@ -88,23 +81,18 @@ export function renderSocialLinksSection(
         debouncedSaveSocial();
       });
 
-      const btnQuitar = document.createElement('button');
-      btnQuitar.className = 'boton enlace-quitar';
-      btnQuitar.textContent = '×';
-      btnQuitar.title = 'quitar enlace';
+      const btnQuitar = createEl('button', { className: 'boton enlace-quitar', title: 'quitar enlace', textContent: '×' });
       btnQuitar.addEventListener('click', () => {
         socialLinksStore.update(arr => arr.filter((_, idx) => idx !== i));
         renderEnlaces();
         saveSocialLinks();
       });
 
-      row.append(nombreInput, urlInput, btnQuitar);
+      const row = createContainer('enlace-row', nombreInput, urlInput, btnQuitar);
       enlacesContainer.appendChild(row);
     }
 
-    const btnAgregar = document.createElement('button');
-    btnAgregar.className = 'boton mt-sm';
-    btnAgregar.textContent = '+ agregar enlace';
+    const btnAgregar = createEl('button', { className: 'boton mt-sm', textContent: '+ agregar enlace' });
     btnAgregar.addEventListener('click', () => {
       socialLinksStore.update(arr => [...arr, { nombre: '', url: '' }]);
       renderEnlaces();

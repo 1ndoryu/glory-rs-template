@@ -24,6 +24,8 @@ export interface DomAttrs {
   'aria-label'?: string;
   'aria-haspopup'?: string;
   'aria-expanded'?: string;
+  'role'?: string;
+  title?: string;
   'data-external'?: string;
   [key: `data-${string}`]: string | undefined;
 }
@@ -64,6 +66,8 @@ export function createEl<K extends keyof HTMLElementTagNameMap>(
     if (attrs['aria-label']) el.setAttribute('aria-label', attrs['aria-label']);
     if (attrs['aria-haspopup']) el.setAttribute('aria-haspopup', attrs['aria-haspopup']);
     if (attrs['aria-expanded']) el.setAttribute('aria-expanded', attrs['aria-expanded']);
+    if (attrs['role']) el.setAttribute('role', attrs['role']);
+    if (attrs['title']) el.setAttribute('title', attrs['title']);
     if (attrs['data-external']) el.setAttribute('data-external', attrs['data-external']);
 
     /* Atributos data-* dinámicos */
