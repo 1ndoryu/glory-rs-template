@@ -8,8 +8,8 @@ use validator::Validate;
 use crate::errors::AppError;
 use crate::middleware::AdminUser;
 use crate::models::article::{
-    Article, ArticlePublic, ArticleQueryParams, CreateArticleRequest,
-    PaginatedArticles, PaginatedArticlesPublic, UpdateArticleRequest,
+    Article, ArticlePublic, ArticleQueryParams, CreateArticleRequest, PaginatedArticles,
+    PaginatedArticlesPublic, UpdateArticleRequest,
 };
 use crate::services::article::ArticleService;
 use crate::AppState;
@@ -93,7 +93,11 @@ pub async fn list_articles(
     let articles =
         ArticleService::list(&state.pool, Some("published"), params.page, params.per_page).await?;
     Ok(Json(PaginatedArticlesPublic {
-        items: articles.items.into_iter().map(ArticlePublic::from).collect(),
+        items: articles
+            .items
+            .into_iter()
+            .map(ArticlePublic::from)
+            .collect(),
         total: articles.total,
         page: articles.page,
         per_page: articles.per_page,

@@ -201,13 +201,12 @@ impl ArticleRepository {
         id: Uuid,
         alias: Option<&str>,
     ) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query(
-            "UPDATE articles SET system_alias = $1, updated_at = NOW() WHERE id = $2",
-        )
-        .bind(alias)
-        .bind(id)
-        .execute(pool)
-        .await?;
+        let result =
+            sqlx::query("UPDATE articles SET system_alias = $1, updated_at = NOW() WHERE id = $2")
+                .bind(alias)
+                .bind(id)
+                .execute(pool)
+                .await?;
         Ok(result.rows_affected() > 0)
     }
 

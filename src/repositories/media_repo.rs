@@ -36,7 +36,8 @@ impl MediaRepository {
         file_type: Option<&str>,
         article_id: Option<Uuid>,
     ) -> Result<Vec<Media>, sqlx::Error> {
-        let cols = "id, article_id, file_path, file_type, file_size, alt_text, created_at, asset_state";
+        let cols =
+            "id, article_id, file_path, file_type, file_size, alt_text, created_at, asset_state";
         match (file_type, article_id) {
             (Some(ft), Some(aid)) => {
                 sqlx::query_as::<_, Media>(&format!(
