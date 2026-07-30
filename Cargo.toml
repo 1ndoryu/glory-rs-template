@@ -40,6 +40,7 @@ thiserror = "2"
 # Auth
 jsonwebtoken = "9"
 argon2 = "0.5"
+rand = "0.8"
 
 # HTTP client (para Resend email API)
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
