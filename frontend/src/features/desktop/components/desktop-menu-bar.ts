@@ -1,72 +1,200 @@
-import { ChevronRight, createElement } from 'lucide';
+/* wandori.us — Desktop Menu Bar
+ * Barra superior del OS con menús desplegables.
+ * Archivo: artículos del blog. Aplicaciones: apps del AppRegistry.
+ * Configuración: abre la app de settings.
+ * [Plan §2.3] Los menús proyectan CommandRegistry/AppRegistry. */
 
-const julyArticles = [
-  'El silencio de las máquinas',
-  'Fragmentos de código y otras nostalgias',
-  'Sobre diseño y otros actos de fe',
-];
+import { createElement, FileUser, type IconNode } from 'lucide';
+import { AppRegistry, type Capability } from '../../runtime/app-registry';
+import { authStore } from '../../../store';
+import { api } from '../../../api/client';
 
-function createMenuLabel(label: string, expanded?: boolean): HTMLButtonElement {
+/* === Estado del menú abierto === */
+let openEntry: HTMLElement | null = null;
+
+function closeOpenMenu(): void {
+  if (openEntry) {
+    openEntry.classList.remove('desktop-menu-bar__entry--open');
+    const menu = openEntry.querySelector('.desktop-context-menu') as HTMLElement | null;
+    if (menu) menu.hidden = true;
+    const btn = openEntry.querySelector('.desktop-menu-bar__item') as HTMLButtonElement | null;
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+    openEntry = null;
+  }
+  document.removeEventListener('click', onOutsideClick);
+  document.removeEventListener('keydown', onEscapeKey);
+}
+
+function onOutsideClick(e: MouseEvent): void {
+  if (openEntry && !openEntry.contains(e.target as Node)) {
+    closeOpenMenu();
+  }
+}
+
+function onEscapeKey(e: KeyboardEvent): void {
+  if (e.key === 'Escape') closeOpenMenu();
+}
+
+/* === Toggle menú === */
+function toggleEntry(entry: HTMLElement): void {
+  if (openEntry === entry) {
+    closeOpenMenu();
+    return;
+  }
+  closeOpenMenu();
+
+  const menu = entry.querySelector('.desktop-context-menu') as HTMLElement | null;
+  const btn = entry.querySelector('.desktop-menu-bar__item') as HTMLButtonElement | null;
+
+  entry.classList.add('desktop-menu-bar__entry--open');
+  if (menu) menu.hidden = false;
+  if (btn) btn.setAttribute('aria-expanded', 'true');
+
+  openEntry = entry;
+
+  setTimeout(() => {
+    document.addEventListener('click', onOutsideClick);
+    document.addEventListener('keydown', onEscapeKey);
+  }, 0);
+}
+
+/* === Crear label de menú === */
+function createMenuLabel(label: string): HTMLButtonElement {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'desktop-menu-bar__item';
-  button.disabled = true;
   button.textContent = label;
   button.setAttribute('aria-haspopup', 'menu');
-  if (expanded !== undefined) button.setAttribute('aria-expanded', String(expanded));
+  button.setAttribute('aria-expanded', 'false');
   return button;
 }
 
+/* === Crear item de menú contextual === */
+function createMenuItem(
+  label: string,
+  options?: { icon?: IconNode; shortcut?: string; disabled?: boolean; onClick?: () => void },
+): HTMLElement {
+  const item = document.createElement('div');
+  item.className = 'desktop-context-menu__item';
+  item.setAttribute('role', 'menuitem');
+
+  if (options?.icon) {
+    const iconEl = document.createElement('span');
+    iconEl.className = 'desktop-context-menu__icon';
+    iconEl.appendChild(createElement(options.icon));
+    item.appendChild(iconEl);
+  }
+
+  const labelEl = document.createElement('span');
+  labelEl.className = 'desktop-context-menu__label';
+  labelEl.textContent = label;
+  item.appendChild(labelEl);
+
+  if (options?.shortcut) {
+    const shortcutEl = document.createElement('span');
+    shortcutEl.className = 'desktop-context-menu__shortcut';
+    shortcutEl.textContent = options.shortcut;
+    item.appendChild(shortcutEl);
+  }
+
+  if (options?.disabled) {
+    item.classList.add('desktop-context-menu__item--disabled');
+    item.setAttribute('aria-disabled', 'true');
+  } else if (options?.onClick) {
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeOpenMenu();
+      options.onClick!();
+    });
+  }
+
+  return item;
+}
+
+/* === Menú Archivo — artículos del blog === */
 function createArchiveMenu(): HTMLElement {
   const menu = document.createElement('div');
   menu.className = 'desktop-context-menu';
   menu.setAttribute('role', 'menu');
-  menu.setAttribute('aria-label', 'Archivo por mes');
+  menu.setAttribute('aria-label', 'Archivo');
+  menu.hidden = true;
 
-  for (const [index, month] of ['Julio 2026', 'Junio 2026', 'Mayo 2026'].entries()) {
-    const monthItem = document.createElement('div');
-    monthItem.className = 'desktop-context-menu__branch';
+  /* Placeholder mientras carga */
+  const loading = createMenuItem('cargando…', { disabled: true });
+  menu.appendChild(loading);
 
-    const monthLabel = document.createElement('div');
-    monthLabel.className = index === 0
-      ? 'desktop-context-menu__item desktop-context-menu__item--selected'
-      : 'desktop-context-menu__item';
-    monthLabel.setAttribute('role', 'menuitem');
-    monthLabel.setAttribute('aria-haspopup', 'menu');
-    monthLabel.setAttribute('aria-expanded', String(index === 0));
+  /* Cargar artículos desde la API */
+  void api.get<{ items: Array<{ title: string; slug: string; published_at: string | null }> }>('/api/articles?per_page=20')
+    .then((data) => {
+      loading.remove();
 
-    const text = document.createElement('span');
-    text.textContent = month;
-    const chevron = createElement(ChevronRight);
-    chevron.classList.add('desktop-context-menu__chevron');
-    monthLabel.append(text, chevron);
-    monthItem.appendChild(monthLabel);
-
-    if (index === 0) {
-      const submenu = document.createElement('div');
-      submenu.className = 'desktop-context-menu desktop-context-menu--nested';
-      submenu.setAttribute('role', 'menu');
-      submenu.setAttribute('aria-label', `Artículos de ${month}`);
-
-      for (const article of julyArticles) {
-        const articleItem = document.createElement('div');
-        articleItem.className = 'desktop-context-menu__item';
-        articleItem.setAttribute('role', 'menuitem');
-        articleItem.textContent = article;
-        submenu.appendChild(articleItem);
+      if (data.items.length === 0) {
+        menu.appendChild(createMenuItem('sin artículos', { disabled: true }));
+        return;
       }
 
-      monthItem.appendChild(submenu);
-    }
+      for (const article of data.items) {
+        menu.appendChild(createMenuItem(article.title, {
+          icon: FileUser,
+          onClick: () => {
+            void import('../../../router').then(r => r.navigate(`/article/${article.slug}`));
+          },
+        }));
+      }
+    })
+    .catch(() => {
+      loading.remove();
+      menu.appendChild(createMenuItem('error al cargar', { disabled: true }));
+    });
 
-    menu.appendChild(monthItem);
+  return menu;
+}
+
+/* === Menú Aplicaciones — apps del AppRegistry === */
+function createApplicationsMenu(): HTMLElement {
+  const menu = document.createElement('div');
+  menu.className = 'desktop-context-menu';
+  menu.setAttribute('role', 'menu');
+  menu.setAttribute('aria-label', 'Aplicaciones');
+  menu.hidden = true;
+
+  const capability: Capability = authStore.get().isAuthenticated ? 'admin' : 'public';
+  const apps = AppRegistry.getAvailable(capability);
+
+  for (const app of apps) {
+    menu.appendChild(createMenuItem(app.title, {
+      icon: app.icon,
+      onClick: () => {
+        /* Import dinámico para evitar circular deps */
+        void import('../../runtime/route-app-adapter').then(m => m.openAppWindow(app.id));
+      },
+    }));
+  }
+
+  if (apps.length === 0) {
+    menu.appendChild(createMenuItem('sin aplicaciones', { disabled: true }));
   }
 
   return menu;
 }
 
-/* [297A-2] Muestra abierta la jerarquía Archivo > mes > artículos para validar
- * su densidad. Aplicaciones y Configuración se conectarán al registro en fase 2. */
+/* === Crear entrada de menú === */
+function createMenuEntry(label: string, menu: HTMLElement): HTMLElement {
+  const entry = document.createElement('div');
+  entry.className = 'desktop-menu-bar__entry';
+
+  const btn = createMenuLabel(label);
+  entry.append(btn, menu);
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleEntry(entry);
+  });
+
+  return entry;
+}
+
+/* === Barra principal === */
 export function createDesktopMenuBar(): HTMLElement {
   const bar = document.createElement('header');
   bar.className = 'desktop-menu-bar';
@@ -74,29 +202,38 @@ export function createDesktopMenuBar(): HTMLElement {
   const menus = document.createElement('div');
   menus.className = 'desktop-menu-bar__menus';
 
+  /* Brand logo (cículo negro de marca) */
   const brand = document.createElement('span');
   brand.className = 'desktop-menu-bar__brand';
   brand.setAttribute('aria-label', 'Menú del sistema');
 
-  const archiveEntry = document.createElement('div');
-  archiveEntry.className = 'desktop-menu-bar__entry';
-  const archiveMenu = createArchiveMenu();
-  archiveMenu.hidden = true;
-  archiveEntry.append(createMenuLabel('Archivo', false), archiveMenu);
+  /* Archivo — artículos */
+  const archiveEntry = createMenuEntry('Archivo', createArchiveMenu());
 
-  const applicationsEntry = document.createElement('div');
-  applicationsEntry.className = 'desktop-menu-bar__entry';
-  applicationsEntry.appendChild(createMenuLabel('Aplicaciones', false));
+  /* Aplicaciones — apps del OS */
+  const appsEntry = createMenuEntry('Aplicaciones', createApplicationsMenu());
 
+  /* Configuración — abre la app settings directamente */
   const settingsEntry = document.createElement('div');
   settingsEntry.className = 'desktop-menu-bar__entry';
-  settingsEntry.appendChild(createMenuLabel('Configuración', false));
+  const settingsBtn = createMenuLabel('Configuración');
+  settingsBtn.addEventListener('click', () => {
+    void import('../../runtime/route-app-adapter').then(m => m.openAppWindow('settings'));
+  });
+  settingsEntry.appendChild(settingsBtn);
 
-  menus.append(brand, archiveEntry, applicationsEntry, settingsEntry);
+  menus.append(brand, archiveEntry, appsEntry, settingsEntry);
 
+  /* Reloj */
   const clock = document.createElement('time');
   clock.className = 'desktop-menu-bar__clock';
-  clock.textContent = '11:42';
+
+  function updateClock(): void {
+    const now = new Date();
+    clock.textContent = now.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+  updateClock();
+  setInterval(updateClock, 30_000);
 
   bar.append(menus, clock);
   return bar;
