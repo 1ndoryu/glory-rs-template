@@ -170,5 +170,10 @@ export const redesLayoutStore = createStore<RedesLayout>('inline');
 export const showProfile = createStore<boolean>(true);
 
 /* Control de visibilidad del sidebar (toggle desde taskbar nav control) */
-export const showSidebar = createStore<boolean>(true);
+export const showSidebar = createStore<boolean>(
+  localStorage.getItem('wandorius:sidebar') !== 'hidden',
+);
+showSidebar.subscribe((visible) => {
+  localStorage.setItem('wandorius:sidebar', visible ? 'visible' : 'hidden');
+});
 
