@@ -17,7 +17,7 @@ import {
 import { createDesktopIcon } from './components/desktop-icon';
 import { createDesktopMenuBar } from './components/desktop-menu-bar';
 import { createDesktopWindow } from './components/desktop-window';
-import { windowStore, focusWindow } from '../runtime/window-manager';
+import { windowStore, focusWindow, restoreWindow, closeWindow, minimizeWindow } from '../runtime/window-manager';
 import { openAppWindow } from '../runtime/route-app-adapter';
 import { navigate } from '../../router';
 import { authStore } from '../../store';
@@ -156,10 +156,10 @@ export function createDesktopShell(
           onClose: () => {
             win.controller.abort();
             dispatchEvent({ type: 'app_closed', appId: win.appId });
-            import('../runtime/window-manager').then(m => m.closeWindow(win.instanceId));
+            closeWindow(win.instanceId);
           },
           onMinimize: () => {
-            import('../runtime/window-manager').then(m => m.minimizeWindow(win.instanceId));
+            minimizeWindow(win.instanceId);
           },
         });
 
@@ -271,17 +271,15 @@ function createReactiveTaskbar(): HTMLElement {
 
       item.append(icon, label, closeBtn);
 
-      /* Click: enfocar o restaurar */
+      /* Click: enfocar, restaurar o cerrar */
       item.addEventListener('click', (e) => {
-        if (e.target === closeBtn) {
-          import('../runtime/window-manager').then(m => {
-            m.closeWindow(win.instanceId);
-            dispatchEvent({ type: 'app_closed', appId: win.appId });
-          });
+        if ((e.target as HTMLElement).closest('.desktop-taskbar__close')) {
+          closeWindow(win.instanceId);
+          dispatchEvent({ type: 'app_closed', appId: win.appId });
           return;
         }
         if (win.state === 'minimized') {
-          import('../runtime/window-manager').then(m => m.restoreWindow(win.instanceId));
+          restoreWindow(win.instanceId);
         } else {
           focusWindow(win.instanceId);
         }
