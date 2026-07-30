@@ -6,11 +6,13 @@
 import { FileUser, Folder, Settings, FileText, FolderCode, Trash2, ShieldUser } from 'lucide';
 import { AppRegistry } from './app-registry';
 import { createFinderPreview } from '../desktop/apps/finder/finder-preview';
-import { createReaderPreview } from '../desktop/apps/reader/reader-preview';
+import { createReaderPreview, type ReaderOptions } from '../desktop/apps/reader/reader-preview';
 import { createFontPanel } from '../settings/font-panel';
 import { createTrashPreview } from '../desktop/apps/trash/trash-preview';
 import { dispatchEvent } from '../analytics/dispatcher';
 import type { MountedView, RenderContext } from '../../core/lifecycle';
+import { api } from '../../api/client';
+import { appendSanitizedHtml } from '../../utils/sanitize-html';
 
 /* === Finder — Explorador de archivos del OS === */
 AppRegistry.register({
@@ -70,12 +72,14 @@ AppRegistry.register({
   requires: 'public',
   routePatterns: ['/article/:slug'],
   layout: 'full-bleed',
-  render: (_ctx: RenderContext): MountedView => {
+  render: (ctx: RenderContext): MountedView => {
     dispatchEvent({ type: 'app_opened', appId: 'reader' });
 
-    /* El contenido real se cargará desde la API en fases posteriores.
-     * Por ahora usa el preview existente. */
-    const content = createReaderPreview({ title: 'Documento' });
+    const opts: ReaderOptions = {
+      slug: ctx.params?.slug ?? ctx.params?.resourceId,
+      title: ctx.params?.title,
+    };
+    const content = createReaderPreview(opts);
 
     return {
       element: content,
@@ -108,7 +112,9 @@ AppRegistry.register({
   },
 });
 
-/* === About — Página about === */
+/* === About — Página about ===
+ * Carga contenido desde la API directamente, sin importar la página legacy.
+ * [Auditoría v2] App autónoma del workspace. */
 AppRegistry.register({
   id: 'about',
   title: 'About',
@@ -117,14 +123,33 @@ AppRegistry.register({
   singleton: true,
   requires: 'public',
   routePatterns: ['/about'],
+  layout: 'full-bleed',
   render: (ctx: RenderContext): MountedView => {
     dispatchEvent({ type: 'app_opened', appId: 'about' });
 
-    const container = document.createElement('div');
-    void import('../../pages/about').then(async m => {
-      if (ctx.signal.aborted) return;
-      container.appendChild(await m.renderAbout());
-    });
+    const container = document.createElement('article');
+    container.className = 'desktop-about';
+
+    /* Cargar contenido desde la API */
+    void (async () => {
+      try {
+        if (ctx.signal.aborted) return;
+        const settings = await api.get<Record<string, string>>('/api/settings');
+        if (ctx.signal.aborted) return;
+        const content = settings.about_content || '';
+        if (content) {
+          appendSanitizedHtml(container, content);
+        } else {
+          const p = document.createElement('p');
+          p.textContent = 'Contenido about no configurado.';
+          container.appendChild(p);
+        }
+      } catch {
+        const p = document.createElement('p');
+        p.textContent = 'Error al cargar contenido about.';
+        container.appendChild(p);
+      }
+    })();
 
     return {
       element: container,
