@@ -1,6 +1,6 @@
 /* wandori.us — API Client
  * Fetch wrapper con auth automática, JSON parsing y manejo de errores.
- * Reemplaza axios por Fetch API nativa (más ligero). */
+ * [297A-8] Auth vía cookie HttpOnly + CSRF token para mutaciones. */
 
 import { authStore } from '../store';
 
@@ -24,16 +24,26 @@ interface RequestOptions {
   formData?: FormData;
 }
 
-/* Request genérico con auth automática */
+/* [297A-8] Leer cookie CSRF del browser */
+function getCsrfToken(): string | null {
+  const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/);
+  return match ? match[1] : null;
+}
+
+/* Request genérico con auth automática (cookies) y CSRF */
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, headers = {}, formData } = options;
 
   const requestHeaders: Record<string, string> = { ...headers };
 
-  /* Agregar token JWT si existe */
-  const { token } = authStore.get();
-  if (token) {
-    requestHeaders['Authorization'] = `Bearer ${token}`;
+  /* [297A-8] Las cookies se envían automáticamente con credentials: 'include'.
+   * Para mutaciones, añadir token CSRF desde la cookie. */
+  const isMutation = method !== 'GET';
+  if (isMutation) {
+    const csrf = getCsrfToken();
+    if (csrf) {
+      requestHeaders['X-CSRF-Token'] = csrf;
+    }
   }
 
   /* Solo setear Content-Type para JSON, no para FormData */
@@ -44,6 +54,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const response = await fetch(`${BASE_URL}${path}`, {
     method,
     headers: requestHeaders,
+    credentials: 'include',
     body: formData ?? (body ? JSON.stringify(body) : undefined),
   });
 
@@ -54,6 +65,12 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     } catch {
       errorBody = await response.text();
     }
+
+    /* [297A-8] Si 401, limpiar estado de auth */
+    if (response.status === 401) {
+      authStore.set({ isAuthenticated: false, userId: null });
+    }
+
     throw new ApiError(response.status, errorBody, `API Error: ${response.status}`);
   }
 

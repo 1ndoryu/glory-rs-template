@@ -13,6 +13,9 @@ pub mod repositories;
 pub mod services;
 
 use sqlx::PgPool;
+use std::sync::Arc;
+
+use crate::handlers::auth::LoginRateLimit;
 
 /// Estado compartido de la aplicacion — accesible desde handlers y middleware
 #[derive(Clone)]
@@ -25,4 +28,6 @@ pub struct AppState {
     pub stripe_secret_key: Option<String>,
     pub stripe_webhook_secret: Option<String>,
     pub site_url: String,
+    /// [297A-8] Rate limit para login por IP
+    pub login_rate_limit: Arc<LoginRateLimit>,
 }

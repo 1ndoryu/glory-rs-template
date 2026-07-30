@@ -6,7 +6,7 @@ import { authStore } from '../store';
 import { navigate } from '../router';
 import { showToast } from '../components/ui/toast';
 import { createInput } from '../components/ui/input';
-import type { AuthResponse, LoginRequest } from '../api/types';
+import type { LoginRequest } from '../api/types';
 
 export function renderLogin(): HTMLElement {
   const page = document.createElement('div');
@@ -52,12 +52,15 @@ export function renderLogin(): HTMLElement {
     errorMsg.style.display = 'none';
 
     try {
-      const data = await api.post<AuthResponse>('/api/auth/login', {
+      /* [297A-8] Login crea sesión en cookie HttpOnly.
+       * El frontend NO almacena token. Llamamos a /auth/me para confirmar. */
+      await api.post('/api/auth/login', {
         email,
         password,
       } as LoginRequest);
 
-      authStore.set({ token: data.token, isAuthenticated: true });
+      const user = await api.get<{ id: string; email: string }>('/api/auth/me');
+      authStore.set({ isAuthenticated: true, userId: user.id });
       showToast('sesion iniciada');
       navigate('/admin');
     } catch {

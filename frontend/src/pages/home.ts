@@ -134,10 +134,10 @@ export async function renderHome(): Promise<HTMLElement> {
   let articles: Article[] = [];
 
   try {
-    const data = await api.get<PaginatedArticles>('/api/articles?status=published&per_page=20');
-    articles = data.items.length > 0 ? data.items : demoArticles;
+    const data = await api.get<PaginatedArticles>('/api/articles?per_page=20');
+    articles = data.items;
   } catch {
-    articles = demoArticles;
+    articles = [];
   }
 
   page.innerHTML = '';
@@ -159,9 +159,9 @@ export async function renderHome(): Promise<HTMLElement> {
 /* Obtener articulos para el sidebar (exportado) */
 export async function getArticles(): Promise<Article[]> {
   try {
-    const data = await api.get<PaginatedArticles>('/api/articles?status=published&per_page=50');
-    return data.items.length > 0 ? data.items : demoArticles;
+    const data = await api.get<PaginatedArticles>('/api/articles?per_page=50');
+    return data.items;
   } catch {
-    return demoArticles;
+    return [];
   }
 }

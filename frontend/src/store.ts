@@ -43,24 +43,18 @@ export function createStore<T>(initialValue: T): Store<T> {
 
 /* === Stores globales de la aplicación === */
 
-/* Estado de autenticación */
+/* Estado de autenticación
+ * [297A-8] Migrado de JWT localStorage a sesiones opacas en cookie HttpOnly.
+ * El frontend ya no almacena tokens. La sesión se gestiona vía cookies automáticamente.
+ * El estado isAuthenticated se determina llamando a /auth/me al inicio. */
 export interface AuthState {
-  token: string | null;
   isAuthenticated: boolean;
+  userId: string | null;
 }
 
 export const authStore = createStore<AuthState>({
-  token: localStorage.getItem('token'),
-  isAuthenticated: !!localStorage.getItem('token'),
-});
-
-/* Guardar token en localStorage al cambiar */
-authStore.subscribe((state) => {
-  if (state.token) {
-    localStorage.setItem('token', state.token);
-  } else {
-    localStorage.removeItem('token');
-  }
+  isAuthenticated: false,
+  userId: null,
 });
 
 /* Configuracion de fuentes, tamanos y layout */

@@ -1,3 +1,5 @@
+use std::net::SocketAddr;
+
 use glory_backend::config::AppConfig;
 use glory_backend::handlers;
 
@@ -23,13 +25,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     sqlx::migrate!().run(&pool).await?;
 
+    /* [297A-8] Limpiar sesiones expiradas al arrancar */
+    let cleaned = glory_backend::services::SessionService::cleanup_expired(&pool)
+        .await
+        .unwrap_or(0);
+    if cleaned > 0 {
+        tracing::info!("Limpiadas {cleaned} sesiones expiradas al arrancar");
+    }
+
     let addr = format!("{}:{}", config.host, config.port);
     tracing::info!("Servidor iniciando en {addr}");
     tracing::info!("Swagger UI disponible en http://{addr}/swagger-ui/");
 
     let app = handlers::create_router(pool, config);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
-    axum::serve(listener, app).await?;
+    /* [297A-8] ConnectInfo necesario para extraer IP del cliente en rate limit */
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await?;
 
     Ok(())
 }
