@@ -17,10 +17,11 @@ import {
   createElement,
   type IconNode,
 } from 'lucide';
-import { workspaceStore, getChildren, moveNodeToParent } from '../../../runtime/workspace/workspace-store';
+import { workspaceStore, getChildren } from '../../../runtime/workspace/workspace-store';
 import { resolveResourceType } from '../../../runtime/resource-type-registry';
 import { openContextMenu } from '../../components/desktop-context-menu';
 import { selectSingle } from '../../../runtime/selection-store';
+import { enableDrag, makeDropTarget } from '../../utils/icon-drag';
 import { authStore } from '../../../../store';
 import type { ResolvedNode } from '../../../runtime/workspace/types';
 
@@ -111,6 +112,9 @@ export function createFinderPreview(options: FinderOptions): HTMLElement {
     currentFolderId = folderId;
     render();
 
+    /* Actualizar drop-id del grid a la carpeta actual */
+    makeDropTarget({ el: grid, dropId: currentFolderId, context: 'finder' });
+
     /* Notificar cambio de título de ventana */
     const ws = workspaceStore.get();
     const node = ws.nodes[folderId];
@@ -118,20 +122,10 @@ export function createFinderPreview(options: FinderOptions): HTMLElement {
     options.onNavigate?.(folderId, label);
   }
 
-  /* Drop en el grid = mover a este folder */
-  grid.addEventListener('dragover', (e: DragEvent) => {
-    if ((e.target as HTMLElement).closest('.desktop-finder__item')) return;
-    e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-  });
-  grid.addEventListener('drop', (e: DragEvent) => {
-    if ((e.target as HTMLElement).closest('.desktop-finder__item')) return;
-    e.preventDefault();
-    const sourceId = e.dataTransfer?.getData('text/plain');
-    if (sourceId) {
-      moveNodeToParent(sourceId, currentFolderId);
-    }
-  });
+  /* Marcar grid como drop target (recibe items arrastrados aquí) */
+  makeDropTarget({ el: grid, dropId: currentFolderId, context: 'finder' });
+
+
 
   finder.append(pathEl, grid);
 
@@ -175,37 +169,17 @@ export function createFinderPreview(options: FinderOptions): HTMLElement {
     for (const child of children) {
       const item = createFinderItem(child, navigateTo, options);
 
-      /* Drag source */
-      item.setAttribute('draggable', 'true');
-      item.addEventListener('dragstart', (e: DragEvent) => {
-        if (e.dataTransfer) {
-          e.dataTransfer.effectAllowed = 'move';
-          e.dataTransfer.setData('text/plain', child.id);
-        }
-        item.classList.add('desktop-finder__item--dragging');
-      });
-      item.addEventListener('dragend', () => {
-        item.classList.remove('desktop-finder__item--dragging');
+      /* Habilitar drag con Pointer Events (sistema unificado) */
+      enableDrag({
+        el: item,
+        nodeId: child.id,
+        context: 'finder',
+        gridEl: grid,
       });
 
-      /* Drop target (solo carpetas) */
+      /* Carpetas son drop targets */
       if (child.type === 'folder') {
-        item.addEventListener('dragover', (e: DragEvent) => {
-          e.preventDefault();
-          if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-          item.classList.add('desktop-finder__item--drop-target');
-        });
-        item.addEventListener('dragleave', () => {
-          item.classList.remove('desktop-finder__item--drop-target');
-        });
-        item.addEventListener('drop', (e: DragEvent) => {
-          e.preventDefault();
-          item.classList.remove('desktop-finder__item--drop-target');
-          const sourceId = e.dataTransfer?.getData('text/plain');
-          if (sourceId && sourceId !== child.id) {
-            moveNodeToParent(sourceId, child.id);
-          }
-        });
+        makeDropTarget({ el: item, dropId: child.id, context: 'finder' });
       }
 
       grid.appendChild(item);

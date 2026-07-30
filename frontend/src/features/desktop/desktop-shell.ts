@@ -13,6 +13,8 @@ import { dispatchEvent } from '../analytics/dispatcher';
 import { enableDragResize } from './utils/drag-resize';
 import { openContextMenu } from './components/desktop-context-menu';
 import { selectBackground } from '../runtime/selection-store';
+import { makeDropTarget, onGlobalDrop } from './utils/icon-drag';
+import { moveNodeToParent } from '../runtime/workspace/workspace-store';
 import { createWorkspaceIconGrid } from './workspace-icon-grid';
 import { createReactiveTaskbar } from './reactive-taskbar';
 
@@ -76,6 +78,9 @@ export function createDesktopShell(
       }
     },
   });
+  /* Marcar workspace como drop target para el desktop (raíz) */
+  makeDropTarget({ el: workspace, dropId: 'desktop', context: 'desktop' });
+
   workspace.append(iconGrid, contentWindow);
 
   /* Context menu en workspace vacío */
@@ -95,6 +100,12 @@ export function createDesktopShell(
 
   /* Taskbar reactivo */
   const { element: taskbar } = createReactiveTaskbar();
+
+  /* Registrar handler global de drop — mueve nodos entre carpetas/desktop */
+  onGlobalDrop((result) => {
+    if (result.sourceId === result.targetId) return; /* Evitar self-drop */
+    moveNodeToParent(result.sourceId, result.targetId);
+  });
 
   shell.append(createDesktopMenuBar(), workspace, taskbar);
 

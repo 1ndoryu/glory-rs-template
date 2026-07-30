@@ -17,7 +17,7 @@ import { workspaceStore, reorderDesktopNodes } from '../runtime/workspace/worksp
 import type { ResolvedNode } from '../runtime/workspace/types';
 import { AppRegistry } from '../runtime/app-registry';
 import { resolveResourceType, type ResourceKind } from '../runtime/resource-type-registry';
-import { enableIconDrag } from './utils/icon-drag';
+import { enableDrag } from './utils/icon-drag';
 
 const SHELL_ICON_MAP: Record<string, IconNode> = {
   'profile': FileUser,
@@ -96,10 +96,12 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
         });
       });
 
-      const cleanup = enableIconDrag({
-        iconEl,
+      const cleanup = enableDrag({
+        el: iconEl,
         nodeId: node.id,
+        context: 'desktop',
         gridEl: grid,
+        itemSelector: '.desktop-icon--interactive',
         onReorder: (draggedId, targetIndex) => {
           const currentIds = Object.values(ws.nodes)
             .filter((n) => n.parentId === 'desktop')

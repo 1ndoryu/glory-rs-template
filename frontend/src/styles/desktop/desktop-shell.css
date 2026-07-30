@@ -118,6 +118,18 @@
   transition: left 0.1s, top 0.1s;
 }
 
+/* [Auditoría v2] Drop hover — feedback visual al arrastrar sobre un target válido */
+.desktop-icon--drop-hover {
+  outline: 2px dashed var(--sistema-texto);
+  outline-offset: 2px;
+  background: rgba(0, 0, 0, 0.03);
+}
+
+/* [Auditoría v2] Finder item dragging state */
+.desktop-finder__item--dragging {
+  opacity: 0.4;
+}
+
 .desktop-taskbar {
   position: relative;
   z-index: var(--z-sistema-barra);
