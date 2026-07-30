@@ -36,7 +36,7 @@
 
 ---
 
-## 1. Nuevas reglas Sentinel (12 reglas)
+## 1. Nuevas reglas Sentinel (17 reglas)
 
 ### 1.1 🔴 P0 — `export-no-usado`
 
@@ -616,7 +616,7 @@ Estos son patrones válidos de organización, pero si hay más de 10 en un archi
 2. `subscribe-sin-cleanup` — previene memory leaks
 3. `archivo-max-lineas` — evita que vuelvan a crecer archivos gigantes
 
-### Sprint 2 (reglas P1 — 5h 40min total)
+### Sprint 2 (reglas P1 — 6h total)
 4. `api-call-en-logica` — 10 min
 5. `import-store-directo` — 10 min
 6. `interface-grande` — 30 min
@@ -628,7 +628,7 @@ Estos son patrones válidos de organización, pero si hay más de 10 en un archi
 12. `keybinding-duplicado` — 1h
 13. `modulo-responsabilidades` — 2h
 
-### Sprint 3 (reglas P2 — 7h total)
+### Sprint 3 (reglas P2 — 4h 40min + 3h post-MVP)
 14. `console-log-produccion` — **10 min (nueva)**
 15. `export-default-prohibido` — **10 min (nueva)**
 16. `any-type-prohibido` — **10 min (nueva)**
