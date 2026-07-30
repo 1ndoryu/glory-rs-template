@@ -48,6 +48,7 @@ function getDesktopIcons(showAdmin: boolean): DesktopIconItem[] {
   const items: DesktopIconItem[] = [
     { id: 'gallery', label: 'Galería', type: 'folder', icon: Folder, selected: true, appId: 'finder' },
     { id: 'projects', label: 'Proyectos', type: 'folder', icon: FolderCode, appId: 'projects' },
+    { id: 'profile', label: 'Perfil', type: 'document', icon: FileUser },
     { id: 'about', label: 'About', type: 'document', icon: FileUser, appId: 'about' },
     { id: 'snake', label: 'Snake', type: 'application', icon: Gamepad2 },
   ];
@@ -62,15 +63,15 @@ function getDesktopIcons(showAdmin: boolean): DesktopIconItem[] {
   return items;
 }
 
-function createIconGrid(showAdmin: boolean): HTMLElement {
+function createIconGrid(showAdmin: boolean, extraActions?: Record<string, () => void>): HTMLElement {
   const grid = document.createElement('div');
   grid.className = 'desktop-icon-grid';
   grid.setAttribute('aria-label', 'Objetos del escritorio');
 
   for (const item of getDesktopIcons(showAdmin)) {
-    const onActivate = item.appId
-      ? () => { void openAppWindow(item.appId!); }
-      : item.action;
+    const onActivate = extraActions?.[item.id]
+      ?? (item.appId ? () => { void openAppWindow(item.appId!); } : item.action);
+    if (!onActivate) continue;
 
     const iconEl = createDesktopIcon({
       label: item.label,
@@ -153,7 +154,10 @@ export function createDesktopShell(
   contentWindow.style.display = 'none';
 
   /* Icon grid */
-  const iconGrid = createIconGrid(authStore.get().isAuthenticated);
+  const iconGrid = createIconGrid(authStore.get().isAuthenticated, {
+    profile: () => setProfileVisible(true),
+
+  });
   workspace.append(iconGrid, profileWindow, contentWindow);
 
   /* [Plan §3] Context menu en workspace vacío */
@@ -184,16 +188,23 @@ export function createDesktopShell(
   const profileTask = document.createElement('button');
   profileTask.type = 'button';
   profileTask.className = 'desktop-taskbar__task desktop-taskbar__task--profile desktop-taskbar__task--active';
-  const profileIconSvg = createElement(FileUser);
-  profileIconSvg.classList.add('desktop-taskbar__icon');
   const profileIconWrap = document.createElement('span');
   profileIconWrap.className = 'desktop-taskbar__icon';
-  profileIconWrap.appendChild(profileIconSvg);
+  profileIconWrap.appendChild(createElement(FileUser));
   const profileLabel = document.createElement('span');
   profileLabel.className = 'desktop-taskbar__label';
   profileLabel.textContent = 'Perfil';
-  profileTask.append(profileIconWrap, profileLabel);
-  profileTask.addEventListener('click', () => {
+  const profileCloseBtn = document.createElement('button');
+  profileCloseBtn.type = 'button';
+  profileCloseBtn.className = 'desktop-taskbar__close';
+  profileCloseBtn.setAttribute('aria-label', 'Cerrar Perfil');
+  profileCloseBtn.appendChild(createElement(X));
+  profileTask.append(profileIconWrap, profileLabel, profileCloseBtn);
+  profileTask.addEventListener('click', (e) => {
+    if ((e.target as HTMLElement).closest('.desktop-taskbar__close')) {
+      setProfileVisible(false);
+      return;
+    }
     setProfileVisible(true);
   });
   taskList.prepend(profileTask);
