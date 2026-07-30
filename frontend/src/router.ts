@@ -1,12 +1,17 @@
 /* wandori.us — SPA Router
  * Routing por History API. Sin recarga de página.
- * Soporta parámetros dinámicos (:slug) y guards de autenticación. */
+ * Soporta parámetros dinámicos (:slug), guards de autenticación
+ * y AbortSignal para lifecycle de vistas. */
+
+import type { RenderContext } from './core/lifecycle';
+export type { RenderContext };
 
 export type RouteParams = Record<string, string>;
 
 export interface Route {
   path: string;
-  render: (params: RouteParams) => HTMLElement | Promise<HTMLElement>;
+  /** Recibe params y contexto con AbortSignal para teardown. */
+  render: (params: RouteParams, ctx: RenderContext) => HTMLElement | Promise<HTMLElement>;
   guard?: () => boolean | Promise<boolean>;
 }
 
@@ -16,6 +21,7 @@ const routes: Route[] = [];
 const listeners: Set<NavigationListener> = new Set();
 let currentPath = '';
 let outlet: HTMLElement | null = null;
+let currentController: AbortController | null = null;
 
 /* Registrar rutas */
 export function addRoute(route: Route): void {
@@ -78,6 +84,12 @@ async function handleRoute(): Promise<void> {
   const pathname = window.location.pathname;
   currentPath = pathname;
 
+  /* Abortar vista anterior si existe */
+  if (currentController) {
+    currentController.abort();
+    currentController = null;
+  }
+
   const matched = matchRoute(pathname);
 
   if (!matched) {
@@ -101,10 +113,14 @@ async function handleRoute(): Promise<void> {
     }
   }
 
+  /* Crear nuevo AbortController para esta vista */
+  currentController = new AbortController();
+  const ctx: RenderContext = { signal: currentController.signal };
+
   /* Renderizar la página */
   if (outlet) {
     outlet.innerHTML = '';
-    const element = await matched.route.render(matched.params);
+    const element = await matched.route.render(matched.params, ctx);
     outlet.appendChild(element);
   }
 

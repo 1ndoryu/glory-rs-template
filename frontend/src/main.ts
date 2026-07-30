@@ -18,13 +18,15 @@ import './styles/desktop/desktop-responsive.css';
 import { addRoute, setOutlet, initRouter } from './router';
 import { createSidebar } from './components/layout/sidebar';
 import { createProfile } from './components/layout/profile';
-import { createDesktopConcept } from './features/desktop/desktop-concept';
+import { createDesktopShell } from './features/desktop/desktop-shell';
+import './features/runtime/app-registration';
+import './features/runtime/command-registration';
+import { initKeyboardShortcuts } from './features/runtime/command-registration';
 import { loadSavedFonts } from './features/settings/font-panel';
 import { initTracking, trackPageView } from './features/analytics/tracker';
 import { authStore, showProfile, siteConfig } from './store';
+import { api } from './api/client';
 
-
-import { navigate } from './router';
 
 /* Pages */
 import { renderHome } from './pages/home';
@@ -57,27 +59,15 @@ async function initApp(): Promise<void> {
   const app = document.getElementById('app');
   if (!app) return;
 
-  /* Auto-login en modo dev: siempre obtener un JWT válido (el token en
-   * localStorage puede estar viejo/invalido tras recrear la BD). */
-  if (import.meta.env.DEV) {
-    const email = import.meta.env.VITE_ADMIN_EMAIL || 'wandorius@wandori.us';
-    const password = import.meta.env.VITE_ADMIN_PASSWORD || 'Wand0rius!2026';
-    const body = JSON.stringify({ email, password });
-    const headers = { 'Content-Type': 'application/json' };
-
-    try {
-      let res = await fetch('/api/auth/login', { method: 'POST', headers, body });
-      if (!res.ok) {
-        /* Usuario no existe — registrarlo y usar su token directamente */
-        res = await fetch('/api/auth/register', { method: 'POST', headers, body });
-      }
-      if (res.ok) {
-        const data: { token: string } = await res.json();
-        authStore.set({ token: data.token, isAuthenticated: true });
-      }
-    } catch (err) {
-      console.warn('Auto-login dev falló:', err);
-    }
+  /* [297A-8] Verificar sesión existente al arrancar.
+   * Las cookies HttpOnly se envían automáticamente con credentials: 'include'.
+   * Si /auth/me responde con usuario válido, marcamos como autenticado. */
+  try {
+    const user = await api.get<{ id: string; email: string }>('/api/auth/me');
+    authStore.set({ isAuthenticated: true, userId: user.id });
+  } catch {
+    /* No hay sesión válida — permanecer como invitado */
+    authStore.set({ isAuthenticated: false, userId: null });
   }
 
   /* Cargar fuentes y settings antes de renderizar */
@@ -99,10 +89,7 @@ async function initApp(): Promise<void> {
   const contenido = document.createElement('main');
   contenido.className = 'contenido-principal';
 
-  const desktop = createDesktopConcept(profile, contenido, {
-    showAdminTools: authStore.get().isAuthenticated,
-    onOpenAdmin: () => navigate('/admin'),
-  });
+  const desktop = createDesktopShell(profile, contenido);
   columnaDerecha.appendChild(desktop.element);
 
   app.appendChild(columnaDerecha);
@@ -140,6 +127,9 @@ async function initApp(): Promise<void> {
 
   /* Tracking de page views */
   initTracking();
+
+  /* Iniciar atajos de teclado del OS */
+  initKeyboardShortcuts();
 
   /* Iniciar router */
   initRouter();
