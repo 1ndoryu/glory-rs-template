@@ -10,6 +10,7 @@ pub mod projects_handler;
 pub mod seo;
 pub mod settings_handler;
 pub mod stripe_webhook;
+pub mod workspace_handler;
 
 use axum::extract::DefaultBodyLimit;
 use axum::http::{header, HeaderValue, Method};
@@ -145,4 +146,5 @@ fn api_routes() -> Router<AppState> {
         .merge(projects_handler::routes())
         .merge(seo::routes())
         .merge(stripe_webhook::routes())
+        .merge(workspace_handler::routes())
 }

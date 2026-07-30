@@ -7,6 +7,7 @@ pub mod product_svc;
 pub mod project_svc;
 pub mod session;
 pub mod settings_svc;
+pub mod workspace_svc;
 
 pub use article::ArticleService;
 pub use auth::AuthService;
