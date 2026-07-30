@@ -159,7 +159,7 @@ export async function openEditor(article?: Article): Promise<void> {
     const payload = { title, excerpt, content: editor.getJSON(), cover_image: coverImage || undefined, status, is_pinned: isPinned };
     const fn = article
       ? ArticleService.update(article.id, payload)
-      : ArticleService.create(payload as any);
+      : ArticleService.create(payload);
     const result = await safeRun(fn, 'error al guardar');
     if (result.ok) {
       showToast(article ? 'articulo actualizado' : 'articulo creado');

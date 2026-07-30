@@ -50,7 +50,7 @@ export async function renderGallery(): Promise<HTMLElement> {
   }
 
   const mediaResponse = mediaResult.value;
-  const media = (mediaResponse as any).items as import('../api/types').Media[];
+  const media = mediaResponse.items;
   page.innerHTML = '';
   page.appendChild(titulo);
 

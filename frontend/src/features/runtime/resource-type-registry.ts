@@ -58,7 +58,7 @@ export function registerResourceType(entry: ResourceTypeEntry): void {
   /* Validar que la app existe en AppRegistry */
   const app = AppRegistry.get(entry.appId);
   if (!app) {
-    console.warn(`[ResourceTypeRegistry] app not found: ${entry.appId}`);
+    /* app no registrada aún — skip silently (init order) */
     return;
   }
   registry.set(entry.kind, entry);

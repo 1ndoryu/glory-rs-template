@@ -104,7 +104,7 @@ class AppRegistryClass {
     try {
       return await app.render(ctx);
     } catch (err) {
-      console.error(`[AppRegistry] app '${appId}' threw during render:`, err);
+      /* Error de render de app — mostrar fallback visual */
       const errorEl = createEl('div');
       errorEl.style.cssText = 'padding:var(--espacio-xl);color:var(--color-texto-secundario);font-size:var(--tamano-pequeno);font-style:italic;';
       errorEl.textContent = `Error al cargar ${app.title}.`;

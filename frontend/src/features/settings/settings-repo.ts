@@ -30,7 +30,7 @@ export function saveSettings(): void {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
     const c = fontStore.get();
-    const result = await safeRun(SettingsService.save({
+    await safeRun(SettingsService.save({
       font_menu: c.menu, font_titulo: c.titulo, font_texto: c.texto,
         tamano_texto: String(c.tamanoTexto), tamano_titulo: String(c.tamanoTitulo),
         tamano_pequeno: String(c.tamanoPequeno), tamano_grande: String(c.tamanoGrande),
@@ -43,7 +43,6 @@ export function saveSettings(): void {
         profile_border: String(c.profileBorder), sidebar_sep_height: String(c.sidebarSepHeight),
         redes_size: String(c.redesSize), redes_gap: String(c.redesGap),
       }), 'error al guardar configuración');
-    if (!result.ok) console.error('Error guardando settings:', result.error);
   }, 500);
 }
 
