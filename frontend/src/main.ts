@@ -22,6 +22,7 @@ import { createDesktopShell } from './features/desktop/desktop-shell';
 import './features/runtime/app-registration';
 import './features/runtime/command-registration';
 import { initKeyboardShortcuts } from './features/runtime/command-registration';
+import { initRouteAppAdapter } from './features/runtime/route-app-adapter';
 import { loadSavedFonts } from './features/settings/font-panel';
 import { initTracking, trackPageView } from './features/analytics/tracker';
 import { authStore, showProfile, siteConfig } from './store';
@@ -130,6 +131,9 @@ async function initApp(): Promise<void> {
 
   /* Iniciar atajos de teclado del OS */
   initKeyboardShortcuts();
+
+  /* Iniciar RouteAppAdapter — intercepta rutas de apps para abrir ventanas */
+  initRouteAppAdapter();
 
   /* Iniciar router */
   initRouter();

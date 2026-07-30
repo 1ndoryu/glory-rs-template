@@ -93,14 +93,25 @@ export function createDesktopShell(
   const workspace = document.createElement('div');
   workspace.className = 'desktop-workspace';
 
-  /* Ventana de perfil (siempre presente, no gestionada por WindowManager) */
+  /* Ventana de perfil — draggable y minimizable */
   const profileWindow = createDesktopWindow({
     title: 'Perfil',
     content: profile,
     className: 'desktop-profile-window',
     active: true,
     resizable: true,
+    onMinimize: () => { profileWindow.style.display = 'none'; },
   });
+  /* Activar drag/resize en ventana de perfil */
+  const profileTitleBar = profileWindow.querySelector('.desktop-window__titlebar') as HTMLElement;
+  if (profileTitleBar) {
+    enableDragResize({
+      windowEl: profileWindow,
+      instanceId: 'profile-static',
+      dragHandle: profileTitleBar,
+      resizable: true,
+    });
+  }
 
   /* Ventana de contenido (para páginas legacy) */
   const contentWindow = createDesktopWindow({
@@ -120,10 +131,12 @@ export function createDesktopShell(
 
   shell.append(createDesktopMenuBar(), workspace, taskbar);
 
-  /* Suscribirse a windowStore para renderizar ventanas de apps */
+  /* Contenedor de ventanas de apps — llena todo el workspace con position absolute */
   const windowContainer = document.createElement('div');
   windowContainer.className = 'desktop-windows-container';
-  windowContainer.style.position = 'relative';
+  windowContainer.style.position = 'absolute';
+  windowContainer.style.inset = '0';
+  windowContainer.style.pointerEvents = 'none';
   workspace.appendChild(windowContainer);
 
   const renderedWindows = new Map<string, { el: HTMLElement; cleanup: () => void }>();
@@ -154,6 +167,7 @@ export function createDesktopShell(
         el.style.top = `${win.bounds.y}px`;
         el.style.width = `${win.bounds.w}px`;
         el.style.height = `${win.bounds.h}px`;
+        el.style.pointerEvents = 'auto';
 
         /* Activar drag/resize */
         const titleBar = el.querySelector('.desktop-window__titlebar') as HTMLElement;

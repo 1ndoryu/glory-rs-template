@@ -17,11 +17,16 @@ export interface Route {
 
 type NavigationListener = (path: string) => void;
 
+/** Interceptor que puede reclamar una ruta y evitar que el router la renderice en el outlet.
+ * Devuelve true si el interceptor se encargó de la ruta. */
+type RouteInterceptor = (pathname: string, params: RouteParams) => boolean | Promise<boolean>;
+
 const routes: Route[] = [];
 const listeners: Set<NavigationListener> = new Set();
 let currentPath = '';
 let outlet: HTMLElement | null = null;
 let currentController: AbortController | null = null;
+let routeInterceptor: RouteInterceptor | null = null;
 
 /* Registrar rutas */
 export function addRoute(route: Route): void {
@@ -43,6 +48,11 @@ export function navigate(path: string): void {
 /* Obtener ruta actual */
 export function getCurrentPath(): string {
   return currentPath;
+}
+
+/** Registrar un interceptor de rutas. Solo uno puede estar activo. */
+export function setRouteInterceptor(interceptor: RouteInterceptor): void {
+  routeInterceptor = interceptor;
 }
 
 /* Suscribirse a cambios de ruta */
@@ -113,11 +123,23 @@ async function handleRoute(): Promise<void> {
     }
   }
 
+  /* Si un interceptor reclama esta ruta, dejar que él la maneje */
+  if (routeInterceptor) {
+    const handled = await routeInterceptor(pathname, matched.params);
+    if (handled) {
+      /* Notificar listeners y terminar — el interceptor se encarga */
+      for (const listener of listeners) {
+        listener(currentPath);
+      }
+      return;
+    }
+  }
+
   /* Crear nuevo AbortController para esta vista */
   currentController = new AbortController();
   const ctx: RenderContext = { signal: currentController.signal };
 
-  /* Renderizar la página */
+  /* Renderizar la página en el outlet */
   if (outlet) {
     outlet.innerHTML = '';
     const element = await matched.route.render(matched.params, ctx);

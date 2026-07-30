@@ -1,9 +1,10 @@
 /* wandori.us — Route App Adapter
  * Conecta el router existente con el AppRegistry y WindowManager.
- * Cuando el router navega a una ruta que una app maneja, el adapter
- * abre una ventana en desktop o renderiza fullscreen en mobile. */
+ * Registra un interceptor de rutas: cuando el router navega a una ruta
+ * que una app maneja, el adapter abre una ventana y evita que el router
+ * renderice en el outlet. Esto elimina el doble rendering. */
 
-import { onNavigate } from '../../router';
+import { setRouteInterceptor, type RouteParams } from '../../router';
 import { AppRegistry } from './app-registry';
 import {
   openWindow,
@@ -12,12 +13,19 @@ import {
   restoreWindow,
 } from './window-manager';
 import { dispatchEvent } from '../analytics/dispatcher';
+import { authStore } from '../../store';
 
-/** Registrar los comandos del sistema en el CommandRegistry. */
+/** Registrar el interceptor de rutas en el router.
+ * Llamar una vez desde main.ts. */
 export function initRouteAppAdapter(): void {
-  onNavigate((path) => {
-    const app = AppRegistry.findByRoute(path);
-    if (!app) return; /* Páginas normales (home, article, etc.) */
+  setRouteInterceptor((pathname: string, _params: RouteParams): boolean => {
+    const app = AppRegistry.findByRoute(pathname);
+    if (!app) return false; /* No es ruta de app → router renderiza normalmente */
+
+    /* Verificar capacidad */
+    const isAuthenticated = authStore.get().isAuthenticated;
+    if (app.requires === 'admin' && !isAuthenticated) return false;
+    if (app.requires === 'authenticated' && !isAuthenticated) return false;
 
     /* Si es singleton y ya está abierto, solo enfocar */
     if (app.singleton) {
@@ -28,12 +36,13 @@ export function initRouteAppAdapter(): void {
         }
         focusWindow(existing.instanceId);
         dispatchEvent({ type: 'window_focused', appId: app.id });
-        return;
+        return true; /* Interceptor manejó la ruta */
       }
     }
 
     /* Abrir nueva ventana */
-    openAppWindow(app.id);
+    void openAppWindow(app.id);
+    return true; /* Interceptor manejó la ruta */
   });
 }
 
