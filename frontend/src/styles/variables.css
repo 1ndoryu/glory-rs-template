@@ -94,6 +94,12 @@
   --sistema-iconos-offset-mobile-pequeno: 390px;
   --sistema-trama-tamano: 8px;
   --sistema-nombre-espaciado: 0.08em;
+  /* === VENTANAS — Posición dinámica (seteada por window-manager) === */
+  --win-x: 0px;
+  --win-y: 0px;
+  --win-w: 640px;
+  --win-h: 480px;
+
   --sistema-borde-doble: 1px solid var(--sistema-texto);
   --sistema-trama-escritorio: radial-gradient(circle, rgba(0, 0, 0, 0.12) 0.5px, transparent 0.75px);
   --sistema-trama-minimizada: repeating-linear-gradient(135deg, transparent 0, transparent 3px, var(--sistema-texto) 3px, var(--sistema-texto) 4px);
