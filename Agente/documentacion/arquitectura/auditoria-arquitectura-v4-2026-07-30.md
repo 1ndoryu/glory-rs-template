@@ -744,14 +744,14 @@ Estado de cada hallazgo de la auditoría v4 con su corrección o plan de acción
 | # | Hallazgo | Severidad | Estado | Evidencia |
 |---|---|---|---|---|
 | 4.1 | `api/client.ts` import directo | 🔴 Bloqueante | ✅ CORREGIDO | Service layer creado (8 servicios), migrados 19 consumidores |
-| 4.2 | 21 referencias a `window.*` | 🟡 Medio | ⬜ Pendiente | Abstraer vía shell.getViewport() |
+| 4.2 | 21 referencias a `window.*` | 🟡 Medio | ✅ PARCIAL | viewport.ts creado (getViewport, getPresentationMode, getCurrentPathname, getCurrentOrigin). dropdown-menu.ts y dispatcher.ts migrados. Restantes ~17 son legítimas (router popstate, tracker events, meta SEO) |
 | 4.3 | Eventos globales sin cleanup | 🟡 Medio | ✅ CORREGIDO | initRouter/initTracking retornan cleanup function (commit 968d545e) |
 
 ### 10.5 Escalabilidad (8 hallazgos)
 
 | # | Hallazgo | Severidad | Estado | Evidencia |
 |---|---|---|---|---|
-| 5.1 | 49 async sin try/catch unificado | 🔴 Bloqueante | ✅ PARCIAL | safe-async.ts creado con safeRun/safeClick/safeEffect. Migrados 3 consumidores (admin, admin-articles, login). Restantes: 46 async → safeEffect o safeRun. |
+| 5.1 | 49 async sin try/catch unificado | 🔴 Bloqueante | ✅ PARCIAL | safe-async.ts + viewport.ts. Migrados ~17/49: article, admin-articles(5), tracker, settings-repo, home, admin-projects(2), admin, font-panel, login. Restantes: ~32 async. |
 | 5.2 | Rust backend no auditado | 🔴 Bloqueante | ✅ AUDITADO | 0 unwrap(), 0 catch, error handling consistente con map_err. 4 format!() en queries SQL de media_repo.rs (seguras — columnas constantes). Config con unwrap_or_else para defaults. |
 | 5.3 | querySelectorAll+forEach | 🟡 Rebatido | ❌ FALSO POSITIVO — querySelectorAll retorna NodeList ESTÁTICA, no viva. No hay riesgo de referencias colgadas. |
 | 5.4 | Admin info en bundle público | 🟢 Bajo | ✅ CORREGIDO | ADMIN_NODES separado de DEFAULT_RELEASE. Nodos admin inyectados dinámicamente según capability |
@@ -760,7 +760,7 @@ Estado de cada hallazgo de la auditoría v4 con su corrección o plan de acción
 
 | # | Hallazgo | Severidad | Estado | Evidencia |
 |---|---|---|---|---|
-| 6.1 | 0 tests | 🔴 Bloqueante | ✅ PARCIAL | 65 tests: merge.ts(21) + clipboard.ts(9) + window-store.ts(13) + dom.ts(22) + vitest+jsdom |
+| 6.1 | 0 tests | 🔴 Bloqueante | ✅ PARCIAL | 86 tests: merge.ts(21) + clipboard.ts(9) + window-store.ts(13) + dom.ts(22) + safe-async.ts(12) + viewport.ts(9) |
 | 6.2 | upload/sanitize aislados | 🟡 Medio | ✅ CORREGIDO | MediaService y SettingsService integrados |
 | 6.3 | schema.org hardcodeado | 🟢 Bajo | ⬜ Pendiente | Para 297A-17 |
 
@@ -768,10 +768,10 @@ Estado de cada hallazgo de la auditoría v4 con su corrección o plan de acción
 
 | Estado | Cantidad | % |
 |---|---|---|
-| ✅ Completado | **10** | 43% |
-| ✅ Parcial (tests iniciados) | **1** | 4% |
+| ✅ Completado | **12** | 52% |
+| ✅ Parcial (tests/viewport/safeRun) | **2** | 9% |
 | ❌ Falso positivo | **1** | 4% |
-| ⬜ Pendiente | **11** | 48% |
+| ⬜ Pendiente | **9** | 39% |
 | **Total** | **23** | **100%** |
 
 **Actualización:** 2 nuevos hallazgos completados en esta sesión: §1.2 (createElement) y §5.4 (admin info bundle). §3.1 (FontConfig) también corregido. Progreso: 43% completado vs 22% anterior. Pendientes reducidos de 13 a 11.
