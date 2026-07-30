@@ -7,7 +7,6 @@ import { FileUser, Folder, Settings, FileText, FolderCode, Trash2, ShieldUser } 
 import { AppRegistry } from './app-registry';
 import { createFinderPreview } from '../desktop/apps/finder/finder-preview';
 import { createReaderPreview, type ReaderOptions } from '../desktop/apps/reader/reader-preview';
-import { createFontPanel } from '../settings/font-panel';
 import { createTrashPreview } from '../desktop/apps/trash/trash-preview';
 import { dispatchEvent } from '../analytics/dispatcher';
 import type { MountedView, RenderContext } from '../../core/lifecycle';
@@ -90,26 +89,24 @@ AppRegistry.register({
   },
 });
 
-/* === Settings — Configuración de fuentes y perfil === */
-AppRegistry.register({
+/* === Settings — Configuración de fuentes y perfil ===
+ * [Auditoría v3 §2.5] Lazy loading: código se carga bajo demanda. */
+AppRegistry.registerLazy({
   id: 'settings',
   title: 'Configuración',
   icon: Settings,
   iconType: 'application',
   singleton: true,
   requires: 'admin',
-  render: (_ctx: RenderContext): MountedView => {
-    dispatchEvent({ type: 'app_opened', appId: 'settings' });
-
-    const content = createFontPanel();
-
-    return {
-      element: content,
-      destroy: () => {
-        dispatchEvent({ type: 'app_closed', appId: 'settings' });
-      },
-    };
-  },
+  load: () => import('../settings/font-panel').then(m => ({
+    render: (_ctx: RenderContext): MountedView => {
+      dispatchEvent({ type: 'app_opened', appId: 'settings' });
+      return {
+        element: m.createFontPanel(),
+        destroy: () => { dispatchEvent({ type: 'app_closed', appId: 'settings' }); },
+      };
+    },
+  })),
 });
 
 /* === About — Página about ===
@@ -185,8 +182,9 @@ AppRegistry.register({
   },
 });
 
-/* === Admin — Panel de administración === */
-AppRegistry.register({
+/* === Admin — Panel de administración ===
+ * [Auditoría v3 §2.5] Lazy loading. */
+AppRegistry.registerLazy({
   id: 'admin',
   title: 'Admin',
   icon: ShieldUser,
@@ -194,26 +192,24 @@ AppRegistry.register({
   singleton: true,
   requires: 'admin',
   routePatterns: ['/admin'],
-  render: (ctx: RenderContext): MountedView => {
-    dispatchEvent({ type: 'app_opened', appId: 'admin' });
-
-    const container = document.createElement('div');
-    void import('../../pages/admin').then(async m => {
-      if (ctx.signal.aborted) return;
-      container.appendChild(await m.renderAdmin());
-    });
-
-    return {
-      element: container,
-      destroy: () => {
-        dispatchEvent({ type: 'app_closed', appId: 'admin' });
-      },
-    };
-  },
+  load: () => import('../../pages/admin').then(m => ({
+    render: (ctx: RenderContext): MountedView => {
+      dispatchEvent({ type: 'app_opened', appId: 'admin' });
+      const container = document.createElement('div');
+      void m.renderAdmin().then(el => {
+        if (!ctx.signal.aborted) container.appendChild(el);
+      });
+      return {
+        element: container,
+        destroy: () => { dispatchEvent({ type: 'app_closed', appId: 'admin' }); },
+      };
+    },
+  })),
 });
 
-/* === Projects — Página de proyectos === */
-AppRegistry.register({
+/* === Projects — Página de proyectos ===
+ * [Auditoría v3 §2.5] Lazy loading. */
+AppRegistry.registerLazy({
   id: 'projects',
   title: 'Proyectos',
   icon: FolderCode,
@@ -224,20 +220,17 @@ AppRegistry.register({
   toolbar: [
     { label: 'Archivo', items: ['projects:new'] },
   ],
-  render: (ctx: RenderContext): MountedView => {
-    dispatchEvent({ type: 'app_opened', appId: 'projects' });
-
-    const container = document.createElement('div');
-    void import('../../pages/projects').then(async m => {
-      if (ctx.signal.aborted) return;
-      container.appendChild(await m.renderProjects());
-    });
-
-    return {
-      element: container,
-      destroy: () => {
-        dispatchEvent({ type: 'app_closed', appId: 'projects' });
-      },
-    };
-  },
+  load: () => import('../../pages/projects').then(m => ({
+    render: (ctx: RenderContext): MountedView => {
+      dispatchEvent({ type: 'app_opened', appId: 'projects' });
+      const container = document.createElement('div');
+      void m.renderProjects().then(el => {
+        if (!ctx.signal.aborted) container.appendChild(el);
+      });
+      return {
+        element: container,
+        destroy: () => { dispatchEvent({ type: 'app_closed', appId: 'projects' }); },
+      };
+    },
+  })),
 });

@@ -87,7 +87,9 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
       grid,
       activableNodes,
       (node) => node.id,
-      /* createElement: crear icono nuevo */
+      /* createElement: crear icono nuevo.
+       * [Auditoría v3 §2.13] Los handlers leen del store en el momento del evento
+       * usando data-node-id, no capturando 'node' del momento de creación. */
       (node) => {
         const onActivate = resolveActivate(node, extraActions);
         if (!onActivate) return document.createElement('span'); /* placeholder */
@@ -99,16 +101,28 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
           onActivate,
         });
 
+        iconEl.setAttribute('data-node-id', node.id);
+
+        /* mousedown: seleccionar — lee nodeId del atributo */
         iconEl.addEventListener('mousedown', (e) => {
-          if (e.button === 0 && e.detail === 1) selectSingle(node.id);
+          if (e.button === 0 && e.detail === 1) {
+            const nid = iconEl.getAttribute('data-node-id');
+            if (nid) selectSingle(nid);
+          }
         });
 
+        /* contextmenu: abre menú con datos frescos del store */
         iconEl.addEventListener('contextmenu', (e) => {
           e.preventDefault();
-          selectSingle(node.id);
+          const nid = iconEl.getAttribute('data-node-id');
+          if (!nid) return;
+          const ws = workspaceStore.get();
+          const currentNode = ws.nodes[nid];
+          if (!currentNode) return;
+          selectSingle(nid);
           openContextMenu({
             context: 'icon',
-            targets: [{ id: node.refId ?? node.id, kind: node.type === 'app' ? 'app' : 'shortcut' }],
+            targets: [{ id: currentNode.refId ?? nid, kind: currentNode.type === 'app' ? 'app' : 'shortcut' }],
             capability: authStore.get().isAuthenticated ? 'admin' : 'public',
             x: e.clientX,
             y: e.clientY,
@@ -122,6 +136,7 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
           gridEl: grid,
           itemSelector: '.desktop-icon--interactive',
           onReorder: (draggedId, targetIndex) => {
+            const ws = workspaceStore.get();
             const currentIds = Object.values(ws.nodes)
               .filter((n) => n.parentId === 'desktop')
               .sort((a, b) => (a.mobileOrder ?? 0) - (b.mobileOrder ?? 0))
