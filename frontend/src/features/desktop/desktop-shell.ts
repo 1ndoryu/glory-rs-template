@@ -129,7 +129,7 @@ export function createDesktopShell(
     title: 'Perfil',
     icon: FileUser,
     content: profile,
-    initialBounds: { x: 44, y: 42, w: 470, h: 360 },
+    initialBounds: { x: 44, y: 42, w: 470, h: 224 },
     focused: true,
     cssClass: 'desktop-profile-window',
     layout: 'full-bleed',

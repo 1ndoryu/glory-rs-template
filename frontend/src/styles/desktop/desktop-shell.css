@@ -194,7 +194,7 @@
   top: clamp(var(--espacio-xl), 9vh, var(--espacio-3xl));
   left: clamp(var(--espacio-lg), 7%, var(--espacio-3xl));
   width: min(var(--sistema-perfil-ancho), calc(100% - var(--sistema-iconos-reserva)));
-  height: clamp(280px, 50vh, 560px);
+  height: clamp(200px, 30vh, 400px);
 }
 
 .desktop-content-window {
