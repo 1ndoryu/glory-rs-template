@@ -84,6 +84,9 @@ function createWorkspaceIconGrid(extraActions?: Record<string, () => void>): HTM
         ?? (node.refId ? () => {
           if (node.id === 'admin') { navigate('/admin'); return; }
           void openAppWindow(node.refId!);
+        } : node.type === 'folder' ? () => {
+          /* Carpetas sin refId abren Finder como explorador de archivos */
+          void openAppWindow('finder');
         } : undefined);
       if (!onActivate) continue;
 
