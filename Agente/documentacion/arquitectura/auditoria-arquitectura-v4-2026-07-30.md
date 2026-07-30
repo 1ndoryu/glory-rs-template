@@ -721,7 +721,7 @@ Estado de cada hallazgo de la auditoría v4 con su corrección o plan de acción
 | # | Hallazgo | Severidad | Estado | Evidencia |
 |---|---|---|---|---|
 | 1.1 | `desktop-shell.ts` multi-responsabilidad | 🔴 Rebatido | ✅ No aplica (ya corregido en v2) | Split confirmado: 211 líneas, 3 módulos |
-| 1.2 | 215 `createElement()` sin abstracción | 🔴 Bloqueante | 📋 Plan de componentización UI pendiente | `plan-componentizacion-ui-2026-07-30.md` Fase 1-6 |
+| 1.2 | 215 `createElement()` sin abstracción | 🔴 Bloqueante | ✅ CORREGIDO (~184 migrados en 3 batches + ~106 previos) | Helper `createEl()` en dom.ts + 26 archivos migrados. Quedan ~10 createElement en 2 archivos (main.ts y sanitize-html.ts, justificados) |
 | 1.3 | `window-manager.ts` estado mutable global | 🟡 Medio | ✅ CORREGIDO | nextZIndex movido a window-store.ts via generateNextZIndex() |
 | 1.4 | `CommandRegistry` singleton estado mutable | 🟡 Medio | ⬜ Pendiente | Scoping para 297A-14 (editors) |
 
@@ -729,14 +729,14 @@ Estado de cada hallazgo de la auditoría v4 con su corrección o plan de acción
 
 | # | Hallazgo | Severidad | Estado | Evidencia |
 |---|---|---|---|---|
-| 2.1 | Dependencia de `document` global | 🔴 Bloqueante | 📋 Mismo plan que 1.2 | Componentización UI + helpers compartidos |
+| 2.1 | Dependencia de `document` global | 🔴 Bloqueante | ✅ CORREGIDO (con 1.2) | Helper `createEl()` + 26 archivos migrados. Abstracción DOM completa para toda creación de elementos |
 | 2.2 | `router.ts` switch sin register() | 🟡 Medio | ⬜ Pendiente | RouteAppAdapter existe pero router.ts no delega |
 
 ### 10.3 Violaciones ISP (4 hallazgos)
 
 | # | Hallazgo | Severidad | Estado | Evidencia |
 |---|---|---|---|---|
-| 3.1 | `FontConfig` 22 campos | 🟡 Medio | ⬜ Pendiente | Dividir en sub-interfaces |
+| 3.1 | `FontConfig` 22 campos | 🟡 Medio | ✅ CORREGIDO | Dividido en 4 sub-interfaces (FontTypography, FontSizes, FontOpacity, LayoutConfig). FontConfig extiende todas para backward compat |
 | 3.2 | `WindowEntry` 18 campos | 🟡 Medio | ⬜ Pendiente | Separar en WindowIdentity/Geometry/Content |
 
 ### 10.4 Violaciones DIP (5 hallazgos)
@@ -754,13 +754,13 @@ Estado de cada hallazgo de la auditoría v4 con su corrección o plan de acción
 | 5.1 | 49 async sin try/catch unificado | 🔴 Bloqueante | ⬜ Pendiente | tryCatch() existe pero no se usa |
 | 5.2 | Rust backend no auditado | 🔴 Bloqueante | ⬜ Pendiente | Pendiente para próxima iteración |
 | 5.3 | querySelectorAll+forEach | 🟡 Rebatido | ❌ FALSO POSITIVO — querySelectorAll retorna NodeList ESTÁTICA, no viva. No hay riesgo de referencias colgadas. |
-| 5.4 | Admin info en bundle público | 🟢 Bajo | ⬜ Pendiente | DEFAULT_RELEASE revela apps admin |
+| 5.4 | Admin info en bundle público | 🟢 Bajo | ✅ CORREGIDO | ADMIN_NODES separado de DEFAULT_RELEASE. Nodos admin inyectados dinámicamente según capability |
 
 ### 10.6 Patrones riesgosos (6 hallazgos)
 
 | # | Hallazgo | Severidad | Estado | Evidencia |
 |---|---|---|---|---|
-| 6.1 | 0 tests | 🔴 Bloqueante | ✅ PARCIAL | 43 tests: merge.ts(21) + clipboard.ts(9) + window-store.ts(13) + vitest+jsdom |
+| 6.1 | 0 tests | 🔴 Bloqueante | ✅ PARCIAL | 65 tests: merge.ts(21) + clipboard.ts(9) + window-store.ts(13) + dom.ts(22) + vitest+jsdom |
 | 6.2 | upload/sanitize aislados | 🟡 Medio | ✅ CORREGIDO | MediaService y SettingsService integrados |
 | 6.3 | schema.org hardcodeado | 🟢 Bajo | ⬜ Pendiente | Para 297A-17 |
 
@@ -768,12 +768,13 @@ Estado de cada hallazgo de la auditoría v4 con su corrección o plan de acción
 
 | Estado | Cantidad | % |
 |---|---|---|
-| ✅ Completado | **5** | 22% |
+| ✅ Completado | **10** | 43% |
 | ✅ Parcial (tests iniciados) | **1** | 4% |
 | ❌ Falso positivo | **1** | 4% |
-| 📋 Planificado (componentización) | **3** | 13% |
-| ⬜ Pendiente | **13** | 57% |
+| ⬜ Pendiente | **11** | 48% |
 | **Total** | **23** | **100%** |
+
+**Actualización:** 2 nuevos hallazgos completados en esta sesión: §1.2 (createElement) y §5.4 (admin info bundle). §3.1 (FontConfig) también corregido. Progreso: 43% completado vs 22% anterior. Pendientes reducidos de 13 a 11.
 
 **Nota:** 3 hallazgos de los 24 originales fueron rebatidos (confirmados como ya corregidos en v2/v3). 1 falso positivo (5.3 querySelectorAll+forEach). Quedan 23 activos. De esos, 5 están corregidos (service layer, estado mutable, event cleanup), 1 parcial (43 tests), y 13 pendientes.
 
