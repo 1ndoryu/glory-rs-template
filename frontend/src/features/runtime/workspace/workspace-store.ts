@@ -1,17 +1,17 @@
 /* wandori.us — Workspace Store
- * Store reactivo que mergea release + overlay → resolved workspace.
- * Persiste overlay del invitado en localStorage.
+ * Store reactivo del workspace. Re-exporta merge, mutations y clipboard.
+ * Este módulo contiene: stores, subscriptions, persistence y API.
  * [Plan 297A-11 §9.1–9.4] */
 
 import { createStore, authStore } from '../../../store';
 import { api } from '../../../api/client';
 import { DEFAULT_RELEASE } from './default-release';
+import { mergeWorkspace, rebaseOverlay } from './merge';
 import type {
   NodeId,
   WorkspaceNode,
   WorkspaceTree,
   WorkspaceOverlay,
-  ResolvedNode,
   ResolvedWorkspace,
 } from './types';
 
@@ -19,75 +19,12 @@ import type {
 const OVERLAY_KEY = 'wandorius:workspace-overlay';
 const OVERLAY_VERSION = 1;
 
-/* === Empty overlay === */
-const EMPTY_OVERLAY: WorkspaceOverlay = {
+export const EMPTY_OVERLAY: WorkspaceOverlay = {
   version: OVERLAY_VERSION,
   addedItems: {},
   fieldOverrides: {},
   tombstones: [],
 };
-
-/* === Merge algorithm === */
-
-/**
- * Merge release + overlay → resolved workspace.
- * 1. Clone release nodes
- * 2. Remove tombstones (and orphan children)
- * 3. Apply field overrides (position, label, parentId, mobileOrder)
- * 4. Add overlay items
- * 5. Filter by auth capability
- */
-function mergeWorkspace(
-  release: WorkspaceTree,
-  overlay: WorkspaceOverlay,
-  capability: 'public' | 'authenticated' | 'admin',
-): ResolvedWorkspace {
-  const result: Record<NodeId, ResolvedNode> = {};
-
-  /* Step 1: Clone release nodes */
-  for (const [id, node] of Object.entries(release.nodes)) {
-    result[id] = { ...node, origin: 'release' };
-  }
-
-  /* Step 2: Remove tombstones and orphan children */
-  const tombstoneSet = new Set(overlay.tombstones);
-  for (const tombId of tombstoneSet) {
-    delete result[tombId];
-  }
-  /* Remove children of tombstoned parents */
-  for (const id of tombstoneSet) {
-    for (const node of Object.values(result)) {
-      if (node.parentId === id) {
-        tombstoneSet.add(node.id);
-        delete result[node.id];
-      }
-    }
-  }
-
-  /* Step 3: Apply field overrides */
-  for (const [id, overrides] of Object.entries(overlay.fieldOverrides)) {
-    const existing = result[id];
-    if (existing) {
-      Object.assign(existing, overrides);
-    }
-  }
-
-  /* Step 4: Add overlay items */
-  for (const [id, node] of Object.entries(overlay.addedItems)) {
-    result[id] = { ...node, origin: 'overlay' };
-  }
-
-  /* Step 5: Filter by capability */
-  const hierarchy = ['public', 'authenticated', 'admin'] as const;
-  const level = hierarchy.indexOf(capability);
-  for (const [id, node] of Object.entries(result)) {
-    if (node.requires && hierarchy.indexOf(node.requires) > level) {
-      delete result[id];
-    }
-  }
-
-  return { releaseVersion: release.version, nodes: result };
-}
 
 /* === Persistence === */
 
@@ -107,58 +44,18 @@ function saveOverlay(overlay: WorkspaceOverlay): void {
   try {
     localStorage.setItem(OVERLAY_KEY, JSON.stringify(overlay));
   } catch {
-    /* localStorage full or unavailable — silent fail */
+    /* localStorage full or unavailable */
   }
 }
 
-/* === Fetch release from API === */
+/* === API === */
 
-/** Rebase overlay ante un release nuevo.
- * Limpia tombstones/overrides de nodos que ya no existen en el nuevo release.
- * Conserva addedItems (son del overlay, no del release).
- * [Plan 297A-11 §9.4] Rebase ante release nuevo y referencias huérfanas. */
-function rebaseOverlay(
-  newRelease: WorkspaceTree,
-  currentOverlay: WorkspaceOverlay,
-): WorkspaceOverlay {
-  const releaseIds = new Set(Object.keys(newRelease.nodes));
-
-  /* Tombstones: solo conservar los que apuntan a nodos que aún existen en el nuevo release */
-  const validTombstones = currentOverlay.tombstones.filter((id) => releaseIds.has(id));
-
-  /* Overrides: solo conservar los que apuntan a nodos que aún existen */
-  const validOverrides: Record<NodeId, Partial<Pick<WorkspaceNode, 'position' | 'label' | 'parentId' | 'mobileOrder'>>> = {};
-  for (const [id, overrides] of Object.entries(currentOverlay.fieldOverrides)) {
-    if (releaseIds.has(id)) {
-      validOverrides[id] = overrides;
-    }
-  }
-
-  /* Si nada cambió, devolver el overlay original (evita trigger innecesario) */
-  if (
-    validTombstones.length === currentOverlay.tombstones.length
-    && Object.keys(validOverrides).length === Object.keys(currentOverlay.fieldOverrides).length
-  ) {
-    return currentOverlay;
-  }
-
-  return {
-    version: currentOverlay.version,
-    addedItems: currentOverlay.addedItems,
-    fieldOverrides: validOverrides,
-    tombstones: validTombstones,
-  };
-}
-
-/** Cargar el release activo desde el backend. Llamar al arrancar.
- * Si el release cambió, rebasea el overlay local. */
 export async function fetchWorkspaceRelease(): Promise<void> {
   try {
     const data = await api.get<{ version: number; tree: WorkspaceTree }>('/api/workspace/release');
     if (data?.tree?.nodes) {
       const currentRelease = releaseStore.get();
       if (data.tree.version !== currentRelease.version) {
-        /* Release nuevo — rebase overlay antes de actualizar */
         const currentOverlay = overlayStore.get();
         const rebased = rebaseOverlay(data.tree, currentOverlay);
         if (rebased !== currentOverlay) {
@@ -168,13 +65,11 @@ export async function fetchWorkspaceRelease(): Promise<void> {
       releaseStore.set(data.tree);
     }
   } catch {
-    /* API no disponible — usar DEFAULT_RELEASE (ya cargado) */
+    /* API no disponible — usar DEFAULT_RELEASE */
   }
 }
 
-/** Publicar el workspace actual como nuevo release (admin). */
 export async function publishWorkspace(): Promise<{ version: number } | null> {
-  /* Construir el tree publicable: merge actual del admin */
   const resolved = workspaceStore.get();
   const nodes: Record<NodeId, WorkspaceNode> = {};
   for (const [id, node] of Object.entries(resolved.nodes)) {
@@ -190,8 +85,6 @@ export async function publishWorkspace(): Promise<{ version: number } | null> {
     };
   }
   const tree: WorkspaceTree = { version: resolved.releaseVersion + 1, nodes };
-
-  /* Usar el tree devuelto por el backend (version auténtica del servidor) */
   const result = await api.post<{ version: number; tree: WorkspaceTree }>('/api/admin/workspace/publish', { tree });
   if (result?.version) {
     releaseStore.set(result.tree);
@@ -203,23 +96,16 @@ export async function publishWorkspace(): Promise<{ version: number } | null> {
 
 /* === Stores === */
 
-/** Release inmutable (admin publica esto). */
 export const releaseStore = createStore<WorkspaceTree>(DEFAULT_RELEASE);
-
-/** Overlay del usuario/invitado (persistido en localStorage). */
 export const overlayStore = createStore<WorkspaceOverlay>(loadOverlay());
-
-/** Workspace resuelto (merge de release + overlay). */
 export const workspaceStore = createStore<ResolvedWorkspace>(
   mergeWorkspace(DEFAULT_RELEASE, loadOverlay(), 'public'),
 );
 
-/* Persistir overlay al cambiar */
 overlayStore.subscribe((overlay) => {
   saveOverlay(overlay);
 });
 
-/* Re-merge cuando cambia release, overlay o auth */
 function recompute(): void {
   const release = releaseStore.get();
   const overlay = overlayStore.get();
@@ -232,199 +118,7 @@ releaseStore.subscribe(() => recompute());
 overlayStore.subscribe(() => recompute());
 authStore.subscribe(() => recompute());
 
-/* === Overlay mutation helpers === */
-
-/** Mover un nodo a una nueva posición grid. */
-export function moveNodePosition(nodeId: NodeId, position: { col: number; row: number }): void {
-  overlayStore.update((prev) => ({
-    ...prev,
-    fieldOverrides: {
-      ...prev.fieldOverrides,
-      [nodeId]: { ...prev.fieldOverrides[nodeId], position },
-    },
-  }));
-}
-
-/** Cambiar el padre de un nodo (mover a carpeta). */
-export function moveNodeToParent(nodeId: NodeId, parentId: NodeId | 'desktop' | null): void {
-  overlayStore.update((prev) => ({
-    ...prev,
-    fieldOverrides: {
-      ...prev.fieldOverrides,
-      [nodeId]: { ...prev.fieldOverrides[nodeId], parentId },
-    },
-  }));
-}
-
-/** Añadir un nodo nuevo al overlay. */
-export function addOverlayNode(node: WorkspaceNode): void {
-  overlayStore.update((prev) => ({
-    ...prev,
-    addedItems: { ...prev.addedItems, [node.id]: node },
-  }));
-}
-
-/** Eliminar un nodo (tombstone). */
-export function tombstoneNode(nodeId: NodeId): void {
-  overlayStore.update((prev) => ({
-    ...prev,
-    tombstones: [...prev.tombstones, nodeId],
-    /* Si fue añadido por overlay, eliminarlo de addedItems en vez de tombstone */
-    addedItems: (() => {
-      const items = { ...prev.addedItems };
-      if (items[nodeId]) {
-        delete items[nodeId];
-        return items;
-      }
-      return items;
-    })(),
-    fieldOverrides: (() => {
-      const overrides = { ...prev.fieldOverrides };
-      delete overrides[nodeId];
-      return overrides;
-    })(),
-  }));
-}
-
-/** Restaurar un nodo de la papelera. */
-export function restoreNode(nodeId: NodeId): void {
-  overlayStore.update((prev) => ({
-    ...prev,
-    tombstones: prev.tombstones.filter((id) => id !== nodeId),
-  }));
-}
-
-/** Resetear overlay al estado por defecto. */
-export function resetOverlay(): void {
-  overlayStore.set(EMPTY_OVERLAY);
-}
-
-/** Reordenar nodos del desktop: asigna mobileOrder según el nuevo orden. */
-export function reorderDesktopNodes(orderedIds: NodeId[]): void {
-  overlayStore.update((prev) => {
-    const overrides = { ...prev.fieldOverrides };
-    for (let i = 0; i < orderedIds.length; i++) {
-      const id = orderedIds[i];
-      overrides[id] = { ...overrides[id], mobileOrder: i };
-    }
-    return { ...prev, fieldOverrides: overrides };
-  });
-}
-
-/** Validar que asignar parentId no crea un ciclo. */
-function wouldCreateCycle(
-  nodes: Readonly<Record<NodeId, ResolvedNode>>,
-  nodeId: NodeId,
-  newParentId: NodeId | 'desktop' | null,
-): boolean {
-  if (newParentId === 'desktop' || newParentId === null) return false;
-  if (newParentId === nodeId) return true;
-  let current: NodeId | 'desktop' | null = newParentId;
-  const visited = new Set<NodeId>();
-  while (current && current !== 'desktop') {
-    if (current === nodeId) return true;
-    if (visited.has(current)) return true; /* ciclo existente */
-    visited.add(current);
-    current = nodes[current]?.parentId ?? null;
-  }
-  return false;
-}
-
-/* === Clipboard (in-memory) === */
-export type ClipboardMode = 'copy' | 'cut';
-
-export interface ClipboardEntry {
-  nodeIds: NodeId[];
-  mode: ClipboardMode;
-}
-
-let clipboard: ClipboardEntry | null = null;
-
-export function getClipboard(): ClipboardEntry | null {
-  return clipboard;
-}
-
-export function setClipboard(nodeIds: NodeId[], mode: ClipboardMode): void {
-  clipboard = { nodeIds, mode };
-}
-
-export function clearClipboard(): void {
-  clipboard = null;
-}
-
-let copyCounter = 0;
-
-/** Pegar nodos del clipboard en un destino. */
-export function pasteFromClipboard(targetParentId: NodeId | 'desktop'): NodeId[] {
-  if (!clipboard) return [];
-  const ws = workspaceStore.get();
-  const pastedIds: NodeId[] = [];
-
-  if (clipboard.mode === 'cut') {
-    /* Cut: mover nodos al destino */
-    const idsToMove = clipboard.nodeIds.filter((id) => ws.nodes[id]);
-    /* Validar ciclos */
-    for (const id of idsToMove) {
-      if (wouldCreateCycle(ws.nodes, id, targetParentId)) return [];
-    }
-    for (const id of idsToMove) {
-      moveNodeToParent(id, targetParentId);
-    }
-    pastedIds.push(...idsToMove);
-    clipboard = null; /* Cut es one-shot */
-  } else {
-    /* Copy: crear nodos nuevos en el overlay */
-    for (const id of clipboard.nodeIds) {
-      const original = ws.nodes[id];
-      if (!original) continue;
-      const newId = `${id}-copy-${++copyCounter}`;
-      addOverlayNode({
-        id: newId,
-        parentId: targetParentId,
-        type: original.type,
-        label: `${original.label} (copia)`,
-        refId: original.refId,
-        requires: original.requires,
-      });
-      pastedIds.push(newId);
-    }
-  }
-
-  return pastedIds;
-}
-
-/** Crear una carpeta nueva en el overlay. */
-export function createFolder(
-  parentId: NodeId | 'desktop',
-  label: string,
-): NodeId {
-  const id = `folder-${Date.now()}`;
-  const ws = workspaceStore.get();
-  const siblings = Object.values(ws.nodes).filter((n) => n.parentId === parentId);
-  addOverlayNode({
-    id,
-    parentId,
-    type: 'folder',
-    label,
-    mobileOrder: siblings.length,
-    requires: 'public',
-  });
-  return id;
-}
-
-/** Obtener nodos en la papelera (tombstoned) con sus datos del release. */
-export function getTombstonedNodes(): WorkspaceNode[] {
-  const release = releaseStore.get();
-  const overlay = overlayStore.get();
-  return overlay.tombstones
-    .map((id) => release.nodes[id])
-    .filter((n): n is WorkspaceNode => n !== undefined);
-}
-
-/** Obtener nodos hijos directos de un padre. */
-export function getChildren(parentId: NodeId | 'desktop'): ResolvedNode[] {
-  const ws = workspaceStore.get();
-  return Object.values(ws.nodes)
-    .filter((n) => n.parentId === parentId)
-    .sort((a, b) => (a.mobileOrder ?? 0) - (b.mobileOrder ?? 0));
-}
+/* Re-export submodules for backward compatibility */
+export { moveNodePosition, moveNodeToParent, addOverlayNode, tombstoneNode, restoreNode, resetOverlay, reorderDesktopNodes, createFolder, getTombstonedNodes, getChildren } from './overlay-mutations';
+export { getClipboard, setClipboard, clearClipboard, pasteFromClipboard } from './clipboard';
+export type { ClipboardMode, ClipboardEntry } from './clipboard';
