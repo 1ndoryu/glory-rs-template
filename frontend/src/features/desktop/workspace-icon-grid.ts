@@ -18,6 +18,7 @@ import type { ResolvedNode } from '../runtime/workspace/types';
 import { AppRegistry } from '../runtime/app-registry';
 import { resolveResourceType, type ResourceKind } from '../runtime/resource-type-registry';
 import { enableDrag } from './utils/icon-drag';
+import { reconcileChildren } from '../../utils/reconcile';
 
 const SHELL_ICON_MAP: Record<string, IconNode> = {
   'profile': FileUser,
@@ -43,6 +44,21 @@ export function resolveNodeIconType(node: ResolvedNode): 'folder' | 'document' |
   return 'application';
 }
 
+/** Resolver callback de activación para un nodo del desktop. */
+function resolveActivate(
+  node: ResolvedNode,
+  extraActions?: Record<string, () => void>,
+): (() => void) | undefined {
+  if (extraActions?.[node.id]) return extraActions[node.id];
+  if (node.type === 'folder') return () => { void openAppWindow('finder', { folderId: node.id }); };
+  if (node.type === 'resource' && node.resourceKind) {
+    const entry = resolveResourceType(node.resourceKind as ResourceKind);
+    return () => { void openAppWindow(entry?.appId ?? 'finder', { resourceId: node.refId ?? node.id }); };
+  }
+  if (node.refId) return () => { void openAppWindow(node.refId!); };
+  return undefined;
+}
+
 export function createWorkspaceIconGrid(extraActions?: Record<string, () => void>): HTMLElement {
   const grid = document.createElement('div');
   grid.className = 'desktop-icon-grid';
@@ -51,74 +67,89 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
   const dragCleanups = new Map<string, () => void>();
 
   workspaceStore.subscribe((ws) => {
-    for (const cleanup of dragCleanups.values()) cleanup();
-    dragCleanups.clear();
-    grid.innerHTML = '';
-
     const desktopNodes = Object.values(ws.nodes)
       .filter((n) => n.parentId === 'desktop')
       .sort((a, b) => (a.mobileOrder ?? 0) - (b.mobileOrder ?? 0));
 
-    for (const node of desktopNodes) {
-      const onActivate = extraActions?.[node.id]
-        ?? (node.type === 'folder' ? () => {
-          void openAppWindow('finder', { folderId: node.id });
-        } : node.type === 'resource' && node.resourceKind ? () => {
-          const entry = resolveResourceType(node.resourceKind! as ResourceKind);
-          void openAppWindow(entry?.appId ?? 'finder', { resourceId: node.refId ?? node.id });
-        } : node.refId ? () => {
-          void openAppWindow(node.refId!);
-        } : undefined);
-      if (!onActivate) continue;
+    /* Filtrar nodos sin activación (equivalente al continue original) */
+    const activableNodes = desktopNodes.filter(n => resolveActivate(n, extraActions));
 
-      const iconEl = createDesktopIcon({
-        label: node.label,
-        type: resolveNodeIconType(node),
-        lucideIcon: resolveNodeIcon(node),
-        onActivate,
-      });
-
-      iconEl.addEventListener('mousedown', (e) => {
-        if (e.button === 0 && e.detail === 1) {
-          selectSingle(node.id);
-        }
-      });
-
-      iconEl.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        selectSingle(node.id);
-        openContextMenu({
-          context: 'icon',
-          targets: [{ id: node.refId ?? node.id, kind: node.type === 'app' ? 'app' : 'shortcut' }],
-          capability: authStore.get().isAuthenticated ? 'admin' : 'public',
-          x: e.clientX,
-          y: e.clientY,
-        });
-      });
-
-      const cleanup = enableDrag({
-        el: iconEl,
-        nodeId: node.id,
-        context: 'desktop',
-        gridEl: grid,
-        itemSelector: '.desktop-icon--interactive',
-        onReorder: (draggedId, targetIndex) => {
-          const currentIds = Object.values(ws.nodes)
-            .filter((n) => n.parentId === 'desktop')
-            .sort((a, b) => (a.mobileOrder ?? 0) - (b.mobileOrder ?? 0))
-            .map((n) => n.id);
-          const fromIndex = currentIds.indexOf(draggedId);
-          if (fromIndex < 0 || fromIndex === targetIndex) return;
-          const reordered = [...currentIds];
-          reordered.splice(fromIndex, 1);
-          reordered.splice(targetIndex, 0, draggedId);
-          reorderDesktopNodes(reordered);
-        },
-      });
-      dragCleanups.set(node.id, cleanup);
-
-      grid.appendChild(iconEl);
+    /* Limpiar drag handlers de nodos que ya no existen */
+    const activeIds = new Set(activableNodes.map(n => n.id));
+    for (const [id, cleanup] of dragCleanups) {
+      if (!activeIds.has(id)) {
+        cleanup();
+        dragCleanups.delete(id);
+      }
     }
+
+    reconcileChildren(
+      grid,
+      activableNodes,
+      (node) => node.id,
+      /* createElement: crear icono nuevo */
+      (node) => {
+        const onActivate = resolveActivate(node, extraActions);
+        if (!onActivate) return document.createElement('span'); /* placeholder */
+
+        const iconEl = createDesktopIcon({
+          label: node.label,
+          type: resolveNodeIconType(node),
+          lucideIcon: resolveNodeIcon(node),
+          onActivate,
+        });
+
+        iconEl.addEventListener('mousedown', (e) => {
+          if (e.button === 0 && e.detail === 1) selectSingle(node.id);
+        });
+
+        iconEl.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          selectSingle(node.id);
+          openContextMenu({
+            context: 'icon',
+            targets: [{ id: node.refId ?? node.id, kind: node.type === 'app' ? 'app' : 'shortcut' }],
+            capability: authStore.get().isAuthenticated ? 'admin' : 'public',
+            x: e.clientX,
+            y: e.clientY,
+          });
+        });
+
+        const cleanup = enableDrag({
+          el: iconEl,
+          nodeId: node.id,
+          context: 'desktop',
+          gridEl: grid,
+          itemSelector: '.desktop-icon--interactive',
+          onReorder: (draggedId, targetIndex) => {
+            const currentIds = Object.values(ws.nodes)
+              .filter((n) => n.parentId === 'desktop')
+              .sort((a, b) => (a.mobileOrder ?? 0) - (b.mobileOrder ?? 0))
+              .map((n) => n.id);
+            const fromIndex = currentIds.indexOf(draggedId);
+            if (fromIndex < 0 || fromIndex === targetIndex) return;
+            const reordered = [...currentIds];
+            reordered.splice(fromIndex, 1);
+            reordered.splice(targetIndex, 0, draggedId);
+            reorderDesktopNodes(reordered);
+          },
+        });
+        dragCleanups.set(node.id, cleanup);
+
+        return iconEl;
+      },
+      /* updateElement: actualizar label y icono si cambiaron */
+      (el, node) => {
+        const label = el.querySelector('.desktop-icon__label');
+        if (label && label.textContent !== node.label) {
+          label.textContent = node.label;
+        }
+        /* Actualizar clase de tipo de icono si cambió */
+        const newType = resolveNodeIconType(node);
+        el.classList.remove('desktop-icon--folder', 'desktop-icon--document', 'desktop-icon--application');
+        el.classList.add(`desktop-icon--${newType}`);
+      },
+    );
   });
 
   /* Clic en vacío limpia selección */
