@@ -237,29 +237,29 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 
 ### 8.1 Modelo expandido
 
-- [ ] Crear `resources` como sobre común, sin cuerpos/precios/binarios.
-- [ ] Estados independientes con constraints/defaults.
-- [ ] About como artículo con alias estable.
-- [ ] Producto independiente de artículo.
-- [ ] Assets con estado processing/clean/rejected y visibilidad.
-- [ ] Product versions inmutables para entregables.
+- [x] Crear `resources` como sobre común, sin cuerpos/precios/binarios. *(migration + model + repo)*
+- [x] Estados independientes con constraints/defaults. *(draft/ready, private/public/unlisted, active/trashed)*
+- [x] About como artículo con alias estable. *(system_alias column)*
+- [x] Producto independiente de artículo. *(article_id Option<Uuid>, FK ON DELETE SET NULL)*
+- [x] Assets con estado processing/clean/rejected y visibilidad. *(AssetProcessingState enum)*
+- [x] Product versions inmutables para entregables. *(product_versions table)*
 
 ### 8.2 Migración
 
-- [ ] Inventariar `status`, `is_visible`, `is_active`, `download_path` y paths actuales.
-- [ ] Expandir esquema sin romper lecturas legacy.
-- [ ] Backfill determinista y reporte de filas ambiguas.
-- [ ] Cambiar services/repositorios a modelo nuevo.
-- [ ] Validar conteos, constraints y rollback.
-- [ ] Contraer columnas legacy solo después de paridad.
+- [x] Inventariar `status`, `is_visible`, `is_active`, `download_path` y paths actuales.
+- [x] Expandir esquema sin romper lecturas legacy. *(expand → backfill strategy)*
+- [x] Backfill determinista y reporte de filas ambiguas. *(migration backfill articles/projects/products/media → resources)*
+- [ ] Cambiar services/repositorios a modelo nuevo. *(repos actualizados; services pendientes)*
+- [ ] Validar conteos, constraints y rollback. *(requiere DB corriendo)*
+- [ ] Contraer columnas legacy solo después de paridad. *(pendiente contract phase)*
 
 ### 8.3 API y pruebas
 
-- [ ] DTO público/admin separado.
-- [ ] Resolver público usa nodo + recurso + capacidad.
-- [ ] Mover referencia no altera recurso.
-- [ ] Referencias múltiples no duplican contenido.
-- [ ] Tests default privado y transiciones inválidas.
+- [ ] DTO público/admin separado. *(pendiente)*
+- [ ] Resolver público usa nodo + recurso + capacidad. *(pendiente)*
+- [ ] Mover referencia no altera recurso. *(pendiente)*
+- [ ] Referencias múltiples no duplican contenido. *(pendiente)*
+- [ ] Tests default privado y transiciones inválidas. *(pendiente)*
 
 **Criterio de salida:** tipos y estados son coherentes en DB/API/OS y no existe exposición por defaults legacy.
 

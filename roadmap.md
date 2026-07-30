@@ -45,15 +45,18 @@
 
 **Salida:** runtime compartido funciona sin chrome/listas/listeners duplicados. Orval pendiente hasta tener backend operativo.
 
-### 297A-10 — Recursos y migraciones
+### 297A-10 — Recursos y migraciones (en ejecución)
 
 **Depende de:** 297A-7/9.
 
-- [ ] Catálogo `resources`, estados ortogonales y defaults privados.
-- [ ] About como artículo; producto independiente de artículo.
-- [ ] Separar preview público y asset privado.con
-- [ ] Migrar status/is_visible/is_active/download_path legacy.
-- [ ] DTO público/admin y OpenAPI completos.
+- [x] Catálogo `resources`, estados ortogonales y defaults privados. *(migration + model + repo)*
+- [x] About como artículo (system_alias); producto independiente (article_id opcional).
+- [x] Asset states (processing/clean/rejected) en media.
+- [x] Product versions inmutables para entregables.
+- [x] Backfill resources desde datos existentes.
+- [ ] Services actualizados: crear via transacción envelope + registro.
+- [ ] DTO público/admin separado.
+- [ ] About seeder/alias para página about.
 
 **Salida:** organizar referencias no altera publicación y ninguna metadata privada se filtra.
 
