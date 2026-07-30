@@ -13,6 +13,7 @@ import './styles/desktop/desktop-menu.css';
 import './styles/desktop/desktop-apps.css';
 import './styles/desktop/desktop-window.css';
 import './styles/desktop/desktop-responsive.css';
+import './styles/desktop/desktop-context-menu.css';
 
 /* Core */
 import { addRoute, setOutlet, initRouter } from './router';
@@ -24,6 +25,8 @@ import './features/runtime/command-registration';
 import { initKeyboardShortcuts } from './features/runtime/command-registration';
 import { initRouteAppAdapter } from './features/runtime/route-app-adapter';
 import { AppRegistry } from './features/runtime/app-registry';
+import { initResourceTypeRegistry } from './features/runtime/resource-type-registry';
+import { setActorCategory } from './features/analytics/dispatcher';
 import { loadSavedFonts } from './features/settings/font-panel';
 import { initTracking, trackPageView } from './features/analytics/tracker';
 import { authStore, showProfile, siteConfig } from './store';
@@ -67,9 +70,11 @@ async function initApp(): Promise<void> {
   try {
     const user = await api.get<{ id: string; email: string }>('/api/auth/me');
     authStore.set({ isAuthenticated: true, userId: user.id });
+    setActorCategory('authenticated');
   } catch {
     /* No hay sesión válida — permanecer como invitado */
     authStore.set({ isAuthenticated: false, userId: null });
+    setActorCategory('anonymous');
   }
 
   /* Cargar fuentes y settings antes de renderizar */
@@ -95,6 +100,11 @@ async function initApp(): Promise<void> {
   columnaDerecha.appendChild(desktop.element);
 
   app.appendChild(columnaDerecha);
+
+  /* [Plan §9.1] Actualizar actor category al cambiar auth durante la sesión */
+  authStore.subscribe((state) => {
+    setActorCategory(state.isAuthenticated ? 'authenticated' : 'anonymous');
+  });
 
   /* Control de visibilidad del profile:
    * Se oculta cuando se esta viendo un articulo */
@@ -138,6 +148,9 @@ async function initApp(): Promise<void> {
 
   /* Iniciar RouteAppAdapter — intercepta rutas de apps para abrir ventanas */
   initRouteAppAdapter();
+
+  /* Iniciar Resource Type Registry — asociaciones tipo→app */
+  initResourceTypeRegistry();
 
   /* Iniciar router */
   initRouter();

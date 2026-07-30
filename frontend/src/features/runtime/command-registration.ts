@@ -1,8 +1,9 @@
 /* wandori.us — Command Registration
  * Registra los comandos del sistema del OS.
+ * [Plan §2.2] Catálogo mínimo de shell y ventanas.
  * Se importa como side-effect en main.ts junto con app-registration. */
 
-import { CommandRegistry } from './command-registry';
+import { CommandRegistry, type CommandContext, type CommandResult } from './command-registry';
 import {
   getFocusedWindow,
   closeWindow,
@@ -10,7 +11,10 @@ import {
   restoreWindow,
   focusWindow,
   getWindows,
+  findOpenWindow,
+  updateWindowBounds,
 } from './window-manager';
+import { AppRegistry } from './app-registry';
 import { dispatchEvent } from '../analytics/dispatcher';
 
 /* === Comandos de ventana === */
@@ -19,12 +23,21 @@ CommandRegistry.register({
   id: 'window:close',
   label: 'Cerrar ventana',
   shortcut: 'Escape',
-  execute: () => {
+  order: 10,
+  contexts: ['window'],
+  undoPolicy: 'none',
+  analyticsEvent: 'window.closed',
+  isAvailable: () => {
     const win = getFocusedWindow();
-    if (!win) return;
+    return win ? { state: 'enabled' } : { state: 'disabled', reason: 'no focused window' };
+  },
+  execute: (): CommandResult => {
+    const win = getFocusedWindow();
+    if (!win) return { status: 'failure', reason: 'no focused window' };
     win.controller.abort();
     dispatchEvent({ type: 'app_closed', appId: win.appId });
     closeWindow(win.instanceId);
+    return { status: 'success' };
   },
 });
 
@@ -32,28 +45,338 @@ CommandRegistry.register({
   id: 'window:minimize',
   label: 'Minimizar ventana',
   shortcut: 'Meta+m',
-  execute: () => {
+  order: 11,
+  contexts: ['window'],
+  undoPolicy: 'local',
+  analyticsEvent: 'window.minimized',
+  isAvailable: () => {
     const win = getFocusedWindow();
-    if (!win) return;
+    if (!win) return { state: 'disabled', reason: 'no focused window' };
+    return win.state === 'minimized'
+      ? { state: 'disabled', reason: 'already minimized' }
+      : { state: 'enabled' };
+  },
+  execute: (): CommandResult => {
+    const win = getFocusedWindow();
+    if (!win) return { status: 'failure', reason: 'no focused window' };
     minimizeWindow(win.instanceId);
+    dispatchEvent({ type: 'window_minimized', appId: win.appId });
+    return { status: 'success' };
+  },
+});
+
+CommandRegistry.register({
+  id: 'window:restore',
+  label: 'Restaurar ventana',
+  order: 12,
+  contexts: ['window', 'taskbar'],
+  undoPolicy: 'local',
+  analyticsEvent: 'window.restored',
+  isAvailable: (ctx) => {
+    const win = ctx.targets?.[0]?.id
+      ? getWindows().find(w => w.instanceId === ctx.targets![0].id)
+      : getFocusedWindow();
+    if (!win) return { state: 'disabled', reason: 'no window' };
+    return win.state === 'minimized'
+      ? { state: 'enabled' }
+      : { state: 'disabled', reason: 'not minimized' };
+  },
+  execute: (ctx?: CommandContext): CommandResult => {
+    const instanceId = ctx?.targets?.[0]?.id;
+    const win = instanceId
+      ? getWindows().find(w => w.instanceId === instanceId)
+      : getFocusedWindow();
+    if (!win) return { status: 'failure', reason: 'no window' };
+    restoreWindow(win.instanceId);
+    dispatchEvent({ type: 'window_restored', appId: win.appId });
+    return { status: 'success' };
+  },
+});
+
+CommandRegistry.register({
+  id: 'window:focus',
+  label: 'Enfocar ventana',
+  order: 13,
+  contexts: ['taskbar'],
+  undoPolicy: 'local',
+  analyticsEvent: 'window.focused',
+  isAvailable: (ctx) => {
+    const instanceId = ctx.targets?.[0]?.id;
+    const win = instanceId
+      ? getWindows().find(w => w.instanceId === instanceId)
+      : undefined;
+    if (!win) return { state: 'disabled', reason: 'no window' };
+    return win.focused
+      ? { state: 'disabled', reason: 'already focused' }
+      : { state: 'enabled' };
+  },
+  execute: (ctx?: CommandContext): CommandResult => {
+    const instanceId = ctx?.targets?.[0]?.id;
+    if (!instanceId) return { status: 'failure', reason: 'no target' };
+    focusWindow(instanceId);
+    const win = getWindows().find(w => w.instanceId === instanceId);
+    if (win) dispatchEvent({ type: 'window_focused', appId: win.appId });
+    return { status: 'success' };
   },
 });
 
 CommandRegistry.register({
   id: 'window:focus-next',
   label: 'Siguiente ventana',
-  shortcut: 'Ctrl+Shift+ArrowRight',
-  execute: () => {
+
+  order: 14,
+  contexts: ['window'],
+  undoPolicy: 'local',
+  analyticsEvent: 'window.cycle',
+  isAvailable: () => {
     const windows = getWindows();
-    if (windows.length < 2) return;
+    return windows.length >= 2
+      ? { state: 'enabled' }
+      : { state: 'disabled', reason: 'less than 2 windows' };
+  },
+  execute: (): CommandResult => {
+    const windows = getWindows();
+    if (windows.length < 2) return { status: 'failure', reason: 'less than 2 windows' };
     const focused = windows.find(w => w.focused);
     const idx = focused ? windows.indexOf(focused) : -1;
     const next = windows[(idx + 1) % windows.length];
     if (next.state === 'minimized') {
       restoreWindow(next.instanceId);
+      dispatchEvent({ type: 'window_restored', appId: next.appId });
     } else {
       focusWindow(next.instanceId);
     }
+    dispatchEvent({ type: 'window_focused', appId: next.appId });
+    return { status: 'success' };
+  },
+});
+
+/* === Comandos de app === */
+
+CommandRegistry.register({
+  id: 'app:open',
+  label: 'Abrir aplicación',
+  order: 1,
+  contexts: ['desktop', 'shortcut', 'taskbar'],
+  requires: 'public',
+  undoPolicy: 'none',
+  analyticsEvent: 'app.opened',
+  isAvailable: (ctx) => {
+    const appId = ctx.targets?.[0]?.id;
+    if (!appId) return { state: 'disabled', reason: 'no app target' };
+    const app = AppRegistry.get(appId);
+    if (!app) return { state: 'hidden' };
+    /* Verificar capacidad */
+    if (app.requires === 'admin' && ctx.capability !== 'admin') {
+      return { state: 'hidden' };
+    }
+    if (app.requires === 'authenticated' && !ctx.capability) {
+      return { state: 'hidden' };
+    }
+    return { state: 'enabled' };
+  },
+  execute: async (ctx?: CommandContext): Promise<CommandResult> => {
+    const appId = ctx?.targets?.[0]?.id;
+    if (!appId) return { status: 'failure', reason: 'no app target' };
+    /* Dinámico para evitar circular imports */
+    const { openAppWindow } = await import('./route-app-adapter');
+    await openAppWindow(appId);
+    return { status: 'success' };
+  },
+});
+
+CommandRegistry.register({
+  id: 'app:focus',
+  label: 'Enfocar aplicación',
+  order: 2,
+  contexts: ['taskbar', 'shortcut'],
+  undoPolicy: 'local',
+  analyticsEvent: 'app.focused',
+  isAvailable: (ctx) => {
+    const appId = ctx.targets?.[0]?.id;
+    if (!appId) return { state: 'disabled', reason: 'no app target' };
+    const win = findOpenWindow(appId);
+    if (!win) return { state: 'hidden' };
+    return win.focused
+      ? { state: 'disabled', reason: 'already focused' }
+      : { state: 'enabled' };
+  },
+  execute: (ctx?: CommandContext): CommandResult => {
+    const appId = ctx?.targets?.[0]?.id;
+    if (!appId) return { status: 'failure', reason: 'no app target' };
+    const win = findOpenWindow(appId);
+    if (!win) return { status: 'failure', reason: 'app not open' };
+    if (win.state === 'minimized') restoreWindow(win.instanceId);
+    focusWindow(win.instanceId);
+    dispatchEvent({ type: 'window_focused', appId });
+    return { status: 'success' };
+  },
+});
+
+/* === Comandos de geometría por teclado (Plan §4.1) === */
+
+const KB_STEP = 20;
+const KB_STEP_LARGE = 60;
+
+CommandRegistry.register({
+  id: 'window:move-up',
+  label: 'Mover ventana arriba',
+  shortcut: 'Ctrl+ArrowUp',
+  order: 20,
+  contexts: ['window'],
+  undoPolicy: 'local',
+  analyticsEvent: 'window.moved',
+  isAvailable: () => {
+    return getFocusedWindow() ? { state: 'enabled' } : { state: 'disabled', reason: 'no focused window' };
+  },
+  execute: (): CommandResult => {
+    const win = getFocusedWindow();
+    if (!win) return { status: 'failure', reason: 'no focused window' };
+    updateWindowBounds(win.instanceId, { y: win.bounds.y - KB_STEP });
+    return { status: 'success' };
+  },
+});
+
+CommandRegistry.register({
+  id: 'window:move-down',
+  label: 'Mover ventana abajo',
+  shortcut: 'Ctrl+ArrowDown',
+  order: 21,
+  contexts: ['window'],
+  undoPolicy: 'local',
+  analyticsEvent: 'window.moved',
+  isAvailable: () => {
+    return getFocusedWindow() ? { state: 'enabled' } : { state: 'disabled', reason: 'no focused window' };
+  },
+  execute: (): CommandResult => {
+    const win = getFocusedWindow();
+    if (!win) return { status: 'failure', reason: 'no focused window' };
+    updateWindowBounds(win.instanceId, { y: win.bounds.y + KB_STEP });
+    return { status: 'success' };
+  },
+});
+
+CommandRegistry.register({
+  id: 'window:move-left',
+  label: 'Mover ventana izquierda',
+  shortcut: 'Ctrl+ArrowLeft',
+  order: 22,
+  contexts: ['window'],
+  undoPolicy: 'local',
+  analyticsEvent: 'window.moved',
+  isAvailable: () => {
+    return getFocusedWindow() ? { state: 'enabled' } : { state: 'disabled', reason: 'no focused window' };
+  },
+  execute: (): CommandResult => {
+    const win = getFocusedWindow();
+    if (!win) return { status: 'failure', reason: 'no focused window' };
+    updateWindowBounds(win.instanceId, { x: win.bounds.x - KB_STEP });
+    return { status: 'success' };
+  },
+});
+
+CommandRegistry.register({
+  id: 'window:move-right',
+  label: 'Mover ventana derecha',
+  shortcut: 'Ctrl+ArrowRight',
+  order: 23,
+  contexts: ['window'],
+  undoPolicy: 'local',
+  analyticsEvent: 'window.moved',
+  isAvailable: () => {
+    return getFocusedWindow() ? { state: 'enabled' } : { state: 'disabled', reason: 'no focused window' };
+  },
+  execute: (): CommandResult => {
+    const win = getFocusedWindow();
+    if (!win) return { status: 'failure', reason: 'no focused window' };
+    updateWindowBounds(win.instanceId, { x: win.bounds.x + KB_STEP });
+    return { status: 'success' };
+  },
+});
+
+/* Resize direccional: expande hacia la flecha presionada, borde opuesto fijo */
+
+CommandRegistry.register({
+  id: 'window:resize-right',
+  label: 'Expandir derecha',
+  shortcut: 'Ctrl+Shift+ArrowRight',
+  order: 24,
+  contexts: ['window'],
+  undoPolicy: 'local',
+  analyticsEvent: 'window.resized',
+  isAvailable: () => {
+    return getFocusedWindow() ? { state: 'enabled' } : { state: 'disabled', reason: 'no focused window' };
+  },
+  execute: (): CommandResult => {
+    const win = getFocusedWindow();
+    if (!win) return { status: 'failure', reason: 'no focused window' };
+    updateWindowBounds(win.instanceId, { w: win.bounds.w + KB_STEP_LARGE });
+    /* x stays fixed — right edge extends */
+    return { status: 'success' };
+  },
+});
+
+CommandRegistry.register({
+  id: 'window:resize-left',
+  label: 'Expandir izquierda',
+  shortcut: 'Ctrl+Shift+ArrowLeft',
+  order: 25,
+  contexts: ['window'],
+  undoPolicy: 'local',
+  analyticsEvent: 'window.resized',
+  isAvailable: () => {
+    return getFocusedWindow() ? { state: 'enabled' } : { state: 'disabled', reason: 'no focused window' };
+  },
+  execute: (): CommandResult => {
+    const win = getFocusedWindow();
+    if (!win) return { status: 'failure', reason: 'no focused window' };
+    const newW = Math.max(240, win.bounds.w + KB_STEP_LARGE);
+    const dx = newW - win.bounds.w;
+    updateWindowBounds(win.instanceId, { x: win.bounds.x - dx, w: newW });
+    /* left edge extends, right edge stays fixed */
+    return { status: 'success' };
+  },
+});
+
+CommandRegistry.register({
+  id: 'window:resize-down',
+  label: 'Expandir abajo',
+  shortcut: 'Ctrl+Shift+ArrowDown',
+  order: 26,
+  contexts: ['window'],
+  undoPolicy: 'local',
+  analyticsEvent: 'window.resized',
+  isAvailable: () => {
+    return getFocusedWindow() ? { state: 'enabled' } : { state: 'disabled', reason: 'no focused window' };
+  },
+  execute: (): CommandResult => {
+    const win = getFocusedWindow();
+    if (!win) return { status: 'failure', reason: 'no focused window' };
+    updateWindowBounds(win.instanceId, { h: win.bounds.h + KB_STEP_LARGE });
+    /* y stays fixed — bottom edge extends */
+    return { status: 'success' };
+  },
+});
+
+CommandRegistry.register({
+  id: 'window:resize-up',
+  label: 'Expandir arriba',
+  shortcut: 'Ctrl+Shift+ArrowUp',
+  order: 27,
+  contexts: ['window'],
+  undoPolicy: 'local',
+  analyticsEvent: 'window.resized',
+  isAvailable: () => {
+    return getFocusedWindow() ? { state: 'enabled' } : { state: 'disabled', reason: 'no focused window' };
+  },
+  execute: (): CommandResult => {
+    const win = getFocusedWindow();
+    if (!win) return { status: 'failure', reason: 'no focused window' };
+    const newH = Math.max(180, win.bounds.h + KB_STEP_LARGE);
+    const dy = newH - win.bounds.h;
+    updateWindowBounds(win.instanceId, { y: win.bounds.y - dy, h: newH });
+    /* top edge extends, bottom edge stays fixed */
+    return { status: 'success' };
   },
 });
 
@@ -62,6 +385,7 @@ CommandRegistry.register({
 /**
  * Inicializa el handler de atajos de teclado del OS.
  * Se llama una vez desde main.ts después de registrar comandos.
+ * [Plan §2.1] Atajos son proyecciones del CommandRegistry.
  */
 export function initKeyboardShortcuts(): void {
   document.addEventListener('keydown', (e) => {

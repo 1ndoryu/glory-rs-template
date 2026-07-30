@@ -23,6 +23,8 @@ import { navigate } from '../../router';
 import { authStore } from '../../store';
 import { dispatchEvent } from '../analytics/dispatcher';
 import { enableDragResize } from './utils/drag-resize';
+import { openContextMenu } from './components/desktop-context-menu';
+import { selectSingle, clearSelection, selectBackground } from '../runtime/selection-store';
 
 export interface DesktopShell {
   element: HTMLElement;
@@ -68,13 +70,35 @@ function createIconGrid(showAdmin: boolean): HTMLElement {
       ? () => { void openAppWindow(item.appId!); }
       : item.action;
 
-    grid.appendChild(createDesktopIcon({
+    const iconEl = createDesktopIcon({
       label: item.label,
       type: item.type,
       selected: item.selected,
       lucideIcon: item.icon,
       onActivate,
-    }));
+    });
+
+    /* [Plan §3] Selección: clic selecciona el icono (solo clic simple) */
+    iconEl.addEventListener('mousedown', (e) => {
+      if (e.button === 0 && e.detail === 1) {
+        selectSingle(item.id);
+      }
+    });
+
+    /* [Plan §3.2] Context menu: clic derecho abre menú contextual del icono */
+    iconEl.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      selectSingle(item.id);
+      openContextMenu({
+        context: 'icon',
+        targets: [{ id: item.appId ?? item.id, kind: item.appId ? 'app' : 'shortcut' }],
+        capability: showAdmin ? 'admin' : 'public',
+        x: e.clientX,
+        y: e.clientY,
+      });
+    });
+
+    grid.appendChild(iconEl);
   }
 
   return grid;
@@ -127,6 +151,27 @@ export function createDesktopShell(
   /* Icon grid */
   const iconGrid = createIconGrid(authStore.get().isAuthenticated);
   workspace.append(iconGrid, profileWindow, contentWindow);
+
+  /* [Plan §3] Context menu en workspace vacío */
+  workspace.addEventListener('contextmenu', (e) => {
+    /* Solo si el clic fue en el workspace mismo, no en un icono/ventana */
+    if (e.target !== workspace && e.target !== iconGrid) return;
+    e.preventDefault();
+    selectBackground();
+    openContextMenu({
+      context: 'desktop',
+      capability: authStore.get().isAuthenticated ? 'admin' : 'public',
+      x: e.clientX,
+      y: e.clientY,
+    });
+  });
+
+  /* [Plan §3] Clic en vacío limpia selección */
+  workspace.addEventListener('mousedown', (e) => {
+    if (e.button === 0 && (e.target === workspace || e.target === iconGrid)) {
+      clearSelection();
+    }
+  });
 
   /* Taskbar reactivo */
   const taskbar = createReactiveTaskbar();

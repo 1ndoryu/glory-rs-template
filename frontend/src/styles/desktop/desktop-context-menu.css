@@ -1,0 +1,82 @@
+/* wandori.us — Desktop Context Menu
+ * Menú contextual minimalista B&W.
+ * [Plan §3.2] Proyección del CommandRegistry.
+ * Sin sombras, radios, blur ni gradientes. */
+
+.desktop-context-menu {
+  min-width: 180px;
+  max-width: 280px;
+  background: var(--sistema-superficie);
+  border: var(--borde);
+  font-family: var(--fuente-sistema);
+  font-size: var(--sistema-texto-tamano);
+}
+
+.desktop-context-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-sm);
+  width: 100%;
+  padding: var(--espacio-xs) var(--espacio-sm);
+  border: none;
+  border-bottom: 1px solid var(--color-borde);
+  border-radius: 0;
+  background: transparent;
+  color: var(--sistema-texto);
+  font-family: inherit;
+  font-size: inherit;
+  text-align: left;
+  cursor: pointer;
+  line-height: var(--linea-altura);
+}
+
+.desktop-context-menu__item:last-child {
+  border-bottom: none;
+}
+
+.desktop-context-menu__item:hover {
+  color: var(--color-seleccion-texto);
+  background: var(--color-seleccion);
+}
+
+.desktop-context-menu__item--disabled {
+  color: var(--color-texto-deshabilitado);
+  cursor: not-allowed;
+}
+
+.desktop-context-menu__item--disabled:hover {
+  color: var(--color-texto-deshabilitado);
+  background: transparent;
+}
+
+.desktop-context-menu__icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: var(--espacio-md);
+  height: var(--espacio-md);
+}
+
+.desktop-context-menu__icon svg {
+  width: 100%;
+  height: 100%;
+  stroke-width: var(--sistema-icono-trazo);
+}
+
+.desktop-context-menu__label {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-context-menu__shortcut {
+  flex: 0 0 auto;
+  font-size: var(--tamano-pequeno);
+  color: var(--color-texto-secundario);
+  margin-left: var(--espacio-md);
+}
+
+.desktop-context-menu__item:hover .desktop-context-menu__shortcut {
+  color: var(--color-seleccion-texto);
+}

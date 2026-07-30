@@ -188,12 +188,15 @@ export function restoreWindow(instanceId: string): void {
   windowStore.set(updated);
 }
 
-/** Actualizar bounds de una ventana (drag/resize). */
+/** Actualizar bounds de una ventana (drag/resize/keyboard).
+ * [Plan §4] Aplica boundary clamping automáticamente. */
 export function updateWindowBounds(instanceId: string, bounds: Partial<WindowBounds>): void {
   const windows = windowStore.get();
   const updated = windows.map(w => {
     if (w.instanceId === instanceId) {
-      return { ...w, bounds: { ...w.bounds, ...bounds } };
+      const merged = { ...w.bounds, ...bounds };
+      const clamped = clampWindowBounds(merged.x, merged.y, merged.w, merged.h);
+      return { ...w, bounds: clamped };
     }
     return w;
   });
