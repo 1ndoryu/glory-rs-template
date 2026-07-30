@@ -1,6 +1,7 @@
 /* wandori.us — Store (State Management)
  * Patrón pub/sub simple. Sin dependencias.
- * Cada store es un objeto reactivo que notifica suscriptores al cambiar. */
+ * Cada store es un objeto reactivo que notifica suscriptores al cambiar.
+ * [Auditoría v4 §3.1] FontConfig dividido en sub-interfaces (ISP). */
 
 type Listener<T> = (value: T) => void;
 type Unsubscribe = () => void;
@@ -27,26 +28,16 @@ export function createStore<T>(initialValue: T): Store<T> {
   const simpleListeners = new Set<Listener<T>>();
 
   return {
-    get() {
-      return value;
-    },
+    get() { return value; },
     set(newValue: T, source: StoreSource = 'user') {
       value = newValue;
-      for (const listener of listeners) {
-        listener(value, source);
-      }
-      for (const listener of simpleListeners) {
-        listener(value);
-      }
+      for (const listener of listeners) listener(value, source);
+      for (const listener of simpleListeners) listener(value);
     },
     update(fn: (current: T) => T, source: StoreSource = 'user') {
       value = fn(value);
-      for (const listener of listeners) {
-        listener(value, source);
-      }
-      for (const listener of simpleListeners) {
-        listener(value);
-      }
+      for (const listener of listeners) listener(value, source);
+      for (const listener of simpleListeners) listener(value);
     },
     subscribe(listener: TypedListener<T>): Unsubscribe {
       listeners.add(listener);
@@ -64,9 +55,7 @@ export function createStore<T>(initialValue: T): Store<T> {
 /* === Stores globales de la aplicación === */
 
 /* Estado de autenticación
- * [297A-8] Migrado de JWT localStorage a sesiones opacas en cookie HttpOnly.
- * El frontend ya no almacena tokens. La sesión se gestiona vía cookies automáticamente.
- * El estado isAuthenticated se determina llamando a /auth/me al inicio. */
+ * [297A-8] Migrado de JWT localStorage a sesiones opacas en cookie HttpOnly. */
 export interface AuthState {
   isAuthenticated: boolean;
   userId: string | null;
@@ -77,23 +66,39 @@ export const authStore = createStore<AuthState>({
   userId: null,
 });
 
-/* Configuracion de fuentes, tamanos y layout */
-export interface FontConfig {
+/* [Auditoría v4 §3.1] FontConfig dividido en sub-interfaces (ISP).
+ * Cada consumidor puede importar solo el subtipo que necesita.
+ * FontConfig sigue siendo la intersección completa para backward compatibility. */
+
+/** Fuentes seleccionadas (nombres de Google Fonts). */
+export interface FontTypography {
   menu: string;
   titulo: string;
   texto: string;
+}
+
+/** Tamaños de fuente en px. */
+export interface FontSizes {
   tamanoTexto: number;
   tamanoTitulo: number;
   tamanoPequeno: number;
   tamanoGrande: number;
   tamanoTituloGrande: number;
   menuSize: number;
-  menuSpacing: number;
-  menuLineHeight: number;
-  menuOpacity: number;
   entradaTitleSize: number;
   entradaSize: number;
+}
+
+/** Opacidades (0-1). */
+export interface FontOpacity {
+  menuOpacity: number;
   entradaOpacity: number;
+}
+
+/** Layout del sidebar, profile y entradas. */
+export interface LayoutConfig {
+  menuSpacing: number;
+  menuLineHeight: number;
   navWidth: number;
   profileWidth: number;
   profileHeight: number;
@@ -103,32 +108,19 @@ export interface FontConfig {
   redesGap: number;
 }
 
+/** Configuración completa de fuentes y layout (intersección de ISP). */
+export interface FontConfig extends FontTypography, FontSizes, FontOpacity, LayoutConfig {}
+
 export const fontStore = createStore<FontConfig>({
-  menu: 'Inter',
-  titulo: 'Inter',
-  texto: 'Inter',
-  tamanoTexto: 15,
-  tamanoTitulo: 24,
-  tamanoPequeno: 13,
-  tamanoGrande: 18,
-  tamanoTituloGrande: 32,
-  menuSize: 15,
-  menuSpacing: 0,
-  menuLineHeight: 2,
-  menuOpacity: 1,
-  entradaTitleSize: 13,
-  entradaSize: 13,
-  entradaOpacity: 1,
-  navWidth: 320,
-  profileWidth: 120,
-  profileHeight: 120,
-  profileBorder: true,
-  sidebarSepHeight: 24,
-  redesSize: 13,
-  redesGap: 8,
+  menu: 'Inter', titulo: 'Inter', texto: 'Inter',
+  tamanoTexto: 15, tamanoTitulo: 24, tamanoPequeno: 13, tamanoGrande: 18, tamanoTituloGrande: 32,
+  menuSize: 15, menuSpacing: 0, menuLineHeight: 2, menuOpacity: 1,
+  entradaTitleSize: 13, entradaSize: 13, entradaOpacity: 1,
+  navWidth: 320, profileWidth: 120, profileHeight: 120, profileBorder: true,
+  sidebarSepHeight: 24, redesSize: 13, redesGap: 8,
 });
 
-/* Aplicar fuentes y tamanos al cambiar */
+/* Aplicar fuentes y tamaños al cambiar */
 fontStore.subscribe((config) => {
   const root = document.documentElement;
   root.style.setProperty('--fuente-menu', `'${config.menu}', system-ui, sans-serif`);
@@ -158,7 +150,7 @@ fontStore.subscribe((config) => {
 /* Imagen de perfil */
 export const profileImage = createStore<string>('/uploads/profile.jpg');
 
-/* Configuracion del sitio */
+/* Configuración del sitio */
 export interface SiteConfig {
   showEntriesOnHome: boolean;
 }
@@ -182,18 +174,17 @@ export const socialLinksStore = createStore<SocialLink[]>([
   { nombre: 'github', url: 'https://github.com/wandorius' },
 ]);
 
-/* Layout de redes: inline (misma linea) o stacked (una por linea) */
+/* Layout de redes: inline o stacked */
 export type RedesLayout = 'inline' | 'stacked';
 export const redesLayoutStore = createStore<RedesLayout>('inline');
 
 /* Control de visibilidad del profile header */
 export const showProfile = createStore<boolean>(true);
 
-/* Control de visibilidad del sidebar (toggle desde taskbar nav control) */
+/* Control de visibilidad del sidebar */
 export const showSidebar = createStore<boolean>(
   localStorage.getItem('wandorius:sidebar') !== 'hidden',
 );
 showSidebar.subscribe((visible) => {
   localStorage.setItem('wandorius:sidebar', visible ? 'visible' : 'hidden');
 });
-

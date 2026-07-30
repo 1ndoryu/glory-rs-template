@@ -6,11 +6,17 @@ import { api } from '../api/client';
 import type { Media } from '../api/types';
 
 export const MediaService = {
-  /** Subir un archivo multimedia. */
-  async upload(file: File, folder?: string): Promise<Media> {
+  /** Subir un archivo multimedia.
+   *  @param file - Archivo a subir
+   *  @param articleId - ID del artículo asociado (opcional)
+   *  @param altText - Texto alternativo (opcional)
+   *  @param folder - Carpeta de destino (opcional) */
+  async upload(file: File, options?: { articleId?: string; altText?: string; folder?: string }): Promise<Media> {
     const formData = new FormData();
     formData.append('file', file);
-    if (folder) formData.append('folder', folder);
+    if (options?.articleId) formData.append('article_id', options.articleId);
+    if (options?.altText) formData.append('alt_text', options.altText);
+    if (options?.folder) formData.append('folder', options.folder);
     return api.upload<Media>('/api/media/upload', formData);
   },
 

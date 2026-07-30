@@ -44,4 +44,9 @@ export const ProductService = {
   async delete(id: string): Promise<void> {
     return api.delete<void>(`/admin/products/${id}`);
   },
+
+  /** Crear sesión de checkout para un producto (público). */
+  async createCheckout(productId: string, email: string): Promise<{ checkout_url: string }> {
+    return api.post<{ checkout_url: string }>(`/api/products/${productId}/checkout`, { email });
+  },
 };
