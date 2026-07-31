@@ -17,6 +17,7 @@
 - Prevención: `Agente/prevencion/prevencion-wandorius-sentinel-varsense-2026-07-29.md`
 - Tema claro/oscuro: `Agente/planes/plan-modo-oscuro-os-2026-07-31.md`
 - Checkpoints SOLID/escalabilidad: `Agente/documentacion/arquitectura/checkpoints-solid-escalabilidad-2026-07-31.md`
+- URLs canónicas y foco: `Agente/planes/plan-deep-links-ventanas-2026-07-31.md`
 
 ## Estado y reglas
 
@@ -115,6 +116,19 @@
 
 **Salida:** el usuario cambia claro/oscuro desde un control único, la preferencia sobrevive según su ámbito y ninguna app duplica tokens o lógica de tema.
 
+### 297A-19 — URLs canónicas, deep links y ventana enfocada
+
+**Depende de:** 297A-9/11/12; integra capacidades de 297A-13. Cada app y recurso tendrá una URL compartible; la URL representa solo la ventana enfocada.
+
+- [ ] Definir formato versionado y allowlisted para app, recurso, alias/slug, versión y parámetros; excluir IDs internos, tokens, posiciones, tamaños, z-index, clipboard y overlays privados.
+- [ ] Hacer que cada `AppRegistry` declare parser/serializer, capacidades, parámetros permitidos y fallback; no crear un router monolítico ni URLs ad-hoc por app.
+- [ ] Al enfocar, usar `replaceState`; al navegar explícitamente, `pushState`; al abrir una URL, reutilizar o enfocar la instancia equivalente sin duplicarla.
+- [ ] Mantener Back/Forward, refresh y transición desktop/tablet/móvil; compartir solo app/recurso enfocado, no la sesión completa ni el workspace público.
+- [ ] Añadir `Copiar URL` con feedback, validación de boundary, protección de drafts/privados/grants, redirects canónicos y fallback seguro sin filtración.
+- [ ] Medir `deep_link_opened`, `window_focus_changed` y `share_url_copied`; probar sesión limpia, varias ventanas, permisos, rutas inválidas y viewports.
+
+**Salida:** copiar una URL desde cualquier app abre o enfoca esa app/recurso en otra sesión, con historial, seguridad, analítica y presentación móvil coherentes.
+
 ### 297A-13 — Registro y overlay remoto
 
 **Depende de:** 297A-8/11; integra móvil 297A-12.
@@ -192,6 +206,14 @@ Este bloque amplía el alcance verificable sin duplicar los manuales canónicos.
 - [ ] Verificar 320/360/390px y tablet 768px, rendimiento y apps críticas: Cuenta, Finder, Reader, Editor, Store, Checkout, Descargas, Configuración y Estadísticas.
 - [ ] Confirmar que móvil reutiliza comandos, permisos, recursos y analítica del escritorio; solo cambia `presentationMode`.
 
+### 297A-19 — URLs canónicas, deep links y ventana enfocada
+
+- [ ] Definir gramática versionada y mapping `app/resource/instance` con singleton o multiinstancia explícitos; parámetros son input no confiable.
+- [ ] Resolver URL en `RouteAppAdapter` con capacidades server-side, 403/404 seguro, sin enumerar privados ni incluir tokens, grants o rutas internas.
+- [ ] Sincronizar foco/z-order con History API: `replaceState` para foco, `pushState` para navegación, Back/Home según presentación y sin listeners stale.
+- [ ] Probar URL desde sesión limpia, refresh, dos ventanas, recurso privado, app inexistente, cambio de breakpoint, scroll/formulario y deduplicación de instancia.
+- [ ] Emitir un único evento de navegación/deep link y verificar SEO solo para recursos públicos activos.
+
 ### 297A-13 — Registro y overlay remoto
 
 - [ ] Implementar registro verificado, login/logout, recuperación, rate limit y auditoría detrás de feature flag; logout limpia clipboard/undo.
@@ -244,6 +266,7 @@ Cada fase termina con esta revisión antes de marcar su salida. La revisión deb
 - [ ] **297A-11 Workspace:** referencias, overlay, clipboard y papelera son composables; mover/copiar un tipo nuevo conserva atomicidad, permisos y undo.
 - [ ] **297A-12 Móvil:** launcher y desktop consumen las mismas apps/comandos; un nuevo breakpoint no crea una app paralela ni pierde estado de ruta.
 - [ ] **297A-18 Tema:** el botón solo despacha un comando y los tokens viven en el sistema visual; agregar un tercer tema de prueba no requiere reescribir componentes.
+- [ ] **297A-19 Deep links:** parser/serializer y foco viven en adaptadores; añadir una app o recurso no modifica el router global ni serializa estado privado.
 - [ ] **297A-13 Cuentas:** merge, sesión y preferencias se resuelven por servicios/adaptadores; otro proveedor de identidad no duplica el flujo ni restaura tombstones.
 - [ ] **297A-14 Editorial:** editores comparten primitives y capacidades; añadir un tipo de documento no amplía el monolito Admin ni copia ventanas.
 - [ ] **297A-15 Comercio:** pago, webhook, entitlement y grants son servicios independientes; otro proveedor o versión no cambia la autoridad server-side.
