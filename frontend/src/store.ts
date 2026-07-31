@@ -56,14 +56,19 @@ export function createStore<T>(initialValue: T): Store<T> {
 
 /* Estado de autenticación
  * [297A-8] Migrado de JWT localStorage a sesiones opacas en cookie HttpOnly. */
+export type AuthCapability = 'public' | 'authenticated' | 'admin';
+
 export interface AuthState {
   isAuthenticated: boolean;
   userId: string | null;
+  /** Capacidad confirmada por el backend; nunca se infiere desde la cookie. */
+  capability: AuthCapability;
 }
 
 export const authStore = createStore<AuthState>({
   isAuthenticated: false,
   userId: null,
+  capability: 'public',
 });
 
 /* [Auditoría v4 §3.1] FontConfig dividido en sub-interfaces (ISP).

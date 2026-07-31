@@ -13,6 +13,10 @@ export interface ContextMenuOptions {
   targets?: readonly CommandTarget[];
   /** Capacidad del usuario actual. */
   capability?: 'public' | 'authenticated' | 'admin';
+  /** Presentación que solicita el menú; por defecto desktop. */
+  presentationMode?: 'desktop' | 'tablet' | 'mobile';
+  /** Clase de presentación opcional; el comportamiento sigue siendo compartido. */
+  className?: string;
   /** Posición donde mostrar el menú. */
   x: number;
   y: number;
@@ -27,7 +31,7 @@ export function openContextMenu(options: ContextMenuOptions): void {
   const ctx: CommandContext = {
     targets: options.targets,
     capability: options.capability,
-    presentationMode: 'desktop',
+    presentationMode: options.presentationMode ?? 'desktop',
   };
 
   const commands = CommandRegistry.getByContext(options.context, ctx);
@@ -51,6 +55,7 @@ export function openContextMenu(options: ContextMenuOptions): void {
     items,
     ariaLabel: 'Menú contextual',
     positioning: 'fixed',
+    className: options.className,
     x: options.x,
     y: options.y,
   });

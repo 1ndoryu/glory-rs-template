@@ -1,17 +1,11 @@
-import { rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { writeAtomic } from './atomic-file.mjs';
 import { sanitize } from './redaction.mjs';
 
 function finalDecision(stages) {
   if (stages.some(stage => stage.status === 'error')) return { exitCode: 2, label: 'SETUP ERROR' };
   if (stages.some(stage => stage.status === 'fail')) return { exitCode: 1, label: 'FAIL' };
   return { exitCode: 0, label: 'PASS' };
-}
-
-async function writeAtomic(target, content) {
-  const temporary = `${target}.tmp`;
-  await writeFile(temporary, content, 'utf8');
-  await rename(temporary, target);
 }
 
 function markdown(report) {

@@ -83,14 +83,24 @@ async fn resolve_user_id(parts: &Parts, state: &AppState) -> Result<Uuid, AppErr
             .await
             .map_err(|e| AppError::Internal(format!("Error validando sesión: {e}")))?
         {
-            return Ok(session.user_id);
+            let active_user = UserRepository::find_by_id(&state.pool, session.user_id)
+                .await
+                .map_err(|e| AppError::Internal(format!("Error verificando usuario: {e}")))?;
+            if active_user.is_some() {
+                return Ok(session.user_id);
+            }
         }
     }
 
     /* Intento 2 (fallback): JWT Bearer header — compatibilidad durante transición */
     if let Ok(token) = extract_bearer_token(parts) {
         if let Ok(claims) = AuthService::verify_token(token, &state.jwt_secret) {
-            return Ok(claims.sub);
+            let active_user = UserRepository::find_by_id(&state.pool, claims.sub)
+                .await
+                .map_err(|e| AppError::Internal(format!("Error verificando usuario: {e}")))?;
+            if active_user.is_some() {
+                return Ok(claims.sub);
+            }
         }
     }
 

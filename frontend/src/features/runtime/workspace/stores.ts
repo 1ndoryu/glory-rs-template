@@ -70,7 +70,7 @@ function scheduleRecompute(): void {
     const release = releaseStore.get();
     const overlay = previewPublicStore.get() ? EMPTY_OVERLAY : overlayStore.get();
     const auth = authStore.get();
-    const capability: 'public' | 'authenticated' | 'admin' = auth.isAuthenticated ? 'admin' : 'public';
+    const capability: 'public' | 'authenticated' | 'admin' = auth.capability;
 
     /* [Auditoría v4 §5.4] Inyectar nodos admin dinámicamente */
     if (capability === 'admin') {

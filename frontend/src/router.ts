@@ -25,6 +25,49 @@ let outlet: HTMLElement | null = null;
 let currentController: AbortController | null = null;
 let routeInterceptor: RouteInterceptor | null = null;
 
+/* Marca privada para distinguir entradas creadas por el OS de un deep link
+ * externo. No contiene rutas, IDs ni estado de sesión; solo el origen. */
+const INTERNAL_HISTORY_KEY = '__wandorius';
+const INTERNAL_HISTORY_KIND = 'navigation';
+
+type InternalHistoryMode = 'push' | 'replace';
+
+function createInternalHistoryState(
+  mode: InternalHistoryMode,
+  createdByPush: boolean,
+  baseState: unknown = history.state,
+): Record<string, unknown> {
+  const preservedState = baseState && typeof baseState === 'object' && !Array.isArray(baseState)
+    ? baseState as Record<string, unknown>
+    : {};
+  return {
+    ...preservedState,
+    [INTERNAL_HISTORY_KEY]: {
+      kind: INTERNAL_HISTORY_KIND,
+      mode,
+      createdByPush,
+    },
+  };
+}
+
+function getInternalHistoryMarker(state: unknown = history.state): Record<string, unknown> | null {
+  if (!state || typeof state !== 'object') return null;
+  const marker = (state as Record<string, unknown>)[INTERNAL_HISTORY_KEY];
+  if (!marker || typeof marker !== 'object') return null;
+  const record = marker as Record<string, unknown>;
+  return record.kind === INTERNAL_HISTORY_KIND ? record : null;
+}
+
+/** Saber si la entrada actual pertenece a una navegación interna del OS. */
+export function isInternalHistoryEntry(state: unknown = history.state): boolean {
+  return getInternalHistoryMarker(state) !== null;
+}
+
+/** Solo una entrada creada con push puede consumirse con history.back(). */
+export function isInternalPushHistoryEntry(state: unknown = history.state): boolean {
+  return getInternalHistoryMarker(state)?.createdByPush === true;
+}
+
 export function addRoute(route: Route): void {
   routes.push(route);
 }
@@ -35,16 +78,53 @@ export function setOutlet(el: HTMLElement): void {
 
 export function navigate(path: string): void {
   if (path === currentPath) return;
-  history.pushState(null, '', path);
+  history.pushState(createInternalHistoryState('push', true), '', path);
   handleRoute();
+}
+
+/** Actualizar la URL sin volver a resolver la ruta ni crear una entrada. */
+export function replacePath(path: string): void {
+  if (path === currentPath) return;
+  /* Reemplazar la URL conserva el origen de la entrada: un estado interno
+   * pasa a mode=replace; un deep link externo conserva state=null. */
+  const currentMarker = getInternalHistoryMarker();
+  const nextState = currentMarker
+    ? createInternalHistoryState('replace', currentMarker.createdByPush === true)
+    : history.state;
+  history.replaceState(nextState, '', path);
+  currentPath = path;
+  for (const listener of listeners) listener(currentPath);
+}
+
+/** Crear una entrada de historial sin renderizar: el caller ya montó la vista. */
+export function pushPath(path: string): void {
+  if (path === currentPath) return;
+  history.pushState(createInternalHistoryState('push', true), '', path);
+  currentPath = path;
+  for (const listener of listeners) listener(currentPath);
+}
+
+/** Renderizar el fallback seguro de ruta sin ejecutar una app. */
+export function showRouteNotFound(): void {
+  if (!outlet) return;
+  outlet.innerHTML = '';
+  outlet.appendChild(createEl('div', { className: 'vacio', textContent: 'página no encontrada' }));
 }
 
 export function getCurrentPath(): string {
   return currentPath;
 }
 
-export function setRouteInterceptor(interceptor: RouteInterceptor): void {
+/** Volver a resolver la URL actual después de cambiar el outlet/presentación. */
+export function refreshRoute(): Promise<void> {
+  return handleRoute();
+}
+
+export function setRouteInterceptor(interceptor: RouteInterceptor | null): () => void {
   routeInterceptor = interceptor;
+  return () => {
+    if (routeInterceptor === interceptor) routeInterceptor = null;
+  };
 }
 
 export function onNavigate(listener: NavigationListener): () => void {
@@ -71,7 +151,11 @@ function matchPath(pattern: string, pathname: string): RouteParams | null {
   const params: RouteParams = {};
   for (let i = 0; i < patternParts.length; i++) {
     if (patternParts[i].startsWith(':')) {
-      params[patternParts[i].slice(1)] = decodeURIComponent(pathParts[i]);
+      try {
+        params[patternParts[i].slice(1)] = decodeURIComponent(pathParts[i]);
+      } catch {
+        return null;
+      }
     } else if (patternParts[i] !== pathParts[i]) {
       return null;
     }
@@ -91,10 +175,10 @@ async function handleRoute(): Promise<void> {
   const matched = matchRoute(pathname);
 
   if (!matched) {
-    if (outlet) {
-      outlet.innerHTML = '';
-      outlet.appendChild(createEl('div', { className: 'vacio', textContent: 'página no encontrada' }));
-    }
+    /* También notificamos rutas desconocidas: los adaptadores deben poder
+     * liberar estado de presentación antes de mostrar el fallback 404. */
+    for (const listener of listeners) listener(currentPath);
+    showRouteNotFound();
     return;
   }
 

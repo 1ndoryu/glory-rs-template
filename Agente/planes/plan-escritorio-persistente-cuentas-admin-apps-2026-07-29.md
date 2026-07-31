@@ -53,7 +53,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 | 5 | 297A-10 | recursos + migraciones | bloqueado |
 | 6 | 297A-11 | workspace + overlay invitado | bloqueado |
 | 7 | 297A-12 | launcher móvil | bloqueado |
-| 8 | 297A-13 | cuenta + overlay remoto | bloqueado |
+| 8 | 297A-13 | cuenta + overlay remoto | parcial: preferencias remotas implementadas; overlay pendiente |
 | 9 | 297A-14 | programas editoriales | bloqueado |
 | 10 | 297A-15 | comercio seguro | bloqueado |
 | 11 | 297A-16 | estadísticas + retiro legado | bloqueado |
@@ -171,6 +171,8 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [x] Login/logout/me con feedback y abort.
 - [x] Lista/revocación de sesiones activas.
 - [ ] Deep links `/login` y `/register` abren Cuenta. *(pendiente 297A-9)*
+- [ ] Icono de estado de sesión en la barra superior (junto al tema) que abre la app Cuenta; refleja login/logout con etiqueta accesible.
+- [ ] Deslogueado, la app Cuenta muestra el formulario de login/registro en su propia ventana (sin overlay de página completa).
 
 ### 6.3 Preparación de registro
 
@@ -319,20 +321,25 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 
 **Criterio de salida:** teléfono funciona como launcher sin lógica/app duplicada y tablet conserva escritorio.
 
-## 11. 297A-13 — Registro y overlay remoto
+## 11. 297A-13 — Registro y overlay remoto *(parcial)*
 
 **Dependencias:** sesiones 297A-8, workspace 297A-11 e integración móvil 297A-12.
 
 - [ ] Habilitar registro solo al pasar gate completo.
-- [ ] Crear `user_workspace_overlays` y `user_preferences`.
-- [ ] Sync con expected revision.
-- [ ] Importar local, usar remoto o reset mediante decisión explícita.
-- [ ] Merge por ID/campo; permisos/recursos retirados ganan.
-- [ ] Conflicto mismo campo devuelve 409 y UI resoluble.
-- [ ] Prueba dos pestañas, dos dispositivos y release nuevo.
-- [ ] Prueba cuenta no restaura recurso retirado.
+- [x] Crear `user_preferences` y el contrato de preferencia de tema con `revision`. *(migration `20260731100000_297a13_preferences`)*
+- [x] Sync con `expected_revision`, actualización condicional y conflicto 409 sin overwrite silencioso. *(PreferencesService + preferences-sync)*
+- [x] Autorizar solo cuentas activas y mantener CSRF/CORS con credenciales en las mutaciones.
+- [x] Proteger logout/cambio de usuario, fallback offline y respuestas tardías; tests frontend incluidos.
+- [x] UI de resolución `remote/local` conectada al estado `conflict`; modal único, accesible, idempotente y cerrado al resolver/logout. *(preferences-conflict-ui.ts)*
+- [x] Pruebas HTTP/integración de 401 sin sesión, 403 sin CSRF, preflight CORS con credenciales y dos actualizaciones concurrentes con una sola victoria; verifican `create_router()` y cuerpos `200/409`. *(4 tests en `preferences_handler.rs`; `cargo test` PASS)*
+- [ ] Crear `user_workspace_overlays` para posiciones/estado del workspace, con importación local/remota/reset, merge por ID/campo, tombstones y release nuevo.
+- [ ] Prueba de dos pestañas/dispositivos y de que una cuenta no restaura recursos retirados.
+- [ ] **Cuenta como app del escritorio:** registrar en AppRegistry con estados invitado/autenticado/verificación pendiente/MFA.
+- [ ] **Estado de sesión visible:** icono en la barra superior (junto al tema) que abre la app Cuenta; refleja login/logout con etiqueta accesible.
+- [ ] **Login dentro de la app:** deslogueado, la app Cuenta muestra el formulario de login/registro; deep links `/login` y `/register` abren Cuenta.
+- [ ] Recuperación de contraseña, rate limit y auditoría de intentos; logout limpia clipboard/undo.
 
-**Criterio de salida:** configuración privada continúa entre dispositivos sin overwrite silencioso.
+**Criterio de salida:** configuración privada continúa entre dispositivos sin overwrite silencioso. El transporte, la resolución UI y las pruebas HTTP de preferencias quedan cerrados; 297A-13 completo permanece abierto hasta implementar el overlay del workspace y Cuenta como app del OS. Cuenta queda definida como app del OS con estado de sesión en la barra superior y login dentro de la propia app.
 
 ## 12. 297A-14 — Programas editoriales
 

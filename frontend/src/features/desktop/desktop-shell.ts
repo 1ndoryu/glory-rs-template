@@ -11,7 +11,6 @@ import {
   minimizeWindow, toggleMaximizeWindow, setWorkspaceBounds, registerShellWindow,
 } from '../runtime/window-manager';
 import { authStore } from '../../store';
-import { dispatchEvent } from '../analytics/dispatcher';
 import { enableDragResize } from './utils/drag-resize';
 import { openContextMenu } from './components/desktop-context-menu';
 import { selectBackground } from '../runtime/selection-store';
@@ -24,12 +23,14 @@ export interface DesktopShell {
   element: HTMLElement;
   contentWindow: HTMLElement;
   setProfileVisible(visible: boolean): void;
+  destroy(): void;
 }
 
 export function createDesktopShell(
   profile: HTMLElement,
   content: HTMLElement,
 ): DesktopShell {
+  let destroyed = false;
   const shell = createEl('section', { className: 'desktop-shell', ariaLabel: 'Escritorio' });
   const workspace = createEl('div', { className: 'desktop-workspace' });
 
@@ -78,28 +79,30 @@ export function createDesktopShell(
   });
   makeDropTarget({ el: workspace, dropId: 'desktop', context: 'desktop' });
 
-  workspace.append(iconGrid, contentWindow);
+  workspace.append(iconGrid.element, contentWindow);
 
-  workspace.addEventListener('contextmenu', (e) => {
-    if (e.target !== workspace && e.target !== iconGrid) return;
+  const onWorkspaceContextMenu = (e: MouseEvent): void => {
+    if (e.target !== workspace && e.target !== iconGrid.element) return;
     e.preventDefault();
     selectBackground();
     openContextMenu({
       context: 'desktop',
-      capability: authStore.get().isAuthenticated ? 'admin' : 'public',
+      capability: authStore.get().capability,
       x: e.clientX,
       y: e.clientY,
     });
-  });
+  };
+  workspace.addEventListener('contextmenu', onWorkspaceContextMenu);
 
-  const { element: taskbar } = createReactiveTaskbar();
+  const taskbar = createReactiveTaskbar();
 
-  onGlobalDrop((result) => {
+  const stopGlobalDrop = onGlobalDrop((result) => {
     if (result.sourceId === result.targetId) return;
     moveNodeToParent(result.sourceId, result.targetId);
   });
 
-  shell.append(createDesktopMenuBar(), workspace, taskbar);
+  const menuBar = createDesktopMenuBar();
+  shell.append(menuBar.element, workspace, taskbar.element);
 
   /* Window container */
   const windowContainer = createEl('div', { className: 'desktop-windows-container' });
@@ -108,13 +111,14 @@ export function createDesktopShell(
   windowContainer.style.pointerEvents = 'none';
   workspace.appendChild(windowContainer);
 
-  new ResizeObserver(() => {
+  const resizeObserver = new ResizeObserver(() => {
     setWorkspaceBounds(windowContainer.clientWidth, windowContainer.clientHeight);
-  }).observe(windowContainer);
+  });
+  resizeObserver.observe(windowContainer);
 
   const renderedWindows = new Map<string, { el: HTMLElement; cleanup: () => void }>();
 
-  windowStore.subscribe((windows) => {
+  const stopWindows = windowStore.subscribe((windows) => {
     for (const win of windows) {
       if (!renderedWindows.has(win.instanceId)) {
         const el = createDesktopWindow({
@@ -126,8 +130,8 @@ export function createDesktopShell(
           active: win.focused,
           resizable: true,
           onClose: () => {
-            win.controller?.abort();
-            if (win.app) dispatchEvent({ type: 'app_closed', appId: win.appId });
+            /* closeWindow es el único dueño del teardown y MountedView.destroy.
+             * Así app_closed no se emite dos veces desde shell y app. */
             closeWindow(win.instanceId);
           },
           onMinimize: () => { minimizeWindow(win.instanceId); },
@@ -192,5 +196,23 @@ export function createDesktopShell(
     }
   }
 
-  return { element: shell, contentWindow, setProfileVisible };
+  function destroy(): void {
+    if (destroyed) return;
+    destroyed = true;
+    stopWindows();
+    stopGlobalDrop();
+    iconGrid.destroy();
+    taskbar.destroy();
+    menuBar.destroy();
+    resizeObserver.disconnect();
+    workspace.removeEventListener('contextmenu', onWorkspaceContextMenu);
+    for (const entry of renderedWindows.values()) {
+      entry.cleanup();
+      entry.el.remove();
+    }
+    renderedWindows.clear();
+    shell.remove();
+  }
+
+  return { element: shell, contentWindow, setProfileVisible, destroy };
 }

@@ -19,6 +19,7 @@
 - Iconos libres del escritorio: `Agente/planes/completados/plan-iconos-libres-desktop-2026-07-31.md`
 - Checkpoints SOLID/escalabilidad: `Agente/documentacion/arquitectura/checkpoints-solid-escalabilidad-2026-07-31.md`
 - URLs canónicas y foco: `Agente/planes/plan-deep-links-ventanas-2026-07-31.md`
+- Cómo agregar una app (receta): `Agente/documentacion/arquitectura/guia-agregar-app-2026-07-31.md`
 
 ## Estado y reglas
 
@@ -117,10 +118,10 @@
 - [x] Usar `data-theme`/atributo equivalente en el shell para que desktop, tablet y launcher móvil compartan la misma implementación; multimedia puede conservar color, el chrome sigue monocromo. *(data-tema en documentElement + override scoped para superficies del OS)*
 - [x] Resolver preferencia inicial por sistema operativo y permitir override explícito. *(matchMedia + localStorage `wandorius:tema`)*
 - [x] Evitar flash de tema en la primera pintura y emitir un evento `theme_changed` medible con modo. *(script inline en index.html + ThemeEvent en dispatcher)*
-- [ ] Guardar anónimo en overlay local y sincronizar la preferencia de cuenta sin sobrescribir decisiones locales silenciosamente; logout/login y conflictos de preferencia. *(bloqueado por 297A-13 overlay remoto)*
+- [ ] Guardar anónimo en overlay local y completar la resolución de la preferencia de cuenta sin sobrescribir decisiones locales silenciosamente; UI de conflicto y logout/login. *(transporte remoto parcial implementado en 297A-13)*
 - [x] Validar contraste AA, foco/teclado, reduced motion, zoom 200% y viewports (1440×900, 1024×768, 390×844, 320px); capturas aprobadas por el usuario. *(aprobación visual 2026-07-31; E2E formal y medición de rendimiento quedan con 297A-17)*
 
-**Salida:** el usuario cambia claro/oscuro desde un control único y la preferencia local sobrevive; tema aprobado visualmente; falta solo la sync remota (297A-13).
+**Salida:** el usuario cambia claro/oscuro desde un control único y la preferencia local sobrevive; tema aprobado visualmente. El transporte remoto de la preferencia está implementado en 297A-13; quedan UI de conflicto y resolución de ámbito local/remoto.
 
 ### 297A-19 — URLs canónicas, deep links y ventana enfocada
 
@@ -174,19 +175,21 @@
 
 **Salida:** los usuarios saben que hay novedades aunque su escritorio esté personalizado; el admin gestiona desde un panel, sin notificaciones inmediatas.
 
-### 297A-13 — Registro y overlay remoto
+### 297A-13 — Registro y overlay remoto *(parcial)*
 
-**Depende de:** 297A-8/11; integra móvil 297A-12. Plan maestro §6.2 y manual de identidad §10/13.
+**Depende de:** 297A-8/11; integra móvil 297A-12.
 
-- [ ] Cuenta como app del escritorio: registrar en AppRegistry con estados invitado/autenticado/verificación pendiente/MFA; deep links `/login` y `/register` abren la app Cuenta.
-- [ ] Icono de estado de sesión en la barra superior (junto al tema) que abre la app Cuenta y refleja login/logout; el login/registro se hace dentro de la misma app cuando está deslogueado (sin modal de página completa).
 - [ ] Habilitar registro verificado.
-- [ ] Overlay remoto y preferencias.
-- [ ] Importar local/usar remoto/reset explícito.
-- [ ] Merge por ID/campo y 409 visible.
-- [ ] Pruebas dos dispositivos/release nuevo.
+- [x] Transporte de preferencias de cuenta: `user_preferences`, revisión optimista, endpoint protegido, CSRF/CORS, fallback local y guardas contra respuestas obsoletas. *(migraciones 297A-13 + `preferences-sync.ts`; type-check, 209 tests, Rust y gate PASS)*
+- [x] UI de resolución `remote/local` para conflictos 409; adaptador separado, modal único/idempotente, cierre al resolver/logout y etiquetado ARIA. *(preferences-conflict-ui.ts + 4 regresiones UI)*
+- [x] Pruebas HTTP/integración de 401 sin sesión, 403 sin CSRF, preflight CORS con credenciales y carrera 409 con dos actualizaciones de la misma revisión; verifican router de producción, cuerpos JSON y revisión final. *(4 tests en `preferences_handler.rs`; `cargo test` PASS)*
+- [ ] Overlay remoto del workspace: `user_workspace_overlays`, importación/reset, merge por ID/campo, tombstones, dos dispositivos y release nuevo.
+- [ ] **Cuenta como app del escritorio:** registrar en AppRegistry con estados invitado/autenticado/verificación pendiente/MFA.
+- [ ] **Estado de sesión visible:** icono en la barra superior (junto al tema) que abre la app Cuenta; refleja login/logout con etiqueta accesible.
+- [ ] **Login dentro de la app:** deslogueado, la app Cuenta muestra el formulario de login/registro; deep links `/login` y `/register` abren Cuenta.
+- [ ] Recuperación de contraseña, rate limit y auditoría de intentos; logout limpia clipboard/undo.
 
-**Salida:** la cuenta es un programa del OS con estado visible desde la barra superior; el usuario se registra/inicia sesión dentro de la app Cuenta y su configuración sincroniza sin sobrescribir ni restaurar recursos retirados.
+**Salida:** las preferencias remotas tienen transporte seguro, control de revisión, resolución visible `remote/local` y pruebas HTTP reales; 297A-13 completo permanece abierto hasta cerrar el overlay del workspace y Cuenta como app del OS.
 
 ### 297A-14 — Programas editoriales
 
@@ -234,6 +237,17 @@
 - [ ] Threat review, performance, observabilidad y runbook.
 
 **Salida:** preparado para revisión de producción; deploy continúa fuera de alcance.
+
+### 297A-23 — Deuda SOLID del runtime de apps (hipótesis)
+
+**Depende de:** 297A-19 (deep links). No tocar el adapter mientras 297A-19 esté en curso. Plan en hipótesis: `Agente/planes/plan-deuda-solid-runtime-2026-07-31.md`.
+
+- [ ] Dividir `route-app-adapter.ts`: coordinador delgado + helpers extraídos (capacidad, dedup, móvil) con tests (SRP).
+- [ ] Centralizar la jerarquía de capacidades en un módulo único consumido por registry y adapter (OCP/DRY).
+- [ ] Resolver la rama muerta `authenticated`: usarla en Cuenta (297A-13) o retirarla.
+- [ ] Test anti-drift: todo nodo `type:'app'` del workspace tiene `AppRegistry.register` (y viceversa).
+
+**Salida:** el runtime sigue SOLID al crecer a editors/comercio: adapter con una responsabilidad, capacidades en un solo punto, sin superficie muerta ni drift registry↔workspace.
 
 ## Detalle operativo de las tareas pendientes
 

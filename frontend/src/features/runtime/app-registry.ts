@@ -21,6 +21,12 @@ export type Capability =
   | 'authenticated'
   | 'admin';
 
+export interface AppDeepLink {
+  readonly patterns: readonly string[];
+  readonly parse: (params: Readonly<Record<string, string>>) => Record<string, string> | null;
+  readonly stringify: (params?: Readonly<Record<string, string>>) => string | null;
+}
+
 export interface AppDefinition {
   readonly id: string;
   readonly title: string;
@@ -28,7 +34,10 @@ export interface AppDefinition {
   readonly iconType?: 'folder' | 'document' | 'application';
   readonly singleton: boolean;
   readonly requires: Capability;
+  /** Legacy route patterns; retained while apps migrate to deepLink. */
   readonly routePatterns?: string[];
+  /** Canonical public route contract; absent for local/private instances. */
+  readonly deepLink?: AppDeepLink;
   readonly layout?: 'padded' | 'full-bleed';
   readonly toolbar?: AppToolbarGroup[];
   readonly render: AppRenderFn;
@@ -91,7 +100,8 @@ class AppRegistryClass {
 
   findByRoute(pathname: string): AppDefinition | undefined {
     for (const app of this.apps.values()) {
-      if (app.routePatterns?.some(pattern => matchSimplePattern(pattern, pathname))) {
+      const patterns = app.deepLink?.patterns ?? app.routePatterns;
+      if (patterns?.some(pattern => matchSimplePattern(pattern, pathname))) {
         return app;
       }
     }

@@ -2,6 +2,7 @@ pub mod analytics_repo;
 pub mod article;
 pub mod media_repo;
 mod note;
+pub mod preferences_repo;
 pub mod product_repo;
 pub mod project_repo;
 pub mod resource_repo;

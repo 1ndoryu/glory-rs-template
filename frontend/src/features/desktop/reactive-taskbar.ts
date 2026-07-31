@@ -11,7 +11,7 @@ import { createEl } from '../../utils/dom';
 import type { WindowIdentity, WindowContent } from '../runtime/window-store';
 import { windowStore, closeWindow, restoreWindow, focusWindow } from '../runtime/window-manager';
 import { showSidebar } from '../../store';
-import { dispatchEvent } from '../analytics/dispatcher';
+
 import { reconcileChildren } from '../../utils/reconcile';
 
 function getTaskClass(win: WindowIdentity): string {
@@ -21,7 +21,7 @@ function getTaskClass(win: WindowIdentity): string {
   return `desktop-taskbar__task desktop-taskbar__task--${activeClass}`;
 }
 
-export function createReactiveTaskbar(): { element: HTMLElement; taskList: HTMLElement } {
+export function createReactiveTaskbar(): { element: HTMLElement; taskList: HTMLElement; destroy: () => void } {
   const taskbar = createEl('footer', { className: 'desktop-taskbar', ariaLabel: 'Ventanas abiertas' });
 
   const navControl = createEl('button', { type: 'button', className: 'desktop-taskbar__nav-control' });
@@ -39,7 +39,7 @@ export function createReactiveTaskbar(): { element: HTMLElement; taskList: HTMLE
   taskbar.append(navControl, taskList);
 
   type TaskbarWin = WindowIdentity & Pick<WindowContent, 'icon' | 'app'>;
-  windowStore.subscribe((windows: readonly TaskbarWin[]) => {
+  const stopWindows = windowStore.subscribe((windows: readonly TaskbarWin[]) => {
     reconcileChildren(
       taskList,
       windows,
@@ -76,7 +76,6 @@ export function createReactiveTaskbar(): { element: HTMLElement; taskList: HTMLE
           const id = item.dataset.key;
           if (!id) return;
           closeWindow(id);
-          dispatchEvent({ type: 'app_closed', appId: id });
         });
 
         item.append(activate, close);
@@ -93,5 +92,10 @@ export function createReactiveTaskbar(): { element: HTMLElement; taskList: HTMLE
     );
   });
 
-  return { element: taskbar, taskList };
+  const destroy = (): void => {
+    stopWindows();
+    taskList.replaceChildren();
+  };
+
+  return { element: taskbar, taskList, destroy };
 }

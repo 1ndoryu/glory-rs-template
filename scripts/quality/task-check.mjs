@@ -4,6 +4,7 @@ import { preflight } from './preflight.mjs';
 import { createReport, printCompact } from './reporter.mjs';
 import { selectReminders } from './reminders.mjs';
 import { cancelAll } from './runner.mjs';
+import { acquireTaskLock } from './lock.mjs';
 import { detectScope } from './scope.mjs';
 import { runDocs } from './adapters/docs.mjs';
 import { runFrontend } from './adapters/frontend.mjs';
@@ -12,11 +13,14 @@ import { runSentinel } from './adapters/sentinel.mjs';
 import { runVarsense } from './adapters/varsense.mjs';
 import { runCustom } from './adapters/custom.mjs';
 
-process.once('SIGINT', () => {
+let interrupted = false;
+function handleInterruption(signal) {
+  interrupted = true;
   cancelAll();
-  process.stderr.write('[quality] CANCELLED — repite el comando cuando decidas continuar.\n');
-  process.exit(130);
-});
+  process.stderr.write(`[quality] CANCELLED (${signal}) — finalizando etapas y liberando el lock.\n`);
+}
+process.once('SIGINT', () => handleInterruption('SIGINT'));
+process.once('SIGTERM', () => handleInterruption('SIGTERM'));
 
 function stageDefinitions(context, scope, taskId) {
   const definitions = [{ name: 'sentinel', run: () => runSentinel(context, scope) }];
@@ -55,16 +59,29 @@ async function main() {
 
   try {
     const context = await preflight(args);
-    const scope = await detectScope(context, args);
-    const stages = [];
-    for (const definition of stageDefinitions(context, scope, args.taskId)) {
-      stages.push(await executeStage(context, scope, definition, args));
+    const releaseTaskLock = await acquireTaskLock(context, args.taskId, undefined, {
+      isCancelled: () => interrupted,
+    });
+    try {
+      const scope = await detectScope(context, args);
+      const stages = [];
+      for (const definition of stageDefinitions(context, scope, args.taskId)) {
+        if (interrupted) throw new Error('quality gate cancelado durante la ejecución');
+        stages.push(await executeStage(context, scope, definition, args));
+      }
+      const reminders = selectReminders(scope, stages, context.qualityConfig.maxReminders);
+      const report = await createReport(context, args, scope, stages, reminders, startedAt);
+      printCompact(report, context);
+      process.exitCode = interrupted ? 130 : report.report.decision.exitCode;
+    } finally {
+      await releaseTaskLock();
     }
-    const reminders = selectReminders(scope, stages, context.qualityConfig.maxReminders);
-    const report = await createReport(context, args, scope, stages, reminders, startedAt);
-    printCompact(report, context);
-    process.exitCode = report.report.decision.exitCode;
   } catch (error) {
+    if (interrupted) {
+      process.stderr.write('[quality] CANCELLED — repite el comando cuando decidas continuar.\n');
+      process.exitCode = 130;
+      return;
+    }
     process.stderr.write(`[quality] SETUP ERROR — ${error.message}\n`);
     process.stderr.write('[quality] Next: npm run quality:setup\n');
     process.exitCode = 2;

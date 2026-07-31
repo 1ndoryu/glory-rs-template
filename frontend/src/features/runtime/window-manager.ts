@@ -4,6 +4,8 @@
  * [Auditoría v3 §2.2] Split para mantener bajo límite de 300 líneas. */
 
 import type { MountedView } from '../../core/lifecycle';
+import type { StoreSource } from '../../store';
+import { stableParamsKey } from './deep-links';
 import type { AppDefinition, AppToolbarGroup } from './app-registry';
 import type { IconNode } from 'lucide';
 import {
@@ -53,7 +55,7 @@ export function openWindow(
     layout: app.layout,
     toolbar: app.toolbar,
     params,
-    _paramKey: params ? Object.values(params).join(':') : undefined,
+    _paramKey: params ? stableParamsKey(params) : undefined,
     onDestroy: view.destroy,
   };
 
@@ -62,7 +64,7 @@ export function openWindow(
 }
 
 /** Cerrar una ventana (destruye contenido y aborta signal). */
-export function closeWindow(instanceId: string): void {
+export function closeWindow(instanceId: string, source: StoreSource = 'user'): void {
   const windows = windowStore.get();
   const target = windows.find(w => w.instanceId === instanceId);
   if (!target) return;
@@ -77,7 +79,7 @@ export function closeWindow(instanceId: string): void {
     topWindow.focused = true;
   }
 
-  windowStore.set(remaining);
+  windowStore.set(remaining, source);
 }
 
 /** Registrar una shell window (perfil, etc.) directamente en windowStore. */
@@ -208,10 +210,11 @@ export function updateWindowBounds(instanceId: string, bounds: Partial<WindowBou
   windowStore.set(updated);
 }
 
-/** Cerrar todas las ventanas (para cleanup). */
+/** Cerrar todas las ventanas (para cleanup y transición de presentación). */
 export function closeAllWindows(): void {
   const windows = windowStore.get();
   for (const w of windows) {
+    w.onDestroy?.();
     w.controller?.abort();
   }
   windowStore.set([]);

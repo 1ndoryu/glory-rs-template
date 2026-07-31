@@ -86,7 +86,7 @@
 - [ ] Prohibir iconos manuales/emoji en chrome.
 - [ ] Detectar CSS inline salvo variable funcional autorizada de geometría.
 - [ ] Detectar token CSS inexistente o huérfano.
-- [ ] Detectar clase usada sin definición y clase huérfana, con allowlist dinámica mínima.
+- [x] Detectar clase usada sin definición y clase huérfana en contratos vanilla (`createEl({ className/class })`, `createContainer`, `createExternalLink`, `classList.add`, `className/contentClass`, templates/ternarios estáticos); ignorar comentarios/cadenas no ejecutables y mantener clases realmente huérfanas detectables. *(VarSense core patch hashado 2026-07-31 + 43 fixtures/tests)*
 - [ ] Detectar app con receta local equivalente a ventana, título, acciones, formulario o card compartidos.
 
 ## Checklist 7 — Configuración y CI
@@ -100,7 +100,8 @@
 - [x] Reporte registra herramientas/config/fecha para comprobar vigencia.
 - [x] CI falla ante errores nuevos de alta confianza.
 - [x] Suprimir falsos positivos conocidos: css-especificacion-diseno-local como `information`, clases fantasma sk-*/legacy en `excludeClassPatterns`, inlineDetection como `information`.
-- [ ] Registrar `sqlx-query-sin-macro`/`sqlx-query-as-sin-macro` como excepción documentada (no son reglas registradas en sentinel; requieren migración a macros compile-time o registro en ruleRegistry).
+- [ ] Resolver/documentar `sqlx-query-sin-macro`/`sqlx-query-as-sin-macro`: el gate actual conserva **75 warnings Sentinel** y no los convierte en suppressions; requieren migración a macros compile-time o registro formal en `ruleRegistry` con fixtures equivalentes.
+- [x] Distribuir cambios agnósticos de VarSense reproduciblemente: patch versionado en `scripts/quality/patches/`, SHA-256 en `quality-tools.json`, aplicación idempotente con diff exacto y tests en `quality:setup`.
 
 ## Criterio de cierre
 

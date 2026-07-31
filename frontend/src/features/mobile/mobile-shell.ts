@@ -7,10 +7,11 @@ import { ArrowLeft, Circle, FileUser, createElement, type IconNode } from 'lucid
 import { createEl } from '../../utils/dom';
 import { createThemeToggleButton, type ThemeToggleButton } from '../../components/ui/theme-toggle-button';
 import { getCurrentPathname } from '../../utils/viewport';
+import { getCanonicalAppPath, type AppOpenHistory } from '../runtime/deep-links';
 import { openContextMenu } from '../desktop/components/desktop-context-menu';
 import { bindLongPress } from './mobile-gestures';
 import { authStore } from '../../store';
-import { navigate } from '../../router';
+import { isInternalPushHistoryEntry, navigate, replacePath } from '../../router';
 import type { MountedView } from '../../core/lifecycle';
 import { AppRegistry } from '../runtime/app-registry';
 import { resolveResourceType, type ResourceKind } from '../runtime/resource-type-registry';
@@ -31,8 +32,8 @@ export interface MobileShell {
   readonly routerOutlet: HTMLElement;
   readonly setLegacyContentVisible: (visible: boolean) => void;
   readonly destroy: () => void;
-  readonly openApp: (appId: string, params?: Readonly<Record<string, string>>) => Promise<void>;
-  readonly openProfile: () => void;
+  readonly openApp: (appId: string, params?: Readonly<Record<string, string>>, options?: { history?: AppOpenHistory }) => Promise<void>;
+  readonly openProfile: () => Promise<void>;
   readonly goHome: () => void;
   readonly goBack: () => void;
 }
@@ -50,9 +51,15 @@ function resolveNodeIcon(node: ResolvedNode): IconNode {
 function resolveNodeAction(
   node: ResolvedNode,
   openApp: (appId: string, params?: Readonly<Record<string, string>>) => Promise<void>,
-  openProfile: () => void,
+  openProfile: () => Promise<void>,
 ): (() => void) | undefined {
-  if (node.id === 'profile' || node.refId === 'shell-profile') return openProfile;
+  if (node.id === 'profile' || node.refId === 'shell-profile') {
+    return () => {
+      void openProfile().catch(() => {
+        /* El shell puede desmontarse durante el click; no reabrir vistas. */
+      });
+    };
+  }
   if (node.type === 'folder') return () => { void openApp('finder', { folderId: node.id }); };
   if (node.type === 'resource' && node.resourceKind) {
     const appId = resolveResourceType(node.resourceKind as ResourceKind)?.appId ?? 'finder';
@@ -65,7 +72,7 @@ function resolveNodeAction(
 function createIconButton(
   node: ResolvedNode,
   openApp: (appId: string, params?: Readonly<Record<string, string>>) => Promise<void>,
-  openProfile: () => void,
+  openProfile: () => Promise<void>,
 ): HTMLButtonElement | null {
   const action = resolveNodeAction(node, openApp, openProfile);
   if (!action) return null;
@@ -143,18 +150,22 @@ export function createMobileShell(
   const openApp = async (
     appId: string,
     params?: Readonly<Record<string, string>>,
+    options: { history?: AppOpenHistory } = {},
   ): Promise<void> => {
     if (destroyed) return;
-    await openMobileApp(appId, params);
+    await openMobileApp(appId, params, options);
   };
 
-  const openProfile = (): void => {
+  const openProfile = async (): Promise<void> => {
     if (destroyed) return;
     const controller = new AbortController();
     pendingControllers.add(controller);
     const view: MountedView = { element: profile };
-    void openMobileView('profile', 'Perfil', view, undefined, true, 'full-bleed', controller)
-      .finally(() => { pendingControllers.delete(controller); });
+    try {
+      await openMobileView('profile', 'Perfil', view, undefined, true, 'full-bleed', controller);
+    } finally {
+      pendingControllers.delete(controller);
+    }
   };
 
   const resolveTargetKind = (node: ResolvedNode): 'app' | 'folder' | 'resource' | 'shortcut' => {
@@ -256,17 +267,37 @@ export function createMobileShell(
     routerOutlet.setAttribute('aria-hidden', entry || !legacyContentVisible ? 'true' : 'false');
   };
 
+  function syncPathToTopMobileApp(): void {
+    const top = getTopMobileApp();
+    const app = top ? AppRegistry.get(top.appId) : undefined;
+    const targetPath = app ? getCanonicalAppPath(app, top?.params) ?? '/' : '/';
+    if (getCurrentPathname() !== targetPath) replacePath(targetPath);
+  }
+
   function goBack(): void {
     if (destroyed) return;
-    if (getTopMobileApp()) {
-      const path = getCurrentPathname();
-      const isAppRoute = Boolean(AppRegistry.findByRoute(path));
-      if (isAppRoute) {
-        popMobileApp();
-        history.back();
-        return;
-      }
+    const entry = getTopMobileApp();
+    if (!entry) return;
+
+    const app = AppRegistry.get(entry.appId);
+    const canonicalPath = app ? getCanonicalAppPath(app, entry.params) : null;
+    const ownsCurrentHistoryEntry = Boolean(
+      canonicalPath
+      && canonicalPath === getCurrentPathname()
+      && isInternalPushHistoryEntry(),
+    );
+
+    /* Una entrada marcada por el OS y representada por la URL actual puede
+     * resolverse con history.back(): retiramos primero la vista y dejamos que
+     * popstate reconcilie la ruta. Una vista local o un deep link externo no
+     * consume historial ajeno: se desapila y se restaura la ruta de la vista
+     * inferior, o la raíz si ya no queda ninguna. */
+    if (ownsCurrentHistoryEntry) {
+      popMobileApp({ preserveHistoryUrl: true });
+      history.back();
+    } else {
       popMobileApp();
+      syncPathToTopMobileApp();
     }
   }
 

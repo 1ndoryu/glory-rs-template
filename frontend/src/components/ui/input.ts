@@ -23,7 +23,10 @@ export function createInput(options: InputOptions): HTMLElement {
   }
 
   const entrada = createEl('input', {
-    className: 'campo-entrada', type, value,
+    className: 'campo-entrada',
+    type,
+    value,
+    'data-transient': type === 'password' || type === 'file' ? 'false' : 'true',
   });
   if (placeholder) entrada.placeholder = placeholder;
   if (required) entrada.required = true;

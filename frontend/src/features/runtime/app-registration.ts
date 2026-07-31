@@ -6,6 +6,7 @@
 import { FileUser, Folder, Settings, FileText, FolderCode, Trash2, ShieldUser } from 'lucide';
 import { createEl } from '../../utils/dom';
 import { AppRegistry } from './app-registry';
+import { createPathDeepLink } from './deep-links';
 import { createFinderPreview } from '../desktop/apps/finder/finder-preview';
 import { createReaderPreview, type ReaderOptions } from '../desktop/apps/reader/reader-preview';
 import { createTrashPreview } from '../desktop/apps/trash/trash-preview';
@@ -23,6 +24,7 @@ AppRegistry.register({
   singleton: false,
   requires: 'public',
   routePatterns: ['/gallery'],
+  deepLink: createPathDeepLink('/gallery'),
   layout: 'full-bleed',
   toolbar: [
     { label: 'Archivo', items: ['finder:new-folder'] },
@@ -66,6 +68,7 @@ AppRegistry.register({
   singleton: false,
   requires: 'public',
   routePatterns: ['/article/:slug'],
+  deepLink: createPathDeepLink('/article/:slug', ['slug']),
   layout: 'full-bleed',
   render: (ctx: RenderContext): MountedView => {
     dispatchEvent({ type: 'app_opened', appId: 'reader' });
@@ -111,6 +114,7 @@ AppRegistry.register({
   singleton: true,
   requires: 'public',
   routePatterns: ['/about'],
+  deepLink: createPathDeepLink('/about'),
   layout: 'full-bleed',
   render: (ctx: RenderContext): MountedView => {
     dispatchEvent({ type: 'app_opened', appId: 'about' });
@@ -196,6 +200,7 @@ AppRegistry.registerLazy({
   singleton: true,
   requires: 'public',
   routePatterns: ['/projects'],
+  deepLink: createPathDeepLink('/projects'),
   toolbar: [
     { label: 'Archivo', items: ['projects:new'] },
   ],

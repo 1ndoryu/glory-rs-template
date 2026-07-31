@@ -2,7 +2,7 @@
 
 > **Tarea:** 297A-12  
 > **Fecha:** 2026-07-29  
-> **Estado:** prototipo visual aprobado; runtime móvil pendiente
+> **Estado:** Bloques 2 y 3 de interacción parcialmente implementados y validados por quality gate; validación visual real y pruebas E2E de transición pendientes
 > **Alcance:** teléfonos `<768px`; tablet conserva experiencia desktop
 
 ## 1. Resultado
@@ -18,13 +18,13 @@ En teléfono, wandori.us se percibe como un móvil minimalista con el mismo leng
 
 ## 2. Invariantes para no reinventar
 
-- [ ] AppRegistry es único para desktop/tablet/móvil.
-- [ ] Una app devuelve el mismo `MountedView`; no existe `MobileReader`, `MobileStore`, etc.
-- [ ] MobileAppStack es una proyección del mismo estado/comandos, no otro store de negocio.
-- [ ] CommandRegistry resuelve acciones; clic derecho desktop se adapta a long press/menú móvil.
-- [ ] RouteAppAdapter conserva deep links y Back.
-- [ ] Workspace overlay usa los mismos nodos; solo cambia `mobileOrder` y presentación.
-- [ ] Seguridad, estados, papelera, pagos y analytics no dependen del viewport.
+- [x] AppRegistry es único para desktop/tablet/móvil.
+- [x] Una app devuelve el mismo `MountedView`; no existe `MobileReader`, `MobileStore`, etc.
+- [x] MobileAppStack es una proyección del mismo estado/comandos, no otro store de negocio.
+- [x] CommandRegistry resuelve acciones; clic derecho desktop se adapta a long press/menú móvil.
+- [x] RouteAppAdapter conserva deep links y params; Back del stack está implementado.
+- [x] Workspace overlay usa los mismos nodos; solo cambia `mobileOrder` y presentación.
+- [x] Seguridad, estados, papelera, pagos y analytics no dependen del viewport.
 
 ## 3. Contrato de presentación
 
@@ -65,23 +65,39 @@ módulo no implementa persistencia, pagos, drag, long press ni el stack definiti
 
 ## 5. Bloque 2 — Shell móvil compartido
 
-- [ ] Añadir `OsPresentationMode` central.
-- [ ] Crear MobileLauncher que consume nodos/registry existentes.
-- [ ] Crear MobileAppStack que monta `MountedView` existente.
-- [ ] Ocultar/no montar DesktopWindow, top menu y taskbar en móvil.
-- [ ] Integrar safe areas, viewport dinámico y teclado virtual.
-- [ ] Mantener navegación exterior accesible mediante comando acordado en prototipo.
-- [ ] Evitar listeners/media queries duplicados por app.
+- [x] Añadir `getPresentationMode()` central y `presentationMode` en analytics/commands.
+- [x] Crear `MobileLauncher` que consume nodos/registry/workspace existentes.
+- [x] Crear `MobileAppStack` que monta `MountedView` existente.
+- [x] Ocultar/no montar DesktopWindow, top menu y taskbar en móvil.
+- [x] Integrar safe areas, viewport dinámico y teclado virtual en el chrome móvil.
+- [x] Mantener navegación exterior accesible mediante control visible de launcher.
+- [x] Evitar listeners/media queries duplicados por app: el shell decide la presentación.
+- [x] Liberar listeners del toggle de tema y gestos del launcher al cambiar de vista o destruir el shell.
+- [x] Capturar/liberar el puntero del long press cuando el navegador lo permite, con fallback seguro para DOM parcial.
+- [x] Hacer reactiva la transición móvil↔tablet sin recarga mediante reinstanciación segura por URL/params.
+- [x] Desmontar el interceptor de rutas, el shell móvil y los listeners asociados con cleanup idempotente.
+- [x] Preservar estados transitorios de formularios/scroll durante la transición mediante snapshot efímero en memoria, opt-in `data-transient="true"` y `data-transient-scroll`; excluye secretos, archivos, campos ocultos y metadata sensible. Legacy outlet y Perfil shell usan claves/rutas separadas; snapshots se limpian en cancelación, error y teardown.
+
+**Implementación:** `frontend/src/features/mobile/mobile-shell.ts` y
+`frontend/src/features/mobile/mobile-stack.ts`. El adapter de rutas conserva
+params y deriva la misma app al stack móvil; no existen componentes `MobileFoo`.
+
+**Gate parcial:** Perfil/Finder/Reader se montan en el shell full-screen con `MountedView`,
+Back/Home destruyen o desapilan vistas y tablet conserva el shell desktop. El interceptor de rutas,
+los listeners y la pila móvil tienen cleanup idempotente. La validación visual real por viewport
+sigue pendiente y no se considera cubierta por el quality gate.
+La transición dinámica por URL/params y lifecycle ya está implementada; el gate restante es
+la validación visual real y la prueba E2E de resize/orientación sin perder estado representable.
 
 **Gate:** Perfil/Finder/Reader abren full-screen sin chrome desktop ni duplicación de contenido.
 
 ## 6. Bloque 3 — Launcher, carpetas y organización
 
-- [ ] Grid ordenable con `mobileOrder`.
-- [ ] Carpetas abren vista full-screen y permiten navegación jerárquica.
-- [ ] Drag/reorder con alternativa accesible por comandos.
-- [ ] Long press abre CommandRegistry móvil.
-- [ ] Crear carpeta, copiar, cortar, pegar y mover usan comandos existentes.
+- [x] Grid ordenable con `mobileOrder` mediante los comandos compartidos `workspace:move-up/down`.
+- [x] Carpetas abren vista full-screen y permiten navegación jerárquica.
+- [x] Reorder con alternativa accesible por comandos; no depende del gesto táctil.
+- [x] Long press abre el CommandRegistry móvil mediante el mismo menú contextual.
+- [x] Crear carpeta, copiar, cortar, pegar y mover usan comandos existentes.
 - [ ] Papelera muestra solo capas autorizadas.
 - [ ] Badges/estados siguen el manual visual.
 - [ ] Overlay local/remoto sincroniza orden y additions/tombstones.
@@ -90,12 +106,16 @@ módulo no implementa persistencia, pagos, drag, long press ni el stack definiti
 
 ## 7. Bloque 4 — Navegación y cambio de modo
 
-- [ ] Back cierra menú, vuelve dentro de app o desapila app en orden correcto.
-- [ ] Home vuelve al launcher sin destruir estado permitido.
-- [ ] Deep link abre directamente app/recurso full-screen.
+- [x] Back desapila la vista superior y ejecuta teardown.
+- [x] Home vuelve al launcher y libera la pila explícitamente.
+- [x] Deep link entrega params al mismo AppRegistry/MountedView full-screen.
+- [x] Back de un deep link delega a History API; Home vuelve a `/` y limpia el stack.
 - [ ] Refresh reconstruye estado seguro desde URL/bootstrap.
-- [ ] Pasar móvil→tablet transforma app activa en ventana recuperable.
-- [ ] Pasar tablet→móvil selecciona la ventana activa como app full-screen.
+- [x] Rutas legacy no gestionadas por AppRegistry se muestran en el outlet móvil; el launcher permanece en `/`.
+- [x] Pasar móvil→tablet transforma la app activa en una ventana recuperable mediante reinstanciación.
+- [x] Pasar tablet→móvil selecciona la ventana activa como app full-screen mediante reinstanciación.
+- [x] Callbacks del shell móvil quedan inertes después de `destroy()`; no reabren vistas desde eventos tardíos.
+- [x] Conservar estados transitorios no representados por URL/params mediante snapshot efímero opt-in; la integración visual/E2E de transición sigue pendiente.
 - [ ] Ventanas secundarias se conservan sin mostrarse o siguen política explícita probada.
 - [ ] Foco se restaura al icono/elemento correcto.
 
@@ -120,7 +140,7 @@ módulo no implementa persistencia, pagos, drag, long press ni el stack definiti
 - [ ] Área táctil mínima 44×44 cuando sea viable; icono óptico no se engrosa.
 - [ ] Foco visible para teclado/switch y orden lógico.
 - [ ] Zoom 200% y texto grande no bloquean navegación.
-- [ ] No depender solo de long press; comandos tienen alternativa visible/accesible.
+- [x] No depender solo de long press; mover arriba/abajo está disponible como comando accesible.
 - [ ] Reduced motion y sin gestos obligatorios sin alternativa.
 - [ ] Contenido no queda bajo notch/safe area/teclado.
 
@@ -130,7 +150,7 @@ módulo no implementa persistencia, pagos, drag, long press ni el stack definiti
 - [ ] No medir touchmove/drag por pixel.
 - [ ] Lazy-load solo apps pesadas medido, no otro bundle móvil.
 - [ ] Launcher inicia con bootstrap único y sin N+1 de iconos/estados.
-- [ ] Memoria se libera al desapilar/destruir apps según lifecycle.
+- [x] Memoria se libera al desapilar/destruir apps según lifecycle; launcher gestures y theme toggle también tienen teardown explícito.
 - [ ] Definir budgets de arranque, interacción y media móvil.
 
 ## 11. Pruebas obligatorias
@@ -139,13 +159,15 @@ módulo no implementa persistencia, pagos, drag, long press ni el stack definiti
 - [ ] Tablet 768×1024 conserva escritorio/ventanas.
 - [ ] Abrir/cerrar/Back/Home y deep link.
 - [ ] Cambio móvil↔tablet con app activa.
-- [ ] Reordenar, carpeta, long press, papelera y reset.
+- [x] Reordenar, carpeta y long press tienen cobertura unitaria de stack/gesto; papelera y reset quedan para prueba funcional visual.
 - [ ] Cuenta, Reader, Finder, Editor, Compra y descarga.
 - [ ] Teclado virtual, safe area, zoom y foco.
-- [ ] Visitante no accede a comandos/recursos admin.
+- [x] Visitante no accede a comandos/recursos admin; la capacidad se confirma desde `/auth/me` y se aplica en router, apertura programática, menús y merge.
 - [ ] No se crean componentes o stores móviles duplicados.
 
 ## 12. Criterio final de cierre
+
+**Estado del gate actual:** El runtime móvil y el snapshot transitorio opt-in pasan type-check, **203 tests en 19 suites**, `task:check -- 297A-12 --fresh` y `self-check`. Sentinel queda en 0 errores/75 warnings heredados; VarSense en 0 errores/2 avisos informativos; custom en 0 errores/4 avisos. La transición dinámica por URL/params, el long press, el menú compartido, el reorder accesible, la autorización por capability y la preservación segura de formularios/scroll están implementados. La validación visual real y las pruebas E2E de cambio de modo siguen abiertas, por eso el criterio final no se marca todavía.
 
 - [ ] Teléfono usa launcher y apps full-screen sin barras/ventanas desktop.
 - [ ] Tablet conserva comportamiento desktop.

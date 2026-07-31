@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { writeAtomic } from './atomic-file.mjs';
 
 async function hashFile(hash, root, relativePath) {
   try {
@@ -38,7 +39,5 @@ export async function writeCachedPass(context, stage, stageFingerprint, result) 
   if (result.status !== 'pass') return;
   const target = cachePath(context, stage);
   await mkdir(path.dirname(target), { recursive: true });
-  const temporary = `${target}.tmp`;
-  await writeFile(temporary, `${JSON.stringify({ fingerprint: stageFingerprint, result }, null, 2)}\n`, 'utf8');
-  await rename(temporary, target);
+  await writeAtomic(target, `${JSON.stringify({ fingerprint: stageFingerprint, result }, null, 2)}\n`);
 }

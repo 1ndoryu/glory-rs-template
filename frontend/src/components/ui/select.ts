@@ -24,7 +24,10 @@ export function createSelect(options: SelectOptions): HTMLElement {
     children.push(createEl('label', { className: 'campo-etiqueta', textContent: label }));
   }
 
-  const select = createEl('select', { className: 'campo-select' });
+  const select = createEl('select', {
+    className: 'campo-select',
+    'data-transient': 'true',
+  });
 
   for (const item of items) {
     const opt = createEl('option', { value: item.value, textContent: item.label });

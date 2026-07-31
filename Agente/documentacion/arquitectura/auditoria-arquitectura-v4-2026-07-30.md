@@ -3,9 +3,10 @@
 > **Fecha:** 2026-07-30
 > **Alcance:** Frontend + backend + tooling
 > **Enfoque:** SOLID, escalabilidad futura (297A-12→17), preparación del código hoy
-> **Resultado:** 24 hallazgos — 6 SOLID graves, 8 escalabilidad crítica, 6 patrones de riesgo, 4 omisiones arquitectónicas
+> **Resultado base:** 24 hallazgos — 6 SOLID graves, 8 escalabilidad crítica, 6 patrones de riesgo, 4 omisiones arquitectónicas
 > **Auditorías anteriores:** v1 (10), v2 (28), v3 (16)
-> **Acumulado:** 78 hallazgos en 4 auditorías
+> **Acumulado base:** 78 hallazgos en 4 auditorías
+> **Revisión SOLID 297A-12:** 4 observaciones de lifecycle/ownership añadidas como anexo; no se mezclan con el conteo base para evitar doble contabilización
 > **Plan asociado:** `plan-mejora-quality-tool-2026-07-30.md`
 > **Revisión extendida:** Esta versión corrige omisiones de la v4 original — añade 12 hallazgos, corrige 3 subestimaciones, profundiza impacto en tareas futuras
 
@@ -760,11 +761,20 @@ Estado de cada hallazgo de la auditoría v4 con su corrección o plan de acción
 
 | # | Hallazgo | Severidad | Estado | Evidencia |
 |---|---|---|---|---|
-| 6.1 | 0 tests | 🔴 Bloqueante | ✅ COMPLETO | 143 tests en 9 suites: merge(21)+clipboard(9)+window-store(13)+dom(22)+safe-async(12)+viewport(9)+sanitize-html(24)+router(11)+command-registry(22). Cobertura de módulos críticos completa. |
+| 6.1 | 0 tests | 🔴 Bloqueante | ✅ COMPLETO | 160 tests en 12 suites: merge(21)+clipboard(9)+window-store(13)+dom(22)+safe-async(12)+viewport(9)+sanitize-html(24)+router(12)+command-registry(22)+mobile-stack(5)+workspace-diff(7)+mobile-gestures(4). Cobertura de módulos críticos ampliada. |
 | 6.2 | upload/sanitize aislados | 🟡 Medio | ✅ CORREGIDO | MediaService y SettingsService integrados |
 | 6.3 | schema.org hardcodeado | 🟢 Bajo | ⬜ Pendiente | Para 297A-17 |
 
-### 10.7 Resumen de correcciones
+### 10.7 Correcciones SOLID/lifecycle de la revisión 297A-12
+
+| Hallazgo confirmado | Principio | Estado | Evidencia |
+|---|---|---|---|
+| Interceptor de rutas global sin cleanup | DIP/SRP | ✅ CORREGIDO | `setRouteInterceptor()` acepta `null`; `initRouteAppAdapter()` devuelve `stopInterceptor`; `main.ts` lo registra en cleanup |
+| `window:close` duplicaba abort/analytics fuera del WindowManager | SRP/DIP | ✅ CORREGIDO | `closeWindow()` centraliza abort, `MountedView.destroy()` y `app_closed`; el comando solo delega |
+| Destrucción móvil no idempotente | SRP/LSP | ✅ CORREGIDO | `MobileShell.destroy()` tiene guard y ownership explícito de `clearMobileStack()` |
+| Tests de transición real y preservación de estado transitorio | SOLID/lifecycle | ⬜ PENDIENTE | Requiere navegador/E2E; URL/params sí se reinstancian, scroll/formularios aún no |
+
+### 10.8 Resumen de correcciones
 
 | Estado | Cantidad | % |
 |---|---|---|
@@ -772,19 +782,25 @@ Estado de cada hallazgo de la auditoría v4 con su corrección o plan de acción
 | ✅ Parcial (viewport/window.*) | **1** | 4% |
 | ❌ Falso positivo | **1** | 4% |
 | ⬜ Pendiente | **2** | 9% |
-| **Total** | **23** | **100%** |
+| **Total del checklist base v4** | **23** | **100%** |
 
-**Última actualización (2026-07-30 sesión quality):** Nuevos completados:
+> El checklist base conserva 23 entradas porque un hallazgo fue rebajado como falso positivo y una fila se integra en la corrección de otro hallazgo. Las 4 observaciones de la revisión SOLID 297A-12 se registran en §10.7 como anexo, no como nuevas filas históricas.
+
+**Última actualización (2026-07-30 sesión quality + auditoría SOLID 297A-12):** Nuevos completados:
 - §1.2: Últimos createElement eliminados (main.ts, gallery.ts). check-dom-abstraction.sh: 0 violaciones (sanitize-html justificado).
 - §4.1: Service layer completo — api imports directos eliminados. api-call-en-logica: 0 violaciones reales.
 - §5.1: safe-async + safeClick + tryCatch migrados masivamente. 0 any types, 0 console en producción.
-- §6.1: 143 tests en 9 suites. Cobertura completa de módulos críticos.
+- §6.1: 160 tests en 12 suites. Cobertura de módulos críticos ampliada con mobile-stack, workspace-diff y mobile-gestures.
 - §6.2: MediaService y SettingsService integrados.
 - Quality tool: 8 scripts de auditoría integrados como stage custom en task:check. Sentinel config limpio (0 errores CLI).
 
-**Pendientes (2):**
+**Pendientes del baseline v4 (2):**
 - §1.4: CommandRegistry scoping (para 297A-14 editors)
 - §6.3: schema.org hardcodeado (para 297A-17 SEO)
+
+**Pendientes de la revisión SOLID 297A-12:**
+- Tests E2E/browser de transición y cleanup real.
+- Preservación de scroll, formularios y estado transitorio no representado por URL/params.
 
 **Falsos positivos documentados en scripts:**
 - subscribe-sin-cleanup: shell-level subscriptions (desktop-shell, reactive-taskbar, workspace-icon-grid) viven toda la sesión.
@@ -802,4 +818,4 @@ Estado de cada hallazgo de la auditoría v4 con su corrección o plan de acción
 - Plan mejora quality tool: `plan-mejora-quality-tool-2026-07-30.md`
 - Plan componentización UI: `plan-componentizacion-ui-2026-07-30.md`
 - Sentinel config: `sentinel.config.json` (7 reglas)
-- VarSense config: `varsense.config.json` (4 detectores)
+- VarSense config: `varsense.config.json` (4 detectores; extractor de contratos vanilla ampliado, patch reproducible y 43 tests del tool)

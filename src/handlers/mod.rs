@@ -5,6 +5,7 @@ pub mod auth;
 mod health;
 pub mod media_handler;
 mod notes;
+pub mod preferences_handler;
 pub mod products_handler;
 pub mod projects_handler;
 pub mod seo;
@@ -49,6 +50,8 @@ impl utoipa::Modify for SecurityAddon {
         health::health_check,
         auth::register,
         auth::login,
+        preferences_handler::get_preferences,
+        preferences_handler::update_preferences,
         notes::create_note,
         notes::get_note,
         notes::list_notes,
@@ -60,6 +63,9 @@ impl utoipa::Modify for SecurityAddon {
         crate::models::RegisterRequest,
         crate::models::LoginRequest,
         crate::models::AuthResponse,
+        crate::models::preferences::UserPreferences,
+        crate::models::preferences::UpdateUserPreferencesRequest,
+        crate::handlers::preferences_handler::UserPreferencesResponse,
         crate::models::Note,
         crate::models::CreateNoteRequest,
         crate::models::UpdateNoteRequest,
@@ -106,6 +112,7 @@ pub fn create_router(pool: sqlx::PgPool, config: crate::config::AppConfig) -> Ro
 
     let cors = CorsLayer::new()
         .allow_origin(AllowOrigin::list(allowed_origins))
+        .allow_credentials(true)
         .allow_methods([
             Method::GET,
             Method::POST,
@@ -113,7 +120,11 @@ pub fn create_router(pool: sqlx::PgPool, config: crate::config::AppConfig) -> Ro
             Method::DELETE,
             Method::PATCH,
         ])
-        .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]);
+        .allow_headers([
+            header::AUTHORIZATION,
+            header::CONTENT_TYPE,
+            header::HeaderName::from_static("x-csrf-token"),
+        ]);
 
     /* Servir archivos subidos estaticamente */
     /* [297A-7] Nota: uploads se mantiene público temporalmente para compatibilidad.
@@ -141,6 +152,7 @@ fn api_routes() -> Router<AppState> {
         .merge(notes::routes())
         .merge(articles::routes())
         .merge(media_handler::routes())
+        .merge(preferences_handler::routes())
         .merge(settings_handler::routes())
         .merge(products_handler::routes())
         .merge(projects_handler::routes())

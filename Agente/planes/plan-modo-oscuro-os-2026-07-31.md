@@ -1,7 +1,7 @@
 # Plan — modo claro/oscuro del OS
 
 > **Fecha:** 2026-07-31  
-> **Estado:** cerrado con aprobación visual del usuario (2026-07-31); fase 4 (remoto) bloqueada por 297A-13; feature flag descartado por decisión del usuario.  
+> **Estado:** cerrado con aprobación visual del usuario (2026-07-31); transporte remoto de preferencia implementado parcialmente en 297A-13, con UI de conflicto y resolución de ámbito aún pendientes; feature flag descartado por decisión del usuario.  
 > **Alcance:** chrome y superficies del OS; la navegación exterior queda fuera del tema.
 
 ## Objetivo y límites
@@ -40,11 +40,13 @@ Añadir un modo claro/oscuro coherente con la identidad Macintosh minimalista, u
 ### 4. Preferencias y sincronización
 
 - [ ] Guardar la elección anónima en el overlay local sin modificar el release público ni `mobileOrder`. *(hoy en localStorage; migrar a overlay en 297A-13)*
-- [ ] Sincronizar la preferencia de cuenta con el overlay remoto usando revisión, merge y 409; nunca sobrescribir silenciosamente. *(bloqueado por 297A-13)*
-- [ ] Resolver login/logout, otro dispositivo y reset a `system`; evitar flash de tema en primera pintura. *(anti-flash resuelto; resto pendiente)*
+- [x] Sincronizar el transporte de la preferencia de cuenta con revisión, actualización condicional y 409; nunca sobrescribir silenciosamente. *(297A-13 parcial)*
+- [x] Conectar UI para resolver explícitamente `remote` o `local`; modal accesible con cleanup y control de cuenta/revisión. *(297A-13 parcial)*
+- [ ] Completar el overlay remoto del workspace y su merge por nodos. *(297A-13)**
+- [ ] Resolver login/logout, otro dispositivo y reset a `system`; evitar flash de tema en primera pintura. *(anti-flash y logout/login del transporte resueltos; ámbito remoto de workspace y reset visible pendientes)*
 - [x] Emitir `theme_changed` con modo y ámbito, sin contenido ni identificadores sensibles. *(ThemeEvent; presentationMode pendiente)*
 
-**Gate:** pruebas local/remoto, dos pestañas/dispositivos, pérdida de red y logout pasan con rollback visible.
+**Gate:** transporte local/remoto, conflicto visible, pérdida de red y logout pasan; pruebas HTTP de autorización/CORS/concurrencia PASS. Quedan dos dispositivos y overlay de workspace.
 
 ### 5. Accesibilidad y validación
 
@@ -65,5 +67,5 @@ Añadir un modo claro/oscuro coherente con la identidad Macintosh minimalista, u
 
 - [x] Un único botón global cambia el tema y es accesible.
 - [x] Desktop, tablet y móvil comparten tokens, comandos, permisos y analítica.
-- [ ] Preferencia local/remota tiene ámbito, merge, reset y rollback explícitos. *(bloqueado por 297A-13)*
+- [ ] Preferencia local/remota tiene UI de ámbito, merge, reset y rollback explícitos. *(transporte y API implementados; resolución visual pendiente en 297A-13)*
 - [x] Manual visual, roadmap, pruebas y quality gate están sincronizados.

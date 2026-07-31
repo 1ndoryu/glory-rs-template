@@ -19,8 +19,10 @@ CommandRegistry.register({
     if (!appId) return { state: 'disabled', reason: 'no app target' };
     const app = AppRegistry.get(appId);
     if (!app) return { state: 'hidden' };
-    if (app.requires === 'admin' && ctx.capability !== 'admin') return { state: 'hidden' };
-    if (app.requires === 'authenticated' && !ctx.capability) return { state: 'hidden' };
+    const hierarchy = ['public', 'authenticated', 'admin'] as const;
+    const currentLevel = hierarchy.indexOf(ctx.capability ?? 'public');
+    const requiredLevel = hierarchy.indexOf(app.requires);
+    if (requiredLevel > currentLevel) return { state: 'hidden' };
     return { state: 'enabled' };
   },
   execute: async (ctx?: CommandContext): Promise<CommandResult> => {

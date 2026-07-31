@@ -1,6 +1,7 @@
 pub mod article;
 pub mod media;
 mod note;
+pub mod preferences;
 pub mod product;
 pub mod project;
 pub mod resource;

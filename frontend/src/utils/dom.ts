@@ -52,6 +52,10 @@ export interface AriaAttrs {
   ariaExpanded?: string;
   'aria-hidden'?: string;
   ariaHidden?: string;
+  'aria-modal'?: string;
+  ariaModal?: string;
+  'aria-labelledby'?: string;
+  ariaLabelledby?: string;
 }
 
 /** Atributos data-* dinámicos. */
@@ -110,6 +114,8 @@ export function createEl<K extends keyof HTMLElementTagNameMap>(
     setAttr(el, 'aria-haspopup', attrs['aria-haspopup'] ?? attrs.ariaHaspopup);
     setAttr(el, 'aria-expanded', attrs['aria-expanded'] ?? attrs.ariaExpanded);
     setAttr(el, 'aria-hidden', attrs['aria-hidden'] ?? attrs.ariaHidden);
+    setAttr(el, 'aria-modal', attrs['aria-modal'] ?? attrs.ariaModal);
+    setAttr(el, 'aria-labelledby', attrs['aria-labelledby'] ?? attrs.ariaLabelledby);
 
     if (attrs['role']) el.setAttribute('role', attrs['role']);
     if (attrs['title']) el.setAttribute('title', attrs['title']);

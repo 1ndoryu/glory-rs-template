@@ -113,7 +113,7 @@ export function createAppToolbar(
   const toolbar = createEl('div', { className: 'desktop-app-toolbar' });
 
   const ctx: CommandContext = {
-    capability: authStore.get().isAuthenticated ? 'admin' : 'public',
+    capability: authStore.get().capability,
     presentationMode: 'desktop',
   };
 

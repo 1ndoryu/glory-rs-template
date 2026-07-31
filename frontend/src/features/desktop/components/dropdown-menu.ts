@@ -21,6 +21,8 @@ export interface DropdownMenuItem {
 export interface DropdownMenuOptions {
   readonly items: readonly DropdownMenuItem[];
   readonly ariaLabel?: string;
+  /** Modificador visual de la misma superficie de menú. */
+  readonly className?: string;
   readonly positioning?: 'fixed' | 'absolute';
   readonly x?: number;
   readonly y?: number;
@@ -96,7 +98,10 @@ export function openDropdownMenu(options: DropdownMenuOptions): HTMLElement | nu
 
   if (options.items.length === 0) return null;
 
-  const menu = createEl('div', { className: 'desktop-context-menu', role: 'menu' });
+  const menu = createEl('div', {
+    className: ['desktop-context-menu', options.className].filter(Boolean).join(' '),
+    role: 'menu',
+  });
   if (options.ariaLabel) menu.setAttribute('aria-label', options.ariaLabel);
 
   for (const item of options.items) {

@@ -7,6 +7,10 @@ import {
   getCurrentPath,
   onNavigate,
   setRouteInterceptor,
+  isInternalHistoryEntry,
+  isInternalPushHistoryEntry,
+  pushPath,
+  replacePath,
 } from './router';
 
 describe('router', () => {
@@ -87,6 +91,29 @@ describe('router', () => {
       /* getCurrentPath returns the last navigated path, not window.location */
       expect(typeof getCurrentPath()).toBe('string');
     });
+
+    it('pushPath y replacePath notifican el canal de navegación una sola vez', async () => {
+      const listener = vi.fn();
+      const stop = onNavigate(listener);
+      pushPath('/deep-link-push');
+      expect(isInternalHistoryEntry()).toBe(true);
+      expect(isInternalPushHistoryEntry()).toBe(true);
+      replacePath('/deep-link-replace');
+      expect(isInternalHistoryEntry()).toBe(true);
+      expect(isInternalPushHistoryEntry()).toBe(true);
+      expect(listener.mock.calls).toEqual([
+        ['/deep-link-push'],
+        ['/deep-link-replace'],
+      ]);
+      stop();
+    });
+
+    it('no clasifica como interna una entrada externa del navegador', () => {
+      history.replaceState(null, '', '/external-deep-link');
+      replacePath('/external-deep-link-normalized');
+      expect(isInternalHistoryEntry()).toBe(false);
+      expect(isInternalPushHistoryEntry()).toBe(false);
+    });
   });
 
   describe('onNavigate', () => {
@@ -107,6 +134,15 @@ describe('router', () => {
       navigate('/no-notify');
       await new Promise(r => setTimeout(r, 10));
       expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('notifica listeners para rutas desconocidas antes del fallback 404', async () => {
+      const listener = vi.fn();
+      const cleanup = onNavigate(listener);
+      navigate('/unknown-route-for-reconciliation');
+      await new Promise(r => setTimeout(r, 10));
+      expect(listener).toHaveBeenCalledWith('/unknown-route-for-reconciliation');
+      cleanup();
     });
   });
 
@@ -133,15 +169,30 @@ describe('router', () => {
     it('intercepta rutas antes del render', async () => {
       const interceptor = vi.fn(() => true);
       const render = vi.fn(() => document.createElement('div'));
-      setRouteInterceptor(interceptor);
+      const stopInterceptor = setRouteInterceptor(interceptor);
       addRoute({ path: '/intercepted', render });
       navigate('/intercepted');
       await new Promise(r => setTimeout(r, 10));
       expect(interceptor).toHaveBeenCalled();
       /* Render should NOT be called because interceptor handled it */
       expect(render).not.toHaveBeenCalled();
-      /* Cleanup */
-      setRouteInterceptor(null as unknown as Parameters<typeof setRouteInterceptor>[0]);
+      /* Cleanup del interceptor por contrato */
+      stopInterceptor();
+      setRouteInterceptor(null);
+    });
+
+    it('limpia un interceptor sin borrar uno instalado después', async () => {
+      const first = vi.fn(() => true);
+      const second = vi.fn(() => true);
+      const stopFirst = setRouteInterceptor(first);
+      setRouteInterceptor(second);
+      stopFirst();
+      addRoute({ path: '/interceptor-cleanup', render: () => document.createElement('div') });
+      navigate('/interceptor-cleanup');
+      await new Promise(r => setTimeout(r, 10));
+      expect(second).toHaveBeenCalled();
+      expect(first).not.toHaveBeenCalled();
+      setRouteInterceptor(null);
     });
   });
 });

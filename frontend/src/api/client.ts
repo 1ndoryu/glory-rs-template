@@ -68,7 +68,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
     /* [297A-8] Si 401, limpiar estado de auth */
     if (response.status === 401) {
-      authStore.set({ isAuthenticated: false, userId: null });
+      authStore.set({ isAuthenticated: false, userId: null, capability: 'public' });
     }
 
     throw new ApiError(response.status, errorBody, `API Error: ${response.status}`);

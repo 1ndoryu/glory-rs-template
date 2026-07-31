@@ -28,12 +28,15 @@ import './features/runtime/app-registration';
 import './features/runtime/commands';
 import { initKeyboardShortcuts } from './features/runtime/commands';
 import { initRouteAppAdapter, setMobileOpenHandler, openAppWindow } from './features/runtime/route-app-adapter';
+import { initWindowUrlSync } from './features/runtime/window-url-sync';
 import { AppRegistry } from './features/runtime/app-registry';
 import { initResourceTypeRegistry } from './features/runtime/resource-type-registry';
 import { setActorCategory } from './features/analytics/dispatcher';
 import { loadSavedFonts } from './features/settings/font-panel';
 import { initTracking, trackPageView } from './features/analytics/tracker';
 import { initThemeStore } from './features/runtime/theme-store';
+import { initPreferencesSync } from './features/runtime/preferences-sync';
+import { initPreferencesConflictUI } from './features/runtime/preferences-conflict-ui';
 import { authStore, showProfile, showSidebar, siteConfig } from './store';
 import { AuthService } from './services';
 import { fetchWorkspaceRelease } from './features/runtime/workspace/workspace-store';
@@ -41,6 +44,13 @@ import { getTopMobileApp } from './features/mobile/mobile-stack';
 import { closeAllWindows, windowStore } from './features/runtime/window-manager';
 import { createEl } from './utils/dom';
 import { getPresentationMode } from './utils/viewport';
+import {
+  captureTransientState,
+  discardTransientState,
+  restoreTransientState,
+  clearTransientState,
+  type TransientStateKey,
+} from './features/runtime/transient-state';
 
 
 /* Pages */
@@ -74,6 +84,8 @@ async function initApp(): Promise<void> {
   /* [297A-18] Aplicar tema persistido y escuchar al SO antes de renderizar
    * (el anti-flash de index.html ya puso data-tema en la primera pintura). */
   initThemeStore();
+  const stopPreferencesSync = initPreferencesSync();
+  const stopPreferencesConflictUI = initPreferencesConflictUI();
   const app = document.getElementById('app');
   if (!app) return;
   let isMobile = getPresentationMode() === 'mobile';
@@ -212,6 +224,7 @@ async function initApp(): Promise<void> {
     setMobileOpenHandler(null);
   };
   const stopRouteAdapter = initRouteAppAdapter();
+  const stopWindowUrlSync = initWindowUrlSync();
 
   /* Iniciar router — cleanup almacenado */
   const stopRouter = initRouter();
@@ -224,27 +237,79 @@ async function initApp(): Promise<void> {
   const onPresentationChange = (event: MediaQueryListEvent): void => {
     const requestId = ++transitionRequest;
     transitionQueue = transitionQueue.then(async () => {
-      if (requestId !== transitionRequest || event.matches === isMobile) return;
+      if (requestId !== transitionRequest || event.matches === isMobile) {
+        /* Si esta era la transición vigente pero ya no requiere cambiar de
+         * presentación, libera cualquier pausa dejada por una transición
+         * anterior obsoleta. */
+        if (requestId === transitionRequest) stopWindowUrlSync.resume();
+        return;
+      }
 
+      const currentPath = window.location.pathname;
       const focusedWindow = windowStore.get().find((win) => win.focused);
       const activeMobile = getTopMobileApp();
-      const activeAppId = focusedWindow?.appId ?? activeMobile?.appId;
-      const activeParams = focusedWindow?.params ?? activeMobile?.params;
-      const activeProfile = focusedWindow?.instanceId === 'shell-profile' || activeMobile?.appId === 'profile';
-      const currentPath = window.location.pathname;
+      /* Perfil solo es la presentación inicial del OS; una ruta legacy activa
+       * debe conservar su outlet aunque Perfil haya quedado enfocado en desktop. */
+      const activeProfile = currentPath === '/'
+        && (focusedWindow?.instanceId === 'shell-profile' || activeMobile?.appId === 'profile');
+      /* Perfil pertenece al chrome del shell, no al catálogo de apps. Nunca
+       * debe convertir una ruta legacy en una transición de app runtime. */
+      const activeRuntimeWindow = focusedWindow?.instanceId === 'shell-profile' ? undefined : focusedWindow;
+      const activeRuntimeMobile = activeMobile?.appId === 'profile' ? undefined : activeMobile;
+      const activeAppId = activeRuntimeWindow?.appId ?? activeRuntimeMobile?.appId;
+      const activeParams = activeRuntimeWindow?.params ?? activeRuntimeMobile?.params;
+      const transientKey: TransientStateKey = activeAppId
+        ? { appId: activeAppId, params: activeParams ? { ...activeParams } : undefined }
+        : { appId: `legacy:${currentPath}` };
+      const transientRoot = activeAppId
+        ? (focusedWindow?.content ?? activeMobile?.view.element)
+        : (desktop?.contentWindow ?? mobile?.routerOutlet);
+      if (transientRoot) captureTransientState(transientRoot, transientKey);
 
-      unmountPresentation();
-      mountPresentation(event.matches);
-      await refreshRoute();
+      stopWindowUrlSync.pause();
+      try {
+        unmountPresentation();
+        mountPresentation(event.matches);
+        await refreshRoute();
 
-      if (requestId !== transitionRequest) return;
-      if (activeProfile && event.matches && mobile) {
-        mobile.openProfile();
-      } else if (activeAppId && activeAppId !== 'profile' && !AppRegistry.findByRoute(currentPath)) {
-        await openAppWindow(activeAppId, activeParams ? { ...activeParams } : undefined);
+        if (requestId !== transitionRequest) {
+          discardTransientState(transientKey);
+          return;
+        }
+        if (activeProfile && event.matches && mobile) {
+          await mobile.openProfile();
+        } else if (activeAppId && activeAppId !== 'profile' && !AppRegistry.findByRoute(currentPath)) {
+          await openAppWindow(activeAppId, activeParams ? { ...activeParams } : undefined, { history: 'none' });
+        }
+
+        if (requestId !== transitionRequest) {
+          discardTransientState(transientKey);
+          return;
+        }
+
+        if (transientKey) {
+          const restoredWindow = activeProfile
+            ? windowStore.get().find((win) => win.instanceId === 'shell-profile')
+            : windowStore.get().find((win) => win.focused && win.appId === activeAppId);
+          const restoredMobile = getTopMobileApp();
+          const restoredRoot = activeAppId
+            ? (restoredWindow?.content ?? restoredMobile?.view.element)
+            : (desktop?.contentWindow ?? mobile?.routerOutlet);
+          if (restoredRoot) restoreTransientState(restoredRoot, transientKey);
+        }
+      } catch (error) {
+        discardTransientState(transientKey);
+        throw error;
+      } finally {
+        /* Una transición obsoleta no puede reactivar el sincronizador mientras
+         * otra más reciente sigue en cola; así nunca se proyecta '/' de forma
+         * transitoria sobre una deep link válida. */
+        if (requestId === transitionRequest) stopWindowUrlSync.resume();
       }
-    }).catch(() => {
-      /* Una transición fallida no debe romper el listener de futuros cambios. */
+    }).catch((error: unknown) => {
+      /* La transición no debe romper futuros cambios; deja diagnóstico sin
+       * serializar contenido de formularios ni detalles potencialmente sensibles. */
+      console.warn('[presentation] transición cancelada:', error instanceof Error ? error.message : 'error desconocido');
     });
   };
   mediaQuery.addEventListener('change', onPresentationChange);
@@ -257,9 +322,13 @@ async function initApp(): Promise<void> {
     cleanedUp = true;
     mediaQuery.removeEventListener('change', onPresentationChange);
     stopTracking();
+    stopPreferencesConflictUI();
+    stopPreferencesSync();
     stopRouter();
     stopRouteAdapter();
+    stopWindowUrlSync.stop();
     stopMobileAdapter();
+    clearTransientState();
     unmountPresentation();
   };
   (window as unknown as Record<string, unknown>).__wandoriusCleanup = cleanup;

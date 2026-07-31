@@ -204,7 +204,7 @@ function createFinderItem(
     openContextMenu({
       context,
       targets,
-      capability: authStore.get().isAuthenticated ? 'admin' : 'public',
+      capability: authStore.get().capability,
       x: e.clientX,
       y: e.clientY,
     });

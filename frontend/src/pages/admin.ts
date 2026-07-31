@@ -23,7 +23,7 @@ export async function renderAdmin(): Promise<HTMLElement> {
   const btnLogout = createEl('button', { className: 'boton', textContent: 'salir' });
   btnLogout.addEventListener('click', safeClick(async () => {
     await AuthService.logout();
-    authStore.set({ isAuthenticated: false, userId: null });
+    authStore.set({ isAuthenticated: false, userId: null, capability: 'public' });
     showToast('sesion cerrada');
     navigate('/');
   }));

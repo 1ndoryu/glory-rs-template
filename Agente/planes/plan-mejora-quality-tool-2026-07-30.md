@@ -2,9 +2,9 @@
 
 > **Epic:** 297A-11
 > **Fecha:** 2026-07-30
-> **Estado:** ⏸️ Pendiente revisión
+> **Estado:** ✅ Lote VarSense reproducible implementado; deuda Sentinel documentada
 > **Auditoría fuente:** `auditoria-arquitectura-v4-2026-07-30.md`
-> **Objetivo:** Convertir el quality gate en un guardián arquitectónico que detecte automáticamente el 62% de los patrones problemáticos identificados en 4 auditorías
+> **Objetivo:** Convertir el quality gate en un guardián arquitectónico con cobertura medible y creciente sobre los patrones problemáticos identificados en 4 auditorías; la cobertura se reporta por versión y alcance, no como una cifra fija global.
 
 ---
 
@@ -15,7 +15,7 @@
 | Sentinel CLI (v0.4.0) | 7 built-in | Seguridad + sintaxis |
 | Sentinel config | 7 reglas (excluye dom.ts, frontend dir) | innerhtml, catch-vacio, hardcoded-secret |
 | **Custom scripts (standalone)** | **13 reglas P0/P1/P2** | **Arquitectura profunda** |
-| VarSense | 4 detectores | CSS tokens + clases |
+| VarSense | 4 detectores + extractor vanilla ampliado | CSS tokens + clases |
 | **Total** | **24 reglas activas** | **~65% de hallazgos detectables** |
 
 **Implementadas como scripts standalone (check-sentinel-extended.sh):**
@@ -48,11 +48,20 @@
 | variableNoDefinida | AST CSS | error | 🟢 Buena |
 | hardcoded CSS | Regex | warning | 🟢 Buena |
 | inline CSS | Regex | information | 🟢 Buena |
-| orphanClass | AST + grep | information | 🟢 Buena |
+| orphanClass | AST + grep + atributos `className`/`class` en TS/JS | information | 🟢 Buena |
+
+**Corrección 2026-07-31:** el indexador de clases de VarSense reconoce contratos vanilla estáticos usados por el frontend: `createEl({ className/class })`, `createContainer()`, `createExternalLink()`, `classList.add()`, declaraciones `className/contentClass`, templates/ternarios con literales estáticos y multilinea. Ignora comentarios, cadenas no ejecutables, interpolaciones dinámicas e identificadores arbitrarios; las clases realmente huérfanas siguen reportándose. El patch reproducible está en `scripts/quality/patches/varsense-class-index.patch`, fijado por SHA-256 `a93b8bf0640d52684268f7ed3c00a9598b13fcb7d7936802948b88fa231fe4bf` en `quality-tools.json`. `npm run quality:setup` valida hash, commit, diff exacto, compila y ejecuta los **43 tests** de VarSense de forma idempotente.
 
 **Anomalía:** Sentinel detecta errores de seguridad y sintaxis, pero **nada de arquitectura**. Cero reglas sobre: tamaño de archivos, responsabilidades, cleanup, imports, tipos duplicados, etc.
 
 ---
+
+## 0.1 Estado verificable del lote 2026-07-31
+
+- VarSense: **0 errores, 1 aviso informativo no bloqueante** en `npm run task:check -- 297A-12 --fresh`; las informaciones continúan visibles en el reporte.
+- Sentinel: **0 errores, 75 warnings** heredados; predominan `sqlx-query(-as)-sin-macro` y dos avisos de directorios sobre el límite. No se suprimen aquí: requieren migración SQLx o una decisión explícita en el núcleo de Sentinel.
+- Setup: `quality-tools.json` fija `varsense` en commit `b299040d2daa4b4dd3c3aeb4cca7dd5998b29901`, patch hashado y `testScript: test`; la instalación falla ante hash, commit o diff divergentes.
+- Validación: **43/43 tests VarSense**, **160/160 tests frontend en 12 suites**, TypeScript sin errores, `task:check` y `self-check` PASS.
 
 ## 1. Nuevas reglas Sentinel (17 reglas)
 
@@ -667,11 +676,11 @@ Estos son patrones válidos de organización, pero si hay más de 10 en un archi
 |---|---|---|
 | Reglas Sentinel | 7 | **22 (+15)** |
 | Detectores VarSense | 4 | **7 (+3)** |
-| Hallazgos detectables automáticamente | 25 (38%) | **53 (80%)** |
+| Hallazgos detectables automáticamente (proyección tras implementar todas las reglas propuestas) | 25 (38%) | **53 (80%)** |
 | Hallazgos no detectables sin AST | 11 (17%) | **10 (15%)** |
 | Hallazgos ya corregidos | 6 (9%) | 6 (9%) |
 
-**La cobertura automática sube de 38% a 80%.** Solo 15% de los hallazgos requerirían análisis AST/profiling que no justifica implementar. Las 5 reglas añadidas en la revisión (store-mutation-in-view, catch-silencioso, console-log-produccion, export-default-prohibido, any-type-prohibido) capturan 4 hallazgos adicionales que antes no eran detectables.
+**Proyección, no estado actual:** si se implementan todas las reglas propuestas, la cobertura del inventario de ese plan subiría de 38% a 80%. El estado operativo actual es el ~65% indicado en §0; la auditoría v4 usa otro inventario y reporta 57/78 (73%). Solo 15% de los hallazgos del inventario del plan requerirían análisis AST/profiling que no justifica implementar. Las 5 reglas añadidas en la revisión (store-mutation-in-view, catch-silencioso, console-log-produccion, export-default-prohibido, any-type-prohibido) capturan 4 hallazgos adicionales que antes no eran detectables.
 
 ---
 

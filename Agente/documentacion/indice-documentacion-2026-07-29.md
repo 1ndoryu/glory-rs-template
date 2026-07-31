@@ -18,6 +18,10 @@
 | ¿Cómo está la salud arquitectónica del frontend (v1)?   | `Agente/documentacion/arquitectura/auditoria-arquitectura-frontend-2026-07-30.md` |
 | ¿Auditoría profunda post-refactorización (v2)?           | `Agente/documentacion/arquitectura/auditoria-arquitectura-frontend-v2-2026-07-30.md` |
 | ¿Cómo se ejecuta la refactorización de módulos grandes? | `Agente/planes/plan-refactorizacion-arquitectura-2026-07-30.md`                    |
+| ¿Cómo preparar y ejecutar el piloto DeepSWE?            | `Agente/documentacion/herramientas/deepswe-piloto-2026-07-31.md`                  |
+| ¿Cómo se planifica el tema claro/oscuro del OS?         | `Agente/planes/plan-modo-oscuro-os-2026-07-31.md`                                  |
+| ¿Cómo se revisan SOLID y escalabilidad por fase?        | `Agente/documentacion/arquitectura/checkpoints-solid-escalabilidad-2026-07-31.md` |
+| ¿Cómo se agrega una nueva app al OS (receta canónica)?  | `Agente/documentacion/arquitectura/guia-agregar-app-2026-07-31.md`                 |
 
 ## Regla de autoridad
 
@@ -41,4 +45,4 @@
 - Plan Sentinel/VarSense editor-agnóstico: trabajo histórico documentado en tareas completadas.
 - Auditoría arquitectónica frontend v1: activa; plan de refactorización parcialmente ejecutado.
 - Auditoría arquitectónica frontend v2: activa; 3 críticos, 5 altos, 8 medios identificados.
-- Plan refactorización arquitectura: activo; ejecutar antes de 297A-12.
+- Plan refactorización arquitectura: activo; runtime móvil 297A-12 implementado parcialmente con `mobile-shell.ts`/`mobile-stack.ts`; revisar gate de transición antes de avanzar.

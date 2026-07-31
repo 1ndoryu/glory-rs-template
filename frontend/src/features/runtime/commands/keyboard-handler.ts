@@ -3,8 +3,8 @@
 
 import { CommandRegistry } from '../command-registry';
 
-export function initKeyboardShortcuts(): void {
-  document.addEventListener('keydown', (e) => {
+export function initKeyboardShortcuts(): () => void {
+  const onKeyDown = (e: KeyboardEvent): void => {
     const target = e.target as HTMLElement;
     if (
       target.tagName === 'INPUT'
@@ -22,7 +22,10 @@ export function initKeyboardShortcuts(): void {
         return;
       }
     }
-  });
+  };
+
+  document.addEventListener('keydown', onKeyDown);
+  return () => { document.removeEventListener('keydown', onKeyDown); };
 }
 
 function matchesShortcut(e: KeyboardEvent, shortcut: string): boolean {

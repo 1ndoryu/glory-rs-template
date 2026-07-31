@@ -1,4 +1,4 @@
-/* wandori.us — Mobile visual prototype
+/* wandori.us — Mobile visual prototype (legacy reference)
  * [297A-12] Concepto navegable para aprobar launcher, apps dominantes y Back/Home.
  * Gotcha: usa contenido de muestra deliberadamente; no persiste estado ni sustituye
  * MobileAppStack, AppRegistry o los comandos compartidos del runtime final. */

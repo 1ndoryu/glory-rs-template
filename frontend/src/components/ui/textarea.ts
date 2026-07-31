@@ -21,7 +21,10 @@ export function createTextarea(options: TextareaOptions): HTMLElement {
   }
 
   const textarea = createEl('textarea', {
-    className: 'campo-textarea', value, rows: String(rows),
+    className: 'campo-textarea',
+    value,
+    rows: String(rows),
+    'data-transient': 'true',
   });
   if (placeholder) textarea.placeholder = placeholder;
 
