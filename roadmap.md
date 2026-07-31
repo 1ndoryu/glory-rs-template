@@ -88,7 +88,7 @@
 
 **Depende de:** 297A-9/11. Tablet conserva desktop.
 
-- [ ] Prototipo visual móvil y aprobación del usuario.
+- [x] Prototipo visual móvil aprobado por el usuario (2026-07-30).
 - [ ] Launcher + MobileAppStack con las mismas apps.
 - [ ] Apps full-screen, sin ventanas/barra superior/taskbar.
 - [ ] Back/Home/long press, carpetas y `mobileOrder`.

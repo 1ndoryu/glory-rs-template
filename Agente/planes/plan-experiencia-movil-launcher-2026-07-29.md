@@ -2,7 +2,7 @@
 
 > **Tarea:** 297A-12  
 > **Fecha:** 2026-07-29  
-> **Estado:** prototipo visual implementado; pendiente de aprobación explícita
+> **Estado:** prototipo visual aprobado; runtime móvil pendiente
 > **Alcance:** teléfonos `<768px`; tablet conserva experiencia desktop
 
 ## 1. Resultado
@@ -55,7 +55,7 @@ interface MobileNavigationState {
 - [x] Mostrar Tienda/Compra móvil sin integrar pago.
 - [x] Definir navegación Back/Home sin barras desktop.
 - [x] Revisar 390×844, 360×800 y 320px; confirmar escritorio en tablet 768px.
-- [ ] Obtener aprobación explícita del usuario antes de implementar runtime móvil.
+- [x] Obtener aprobación explícita del usuario antes de implementar runtime móvil. *(2026-07-30)*
 
 **Implementación de revisión:** `frontend/src/features/mobile/mobile-prototype.ts` y
 `frontend/src/styles/mobile/mobile-prototype.css`. Los datos son demostrativos y el
