@@ -176,15 +176,17 @@
 
 ### 297A-13 — Registro y overlay remoto
 
-**Depende de:** 297A-8/11; integra móvil 297A-12.
+**Depende de:** 297A-8/11; integra móvil 297A-12. Plan maestro §6.2 y manual de identidad §10/13.
 
+- [ ] Cuenta como app del escritorio: registrar en AppRegistry con estados invitado/autenticado/verificación pendiente/MFA; deep links `/login` y `/register` abren la app Cuenta.
+- [ ] Icono de estado de sesión en la barra superior (junto al tema) que abre la app Cuenta y refleja login/logout; el login/registro se hace dentro de la misma app cuando está deslogueado (sin modal de página completa).
 - [ ] Habilitar registro verificado.
 - [ ] Overlay remoto y preferencias.
 - [ ] Importar local/usar remoto/reset explícito.
 - [ ] Merge por ID/campo y 409 visible.
 - [ ] Pruebas dos dispositivos/release nuevo.
 
-**Salida:** cuenta sincroniza sin sobrescribir ni restaurar recursos retirados.
+**Salida:** la cuenta es un programa del OS con estado visible desde la barra superior; el usuario se registra/inicia sesión dentro de la app Cuenta y su configuración sincroniza sin sobrescribir ni restaurar recursos retirados.
 
 ### 297A-14 — Programas editoriales
 
