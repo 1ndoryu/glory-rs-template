@@ -13,7 +13,7 @@ import type {
 } from './types';
 
 /* Re-export stores y constantes desde stores.ts */
-export { releaseStore, overlayStore, workspaceStore, EMPTY_OVERLAY } from './stores';
+export { releaseStore, overlayStore, workspaceStore, EMPTY_OVERLAY, previewPublicStore } from './stores';
 
 /* Import local para funciones API */
 import { releaseStore, overlayStore, workspaceStore, EMPTY_OVERLAY } from './stores';

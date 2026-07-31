@@ -10,6 +10,7 @@ import {
   workspaceStore,
   publishWorkspace,
   rollbackWorkspace,
+  previewPublicStore,
   setClipboard,
   getClipboard,
   pasteFromClipboard,
@@ -222,6 +223,26 @@ CommandRegistry.register({
     }
     const pasted = pasteFromClipboard(parentId);
     if (pasted.length === 0) return { status: 'failure', reason: 'no se pudo pegar (ciclo o destino inválido)' };
+    return { status: 'success' };
+  },
+});
+
+CommandRegistry.register({
+  id: 'workspace:preview-public',
+  label: 'Vista pública',
+  order: 35,
+  contexts: ['desktop'],
+  requires: 'admin',
+  undoPolicy: 'none',
+  analyticsEvent: 'workspace.preview_public',
+  isAvailable: (ctx) => {
+    if (ctx.capability !== 'admin') return { state: 'hidden' };
+    return { state: 'enabled' };
+  },
+  execute: (): CommandResult => {
+    const current = previewPublicStore.get();
+    previewPublicStore.set(!current);
+    showToast(current ? 'Vista personal restaurada' : 'Viendo como visitante');
     return { status: 'success' };
   },
 });

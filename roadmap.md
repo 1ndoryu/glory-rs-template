@@ -80,7 +80,7 @@
 - [x] Split de archivos grandes: command-registration (725→6), workspace-store (430→4), desktop-shell (419→3).
 - [x] Migración workspace_releases con seed data. *(20260731000000)*
 - [x] Draft/release/preview/publicar/rollback. *(diff.ts + publish con confirmación + rollbackWorkspace)*
-- [ ] Organizador público separado del workspace admin personal.
+- [x] Organizador público separado del workspace admin personal. *(previewPublicStore + workspace:preview-public)*
 
 **Salida:** admin publica el preview exacto; visitante reorganiza sin escribir global.
 

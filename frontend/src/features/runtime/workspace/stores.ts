@@ -15,6 +15,10 @@ import type {
 const OVERLAY_KEY = 'wandorius:workspace-overlay';
 const OVERLAY_VERSION = 1;
 
+/** Modo vista pública: cuando activo, el workspace muestra solo el release
+ *  (lo que ven los visitantes), ignorando el overlay del admin. */
+export const previewPublicStore = createStore<boolean>(false);
+
 export const EMPTY_OVERLAY: WorkspaceOverlay = {
   version: OVERLAY_VERSION,
   addedItems: {},
@@ -64,7 +68,7 @@ function scheduleRecompute(): void {
   queueMicrotask(() => {
     recomputeScheduled = false;
     const release = releaseStore.get();
-    const overlay = overlayStore.get();
+    const overlay = previewPublicStore.get() ? EMPTY_OVERLAY : overlayStore.get();
     const auth = authStore.get();
     const capability: 'public' | 'authenticated' | 'admin' = auth.isAuthenticated ? 'admin' : 'public';
 
@@ -88,3 +92,4 @@ function scheduleRecompute(): void {
 releaseStore.subscribe(() => scheduleRecompute());
 overlayStore.subscribe(() => scheduleRecompute());
 authStore.subscribe(() => scheduleRecompute());
+previewPublicStore.subscribe(() => scheduleRecompute());
