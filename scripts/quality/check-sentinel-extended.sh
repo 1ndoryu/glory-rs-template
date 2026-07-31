@@ -159,29 +159,38 @@ echo ""
 
 # === P2: interface-grande (>10 campos) ===
 echo "--- P2: Interfaces grandes (>10 campos) ---"
-# Buscar interfaces con más de 10 campos.
-# Maneja interfaces multi-línea Y de una sola línea.
+# Contar campos reales (líneas con nombre: tipo;) ignorando tipos anidados Array<{...}>.
+# Cuenta líneas que empiezan con espacios + identificador + opcional ? + :
 LARGE_INTERFACES=$(find "$FRONTEND_SRC" -name '*.ts' ! -name '*.d.ts' ! -name '*.test.ts' \
   ! -path '*/node_modules/*' 2>/dev/null \
   | while IFS= read -r file; do
       awk '
         /^export interface |^interface / {
-          name=$0; count=0; in_iface=1
+          name=$0; count=0; in_iface=1; brace_depth=0
           # Contar campos en la misma línea (interface de una sola línea)
-          line=$0
-          gsub(/[^;]+/, "", line)
-          count = length(line)
-          # Si la línea tiene }, terminar inmediatamente
-          if ($0 ~ /\}/) {
+          n = split($0, parts, "")
+          for (i = 1; i <= n; i++) {
+            if (parts[i] == "{") brace_depth++
+            if (parts[i] == "}") brace_depth--
+          }
+          # Contar campos como líneas con "  campo?:" o "  campo:"
+          line = $0
+          gsub(/[^:]+/, "", line)
+          field_count = length(line)
+          # Restar 1 por el { de apertura
+          if (field_count > 0) count = field_count - 1
+          if (brace_depth <= 0) {
             if (count > 10) print FILENAME":"NR": "name" ("count" campos)"
             in_iface=0
           }
           next
         }
-        in_iface && /;/ {
-          line=$0
-          gsub(/[^;]+/, "", line)
-          count += length(line)
+        in_iface && /^[[:space:]]+[A-Za-z_][A-Za-z0-9_]*\??:/ {
+          count++
+        }
+        in_iface && /^[[:space:]]*\[/ {
+          # Index signature como [key: string]: ... — contar como 1 campo
+          count++
         }
         in_iface && /^}/ {
           if (count > 10) print FILENAME":"NR": "name" ("count" campos)"
