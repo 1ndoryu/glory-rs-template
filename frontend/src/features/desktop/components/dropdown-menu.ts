@@ -7,6 +7,7 @@
 import { createElement, type IconNode } from 'lucide';
 import { createEl } from '../../../utils/dom';
 import { getViewport } from '../../../utils/viewport';
+import { formatShortcut } from '../../../utils/format-shortcut';
 
 export interface DropdownMenuItem {
   readonly icon?: IconNode;
@@ -71,7 +72,9 @@ export function createDropdownItem(item: DropdownMenuItem): HTMLElement {
   el.appendChild(createEl('span', { className: 'desktop-context-menu__label', textContent: item.label }));
 
   if (item.shortcut) {
-    el.appendChild(createEl('span', { className: 'desktop-context-menu__shortcut', textContent: item.shortcut }));
+    /* [297A-20] Atajo renderizado con glifos de tecla (Meta+Shift+l -> ⌘⇧L).
+     * Para revertir: volver a textContent: item.shortcut. */
+    el.appendChild(createEl('span', { className: 'desktop-context-menu__shortcut', textContent: formatShortcut(item.shortcut) }));
   }
 
   if (item.disabled) {

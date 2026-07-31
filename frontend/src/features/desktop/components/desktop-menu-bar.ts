@@ -6,6 +6,7 @@
 
 import { createElement, FileUser, Folder, type IconNode } from 'lucide';
 import { createEl } from '../../../utils/dom';
+import { formatShortcut } from '../../../utils/format-shortcut';
 import { AppRegistry, type Capability } from '../../runtime/app-registry';
 import { authStore } from '../../../store';
 import { ArticleService } from '../../../services';
@@ -95,7 +96,9 @@ function createMenuItem(
   }
   children.push(createEl('span', { className: 'desktop-context-menu__label', textContent: label }));
   if (options?.shortcut) {
-    children.push(createEl('span', { className: 'desktop-context-menu__shortcut', textContent: options.shortcut }));
+    /* [297A-20] Atajo renderizado con glifos de tecla (Meta+Shift+l -> ⌘⇧L).
+     * Para revertir: volver a textContent: options.shortcut. */
+    children.push(createEl('span', { className: 'desktop-context-menu__shortcut', textContent: formatShortcut(options.shortcut) }));
   }
 
   const item = createEl('div', { className: 'desktop-context-menu__item', role: 'menuitem' }, ...children);

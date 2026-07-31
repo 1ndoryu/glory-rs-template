@@ -9,7 +9,12 @@
   background: var(--sistema-superficie);
   border: var(--sistema-borde);
   font-family: var(--fuente-sistema);
-  font-size: var(--sistema-texto-tamano);
+  /* [297A-20] Prueba de usuario: texto 2px menor (13px -> 11px).
+   * Antes usaba --sistema-texto-tamano (13px) y anulaba el token dedicado
+   * --sistema-menu-contexto-texto-tamano (11px) que ya consumen dropdowns
+   * y menus moviles. Consumir el token unifica todos los menus contextuales.
+   * Para revertir: volver a var(--sistema-texto-tamano). */
+  font-size: var(--sistema-menu-contexto-texto-tamano);
 }
 
 .desktop-context-menu__item {
@@ -72,7 +77,10 @@
 
 .desktop-context-menu__shortcut {
   flex: 0 0 auto;
-  font-size: var(--tamano-pequeno);
+  /* [297A-20] Prueba de usuario: el atajo tambien baja 2px (13px -> 11px),
+   * alineado con el texto del item. Antes usaba --tamano-pequeno (13px).
+   * Para revertir: volver a var(--tamano-pequeno). */
+  font-size: var(--sistema-menu-contexto-texto-tamano);
   color: var(--sistema-texto-secundario);
   margin-left: var(--espacio-md);
 }
