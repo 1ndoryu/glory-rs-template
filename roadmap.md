@@ -15,6 +15,8 @@
 - Plan móvil: `Agente/planes/plan-experiencia-movil-launcher-2026-07-29.md`
 - Quality gate: `Agente/planes/completados/plan-escalabilidad-sentinel-wandorius-2026-07-29.md`
 - Prevención: `Agente/prevencion/prevencion-wandorius-sentinel-varsense-2026-07-29.md`
+- Tema claro/oscuro: `Agente/planes/plan-modo-oscuro-os-2026-07-31.md`
+- Checkpoints SOLID/escalabilidad: `Agente/documentacion/arquitectura/checkpoints-solid-escalabilidad-2026-07-31.md`
 
 ## Estado y reglas
 
@@ -99,6 +101,19 @@
 - [ ] Pruebas visuales/E2E 320/360/390 y tablet 768.
 
 **Salida:** teléfono funciona como launcher sin duplicar lógica; tablet sigue como escritorio.
+
+### 297A-18 — Tema claro/oscuro del sistema
+
+**Depende de:** 297A-9/12; la persistencia remota se completa con 297A-13. No se implementa hasta validar el concepto visual.
+
+- [ ] Definir tokens semánticos para fondo, texto, bordes, estados, foco, selección, menús, ventanas y taskbar; ningún componente podrá fijar colores directamente.
+- [ ] Añadir un único botón global `Claro/Oscuro` en el chrome del OS, con icono Lucide de 1px, etiqueta accesible y estado visible; Configuración solo reutiliza ese comando.
+- [ ] Usar `data-theme`/atributo equivalente en el shell para que desktop, tablet y launcher móvil compartan la misma implementación; multimedia puede conservar color, el chrome sigue monocromo.
+- [ ] Resolver preferencia inicial por sistema operativo y permitir override explícito; guardar anónimo en overlay local y sincronizar la preferencia de cuenta sin sobrescribir decisiones locales silenciosamente.
+- [ ] Evitar flash de tema en la primera pintura, soportar logout/login y conflictos de preferencia, y emitir un evento `theme_changed` medible con modo y `presentationMode`.
+- [ ] Validar contraste AA, foco/teclado, reduced motion, zoom 200%, 1440x900, 1024x768, 390x844 y 320px; preparar capturas comparables para aprobación visual.
+
+**Salida:** el usuario cambia claro/oscuro desde un control único, la preferencia sobrevive según su ámbito y ninguna app duplica tokens o lógica de tema.
 
 ### 297A-13 — Registro y overlay remoto
 
@@ -208,3 +223,29 @@ Este bloque amplía el alcance verificable sin duplicar los manuales canónicos.
 - [ ] Validar HTML público, sitemap, metadata y Open Graph sin exponer drafts ni rutas privadas.
 - [ ] Verificar manual visual, teclado, foco, live regions, zoom 200%, reduced motion, alto contraste y multimedia accesible.
 - [ ] Ejecutar Sentinel, VarSense, type-check, tests, E2E, presupuestos de rendimiento, observabilidad y runbook Coolify; deploy continúa fuera de alcance.
+
+## Revisión SOLID y escalabilidad por fase
+
+Cada fase termina con esta revisión antes de marcar su salida. La revisión debe quedar evidenciada en el plan de la fase, en el quality gate y en el commit; no se acepta “lo refactorizamos después”.
+
+### Checklist común de cierre
+
+- [ ] **SRP/ISP:** cada módulo tiene una responsabilidad clara, las interfaces exponen solo capacidades necesarias y los componentes no mezclan chrome, contenido, persistencia y analítica.
+- [ ] **OCP/DIP:** nuevas apps, recursos, comandos y temas se agregan mediante registros/adaptadores; no se crean `if/else` globales ni copias por plataforma.
+- [ ] **Límites:** componentes/CSS ≤300 líneas, lifecycle/store/hook ≤120 y utils ≤150; dividir antes de superar el límite y justificar cualquier excepción.
+- [ ] **Contratos:** tipos, DTOs, errores, permisos y eventos son explícitos; no hay estado duplicado, listeners sin teardown, I/O silencioso ni roundtrips N+1.
+- [ ] **Escalabilidad:** se prueba un segundo caso real (otra app, recurso, usuario, tema o viewport), se revisan índices/paginación/cache y se documenta el impacto de migración y rollback.
+- [ ] **Calidad:** Sentinel/VarSense, type-check, tests y prueba funcional/visual pasan; cualquier falso positivo queda documentado en `Agente/prevencion/`.
+
+### Foco obligatorio por fase
+
+- [ ] **297A-9 Runtime:** registry/adapters y WindowManager no conocen apps concretas; agregar una app no modifica el shell ni duplica listeners.
+- [ ] **297A-10 Recursos:** services/repositories/DTOs permanecen separados; un nuevo `resourceKind` no altera recursos existentes ni filtra metadata privada.
+- [ ] **297A-11 Workspace:** referencias, overlay, clipboard y papelera son composables; mover/copiar un tipo nuevo conserva atomicidad, permisos y undo.
+- [ ] **297A-12 Móvil:** launcher y desktop consumen las mismas apps/comandos; un nuevo breakpoint no crea una app paralela ni pierde estado de ruta.
+- [ ] **297A-18 Tema:** el botón solo despacha un comando y los tokens viven en el sistema visual; agregar un tercer tema de prueba no requiere reescribir componentes.
+- [ ] **297A-13 Cuentas:** merge, sesión y preferencias se resuelven por servicios/adaptadores; otro proveedor de identidad no duplica el flujo ni restaura tombstones.
+- [ ] **297A-14 Editorial:** editores comparten primitives y capacidades; añadir un tipo de documento no amplía el monolito Admin ni copia ventanas.
+- [ ] **297A-15 Comercio:** pago, webhook, entitlement y grants son servicios independientes; otro proveedor o versión no cambia la autoridad server-side.
+- [ ] **297A-16 Analytics:** catálogo, dispatcher y agregados son extensibles; añadir un evento no expone datos ni obliga a reescribir paneles existentes.
+- [ ] **297A-17 Hardening:** las reglas se ejecutan igual en local/CI y el runbook cubre rollback; ninguna excepción de Sentinel/VarSense oculta deuda estructural.
