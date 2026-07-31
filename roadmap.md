@@ -4,7 +4,7 @@
 > **Stack:** Rust/Axum + PostgreSQL + Vanilla TypeScript/Vite
 > **Deploy:** no planificado
 > **Epic:** 297A-4 — OS persistente, cuentas, programas y comercio
-> **Visual:** identidad desktop y prototipo móvil aprobados; shell móvil real y transición dinámica por URL/params implementados, validación visual/E2E pendiente
+> **Visual:** identidad desktop y prototipo móvil aprobados; shell móvil, transición dinámica y primera interacción launcher implementados, validación visual/E2E pendiente
 
 ## Fuentes canónicas
 
@@ -25,14 +25,14 @@
 - Workspace overlay implementado: release + overlay + merge + clipboard + papelera + crear carpetas.
 - Split de archivos grandes completado: command-registration (725→6), workspace-store (430→4), desktop-shell (419→3).
 - Sesiones opacas en cookie operativas; JWT localStorage eliminado del frontend. `/admin` legacy y uploads públicos siguen como deuda controlada.
-- **Quality tool sprint completo:** 13 reglas custom (P0/P1/P2) + 7 Sentinel CLI + 4 VarSense = 24 reglas activas, ~65% cobertura de hallazgos. VarSense reconoce clases dinámicas de fábricas DOM vanilla. Auditoría v4 al 83% (19/23). ISP refactor DomAttrs (33→6 sub-interfaces). 156 tests en 11 suites.
+- **Quality tool sprint:** 13 reglas custom (P0/P1/P2) + 7 Sentinel CLI + 4 VarSense = 24 reglas activas; la cobertura operativa estimada del quality tool es ~65% del inventario de patrones automatizables definido en el plan. VarSense reconoce contratos vanilla de clases con patch reproducible (`a93b8bf0…`, 43 tests del tool). Último gate 297A-12: VarSense 0 errores/1 aviso informativo, Sentinel 0 errores + 75 warnings heredados. Auditoría v4 reporta por separado 57/78 hallazgos arquitectónicos potencialmente detectables (73%) y 19/23 correcciones del checklist base (83%); no son denominadores comparables. ISP refactor DomAttrs (33→6 sub-interfaces). Frontend: 160 tests en 12 suites.
 - Ejecutar una tarea por vez y en este orden; no saltar dependencias.
 - El plan maestro contiene checklists/gates. El roadmap conserva solo pendientes.
 - El quality gate está operativo; toda tarea futura debe cerrarse con `npm run task:check -- {ID}`.
 
 ## Siguiente bloque habilitado
 
-**297A-12 — Runtime móvil parcial implementado.** El shell/stack real está validado por type-check, tests y quality gate. Quedan transición dinámica móvil↔tablet, pruebas visuales en navegador, reorder/long press y cierre de apps críticas.
+**297A-12 — Runtime móvil parcial implementado.** Shell/stack, transición dinámica, long press, menú contextual compartido, reorder accesible y frontera de capacidades están validados por type-check, 160 tests y quality gate. Quedan pruebas visuales/E2E en navegador, estados transitorios, safe areas y apps críticas.
 
 **297A-10 — Recursos y migraciones (completado).** Resource envelope, product versions, asset states, services con transacción, DTO público/admin y About seeder.
 
@@ -96,25 +96,26 @@
 - [x] Prototipo visual móvil aprobado por el usuario (2026-07-30).
 - [x] Launcher + MobileAppStack con las mismas apps.
 - [x] Shell móvil full-screen, sin ventanas/barra superior/taskbar; validación visual por viewport pendiente.
-- [x] Back/Home y carpetas consumen workspace/registry; Back/Home sincronizan URL; long press y reorder siguen pendientes.
+- [x] Back/Home y carpetas consumen workspace/registry; Back/Home sincronizan URL; long press y reorder accesible consumen CommandRegistry y `mobileOrder`.
 - [x] Transición dinámica móvil↔tablet sin recarga mediante reinstanciación segura.
 - [x] Cambio móvil↔tablet conserva app/recurso por URL/params; estados transitorios siguen pendientes.
-- [ ] Pruebas visuales/E2E 320/360/390 y tablet 768.
+- [ ] Pruebas visuales/E2E 320/360/390 y tablet 768; orientación, safe areas, teclado virtual y estados transitorios.
 
 **Salida:** teléfono funciona como launcher sin duplicar lógica; tablet sigue como escritorio.
 
-### 297A-18 — Tema claro/oscuro del sistema
+### 297A-18 — Tema claro/oscuro del sistema (implementado; remoto y matriz de validación pendientes)
 
-**Depende de:** 297A-9/12; la persistencia remota se completa con 297A-13. No se implementa hasta validar el concepto visual.
+**Depende de:** 297A-9/12; la persistencia remota se completa con 297A-13.
 
-- [ ] Definir tokens semánticos para fondo, texto, bordes, estados, foco, selección, menús, ventanas y taskbar; ningún componente podrá fijar colores directamente.
-- [ ] Añadir un único botón global `Claro/Oscuro` en el chrome del OS, con icono Lucide de 1px, etiqueta accesible y estado visible; Configuración solo reutiliza ese comando.
-- [ ] Usar `data-theme`/atributo equivalente en el shell para que desktop, tablet y launcher móvil compartan la misma implementación; multimedia puede conservar color, el chrome sigue monocromo.
-- [ ] Resolver preferencia inicial por sistema operativo y permitir override explícito; guardar anónimo en overlay local y sincronizar la preferencia de cuenta sin sobrescribir decisiones locales silenciosamente.
-- [ ] Evitar flash de tema en la primera pintura, soportar logout/login y conflictos de preferencia, y emitir un evento `theme_changed` medible con modo y `presentationMode`.
-- [ ] Validar contraste AA, foco/teclado, reduced motion, zoom 200%, 1440x900, 1024x768, 390x844 y 320px; preparar capturas comparables para aprobación visual.
+- [x] Definir tokens semánticos para fondo, texto, bordes, estados, foco, selección, menús, ventanas y taskbar; ningún componente podrá fijar colores directamente. *(variables.css + migración de 8 CSS del OS)*
+- [x] Añadir un único botón global `Claro/Oscuro` en el chrome del OS, con icono Lucide de 1px, etiqueta accesible y estado visible; Configuración solo reutiliza ese comando. *(comando `theme:toggle` + botón compartido en barra superior y launcher móvil, junto a la hora)*
+- [x] Usar `data-theme`/atributo equivalente en el shell para que desktop, tablet y launcher móvil compartan la misma implementación; multimedia puede conservar color, el chrome sigue monocromo. *(data-tema en documentElement + override scoped para superficies del OS)*
+- [x] Resolver preferencia inicial por sistema operativo y permitir override explícito. *(matchMedia + localStorage `wandorius:tema`)*
+- [x] Evitar flash de tema en la primera pintura y emitir un evento `theme_changed` medible con modo. *(script inline en index.html + ThemeEvent en dispatcher)*
+- [ ] Guardar anónimo en overlay local y sincronizar la preferencia de cuenta sin sobrescribir decisiones locales silenciosamente; logout/login y conflictos de preferencia. *(bloqueado por 297A-13 overlay remoto)*
+- [ ] Validar contraste AA completo, foco/teclado, reduced motion, zoom 200%, 1440x900, 1024x768, 390x844 y 320px; preparar capturas comparables para aprobación visual. *(legibilidad dark verificada en navegador para la ventana Perfil)*
 
-**Salida:** el usuario cambia claro/oscuro desde un control único, la preferencia sobrevive según su ámbito y ninguna app duplica tokens o lógica de tema.
+**Salida:** el usuario cambia claro/oscuro desde un control único; la preferencia local sobrevive; falta sync remota (297A-13) y la matriz de validación completa.
 
 ### 297A-19 — URLs canónicas, deep links y ventana enfocada
 
