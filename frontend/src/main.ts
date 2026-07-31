@@ -19,23 +19,26 @@ import './styles/desktop/desktop-trash.css';
 import './styles/mobile/mobile-prototype.css';
 
 /* Core */
-import { addRoute, setOutlet, initRouter } from './router';
+import { addRoute, setOutlet, initRouter, refreshRoute } from './router';
 import { createSidebar } from './components/layout/sidebar';
 import { createProfile } from './components/layout/profile';
 import { createDesktopShell } from './features/desktop/desktop-shell';
-import { createMobilePrototype } from './features/mobile/mobile-prototype';
+import { createMobileShell } from './features/mobile/mobile-shell';
 import './features/runtime/app-registration';
 import './features/runtime/commands';
 import { initKeyboardShortcuts } from './features/runtime/commands';
-import { initRouteAppAdapter } from './features/runtime/route-app-adapter';
+import { initRouteAppAdapter, setMobileOpenHandler, openAppWindow } from './features/runtime/route-app-adapter';
 import { AppRegistry } from './features/runtime/app-registry';
 import { initResourceTypeRegistry } from './features/runtime/resource-type-registry';
 import { setActorCategory } from './features/analytics/dispatcher';
 import { loadSavedFonts } from './features/settings/font-panel';
 import { initTracking, trackPageView } from './features/analytics/tracker';
+import { initThemeStore } from './features/runtime/theme-store';
 import { authStore, showProfile, showSidebar, siteConfig } from './store';
 import { AuthService } from './services';
 import { fetchWorkspaceRelease } from './features/runtime/workspace/workspace-store';
+import { getTopMobileApp } from './features/mobile/mobile-stack';
+import { closeAllWindows, windowStore } from './features/runtime/window-manager';
 import { createEl } from './utils/dom';
 import { getPresentationMode } from './utils/viewport';
 
@@ -68,19 +71,22 @@ addRoute({ path: '/checkout/cancel', render: () => renderCheckoutCancel() });
 
 /* === Inicializar aplicacion === */
 async function initApp(): Promise<void> {
+  /* [297A-18] Aplicar tema persistido y escuchar al SO antes de renderizar
+   * (el anti-flash de index.html ya puso data-tema en la primera pintura). */
+  initThemeStore();
   const app = document.getElementById('app');
   if (!app) return;
-  const isMobilePrototype = getPresentationMode() === 'mobile';
+  let isMobile = getPresentationMode() === 'mobile';
 
   /* [297A-8] Verificar sesión existente al arrancar.
    * Las cookies HttpOnly se envían automáticamente con credentials: 'include'.
    * Si /auth/me responde con usuario válido, marcamos como autenticado. */
   try {
-    await AuthService.me();
-    setActorCategory('authenticated');
+    const auth = await AuthService.me();
+    setActorCategory(auth.capability === 'public' ? 'anonymous' : auth.capability);
   } catch {
     /* No hay sesión válida — permanecer como invitado */
-    authStore.set({ isAuthenticated: false, userId: null });
+    authStore.set({ isAuthenticated: false, userId: null, capability: 'public' });
     setActorCategory('anonymous');
   }
 
@@ -99,7 +105,7 @@ async function initApp(): Promise<void> {
 
   /* [297A-12] El concepto móvil arranca en launcher. La preferencia definitiva
    * y la transición entre modos pertenecen a MobileAppStack, tras aprobación. */
-  if (isMobilePrototype) showSidebar.set(false, 'init');
+  if (isMobile) showSidebar.set(false, 'init');
 
   /* [Plan §2.2] navigation.toggleExternalNav: toggle sidebar */
   showSidebar.subscribe((visible) => {
@@ -110,21 +116,54 @@ async function initApp(): Promise<void> {
   /* Columna derecha: superficie exclusiva del escritorio */
   const columnaDerecha = createEl('div', { className: 'columna-derecha' });
 
+  /* Registrar asociaciones antes de pintar el launcher: el primer render ya
+   * debe resolver iconos y apps de recursos sin depender del orden de listeners. */
+  initResourceTypeRegistry();
+
   /* Perfil y outlet conservan sus contratos; el shell solo cambia su presentación. */
   const profile = createProfile();
   const contenido = createEl('main', { className: 'contenido-principal' });
 
-  const desktop = isMobilePrototype ? null : createDesktopShell(profile, contenido);
-  const mobile = isMobilePrototype
-    ? createMobilePrototype(profile, () => showSidebar.update((visible) => !visible))
-    : null;
-  columnaDerecha.appendChild(mobile?.element ?? desktop!.element);
+  let desktop: ReturnType<typeof createDesktopShell> | null = null;
+  let mobile: ReturnType<typeof createMobileShell> | null = null;
+  let stopKeyboard: (() => void) | undefined;
+
+  function mountPresentation(mobileMode: boolean): void {
+    isMobile = mobileMode;
+    if (mobileMode) {
+      mobile = createMobileShell(profile, () => showSidebar.update((visible) => !visible));
+      columnaDerecha.appendChild(mobile.element);
+    } else {
+      desktop = createDesktopShell(profile, contenido);
+      columnaDerecha.appendChild(desktop.element);
+      stopKeyboard = initKeyboardShortcuts();
+    }
+    setOutlet(mobile?.routerOutlet ?? contenido);
+    setMobileOpenHandler(mobile?.openApp ?? null);
+  }
+
+  function unmountPresentation(): void {
+    setMobileOpenHandler(null);
+    stopKeyboard?.();
+    stopKeyboard = undefined;
+    if (desktop) {
+      closeAllWindows();
+      desktop.destroy();
+      desktop = null;
+    }
+    if (mobile) {
+      mobile.destroy();
+      mobile = null;
+    }
+  }
+
+  mountPresentation(isMobile);
 
   app.appendChild(columnaDerecha);
 
   /* [Plan §9.1] Actualizar actor category al cambiar auth durante la sesión */
   authStore.subscribe((state) => {
-    setActorCategory(state.isAuthenticated ? 'authenticated' : 'anonymous');
+    setActorCategory(state.capability === 'public' ? 'anonymous' : state.capability);
   });
 
   /* Control de visibilidad del profile:
@@ -140,15 +179,16 @@ async function initApp(): Promise<void> {
     }
   });
 
-  /* Configurar outlet del router */
-  setOutlet(mobile?.routerOutlet ?? contenido);
-
   /* Control de visibilidad del contenido principal (legacy outlet):
    * Se oculta cuando la ruta es manejada por una app del runtime (ventana propia),
    * o en home cuando las entradas están desactivadas. */
   function updateContenidoVisibility(): void {
-    if (!desktop) return;
     const path = window.location.pathname;
+    if (!desktop) {
+      const isAppRoute = !!AppRegistry.findByRoute(path);
+      mobile?.setLegacyContentVisible(path !== '/' && !isAppRoute);
+      return;
+    }
     const isHome = path === '/';
     const showEntries = siteConfig.get().showEntriesOnHome;
     const isAppRoute = !!AppRegistry.findByRoute(path);
@@ -166,20 +206,63 @@ async function initApp(): Promise<void> {
   /* Tracking de page views — cleanup almacenado para posible teardown */
   const stopTracking = initTracking();
 
-  /* Iniciar atajos de teclado del OS */
-  if (desktop) initKeyboardShortcuts();
-
-  /* Iniciar RouteAppAdapter — intercepta rutas de apps para abrir ventanas */
-  if (desktop) initRouteAppAdapter();
-
-  /* Iniciar Resource Type Registry — asociaciones tipo→app */
-  initResourceTypeRegistry();
+  /* Registrar primero el destino móvil y después el interceptor: una navegación
+   * inicial nunca puede caer accidentalmente en una ventana desktop. */
+  const stopMobileAdapter = (): void => {
+    setMobileOpenHandler(null);
+  };
+  const stopRouteAdapter = initRouteAppAdapter();
 
   /* Iniciar router — cleanup almacenado */
   const stopRouter = initRouter();
 
-  /* Exponer cleanups globalmente para posibles teardowns futuros */
-  (window as unknown as Record<string, unknown>).__wandoriusCleanup = { stopTracking, stopRouter };
+  /* La URL conserva la app/recurso; al cambiar de breakpoint se reinstancia
+   * en el shell nuevo en lugar de transferir MountedView entre stores. */
+  const mediaQuery = window.matchMedia('(max-width: 767px)');
+  let transitionRequest = 0;
+  let transitionQueue: Promise<void> = Promise.resolve();
+  const onPresentationChange = (event: MediaQueryListEvent): void => {
+    const requestId = ++transitionRequest;
+    transitionQueue = transitionQueue.then(async () => {
+      if (requestId !== transitionRequest || event.matches === isMobile) return;
+
+      const focusedWindow = windowStore.get().find((win) => win.focused);
+      const activeMobile = getTopMobileApp();
+      const activeAppId = focusedWindow?.appId ?? activeMobile?.appId;
+      const activeParams = focusedWindow?.params ?? activeMobile?.params;
+      const activeProfile = focusedWindow?.instanceId === 'shell-profile' || activeMobile?.appId === 'profile';
+      const currentPath = window.location.pathname;
+
+      unmountPresentation();
+      mountPresentation(event.matches);
+      await refreshRoute();
+
+      if (requestId !== transitionRequest) return;
+      if (activeProfile && event.matches && mobile) {
+        mobile.openProfile();
+      } else if (activeAppId && activeAppId !== 'profile' && !AppRegistry.findByRoute(currentPath)) {
+        await openAppWindow(activeAppId, activeParams ? { ...activeParams } : undefined);
+      }
+    }).catch(() => {
+      /* Una transición fallida no debe romper el listener de futuros cambios. */
+    });
+  };
+  mediaQuery.addEventListener('change', onPresentationChange);
+
+  /* Exponer un único teardown idempotente para integraciones/hot reload.
+   * El orden libera primero eventos globales y termina desmontando la presentación. */
+  let cleanedUp = false;
+  const cleanup = (): void => {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    mediaQuery.removeEventListener('change', onPresentationChange);
+    stopTracking();
+    stopRouter();
+    stopRouteAdapter();
+    stopMobileAdapter();
+    unmountPresentation();
+  };
+  (window as unknown as Record<string, unknown>).__wandoriusCleanup = cleanup;
 }
 
 /* Arrancar cuando el DOM este listo */

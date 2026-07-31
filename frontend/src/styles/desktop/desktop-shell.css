@@ -94,8 +94,8 @@
 }
 
 .desktop-icon--selected .desktop-icon__label {
-  color: var(--color-seleccion-texto);
-  background: var(--color-seleccion);
+  color: var(--sistema-inverso-texto);
+  background: var(--sistema-inverso-fondo);
 }
 
 /* [Plan 297A-11 §9.4] Icon drag states */
@@ -114,7 +114,7 @@
   position: absolute;
   pointer-events: none;
   border: 1px dashed var(--sistema-texto);
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--sistema-drop-target-fondo);
   transition: left 0.1s, top 0.1s;
 }
 
@@ -122,7 +122,7 @@
 .desktop-icon--drop-hover {
   outline: 2px dashed var(--sistema-texto);
   outline-offset: 2px;
-  background: rgba(0, 0, 0, 0.03);
+  background: var(--sistema-drop-hover-fondo);
 }
 
 /* [Auditoría v2] Finder item dragging state */
@@ -137,7 +137,7 @@
   grid-template-columns: auto minmax(0, 1fr);
   align-items: stretch;
   min-width: 0;
-  border-top: var(--borde);
+  border-top: var(--sistema-borde);
   background: var(--sistema-superficie);
 }
 
@@ -155,7 +155,7 @@
 }
 
 .desktop-taskbar__nav-control {
-  border-right: var(--borde);
+  border-right: var(--sistema-borde);
   border-top: 0;
   border-bottom: 0;
   border-left: 0;
@@ -177,7 +177,7 @@
 .desktop-taskbar__task {
   width: min(var(--sistema-tarea-ancho), 40%);
   padding-right: 0;
-  border-right: var(--borde);
+  border-right: var(--sistema-borde);
 }
 
 .desktop-taskbar__activate {
@@ -191,8 +191,8 @@
 }
 
 .desktop-taskbar__task--active {
-  color: var(--color-seleccion-texto);
-  background: var(--color-seleccion);
+  color: var(--sistema-inverso-texto);
+  background: var(--sistema-inverso-fondo);
 }
 
 .desktop-taskbar__task--minimized {

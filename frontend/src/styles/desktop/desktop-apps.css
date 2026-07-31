@@ -25,7 +25,7 @@
 
 .desktop-finder__path {
   padding: var(--espacio-sm) var(--espacio-md);
-  border-bottom: var(--borde);
+  border-bottom: var(--sistema-borde);
 }
 
 .desktop-finder__grid {
@@ -56,7 +56,7 @@
   display: block;
   width: 100%;
   aspect-ratio: 4 / 3;
-  border: var(--borde);
+  border: var(--sistema-borde);
   object-fit: cover;
   filter: grayscale(1) contrast(1.08);
 }
@@ -101,7 +101,7 @@
   width: 100%;
   max-height: var(--sistema-reader-imagen-alto);
   margin: var(--espacio-lg) 0;
-  border: var(--borde);
+  border: var(--sistema-borde);
   object-fit: cover;
   filter: grayscale(1) contrast(1.08);
 }
@@ -109,7 +109,7 @@
 .desktop-reader__quote {
   margin: var(--espacio-lg) 0;
   padding-left: var(--espacio-md);
-  border-left: var(--borde);
+  border-left: var(--sistema-borde);
   font-style: italic;
 }
 

@@ -68,11 +68,18 @@
   --sistema-finder-ancho: 620px;
   --sistema-finder-alto: 500px;
   --sistema-finder-documento-tamano: 48px;
+  --sistema-ventana-ancho-default: 640px;
+  --sistema-ventana-alto-default: 480px;
+  --sistema-drop-target-fondo: rgba(0, 0, 0, 0.05);
+  --sistema-drop-hover-fondo: rgba(0, 0, 0, 0.03);
   --sistema-reader-ancho: 680px;
   --sistema-reader-imagen-alto: 320px;
   --sistema-titulo-alto: 28px;
   --sistema-control-tamano: 18px;
   --sistema-control-icono-tamano: 12px;
+  /* [297A-18] Botón de tema del OS: 1px mayor que los controles de ventana. */
+  --sistema-tema-boton-tamano: 19px;
+  --sistema-tema-boton-icono-tamano: 13px;
   --sistema-logo-tamano: 14px;
   --sistema-escritorio-alto-min: 560px;
   --sistema-escritorio-alto-mobile: 680px;
@@ -108,9 +115,16 @@
   --win-w: 640px;
   --win-h: 480px;
 
+  --sistema-borde: 1px solid var(--sistema-texto);
   --sistema-borde-doble: 1px solid var(--sistema-texto);
   --sistema-trama-escritorio: radial-gradient(circle, rgba(0, 0, 0, 0.12) 0.5px, transparent 0.75px);
   --sistema-trama-minimizada: repeating-linear-gradient(135deg, transparent 0, transparent 3px, var(--sistema-texto) 3px, var(--sistema-texto) 4px);
+
+  /* [297A-18] Semántica OS: selección e inversión. Auto-invierten en oscuro. */
+  --sistema-inverso-fondo: #000000;
+  --sistema-inverso-texto: #ffffff;
+  --sistema-texto-secundario: #555555;
+  --sistema-texto-deshabilitado: #999999;
 
   --peso-normal: 400;
   --peso-medio: 500;
@@ -141,4 +155,45 @@
 
   /* === TRANSICIONES — Mínimas, funcionales === */
   --transicion: 0.15s ease;
+}
+
+/* [297A-18] Tema oscuro — Invierte los tokens del chrome del OS (--sistema-*).
+ * La navegación exterior y las páginas legacy conservan su identidad clara:
+ * son "documentos" que se abren dentro del shell y no forman parte del OS.
+ * --sistema-borde / --sistema-borde-doble / --sistema-trama-minimizada se
+ * auto-invierten vía var(--sistema-texto); no necesitan override. */
+[data-tema='oscuro'] {
+  --sistema-fondo: #000000;
+  --sistema-superficie: #000000;
+  --sistema-texto: #ffffff;
+  --sistema-texto-secundario: rgba(255, 255, 255, 0.7);
+  --sistema-texto-deshabilitado: rgba(255, 255, 255, 0.4);
+  --sistema-inverso-fondo: #ffffff;
+  --sistema-inverso-texto: #000000;
+  --sistema-drop-target-fondo: rgba(255, 255, 255, 0.1);
+  --sistema-drop-hover-fondo: rgba(255, 255, 255, 0.06);
+  --sistema-trama-escritorio: radial-gradient(circle, rgba(255, 255, 255, 0.16) 0.5px, transparent 0.75px);
+}
+
+/* [297A-18] Contenido de apps del OS: hereda contexto de tema oscuro.
+ * Finder/Reader/Trash ya usan --sistema-*; Profile, Settings (font-panel,
+ * arrow-select), About, Admin y Projects renderizan componentes compartidos
+ * con las páginas legacy (que usan --color-*). Para que el dark mode sea
+ * legible sin migrar cada componente (lo que rompería las páginas legacy),
+ * se redefine el juego de tokens exteriores dentro del alcance del OS:
+ *   - desktop: ventanas de apps (.desktop-windows-container .desktop-window);
+ *     el content window legacy (.desktop-content-window) vive fuera de ese
+ *     contenedor y conserva su identidad clara.
+ *   - móvil: launcher y apps (.movilApp, .movilLauncher); el router outlet
+ *     legacy queda excluido. */
+[data-tema='oscuro'] .desktop-windows-container .desktop-window,
+[data-tema='oscuro'] .movilOs .movilApp,
+[data-tema='oscuro'] .movilOs .movilLauncher {
+  --color-texto: #ffffff;
+  --color-texto-secundario: rgba(255, 255, 255, 0.7);
+  --color-texto-deshabilitado: rgba(255, 255, 255, 0.4);
+  --color-borde: #ffffff;
+  --color-seleccion: #ffffff;
+  --color-seleccion-texto: #000000;
+  --color-fondo: #000000;
 }

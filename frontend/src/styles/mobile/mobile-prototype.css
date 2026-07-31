@@ -44,13 +44,36 @@
     gap: var(--espacio-sm);
     min-height: var(--altoCabeceraSistemaMovil);
     padding: var(--espacio-md) var(--espacio-lg);
-    border-bottom: var(--borde);
+    border-bottom: var(--sistema-borde);
     background: var(--sistema-fondo);
   }
 
   .movilLauncher__fecha {
     margin: 0;
     font-size: var(--sistema-menu-contexto-texto-tamano);
+  }
+
+  /* [297A-18] Botón de tema del launcher: área táctil mínima, tokens del sistema. */
+  .movilLauncher__tema {
+    display: grid;
+    width: var(--areaControlSistemaMovil);
+    height: var(--areaControlSistemaMovil);
+    margin-left: auto;
+    place-items: center;
+    border: var(--sistema-borde);
+    background: var(--sistema-fondo);
+    color: var(--sistema-texto);
+  }
+
+  .movilLauncher__tema svg {
+    width: var(--sistema-control-icono-tamano);
+    height: var(--sistema-control-icono-tamano);
+    stroke-width: var(--sistema-icono-trazo);
+  }
+
+  .movilLauncher__tema:focus-visible {
+    outline: var(--sistema-borde);
+    outline-offset: var(--espacio-xs);
   }
 
   .movilLauncher__grid {
@@ -79,8 +102,19 @@
   .movilNavegacion__control:focus-visible,
   .movilAccion:focus-visible,
   .movilCampo input:focus-visible {
-    outline: var(--borde);
+    outline: var(--sistema-borde);
     outline-offset: var(--espacio-xs);
+  }
+
+  /* El menú sigue siendo el dropdown canónico; solo cambia su presentación. */
+  .desktop-context-menu--mobile {
+    min-width: min(240px, calc(100vw - var(--espacio-lg)));
+    max-width: calc(100vw - var(--espacio-lg));
+  }
+
+  .desktop-context-menu--mobile .desktop-context-menu__item {
+    min-height: var(--areaControlSistemaMovil);
+    padding: var(--espacio-sm) var(--espacio-md);
   }
 
   .movilLauncher__pictograma {
@@ -88,7 +122,7 @@
     width: var(--tamanoCeldaSistemaMovil);
     height: var(--tamanoCeldaSistemaMovil);
     place-items: center;
-    border: var(--borde);
+    border: var(--sistema-borde);
     background: var(--sistema-fondo);
   }
 
@@ -114,7 +148,7 @@
     align-items: center;
     min-height: var(--altoNavegacionSistemaMovil);
     padding: 0 var(--espacio-lg);
-    border-top: var(--borde);
+    border-top: var(--sistema-borde);
     background: var(--sistema-fondo);
   }
 
@@ -156,7 +190,7 @@
     align-items: center;
     gap: var(--espacio-sm);
     padding: 0 var(--espacio-lg);
-    border-bottom: var(--borde);
+    border-bottom: var(--sistema-borde);
   }
 
   .movilApp__titulo {
@@ -172,6 +206,11 @@
     min-height: 0;
     overflow-y: auto;
     padding: var(--espacio-lg);
+  }
+
+  /* El layout lo declara AppRegistry; full-bleed no recibe padding del shell. */
+  .movilApp__contenido--fullBleed {
+    padding: 0;
   }
 
   .movilPerfil {
@@ -201,7 +240,7 @@
   .movilCarpeta__ruta {
     margin: 0;
     padding: var(--espacio-sm) var(--espacio-md);
-    border-bottom: var(--borde);
+    border-bottom: var(--sistema-borde);
     font-size: var(--sistema-menu-contexto-texto-tamano);
   }
 
@@ -237,7 +276,7 @@
   .movilProducto__imagen {
     min-height: var(--altoMediaSistemaMovil);
     margin-bottom: var(--espacio-lg);
-    border: var(--borde);
+    border: var(--sistema-borde);
     background-image: repeating-linear-gradient(135deg, transparent 0, transparent var(--espacio-sm), var(--sistema-texto) var(--espacio-sm), var(--sistema-texto) calc(var(--espacio-sm) + 1px));
   }
 
@@ -252,7 +291,7 @@
     min-height: var(--areaControlSistemaMovil);
     margin-top: var(--espacio-lg);
     place-items: center;
-    border: var(--borde);
+    border: var(--sistema-borde);
     background: var(--sistema-texto);
     color: var(--sistema-fondo);
     font-family: var(--fuente-sistema);
@@ -260,7 +299,7 @@
 
   .movilCompra__resumen {
     padding-bottom: var(--espacio-md);
-    border-bottom: var(--borde);
+    border-bottom: var(--sistema-borde);
   }
 
   .movilCampo {
@@ -273,7 +312,7 @@
   .movilCampo input {
     min-height: var(--areaControlSistemaMovil);
     padding: 0 var(--espacio-sm);
-    border: var(--borde);
+    border: var(--sistema-borde);
     font-family: var(--fuente-sistema);
   }
 

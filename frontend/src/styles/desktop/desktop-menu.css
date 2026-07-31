@@ -62,12 +62,47 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* [297A-18] Grupo derecho de la barra: hora + botón de tema. */
+.desktop-menu-bar__derecha {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-md);
+  justify-self: end;
+}
+
+/* [297A-18] Botón único de tema del OS (barra superior).
+ * Comparte comando con el launcher móvil; solo consume tokens del sistema.
+ * 1px mayor que los controles de ventana (--sistema-tema-boton-tamano). */
+.desktop-menu-bar__tema {
+  display: grid;
+  place-items: center;
+  width: var(--sistema-tema-boton-tamano);
+  height: var(--sistema-tema-boton-tamano);
+  cursor: pointer;
+}
+
+.desktop-menu-bar__tema:hover {
+  background: var(--sistema-texto);
+  color: var(--sistema-superficie);
+}
+
+.desktop-menu-bar__tema svg {
+  width: var(--sistema-tema-boton-icono-tamano);
+  height: var(--sistema-tema-boton-icono-tamano);
+  stroke-width: var(--sistema-icono-trazo);
+}
+
+.desktop-menu-bar__tema:focus-visible {
+  outline: 1px solid var(--sistema-texto);
+  outline-offset: 2px;
+}
+
 .desktop-context-menu {
   position: absolute;
   top: 100%;
   left: 0;
   width: var(--sistema-menu-contexto-ancho);
-  border: var(--borde);
+  border: var(--sistema-borde);
   background: var(--sistema-superficie);
   font-size: var(--sistema-menu-contexto-texto-tamano);
 }
@@ -93,8 +128,8 @@
 }
 
 .desktop-context-menu__item--selected {
-  background: var(--color-seleccion);
-  color: var(--color-seleccion-texto);
+  background: var(--sistema-inverso-fondo);
+  color: var(--sistema-inverso-texto);
 }
 
 .desktop-context-menu__chevron {

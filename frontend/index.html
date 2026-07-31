@@ -10,6 +10,18 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>W</text></svg>" />
+  <!-- [297A-18] Anti-flash de tema: aplica data-tema antes de la primera pintura.
+       Fuente de verdad es theme-store (frontend/src/features/runtime/theme-store.ts);
+       este bloque solo evita el parpadeo. Sin almacenamiento cae a claro. -->
+  <script>
+    (function () {
+      try {
+        var tema = localStorage.getItem('wandorius:tema');
+        var oscuro = tema === 'oscuro' || (tema !== 'claro' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (oscuro) document.documentElement.setAttribute('data-tema', 'oscuro');
+      } catch (e) { /* sin almacenamiento: tema claro por defecto */ }
+    })();
+  </script>
 </head>
 <body>
   <div id="app"></div>

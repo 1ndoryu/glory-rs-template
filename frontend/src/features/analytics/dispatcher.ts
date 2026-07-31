@@ -85,6 +85,12 @@ type ReliabilityEvent =
   | { type: 'operation_failed'; operation: string; error?: string }
   | { type: 'retry_outcome'; operation: string; success: boolean };
 
+/* [297A-18] Eventos de preferencias del OS (tema).
+ * mode = preferencia del usuario; resolved = tema efectivamente aplicado;
+ * scope = 'local' hasta que 297A-13 sincronice la preferencia de cuenta. */
+type ThemeEvent =
+  | { type: 'theme_changed'; mode: 'system' | 'claro' | 'oscuro'; resolved: 'claro' | 'oscuro'; scope: 'local' | 'account' };
+
 /** Unión de todos los eventos tipados. */
 export type TrackEvent =
   | SessionEvent
@@ -95,7 +101,8 @@ export type TrackEvent =
   | WorkspaceEvent
   | PublicationEvent
   | CommerceEvent
-  | ReliabilityEvent;
+  | ReliabilityEvent
+  | ThemeEvent;
 
 /** Envelope completo del evento (Plan §9.1). */
 export interface AnalyticsEnvelope {

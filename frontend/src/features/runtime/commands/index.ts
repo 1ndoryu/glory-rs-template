@@ -6,6 +6,8 @@ import './window-commands';
 import './geometry-commands';
 import './app-commands';
 import './workspace-commands';
+import './workspace-reorder-commands';
 import './toolbar-commands';
+import './theme-commands';
 
 export { initKeyboardShortcuts } from './keyboard-handler';

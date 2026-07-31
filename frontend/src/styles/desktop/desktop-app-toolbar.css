@@ -8,7 +8,7 @@
   display: flex;
   align-items: stretch;
   min-height: var(--sistema-titulo-alto);
-  border-bottom: var(--borde);
+  border-bottom: var(--sistema-borde);
   background: var(--sistema-superficie);
   font-family: var(--fuente-sistema);
   font-size: var(--sistema-texto-tamano);
@@ -47,9 +47,8 @@
   left: 0;
   z-index: 9999;
   min-width: 160px;
-  border: var(--borde);
+  border: var(--sistema-borde);
   background: var(--sistema-superficie);
-  box-shadow: none;
 }
 
 .desktop-app-toolbar__menu-item {

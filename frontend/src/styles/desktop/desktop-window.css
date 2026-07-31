@@ -4,15 +4,15 @@
   display: flex;
   flex-direction: column;
   min-width: var(--sistema-ventana-ancho-min);
-  border: var(--borde);
+  border: var(--sistema-borde);
   background: var(--sistema-superficie);
   color: var(--sistema-texto);
   overflow: hidden;
   /* Position via CSS custom properties — set by shell/drag-resize */
   left: var(--win-x, 0);
   top: var(--win-y, 0);
-  width: var(--win-w, 640px);
-  height: var(--win-h, 480px);
+  width: var(--win-w, var(--sistema-ventana-ancho-default));
+  height: var(--win-h, var(--sistema-ventana-alto-default));
 }
 
 .desktop-window__titlebar {
@@ -22,7 +22,7 @@
   gap: var(--espacio-sm);
   height: var(--sistema-titulo-alto);
   padding: 0 var(--espacio-xs);
-  border-bottom: var(--borde);
+  border-bottom: var(--sistema-borde);
   background: var(--sistema-superficie);
 }
 
@@ -43,7 +43,7 @@
   width: var(--sistema-control-tamano);
   height: var(--sistema-control-tamano);
   padding: 0;
-  border: var(--borde);
+  border: var(--sistema-borde);
   border-radius: 0;
   background: var(--sistema-superficie);
   color: var(--sistema-texto);
@@ -81,7 +81,7 @@
 }
 
 .desktop-window__body::-webkit-scrollbar-thumb {
-  background: var(--color-borde);
+  background: var(--sistema-texto);
   border: 2px solid var(--sistema-superficie);
 }
 
@@ -104,7 +104,7 @@
   grid-column: 1;
   max-width: var(--sistema-perfil-foto-max);
   max-height: var(--sistema-perfil-foto-max);
-  border: var(--borde);
+  border: var(--sistema-borde);
   image-rendering: auto;
 }
 
