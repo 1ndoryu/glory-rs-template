@@ -92,6 +92,14 @@
   --sistema-iconos-reserva-tablet: 190px;
   --sistema-iconos-offset-mobile: 330px;
   --sistema-iconos-offset-mobile-pequeno: 390px;
+  --altoCabeceraSistemaMovil: 52px;
+  --altoNavegacionSistemaMovil: 58px;
+  --areaControlSistemaMovil: 44px;
+  --tamanoCeldaSistemaMovil: 64px;
+  --tamanoIconoSistemaMovil: 30px;
+  --tamanoFotoSistemaMovil: 132px;
+  --altoMediaSistemaMovil: 184px;
+  --anchoContenidoSistemaMovil: 420px;
   --sistema-trama-tamano: 8px;
   --sistema-nombre-espaciado: 0.08em;
   /* === VENTANAS — Posición dinámica (seteada por window-manager) === */

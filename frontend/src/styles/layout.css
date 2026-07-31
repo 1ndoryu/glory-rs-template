@@ -127,6 +127,10 @@
   font-family: var(--fuente-titulo);
 }
 
+.profile-foto[hidden] {
+  display: none;
+}
+
 .profile-nombre {
   font-family: var(--fuente-menu);
   font-size: var(--tamano-titulo);
@@ -313,4 +317,3 @@
 }
 
 } /* @layer components */
-

@@ -16,12 +16,14 @@ import './styles/desktop/desktop-responsive.css';
 import './styles/desktop/desktop-context-menu.css';
 import './styles/desktop/desktop-app-toolbar.css';
 import './styles/desktop/desktop-trash.css';
+import './styles/mobile/mobile-prototype.css';
 
 /* Core */
 import { addRoute, setOutlet, initRouter } from './router';
 import { createSidebar } from './components/layout/sidebar';
 import { createProfile } from './components/layout/profile';
 import { createDesktopShell } from './features/desktop/desktop-shell';
+import { createMobilePrototype } from './features/mobile/mobile-prototype';
 import './features/runtime/app-registration';
 import './features/runtime/commands';
 import { initKeyboardShortcuts } from './features/runtime/commands';
@@ -35,6 +37,7 @@ import { authStore, showProfile, showSidebar, siteConfig } from './store';
 import { AuthService } from './services';
 import { fetchWorkspaceRelease } from './features/runtime/workspace/workspace-store';
 import { createEl } from './utils/dom';
+import { getPresentationMode } from './utils/viewport';
 
 
 /* Pages */
@@ -67,6 +70,7 @@ addRoute({ path: '/checkout/cancel', render: () => renderCheckoutCancel() });
 async function initApp(): Promise<void> {
   const app = document.getElementById('app');
   if (!app) return;
+  const isMobilePrototype = getPresentationMode() === 'mobile';
 
   /* [297A-8] Verificar sesión existente al arrancar.
    * Las cookies HttpOnly se envían automáticamente con credentials: 'include'.
@@ -93,6 +97,10 @@ async function initApp(): Promise<void> {
   const sidebar = createSidebar();
   app.appendChild(sidebar);
 
+  /* [297A-12] El concepto móvil arranca en launcher. La preferencia definitiva
+   * y la transición entre modos pertenecen a MobileAppStack, tras aprobación. */
+  if (isMobilePrototype) showSidebar.set(false, 'init');
+
   /* [Plan §2.2] navigation.toggleExternalNav: toggle sidebar */
   showSidebar.subscribe((visible) => {
     sidebar.style.display = visible ? '' : 'none';
@@ -106,8 +114,11 @@ async function initApp(): Promise<void> {
   const profile = createProfile();
   const contenido = createEl('main', { className: 'contenido-principal' });
 
-  const desktop = createDesktopShell(profile, contenido);
-  columnaDerecha.appendChild(desktop.element);
+  const desktop = isMobilePrototype ? null : createDesktopShell(profile, contenido);
+  const mobile = isMobilePrototype
+    ? createMobilePrototype(profile, () => showSidebar.update((visible) => !visible))
+    : null;
+  columnaDerecha.appendChild(mobile?.element ?? desktop!.element);
 
   app.appendChild(columnaDerecha);
 
@@ -120,7 +131,7 @@ async function initApp(): Promise<void> {
    * Se oculta cuando se esta viendo un articulo.
    * Usa setProfileVisible para mantener taskbar sincronizado. */
   showProfile.subscribe((visible) => {
-    desktop.setProfileVisible(visible);
+    desktop?.setProfileVisible(visible);
     /* Cuando no hay profile, centrar el contenido */
     if (visible) {
       columnaDerecha.classList.remove('columna-derecha--sin-profile');
@@ -130,12 +141,13 @@ async function initApp(): Promise<void> {
   });
 
   /* Configurar outlet del router */
-  setOutlet(contenido);
+  setOutlet(mobile?.routerOutlet ?? contenido);
 
   /* Control de visibilidad del contenido principal (legacy outlet):
    * Se oculta cuando la ruta es manejada por una app del runtime (ventana propia),
    * o en home cuando las entradas están desactivadas. */
   function updateContenidoVisibility(): void {
+    if (!desktop) return;
     const path = window.location.pathname;
     const isHome = path === '/';
     const showEntries = siteConfig.get().showEntriesOnHome;
@@ -155,10 +167,10 @@ async function initApp(): Promise<void> {
   const stopTracking = initTracking();
 
   /* Iniciar atajos de teclado del OS */
-  initKeyboardShortcuts();
+  if (desktop) initKeyboardShortcuts();
 
   /* Iniciar RouteAppAdapter — intercepta rutas de apps para abrir ventanas */
-  initRouteAppAdapter();
+  if (desktop) initRouteAppAdapter();
 
   /* Iniciar Resource Type Registry — asociaciones tipo→app */
   initResourceTypeRegistry();

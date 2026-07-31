@@ -2,7 +2,7 @@
 
 > **Tarea:** 297A-12  
 > **Fecha:** 2026-07-29  
-> **Estado:** planificado; bloqueado por runtime 297A-9 y workspace 297A-11  
+> **Estado:** prototipo visual implementado; pendiente de aprobación explícita
 > **Alcance:** teléfonos `<768px`; tablet conserva experiencia desktop
 
 ## 1. Resultado
@@ -48,14 +48,18 @@ interface MobileNavigationState {
 
 ## 4. Bloque 1 — Prototipo visual sin lógica final
 
-- [ ] Crear boceto real del launcher con grid, carpetas, badges y Papelera.
-- [ ] Mostrar una app pública a pantalla completa.
-- [ ] Mostrar Finder/carpeta móvil.
-- [ ] Mostrar Reader móvil con artículo/media.
-- [ ] Mostrar Tienda/Compra móvil sin integrar pago.
-- [ ] Definir navegación Back/Home sin barras desktop.
-- [ ] Revisar 390×844, 360×800 y 320px.
+- [x] Crear boceto real del launcher con grid, carpetas y Papelera; badges quedan para el estado real.
+- [x] Mostrar una app pública a pantalla completa.
+- [x] Mostrar Finder/carpeta móvil.
+- [x] Mostrar Reader móvil con artículo/media.
+- [x] Mostrar Tienda/Compra móvil sin integrar pago.
+- [x] Definir navegación Back/Home sin barras desktop.
+- [x] Revisar 390×844, 360×800 y 320px; confirmar escritorio en tablet 768px.
 - [ ] Obtener aprobación explícita del usuario antes de implementar runtime móvil.
+
+**Implementación de revisión:** `frontend/src/features/mobile/mobile-prototype.ts` y
+`frontend/src/styles/mobile/mobile-prototype.css`. Los datos son demostrativos y el
+módulo no implementa persistencia, pagos, drag, long press ni el stack definitivo.
 
 **Gate:** aspecto y navegación base aprobados.
 
