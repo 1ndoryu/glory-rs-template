@@ -14,6 +14,13 @@ import { showSidebar } from '../../store';
 import { dispatchEvent } from '../analytics/dispatcher';
 import { reconcileChildren } from '../../utils/reconcile';
 
+function getTaskClass(win: WindowIdentity): string {
+  const activeClass = win.state === 'open' && win.focused
+    ? 'active'
+    : win.state === 'minimized' ? 'minimized' : '';
+  return `desktop-taskbar__task desktop-taskbar__task--${activeClass}`;
+}
+
 export function createReactiveTaskbar(): { element: HTMLElement; taskList: HTMLElement } {
   const taskbar = createEl('footer', { className: 'desktop-taskbar', ariaLabel: 'Ventanas abiertas' });
 
@@ -41,22 +48,23 @@ export function createReactiveTaskbar(): { element: HTMLElement; taskList: HTMLE
         const svgIcon = createElement(win.icon ?? win.app?.icon ?? FileUser);
         svgIcon.classList.add('desktop-taskbar__icon');
 
-        const item = createEl('button', { type: 'button' },
-          svgIcon,
-          createEl('span', { className: 'desktop-taskbar__label', textContent: win.title }),
-          createEl('button', { type: 'button', className: 'desktop-taskbar__close', ariaLabel: `Cerrar ${win.title}` },
-            createElement(X),
-          ),
+        /* [297A-12] El control de cerrar no puede vivir dentro de otro button:
+         * el HTML inválido hacía que el navegador separara sus nodos y desarmara
+         * visualmente la tarea de About. La envoltura agrupa dos controles hermanos. */
+        const item = createEl('div', { className: getTaskClass(win) });
+        const activate = createEl('button', {
+          type: 'button', className: 'desktop-taskbar__activate', ariaLabel: `Abrir ${win.title}`,
+        },
+        svgIcon,
+        createEl('span', { className: 'desktop-taskbar__label', textContent: win.title }),
+        );
+        const close = createEl('button', { type: 'button', className: 'desktop-taskbar__close', ariaLabel: `Cerrar ${win.title}` },
+          createElement(X),
         );
 
-        item.addEventListener('click', (e) => {
+        activate.addEventListener('click', () => {
           const id = item.dataset.key;
           if (!id) return;
-          if ((e.target as HTMLElement).closest('.desktop-taskbar__close')) {
-            closeWindow(id);
-            dispatchEvent({ type: 'app_closed', appId: id });
-            return;
-          }
           const win = windowStore.get().find(w => w.instanceId === id);
           if (win?.state === 'minimized') {
             restoreWindow(id);
@@ -64,12 +72,19 @@ export function createReactiveTaskbar(): { element: HTMLElement; taskList: HTMLE
             focusWindow(id);
           }
         });
+        close.addEventListener('click', () => {
+          const id = item.dataset.key;
+          if (!id) return;
+          closeWindow(id);
+          dispatchEvent({ type: 'app_closed', appId: id });
+        });
+
+        item.append(activate, close);
 
         return item;
       },
       (el, win) => {
-        const activeClass = win.state === 'open' && win.focused ? 'active' : win.state === 'minimized' ? 'minimized' : '';
-        el.className = `desktop-taskbar__task desktop-taskbar__task--${activeClass}`;
+        el.className = getTaskClass(win);
         const label = el.querySelector('.desktop-taskbar__label');
         if (label && label.textContent !== win.title) label.textContent = win.title;
         const closeBtn = el.querySelector('.desktop-taskbar__close');

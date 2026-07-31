@@ -145,8 +145,12 @@
 .desktop-taskbar__task {
   display: flex;
   align-items: center;
-  gap: var(--espacio-sm);
   min-width: 0;
+}
+
+.desktop-taskbar__nav-control,
+.desktop-taskbar__activate {
+  gap: var(--espacio-sm);
   padding: 0 var(--espacio-sm);
 }
 
@@ -174,6 +178,16 @@
   width: min(var(--sistema-tarea-ancho), 40%);
   padding-right: 0;
   border-right: var(--borde);
+}
+
+.desktop-taskbar__activate {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-self: stretch;
+  color: inherit;
+  font-family: var(--fuente-sistema);
 }
 
 .desktop-taskbar__task--active {
