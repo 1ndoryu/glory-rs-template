@@ -4,7 +4,7 @@
 > **Stack:** Rust/Axum + PostgreSQL + Vanilla TypeScript/Vite
 > **Deploy:** no planificado
 > **Epic:** 297A-4 — OS persistente, cuentas, programas y comercio
-> **Visual:** identidad desktop aprobada; concepto móvil pendiente
+> **Visual:** identidad desktop y prototipo móvil aprobados; runtime móvil pendiente
 
 ## Fuentes canónicas
 
