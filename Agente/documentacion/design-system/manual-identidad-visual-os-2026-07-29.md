@@ -91,6 +91,17 @@ Familias requeridas:
 - No crear tokens por app cuando el rol visual ya existe.
 - CSS nuevo usa nombres de clase en español y `camelCase`; las clases legacy `desktop-*` se migran por componente, sin mezclar dos recetas permanentes.
 
+### 5.1 Tema claro/oscuro (data-tema)
+
+El OS soporta dos temas, `claro` (por defecto) y `oscuro`, más la resolución inicial `system` basada en `prefers-color-scheme`. El tema se aplica como atributo `data-tema="claro|oscuro"` en `documentElement`; desktop, tablet y launcher móvil comparten la misma implementación.
+
+- Los tokens semánticos `--sistema-*` (fondo, texto, borde, inverso, secundario, deshabilitado, tramas, drop) se redefinen dentro de `[data-tema='oscuro']` en `variables.css`; ningún componente fija colores ni lee el tema directamente.
+- El tema oscuro invierte el lenguaje 1-bit: fondo negro, texto blanco, bordes blancos y trama del escritorio en puntos blancos. No introduce grises decorativos, sombras, gradientes ni radios.
+- Las superficies del OS (ventanas, menús, taskbar, launcher, apps) consumen los tokens redefinidos vía override scoped (`.desktop-window`, `.movilApp`, `.movilLauncher`). El contenido multimedia conserva su color (excepción §4.2).
+- La navegación exterior y el contenido legacy fuera de esas superficies permanecen sin cambios; el override de tokens se limita al chrome del OS.
+- Control único: botón de tema junto al reloj (barra superior) y en el launcher móvil, vía comando compartido `theme:toggle` (Meta+Shift+L); Configuración reutiliza ese comando.
+- La preferencia se persiste en `localStorage` (`wandorius:tema`) y se resuelve antes de la primera pintura (script inline en `index.html`) para evitar flash. La sincronización con la cuenta (overlay remoto) queda pendiente de 297A-13.
+
 ## 6. Tipografía
 
 - Fuente canónica del OS: `JetBrains Mono`, con fallback monoespaciado del sistema.
@@ -189,7 +200,7 @@ Estados obligatorios:
 Composición pública prevista:
 
 ```text
-●  Archivo  Aplicaciones  Configuración  Cuenta                 reloj
+●  Archivo  Aplicaciones  Configuración  Cuenta      [tema]  reloj
 ```
 
 Admin añade `Admin`; el logo es un círculo negro sin letra. No aparece `wandori.os`.
@@ -197,6 +208,7 @@ Admin añade `Admin`; el logo es un círculo negro sin letra. No aparece `wandor
 - Una sola fila en desktop.
 - Los menús no se ocultan de forma que pierdan funcionalidad.
 - En móvil, los elementos excedentes pasan a un menú compacto/overflow accesible.
+- El botón de tema vive a la izquierda del reloj y usa el comando compartido `theme:toggle` (§5.1); el reloj es el elemento del extremo derecho.
 - El reloj es informativo y no desplaza comandos críticos.
 
 ## 11. Menús superior y contextual

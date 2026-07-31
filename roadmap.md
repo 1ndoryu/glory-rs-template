@@ -103,7 +103,7 @@
 
 **Salida:** teléfono funciona como launcher sin duplicar lógica; tablet sigue como escritorio.
 
-### 297A-18 — Tema claro/oscuro del sistema (implementado; remoto y matriz de validación pendientes)
+### 297A-18 — Tema claro/oscuro del sistema (implementado y aprobado visualmente; solo sync remota pendiente)
 
 **Depende de:** 297A-9/12; la persistencia remota se completa con 297A-13.
 
@@ -113,9 +113,9 @@
 - [x] Resolver preferencia inicial por sistema operativo y permitir override explícito. *(matchMedia + localStorage `wandorius:tema`)*
 - [x] Evitar flash de tema en la primera pintura y emitir un evento `theme_changed` medible con modo. *(script inline en index.html + ThemeEvent en dispatcher)*
 - [ ] Guardar anónimo en overlay local y sincronizar la preferencia de cuenta sin sobrescribir decisiones locales silenciosamente; logout/login y conflictos de preferencia. *(bloqueado por 297A-13 overlay remoto)*
-- [ ] Validar contraste AA completo, foco/teclado, reduced motion, zoom 200%, 1440x900, 1024x768, 390x844 y 320px; preparar capturas comparables para aprobación visual. *(legibilidad dark verificada en navegador para la ventana Perfil)*
+- [x] Validar contraste AA, foco/teclado, reduced motion, zoom 200% y viewports (1440×900, 1024×768, 390×844, 320px); capturas aprobadas por el usuario. *(aprobación visual 2026-07-31; E2E formal y medición de rendimiento quedan con 297A-17)*
 
-**Salida:** el usuario cambia claro/oscuro desde un control único; la preferencia local sobrevive; falta sync remota (297A-13) y la matriz de validación completa.
+**Salida:** el usuario cambia claro/oscuro desde un control único y la preferencia local sobrevive; tema aprobado visualmente; falta solo la sync remota (297A-13).
 
 ### 297A-19 — URLs canónicas, deep links y ventana enfocada
 
