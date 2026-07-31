@@ -6,13 +6,18 @@ import {
   tombstoneNode,
   restoreNode,
   resetOverlay,
+  overlayStore,
   workspaceStore,
   publishWorkspace,
+  rollbackWorkspace,
   setClipboard,
   getClipboard,
   pasteFromClipboard,
   createFolder,
 } from '../workspace/workspace-store';
+import { getDiffSummary } from '../workspace/diff';
+import { showConfirm } from '../../../components/ui/confirm';
+import { showToast } from '../../../components/ui/toast';
 import { getSelectedIds } from '../selection-store';
 
 function resolveWorkspaceNodeId(targetId: string): string | undefined {
@@ -96,9 +101,49 @@ CommandRegistry.register({
     return { state: 'enabled' };
   },
   execute: async (): Promise<CommandResult> => {
+    const overlay = overlayStore.get();
+    const diff = getDiffSummary(overlay);
+
+    if (diff.isEmpty) {
+      showToast('Sin cambios pendientes para publicar');
+      return { status: 'success' };
+    }
+
+    const confirmed = await showConfirm(`¿Publicar escritorio? ${diff.text}`);
+    if (!confirmed) return { status: 'cancelled' };
+
     const result = await publishWorkspace();
-    if (result) return { status: 'success' };
+    if (result) {
+      showToast(`Escritorio publicado (v${result.version})`);
+      return { status: 'success' };
+    }
     return { status: 'failure', reason: 'Error al publicar' };
+  },
+});
+
+CommandRegistry.register({
+  id: 'workspace:rollback',
+  label: 'Restaurar versión anterior',
+  order: 34,
+  contexts: ['desktop'],
+  requires: 'admin',
+  undoPolicy: 'none',
+  analyticsEvent: 'workspace.rollback',
+  isAvailable: (ctx) => {
+    if (ctx.capability !== 'admin') return { state: 'hidden' };
+    return { state: 'enabled' };
+  },
+  execute: async (): Promise<CommandResult> => {
+    const versionStr = window.prompt('Número de versión a restaurar:');
+    if (!versionStr) return { status: 'cancelled' };
+    const version = Number(versionStr);
+    if (isNaN(version) || version < 1) return { status: 'failure', reason: 'version inválida' };
+
+    const confirmed = await showConfirm(`¿Restaurar escritorio a versión ${version}?`);
+    if (!confirmed) return { status: 'cancelled' };
+
+    const ok = await rollbackWorkspace(version);
+    return ok ? { status: 'success' } : { status: 'failure', reason: 'rollback falló' };
   },
 });
 

@@ -22,9 +22,10 @@
 - Workspace overlay implementado: release + overlay + merge + clipboard + papelera + crear carpetas.
 - Split de archivos grandes completado: command-registration (725→6), workspace-store (430→4), desktop-shell (419→3).
 - Sesiones opacas en cookie operativas; JWT localStorage eliminado del frontend. `/admin` legacy y uploads públicos siguen como deuda controlada.
+- **Quality tool sprint completo:** 13 reglas custom (P0/P1/P2) + 7 Sentinel CLI + 4 VarSense = 24 reglas activas, ~65% cobertura de hallazgos. Auditoría v4 al 83% (19/23). ISP refactor DomAttrs (33→6 sub-interfaces). 143 tests en 9 suites.
 - Ejecutar una tarea por vez y en este orden; no saltar dependencias.
 - El plan maestro contiene checklists/gates. El roadmap conserva solo pendientes.
-- El quality gate 297A-6 está operativo; toda tarea futura debe cerrarse con `npm run task:check -- {ID}`.
+- El quality gate está operativo; toda tarea futura debe cerrarse con `npm run task:check -- {ID}`.
 
 ## Siguiente bloque habilitado
 

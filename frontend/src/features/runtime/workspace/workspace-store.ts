@@ -4,6 +4,7 @@
  * [Plan 297A-11 §9.1–9.4] [Auditoría v2] */
 
 import { WorkspaceService } from '../../../services';
+import { showToast } from '../../../components/ui/toast';
 import { rebaseOverlay } from './merge';
 import type {
   NodeId,
@@ -61,6 +62,25 @@ export async function publishWorkspace(): Promise<{ version: number } | null> {
     return { version: result.version };
   }
   return null;
+}
+
+/** Rollback a una versión anterior del release (admin).
+ *  Re-publica el árbol antiguo como nueva versión y limpia el overlay. */
+export async function rollbackWorkspace(targetVersion: number): Promise<boolean> {
+  try {
+    const oldRelease = await WorkspaceService.getReleaseByVersion(targetVersion);
+    if (!oldRelease?.tree) return false;
+    const result = await WorkspaceService.publish(oldRelease.tree);
+    if (result?.version) {
+      releaseStore.set(result.tree);
+      overlayStore.set(EMPTY_OVERLAY);
+      showToast(`Rollback exitoso (v${result.version})`);
+      return true;
+    }
+  } catch {
+    showToast('Error al restaurar versión anterior');
+  }
+  return false;
 }
 
 /* Re-export submodules for backward compatibility */
