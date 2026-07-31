@@ -16,7 +16,7 @@
 - Quality gate: `Agente/planes/completados/plan-escalabilidad-sentinel-wandorius-2026-07-29.md`
 - Prevención: `Agente/prevencion/prevencion-wandorius-sentinel-varsense-2026-07-29.md`
 - Tema claro/oscuro: `Agente/planes/plan-modo-oscuro-os-2026-07-31.md`
-- Iconos libres del escritorio: `Agente/planes/plan-iconos-libres-desktop-2026-07-31.md`
+- Iconos libres del escritorio: `Agente/planes/completados/plan-iconos-libres-desktop-2026-07-31.md`
 - Checkpoints SOLID/escalabilidad: `Agente/documentacion/arquitectura/checkpoints-solid-escalabilidad-2026-07-31.md`
 - URLs canónicas y foco: `Agente/planes/plan-deep-links-ventanas-2026-07-31.md`
 
