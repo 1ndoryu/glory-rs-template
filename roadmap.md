@@ -79,7 +79,7 @@
 - [x] App toolbar automático en todas las ventanas. *(createDesktopWindow siempre renderiza toolbar)*
 - [x] Split de archivos grandes: command-registration (725→6), workspace-store (430→4), desktop-shell (419→3).
 - [x] Migración workspace_releases con seed data. *(20260731000000)*
-- [ ] Draft/release/preview/publicar/rollback.
+- [x] Draft/release/preview/publicar/rollback. *(diff.ts + publish con confirmación + rollbackWorkspace)*
 - [ ] Organizador público separado del workspace admin personal.
 
 **Salida:** admin publica el preview exacto; visitante reorganiza sin escribir global.
