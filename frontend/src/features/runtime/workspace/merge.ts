@@ -1,6 +1,7 @@
 /* wandori.us — Workspace Merge
  * Algoritmo puro: merge release + overlay → resolved workspace. */
 
+import { hasCapability, type Capability } from '../capability';
 import type {
   NodeId,
   WorkspaceNode,
@@ -21,7 +22,7 @@ import type {
 export function mergeWorkspace(
   release: WorkspaceTree,
   overlay: WorkspaceOverlay,
-  capability: 'public' | 'authenticated' | 'admin',
+  capability: Capability,
 ): ResolvedWorkspace {
   const result: Record<NodeId, ResolvedNode> = {};
 
@@ -46,7 +47,15 @@ export function mergeWorkspace(
     }
   }
 
+  const collidedOverlayIds = new Set<NodeId>();
   for (const [id, node] of Object.entries(overlay.addedItems)) {
+    /* IDs del release pertenecen al namespace publicado. Un overlay remoto
+     * inválido no puede reemplazar silenciosamente una app/recurso publicado;
+     * el item colisionado se ignora y el release conserva precedencia. */
+    if (result[id]) {
+      collidedOverlayIds.add(id);
+      continue;
+    }
     result[id] = { ...node, origin: 'overlay' };
   }
 
@@ -56,15 +65,11 @@ export function mergeWorkspace(
    * mover una carpeta propia no persistía). */
   for (const [id, overrides] of Object.entries(overlay.fieldOverrides)) {
     const existing = result[id];
-    if (existing) Object.assign(existing, overrides);
+    if (existing && !collidedOverlayIds.has(id)) Object.assign(existing, overrides);
   }
 
-  const hierarchy = ['public', 'authenticated', 'admin'] as const;
-  const level = hierarchy.indexOf(capability);
   for (const [id, node] of Object.entries(result)) {
-    if (node.requires && hierarchy.indexOf(node.requires) > level) {
-      delete result[id];
-    }
+    if (!hasCapability(capability, node.requires)) delete result[id];
   }
 
   return { releaseVersion: release.version, nodes: result };
@@ -79,9 +84,12 @@ export function rebaseOverlay(
 
   const validTombstones = currentOverlay.tombstones.filter((id) => releaseIds.has(id));
 
+  const addedIds = new Set(Object.keys(currentOverlay.addedItems));
   const validOverrides: Record<NodeId, Partial<Pick<WorkspaceNode, 'position' | 'label' | 'parentId' | 'mobileOrder'>>> = {};
   for (const [id, overrides] of Object.entries(currentOverlay.fieldOverrides)) {
-    if (releaseIds.has(id)) {
+    /* Los nodos publicados se rebajan contra el release; los creados por el
+     * usuario permanecen válidos aunque no formen parte del release. */
+    if (releaseIds.has(id) || addedIds.has(id)) {
       validOverrides[id] = overrides;
     }
   }

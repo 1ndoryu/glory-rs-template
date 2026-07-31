@@ -1,0 +1,77 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AuthService } from '../../services';
+import { authStore } from '../../store';
+import { createAccountView } from './account-view';
+
+function mount(): { element: HTMLElement; controller: AbortController } {
+  const controller = new AbortController();
+  return { element: createAccountView({ signal: controller.signal }), controller };
+}
+
+beforeEach(() => {
+  vi.restoreAllMocks();
+  authStore.set({ isAuthenticated: false, userId: null, capability: 'public' }, 'sync');
+});
+
+describe('account-view', () => {
+  it('muestra login y registro cerrado para invitado', () => {
+    const { element } = mount();
+
+    expect(element.getAttribute('aria-label')).toBe('Cuenta');
+    expect(element.querySelector('.account-app__title')?.textContent).toBe('cuenta');
+    expect(element.querySelector('input[type="email"]')).not.toBeNull();
+    expect(element.querySelector('input[type="password"]')).not.toBeNull();
+    expect(element.textContent).toContain('registro cerrado temporalmente.');
+  });
+
+  it('valida campos antes de invocar login', async () => {
+    const login = vi.spyOn(AuthService, 'login');
+    const { element } = mount();
+    element.querySelector<HTMLButtonElement>('.account-app__submit')?.click();
+
+    expect(login).not.toHaveBeenCalled();
+    expect(element.querySelector('.account-app__error')?.textContent)
+      .toBe('completa todos los campos');
+  });
+
+  it('invoca AuthService.login con los valores del formulario', async () => {
+    const login = vi.spyOn(AuthService, 'login').mockResolvedValue(undefined);
+    const { element } = mount();
+    const email = element.querySelector<HTMLInputElement>('input[type="email"]');
+    const password = element.querySelector<HTMLInputElement>('input[type="password"]');
+    if (!email || !password) throw new Error('formulario no montado');
+    email.value = 'user@example.com';
+    email.dispatchEvent(new Event('input', { bubbles: true }));
+    password.value = 'secret';
+    password.dispatchEvent(new Event('input', { bubbles: true }));
+    element.querySelector<HTMLButtonElement>('.account-app__submit')?.click();
+
+    await vi.waitFor(() => expect(login).toHaveBeenCalledWith('user@example.com', 'secret'));
+  });
+
+  it('cambia reactivamente a sesión admin sin remontar la vista', () => {
+    const { element } = mount();
+    authStore.set({ isAuthenticated: true, userId: 'admin-1', capability: 'admin' }, 'sync');
+
+    expect(element.textContent).toContain('sesión activa · admin');
+    expect(element.querySelector('input')).toBeNull();
+    expect(element.querySelector('[aria-label="Cerrar sesión"]')).not.toBeNull();
+  });
+
+  it('invoca logout desde la vista autenticada', async () => {
+    const logout = vi.spyOn(AuthService, 'logout').mockResolvedValue(undefined);
+    authStore.set({ isAuthenticated: true, userId: 'user-1', capability: 'authenticated' }, 'sync');
+    const { element } = mount();
+    element.querySelector<HTMLButtonElement>('[aria-label="Cerrar sesión"]')?.click();
+
+    await vi.waitFor(() => expect(logout).toHaveBeenCalledOnce());
+  });
+
+  it('deja de reaccionar después de abortar el contexto', () => {
+    const { element, controller } = mount();
+    controller.abort();
+    authStore.set({ isAuthenticated: true, userId: 'user-1', capability: 'authenticated' }, 'sync');
+
+    expect(element.querySelector('input[type="email"]')).not.toBeNull();
+  });
+});

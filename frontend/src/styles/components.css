@@ -236,6 +236,55 @@
   text-decoration: underline;
 }
 
+/* === RESOLUCIÓN DE OVERLAY DEL WORKSPACE === */
+.workspace-overlay-conflict {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-md);
+}
+
+.workspace-overlay-conflict__title {
+  margin: 0;
+  font-family: var(--fuente-titulo);
+  font-size: var(--tamano-grande);
+  font-weight: var(--peso-normal);
+}
+
+.workspace-overlay-conflict__message {
+  margin: 0;
+  line-height: var(--linea-altura);
+}
+
+.workspace-overlay-conflict__values {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--espacio-sm) var(--espacio-md);
+  margin: 0;
+  padding: var(--espacio-md) 0;
+  border-top: var(--borde);
+  border-bottom: var(--borde);
+}
+
+.workspace-overlay-conflict__values dt {
+  color: var(--color-texto-secundario);
+}
+
+.workspace-overlay-conflict__values dd {
+  margin: 0;
+  text-align: right;
+}
+
+.workspace-overlay-conflict__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--espacio-md);
+}
+
+.workspace-overlay-conflict__action {
+  text-decoration: underline;
+}
+
 /* === TOAST / NOTIFICACIÓN === */
 .toast-contenedor {
   position: fixed;

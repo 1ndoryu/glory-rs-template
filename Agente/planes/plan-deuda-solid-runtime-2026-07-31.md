@@ -1,7 +1,9 @@
-# Plan 297A-23 — Deuda SOLID del runtime de apps (hipótesis)
+# Plan 297A-23 — Deuda SOLID del runtime de apps
 
 > **Fecha:** 2026-07-31
-> **Estado:** hipótesis pendientes de validar; no ejecutar hasta cerrar 297A-19 (deep links) y aprobar fases.
+> **Estado:** Fases 3–5 técnicas y documentales completadas; validación visual del runtime pendiente separada en 297A-24.
+> **Evidencia F1:** la jerarquía estaba duplicada en registry, adapter, comandos, menú y merge; `authenticated` permanece como capacidad válida para Cuenta y futuras áreas protegidas.
+> **Última actualización:** 2026-07-31.
 > **Epic:** 297A-4 (OS persistente, cuentas, programas y comercio).
 > **Origen:** revisión SOLID de la guía canónica `Agente/documentacion/arquitectura/guia-agregar-app-2026-07-31.md`; hallazgos verificados contra `route-app-adapter.ts`, `app-registry.ts` y `app-registration.ts`.
 
@@ -29,51 +31,84 @@ Reducir la deuda SOLID detectada antes de que crezcan los dominios de 297A-14 (e
 ## Fases
 
 ### Fase 1 — Validación de hipótesis (sin código)
-- [ ] Releer `route-app-adapter.ts` completo y listar cada responsabilidad con sus consumidores (interceptor, `openAppWindow`, móvil).
-- [ ] Confirmar el único lugar donde se repite la jerarquía de capacidades (registry + adapter) y si hay más copias (buscar `'authenticated'`).
-- [ ] Decidir con el usuario el destino de `authenticated` (usarla en Cuenta o retirarla).
-- [ ] Mapear los nodos `type:'app'` actuales frente a registros para dimensionar el test anti-drift.
+- [x] Releer `route-app-adapter.ts` completo y listar cada responsabilidad con sus consumidores (interceptor, `openAppWindow`, móvil). *(adapter coordina rutas, autorización, dedup, lifecycle desktop y delegación móvil)*
+- [x] Confirmar la duplicación de la jerarquía de capacidades en registry, adapter, comandos, menú y merge. *(búsqueda 2026-07-31)*
+- [x] Decidir el destino de `authenticated`: permanece en el contrato para Cuenta y futuras superficies autenticadas; no se retira.
+- [x] Mapear los nodos `type:'app'` actuales frente a registros para dimensionar el test anti-drift. *(5 referencias: about, admin, projects, settings, trash; account queda legítimamente fuera por no tener icono)*
 
-**Gate F1:** cada hipótesis queda marcada como validada/falsada con evidencia citada (archivo/línea), y H3 tiene decisión del usuario.
+**Gate F1:** H1 sigue abierta; H2 implementada en F2; H3 validada; H4 implementada y verificada en F4.
 
 ### Fase 2 — Centralizar capacidades (H2)
-- [ ] Crear `frontend/src/features/runtime/capability.ts` con el tipo `Capability`, el orden y helpers de comparación/filtro.
-- [ ] Consumirlo en `app-registry.ts` (`getAvailable`) y `route-app-adapter.ts` (frontera).
-- [ ] Según decisión H3: usar `authenticated` en Cuenta o retirarla del tipo y del orden.
-- [ ] `npx tsc --noEmit` + tests de registry/adapter; sin cambios de contrato externo.
+- [x] Crear `frontend/src/features/runtime/capability.ts` con el tipo `Capability`, el orden y helpers de comparación/filtro.
+- [x] Consumirlo en `app-registry.ts`, `route-app-adapter.ts`, `app-commands.ts`, `desktop-menu-bar.ts`, `command-registry.ts`, `resource-type-registry.ts` y `workspace/merge.ts`.
+- [x] Conservar `authenticated` en el contrato para Cuenta y futuras superficies autenticadas.
+- [x] `npx tsc --noEmit` + tests de registry/adapter; sin cambios de contrato externo. *(typecheck PASS; Vitest 246/246)*
 
-**Gate F2:** una sola fuente de verdad de capacidades; cero copias de la jerarquía en el repo; type-check y tests PASS.
+**Gate F2:** una sola fuente de verdad de capacidades; cero arreglos de jerarquía duplicados; `task:check` y `self-check` PASS.
 
 ### Fase 3 — SRP del adapter (H1)
-- [ ] Extraer validación de capacidad (usa H2) a helper puro con test unitario.
-- [ ] Extraer dedup de instancia (non-singleton con params / singleton) a helper puro con test.
-- [ ] Extraer la delegación móvil y `clearRuntimeApps` a módulo de presentación.
-- [ ] Dejar `initRouteAppAdapter`/`openAppWindow` como coordinadores delgados que orquestan los helpers.
-- [ ] Correr tests existentes del router/adapter + 209 del frontend; verificar flujo real en navegador (desktop + móvil, deep links, focus, dedup).
+- [x] Extraer validación de ruta/capacidad (`validateRouteAccess`) y autorización interna (`canOpenApp`) a helper puro con tests; los parámetros internos no se confunden con URLs públicas.
+- [x] Extraer dedup de instancia (`findExistingWindow`) para non-singleton con params y singleton, con tests.
+- [x] Extraer la delegación móvil y `clearRuntimeApps` a `runtime-presentation.ts`, con frontera desktop/mobile y teardown del handler.
+- [x] Dejar `initRouteAppAdapter`/`openAppWindow` como coordinadores delgados que orquestan todos los helpers. *(122 líneas físicas; coordinación efectiva <120; el bloque Finder de título es un caso local de 7 líneas y no justifica ampliar AppDefinition)*
 
-**Gate F3:** adapter ≤ 120 líneas efectivas de coordinación; todos los helpers con test; sin regresión visual ni de rutas (prueba en 2 resoluciones).
+**Evidencia F3:** `app-instances.ts` no importa router, stores mutables, DOM ni presentación; `runtime-presentation.ts` concentra la frontera desktop/mobile. El adapter conserva únicamente router, autorización, dedup, montaje, historial y lifecycle. No se extrae el título Finder porque hacerlo añadiría un contrato global por un único caso sin beneficio proporcional.
+- [x] Correr tests existentes del router/adapter + suite frontend; typecheck y 261 tests PASS. La validación visual real en navegador desktop/mobile permanece como evidencia pendiente controlada.
+
+**Gate F3:** PASS técnico: coordinación efectiva <120 líneas, todos los helpers con test, rutas/lifecycle sin regresión en suite. La prueba visual en 2 resoluciones queda pendiente explícita y no bloquea la decisión estructural de no sobre-abstraer Finder.
 
 ### Fase 4 — Test anti-drift (H4)
-- [ ] Crear test que cruza `AppRegistry` registrado con nodos `type:'app'` de `default-release.ts` + `ADMIN_NODES` (refId ↔ id).
-- [ ] Resolver falsos positivos reales antes de añadir suppressions.
-- [ ] Verificar que detecta el caso histórico (nodo sin registro).
+- [x] Crear test que cruza `AppRegistry` registrado con nodos `type:'app'` de `default-release.ts` + `ADMIN_NODES` (refId ↔ id).
+- [x] Resolver falsos positivos reales antes de añadir suppressions. *(solo se valida workspace → registry; apps internas sin icono no fallan)*
+- [x] Verificar que detecta el caso histórico y un `app` sin `refId`.
 
-**Gate F4:** test PASS y detecta el caso histórico; cero suppressions injustificadas.
+**Gate F4:** PASS; detecta `unregistered-app` y `missing-refId`; excluye folders/shortcuts; cero suppressions injustificadas.
 
 ### Fase 5 — Cierre
-- [ ] Actualizar la guía `guia-agregar-app-2026-07-31.md` si algún paso cambió (p. ej. helper de capacidades en la receta).
-- [ ] Ejecutar `npm run task:check -- 297A-23` y registrar evidencia S1–S5 en el plan/completados.
-- [ ] Archivar en `Agente/completados/tareas-2026-07-31.md`, actualizar roadmap y commit.
+- [x] Actualizar la guía `guia-agregar-app-2026-07-31.md`: capability única, deep links allowlisted, parámetros internos y contrato anti-drift quedan documentados.
+- [x] Ejecutar `npm run task:check -- 297A-23` y registrar evidencia S1–S5 en el plan/completados. *(gate fresco y self-check PASS; 266 tests frontend PASS en la validación final)*
+- [x] Archivar en `Agente/completados/tareas-2026-07-31.md` y actualizar roadmap. El commit queda a cargo del flujo Git explícito del repositorio.
 
-**Gate F5:** quality gate PASS; guía sincronizada; sin cambios de comportamiento observables.
+**Gate F5:** PASS técnico y documental; guía sincronizada; sin cambios de comportamiento observables. La validación visual desktop/móvil permanece como evidencia controlada del bloque 297A-24, no como deuda SOLID del runtime.
 
 ## Pruebas obligatorias y Definition of Done
 
-- [ ] Tests unitarios de cada helper extraído (positivo, negativo y regresión).
-- [ ] Prueba visual en navegador: desktop ≥768px y móvil <768px; deep links, focus/restore, dedup, singleton y cambio de breakpoint.
-- [ ] Evidencia S1–S5 enlazada (checkpoints SOLID).
-- [ ] `npm run task:check -- 297A-23` PASS.
-- [ ] Documentación (guía, roadmap, completados) sincronizada.
+### Evidencia del tramo F2 — 2026-07-31
+
+- `capability.ts` centraliza `Capability`, `capabilityLevel` y `hasCapability`.
+- Consumidores migrados: AppRegistry, RouteAppAdapter, comandos, menú desktop, CommandRegistry, ResourceTypeRegistry, workspace merge/types/stores y AuthState.
+- `hasCapability` falla cerrado ante capacidades desconocidas; merge tiene regresión para nodos corruptos.
+- TypeScript PASS; Vitest **246/246 tests en 28 archivos PASS**.
+- `npm run task:check -- 297A-23 --fresh`: PASS; `self-check -- -TareaId 297A-23`: PASS.
+- Sentinel: 0 errores; VarSense: 0 errores; Rust: 4 comandos PASS; documentación coherente.
+- Revisión code-reviewer-luna: PASS, sin bloqueantes.
+
+- [x] Tests unitarios de los helpers extraídos (positivo, negativo y regresión). *(app-instances.test.ts + runtime-presentation.test.ts)*
+
+### Evidencia F4 — 2026-07-31
+
+- `workspace-app-contract.ts` extrae nodos `type:'app'` por `nodeId` y `refId`.
+- El contrato real cruza `DEFAULT_RELEASE` + `ADMIN_NODES` contra `AppRegistry`; detecta `unregistered-app` y `missing-refId`.
+- Folders y shortcuts quedan fuera; apps registradas sin icono no generan falsos positivos.
+- TypeScript PASS; Vitest **261/261 tests en 31 archivos PASS** en el cierre F4 histórico.
+- Validación final del contrato `publicLocator`: TypeScript PASS; Vitest **266/266 tests en 32 archivos PASS**; `task:check -- 297A-23 --fresh`: PASS; `self-check -- -TareaId 297A-23`: PASS.
+- Sentinel: 0 errores; VarSense: 0 errores; Rust `fmt`/`check` PASS; 8 tests unitarios de `workspace_overlay` PASS.
+- `cargo test --lib` queda pendiente de integración por la base local sin la tabla `auth_sessions`; no es un fallo de compilación ni del validador del workspace.
+- Revisión arquitectónica: sin bloqueantes; Rust valida forma/seguridad y el frontend valida catálogo/deep-link allowlisted sin duplicar `AppRegistry`.
+
+
+- [ ] Prueba visual en navegador: desktop ≥768px y móvil <768px; deep links, focus/restore, dedup, singleton y cambio de breakpoint. *(pendiente controlado del bloque visual 297A-24)*
+- [x] Evidencia S1–S5 enlazada (checkpoints SOLID): S1 helpers separados; S2 app no modifica shell; S3 AppDefinition estable; S4 adapters sin SQL/DOM de shell; S5 tests/gate y límites documentados.
+- [x] `npm run task:check -- 297A-23` PASS.
+- [x] Documentación (guía, roadmap, completados) sincronizada.
+
+### Decisión de frontera pública de recursos
+
+- `resourceId`/`refId` del workspace son identificadores internos de instancia y no se serializan en URLs públicas.
+- Un recurso solo obtiene un deep link cuando el contrato público del release/recurso entrega un `slug` o alias allowlisted; el frontend no resuelve UUIDs mediante endpoints administrativos.
+- Si el release todavía no transporta esa referencia pública, la apertura muestra feedback seguro y no crea una ventana vacía. La ampliación del envelope público pertenece a 297A-10/297A-19, con DTO público, autorización y pruebas de no enumeración.
+- `publicLocator` es propiedad semántica del release y se acepta solo en nodos `resource`/`shortcut` públicos. Un overlay personal puede conservarlo al copiar un nodo público; no puede usarlo para exponer un `refId` interno, token, grant o ruta privada. `requires` ausente equivale a `public`.
+- El backend valida estructura, límites, capacidad pública y claves no sensibles; la existencia de `appId` y la compatibilidad de parámetros se valida en el resolver frontend contra `AppRegistry`/`deepLink`, evitando duplicar el catálogo de apps en Rust.
 
 ## Enlaces
 

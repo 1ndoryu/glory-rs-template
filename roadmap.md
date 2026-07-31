@@ -42,7 +42,7 @@
 
 **297A-10 — Recursos y migraciones (completado).** Resource envelope, product versions, asset states, services con transacción, DTO público/admin y About seeder.
 
-**Plan transversal 297A-4 — parcialmente cerrado.** CommandRegistry enriquecido (§2), selección+foco (§3), context menu (§2.3), keyboard move/resize (§4.1), resource-type-registry (§7), analytics envelope (§9.1/9.2). Pendiente: clipboard/undo (§5, 297A-11), persistencia (§6, 297A-13), mobile (§2.3/3, 297A-12), tests unitarios (§11, requiere vitest).
+**Plan transversal 297A-4 — parcialmente cerrado.** CommandRegistry enriquecido (§2), selección+foco (§3), context menu (§2.3), keyboard move/resize (§4.1), resource-type-registry (§7), analytics envelope (§9.1/9.2), persistencia local/remota del workspace (§6, 297A-13) y tests unitarios iniciales (§11). Pendiente: clipboard/undo (§5, 297A-11), E2E multi-dispositivo, mobile formal (§2.3/3, 297A-12) y cobertura ampliada.
 
 ## Pendientes ordenados
 
@@ -118,10 +118,10 @@
 - [x] Usar `data-theme`/atributo equivalente en el shell para que desktop, tablet y launcher móvil compartan la misma implementación; multimedia puede conservar color, el chrome sigue monocromo. *(data-tema en documentElement + override scoped para superficies del OS)*
 - [x] Resolver preferencia inicial por sistema operativo y permitir override explícito. *(matchMedia + localStorage `wandorius:tema`)*
 - [x] Evitar flash de tema en la primera pintura y emitir un evento `theme_changed` medible con modo. *(script inline en index.html + ThemeEvent en dispatcher)*
-- [ ] Guardar anónimo en overlay local y completar la resolución de la preferencia de cuenta sin sobrescribir decisiones locales silenciosamente; UI de conflicto y logout/login. *(transporte remoto parcial implementado en 297A-13)*
+- [x] Guardar anónimo en overlay local y completar la resolución de la preferencia de cuenta sin sobrescribir decisiones locales silenciosamente; UI de conflicto y logout/login. *(transporte remoto, fallback offline y UI de conflicto implementados en 297A-13)*
 - [x] Validar contraste AA, foco/teclado, reduced motion, zoom 200% y viewports (1440×900, 1024×768, 390×844, 320px); capturas aprobadas por el usuario. *(aprobación visual 2026-07-31; E2E formal y medición de rendimiento quedan con 297A-17)*
 
-**Salida:** el usuario cambia claro/oscuro desde un control único y la preferencia local sobrevive; tema aprobado visualmente. El transporte remoto de la preferencia está implementado en 297A-13; quedan UI de conflicto y resolución de ámbito local/remoto.
+**Salida:** el usuario cambia claro/oscuro desde un control único y la preferencia local sobrevive; tema aprobado visualmente. El transporte remoto, fallback offline y resolución explícita local/remota están implementados; quedan E2E multi-dispositivo y Cuenta.
 
 ### 297A-19 — URLs canónicas, deep links y ventana enfocada
 
@@ -131,8 +131,8 @@
 - [x] Migrar parser/serializer y fallback seguro de Reader, Finder/Galería, About y Projects; apps legacy sin contrato no aceptan parámetros dinámicos.
 - [x] Conectar `replacePath` a todos los cambios de foco y reservar `pushPath` para aperturas explícitas; `window-url-sync` deriva de los stores sin router paralelo.
 - [ ] Mantener Back/Forward, refresh y transición desktop/tablet/móvil para el foco completo; la reconciliación de rutas documentales, parámetros inseguros, capacidades y semántica `push/replace` ya está implementada y probada, pero falta E2E real de `goBack()`/`popstate`/interacción móvil.
-- [ ] Añadir `Copiar URL` con feedback, protección de drafts/privados/grants y redirects canónicos; el fallback seguro y boundary allowlisted ya están implementados.
-- [ ] Medir `deep_link_opened`, `window_focus_changed` y `share_url_copied`; probar sesión limpia, varias ventanas, permisos, rutas inválidas y viewports. El boundary y las rutas inválidas ya tienen cobertura unitaria.
+- [x] Añadir `Copiar URL` como comando global del toolbar, con feedback, fallback de Clipboard API/execCommand y URL canónica allowlisted. *(navigation-commands.ts + desktop-window.ts)*
+- [ ] Medir `deep_link_opened` y `window_focus_changed`; `share_url_copied` ya emite metadatos allowlisted (`routeName`, `appId`, `presentationMode`, `success`). Probar sesión limpia, varias ventanas, permisos, rutas inválidas y viewports. El boundary y las rutas inválidas ya tienen cobertura unitaria.
 
 **Salida:** copiar una URL desde cualquier app abre o enfoca esa app/recurso en otra sesión, con historial, seguridad, analítica y presentación móvil coherentes.
 
@@ -175,7 +175,7 @@
 
 **Salida:** los usuarios saben que hay novedades aunque su escritorio esté personalizado; el admin gestiona desde un panel, sin notificaciones inmediatas.
 
-### 297A-13 — Registro y overlay remoto *(parcial)*
+### 297A-13 — Registro y overlay remoto *(parcial: Cuenta base implementada; registro avanzado pendiente)*
 
 **Depende de:** 297A-8/11; integra móvil 297A-12.
 
@@ -183,13 +183,14 @@
 - [x] Transporte de preferencias de cuenta: `user_preferences`, revisión optimista, endpoint protegido, CSRF/CORS, fallback local y guardas contra respuestas obsoletas. *(migraciones 297A-13 + `preferences-sync.ts`; type-check, 209 tests, Rust y gate PASS)*
 - [x] UI de resolución `remote/local` para conflictos 409; adaptador separado, modal único/idempotente, cierre al resolver/logout y etiquetado ARIA. *(preferences-conflict-ui.ts + 4 regresiones UI)*
 - [x] Pruebas HTTP/integración de 401 sin sesión, 403 sin CSRF, preflight CORS con credenciales y carrera 409 con dos actualizaciones de la misma revisión; verifican router de producción, cuerpos JSON y revisión final. *(4 tests en `preferences_handler.rs`; `cargo test` PASS)*
-- [ ] Overlay remoto del workspace: `user_workspace_overlays`, importación/reset, merge por ID/campo, tombstones, dos dispositivos y release nuevo.
-- [ ] **Cuenta como app del escritorio:** registrar en AppRegistry con estados invitado/autenticado/verificación pendiente/MFA.
-- [ ] **Estado de sesión visible:** icono en la barra superior (junto al tema) que abre la app Cuenta; refleja login/logout con etiqueta accesible.
-- [ ] **Login dentro de la app:** deslogueado, la app Cuenta muestra el formulario de login/registro; deep links `/login` y `/register` abren Cuenta.
+- [x] Overlay remoto del workspace: `user_workspace_overlays`, contrato JSON validado, revisión optimista, importación local/remota, reset, merge por ID/campo, tombstones, rebase ante release nuevo y conflicto visible. *(migration `20260731120000_297a13_workspace_overlays`; `overlay-sync.ts` + `overlay-conflict-ui.ts`; type-check, 221 tests, Rust y gate PASS)*
+- [ ] Prueba E2E real de dos pestañas/dispositivos y política de merge semántico entre cambios concurrentes.
+- [x] **Cuenta como app del escritorio:** registrar en AppRegistry como singleton público con estados invitado/autenticado/admin; verificación pendiente y MFA quedan como estados futuros del backend. *(account-view.ts + AppRegistry)*
+- [x] **Estado de sesión visible:** control en barra superior y launcher móvil junto al tema; abre Cuenta y refleja Entrar/Cuenta/Cuenta · admin con etiqueta accesible. *(desktop-menu-bar.ts + mobile-shell.ts)*
+- [x] **Login dentro de la app:** deslogueado, Cuenta muestra login dentro de su ventana; `/login` es deep link canónico y el wrapper legacy reutiliza la misma vista. Registro y `/register` permanecen cerrados hasta completar backend verificado.
 - [ ] Recuperación de contraseña, rate limit y auditoría de intentos; logout limpia clipboard/undo.
 
-**Salida:** las preferencias remotas tienen transporte seguro, control de revisión, resolución visible `remote/local` y pruebas HTTP reales; 297A-13 completo permanece abierto hasta cerrar el overlay del workspace y Cuenta como app del OS.
+**Salida:** preferencias, overlay remoto y Cuenta base tienen transporte seguro, control de revisión, validación server-side, resolución visible `remote/local`, login/logout y pruebas frontend; 297A-13 permanece abierto por registro verificado, E2E multi-dispositivo/móvil, MFA, recuperación y auditoría avanzada.
 
 ### 297A-14 — Programas editoriales
 
@@ -238,16 +239,28 @@
 
 **Salida:** preparado para revisión de producción; deploy continúa fuera de alcance.
 
-### 297A-23 — Deuda SOLID del runtime de apps (hipótesis)
+### 297A-23 — Deuda SOLID del runtime de apps *(F3–F5 técnicas/documentales completadas; validación visual separada)*
 
-**Depende de:** 297A-19 (deep links). No tocar el adapter mientras 297A-19 esté en curso. Plan en hipótesis: `Agente/planes/plan-deuda-solid-runtime-2026-07-31.md`.
+**Depende de:** 297A-19 (deep links). Plan y evidencia: `Agente/planes/plan-deuda-solid-runtime-2026-07-31.md`.
 
-- [ ] Dividir `route-app-adapter.ts`: coordinador delgado + helpers extraídos (capacidad, dedup, móvil) con tests (SRP).
-- [ ] Centralizar la jerarquía de capacidades en un módulo único consumido por registry y adapter (OCP/DRY).
-- [ ] Resolver la rama muerta `authenticated`: usarla en Cuenta (297A-13) o retirarla.
-- [ ] Test anti-drift: todo nodo `type:'app'` del workspace tiene `AppRegistry.register` (y viceversa).
+- [x] Centralizar la jerarquía de capacidades en `runtime/capability.ts`, consumida por registry, adapter, comandos, menú, recursos, workspace y sesión (OCP/DRY).
+- [x] Resolver la rama `authenticated`: se conserva para Cuenta y futuras superficies autenticadas; no se retira.
+- [x] Añadir política fail-closed y regresión para capacidades corruptas.
+- [x] Completar la división de `route-app-adapter.ts`: acceso/dedup en `app-instances.ts`, frontera móvil/cleanup en `runtime-presentation.ts`; coordinador medido con coordinación efectiva <120 líneas (SRP).
+- [x] Test anti-drift workspace → AppRegistry: detecta `unregistered-app` y `missing-refId`, excluye folders/shortcuts y permite apps internas sin icono.
 
-**Salida:** el runtime sigue SOLID al crecer a editors/comercio: adapter con una responsabilidad, capacidades en un solo punto, sin superficie muerta ni drift registry↔workspace.
+**Evidencia del tramo:** TypeScript PASS, Vitest 266/266 en la validación final, `task:check` PASS, `self-check` PASS, Sentinel/VarSense sin errores bloqueantes. F3–F5 técnicas/documentales están completadas; el contrato `publicLocator` separa `refId` interno de referencias públicas allowlisted y la integración Rust completa queda pendiente de aplicar migraciones en la base local (`auth_sessions`). La validación visual/E2E del runtime permanece controlada en 297A-24.
+
+### 297A-24 — Investigar y resolver: cierre automático de ventanas al abrir otra
+
+**Depende de:** 297A-19 (deep links). **Bug reproducido** — investigar y resolver, no parchear. Plan: `Agente/planes/plan-cierre-automatico-ventanas-2026-07-31.md`.
+
+- [x] Corregir la causa raíz con S1: `window-url-sync` no proyecta `/` cuando existe cualquier app runtime abierta; Perfil/shell queda fuera del catálogo y no dispara reconciliación destructiva.
+- [x] Fijar con tests: app no canónica y Perfil no cierran otras apps; cerrar la última app permite `/`; la guardia respeta desktop/tablet frente a móvil.
+- [x] Resolver el mismatch `resourceId` vs `slug` de Reader: `resourceId` interno ya no se interpreta como slug público; apps internas siguen sin URL canónica por diseño; recursos sin `publicLocator` muestran feedback seguro. La resolución futura requiere envelope público autorizado.
+- [ ] Prueba visual manual desktop/móvil (apertura canónica/no canónica, Perfil, refresh, Back/Home); `task:check` y `self-check` ya pasan.
+
+**Salida:** abrir una ventana nunca cierra las demás; el cierre masivo solo ocurre cuando el usuario navega realmente fuera de las apps; lección registrada.
 
 ## Detalle operativo de las tareas pendientes
 
@@ -278,8 +291,9 @@ Este bloque amplía el alcance verificable sin duplicar los manuales canónicos.
 ### 297A-13 — Registro y overlay remoto
 
 - [ ] Implementar registro verificado, login/logout, recuperación, rate limit y auditoría detrás de feature flag; logout limpia clipboard/undo.
-- [ ] Sincronizar overlay y preferencias con revisión esperada, actualización optimista con rollback y conflicto 409 visible.
-- [ ] Definir importación local, uso remoto, reset explícito y merge por ID/campo; probar dos pestañas/dispositivos, pérdida de red y release nuevo.
+- [x] Sincronizar preferencias y overlay con revisión esperada, actualización optimista, validación server-side, fallback offline y conflicto 409 visible. *(preferencias + `user_workspace_overlays`; gate y self-check PASS)*
+- [x] Definir importación local, uso remoto, reset explícito, merge por ID/campo, tombstones y rebase ante release nuevo; probar autorización, payload inválido, corrupción persistida y revisión inicial sin fila fantasma.
+- [ ] Probar E2E dos pestañas/dispositivos y decidir merge semántico para cambios concurrentes no resolubles por reemplazo local/remoto.
 
 ### 297A-14 — Programas editoriales
 

@@ -28,6 +28,7 @@ type AppRenderFn = (ctx: RenderContext) => MountedView | Promise<MountedView>;
 
 ```ts
 // frontend/src/features/runtime/app-registry.ts
+// frontend/src/features/runtime/capability.ts
 type Capability = 'public' | 'authenticated' | 'admin';
 
 interface AppDefinition {
@@ -88,7 +89,8 @@ AppRegistry.register({
 ```
 
 - **Eager vs lazy:** apps pequeñas y siempre presentes → `register`; apps grandes o bajo demanda → `registerLazy({ ..., load: () => import('...').then(m => ({ render: ... })) })` (patrón Admin/Settings). No inflar el bundle inicial.
-- **Parámetros de instancia:** `ctx.params`; dedup por `_paramKey` lo hace `route-app-adapter` automáticamente con `stableParamsKey`.
+- **Parámetros de instancia:** `ctx.params`; dedup por `_paramKey` lo hace `route-app-adapter` automáticamente con `stableParamsKey`. Los parámetros internos del workspace (`folderId`, `resourceId`) no son URLs públicas y nunca deben convertirse implícitamente en slug.
+- **Recursos públicos:** un nodo `resource` puede declarar `publicLocator: { appId, params }`; el resolver central valida que la app exista, sea pública y acepte esos parámetros mediante su `deepLink`. `refId` sigue siendo interno. Sin locator válido, la UI informa que el recurso no está disponible públicamente y no abre una ventana vacía.
 
 ### Paso 3 — Ruta pública canónica (solo si aplica)
 
@@ -160,7 +162,7 @@ Prueba visual real en navegador: desktop (≥768px) y móvil (<768px), estados v
 | App admin (ej. admin)                     | `registerLazy` + `requires:'admin'`          | opcional (`/admin`)  | `ADMIN_NODES` (stores.ts)                          |
 | App con parámetros (ej. reader)           | `register` + `deepLink` con `parameterNames` | `/article/:slug`     | `DEFAULT_RELEASE`                                  |
 
-Capacidades: `getAvailable(currentCapability)` filtra por jerarquía `public < authenticated < admin`; `route-app-adapter` aplica la misma frontera en `openAppWindow` y en el interceptor de rutas.
+Capacidades: `getAvailable(currentCapability)` y `route-app-adapter` consumen `hasCapability` desde `runtime/capability.ts`, con jerarquía `public < authenticated < admin`. La misma política se reutiliza en comandos, resource registry y workspace merge; no copiar arreglos de niveles en consumidores.
 
 ## 4. Gate SOLID (evidencia para la tarea)
 
@@ -178,6 +180,7 @@ Definition of Done: evidencia S1–S5 en el plan, prueba positiva + negativa + r
 - Clases CSS sin regla = hallazgo de VarSense: verificar que toda clase nueva tenga su regla (contraejemplo real: `.desktop-about` en `app-registration.ts` sin CSS; el contenido real usa `.about-contenido` en `pages.css`).
 - Apps sin `deepLink` no hacen `pushPath` (`getCanonicalAppPath` → `null`): no intentar URL canónica en apps locales.
 - `dispatchEvent({ type: 'app_opened' })` dentro de `render` y `app_closed` en `destroy` — patrón consistente del OS (analítica).
+- `publicLocator` pertenece semánticamente al nodo/release. Un overlay puede conservarlo al copiar un `resource`/`shortcut` público, pero no puede usarlo para exponer `refId`, rutas privadas, tokens o grants; el backend valida la forma pública y el resolver frontend valida la app/deep-link. `requires` ausente equivale a `public`.
 - No borrar `routePatterns` legacy de apps existentes hasta migrar a `deepLink` (Reader ya migrado; Finder/About/Projects tienen ambos).
 
 ## 6. Referencias

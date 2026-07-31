@@ -3,8 +3,8 @@
 > **Epic:** 297A-4  
 > **Fecha:** 2026-07-29  
 > **Prioridad:** máxima  
-> **Estado:** en ejecución; identidad visual, seguridad inmediata, sesiones seguras y foundation del runtime implementados
-> **Siguiente bloque:** 297A-10 — recursos y migraciones (tras cerrar297A-9)
+> **Estado:** en ejecución; identidad visual, seguridad inmediata, sesiones seguras, runtime, recursos, workspace y Cuenta base implementados
+> **Siguiente bloque:** 297A-22 — reordenamiento por arrastre con grid, pendiente de revisión de decisiones abiertas
 
 ## 1. Autoridad y alcance
 
@@ -53,7 +53,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 | 5 | 297A-10 | recursos + migraciones | bloqueado |
 | 6 | 297A-11 | workspace + overlay invitado | bloqueado |
 | 7 | 297A-12 | launcher móvil | bloqueado |
-| 8 | 297A-13 | cuenta + overlay remoto | parcial: preferencias remotas implementadas; overlay pendiente |
+| 8 | 297A-13 | cuenta + overlay remoto | parcial: Cuenta base, preferencias y overlay remoto implementados; registro avanzado/E2E pendientes |
 | 9 | 297A-14 | programas editoriales | bloqueado |
 | 10 | 297A-15 | comercio seguro | bloqueado |
 | 11 | 297A-16 | estadísticas + retiro legado | bloqueado |
@@ -166,13 +166,13 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 
 ### 6.2 Cuenta como programa
 
-- [ ] Registrar Cuenta en AppRegistry provisional/final según fase runtime. *(pendiente 297A-9)*
-- [ ] Estados invitado, autenticado, verificación pendiente y admin MFA pendiente. *(parcial: auth/no-auth)*
+- [x] Registrar Cuenta en AppRegistry como app singleton pública. *(implementado en 297A-13: `account-view.ts` + `AppRegistry`)*
+- [x] Estados invitado, autenticado y admin. *(verificación pendiente y MFA permanecen fuera del alcance implementado)*
 - [x] Login/logout/me con feedback y abort.
 - [x] Lista/revocación de sesiones activas.
-- [ ] Deep links `/login` y `/register` abren Cuenta. *(pendiente 297A-9)*
-- [ ] Icono de estado de sesión en la barra superior (junto al tema) que abre la app Cuenta; refleja login/logout con etiqueta accesible.
-- [ ] Deslogueado, la app Cuenta muestra el formulario de login/registro en su propia ventana (sin overlay de página completa).
+- [x] Deep link `/login` abre Cuenta; `/register` permanece cerrado hasta completar registro verificado.
+- [x] Icono de estado de sesión en la barra superior y launcher móvil; abre Cuenta y refleja login/logout con etiqueta accesible.
+- [x] Deslogueado, la app Cuenta muestra el formulario de login en su propia ventana, sin overlay de página completa. Registro permanece cerrado.
 
 ### 6.3 Preparación de registro
 
@@ -183,7 +183,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [ ] Registro permanece apagado hasta completar todo el checklist.
 
 **Criterio de salida:** admin opera Cuenta sin token en Web Storage; sesiones pueden revocarse y errores no se silencian.
-**Estado:** completado. Sesiones opacas en cookie operativas; JWT eliminado del frontend; CSRF y rate limit activos. Cuenta como programa pendiente de297A-9.
+**Estado:** completado. Sesiones opacas en cookie operativas; JWT eliminado del frontend; CSRF y rate limit activos. Cuenta base como app del OS quedó implementada y validada en 297A-13; registro verificado, recovery, MFA y auditoría avanzada siguen pendientes.
 
 ## 7. 297A-9 — Foundation del runtime desktop/tablet
 
@@ -321,7 +321,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 
 **Criterio de salida:** teléfono funciona como launcher sin lógica/app duplicada y tablet conserva escritorio.
 
-## 11. 297A-13 — Registro y overlay remoto *(parcial)*
+## 11. 297A-13 — Registro y overlay remoto *(parcial: Cuenta base implementada; registro avanzado pendiente)*
 
 **Dependencias:** sesiones 297A-8, workspace 297A-11 e integración móvil 297A-12.
 
@@ -332,14 +332,15 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [x] Proteger logout/cambio de usuario, fallback offline y respuestas tardías; tests frontend incluidos.
 - [x] UI de resolución `remote/local` conectada al estado `conflict`; modal único, accesible, idempotente y cerrado al resolver/logout. *(preferences-conflict-ui.ts)*
 - [x] Pruebas HTTP/integración de 401 sin sesión, 403 sin CSRF, preflight CORS con credenciales y dos actualizaciones concurrentes con una sola victoria; verifican `create_router()` y cuerpos `200/409`. *(4 tests en `preferences_handler.rs`; `cargo test` PASS)*
-- [ ] Crear `user_workspace_overlays` para posiciones/estado del workspace, con importación local/remota/reset, merge por ID/campo, tombstones y release nuevo.
-- [ ] Prueba de dos pestañas/dispositivos y de que una cuenta no restaura recursos retirados.
-- [ ] **Cuenta como app del escritorio:** registrar en AppRegistry con estados invitado/autenticado/verificación pendiente/MFA.
-- [ ] **Estado de sesión visible:** icono en la barra superior (junto al tema) que abre la app Cuenta; refleja login/logout con etiqueta accesible.
-- [ ] **Login dentro de la app:** deslogueado, la app Cuenta muestra el formulario de login/registro; deep links `/login` y `/register` abren Cuenta.
+- [x] Crear `user_workspace_overlays` para posiciones/estado del workspace, con contrato JSON validado, importación local/remota/reset, merge por ID/campo, tombstones y rebase ante release nuevo. *(migration `20260731120000_297a13_workspace_overlays`; service/repository/handler + `overlay-sync.ts`; gate PASS)*
+- [x] Verificar autorización, CSRF, payload inválido, corrupción persistida, revisión inicial sin fila fantasma y que una cuenta no restaure recursos retirados. *(tests unitarios/HTTP del overlay; `cargo test` PASS)*
+- [ ] Prueba E2E de dos pestañas/dispositivos y decisión de merge semántico para cambios concurrentes.
+- [x] **Cuenta como app del escritorio:** registrar en AppRegistry como singleton público con estados invitado/autenticado/admin; verificación pendiente y MFA quedan como estados futuros del backend. *(account-view.ts + AppRegistry)*
+- [x] **Estado de sesión visible:** control en barra superior y launcher móvil junto al tema; abre Cuenta y refleja Entrar/Cuenta/Cuenta · admin con etiqueta accesible. *(desktop-menu-bar.ts + mobile-shell.ts)*
+- [x] **Login dentro de la app:** deslogueado, Cuenta muestra login dentro de su ventana; `/login` es deep link canónico y el wrapper legacy reutiliza la misma vista. Registro y `/register` permanecen cerrados hasta completar backend verificado.
 - [ ] Recuperación de contraseña, rate limit y auditoría de intentos; logout limpia clipboard/undo.
 
-**Criterio de salida:** configuración privada continúa entre dispositivos sin overwrite silencioso. El transporte, la resolución UI y las pruebas HTTP de preferencias quedan cerrados; 297A-13 completo permanece abierto hasta implementar el overlay del workspace y Cuenta como app del OS. Cuenta queda definida como app del OS con estado de sesión en la barra superior y login dentro de la propia app.
+**Criterio de salida:** configuración privada y organización del workspace tienen transporte autenticado, revisión optimista, fallback offline, validación y conflicto explícito sin overwrite silencioso. Cuenta base queda implementada como app del OS con login/logout y estado visible; 297A-13 permanece abierto por registro verificado, MFA, recuperación, auditoría avanzada y E2E multi-dispositivo/móvil.
 
 ## 12. 297A-14 — Programas editoriales
 

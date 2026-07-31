@@ -4,6 +4,7 @@
 import { CommandRegistry, type CommandContext, type CommandResult } from '../command-registry';
 import { focusWindow, findOpenWindow, restoreWindow } from '../window-manager';
 import { AppRegistry } from '../app-registry';
+import { hasCapability } from '../capability';
 import { dispatchEvent } from '../../analytics/dispatcher';
 
 CommandRegistry.register({
@@ -19,10 +20,7 @@ CommandRegistry.register({
     if (!appId) return { state: 'disabled', reason: 'no app target' };
     const app = AppRegistry.get(appId);
     if (!app) return { state: 'hidden' };
-    const hierarchy = ['public', 'authenticated', 'admin'] as const;
-    const currentLevel = hierarchy.indexOf(ctx.capability ?? 'public');
-    const requiredLevel = hierarchy.indexOf(app.requires);
-    if (requiredLevel > currentLevel) return { state: 'hidden' };
+    if (!hasCapability(ctx.capability ?? 'public', app.requires)) return { state: 'hidden' };
     return { state: 'enabled' };
   },
   execute: async (ctx?: CommandContext): Promise<CommandResult> => {

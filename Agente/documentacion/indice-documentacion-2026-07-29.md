@@ -22,6 +22,8 @@
 | ¿Cómo se planifica el tema claro/oscuro del OS?         | `Agente/planes/plan-modo-oscuro-os-2026-07-31.md`                                  |
 | ¿Cómo se revisan SOLID y escalabilidad por fase?        | `Agente/documentacion/arquitectura/checkpoints-solid-escalabilidad-2026-07-31.md` |
 | ¿Cómo se agrega una nueva app al OS (receta canónica)?  | `Agente/documentacion/arquitectura/guia-agregar-app-2026-07-31.md`                 |
+| ¿Cómo se paga la deuda SOLID del runtime de apps?       | `Agente/planes/plan-deuda-solid-runtime-2026-07-31.md`                             |
+| ¿Por qué se cierran ventanas al abrir otra y cómo se resuelve? | `Agente/planes/plan-cierre-automatico-ventanas-2026-07-31.md`                |
 
 ## Regla de autoridad
 

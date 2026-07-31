@@ -5,6 +5,8 @@
  * Extensión y MIME del cliente no son autoridad; backend entrega tipo normalizado. */
 
 import { AppRegistry } from './app-registry';
+import type { Capability } from './capability';
+import { hasCapability } from './capability';
 
 /** Tipo de recurso conocido por el OS. */
 export type ResourceKind =
@@ -46,7 +48,7 @@ export interface ResourceTypeEntry {
   /** MIME types que este tipo acepta (para resolver desde MIME). */
   readonly mimePatterns?: readonly string[];
   /** Si requiere capacidad específica. */
-  readonly requires?: 'public' | 'authenticated' | 'admin';
+  readonly requires?: Capability;
 }
 
 /* === Catálogo de asociaciones === */
@@ -85,10 +87,10 @@ export function resolveByMime(mime: string): ResourceTypeEntry | undefined {
 }
 
 /** Obtener acciones disponibles para un tipo de recurso. */
-export function getResourceActions(kind: ResourceKind, capability?: string): readonly ResourceAction[] {
+export function getResourceActions(kind: ResourceKind, capability?: Capability): readonly ResourceAction[] {
   const entry = registry.get(kind);
   if (!entry) return ['properties']; /* Fallback seguro */
-  if (entry.requires === 'admin' && capability !== 'admin') {
+  if (!hasCapability(capability ?? 'public', entry.requires)) {
     return ['open', 'properties']; /* Público solo abre y ve propiedades */
   }
   return entry.actions;

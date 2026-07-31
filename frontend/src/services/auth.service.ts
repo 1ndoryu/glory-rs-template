@@ -28,7 +28,10 @@ export const AuthService = {
   async login(email: string, password: string): Promise<void> {
     /* El endpoint de sesión responde 204; la capacidad se confirma en /me. */
     await api.post<void>('/api/auth/login', { email, password });
-    await this.me();
+    const session = await this.me();
+    if (!session.isAuthenticated) {
+      throw new Error('La sesión no pudo confirmarse');
+    }
   },
 
   /** Cerrar sesión. */

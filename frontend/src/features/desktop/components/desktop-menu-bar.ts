@@ -4,10 +4,12 @@
  * Configuración: abre la app de settings.
  * [Plan §2.3] Los menús proyectan CommandRegistry/AppRegistry. */
 
-import { createElement, FileUser, Folder, type IconNode } from 'lucide';
+import { createElement, FileUser, Folder, UserRound, type IconNode } from 'lucide';
 import { createEl } from '../../../utils/dom';
 import { formatShortcut } from '../../../utils/format-shortcut';
-import { AppRegistry, type Capability } from '../../runtime/app-registry';
+import { AppRegistry } from '../../runtime/app-registry';
+import type { Capability } from '../../runtime/capability';
+import { hasCapability } from '../../runtime/capability';
 import { authStore } from '../../../store';
 import { ArticleService } from '../../../services';
 import { createThemeToggleButton } from '../../../components/ui/theme-toggle-button';
@@ -162,14 +164,13 @@ function createApplicationsMenu(
       if (!isAlive() || generation !== refreshGeneration) return;
       const ws = workspaceStore.get();
       const capability: Capability = authStore.get().capability;
-      const hierarchy: Capability[] = ['public', 'authenticated', 'admin'];
       const launcherItems = Object.values(ws.nodes)
         .filter(node => node.parentId === 'desktop' && (node.type === 'app' || node.type === 'folder'))
         .sort((a, b) => (a.mobileOrder ?? 0) - (b.mobileOrder ?? 0));
 
       for (const node of launcherItems) {
         const app = node.type === 'app' && node.refId ? AppRegistry.get(node.refId) : undefined;
-        if (app && hierarchy.indexOf(app.requires) > hierarchy.indexOf(capability)) continue;
+        if (app && !hasCapability(capability, app.requires)) continue;
         const icon = app?.icon ?? Folder;
         menu.appendChild(createMenuItem(node.label, closeMenu, {
           icon,
@@ -229,6 +230,23 @@ export function createDesktopMenuBar(): DesktopMenuBar {
   /* [297A-18] Botón único de tema del OS; comparte el comando con el launcher móvil.
    * Se ubica junto a la hora en el extremo derecho de la barra. */
   const themeToggle = createThemeToggleButton('desktop-menu-bar__item desktop-menu-bar__tema');
+  const accountButton = createEl('button', {
+    type: 'button',
+    className: 'desktop-menu-bar__item desktop-menu-bar__account',
+    ariaLabel: 'Abrir Cuenta',
+  }, createElement(UserRound), createEl('span', { className: 'desktop-menu-bar__account-label' }));
+  const accountLabel = accountButton.querySelector('.desktop-menu-bar__account-label');
+  const stopAuth = authStore.subscribe((state) => {
+    if (!accountLabel) return;
+    accountLabel.textContent = state.isAuthenticated
+      ? (state.capability === 'admin' ? 'Cuenta · admin' : 'Cuenta')
+      : 'Entrar';
+    accountButton.setAttribute('aria-label', state.isAuthenticated ? 'Abrir Cuenta' : 'Iniciar sesión');
+  });
+  accountButton.addEventListener('click', () => {
+    controller.close();
+    void import('../../runtime/route-app-adapter').then(adapter => adapter.openAppWindow('account'));
+  });
   const menus = createEl('div', { className: 'desktop-menu-bar__menus' },
     brand, archiveEntry, applicationsEntry, settingsEntry,
   );
@@ -236,7 +254,7 @@ export function createDesktopMenuBar(): DesktopMenuBar {
   /* [297A-18] La hora queda al final, a la extrema derecha; el botón de tema
    * va inmediatamente a su izquierda. */
   const barraDerecha = createEl('div', { className: 'desktop-menu-bar__derecha' },
-    themeToggle.element, clock,
+    accountButton, themeToggle.element, clock,
   );
 
   function updateClock(): void {
@@ -255,6 +273,7 @@ export function createDesktopMenuBar(): DesktopMenuBar {
       destroyed = true;
       window.clearInterval(clockInterval);
       controller.close();
+      stopAuth();
       themeToggle.destroy();
       element.remove();
     },

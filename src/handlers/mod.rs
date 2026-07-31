@@ -12,6 +12,7 @@ pub mod seo;
 pub mod settings_handler;
 pub mod stripe_webhook;
 pub mod workspace_handler;
+pub mod workspace_overlay_handler;
 
 use axum::extract::DefaultBodyLimit;
 use axum::http::{header, HeaderValue, Method};
@@ -52,6 +53,8 @@ impl utoipa::Modify for SecurityAddon {
         auth::login,
         preferences_handler::get_preferences,
         preferences_handler::update_preferences,
+        workspace_overlay_handler::get_overlay,
+        workspace_overlay_handler::update_overlay,
         notes::create_note,
         notes::get_note,
         notes::list_notes,
@@ -66,6 +69,9 @@ impl utoipa::Modify for SecurityAddon {
         crate::models::preferences::UserPreferences,
         crate::models::preferences::UpdateUserPreferencesRequest,
         crate::handlers::preferences_handler::UserPreferencesResponse,
+        crate::models::workspace_overlay::WorkspaceOverlayDocument,
+        crate::models::workspace_overlay::UpdateWorkspaceOverlayRequest,
+        crate::handlers::workspace_overlay_handler::WorkspaceOverlayApiResponse,
         crate::models::Note,
         crate::models::CreateNoteRequest,
         crate::models::UpdateNoteRequest,
@@ -159,4 +165,5 @@ fn api_routes() -> Router<AppState> {
         .merge(seo::routes())
         .merge(stripe_webhook::routes())
         .merge(workspace_handler::routes())
+        .merge(workspace_overlay_handler::routes())
 }

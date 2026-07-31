@@ -40,6 +40,9 @@ import { initPreferencesConflictUI } from './features/runtime/preferences-confli
 import { authStore, showProfile, showSidebar, siteConfig } from './store';
 import { AuthService } from './services';
 import { fetchWorkspaceRelease } from './features/runtime/workspace/workspace-store';
+import { initOverlaySync } from './features/runtime/workspace/overlay-sync';
+import { initOverlayConflictUI } from './features/runtime/workspace/overlay-conflict-ui';
+import { createAccountView } from './features/runtime/account-view';
 import { getTopMobileApp } from './features/mobile/mobile-stack';
 import { closeAllWindows, windowStore } from './features/runtime/window-manager';
 import { createEl } from './utils/dom';
@@ -59,7 +62,6 @@ import { renderArticle } from './pages/article';
 import { renderAbout } from './pages/about';
 import { renderGallery } from './pages/gallery';
 import { renderProjects } from './pages/projects';
-import { renderLogin } from './pages/login';
 import { renderAdmin } from './pages/admin';
 import { renderCheckoutSuccess, renderCheckoutCancel } from './pages/checkout';
 
@@ -74,7 +76,9 @@ addRoute({ path: '/article/:slug', render: (params) => renderArticle(params) });
 addRoute({ path: '/about', render: () => renderAbout() });
 addRoute({ path: '/gallery', render: () => renderGallery() });
 addRoute({ path: '/projects', render: () => renderProjects() });
-addRoute({ path: '/login', render: () => renderLogin() });
+/* `/login` es el deep link canónico de Cuenta; si el adapter aún no está
+ * montado, el router conserva el mismo contenido como fallback. */
+addRoute({ path: '/login', render: (_params, ctx) => createAccountView(ctx) });
 addRoute({ path: '/admin', render: () => renderAdmin(), guard: requireAuth });
 addRoute({ path: '/checkout/success', render: () => renderCheckoutSuccess() });
 addRoute({ path: '/checkout/cancel', render: () => renderCheckoutCancel() });
@@ -86,9 +90,17 @@ async function initApp(): Promise<void> {
   initThemeStore();
   const stopPreferencesSync = initPreferencesSync();
   const stopPreferencesConflictUI = initPreferencesConflictUI();
+  const stopOverlaySync = initOverlaySync();
+  const stopOverlayConflictUI = initOverlayConflictUI();
   const app = document.getElementById('app');
   if (!app) return;
   let isMobile = getPresentationMode() === 'mobile';
+
+  /* [297A-11] Cargar primero el release del workspace desde el backend.
+   * El overlay remoto se rebasa contra este árbol; AuthService.me() cambia
+   * authStore y puede iniciar el sync, así que el orden evita usar DEFAULT_RELEASE
+   * por una carrera de red durante el arranque. */
+  await fetchWorkspaceRelease();
 
   /* [297A-8] Verificar sesión existente al arrancar.
    * Las cookies HttpOnly se envían automáticamente con credentials: 'include'.
@@ -104,9 +116,6 @@ async function initApp(): Promise<void> {
 
   /* Cargar fuentes y settings antes de renderizar */
   await loadSavedFonts();
-
-  /* [297A-11] Cargar release del workspace desde el backend */
-  await fetchWorkspaceRelease();
 
   /* Limpiar */
   app.innerHTML = '';
@@ -324,6 +333,8 @@ async function initApp(): Promise<void> {
     stopTracking();
     stopPreferencesConflictUI();
     stopPreferencesSync();
+    stopOverlaySync();
+    stopOverlayConflictUI();
     stopRouter();
     stopRouteAdapter();
     stopWindowUrlSync.stop();

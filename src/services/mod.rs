@@ -8,6 +8,7 @@ pub mod product_svc;
 pub mod project_svc;
 pub mod session;
 pub mod settings_svc;
+pub mod workspace_overlay_svc;
 pub mod workspace_svc;
 
 pub use article::ArticleService;

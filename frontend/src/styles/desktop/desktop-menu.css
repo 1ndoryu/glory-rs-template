@@ -62,6 +62,30 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* [297A-13] Estado de sesión: proyección del authStore, no estado paralelo. */
+.desktop-menu-bar__account {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espacio-xs);
+  cursor: pointer;
+}
+
+.desktop-menu-bar__account svg {
+  width: var(--espacio-md);
+  height: var(--espacio-md);
+  stroke-width: var(--sistema-icono-trazo);
+}
+
+.desktop-menu-bar__account:hover {
+  background: var(--sistema-texto);
+  color: var(--sistema-superficie);
+}
+
+.desktop-menu-bar__account:focus-visible {
+  outline: 1px solid var(--sistema-texto);
+  outline-offset: 2px;
+}
+
 /* [297A-18] Grupo derecho de la barra: hora + botón de tema. */
 .desktop-menu-bar__derecha {
   display: flex;

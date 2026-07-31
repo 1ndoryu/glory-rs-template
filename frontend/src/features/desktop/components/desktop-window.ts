@@ -65,6 +65,7 @@ export function createDesktopWindow(options: DesktopWindowOptions): HTMLElement 
       items: [
         { id: 'window:minimize', label: 'Minimizar', icon: Minus },
         { id: 'window:maximize', label: 'Maximizar', icon: Maximize2 },
+        { id: 'navigation:copy-url' },
         '---',
         { id: 'window:close', label: 'Cerrar', icon: X },
       ],

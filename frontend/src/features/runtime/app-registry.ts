@@ -6,6 +6,9 @@
 import { createEl } from '../../utils/dom';
 import type { IconNode } from 'lucide';
 import type { AppRenderFn, MountedView, RenderContext } from '../../core/lifecycle';
+import { hasCapability, type Capability } from './capability';
+
+export type { Capability } from './capability';
 
 export type ToolbarItemRef =
   | string
@@ -15,11 +18,6 @@ export interface AppToolbarGroup {
   readonly label: string;
   readonly items: ToolbarItemRef[];
 }
-
-export type Capability =
-  | 'public'
-  | 'authenticated'
-  | 'admin';
 
 export interface AppDeepLink {
   readonly patterns: readonly string[];
@@ -93,9 +91,7 @@ class AppRegistryClass {
   }
 
   getAvailable(currentCapability: Capability): readonly AppDefinition[] {
-    const hierarchy: Capability[] = ['public', 'authenticated', 'admin'];
-    const level = hierarchy.indexOf(currentCapability);
-    return this.getAll().filter(app => hierarchy.indexOf(app.requires) <= level);
+    return this.getAll().filter(app => hasCapability(currentCapability, app.requires));
   }
 
   findByRoute(pathname: string): AppDefinition | undefined {

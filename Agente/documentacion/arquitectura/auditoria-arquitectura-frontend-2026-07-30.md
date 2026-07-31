@@ -4,6 +4,7 @@
 > **Alcance:** frontend TypeScript/Vite del OS desktop
 > **Resultado:** 3 violaciones de tamaño, 5 problemas de escalabilidad, 2 fallas arquitectónicas críticas (Finder + modelo de datos), 4 fortalezas identificadas
 > **Plan asociado:** `Agente/planes/plan-refactorizacion-architectura-2026-07-30.md`
+> **Estado documental:** histórico/superseded por 297A-11 y 297A-23. Los ejemplos de `resourceId` como parámetro de Reader describen el diseño previo y no son un contrato vigente; el contrato actual usa `publicLocator` allowlisted (`appId` + `params`) y nunca convierte `refId` en slug.
 
 ## 1. Métricas del codebase
 

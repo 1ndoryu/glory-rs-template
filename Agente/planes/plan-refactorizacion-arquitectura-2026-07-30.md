@@ -5,6 +5,7 @@
 > **Auditoría:** `Agente/documentacion/arquitectura/auditoria-arquitectura-frontend-2026-07-30.md` (§7, §8)
 > **Depende de:** 297A-11 parcial (workspace overlay implementado)
 > **Bloquea:** 297A-12 (móvil), 297A-14 (editors), testing unitario
+> **Estado documental:** histórico/superseded por 297A-11 y 297A-23. El ejemplo antiguo `resourceId → Reader` fue reemplazado por `publicLocator` público allowlisted; `refId` nunca se transforma en slug.
 
 ## 1. Objetivo
 
@@ -33,7 +34,7 @@ La auditoría profunda (§7, §8) identificó que el pipeline completo `backend 
 - [x] Añadir `params?` a `openWindow()` en `window-manager.ts` y `WindowEntry`.
 - [x] Reescribir `finder-preview.ts` como `WorkspaceFileBrowser` que recibe `folderId` y renderiza hijos de `workspaceStore`.
 - [x] Finder renderiza hijos usando `ResourceTypeRegistry` (iconos, thumbnails, acciones según tipo).
-- [x] Doble clic en recurso → `openAppWindow(entry.appId, { resourceId: node.refId })`.
+- [x] Doble clic en recurso → resolver `publicLocator` allowlisted y abrir solo `{ appId, params }` públicos; sin fallback `resourceId → slug`.
 - [x] Hacer Finder `singleton: false` en `app-registration.ts`.
 - [x] Actualizar activación de carpetas en `desktop-shell.ts`: `openAppWindow('finder', { folderId: node.id })`.
 - [x] Actualizar `finder:new-folder` para crear en el contexto actual (no hardcoded 'desktop').

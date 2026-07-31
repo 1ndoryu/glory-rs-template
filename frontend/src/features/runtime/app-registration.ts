@@ -3,7 +3,7 @@
  * Cada app define su id, título, icono, capacidades y render function.
  * Las apps solo devuelven contenido; el shell crea la ventana. */
 
-import { FileUser, Folder, Settings, FileText, FolderCode, Trash2, ShieldUser } from 'lucide';
+import { FileUser, Folder, Settings, FileText, FolderCode, Trash2, ShieldUser, UserRound } from 'lucide';
 import { createEl } from '../../utils/dom';
 import { AppRegistry } from './app-registry';
 import { createPathDeepLink } from './deep-links';
@@ -14,6 +14,7 @@ import { dispatchEvent } from '../analytics/dispatcher';
 import type { MountedView, RenderContext } from '../../core/lifecycle';
 import { SettingsService } from '../../services';
 import { appendSanitizedHtml } from '../../utils/sanitize-html';
+import { mountAccountView } from './account-view';
 
 /* === Finder === */
 AppRegistry.register({
@@ -73,8 +74,11 @@ AppRegistry.register({
   render: (ctx: RenderContext): MountedView => {
     dispatchEvent({ type: 'app_opened', appId: 'reader' });
 
+    /* `slug` es el único identificador público permitido por el deep link.
+     * `resourceId` pertenece al workspace y no puede convertirse implícitamente
+     * en slug: resolverlo requerirá un envelope público autorizado. */
     const opts: ReaderOptions = {
-      slug: ctx.params?.slug ?? ctx.params?.resourceId,
+      slug: ctx.params?.slug,
       title: ctx.params?.title,
     };
     const content = createReaderPreview(opts);
@@ -82,6 +86,30 @@ AppRegistry.register({
     return {
       element: content,
       destroy: () => { dispatchEvent({ type: 'app_closed', appId: 'reader' }); },
+    };
+  },
+});
+
+/* === Cuenta === */
+AppRegistry.register({
+  id: 'account',
+  title: 'Cuenta',
+  icon: UserRound,
+  iconType: 'application',
+  singleton: true,
+  requires: 'public',
+  routePatterns: ['/login'],
+  deepLink: createPathDeepLink('/login'),
+  layout: 'padded',
+  render: (ctx: RenderContext): MountedView => {
+    dispatchEvent({ type: 'app_opened', appId: 'account' });
+    const view = mountAccountView(ctx);
+    return {
+      element: view.element,
+      destroy: () => {
+        view.destroy?.();
+        dispatchEvent({ type: 'app_closed', appId: 'account' });
+      },
     };
   },
 });

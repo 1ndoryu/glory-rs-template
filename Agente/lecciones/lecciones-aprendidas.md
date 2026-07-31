@@ -22,3 +22,7 @@
 ## 297A-6 — Un gate full debe incluir sus inputs y excluir sus artefactos
 
 Un analizador instalado dentro del workspace puede terminar analizándose a sí mismo si sus carpetas de herramientas/reportes no están excluidas. A la vez, un cache full no es seguro si solo hashea el diff visible: debe depender de todo el árbol versionado, configs y versiones fijadas. Ambas condiciones se validan antes de aceptar un PASS cacheado.
+
+## 297A-24 — El chrome del shell no es una ruta runtime
+
+`Perfil` se registra como `shell-profile` en `windowStore`, no en `AppRegistry`, y por diseño no tiene URL pública. El sincronizador de URL debe proyectar únicamente apps runtime; si enfocar una entrada shell sin ruta fuerza `/`, la reconciliación puede interpretar una acción visual como navegación fuera del OS y cerrar todas las apps. La guardia debe considerar la superficie activa y cualquier app runtime abierta, mientras que el cierre masivo queda reservado a una navegación documental explícita. Esta separación se protege con tests de foco de Perfil, app no canónica, cierre de la última app y desktop/móvil.

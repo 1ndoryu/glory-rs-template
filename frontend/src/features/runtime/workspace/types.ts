@@ -3,6 +3,8 @@
  * Flat-map con parentId para merges eficientes sin deep nesting.
  * [Plan 297A-11 §9.1] Contratos versionados. */
 
+import type { Capability } from '../capability';
+
 export type NodeId = string;
 
 /** Tipo de recurso del workspace/backend.
@@ -13,6 +15,12 @@ export type WorkspaceResourceKind = 'article' | 'about' | 'project' | 'product' 
 
 /** Tipo de nodo en el workspace (alinea con manual §6.2). */
 export type WorkspaceNodeType = 'folder' | 'shortcut' | 'app' | 'resource';
+
+/** Referencia pública allowlisted para abrir un recurso sin exponer refId. */
+export interface PublicResourceLocator {
+  readonly appId: string;
+  readonly params: Readonly<Record<string, string>>;
+}
 
 /** Posición snap-grid en el escritorio. */
 export interface GridPosition {
@@ -34,12 +42,14 @@ export interface WorkspaceNode {
   readonly refId?: string;
   /** Tipo de recurso editorial/comercial (solo para type: 'resource'). */
   readonly resourceKind?: WorkspaceResourceKind;
+  /** Locator público; nunca contiene el UUID interno del recurso. */
+  readonly publicLocator?: PublicResourceLocator;
   /** Posición en grid del desktop. */
   position?: GridPosition;
   /** Orden en vista móvil. */
   mobileOrder?: number;
   /** Capacidad requerida para ver este nodo. */
-  readonly requires?: 'public' | 'authenticated' | 'admin';
+  readonly requires?: Capability;
 }
 
 /** Árbol completo del workspace (release o draft). */

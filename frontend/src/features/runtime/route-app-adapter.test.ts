@@ -5,9 +5,12 @@ import {
   closeAllWindows,
   openWindow,
   registerShellWindow,
+  focusWindow,
+  closeWindow,
   windowStore,
 } from './window-manager';
 import { initRouteAppAdapter } from './route-app-adapter';
+import { initWindowUrlSync } from './window-url-sync';
 import { addRoute, navigate, replacePath, setOutlet } from '../../router';
 import { authStore } from '../../store';
 import { clearMobileStack, mobileStackStore, openMobileView } from '../mobile/mobile-stack';
@@ -16,6 +19,7 @@ import type { MountedView } from '../../core/lifecycle';
 const routedAppId = 'route-adapter-reconcile-test';
 const invalidParamsAppId = 'route-adapter-invalid-params-test';
 const protectedAppId = 'route-adapter-protected-test';
+const localAppId = 'route-adapter-local-test';
 
 const invalidParamsApp: AppDefinition = {
   id: invalidParamsAppId,
@@ -37,6 +41,15 @@ const protectedApp: AppDefinition = {
   render: () => ({ element: document.createElement('div') }),
 };
 
+const localApp: AppDefinition = {
+  id: localAppId,
+  title: 'App local de prueba',
+  icon: [],
+  singleton: false,
+  requires: 'public',
+  render: () => ({ element: document.createElement('div') }),
+};
+
 const routedApp: AppDefinition = {
   id: routedAppId,
   title: 'Ruta de prueba',
@@ -50,6 +63,7 @@ const routedApp: AppDefinition = {
 AppRegistry.register(routedApp);
 AppRegistry.register(invalidParamsApp);
 AppRegistry.register(protectedApp);
+AppRegistry.register(localApp);
 addRoute({ path: '/runtime-test', render: () => document.createElement('div') });
 addRoute({ path: '/runtime-invalid/:slug', render: () => document.createElement('div') });
 addRoute({ path: '/runtime-protected', render: () => document.createElement('div') });
@@ -114,6 +128,63 @@ describe('RouteAppAdapter runtime reconciliation', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(windowStore.get().some((window) => window.appId === routedAppId)).toBe(false);
+  });
+
+  it('no cierra la app al enfocar Perfil, que es chrome del shell', () => {
+    stopAdapter = initRouteAppAdapter();
+    const stopUrlSync = initWindowUrlSync();
+    openWindow(routedApp, createTestView(), new AbortController());
+    replacePath('/runtime-test');
+    registerShellWindow({
+      instanceId: 'shell-profile',
+      title: 'Perfil',
+      icon: [],
+      content: document.createElement('div'),
+      focused: false,
+    });
+
+    focusWindow('shell-profile');
+
+    expect(windowStore.get().map((window) => window.appId)).toEqual([
+      routedAppId,
+      'shell-profile',
+    ]);
+    expect(window.location.pathname).toBe('/runtime-test');
+    stopUrlSync.stop();
+  });
+
+  it('no cierra una app canónica al abrir otra app runtime sin deep link', () => {
+    stopAdapter = initRouteAppAdapter();
+    const stopUrlSync = initWindowUrlSync();
+    openWindow(routedApp, createTestView(), new AbortController());
+    replacePath('/runtime-test');
+
+    openWindow(localApp, createTestView(), new AbortController());
+
+    expect(windowStore.get().map((window) => window.appId)).toEqual([routedAppId, localAppId]);
+    expect(window.location.pathname).toBe('/runtime-test');
+    stopUrlSync.stop();
+  });
+
+  it('vuelve a `/` al cerrar la última app y conserva Perfil', () => {
+    stopAdapter = initRouteAppAdapter();
+    const stopUrlSync = initWindowUrlSync();
+    registerShellWindow({
+      instanceId: 'shell-profile',
+      title: 'Perfil',
+      icon: [],
+      content: document.createElement('div'),
+      focused: true,
+    });
+    openWindow(routedApp, createTestView(), new AbortController());
+    replacePath('/runtime-test');
+    const appWindow = windowStore.get().find((window) => window.appId === routedAppId);
+    expect(appWindow).toBeDefined();
+    closeWindow(appWindow!.instanceId);
+
+    expect(windowStore.get().map((window) => window.instanceId)).toEqual(['shell-profile']);
+    expect(window.location.pathname).toBe('/');
+    stopUrlSync.stop();
   });
 
   it('cierra apps al volver a una ruta documental y conserva Perfil', () => {

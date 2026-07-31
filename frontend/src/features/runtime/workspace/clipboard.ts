@@ -72,6 +72,8 @@ export function pasteFromClipboard(targetParentId: NodeId | 'desktop'): NodeId[]
         type: original.type,
         label: `${original.label} (copia)`,
         refId: original.refId,
+        resourceKind: original.resourceKind,
+        publicLocator: original.publicLocator,
         requires: original.requires,
       });
       pastedIds.push(newId);

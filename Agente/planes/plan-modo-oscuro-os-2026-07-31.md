@@ -1,7 +1,7 @@
 # Plan — modo claro/oscuro del OS
 
 > **Fecha:** 2026-07-31  
-> **Estado:** cerrado con aprobación visual del usuario (2026-07-31); transporte remoto de preferencia implementado parcialmente en 297A-13, con UI de conflicto y resolución de ámbito aún pendientes; feature flag descartado por decisión del usuario.  
+> **Estado:** cerrado con aprobación visual del usuario (2026-07-31); transporte remoto de preferencia, overlay de workspace y Cuenta base implementados/validados en 297A-13; E2E multi-dispositivo, registro avanzado y Cuenta ampliada siguen pendientes; feature flag descartado por decisión del usuario.
 > **Alcance:** chrome y superficies del OS; la navegación exterior queda fuera del tema.
 
 ## Objetivo y límites
@@ -39,14 +39,15 @@ Añadir un modo claro/oscuro coherente con la identidad Macintosh minimalista, u
 
 ### 4. Preferencias y sincronización
 
-- [ ] Guardar la elección anónima en el overlay local sin modificar el release público ni `mobileOrder`. *(hoy en localStorage; migrar a overlay en 297A-13)*
+- [x] Guardar la elección anónima en el overlay local sin modificar el release público ni `mobileOrder`. *(localStorage/overlayStore; el transporte remoto autenticado se implementa por separado)*
 - [x] Sincronizar el transporte de la preferencia de cuenta con revisión, actualización condicional y 409; nunca sobrescribir silenciosamente. *(297A-13 parcial)*
 - [x] Conectar UI para resolver explícitamente `remote` o `local`; modal accesible con cleanup y control de cuenta/revisión. *(297A-13 parcial)*
-- [ ] Completar el overlay remoto del workspace y su merge por nodos. *(297A-13)**
-- [ ] Resolver login/logout, otro dispositivo y reset a `system`; evitar flash de tema en primera pintura. *(anti-flash y logout/login del transporte resueltos; ámbito remoto de workspace y reset visible pendientes)*
+- [x] Completar el overlay remoto del workspace y su merge por nodos. *(297A-13: contrato validado, sync offline-first, conflicto visible y rebase ante release nuevo)*
+- [ ] Ejecutar E2E multi-dispositivo y cerrar la política de merge semántico para conflictos concurrentes.
+- [ ] Resolver E2E de otro dispositivo y reset explícito a `system`; evitar flash de tema en primera pintura. *(anti-flash, logout/login, Cuenta base y reset de overlay remoto están implementados; E2E multi-dispositivo y registro avanzado permanecen pendientes)*
 - [x] Emitir `theme_changed` con modo y ámbito, sin contenido ni identificadores sensibles. *(ThemeEvent; presentationMode pendiente)*
 
-**Gate:** transporte local/remoto, conflicto visible, pérdida de red y logout pasan; pruebas HTTP de autorización/CORS/concurrencia PASS. Quedan dos dispositivos y overlay de workspace.
+**Gate:** transporte local/remoto, conflicto visible, pérdida de red, logout, validación de payload y revisión optimista pasan; pruebas HTTP de autorización/CORS/concurrencia y overlay PASS. Quedan E2E de dos dispositivos y merge semántico.
 
 ### 5. Accesibilidad y validación
 
@@ -55,7 +56,7 @@ Añadir un modo claro/oscuro coherente con la identidad Macintosh minimalista, u
 - [ ] Ejecutar E2E de cambio de tema en escritorio/tablet/móvil y confirmar que la URL/app/recurso se conserva. *(E2E formal pendiente — infra de 297A-17)*
 - [ ] Medir rendimiento de primera pintura y cambio de tema; documentar cualquier presupuesto excedido.
 
-**Gate:** evidencia visual/E2E y quality gate completo; no se marca como terminado con warnings bloqueantes.
+**Gate:** evidencia visual, E2E formal pendiente de 297A-17 y quality gate completo; no se marca como terminado con warnings bloqueantes.
 
 ### 6. Cierre documental
 
@@ -67,5 +68,5 @@ Añadir un modo claro/oscuro coherente con la identidad Macintosh minimalista, u
 
 - [x] Un único botón global cambia el tema y es accesible.
 - [x] Desktop, tablet y móvil comparten tokens, comandos, permisos y analítica.
-- [ ] Preferencia local/remota tiene UI de ámbito, merge, reset y rollback explícitos. *(transporte y API implementados; resolución visual pendiente en 297A-13)*
+- [ ] Preferencia y overlay local/remoto tienen UI de ámbito, merge, reset y rollback explícitos. *(transporte, API y resolución visual implementados; E2E multi-dispositivo y merge semántico avanzado pendientes)*
 - [x] Manual visual, roadmap, pruebas y quality gate están sincronizados.

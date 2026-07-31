@@ -9,45 +9,25 @@ import { AppRegistry } from './app-registry';
 import {
   openWindow,
   focusWindow,
-  findOpenWindow,
   restoreWindow,
-  closeWindow,
   windowStore,
 } from './window-manager';
-import { clearMobileStack } from '../mobile/mobile-stack';
+import { canOpenApp, findExistingWindow, validateRouteAccess } from './app-instances';
+import {
+  clearRuntimePresentation,
+  isMobilePresentationReady,
+  openInMobileIfActive,
+} from './runtime-presentation';
 import { dispatchEvent } from '../analytics/dispatcher';
 import { authStore } from '../../store';
-import { getPresentationMode } from '../../utils/viewport';
-import { getCanonicalAppPath, parseAppParams, stableParamsKey, type AppOpenHistory } from './deep-links';
+import { getCanonicalAppPath, type AppOpenHistory } from './deep-links';
 
-/** Handler de presentación móvil registrado por el MobileShell. */
-let mobileOpenHandler: ((appId: string, params?: Record<string, string>, options?: { history?: AppOpenHistory }) => Promise<void>) | null = null;
-
-export function setMobileOpenHandler(
-  handler: ((appId: string, params?: Record<string, string>, options?: { history?: AppOpenHistory }) => Promise<void>) | null,
-): () => void {
-  mobileOpenHandler = handler;
-  return () => {
-    if (mobileOpenHandler === handler) mobileOpenHandler = null;
-  };
-}
-
-/** Liberar contenido del OS cuando la URL deja una app válida.
- * La ventana shell de Perfil no pertenece a una app y se conserva. */
-function clearRuntimeApps(): void {
-  if (getPresentationMode() === 'mobile') {
-    clearMobileStack('sync');
-    return;
-  }
-
-  for (const win of windowStore.get()) {
-    if (win.instanceId !== 'shell-profile') closeWindow(win.instanceId, 'sync');
-  }
-}
+/* Re-export legacy API; the implementation lives in the presentation boundary. */
+export { setMobileOpenHandler } from './runtime-presentation';
 
 function reconcileRuntimeForRoute(pathname: string): void {
   if (AppRegistry.findByRoute(pathname)) return;
-  clearRuntimeApps();
+  clearRuntimePresentation();
 }
 
 /** Registrar el interceptor de rutas en el router.
@@ -60,43 +40,28 @@ export function initRouteAppAdapter(): () => void {
 
     /* Si el shell móvil todavía no está listo, dejar que el router renderice
      * la ruta normal; nunca interceptar y dejar un outlet vacío. */
-    if (getPresentationMode() === 'mobile' && !mobileOpenHandler) return false;
+    if (!isMobilePresentationReady()) return false;
 
-    /* Validar parámetros públicos antes de hidratar la app. */
-    const safeParams = parseAppParams(app, params);
-    if (safeParams === null) {
-      clearRuntimeApps();
+    /* Validar parámetros y capacidad antes de hidratar la app. */
+    const access = validateRouteAccess(app, params, authStore.get().capability);
+    if (!access.allowed || !access.params) {
+      clearRuntimePresentation();
       showRouteNotFound();
       return true;
     }
 
-    /* Verificar capacidad */
-    const capability = authStore.get().capability;
-    const hierarchy = ['public', 'authenticated', 'admin'] as const;
-    const currentLevel = hierarchy.indexOf(capability);
-    const requiredLevel = hierarchy.indexOf(app.requires);
-    if (requiredLevel > currentLevel) {
-      clearRuntimeApps();
-      showRouteNotFound();
-      return true;
-    }
-
-    /* Si es singleton y ya está abierto, solo enfocar */
-    if (app.singleton) {
-      const existing = findOpenWindow(app.id);
-      if (existing) {
-        if (existing.state === 'minimized') {
-          restoreWindow(existing.instanceId);
-        }
-        focusWindow(existing.instanceId);
-        dispatchEvent({ type: 'window_focused', appId: app.id });
-        return true; /* Interceptor manejó la ruta */
-      }
+    /* Una instancia existente se enfoca; no se duplica. */
+    const existing = findExistingWindow(windowStore.get(), app, access.params);
+    if (existing) {
+      if (existing.state === 'minimized') restoreWindow(existing.instanceId);
+      focusWindow(existing.instanceId);
+      dispatchEvent({ type: 'window_focused', appId: app.id });
+      return true; /* Interceptor manejó la ruta */
     }
 
     /* Abrir la app con los parámetros de la ruta; el adapter elige
      * ventana desktop o pila móvil según la presentación activa. */
-    await openAppWindow(app.id, safeParams, { history: 'none' });
+    await openAppWindow(app.id, access.params, { history: 'none' });
     return true; /* Interceptor manejó la ruta */
   });
 
@@ -118,39 +83,18 @@ export async function openAppWindow(
   /* La apertura programática también es una frontera de autorización:
    * no depende de que la llamada venga del router o de un comando visible. */
   const capability = authStore.get().capability;
-  const hierarchy = ['public', 'authenticated', 'admin'] as const;
-  if (hierarchy.indexOf(app.requires) > hierarchy.indexOf(capability)) return;
+  if (!canOpenApp(app, capability)) return;
 
-  /* Para apps non-singleton con params (Finder con folderId),
-   * buscar ventana existente con los mismos params y enfocarla. */
-  if (!app.singleton && params) {
-    const paramKey = stableParamsKey(params);
-    const existing = windowStore.get().find(
-      w => w.appId === appId && w._paramKey === paramKey,
-    );
-    if (existing) {
-      if (existing.state === 'minimized') restoreWindow(existing.instanceId);
-      focusWindow(existing.instanceId);
-      return;
-    }
-  }
-
-  /* Singleton ya abierto → enfocar */
-  if (app.singleton) {
-    const existing = findOpenWindow(appId);
-    if (existing) {
-      if (existing.state === 'minimized') restoreWindow(existing.instanceId);
-      focusWindow(existing.instanceId);
-      return;
-    }
+  /* Resolver singleton o instancia parametrizada antes de montar contenido. */
+  const existing = findExistingWindow(windowStore.get(), app, params);
+  if (existing) {
+    if (existing.state === 'minimized') restoreWindow(existing.instanceId);
+    focusWindow(existing.instanceId);
+    return;
   }
 
   /* La presentación decide el chrome; la app y sus parámetros siguen siendo los mismos. */
-  if (getPresentationMode() === 'mobile') {
-    /* En móvil nunca caer al chrome desktop por una carrera de inicialización. */
-    if (mobileOpenHandler) await mobileOpenHandler(appId, params, options);
-    return;
-  }
+  if (await openInMobileIfActive(appId, params, options)) return;
 
   /* Crear AbortController y RenderContext */
   const controller = new AbortController();

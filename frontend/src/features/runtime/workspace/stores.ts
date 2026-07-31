@@ -6,6 +6,7 @@
 import { createStore, authStore } from '../../../store';
 import { DEFAULT_RELEASE, ADMIN_NODES } from './default-release';
 import { mergeWorkspace } from './merge';
+import type { Capability } from '../capability';
 import type {
   NodeId, WorkspaceNode, WorkspaceTree,
   WorkspaceOverlay,
@@ -70,7 +71,7 @@ function scheduleRecompute(): void {
     const release = releaseStore.get();
     const overlay = previewPublicStore.get() ? EMPTY_OVERLAY : overlayStore.get();
     const auth = authStore.get();
-    const capability: 'public' | 'authenticated' | 'admin' = auth.capability;
+    const capability: Capability = auth.capability;
 
     /* [Auditoría v4 §5.4] Inyectar nodos admin dinámicamente */
     if (capability === 'admin') {

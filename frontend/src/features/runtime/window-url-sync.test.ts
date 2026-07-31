@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { AppRegistry } from './app-registry';
 import { createPathDeepLink } from './deep-links';
-import { resolveFocusedPath } from './window-url-sync';
+import { hasOpenRuntimeApp, resolveFocusedPath } from './window-url-sync';
 
 const publicAppId = 'window-url-sync-public-test';
 const localAppId = 'window-url-sync-local-test';
@@ -23,6 +23,37 @@ AppRegistry.register({
   singleton: false,
   requires: 'public',
   render: () => ({ element: document.createElement('div') }),
+});
+
+describe('hasOpenRuntimeApp', () => {
+  it('considera solo la superficie desktop/tablet activa', () => {
+    expect(hasOpenRuntimeApp(
+      [
+        { appId: publicAppId, focused: false },
+        { appId: 'shell-profile', focused: true },
+      ],
+      [{ appId: publicAppId }],
+      'desktop',
+    )).toBe(true);
+    expect(hasOpenRuntimeApp(
+      [{ appId: 'shell-profile', focused: true }],
+      [{ appId: publicAppId }],
+      'desktop',
+    )).toBe(false);
+  });
+
+  it('considera solo la pila móvil activa', () => {
+    expect(hasOpenRuntimeApp(
+      [{ appId: publicAppId, focused: true }],
+      [{ appId: 'shell-profile' }],
+      'mobile',
+    )).toBe(false);
+    expect(hasOpenRuntimeApp(
+      [{ appId: publicAppId, focused: true }],
+      [{ appId: publicAppId }],
+      'mobile',
+    )).toBe(true);
+  });
 });
 
 describe('resolveFocusedPath', () => {

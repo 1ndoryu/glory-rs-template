@@ -8,6 +8,7 @@ pub mod project_repo;
 pub mod resource_repo;
 pub mod settings_repo;
 mod user;
+pub mod workspace_overlay_repo;
 pub mod workspace_repo;
 
 pub use article::ArticleRepository;

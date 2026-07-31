@@ -19,12 +19,13 @@ import {
 } from 'lucide';
 import { createEl } from '../../../../utils/dom';
 import { workspaceStore, getChildren } from '../../../runtime/workspace/workspace-store';
-import { resolveResourceType } from '../../../runtime/resource-type-registry';
 import { openContextMenu } from '../../components/desktop-context-menu';
 import { selectSingle } from '../../../runtime/selection-store';
 import { enableDrag, makeDropTarget } from '../../utils/icon-drag';
 import { authStore } from '../../../../store';
 import type { ResolvedNode } from '../../../runtime/workspace/types';
+import { resolvePublicResourceTarget } from '../../../runtime/workspace/public-resource-locator';
+import { showToast } from '../../../../components/ui/toast';
 
 export interface FinderOptions {
   folderId: string;
@@ -221,9 +222,12 @@ function activateNode(
   if (node.type === 'folder') {
     navigateTo(node.id);
   } else if (node.type === 'resource' && node.resourceKind) {
-    const entry = resolveResourceType(node.resourceKind);
-    const appId = entry?.appId ?? 'finder';
-    options.onOpenApp(appId, { resourceId: node.refId ?? node.id });
+    const publicTarget = resolvePublicResourceTarget(node);
+    if (publicTarget) {
+      options.onOpenApp(publicTarget.appId, publicTarget.params);
+      return;
+    }
+    showToast('Este recurso todavía no tiene una referencia pública disponible');
   } else if (node.type === 'app' && node.refId) {
     options.onOpenApp(node.refId);
   }

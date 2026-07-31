@@ -3,6 +3,10 @@
  * Cada store es un objeto reactivo que notifica suscriptores al cambiar.
  * [Auditoría v4 §3.1] FontConfig dividido en sub-interfaces (ISP). */
 
+import type { Capability } from './features/runtime/capability';
+
+export type AuthCapability = Capability;
+
 type Listener<T> = (value: T) => void;
 type Unsubscribe = () => void;
 
@@ -56,8 +60,6 @@ export function createStore<T>(initialValue: T): Store<T> {
 
 /* Estado de autenticación
  * [297A-8] Migrado de JWT localStorage a sesiones opacas en cookie HttpOnly. */
-export type AuthCapability = 'public' | 'authenticated' | 'admin';
-
 export interface AuthState {
   isAuthenticated: boolean;
   userId: string | null;

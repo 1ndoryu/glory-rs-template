@@ -36,7 +36,14 @@ type SessionEvent =
 type NavigationEvent =
   | { type: 'page_view'; path: string }
   | { type: 'route_viewed'; path: string }
-  | { type: 'external_nav_toggled'; expanded: boolean };
+  | { type: 'external_nav_toggled'; expanded: boolean }
+  | {
+      type: 'share_url_copied';
+      success: boolean;
+      routeName: string;
+      appId: string;
+      presentationMode: 'desktop' | 'tablet' | 'mobile';
+    };
 
 /** Eventos de apps. */
 type AppEvent =

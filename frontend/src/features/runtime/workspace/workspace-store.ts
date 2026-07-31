@@ -49,6 +49,8 @@ export async function publishWorkspace(): Promise<{ version: number } | null> {
       type: node.type,
       label: node.label,
       refId: node.refId,
+      resourceKind: node.resourceKind,
+      publicLocator: node.publicLocator,
       position: node.position,
       mobileOrder: node.mobileOrder,
       requires: node.requires,

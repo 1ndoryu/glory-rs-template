@@ -3,6 +3,7 @@ use uuid::Uuid;
 
 use crate::errors::AppError;
 use crate::models::workspace::{WorkspaceRelease, WorkspaceReleasePublic};
+use crate::models::workspace_overlay::validate_public_locators_in_tree;
 use crate::repositories::workspace_repo::WorkspaceRepository;
 
 pub struct WorkspaceService;
@@ -47,6 +48,9 @@ impl WorkspaceService {
         tree: serde_json::Value,
         published_by: Uuid,
     ) -> Result<WorkspaceRelease, AppError> {
+        validate_public_locators_in_tree(&tree)
+            .map_err(|message| AppError::Validation(message.to_string()))?;
+
         let mut tx = pool.begin().await?;
 
         /* Obtener siguiente versión */

@@ -134,6 +134,20 @@ describe('mergeWorkspace', () => {
     expect(result.nodes.adminNode.label).toBe('Admin');
   });
 
+  it('debe ocultar nodos con capacidad corrupta por fail-closed', () => {
+    const release: WorkspaceTree = {
+      version: 1,
+      nodes: {
+        poisoned: {
+          id: 'poisoned', parentId: 'desktop', type: 'app', label: 'Poisoned',
+          requires: 'unknown' as 'public',
+        },
+      },
+    };
+    const result = mergeWorkspace(release, emptyOverlay, 'admin');
+    expect(result.nodes.poisoned).toBeUndefined();
+  });
+
   /* Edge cases */
   it('debe ignorar tombstones de nodos que no existen', () => {
     const overlay: WorkspaceOverlay = {
@@ -179,7 +193,7 @@ describe('mergeWorkspace', () => {
     expect(result.nodes.orphan2).toBeDefined();
   });
 
-  it('addedItems con mismo ID que release node debe coexistir (overlay gana en posicion pero no reemplaza)', () => {
+  it('addedItems con mismo ID que release node no reemplaza el release', () => {
     const release: WorkspaceTree = {
       version: 1,
       nodes: {
@@ -198,9 +212,11 @@ describe('mergeWorkspace', () => {
       addedItems: { item: overlayNode },
     };
     const result = mergeWorkspace(release, overlay, 'public');
-    // El addedItem aparece con origin overlay
+    /* El namespace publicado tiene precedencia: el overlay colisionado se
+     * ignora para impedir reemplazar silenciosamente una app/recurso. */
     expect(result.nodes.item).toBeDefined();
-    expect(result.nodes.item.origin).toBe('overlay'); // overlay gana en duplicados
+    expect(result.nodes.item.origin).toBe('release');
+    expect(result.nodes.item.label).toBe('Original');
   });
 });
 
@@ -274,6 +290,23 @@ describe('rebaseOverlay', () => {
     const result = rebaseOverlay(newRelease, overlay);
     expect(result.fieldOverrides['a']).toBeDefined();
     expect(result.fieldOverrides['a'].position).toEqual({ col: 10, row: 10 });
+  });
+
+  it('debe preservar overrides de nodos creados por el usuario durante rebase', () => {
+    const overlay: WorkspaceOverlay = {
+      ...emptyOverlay,
+      addedItems: {
+        userItem: { id: 'userItem', parentId: 'desktop', type: 'folder', label: 'Usuario', requires: 'public' },
+      },
+      fieldOverrides: {
+        userItem: { position: { col: 4, row: 2 }, label: 'Usuario editado' },
+      },
+    };
+    const result = rebaseOverlay(newRelease, overlay);
+    expect(result.fieldOverrides.userItem).toEqual({
+      position: { col: 4, row: 2 },
+      label: 'Usuario editado',
+    });
   });
 
   it('debe preservar addedItems durante rebase', () => {

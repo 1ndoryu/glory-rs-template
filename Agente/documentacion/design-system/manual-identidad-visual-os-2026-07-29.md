@@ -100,7 +100,7 @@ El OS soporta dos temas, `claro` (por defecto) y `oscuro`, más la resolución i
 - Las superficies del OS (ventanas, menús, taskbar, launcher, apps) consumen los tokens redefinidos vía override scoped (`.desktop-window`, `.movilApp`, `.movilLauncher`). El contenido multimedia conserva su color (excepción §4.2).
 - La navegación exterior y el contenido legacy fuera de esas superficies permanecen sin cambios; el override de tokens se limita al chrome del OS.
 - Control único: botón de tema junto al reloj (barra superior) y en el launcher móvil, vía comando compartido `theme:toggle` (Meta+Shift+L); Configuración reutiliza ese comando.
-- La preferencia se persiste en `localStorage` (`wandorius:tema`) y se resuelve antes de la primera pintura (script inline en `index.html`) para evitar flash. La sincronización con la cuenta (overlay remoto) queda pendiente de 297A-13.
+- La preferencia se persiste en `localStorage` (`wandorius:tema`) y se resuelve antes de la primera pintura (script inline en `index.html`) para evitar flash. La sincronización con la cuenta usa el transporte remoto de 297A-13 con revisión optimista y conflicto explícito. Cuenta se presenta como app del OS con login/logout y estado visible; el E2E multi-dispositivo y registro avanzado quedan pendientes.
 
 ## 6. Tipografía
 

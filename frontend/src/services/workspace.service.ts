@@ -4,7 +4,7 @@
  * [Plan §9.2] — Preparación para 297A-11 draft/release y 297A-13 overlay remoto. */
 
 import { api } from '../api/client';
-import type { WorkspaceTree } from '../features/runtime/workspace/types';
+import type { WorkspaceOverlay, WorkspaceTree } from '../features/runtime/workspace/types';
 
 export interface ReleaseInfo {
   version: number;
@@ -17,6 +17,17 @@ export interface ReleaseListItem {
   version: number;
   published_at: string;
   published_by: string | null;
+}
+
+export interface WorkspaceOverlayResponse {
+  overlay: WorkspaceOverlay;
+  revision: number;
+  updated_at: string;
+}
+
+export interface UpdateWorkspaceOverlayRequest {
+  overlay: WorkspaceOverlay;
+  expected_revision: number;
 }
 
 export const WorkspaceService = {
@@ -45,19 +56,13 @@ export const WorkspaceService = {
     return api.post<ReleaseInfo>('/admin/workspace/publish', { tree });
   },
 
-  /** Guardar/actualizar el overlay remoto (usuario autenticado).
-   *  [297A-13] Endpoint futuro. */
-  async saveOverlay(overlay: unknown): Promise<void> {
-    return api.post<void>('/api/workspace/overlay', { overlay });
+  /** Guardar/actualizar el overlay remoto con revisión optimista. */
+  async saveOverlay(request: UpdateWorkspaceOverlayRequest): Promise<WorkspaceOverlayResponse> {
+    return api.put<WorkspaceOverlayResponse>('/api/workspace/overlay', request);
   },
 
-  /** Obtener el overlay remoto (usuario autenticado).
-   *  [297A-13] Endpoint futuro. */
-  async getOverlay(): Promise<unknown | null> {
-    try {
-      return await api.get<unknown>('/api/workspace/overlay');
-    } catch {
-      return null;
-    }
+  /** Obtener el overlay remoto de la cuenta autenticada. */
+  async getOverlay(): Promise<WorkspaceOverlayResponse> {
+    return api.get<WorkspaceOverlayResponse>('/api/workspace/overlay');
   },
 };

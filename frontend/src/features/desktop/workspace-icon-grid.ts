@@ -17,11 +17,12 @@ import { selectSingle, clearSelection } from '../runtime/selection-store';
 import { workspaceStore, reorderDesktopNodes } from '../runtime/workspace/workspace-store';
 import type { ResolvedNode } from '../runtime/workspace/types';
 import { AppRegistry } from '../runtime/app-registry';
-import { resolveResourceType, type ResourceKind } from '../runtime/resource-type-registry';
 import { enableDrag } from './utils/icon-drag';
 import { DESKTOP_MIN_WIDTH, getGridMetrics, planPlacement, reflowPositions } from './utils/icon-grid';
 import { moveNodesPosition } from '../runtime/workspace/overlay-mutations';
 import { reconcileChildren } from '../../utils/reconcile';
+import { resolvePublicResourceTarget } from '../runtime/workspace/public-resource-locator';
+import { showToast } from '../../components/ui/toast';
 
 const SHELL_ICON_MAP: Record<string, IconNode> = {
   'profile': FileUser,
@@ -54,8 +55,11 @@ function resolveActivate(
   if (extraActions?.[node.id]) return extraActions[node.id];
   if (node.type === 'folder') return () => { void openAppWindow('finder', { folderId: node.id }); };
   if (node.type === 'resource' && node.resourceKind) {
-    const entry = resolveResourceType(node.resourceKind as ResourceKind);
-    return () => { void openAppWindow(entry?.appId ?? 'finder', { resourceId: node.refId ?? node.id }); };
+    const entry = resolvePublicResourceTarget(node);
+    if (entry) return () => { void openAppWindow(entry.appId, entry.params); };
+    return () => {
+      showToast('Este recurso todavía no tiene una referencia pública disponible');
+    };
   }
   if (node.refId) return () => { void openAppWindow(node.refId!); };
   return undefined;

@@ -8,6 +8,7 @@
  * [297A-9/10] Contrato transversal de interacción, comandos y medición. */
 
 import type { IconNode } from 'lucide';
+import type { Capability } from './capability';
 
 /* === Tipos del contrato de comandos === */
 
@@ -29,7 +30,7 @@ export interface CommandContext {
   /** Targets seleccionados sobre los que actúa. */
   readonly targets?: readonly CommandTarget[];
   /** Capacidad del usuario actual ('public' | 'authenticated' | 'admin'). */
-  readonly capability?: 'public' | 'authenticated' | 'admin';
+  readonly capability?: Capability;
   /** Modo de presentación ('desktop' | 'tablet' | 'mobile'). */
   readonly presentationMode?: 'desktop' | 'tablet' | 'mobile';
 }
@@ -61,7 +62,7 @@ export interface Command {
   /** Contextos donde este comando es relevante. */
   readonly contexts?: readonly string[];
   /** Capacidad mínima requerida. Default: 'public'. */
-  readonly requires?: 'public' | 'authenticated' | 'admin';
+  readonly requires?: Capability;
   /** Política de undo. Default: 'none'. */
   readonly undoPolicy?: UndoPolicy;
   /** Nombre del evento analítico al ejecutar. */

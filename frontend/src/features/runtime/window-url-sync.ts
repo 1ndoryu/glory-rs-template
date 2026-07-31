@@ -18,6 +18,21 @@ export interface FocusedEntrySnapshot {
   readonly params?: Readonly<Record<string, string>>;
 }
 
+/**
+ * Indica si la presentación tiene alguna app runtime abierta aunque el foco
+ * esté en chrome del shell, como Perfil, y aunque no exista URL pública.
+ * Solo una app registrada cuenta; entradas como `shell-profile` no cuentan.
+ * [297A-24] Evita cerrar ventanas como efecto secundario de una proyección.
+ */
+export function hasOpenRuntimeApp(
+  windows: readonly FocusedEntrySnapshot[],
+  mobileStack: readonly FocusedEntrySnapshot[],
+  presentation: 'desktop' | 'tablet' | 'mobile',
+): boolean {
+  const activeSurface = presentation === 'mobile' ? mobileStack : windows;
+  return activeSurface.some((entry) => AppRegistry.get(entry.appId) !== undefined);
+}
+
 /** Resolver puro del path que representa la app actualmente enfocada. */
 export function resolveFocusedPath(
   windows: readonly FocusedEntrySnapshot[],
@@ -31,6 +46,45 @@ export function resolveFocusedPath(
 
   const app = AppRegistry.get(active.appId);
   return app ? getCanonicalAppPath(app, active.params) ?? '/' : '/';
+}
+
+/** Contexto público de la instancia enfocada, sin estado privado. */
+export interface FocusedCanonicalTarget {
+  readonly url: string;
+  readonly path: string;
+  readonly routeName: string;
+  readonly appId: string;
+  readonly presentationMode: 'desktop' | 'tablet' | 'mobile';
+}
+
+/**
+ * Obtener el contexto canónico de la instancia enfocada si su app declara una
+ * ruta pública. No incluye geometría, overlays ni estado de sesión.
+ */
+export function resolveFocusedCanonicalTarget(): FocusedCanonicalTarget | null {
+  const presentationMode = getPresentationMode();
+  const windows = windowStore.get();
+  const mobileStack = mobileStackStore.get();
+  const active = presentationMode === 'mobile'
+    ? mobileStack.at(-1)
+    : windows.find((entry) => entry.focused);
+  if (!active) return null;
+
+  const app = AppRegistry.get(active.appId);
+  const path = app ? getCanonicalAppPath(app, active.params) : null;
+  if (!path || path === '/') return null;
+  return {
+    url: new URL(path, window.location.origin).toString(),
+    path,
+    routeName: path.split('/').filter(Boolean)[0] ?? 'root',
+    appId: active.appId,
+    presentationMode,
+  };
+}
+
+/** Obtener solo la URL absoluta del destino enfocado. */
+export function resolveFocusedCanonicalUrl(): string | null {
+  return resolveFocusedCanonicalTarget()?.url ?? null;
 }
 
 /** Registrar el sincronizador de foco; devuelve teardown idempotente. */
@@ -48,11 +102,16 @@ export function initWindowUrlSync(): WindowUrlSyncHandle {
 
   const sync = (): void => {
     if (paused || stopped) return;
-    const targetPath = resolveFocusedPath(
-      windowStore.get(),
-      mobileStackStore.get(),
-      getPresentationMode(),
-    );
+    const windows = windowStore.get();
+    const mobileStack = mobileStackStore.get();
+    const presentation = getPresentationMode();
+    const targetPath = resolveFocusedPath(windows, mobileStack, presentation);
+
+    /* [297A-24 / S1] Una app runtime sin deep link no debe navegar a `/`.
+     * Hacerlo activaría la reconciliación de rutas y cerraría todas las demás
+     * ventanas aunque el usuario solo haya abierto/enfocado otra app. `/` se
+     * proyecta únicamente cuando no existe ninguna app runtime enfocada. */
+    if (targetPath === '/' && hasOpenRuntimeApp(windows, mobileStack, presentation)) return;
     if (targetPath !== getCurrentPath()) replacePath(targetPath);
   };
 

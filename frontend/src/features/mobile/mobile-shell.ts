@@ -3,7 +3,7 @@
  * Las apps entregan el mismo MountedView que desktop; este módulo solo aporta
  * navegación y chrome móvil. [297A-12 §2–4] */
 
-import { ArrowLeft, Circle, FileUser, createElement, type IconNode } from 'lucide';
+import { Circle, FileUser, createElement, type IconNode } from 'lucide';
 import { createEl } from '../../utils/dom';
 import { createThemeToggleButton, type ThemeToggleButton } from '../../components/ui/theme-toggle-button';
 import { getCurrentPathname } from '../../utils/viewport';
@@ -11,12 +11,16 @@ import { getCanonicalAppPath, type AppOpenHistory } from '../runtime/deep-links'
 import { openContextMenu } from '../desktop/components/desktop-context-menu';
 import { bindLongPress } from './mobile-gestures';
 import { authStore } from '../../store';
+import { createMobileAccountControl, type MobileAccountControl } from './mobile-account-control';
+import { createAppHeader, createNavigation } from './mobile-chrome';
 import { isInternalPushHistoryEntry, navigate, replacePath } from '../../router';
 import type { MountedView } from '../../core/lifecycle';
 import { AppRegistry } from '../runtime/app-registry';
 import { resolveResourceType, type ResourceKind } from '../runtime/resource-type-registry';
 import { workspaceStore } from '../runtime/workspace/workspace-store';
 import type { ResolvedNode } from '../runtime/workspace/types';
+import { resolvePublicResourceTarget } from '../runtime/workspace/public-resource-locator';
+import { showToast } from '../../components/ui/toast';
 import {
   clearMobileStack,
   getTopMobileApp,
@@ -62,8 +66,11 @@ function resolveNodeAction(
   }
   if (node.type === 'folder') return () => { void openApp('finder', { folderId: node.id }); };
   if (node.type === 'resource' && node.resourceKind) {
-    const appId = resolveResourceType(node.resourceKind as ResourceKind)?.appId ?? 'finder';
-    return () => { void openApp(appId, { resourceId: node.refId ?? node.id }); };
+    const publicTarget = resolvePublicResourceTarget(node);
+    if (publicTarget) return () => { void openApp(publicTarget.appId, publicTarget.params); };
+    return () => {
+      showToast('Este recurso todavía no tiene una referencia pública disponible');
+    };
   }
   if (node.refId && AppRegistry.get(node.refId)) return () => { void openApp(node.refId!); };
   return undefined;
@@ -95,40 +102,6 @@ function createIconButton(
   return button;
 }
 
-function createNavigation(
-  hasApp: boolean,
-  goBack: () => void,
-  goHome: () => void,
-): HTMLElement {
-  const navigation = createEl('nav', {
-    className: 'movilNavegacion',
-    ariaLabel: 'Navegación del sistema',
-  });
-  const back = createEl('button', {
-    type: 'button',
-    className: 'movilNavegacion__control',
-    ariaLabel: 'Atrás',
-  }, createElement(ArrowLeft));
-  const home = createEl('button', {
-    type: 'button',
-    className: 'movilNavegacion__control',
-    ariaLabel: 'Ir al inicio',
-  }, createElement(Circle));
-  back.disabled = !hasApp;
-  back.addEventListener('click', goBack);
-  home.addEventListener('click', goHome);
-  navigation.append(back, home);
-  return navigation;
-}
-
-function createAppHeader(title: string): HTMLElement {
-  return createEl('header', { className: 'movilApp__cabecera' },
-    createEl('span', { className: 'movilMarca', ariaHidden: 'true' }),
-    createEl('h1', { className: 'movilApp__titulo', textContent: title }),
-    createEl('span', { ariaHidden: 'true' }),
-  );
-}
-
 export function createMobileShell(
   profile: HTMLElement,
   onToggleExternalNav: () => void,
@@ -146,6 +119,7 @@ export function createMobileShell(
   const launcherGestureCleanups: Array<() => void> = [];
   /* [297A-18] Botón de tema del launcher; se destruye al re-renderizar launcher. */
   let launcherThemeToggle: ThemeToggleButton | null = null;
+  let launcherAccountControl: MobileAccountControl | null = null;
 
   const openApp = async (
     appId: string,
@@ -195,6 +169,8 @@ export function createMobileShell(
     clearLauncherGestures();
     launcherThemeToggle?.destroy();
     launcherThemeToggle = null;
+    launcherAccountControl?.destroy();
+    launcherAccountControl = null;
   };
 
   const renderLauncher = (): HTMLElement => {
@@ -202,10 +178,11 @@ export function createMobileShell(
     const launcher = createEl('div', { className: 'movilLauncher' });
     const themeToggle = createThemeToggleButton('movilLauncher__tema');
     launcherThemeToggle = themeToggle;
+    launcherAccountControl = createMobileAccountControl(() => { void openApp('account'); });
     const header = createEl('header', { className: 'movilLauncher__cabecera' },
       createEl('span', { className: 'movilMarca', ariaHidden: 'true' }),
       createEl('p', { className: 'movilLauncher__fecha', textContent: 'inicio' }),
-      themeToggle.element,
+      createEl('span', { className: 'movilLauncher__acciones' }, launcherAccountControl.element, themeToggle.element),
     );
     const grid = createEl('div', {
       className: 'movilLauncher__grid',

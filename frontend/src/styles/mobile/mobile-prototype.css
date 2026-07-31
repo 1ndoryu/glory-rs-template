@@ -53,6 +53,43 @@
     font-size: var(--sistema-menu-contexto-texto-tamano);
   }
 
+  .movilLauncher__acciones {
+    display: flex;
+    align-items: center;
+    gap: var(--espacio-sm);
+    margin-left: auto;
+  }
+
+  /* [297A-13] Cuenta proyecta authStore; no mantiene estado móvil paralelo. */
+  .movilLauncher__cuenta {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--espacio-xs);
+    min-height: var(--areaControlSistemaMovil);
+    padding: 0 var(--espacio-sm);
+    border: var(--sistema-borde);
+    background: var(--sistema-fondo);
+    color: var(--sistema-texto);
+    font-family: var(--fuente-sistema);
+    font-size: var(--sistema-menu-contexto-texto-tamano);
+  }
+
+  .movilLauncher__cuenta svg {
+    width: var(--sistema-control-icono-tamano);
+    height: var(--sistema-control-icono-tamano);
+    stroke-width: var(--sistema-icono-trazo);
+  }
+
+  .movilLauncher__cuenta:hover {
+    background: var(--sistema-texto);
+    color: var(--sistema-fondo);
+  }
+
+  .movilLauncher__cuenta:focus-visible {
+    outline: var(--sistema-borde);
+    outline-offset: var(--espacio-xs);
+  }
+
   /* [297A-18] Botón de tema del launcher: área táctil mínima, tokens del sistema. */
   .movilLauncher__tema {
     display: grid;
