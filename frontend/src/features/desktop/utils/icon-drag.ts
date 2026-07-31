@@ -7,7 +7,8 @@
  */
 
 import type { NodeId } from '../../runtime/workspace/types';
-import { findReorderIndex, findDropTarget, makeDropTarget, updateHighlight, type HighlightSession } from './icon-reorder';
+import { findReorderIndex, findDropTarget, makeDropTarget, updateHighlight, isGridTarget, type HighlightSession } from './icon-reorder';
+import { getGridMetrics, getCellAt, DESKTOP_MIN_WIDTH } from './icon-grid';
 
 /* Re-export para compatibilidad — otros módulos importan desde icon-drag */
 export { makeDropTarget };
@@ -28,13 +29,18 @@ interface DragSession extends HighlightSession {
   readonly sourceContext: string;
   readonly ghost: HTMLElement;
   readonly onReorder?: (draggedId: NodeId, targetIndex: number) => void;
+  /** [297A-20] Soltar en celda snap del grid del escritorio. */
+  readonly onPlaceCell?: (draggedId: NodeId, col: number, row: number) => void;
 }
 
 let activeSession: DragSession | null = null;
 let globalDropHandler: DragDropHandler | null = null;
 
-export function onGlobalDrop(handler: DragDropHandler): void {
+export function onGlobalDrop(handler: DragDropHandler): () => void {
   globalDropHandler = handler;
+  return () => {
+    if (globalDropHandler === handler) globalDropHandler = null;
+  };
 }
 
 
@@ -45,8 +51,9 @@ export function enableDrag(options: {
   gridEl: HTMLElement;
   itemSelector?: string;
   onReorder?: (draggedId: NodeId, targetIndex: number) => void;
+  onPlaceCell?: (draggedId: NodeId, col: number, row: number) => void;
 }): () => void {
-  const { el, nodeId, context, gridEl, itemSelector = '.desktop-icon--interactive', onReorder } = options;
+  const { el, nodeId, context, gridEl, itemSelector = '.desktop-icon--interactive', onReorder, onPlaceCell } = options;
   const DRAG_THRESHOLD = 6;
 
   let startX = 0;
@@ -77,6 +84,8 @@ export function enableDrag(options: {
       ghost.style.opacity = '0.7';
       document.body.appendChild(ghost);
 
+      const placement = Boolean(onPlaceCell) && window.innerWidth >= DESKTOP_MIN_WIDTH;
+
       activeSession = {
         sourceId: nodeId,
         sourceContext: context,
@@ -84,6 +93,8 @@ export function enableDrag(options: {
         gridEl,
         itemSelector,
         onReorder,
+        onPlaceCell,
+        placement,
         highlightEl: null,
         currentTarget: null,
       } satisfies DragSession;
@@ -108,11 +119,19 @@ export function enableDrag(options: {
 
     const target = findDropTarget(e.clientX, e.clientY, activeSession.ghost, null);
 
-    if (target) {
+    /* [297A-20] Modo snap: el drop se decide por geometría, no por el elemento
+     * bajo el cursor. Si el puntero cae en una celda del grid se coloca aunque
+     * haya una ventana encima (las ventanas ya no bloquean el escritorio). */
+    if (activeSession.placement && onPlaceCell) {
+      const metrics = getGridMetrics(gridEl, itemSelector);
+      const cell = getCellAt(e.clientX, e.clientY, metrics);
+      if (cell) onPlaceCell(nodeId, cell.col, cell.row);
+    } else if (target) {
       const targetId = target.dataset.dropId ?? '';
       const targetContext = target.dataset.dropContext ?? '';
-      const isSameGrid = target === gridEl;
+      const isSameGrid = isGridTarget(target, gridEl);
 
+      /* Reorder por índice (móvil o sin onPlaceCell). */
       if (isSameGrid && onReorder) {
         const targetIndex = findReorderIndex(e.clientX, e.clientY, gridEl, itemSelector);
         if (targetIndex >= 0) {

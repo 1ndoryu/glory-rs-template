@@ -16,6 +16,7 @@
 - Quality gate: `Agente/planes/completados/plan-escalabilidad-sentinel-wandorius-2026-07-29.md`
 - Prevención: `Agente/prevencion/prevencion-wandorius-sentinel-varsense-2026-07-29.md`
 - Tema claro/oscuro: `Agente/planes/plan-modo-oscuro-os-2026-07-31.md`
+- Iconos libres del escritorio: `Agente/planes/plan-iconos-libres-desktop-2026-07-31.md`
 - Checkpoints SOLID/escalabilidad: `Agente/documentacion/arquitectura/checkpoints-solid-escalabilidad-2026-07-31.md`
 - URLs canónicas y foco: `Agente/planes/plan-deep-links-ventanas-2026-07-31.md`
 
@@ -25,12 +26,14 @@
 - Workspace overlay implementado: release + overlay + merge + clipboard + papelera + crear carpetas.
 - Split de archivos grandes completado: command-registration (725→6), workspace-store (430→4), desktop-shell (419→3).
 - Sesiones opacas en cookie operativas; JWT localStorage eliminado del frontend. `/admin` legacy y uploads públicos siguen como deuda controlada.
-- **Quality tool sprint:** 13 reglas custom (P0/P1/P2) + 7 Sentinel CLI + 4 VarSense = 24 reglas activas; la cobertura operativa estimada del quality tool es ~65% del inventario de patrones automatizables definido en el plan. VarSense reconoce contratos vanilla de clases con patch reproducible (`a93b8bf0…`, 43 tests del tool). Último gate 297A-12: VarSense 0 errores/1 aviso informativo, Sentinel 0 errores + 75 warnings heredados. Auditoría v4 reporta por separado 57/78 hallazgos arquitectónicos potencialmente detectables (73%) y 19/23 correcciones del checklist base (83%); no son denominadores comparables. ISP refactor DomAttrs (33→6 sub-interfaces). Frontend: 160 tests en 12 suites.
+- **Quality tool sprint:** 13 reglas custom (P0/P1/P2) + 7 Sentinel CLI + 4 VarSense = 24 reglas activas; la cobertura operativa estimada del quality tool es ~65% del inventario de patrones automatizables definido en el plan. VarSense reconoce contratos vanilla de clases con patch reproducible (`a93b8bf0…`, 43 tests del tool). Último gate 297A-19: PASS, VarSense 0 errores/2 avisos informativos, Sentinel 0 errores + 75 warnings heredados, custom 0 errores/3 informativos. Auditoría v4 reporta por separado 57/78 hallazgos arquitectónicos potencialmente detectables (73%) y 19/23 correcciones del checklist base (83%); no son denominadores comparables. ISP refactor DomAttrs (33→6 sub-interfaces). Frontend: 194 tests en 17 suites.
 - Ejecutar una tarea por vez y en este orden; no saltar dependencias.
 - El plan maestro contiene checklists/gates. El roadmap conserva solo pendientes.
 - El quality gate está operativo; toda tarea futura debe cerrarse con `npm run task:check -- {ID}`.
 
 ## Siguiente bloque habilitado
+
+**297A-20 — Iconos libres con snap-grid (completado).** Posición libre por celda con colisión resuelta, drop geométrico (ya no se pierde bajo ventanas), reflow por resolución y persistencia en overlay. Validado por el usuario en navegador; detalle en `Agente/completados/tareas-2026-07-31.md`.
 
 **297A-12 — Runtime móvil parcial implementado.** Shell/stack, transición dinámica, long press, menú contextual compartido, reorder accesible y frontera de capacidades están validados por type-check, 160 tests y quality gate. Quedan pruebas visuales/E2E en navegador, estados transitorios, safe areas y apps críticas.
 
@@ -98,7 +101,7 @@
 - [x] Shell móvil full-screen, sin ventanas/barra superior/taskbar; validación visual por viewport pendiente.
 - [x] Back/Home y carpetas consumen workspace/registry; Back/Home sincronizan URL; long press y reorder accesible consumen CommandRegistry y `mobileOrder`.
 - [x] Transición dinámica móvil↔tablet sin recarga mediante reinstanciación segura.
-- [x] Cambio móvil↔tablet conserva app/recurso por URL/params; estados transitorios siguen pendientes.
+- [x] Cambio móvil↔tablet conserva app/recurso por URL/params; el sincronizador pausa/reanuda durante la reinstanciación y evita entradas duplicadas. Estados transitorios y E2E visual siguen pendientes.
 - [ ] Pruebas visuales/E2E 320/360/390 y tablet 768; orientación, safe areas, teclado virtual y estados transitorios.
 
 **Salida:** teléfono funciona como launcher sin duplicar lógica; tablet sigue como escritorio.
@@ -121,14 +124,39 @@
 
 **Depende de:** 297A-9/11/12; integra capacidades de 297A-13. Cada app y recurso tendrá una URL compartible; la URL representa solo la ventana enfocada.
 
-- [ ] Definir formato versionado y allowlisted para app, recurso, alias/slug, versión y parámetros; excluir IDs internos, tokens, posiciones, tamaños, z-index, clipboard y overlays privados.
-- [ ] Hacer que cada `AppRegistry` declare parser/serializer, capacidades, parámetros permitidos y fallback; no crear un router monolítico ni URLs ad-hoc por app.
-- [ ] Al enfocar, usar `replaceState`; al navegar explícitamente, `pushState`; al abrir una URL, reutilizar o enfocar la instancia equivalente sin duplicarla.
-- [ ] Mantener Back/Forward, refresh y transición desktop/tablet/móvil; compartir solo app/recurso enfocado, no la sesión completa ni el workspace público.
-- [ ] Añadir `Copiar URL` con feedback, validación de boundary, protección de drafts/privados/grants, redirects canónicos y fallback seguro sin filtración.
-- [ ] Medir `deep_link_opened`, `window_focus_changed` y `share_url_copied`; probar sesión limpia, varias ventanas, permisos, rutas inválidas y viewports.
+- [x] Definir contrato allowlisted para rutas públicas y parámetros; excluir IDs internos, tokens, posiciones, tamaños, z-index, clipboard y overlays privados. *(AppDeepLink + createPathDeepLink)*
+- [x] Migrar parser/serializer y fallback seguro de Reader, Finder/Galería, About y Projects; apps legacy sin contrato no aceptan parámetros dinámicos.
+- [x] Conectar `replacePath` a todos los cambios de foco y reservar `pushPath` para aperturas explícitas; `window-url-sync` deriva de los stores sin router paralelo.
+- [ ] Mantener Back/Forward, refresh y transición desktop/tablet/móvil para el foco completo; la reconciliación de rutas documentales, parámetros inseguros y capacidades ya está implementada y probada, pero falta E2E real con `popstate`/interacción móvil.
+- [ ] Añadir `Copiar URL` con feedback, protección de drafts/privados/grants y redirects canónicos; el fallback seguro y boundary allowlisted ya están implementados.
+- [ ] Medir `deep_link_opened`, `window_focus_changed` y `share_url_copied`; probar sesión limpia, varias ventanas, permisos, rutas inválidas y viewports. El boundary y las rutas inválidas ya tienen cobertura unitaria.
 
 **Salida:** copiar una URL desde cualquier app abre o enfoca esa app/recurso en otra sesión, con historial, seguridad, analítica y presentación móvil coherentes.
+
+### 297A-20 — Iconos de escritorio con posición libre (snap-grid) (completado)
+
+**Depende de:** 297A-11 (overlay). El usuario coloca iconos en cualquier celda del escritorio; la disposición del admin se publica y cada visitante personaliza sin afectar a otros. Plan: `plan-iconos-libres-desktop-2026-07-31.md`.
+
+- [x] Renderizar iconos por `position {col,row}` (snap-grid 88px) con fallback al orden actual cuando no hay posición. *(grid geométrico RTL: `getGridMetrics`/`getCellAt`; `grid-auto-rows` fijo a `--sistema-icono-fila` 64px para que geometría y CSS coincidan)*
+- [x] Conectar el drag existente para soltar en celda libre llamando a `moveNodePosition()`; el click sigue abriendo la app y el drag a carpeta/papelera se conserva. *(drop geométrico por celda, sin depender de `elementFromPoint`; funciona con ventanas abiertas encima)*
+- [x] Resolver colisiones (desplazar ocupado a celda libre) y reencuadre al cambiar resolución/breakpoint; móvil conserva el orden del launcher (`mobileOrder` no se contamina). *(param `avoid` en `findFreeCell`/`planPlacement`; `reflowPositions` con clamping; móvil ignora posiciones)*
+- [x] Persistir posición en el overlay personal (`fieldOverrides` + localStorage) y permitir que el admin la publique al release.
+- [x] Tests (merge/colisión/snap) y validación visual en navegador (desktop y tablet). *(37/37 tests; verificado por el usuario: «funciona bien, iconos no se juntan»)*
+
+**Salida:** el escritorio se puede ordenar libremente; la vista pública carga la disposición del admin y cada visitante tiene su propio estado personalizado.
+
+**Pendiente controlado:** modo depuración temporal (Ctrl+Shift+G, cuadrícula roja) que el usuario pidió mantener — eliminarlo cuando lo indique.
+
+### 297A-21 — Notificaciones de novedades (campana + gestión admin)
+
+**Depende de:** 297A-20, 297A-13 (entrega remota) y menú Admin de 297A-14. Idea nueva: campana junto al tema que avisa de contenido nuevo incluso a usuarios con estado personalizado (el overlay por diff ya les muestra lo nuevo; la campana solo añade el aviso). Plan propio al arrancar.
+
+- [ ] Definir qué genera una notificación (release nuevo, recursos agregados/actualizados), cuándo se marca leída y política anti-spam sin envío inmediato.
+- [ ] Campana en la barra superior (junto al tema) con contador, icono Lucide 1px, accesibilidad y estado local/remoto.
+- [ ] Entrega de novedades por overlay (297A-13) y panel Admin para publicar/descartar novedades, integrado en el menú Admin por capacidades (297A-14).
+- [ ] Pruebas: usuario con overlay personalizado recibe aviso de novedades y las ve; casos negativos (sin spam, leídas, logout/login).
+
+**Salida:** los usuarios saben que hay novedades aunque su escritorio esté personalizado; el admin gestiona desde un panel, sin notificaciones inmediatas.
 
 ### 297A-13 — Registro y overlay remoto
 

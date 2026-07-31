@@ -92,9 +92,17 @@
   --sistema-ventana-ancho-min: 240px;
   --sistema-icono-celda: 88px;
   --sistema-icono-celda-mobile: 72px;
+  /* [297A-20] Altura uniforme de fila del snap-grid del escritorio.
+   * Las filas fijas hacen que la geometría calculada (getGridMetrics) coincida
+   * exactamente con la colocación real del CSS grid. */
+  --sistema-icono-fila: 64px;
   --sistema-icono-ancho: 44px;
   --sistema-icono-alto: 32px;
   --sistema-icono-trazo: 1;
+  /* [297A-20] Posición opcional del snap-grid; TypeScript las sobreescribe
+   * solo para nodos con posición explícita. */
+  --icono-col: auto;
+  --icono-row: auto;
   --sistema-iconos-reserva: 220px;
   --sistema-iconos-reserva-tablet: 190px;
   --sistema-iconos-offset-mobile: 330px;

@@ -46,13 +46,17 @@ export function mergeWorkspace(
     }
   }
 
+  for (const [id, node] of Object.entries(overlay.addedItems)) {
+    result[id] = { ...node, origin: 'overlay' };
+  }
+
+  /* [297A-20] Aplicar fieldOverrides DESPUÉS de añadir los items del overlay:
+   * así la posición/etiqueta de nodos creados por el usuario (addedItems)
+   * también se resuelve (antes los addedItems sobrescribían el override y
+   * mover una carpeta propia no persistía). */
   for (const [id, overrides] of Object.entries(overlay.fieldOverrides)) {
     const existing = result[id];
     if (existing) Object.assign(existing, overrides);
-  }
-
-  for (const [id, node] of Object.entries(overlay.addedItems)) {
-    result[id] = { ...node, origin: 'overlay' };
   }
 
   const hierarchy = ['public', 'authenticated', 'admin'] as const;

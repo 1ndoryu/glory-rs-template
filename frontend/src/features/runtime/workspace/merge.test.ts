@@ -104,6 +104,25 @@ describe('mergeWorkspace', () => {
     expect(result.nodes['new-folder'].origin).toBe('overlay');
   });
 
+  /* [297A-20] La posición de un nodo creado por el usuario (addedItem) también
+   * debe resolverse desde fieldOverrides, como en nodos del release. */
+  it('debe aplicar fieldOverrides de posición a nodos addedItems', () => {
+    const newFolder: WorkspaceNode = {
+      id: 'new-folder',
+      parentId: 'desktop',
+      type: 'folder',
+      label: 'Nueva carpeta',
+      requires: 'public',
+    };
+    const overlay: WorkspaceOverlay = {
+      ...emptyOverlay,
+      addedItems: { 'new-folder': newFolder },
+      fieldOverrides: { 'new-folder': { position: { col: 3, row: 2 } } },
+    };
+    const result = mergeWorkspace(simpleRelease, overlay, 'public');
+    expect(result.nodes['new-folder'].position).toEqual({ col: 3, row: 2 });
+  });
+
   it('debe filtrar nodos admin para usuario public', () => {
     const result = mergeWorkspace(simpleRelease, emptyOverlay, 'public');
     expect(result.nodes.adminNode).toBeUndefined();

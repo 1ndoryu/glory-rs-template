@@ -40,9 +40,18 @@
     position: relative;
     top: auto;
     right: auto;
+    left: auto;
+    /* [297A-20] Móvil: sin posiciones libres; auto-flow según mobileOrder. */
+    direction: ltr;
+    grid-auto-flow: row;
     grid-template-columns: repeat(3, minmax(var(--sistema-icono-celda-mobile), 1fr));
     gap: var(--espacio-xl) var(--espacio-sm);
     padding: var(--sistema-iconos-offset-mobile) var(--espacio-md) var(--espacio-3xl);
+  }
+
+  .desktop-icon--posicionado {
+    grid-column: auto;
+    grid-row: auto;
   }
 
   .desktop-content-window {

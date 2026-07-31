@@ -14,6 +14,21 @@ export function moveNodePosition(nodeId: NodeId, position: { col: number; row: n
   }));
 }
 
+/** [297A-20] Mueve varios nodos en un SOLO update del overlay.
+ * Evita N re-renders al reencuadrar tras un resize del grid. */
+export function moveNodesPosition(
+  moves: ReadonlyArray<{ nodeId: NodeId; position: { col: number; row: number } }>,
+): void {
+  if (moves.length === 0) return;
+  overlayStore.update((prev) => {
+    const fieldOverrides = { ...prev.fieldOverrides };
+    for (const move of moves) {
+      fieldOverrides[move.nodeId] = { ...fieldOverrides[move.nodeId], position: move.position };
+    }
+    return { ...prev, fieldOverrides };
+  });
+}
+
 export function moveNodeToParent(nodeId: NodeId, parentId: NodeId | 'desktop' | null): void {
   overlayStore.update((prev) => ({
     ...prev,
@@ -59,7 +74,9 @@ export function resetOverlay(): void {
   overlayStore.set(EMPTY_OVERLAY);
 }
 
-export function reorderDesktopNodes(orderedIds: NodeId[]): void {
+/** Persistir el orden de una colección en la proyección móvil.
+ * No modifica position, por lo que el layout desktop permanece intacto. */
+export function reorderWorkspaceNodes(orderedIds: readonly NodeId[]): void {
   overlayStore.update((prev) => {
     const overrides = { ...prev.fieldOverrides };
     for (let i = 0; i < orderedIds.length; i++) {
@@ -67,6 +84,11 @@ export function reorderDesktopNodes(orderedIds: NodeId[]): void {
     }
     return { ...prev, fieldOverrides: overrides };
   });
+}
+
+/** Compatibilidad con el drag desktop existente. */
+export function reorderDesktopNodes(orderedIds: NodeId[]): void {
+  reorderWorkspaceNodes(orderedIds);
 }
 
 export function createFolder(parentId: NodeId | 'desktop', label: string): NodeId {

@@ -41,15 +41,36 @@
   top: var(--espacio-xl);
   right: var(--espacio-lg);
   bottom: var(--espacio-xl);
+  /* [297A-20] left + direction rtl: el grid cubre TODO el escritorio y la
+   * columna 0 queda a la derecha (diseño inicial). Las celdas libres hacia
+   * la izquierda son las posiciones a las que el usuario puede arrastrar. */
+  left: var(--espacio-lg);
+  direction: rtl;
   z-index: var(--z-sistema-iconos);
   display: grid;
   grid-template-columns: repeat(auto-fill, var(--sistema-icono-celda));
-  grid-auto-rows: max-content;
+  /* [297A-20] Filas uniformes: la geometría real coincide con la calculada por
+   * getGridMetrics. Antes (max-content) las filas vacías colapsaban a 0px y el
+   * icono aterrizaba fuera de la celda que mostraba el highlight. */
+  grid-auto-rows: var(--sistema-icono-fila);
+  /* dense rellena los huecos con los iconos sin posición explícita,
+   * mientras los posicionados conservan su celda exacta. */
+  grid-auto-flow: dense;
   gap: var(--espacio-xl) var(--espacio-md);
   align-content: start;
 }
 
+/* [297A-20] Icono anclado a una celda snap (col/row 1-based vía custom properties).
+ * Con direction: rtl, col 1 = columna derecha; col creciente = hacia la izquierda. */
+.desktop-icon--posicionado {
+  grid-column: var(--icono-col);
+  grid-row: var(--icono-row);
+}
+
 .desktop-icon {
+  /* [297A-20] El grid es rtl para anclar la col 0 a la derecha, pero el
+   * contenido del icono (flex columna, texto) vuelve a ltr para no invertirse. */
+  direction: ltr;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -96,6 +117,32 @@
 .desktop-icon--selected .desktop-icon__label {
   color: var(--sistema-inverso-texto);
   background: var(--sistema-inverso-fondo);
+}
+
+/* [297A-20][DEPURACION TEMPORAL] Límite del grid en rojo + celdas visibles.
+ * Activar con Ctrl+Shift+G. PENDIENTE: eliminar con el toggle en
+ * workspace-icon-grid.ts cuando se resuelva el tema de celdas inferiores. */
+.desktop-icon-grid--depurar {
+  outline: 2px dashed #ff0000;
+  outline-offset: -1px;
+}
+
+.desktop-icon-grid__debug {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.desktop-icon-grid__debug-celda {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 0, 0, 0.55);
+  display: grid;
+  place-items: center;
+  font: 10px/1 var(--fuente-sistema-pixel);
+  color: rgba(255, 0, 0, 0.9);
+  pointer-events: none;
 }
 
 /* [Plan 297A-11 §9.4] Icon drag states */
