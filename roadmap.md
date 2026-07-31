@@ -26,7 +26,7 @@
 - Workspace overlay implementado: release + overlay + merge + clipboard + papelera + crear carpetas.
 - Split de archivos grandes completado: command-registration (725→6), workspace-store (430→4), desktop-shell (419→3).
 - Sesiones opacas en cookie operativas; JWT localStorage eliminado del frontend. `/admin` legacy y uploads públicos siguen como deuda controlada.
-- **Quality tool sprint:** 13 reglas custom (P0/P1/P2) + 7 Sentinel CLI + 4 VarSense = 24 reglas activas; la cobertura operativa estimada del quality tool es ~65% del inventario de patrones automatizables definido en el plan. VarSense reconoce contratos vanilla de clases con patch reproducible (`a93b8bf0…`, 43 tests del tool). Último gate 297A-19: PASS, VarSense 0 errores/2 avisos informativos, Sentinel 0 errores + 75 warnings heredados, custom 0 errores/3 informativos. Auditoría v4 reporta por separado 57/78 hallazgos arquitectónicos potencialmente detectables (73%) y 19/23 correcciones del checklist base (83%); no son denominadores comparables. ISP refactor DomAttrs (33→6 sub-interfaces). Frontend: 194 tests en 17 suites.
+- **Quality tool sprint:** 13 reglas custom (P0/P1/P2) + 7 Sentinel CLI + 4 VarSense = 24 reglas activas; la cobertura operativa estimada del quality tool es ~65% del inventario de patrones automatizables definido en el plan. VarSense reconoce contratos vanilla de clases con patch reproducible (`a93b8bf0…`, 43 tests del tool). Último gate 297A-19: PASS, VarSense 0 errores/2 avisos informativos, Sentinel 0 errores + 75 warnings heredados, custom 0 errores/3 informativos. Auditoría v4 reporta por separado 57/78 hallazgos arquitectónicos potencialmente detectables (73%) y 19/23 correcciones del checklist base (83%); no son denominadores comparables. ISP refactor DomAttrs (33→6 sub-interfaces). Frontend: 203 tests en 19 suites.
 - Ejecutar una tarea por vez y en este orden; no saltar dependencias.
 - El plan maestro contiene checklists/gates. El roadmap conserva solo pendientes.
 - El quality gate está operativo; toda tarea futura debe cerrarse con `npm run task:check -- {ID}`.
@@ -35,7 +35,9 @@
 
 **297A-20 — Iconos libres con snap-grid (completado).** Posición libre por celda con colisión resuelta, drop geométrico (ya no se pierde bajo ventanas), reflow por resolución y persistencia en overlay. Validado por el usuario en navegador; detalle en `Agente/completados/tareas-2026-07-31.md`.
 
-**297A-12 — Runtime móvil parcial implementado.** Shell/stack, transición dinámica, long press, menú contextual compartido, reorder accesible y frontera de capacidades están validados por type-check, 160 tests y quality gate. Quedan pruebas visuales/E2E en navegador, estados transitorios, safe areas y apps críticas.
+> **297A-22 — Reordenamiento por arrastre con grid (PENDIENTE DE REVISIÓN).** El usuario detectó que "Mover arriba/abajo" (swap de `mobileOrder`) no debe ser el mecanismo de reorden: ni en escritorio (donde no mueve nada visible, el grid usa `position`) ni en móvil (debería ser por arrastre sobre celdas, como el escritorio). Plan de diseño listo para revisión en `Agente/planes/plan-reordenamiento-arrastre-grid-2026-07-31.md` — **no ejecutar hasta aprobación de las decisiones abiertas (sección 8 del plan).**
+
+**297A-12 — Runtime móvil parcial implementado.** Shell/stack, transición dinámica, long press, menú contextual compartido, reorder accesible, frontera de capacidades y snapshot transitorio opt-in están validados por type-check, 203 tests en 19 suites y quality gate. Quedan pruebas visuales/E2E en navegador, safe areas, teclado virtual, foco y apps críticas.
 
 **297A-10 — Recursos y migraciones (completado).** Resource envelope, product versions, asset states, services con transacción, DTO público/admin y About seeder.
 
@@ -101,8 +103,8 @@
 - [x] Shell móvil full-screen, sin ventanas/barra superior/taskbar; validación visual por viewport pendiente.
 - [x] Back/Home y carpetas consumen workspace/registry; Back/Home sincronizan URL; long press y reorder accesible consumen CommandRegistry y `mobileOrder`.
 - [x] Transición dinámica móvil↔tablet sin recarga mediante reinstanciación segura.
-- [x] Cambio móvil↔tablet conserva app/recurso por URL/params; el sincronizador pausa/reanuda durante la reinstanciación y evita entradas duplicadas. Estados transitorios y E2E visual siguen pendientes.
-- [ ] Pruebas visuales/E2E 320/360/390 y tablet 768; orientación, safe areas, teclado virtual y estados transitorios.
+- [x] Cambio móvil↔tablet conserva app/recurso por URL/params; el sincronizador pausa/reanuda durante la reinstanciación y evita entradas duplicadas. El snapshot transitorio opt-in conserva formularios/scroll seguros durante la reinstanciación; la validación E2E visual sigue pendiente.
+- [ ] Pruebas visuales/E2E 320/360/390 y tablet 768; orientación, safe areas, teclado virtual, foco, scroll/formularios y apps críticas.
 
 **Salida:** teléfono funciona como launcher sin duplicar lógica; tablet sigue como escritorio.
 
@@ -127,7 +129,7 @@
 - [x] Definir contrato allowlisted para rutas públicas y parámetros; excluir IDs internos, tokens, posiciones, tamaños, z-index, clipboard y overlays privados. *(AppDeepLink + createPathDeepLink)*
 - [x] Migrar parser/serializer y fallback seguro de Reader, Finder/Galería, About y Projects; apps legacy sin contrato no aceptan parámetros dinámicos.
 - [x] Conectar `replacePath` a todos los cambios de foco y reservar `pushPath` para aperturas explícitas; `window-url-sync` deriva de los stores sin router paralelo.
-- [ ] Mantener Back/Forward, refresh y transición desktop/tablet/móvil para el foco completo; la reconciliación de rutas documentales, parámetros inseguros y capacidades ya está implementada y probada, pero falta E2E real con `popstate`/interacción móvil.
+- [ ] Mantener Back/Forward, refresh y transición desktop/tablet/móvil para el foco completo; la reconciliación de rutas documentales, parámetros inseguros, capacidades y semántica `push/replace` ya está implementada y probada, pero falta E2E real de `goBack()`/`popstate`/interacción móvil.
 - [ ] Añadir `Copiar URL` con feedback, protección de drafts/privados/grants y redirects canónicos; el fallback seguro y boundary allowlisted ya están implementados.
 - [ ] Medir `deep_link_opened`, `window_focus_changed` y `share_url_copied`; probar sesión limpia, varias ventanas, permisos, rutas inválidas y viewports. El boundary y las rutas inválidas ya tienen cobertura unitaria.
 
@@ -146,6 +148,20 @@
 **Salida:** el escritorio se puede ordenar libremente; la vista pública carga la disposición del admin y cada visitante tiene su propio estado personalizado.
 
 **Pendiente controlado:** modo depuración temporal (Ctrl+Shift+G, cuadrícula roja) que el usuario pidió mantener — eliminarlo cuando lo indique.
+
+### 297A-22 — Reordenamiento por arrastre con grid (móvil + escritorio) [PENDIENTE DE REVISIÓN]
+
+**Depende de:** 297A-20 (snap-grid desktop) y 297A-12 (launcher móvil). Plan en `Agente/planes/plan-reordenamiento-arrastre-grid-2026-07-31.md`. **No ejecutar hasta revisión y aprobación de las decisiones abiertas (sección 8).**
+
+- [ ] Revisar y aprobar: opción de modelo (recomendada: `mobilePosition` con paridad), grid móvil apretado vs con huecos, destino de `workspace:move-up/down`, gesto long press + drag, vida de `mobileOrder`. *(pendiente del usuario)*
+- [ ] Modelo de datos: `mobilePosition {col,row}` en tipos/fieldOverrides; `mobileOrder` deprecado a fallback; actualizar `merge.ts`, `overlay-mutations.ts`, `getChildren` y `default-release.ts`.
+- [ ] Launcher móvil como snap-grid: geometría reutilizada de `icon-grid.ts` parametrizada por columnas fijas (3/2); render con `mobilePosition` + fallback `mobileOrder`.
+- [ ] Drag táctil en launcher: long press → modo edición; movimiento >umbral → drag; soltar en celda → `planPlacement` → persistir `mobilePosition`.
+- [ ] Escritorio: quitar del menú contextual el swap sin efecto visible; drag desktop conserva `position` (297A-20 sin regresión).
+- [ ] Alternativa accesible: reemplazar `workspace:move-up/down` por comandos sobre celdas (cumple 297A-12 §9).
+- [ ] Migración de datos y limpieza del swap; tests unitarios + validación visual (320/360/390/768+, drag táctil, foco, teclado, reload/sync).
+
+**Salida:** reordenar iconos es por arrastre sobre celdas en móvil y escritorio; "Mover arriba/abajo" deja de ser el mecanismo; organización móvil persiste en overlay sin contaminar el desktop.
 
 ### 297A-21 — Notificaciones de novedades (campana + gestión admin)
 
