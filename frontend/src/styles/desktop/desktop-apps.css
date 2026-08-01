@@ -68,8 +68,8 @@
 }
 
 /* [018A-78][018A-80] Iconos del Finder compactos y coherentes con el escritorio.
- * 018A-78: celdas de --sistema-icono-celda (no 1fr), grupo centrado, trazo 1px
- * y regla muerta .desktop-finder__document-icon retirada.
+ * 018A-78: celdas de --sistema-icono-celda (no 1fr), trazo 1px y regla muerta
+ * .desktop-finder__document-icon retirada.
  * 018A-80: columnas automáticas (auto-fill, como el escritorio) en vez de fijar
  * 3, e icono un poco más pequeño (--sistema-finder-icono-tamano 40px). El
  * override móvil de 2 columnas quedó redundante y se retiró.
@@ -77,7 +77,10 @@
  * quedaba espacio vacío debajo del grid (fuera de su área), así que el clic
  * derecho en esa zona no abría el menú contextual. min-height: 100% en el
  * contenedor + flex: 1 en el grid lo estiran; align-content: start evita que
- * las filas implícitas se estiren (iconos espaciados verticalmente). */
+ * las filas implícitas se estiren (iconos espaciados verticalmente).
+ * [018A-93] Alineación horizontal al inicio (justify-content: start), igual
+ * que el grid del escritorio: los iconos se agrupan a la izquierda en vez de
+ * centrarse. */
 .desktop-finder {
   display: flex;
   flex-direction: column;
@@ -87,7 +90,7 @@
 .desktop-finder__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, var(--sistema-icono-celda));
-  justify-content: center;
+  justify-content: start;
   align-content: start;
   flex: 1;
   gap: var(--espacio-md);
