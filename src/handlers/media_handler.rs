@@ -1,5 +1,7 @@
+use axum::body::Body;
 use axum::extract::{Multipart, Path, Query, State};
-use axum::http::StatusCode;
+use axum::http::{header, HeaderValue, StatusCode};
+use axum::response::Response;
 use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use utoipa::IntoParams;
@@ -8,11 +10,78 @@ use uuid::Uuid;
 use crate::errors::AppError;
 use crate::middleware::AdminUser;
 use crate::models::media::{CreateMediaRequest, Media, MediaQueryParams};
+use crate::repositories::media_repo::MediaRepository;
+use crate::services::commerce::resolve_private_download_path;
 use crate::services::media_svc::{classify_media_type, MediaService};
 use crate::AppState;
 
 /* Tamano maximo de archivo: 10MB */
 const MAX_FILE_SIZE: usize = 10 * 1024 * 1024;
+
+fn public_preview_path(id: Uuid) -> String {
+    format!("/api/media/{id}/preview")
+}
+
+fn admin_preview_path(id: Uuid) -> String {
+    format!("/api/admin/media/{id}/preview")
+}
+
+fn media_content_type(media: &Media) -> &'static str {
+    let extension = media
+        .file_path
+        .rsplit('.')
+        .next()
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    match extension.as_str() {
+        "jpg" | "jpeg" => "image/jpeg",
+        "png" => "image/png",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "svg" => "image/svg+xml",
+        "avif" => "image/avif",
+        "mp3" => "audio/mpeg",
+        "wav" => "audio/wav",
+        "ogg" => "audio/ogg",
+        "flac" => "audio/flac",
+        "m4a" => "audio/mp4",
+        "aac" => "audio/aac",
+        "mp4" => "video/mp4",
+        "webm" => "video/webm",
+        "mov" => "video/quicktime",
+        "mkv" => "video/x-matroska",
+        _ => match media.file_type.as_str() {
+            "image" => "image/*",
+            "audio" => "audio/*",
+            "video" => "video/*",
+            _ => "application/octet-stream",
+        },
+    }
+}
+
+async fn serve_media(
+    state: &AppState,
+    media: Media,
+    is_public: bool,
+) -> Result<Response, AppError> {
+    let path = resolve_private_download_path(&state.upload_dir, &media.file_path)?;
+    let bytes = tokio::fs::read(&path)
+        .await
+        .map_err(|error| AppError::Internal(format!("Error leyendo media: {error}")))?;
+    let content_type = HeaderValue::from_static(media_content_type(&media));
+    let cache_control = if is_public {
+        "public, max-age=3600"
+    } else {
+        "private, no-store"
+    };
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, content_type)
+        .header(header::X_CONTENT_TYPE_OPTIONS, "nosniff")
+        .header(header::CACHE_CONTROL, cache_control)
+        .body(Body::from(bytes))
+        .map_err(|error| AppError::Internal(format!("Error preparando media: {error}")))
+}
 
 /// Parametros del listado admin de media.
 #[derive(Debug, serde::Deserialize, IntoParams)]
@@ -124,7 +193,7 @@ pub async fn upload_media(
         return Err(AppError::BadRequest("No se proporciono archivo".into()));
     }
 
-    let media = MediaService::create(
+    let mut media = MediaService::create(
         &state.pool,
         CreateMediaRequest {
             article_id,
@@ -135,6 +204,10 @@ pub async fn upload_media(
         },
     )
     .await?;
+
+    /* La respuesta conserva el contrato `file_path`, pero solo contiene la
+     * URL autorizada; el path real de storage nunca vuelve al navegador. */
+    media.file_path = public_preview_path(media.id);
 
     Ok((StatusCode::CREATED, Json(media)))
 }
@@ -150,9 +223,12 @@ pub async fn list_media(
     State(state): State<AppState>,
     Query(params): Query<MediaQueryParams>,
 ) -> Result<Json<Vec<Media>>, AppError> {
-    let media =
+    let mut media =
         MediaService::list_public(&state.pool, params.file_type.as_deref(), params.article_id)
             .await?;
+    for item in &mut media {
+        item.file_path = public_preview_path(item.id);
+    }
     Ok(Json(media))
 }
 
@@ -172,13 +248,16 @@ pub async fn list_admin_media(
     _auth: AdminUser,
     Query(params): Query<AdminMediaQueryParams>,
 ) -> Result<Json<Vec<Media>>, AppError> {
-    let media = MediaService::list_admin(
+    let mut media = MediaService::list_admin(
         &state.pool,
         params.file_type.as_deref(),
         params.article_id,
         params.asset_state.as_deref(),
     )
     .await?;
+    for item in &mut media {
+        item.file_path = admin_preview_path(item.id);
+    }
     Ok(Json(media))
 }
 
@@ -196,8 +275,54 @@ pub async fn list_trashed_media(
     State(state): State<AppState>,
     _auth: AdminUser,
 ) -> Result<Json<Vec<Media>>, AppError> {
-    let media = MediaService::list_trashed(&state.pool).await?;
+    let mut media = MediaService::list_trashed(&state.pool).await?;
+    for item in &mut media {
+        item.file_path = admin_preview_path(item.id);
+    }
     Ok(Json(media))
+}
+
+/// Servir un asset público únicamente si su envelope está publicado y limpio.
+#[utoipa::path(
+    get,
+    path = "/api/media/{id}/preview",
+    params(("id" = Uuid, Path, description = "ID de media")),
+    responses(
+        (status = 200, description = "Asset multimedia público"),
+        (status = 404, description = "Media no disponible", body = ErrorResponse)
+    )
+)]
+pub async fn preview_media(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Response, AppError> {
+    let media = MediaRepository::find_public_by_id(&state.pool, id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Media no disponible".into()))?;
+    serve_media(&state, media, true).await
+}
+
+/// Servir un asset activo para la biblioteca administrativa.
+#[utoipa::path(
+    get,
+    path = "/api/admin/media/{id}/preview",
+    params(("id" = Uuid, Path, description = "ID de media")),
+    responses(
+        (status = 200, description = "Asset multimedia administrable"),
+        (status = 401, description = "No autorizado", body = ErrorResponse),
+        (status = 404, description = "Media no disponible", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
+pub async fn preview_admin_media(
+    State(state): State<AppState>,
+    _auth: AdminUser,
+    Path(id): Path<Uuid>,
+) -> Result<Response, AppError> {
+    let media = MediaRepository::find_admin_by_id(&state.pool, id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Media no disponible".into()))?;
+    serve_media(&state, media, false).await
 }
 
 /// Eliminar media (admin) — soft delete del envelope.
@@ -246,11 +371,13 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         /* Público: solo assets clean + public + active */
         .route("/media", get(list_media))
+        .route("/media/:id/preview", get(preview_media))
         /* Admin — contrato canónico /admin/media */
         .route("/admin/media", post(upload_media).get(list_admin_media))
         .route("/admin/media/trashed", get(list_trashed_media))
         .route("/admin/media/:id", delete(delete_media))
         .route("/admin/media/:id/restore", post(restore_media))
+        .route("/admin/media/:id/preview", get(preview_admin_media))
 }
 
 #[cfg(test)]
@@ -362,11 +489,13 @@ mod tests {
 
         let delete_uri = format!("/api/admin/media/{}", Uuid::new_v4());
         let restore_uri = format!("/api/admin/media/{}/restore", Uuid::new_v4());
+        let preview_uri = format!("/api/admin/media/{}/preview", Uuid::new_v4());
         let cases = [
             ("GET", "/api/admin/media"),
             ("GET", "/api/admin/media/trashed"),
             ("DELETE", delete_uri.as_str()),
             ("POST", restore_uri.as_str()),
+            ("GET", preview_uri.as_str()),
         ];
 
         for (method, uri) in cases {
@@ -415,9 +544,10 @@ mod tests {
         let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
             .expect("cuerpo legible");
-        let ids: Vec<String> = serde_json::from_slice::<Vec<serde_json::Value>>(&body_bytes)
-            .expect("listado público debe ser JSON")
-            .into_iter()
+        let public_items = serde_json::from_slice::<Vec<serde_json::Value>>(&body_bytes)
+            .expect("listado público debe ser JSON");
+        let ids: Vec<String> = public_items
+            .iter()
             .map(|item| item["id"].as_str().unwrap_or("").to_string())
             .collect();
 
@@ -434,5 +564,75 @@ mod tests {
         assert!(!ids.contains(&rejected.to_string()), "rejected oculto");
         assert!(!ids.contains(&private_asset.to_string()), "private oculto");
         assert!(!ids.contains(&trashed.to_string()), "trashed oculto");
+        let public_item = public_items
+            .iter()
+            .find(|item| item["id"] == clean_public.to_string())
+            .expect("media pública debe conservar su id");
+        assert_eq!(
+            public_item["file_path"],
+            format!("/api/media/{clean_public}/preview"),
+            "el listado no debe filtrar la storage key"
+        );
+    }
+
+    #[tokio::test]
+    async fn public_preview_authorizes_asset_and_static_upload_route_is_gone() {
+        let state = test_state().await;
+        let router = production_router(&state);
+        std::fs::create_dir_all(&state.upload_dir).expect("storage de prueba debe existir");
+        std::fs::write(format!("{}/fixture.png", state.upload_dir), b"png-fixture")
+            .expect("fixture binario debe escribirse");
+
+        let public_id = insert_media_fixture(&state.pool, "public", "active", "clean").await;
+        let private_id = insert_media_fixture(&state.pool, "private", "active", "clean").await;
+
+        let public_response = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri(format!("/api/media/{public_id}/preview"))
+                    .body(Body::empty())
+                    .expect("preview pública válida"),
+            )
+            .await
+            .expect("router debe responder preview público");
+        assert_eq!(public_response.status(), StatusCode::OK);
+        assert_eq!(
+            public_response
+                .headers()
+                .get("content-type")
+                .and_then(|v| v.to_str().ok()),
+            Some("image/png")
+        );
+
+        let private_response = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri(format!("/api/media/{private_id}/preview"))
+                    .body(Body::empty())
+                    .expect("preview privada válida"),
+            )
+            .await
+            .expect("router debe responder preview privado");
+        assert_eq!(private_response.status(), StatusCode::NOT_FOUND);
+
+        let static_response = router
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/uploads/fixture.png")
+                    .body(Body::empty())
+                    .expect("ruta legacy válida"),
+            )
+            .await
+            .expect("router debe responder ruta legacy");
+        assert_eq!(static_response.status(), StatusCode::NOT_FOUND);
+
+        cleanup_media_fixture(&state.pool, public_id).await;
+        cleanup_media_fixture(&state.pool, private_id).await;
+        let _ = std::fs::remove_file(format!("{}/fixture.png", state.upload_dir));
     }
 }

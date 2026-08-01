@@ -34,6 +34,39 @@ impl MediaRepository {
         .await
     }
 
+    /// Buscar un asset público ya procesado. El join con `resources` evita
+    /// servir media privada, en borrador o enviada a la papelera aunque se
+    /// conozca su UUID.
+    pub async fn find_public_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Media>, sqlx::Error> {
+        sqlx::query_as::<_, Media>(&format!(
+            "SELECT {LIST_COLS} FROM media m \
+             INNER JOIN resources r ON r.id = m.id \
+             WHERE m.id = $1 \
+               AND r.kind = 'media'::resource_kind \
+               AND r.lifecycle = 'active'::lifecycle_state \
+               AND r.visibility = 'public'::visibility_state \
+               AND m.asset_state = 'clean'::asset_processing_state"
+        ))
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+    }
+
+    /// Buscar un asset activo para la vista administrativa. El storage sigue
+    /// siendo interno; la ruta solo se consume dentro del handler de preview.
+    pub async fn find_admin_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Media>, sqlx::Error> {
+        sqlx::query_as::<_, Media>(&format!(
+            "SELECT {LIST_COLS} FROM media m \
+             INNER JOIN resources r ON r.id = m.id \
+             WHERE m.id = $1 \
+               AND r.kind = 'media'::resource_kind \
+               AND r.lifecycle = 'active'::lifecycle_state"
+        ))
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+    }
+
     /// Listado público: solo envelope active + public + asset clean.
     /// [297A-14 F4] El público nunca recibe processing/rejected/private/trashed.
     pub async fn list_public(

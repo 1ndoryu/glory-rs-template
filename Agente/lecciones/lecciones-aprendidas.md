@@ -157,3 +157,9 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 - Descargas privadas y webhooks también son parte del contrato: documentar el grant, headers y estados evita que el cliente invente una ruta pública o una autorización alternativa.
 - Un endpoint de descarga binaria puede describirse sin registrar storage keys ni modelar el token como credencial reutilizable; OpenAPI debe mostrar solo el boundary observable.
 - Los webhooks externos usan cuerpo crudo y firma en header; su documentación no debe generar un cliente de usuario ni sustituir la verificación HMAC del backend.
+
+## 018A-28 — El storage privado no debe ser una ruta pública
+
+- Un filtro SQL en el listado no protege un archivo si `ServeDir` permite adivinar su nombre; la autorización debe repetirse en el handler que abre los bytes.
+- El mismo confinamiento canónico de path sirve para media y descargas, pero la decisión de visibilidad debe vivir en el envelope (`active/public/clean`) y no en el navegador.
+- Mantener temporalmente el nombre `file_path` como URL de preview permite migrar consumidores sin filtrar la storage key; el contrato DTO público/admin separado debe ser el cleanup siguiente.

@@ -21,7 +21,6 @@ use axum::http::{header, HeaderValue, Method};
 use axum::Router;
 use tower::ServiceBuilder;
 use tower_http::cors::{AllowOrigin, CorsLayer};
-use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -112,6 +111,8 @@ impl utoipa::Modify for SecurityAddon {
         media_handler::list_trashed_media,
         media_handler::delete_media,
         media_handler::restore_media,
+        media_handler::preview_media,
+        media_handler::preview_admin_media,
         download_handler::download,
         stripe_webhook::stripe_webhook,
         notes::create_note,
@@ -230,15 +231,9 @@ pub fn create_router(pool: sqlx::PgPool, config: crate::config::AppConfig) -> Ro
             header::HeaderName::from_static("x-csrf-token"),
         ]);
 
-    /* Servir archivos subidos estaticamente */
-    /* [297A-7] Nota: uploads se mantiene público temporalmente para compatibilidad.
-     * En 297A-10 se migrará a serving autorizado. */
-    let uploads_service = ServeDir::new(&state.upload_dir);
-
     Router::new()
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .nest("/api", api_routes())
-        .nest_service("/uploads", uploads_service)
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
