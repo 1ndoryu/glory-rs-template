@@ -3,6 +3,7 @@ import { readdir, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const STALE_TEMP_MS = 600_000;
+const RETRYABLE_REPLACE_ERRORS = new Set(['EPERM', 'EEXIST', 'EBUSY']);
 
 export async function cleanupStaleAtomicTemps(target) {
   const directory = path.dirname(target);
@@ -37,12 +38,20 @@ export async function writeAtomic(target, content) {
       await rename(temporary, target);
       return;
     } catch (error) {
-      if (!['EPERM', 'EEXIST', 'EBUSY'].includes(error?.code) || attempt === 5) {
+      if (!RETRYABLE_REPLACE_ERRORS.has(error?.code) || attempt === 5) {
         try { await unlink(temporary); } catch { /* limpieza best-effort */ }
         throw error;
       }
       try { await unlink(target); } catch (unlinkError) {
-        if (unlinkError?.code !== 'ENOENT') throw unlinkError;
+        if (unlinkError?.code === 'ENOENT') continue;
+        if (!RETRYABLE_REPLACE_ERRORS.has(unlinkError?.code) || attempt === 5) {
+          throw unlinkError;
+        }
+        /* Otro escritor aún conserva el handle del target en Windows. El
+         * siguiente intento vuelve a intentar el reemplazo sin borrar ningún
+         * path distinto al target exacto. */
+        await new Promise(resolve => setTimeout(resolve, 5 * (attempt + 1)));
+        continue;
       }
       await new Promise(resolve => setTimeout(resolve, 5 * (attempt + 1)));
     }

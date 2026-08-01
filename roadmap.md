@@ -376,6 +376,7 @@ Plan canónico: `Agente/planes/plan-programas-editoriales-2026-07-31.md`.
 - [x] **018A-34 —** Migrar auth, preferences, notifications, settings y analytics al cliente generado; workspace queda como último dominio frontend con adaptación propia.
 - [x] **018A-35 —** Migrar `WorkspaceService` y retirar el último consumidor frontend del cliente manual; mantener el modelo rico del runtime separado de los DTOs OpenAPI.
 - [x] **018A-36 —** Retirar el cliente manual sin borrar la política común de sesión/CSRF/errores; verificar que no quedan consumidores de `api.get/post/...`.
+- [x] **018A-37 —** `test:changed` selecciona tests por grafo de imports en vez de ejecutar toda la suite ante cualquier cambio fuente; `writeAtomic` reintenta carreras Windows. `test:full` sigue siendo el modo explícito total.
 - [ ] Completar la matriz de paridad y retirar contratos/CSS legacy restantes. *(JWT Bearer ya no forma parte del contrato)*
 
 ### 297A-17 — Hardening, identidad, accesibilidad y SEO
@@ -384,6 +385,7 @@ Plan canónico: `Agente/planes/plan-programas-editoriales-2026-07-31.md`.
 - [x] Validar SEO base: HTML público, sitemap, robots, metadata y Open Graph sin exponer drafts ni rutas privadas; queda auditoría final.
 - [ ] Verificar manual visual, teclado, foco, live regions, zoom 200%, reduced motion, alto contraste y multimedia accesible.
 - [ ] Ejecutar Sentinel, VarSense, type-check, tests, E2E, presupuestos de rendimiento, observabilidad y runbook Coolify; deploy continúa fuera de alcance. El split estructural de modelos ya está cerrado: `workspace/` y `workspace_overlay/` agrupan DTOs, validación, locators y tests sin suppressions. Para backend se debe usar `npm test`/`npm run check:back`, que derivan la BD por rama y aplican el contexto correcto.
+- [x] **018A-37 —** El selector frontend incremental y la escritura atómica Windows quedan cubiertos por fixtures del orquestador; la suite completa sigue reservada para `test:full`/CI.
 
 ## Revisión SOLID y escalabilidad por fase
 

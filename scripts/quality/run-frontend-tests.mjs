@@ -2,6 +2,11 @@ import { execFile, spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import {
+  buildFrontendDependencyGraph,
+  isFrontendTestFile,
+  selectImpactedTests,
+} from './frontend-test-selection.mjs';
 
 const execFileAsync = promisify(execFile);
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -74,26 +79,46 @@ const files = await changedFiles();
 const frontendItems = files.filter(item => item.file.startsWith('frontend/'));
 const forceFull = flags.has('--full')
   || files.some(item => fullMarkers.has(item.file))
-  || frontendItems.some(item => item.status === 'D' || item.status.startsWith('R') || item.status === '??')
-  || frontendItems.some(item => isFrontendSource(item.file) && !isFrontendTest(item.file));
+  || frontendItems.some(item => item.status === 'D' || item.status.startsWith('R'));
 const testFiles = frontendItems
   .filter(item => isFrontendTest(item.file))
   .map(item => item.file.replace(/^frontend\//, ''));
+const hasFrontendSourceChange = frontendItems.some(item => isFrontendSource(item.file));
+let selectedTests = testFiles;
+if (!forceFull && hasFrontendSourceChange) {
+  const graph = await buildFrontendDependencyGraph(frontendRoot);
+  const changedSourceFiles = frontendItems
+    .filter(item => isFrontendSource(item.file))
+    .map(item => item.file.replace(/^frontend\//, ''));
+  const allTestFiles = [...graph.keys()]
+    .filter(isFrontendTestFile)
+    .map(file => path.relative(frontendRoot, file).replace(/\\/g, '/'));
+  selectedTests = selectImpactedTests({
+    frontendRoot,
+    changedFiles: changedSourceFiles,
+    testFiles: allTestFiles,
+    graph,
+  });
+  if (selectedTests.length === 0) {
+    process.stdout.write('[frontend-tests] No hay tests dependientes del cambio; type-check sigue siendo obligatorio.\n');
+    process.exit(0);
+  }
+}
 
 if (flags.has('--dry-run')) {
-  process.stdout.write(`${JSON.stringify({ mode: forceFull ? 'full' : 'selected', files: testFiles }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ mode: forceFull ? 'full' : 'selected', files: selectedTests }, null, 2)}\n`);
   process.exit(0);
 }
 
-if (!forceFull && testFiles.length === 0) {
-  process.stdout.write('[frontend-tests] Sin archivos TypeScript relacionados; no se ejecutan tests.\n');
+if (!forceFull && selectedTests.length === 0) {
+  process.stdout.write('[frontend-tests] Sin tests dependientes; type-check sigue siendo obligatorio.\n');
   process.exit(0);
 }
 
-/* [018A-4] Solo tests modificados se ejecutan de forma selectiva. Código,
- * configuración, borrados, renombres o untracked fuerzan full para evitar
- * falsos PASS por un grafo de dependencias incompleto. */
+/* [018A-37] Cambios de código seleccionan tests por grafo de imports local.
+ * `--full`/test:full conserva la suite completa para CI o una revisión total;
+ * untracked ya no dispara todos los workers solo por existir. */
 const vitestArgs = forceFull
   ? ['run', '--maxWorkers=1', '--no-file-parallelism']
-  : ['run', '--maxWorkers=1', '--no-file-parallelism', ...testFiles];
+  : ['run', '--maxWorkers=1', '--no-file-parallelism', ...selectedTests];
 process.exitCode = await runVitest(vitestArgs);

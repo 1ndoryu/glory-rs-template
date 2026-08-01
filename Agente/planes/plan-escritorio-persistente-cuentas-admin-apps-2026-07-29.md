@@ -437,6 +437,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [x] **018A-34 —** Migrar `AuthService`, `PreferencesService`, `NotificationsService`, `SettingsService` y `AnalyticsService` al cliente generado; conservar stores, consentimiento y logout observable. `WorkspaceService` queda separado por sus tipos de overlay/release.
 - [x] **018A-35 —** Migrar `WorkspaceService` al cliente generado. Las funciones de conversión de release/overlay aíslan las aserciones de tipos y preservan el `404` público como `null`; no quedan consumidores de `api` en los servicios de dominio.
 - [x] **018A-36 —** Retirar el objeto `api` manual y dejar `client.ts` como boundary de mutator/error para Orval; confirmar con búsqueda estática y pruebas de transporte que no se reintroduce una segunda puerta HTTP.
+- [x] **018A-37 —** Ajustar el rendimiento local de tests: selección por grafo de imports, suite completa explícita y retry acotado de `writeAtomic` en Windows; el type-check y el gate siguen siendo obligatorios aunque no exista test dependiente.
 - [ ] Eliminar CSS/clases huérfanas con VarSense.
 
 **Criterio de salida:** una sola administración como app registrada, analytics útil/privado y cero rutas/chrome duplicados legacy; uploads y CSS/contratos obsoletos deben desaparecer después de su matriz de paridad.

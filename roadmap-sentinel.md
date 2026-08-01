@@ -196,13 +196,14 @@ Una regla no ejecuta procesos, no escribe archivos, no imprime salida humana y n
 #### SNT-05A — Rendimiento local completado en 018A-4
 
 - [x] Mantener Vitest serial por defecto (`maxWorkers=1`, sin paralelismo de archivos); la suite completa queda explícita en `test:full`.
-- [x] Añadir `test:changed` como selección segura: solo tests modificados se ejecutan de forma selectiva; cambios de código/configuración, borrados, renombres o untracked fuerzan suite completa; documentación/backend omiten la etapa.
+- [x] Añadir `test:changed` como selección segura: un grafo local de imports ejecuta solo los tests que dependen del código cambiado; configuración, borrados y renombres fuerzan suite completa; untracked fuente entra en el grafo y un cambio sin test dependiente no consume workers innecesarios.
+- [x] Corregir la carrera Windows de `writeAtomic`: dos escritores que compiten por el mismo reporte reintentan `EPERM/EBUSY/EEXIST` sin propagar un falso fallo ni borrar rutas ajenas.
 - [x] Añadir captura máxima de 64 KiB por stdout/stderr del runner para evitar crecimiento de memoria; el reporte conserva un marcador visible para solicitar el log original cuando el adapter lo soporte.
 - [x] Versionar fingerprint de caché con Node, plataforma, arquitectura, configuración, manifiesto de herramientas y archivos del alcance; añadir prueba de hit/miss por cambio de contenido.
 - [x] Incluir borrados/renombres en detección de alcance y forzar invalidación full ante cambios ambiguos.
 - [x] Añadir pruebas de lock fail-fast, scope/globs, caché y captura ruidosa; confirmar `npm run quality:test` (17/17) y `task:check -- 297A-19 --fresh` PASS.
 
-**Gate SNT-05A:** cerrado. La ejecución local ya no dispara automáticamente workers múltiples ni `--changed HEAD` sobre todo el workspace. El benchmark comparativo de Sentinel/VarSense y el índice compartido quedan pendientes de SNT-03/SNT-05.
+**Gate SNT-05A:** cerrado. La ejecución local ya no dispara automáticamente workers múltiples ni una suite completa por cada archivo fuente; el grafo de imports selecciona dependencias y `test:full` conserva la revisión total explícita. El benchmark comparativo de Sentinel/VarSense y el índice compartido quedan pendientes de SNT-03/SNT-05.
 
 **Gate:** benchmark reproducible demuestra mejora; dos ejecuciones iguales producen el mismo JSON ordenado y no reutilizan PASS obsoleto.
 
