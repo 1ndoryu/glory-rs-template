@@ -16,6 +16,11 @@ use crate::services::settings_svc::{AnalyticsService, SettingsService};
 use crate::AppState;
 
 /// Obtener todos los settings (publico para temas/fonts)
+#[utoipa::path(
+    get,
+    path = "/api/settings",
+    responses((status = 200, description = "Configuración pública clave-valor"))
+)]
 pub async fn get_settings(
     State(state): State<AppState>,
 ) -> Result<Json<HashMap<String, String>>, AppError> {
@@ -24,6 +29,16 @@ pub async fn get_settings(
 }
 
 /// Actualizar settings (admin)
+#[utoipa::path(
+    post,
+    path = "/api/admin/settings",
+    request_body = UpdateSettingsRequest,
+    responses(
+        (status = 204, description = "Configuración actualizada"),
+        (status = 401, description = "No autorizado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
 pub async fn update_settings(
     State(state): State<AppState>,
     _auth: AdminUser,
@@ -34,6 +49,12 @@ pub async fn update_settings(
 }
 
 /// Registrar eventos de analytics (publico)
+#[utoipa::path(
+    post,
+    path = "/api/analytics/events",
+    request_body = TrackEventsRequest,
+    responses((status = 204, description = "Eventos aceptados o ignorados por consentimiento"))
+)]
 pub async fn track_events(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
@@ -79,6 +100,16 @@ pub async fn track_events(
 }
 
 /// Purga eventos más antiguos que la política elegida por el administrador.
+#[utoipa::path(
+    post,
+    path = "/api/admin/analytics/retention",
+    request_body = AnalyticsRetentionRequest,
+    responses(
+        (status = 200, description = "Retención aplicada", body = AnalyticsRetentionResponse),
+        (status = 401, description = "No autorizado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
 pub async fn purge_analytics(
     State(state): State<AppState>,
     _auth: AdminUser,
@@ -92,6 +123,15 @@ pub async fn purge_analytics(
 }
 
 /// Obtener estadisticas (admin)
+#[utoipa::path(
+    get,
+    path = "/api/admin/analytics/stats",
+    responses(
+        (status = 200, description = "Estadísticas agregadas", body = AnalyticsStats),
+        (status = 401, description = "No autorizado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
 pub async fn get_analytics_stats(
     State(state): State<AppState>,
     _auth: AdminUser,

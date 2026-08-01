@@ -26,6 +26,7 @@ pub struct AnalyticsEvent {
     pub event_type: String,
     pub target_type: Option<String>,
     pub target_id: Option<Uuid>,
+    #[schema(value_type = Object)]
     pub metadata: Option<serde_json::Value>,
     pub ip_hash: Option<String>,
     pub user_agent: Option<String>,
@@ -65,6 +66,7 @@ pub struct TrackEvent {
     pub event_type: String,
     pub target_type: Option<String>,
     pub target_id: Option<Uuid>,
+    #[schema(value_type = Object)]
     pub metadata: Option<serde_json::Value>,
 }
 

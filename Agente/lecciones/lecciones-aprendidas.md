@@ -130,3 +130,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Checkout no debe publicar `serde_json::Value` como contrato: un DTO estable conserva la forma pública aunque Stripe agregue campos internos.
 - El precio, la disponibilidad y la entrega siguen siendo decisiones server-side; tipar la respuesta no autoriza al navegador a conceder acceso.
+
+## 018A-23 — Agrupar endpoints por dominio reduce drift
+
+- Notificaciones, analytics y settings deben aparecer en el mismo contrato que sus servicios frontend; dejar uno fuera obliga a reintroducir `fetch` y tipos manuales.
+- Las respuestas públicas pueden documentarse sin exponer metadata privada; la autorización sigue en `AuthUser`/`AdminUser`, no en el schema.

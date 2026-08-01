@@ -12,12 +12,28 @@ use crate::models::notification::{
 use crate::services::notification_svc::NotificationService;
 use crate::AppState;
 
+#[utoipa::path(
+    get,
+    path = "/api/notifications",
+    responses((status = 200, description = "Novedades públicas", body = NotificationList))
+)]
+/* [018A-23] Notificaciones, settings y analytics comparten el contrato
+ * tipado; los servicios siguen siendo la autoridad y el dispatcher solo mide. */
 pub async fn list_public(
     State(state): State<AppState>,
 ) -> Result<Json<NotificationList>, AppError> {
     Ok(Json(NotificationService::list_public(&state.pool).await?))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/me/notifications",
+    responses(
+        (status = 200, description = "Novedades de la cuenta", body = NotificationList),
+        (status = 401, description = "No autorizado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
 pub async fn list_mine(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -27,6 +43,16 @@ pub async fn list_mine(
     ))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/notifications/{id}/read",
+    params(("id" = Uuid, Path, description = "ID de la novedad")),
+    responses(
+        (status = 204, description = "Novedad marcada como leída"),
+        (status = 401, description = "No autorizado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
 pub async fn mark_read(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -36,6 +62,15 @@ pub async fn mark_read(
     Ok(StatusCode::NO_CONTENT)
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/admin/notifications",
+    responses(
+        (status = 200, description = "Novedades administrables", body = NotificationList),
+        (status = 401, description = "No autorizado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
 pub async fn list_admin(
     State(state): State<AppState>,
     _admin: AdminUser,
@@ -43,6 +78,16 @@ pub async fn list_admin(
     Ok(Json(NotificationService::list_admin(&state.pool).await?))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/admin/notifications",
+    request_body = CreateNotificationRequest,
+    responses(
+        (status = 200, description = "Novedad creada", body = Notification),
+        (status = 401, description = "No autorizado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
 pub async fn create_admin(
     State(state): State<AppState>,
     admin: AdminUser,
@@ -53,6 +98,18 @@ pub async fn create_admin(
     ))
 }
 
+#[utoipa::path(
+    patch,
+    path = "/api/admin/notifications/{id}/status",
+    params(("id" = Uuid, Path, description = "ID de la novedad")),
+    request_body = UpdateNotificationStatusRequest,
+    responses(
+        (status = 200, description = "Estado actualizado", body = Notification),
+        (status = 401, description = "No autorizado", body = ErrorResponse),
+        (status = 404, description = "No encontrado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
 pub async fn update_status_admin(
     State(state): State<AppState>,
     _admin: AdminUser,
