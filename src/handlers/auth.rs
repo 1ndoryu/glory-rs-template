@@ -26,12 +26,21 @@ use crate::AppState;
 /// [297A-8] Rate limit: máximo 5 intentos de login por IP por minuto
 const MAX_LOGIN_ATTEMPTS: u8 = 5;
 const RATE_LIMIT_WINDOW_SECS: u64 = 60;
+const MAX_AUTH_ACTION_ATTEMPTS: u8 = 3;
+const AUTH_ACTION_WINDOW_SECS: u64 = 300;
 
 /// Almacén de rate limit por IP (en memoria)
 pub type LoginRateLimit = Mutex<HashMap<String, (u8, Instant)>>;
+pub type AuthActionRateLimit = Mutex<HashMap<String, (u8, Instant)>>;
 
 /// Verifica rate limit para una IP. Retorna Ok(()) si permitido, Err si bloqueado.
-fn check_rate_limit(rate_limit: &LoginRateLimit, ip: &str) -> Result<(), AppError> {
+fn check_rate_limit(
+    rate_limit: &AuthActionRateLimit,
+    key: &str,
+    max_attempts: u8,
+    window_secs: u64,
+    message: &'static str,
+) -> Result<(), AppError> {
     let mut map = rate_limit
         .lock()
         .map_err(|e| AppError::Internal(format!("Error verificando rate limit: {e}")))?;
@@ -39,25 +48,48 @@ fn check_rate_limit(rate_limit: &LoginRateLimit, ip: &str) -> Result<(), AppErro
     let now = Instant::now();
 
     // Limpiar entradas expiradas
-    map.retain(|_, (_, instant)| now.duration_since(*instant).as_secs() < RATE_LIMIT_WINDOW_SECS);
+    map.retain(|_, (_, instant)| now.duration_since(*instant).as_secs() < window_secs);
 
-    if let Some((count, first)) = map.get_mut(ip) {
-        if now.duration_since(*first).as_secs() >= RATE_LIMIT_WINDOW_SECS {
+    if let Some((count, first)) = map.get_mut(key) {
+        if now.duration_since(*first).as_secs() >= window_secs {
             /* Ventana expirada — resetear */
-            map.insert(ip.to_string(), (1, now));
+            map.insert(key.to_string(), (1, now));
             Ok(())
-        } else if *count >= MAX_LOGIN_ATTEMPTS {
-            Err(AppError::Forbidden(
-                "Demasiados intentos de login. Intenta de nuevo en un minuto.".into(),
-            ))
+        } else if *count >= max_attempts {
+            Err(AppError::Forbidden(message.into()))
         } else {
             *count += 1;
             Ok(())
         }
     } else {
-        map.insert(ip.to_string(), (1, now));
+        map.insert(key.to_string(), (1, now));
         Ok(())
     }
+}
+
+fn check_login_rate_limit(rate_limit: &LoginRateLimit, ip: &str) -> Result<(), AppError> {
+    check_rate_limit(
+        rate_limit,
+        ip,
+        MAX_LOGIN_ATTEMPTS,
+        RATE_LIMIT_WINDOW_SECS,
+        "Demasiados intentos de login. Intenta de nuevo en un minuto.",
+    )
+}
+
+fn check_auth_action_rate_limit(
+    rate_limit: &AuthActionRateLimit,
+    action: &str,
+    ip: &str,
+) -> Result<(), AppError> {
+    let key = format!("{action}:{ip}");
+    check_rate_limit(
+        rate_limit,
+        &key,
+        MAX_AUTH_ACTION_ATTEMPTS,
+        AUTH_ACTION_WINDOW_SECS,
+        "Demasiadas solicitudes. Intenta de nuevo más tarde.",
+    )
 }
 
 /// Registrar nuevo usuario
@@ -76,8 +108,14 @@ fn check_rate_limit(rate_limit: &LoginRateLimit, ip: &str) -> Result<(), AppErro
 )]
 pub async fn register(
     State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Json(req): Json<RegisterRequest>,
 ) -> Result<(StatusCode, Json<RegistrationResponse>), AppError> {
+    check_auth_action_rate_limit(
+        &state.auth_action_rate_limit,
+        "register",
+        &addr.ip().to_string(),
+    )?;
     req.validate()
         .map_err(|e| AppError::Validation(e.to_string()))?;
 
@@ -145,8 +183,14 @@ pub async fn verify_email(
 )]
 pub async fn request_password_reset(
     State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Json(req): Json<PasswordResetRequest>,
 ) -> Result<(StatusCode, Json<RegistrationResponse>), AppError> {
+    check_auth_action_rate_limit(
+        &state.auth_action_rate_limit,
+        "password-reset",
+        &addr.ip().to_string(),
+    )?;
     req.validate()
         .map_err(|e| AppError::Validation(e.to_string()))?;
     if let Some(token) = AuthService::issue_password_reset(&state.pool, &req.email).await? {
@@ -179,8 +223,14 @@ pub async fn request_password_reset(
 )]
 pub async fn reset_password(
     State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Json(req): Json<ConfirmPasswordResetRequest>,
 ) -> Result<StatusCode, AppError> {
+    check_auth_action_rate_limit(
+        &state.auth_action_rate_limit,
+        "password-reset-confirm",
+        &addr.ip().to_string(),
+    )?;
     req.validate()
         .map_err(|e| AppError::Validation(e.to_string()))?;
     AuthService::reset_password(&state.pool, &req.token, &req.password).await?;
@@ -208,7 +258,7 @@ pub async fn login(
 
     /* [297A-8] Rate limit por IP */
     let ip = addr.ip().to_string();
-    check_rate_limit(&state.login_rate_limit, &ip)?;
+    check_login_rate_limit(&state.login_rate_limit, &ip)?;
 
     /* Verificar credenciales */
     let Some(user) = UserRepository::find_by_email(&state.pool, &req.email)
@@ -434,4 +484,34 @@ pub fn routes() -> Router<AppState> {
         .route("/auth/logout", post(logout))
         .route("/auth/sessions", get(list_sessions))
         .route("/auth/sessions/:id", delete(revoke_session))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+
+    use super::{
+        check_auth_action_rate_limit, check_login_rate_limit, AuthActionRateLimit, LoginRateLimit,
+    };
+
+    #[test]
+    fn auth_action_limit_is_separate_from_login_limit() {
+        let limit: AuthActionRateLimit = Mutex::new(HashMap::new());
+        for _ in 0..3 {
+            assert!(check_auth_action_rate_limit(&limit, "register", "127.0.0.1").is_ok());
+        }
+        assert!(check_auth_action_rate_limit(&limit, "register", "127.0.0.1").is_err());
+        let login_limit: LoginRateLimit = Mutex::new(HashMap::new());
+        assert!(check_login_rate_limit(&login_limit, "127.0.0.1").is_ok());
+    }
+
+    #[test]
+    fn different_auth_actions_do_not_share_a_bucket() {
+        let limit: AuthActionRateLimit = Mutex::new(HashMap::new());
+        for _ in 0..3 {
+            assert!(check_auth_action_rate_limit(&limit, "register", "127.0.0.1").is_ok());
+        }
+        assert!(check_auth_action_rate_limit(&limit, "password-reset", "127.0.0.1").is_ok());
+    }
 }

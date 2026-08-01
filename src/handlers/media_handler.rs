@@ -431,6 +431,9 @@ mod tests {
             login_rate_limit: Arc::new(Mutex::new(
                 HashMap::<String, (u8, std::time::Instant)>::new(),
             )),
+            auth_action_rate_limit: Arc::new(Mutex::new(
+                HashMap::<String, (u8, std::time::Instant)>::new(),
+            )),
         }
     }
 

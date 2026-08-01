@@ -211,6 +211,9 @@ pub fn create_router(pool: sqlx::PgPool, config: crate::config::AppConfig) -> Ro
         login_rate_limit: std::sync::Arc::new(std::sync::Mutex::new(
             std::collections::HashMap::new(),
         )),
+        auth_action_rate_limit: std::sync::Arc::new(std::sync::Mutex::new(
+            std::collections::HashMap::new(),
+        )),
     };
 
     /* [297A-7] CORS con allowlist de orígenes */

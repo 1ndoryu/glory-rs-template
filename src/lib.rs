@@ -15,7 +15,7 @@ pub mod services;
 use sqlx::PgPool;
 use std::sync::Arc;
 
-use crate::handlers::auth::LoginRateLimit;
+use crate::handlers::auth::{AuthActionRateLimit, LoginRateLimit};
 
 /// Estado compartido de la aplicacion — accesible desde handlers y middleware
 #[derive(Clone)]
@@ -29,4 +29,6 @@ pub struct AppState {
     pub site_url: String,
     /// [297A-8] Rate limit para login por IP
     pub login_rate_limit: Arc<LoginRateLimit>,
+    /// Rate limit independiente para registro y recuperación por IP
+    pub auth_action_rate_limit: Arc<AuthActionRateLimit>,
 }

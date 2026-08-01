@@ -293,3 +293,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - El formulario puede vivir dentro de Cuenta y reutilizar el servicio generado, pero la autoridad para crear sesiones sigue en el flag server-side y la verificación de correo.
 - Las respuestas de recuperación deben conservar el mensaje no enumerable; tokens de verificación/reset requieren un contrato de URL separado antes de entrar al cliente.
+
+## 018A-59 — Buckets con ventanas distintas necesitan almacenes distintos
+
+- Reutilizar un `HashMap` y limpiar todas sus entradas con la ventana del login hace que una llamada de login pueda borrar prematuramente el contador de recuperación.
+- Separar los buckets conserva ventanas independientes y deja claro qué parte es protección local del proceso frente a un futuro limitador distribuido.

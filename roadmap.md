@@ -214,6 +214,7 @@ Plan: `Agente/planes/plan-notificaciones-2026-08-01.md`.
 - [x] Backend de recuperación: solicitud no enumerable, token hashado de 1 h, cambio de contraseña y revocación de sesiones. *(UI, MFA/passkey y E2E quedan diferidos)*
 - [x] Rate limit de login, auditoría hash de intentos y logout limpia clipboard/undo. *(migration `20260801030000_297a13_auth_audit` + handler)*
 - [x] **018A-57 —** Cuenta invitado ofrece formularios internos de registro y recuperación; el backend mantiene `registration_enabled=false` y no se exponen tokens ni se activa correo real.
+- [x] **018A-59 —** Registro, solicitud de recuperación y confirmación de recuperación usan un bucket de 3 intentos por IP cada 5 minutos, separado del bucket de login de 5/min; rate limit distribuido queda diferido.
 - [x] **018A-58 —** Sincronizar la salida documental de 297A-13: formularios internos hechos; UI de tokens, correo real, MFA y E2E siguen pendientes.
 
 **Salida:** preferencias, overlay remoto y Cuenta base tienen transporte seguro, control de revisión, validación server-side, resolución visible `remote/local`, login/logout y formularios frontend; 297A-13 permanece abierto por UI de tokens/correo real, E2E multi-dispositivo/móvil, MFA y auditoría específica.
@@ -348,7 +349,7 @@ Este bloque amplía el alcance verificable sin duplicar los manuales canónicos.
 
 ### 297A-13 — Registro y overlay remoto
 
-- [x] Implementar registro verificado y recuperación detrás de feature flag; rate limit/login/logout, auditoría hash, limpieza de clipboard y formularios internos de Cuenta están operativos. *(correo real, UI de tokens, MFA y E2E quedan diferidos)*
+- [x] Implementar registro verificado y recuperación detrás de feature flag; rate limit/login/logout, auditoría hash, limpieza de clipboard, formularios internos de Cuenta y rate limit específico por IP están operativos. *(correo real, UI de tokens, MFA, rate limit distribuido y E2E quedan diferidos)*
 - [x] Sincronizar preferencias y overlay con revisión esperada, actualización optimista, validación server-side, fallback offline y conflicto 409 visible. *(preferencias + `user_workspace_overlays`; gate y self-check PASS)*
 - [x] Definir importación local, uso remoto, reset explícito, merge por ID/campo, tombstones y rebase ante release nuevo; probar autorización, payload inválido, corrupción persistida y revisión inicial sin fila fantasma.
 - [ ] Probar E2E dos pestañas/dispositivos y decidir merge semántico para cambios concurrentes no resolubles por reemplazo local/remoto.

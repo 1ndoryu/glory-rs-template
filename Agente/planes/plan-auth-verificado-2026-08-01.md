@@ -22,7 +22,7 @@
 - [x] UI dentro de Cuenta para registro y solicitud de recuperación; mantiene mensajes no enumerables y respeta `registration_enabled=false`.
 - [ ] UI de consumo de tokens para verificación y cambio de contraseña; requiere definir el enlace de correo y su tratamiento de URL sin filtrar secretos.
 - [ ] Resend real con Resend/SMTP, secretos de staging y reintentos observables.
-- [ ] Rate limit específico de registro/reset y auditoría de cada intento sensible.
+- [x] Rate limit específico de registro/reset por IP (3 intentos/5 min) y bucket separado del login; auditoría de cada intento sensible y rate limit distribuido quedan pendientes.
 - [ ] MFA/passkey, E2E de expiración/replay y pruebas de dos dispositivos.
 
 **Gate de la fase autónoma:** `cargo check`, clippy, 30 tests Rust, type-check frontend y `task:check` pasan; el flag permanece apagado hasta tener correo y UI.
