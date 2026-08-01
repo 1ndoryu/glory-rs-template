@@ -202,6 +202,20 @@ async fn handle_expired(state: &AppState, session: &serde_json::Value) -> Result
 
 /// Endpoint del webhook de Stripe.
 /// Recibe eventos y procesa `checkout.session.completed`.
+/* [018A-27] El webhook se documenta como integración externa: firma en header,
+ * JSON crudo y respuesta vacía. La verificación HMAC sigue siendo exclusiva
+ * del backend; OpenAPI no convierte el cuerpo en una autorización. */
+#[utoipa::path(
+    post,
+    path = "/api/webhook/stripe",
+    params(("stripe-signature" = String, Header, description = "Firma HMAC de Stripe")),
+    request_body(content = String, description = "Evento Stripe JSON", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Evento aceptado"),
+        (status = 400, description = "Firma o JSON inválido", body = ErrorResponse),
+        (status = 500, description = "Webhook no configurado", body = ErrorResponse)
+    )
+)]
 pub async fn stripe_webhook(
     State(state): State<AppState>,
     headers: HeaderMap,

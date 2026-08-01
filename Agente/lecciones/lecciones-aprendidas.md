@@ -151,3 +151,9 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 - Una app administrativa debe registrarse una sola vez en `AppRegistry`; conservar una ruta de página sin ventana crea un segundo punto de entrada y permite que el shell pierda capacidades, foco y analítica.
 - Los comandos de toolbar que crean contenido deben declarar `adminOnly` y abrir el editor por `openAppWindow`; navegar a `/admin` acopla una acción concreta a un panel monolítico.
 - Retirar la ruta no implica borrar el módulo que renderiza la app: el contenido puede seguir siendo reutilizable mientras la presentación y la autorización viven en el runtime.
+
+## 018A-27 — Documentar los límites de integraciones server-side
+
+- Descargas privadas y webhooks también son parte del contrato: documentar el grant, headers y estados evita que el cliente invente una ruta pública o una autorización alternativa.
+- Un endpoint de descarga binaria puede describirse sin registrar storage keys ni modelar el token como credencial reutilizable; OpenAPI debe mostrar solo el boundary observable.
+- Los webhooks externos usan cuerpo crudo y firma en header; su documentación no debe generar un cliente de usuario ni sustituir la verificación HMAC del backend.

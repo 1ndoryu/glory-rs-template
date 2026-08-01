@@ -66,6 +66,7 @@
 - [x] **018A-23 —** Paridad OpenAPI de notificaciones, analytics y settings; clientes `notifications/` y `settings-handler/` regenerados. Media, workspace y auth restante siguen pendientes.
 - [x] **018A-24 —** Paridad OpenAPI de sesión/cuenta y workspace: `me/logout/sessions`, release activo e historial/publicación admin con rutas `/api` correctas; clientes regenerados. Media/multipart y auth avanzada siguen pendientes.
 - [x] **018A-25 —** Paridad OpenAPI de media: galería pública, biblioteca admin, papelera, restore y respuesta de upload; cliente `media-handler/` regenerado. El request multipart sigue manual por seguridad.
+- [x] **018A-27 —** Cobertura OpenAPI de descargas privadas y webhook Stripe: grant opaco, firma en header, JSON crudo y errores documentados sin exponer storage ni secretos.
 
 **Salida:** runtime compartido funciona sin chrome/listas/listeners duplicados. Orval se regenera localmente sin backend vivo; quedan cobertura total del contrato y retiro del cliente manual.
 

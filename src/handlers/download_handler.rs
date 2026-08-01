@@ -36,6 +36,19 @@ fn safe_download_name(product_name: &str, extension: Option<&str>) -> String {
 }
 
 /// Descarga un producto usando un grant de corta duración.
+/* [018A-27] El enlace opaco también forma parte del contrato OpenAPI: se
+ * documenta el parámetro público y los estados de autorización sin exponer
+ * rutas de storage ni conceder confianza al navegador. */
+#[utoipa::path(
+    get,
+    path = "/api/downloads/{token}",
+    params(("token" = String, Path, description = "Grant opaco de descarga")),
+    responses(
+        (status = 200, description = "Archivo descargable", content_type = "application/octet-stream"),
+        (status = 403, description = "Grant inexistente, revocado o expirado", body = ErrorResponse),
+        (status = 404, description = "Archivo no disponible", body = ErrorResponse)
+    )
+)]
 pub async fn download(
     State(state): State<AppState>,
     Path(token): Path<String>,

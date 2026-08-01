@@ -112,6 +112,8 @@ impl utoipa::Modify for SecurityAddon {
         media_handler::list_trashed_media,
         media_handler::delete_media,
         media_handler::restore_media,
+        download_handler::download,
+        stripe_webhook::stripe_webhook,
         notes::create_note,
         notes::get_note,
         notes::list_notes,
