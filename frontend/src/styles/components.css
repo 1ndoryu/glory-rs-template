@@ -83,6 +83,20 @@
   gap: var(--espacio-sm);
 }
 
+/* [018A-67] El SVG directo de un botón con icono+texto se dimensiona desde
+ * token (misma receta que .boton-icono); sin esto Lucide cae a 24px por
+ * defecto y desborda la línea del botón. Solo `> svg` (hijo directo): los
+ * consumidores que envuelvan el icono en un span (account-app) dimensionan
+ * su envoltorio y no se ven afectados. */
+.desktop-window .boton-con-icono > svg,
+.movilApp .boton-con-icono > svg,
+.modal-contenido .boton-con-icono > svg,
+.confirm-contenido .boton-con-icono > svg {
+  width: var(--sistema-boton-icono-svg-tamano);
+  height: var(--sistema-boton-icono-svg-tamano);
+  stroke-width: var(--sistema-icono-trazo);
+}
+
 /* [317A-4] Los tabs (barra-tabs) son navegación, no botones de acción: aunque
  * usen la clase .boton, nunca llevan el borde de botón OS. */
 .barra-tabs .boton {

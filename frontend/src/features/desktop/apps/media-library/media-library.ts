@@ -93,7 +93,10 @@ function createItemCard(
   });
   const actions = createEl('div', { className: 'media-library__actions' });
 
-  const copyBtn = createEl('button', { type: 'button', className: 'boton boton-pequeno', ariaLabel: 'Copiar URL' },
+  /* [018A-67] Icon-only: receta .boton-icono (caja 20px, SVG 14px del token),
+   * coherente con las toolbars del OS. Antes era .boton + SVG Lucide de 24px
+   * sin dimensionar. */
+  const copyBtn = createEl('button', { type: 'button', className: 'boton-icono', ariaLabel: 'Copiar URL' },
     createElement(Link));
   copyBtn.addEventListener('click', safeClick(async () => {
     const ok = await copyToClipboard(item.url);
@@ -103,7 +106,7 @@ function createItemCard(
 
   if (isTrashView) {
     const restoreBtn = createEl('button', {
-      type: 'button', className: 'boton boton-pequeno', ariaLabel: `Restaurar ${name}`,
+      type: 'button', className: 'boton-icono', ariaLabel: `Restaurar ${name}`,
     }, createElement(RotateCcw));
     restoreBtn.addEventListener('click', safeClick(async () => {
       const result = await safeRun(MediaService.restore(item.id), 'error al restaurar');
@@ -115,7 +118,7 @@ function createItemCard(
     actions.appendChild(restoreBtn);
   } else {
     const deleteBtn = createEl('button', {
-      type: 'button', className: 'boton boton-pequeno', ariaLabel: `Eliminar ${name}`,
+      type: 'button', className: 'boton-icono', ariaLabel: `Eliminar ${name}`,
     }, createElement(Trash2));
     deleteBtn.addEventListener('click', safeClick(async () => {
       const confirmed = await showConfirm(`mover "${name}" a la papelera?`);
@@ -168,8 +171,12 @@ export function createMediaLibraryPreview(options: MediaLibraryOptions): MediaLi
     trashToggle.textContent = trashView ? 'biblioteca' : 'papelera';
     void render();
   });
-  const uploadBtn = createEl('button', { type: 'button', className: 'boton', textContent: 'subir archivo' },
-    createElement(Upload));
+  /* [018A-67] Icono primero y texto en span, con la receta boton-con-icono:
+   * flex centrado + gap + SVG dimensionado desde token. Antes era .boton a
+   * secas con el SVG después del texto: sin flex, el icono (24px por defecto
+   * de Lucide) se iba a la segunda línea y el botón quedaba alto y roto. */
+  const uploadBtn = createEl('button', { type: 'button', className: 'boton boton-con-icono' },
+    createElement(Upload), createEl('span', { textContent: 'subir archivo' }));
   const fileInput = createEl('input', { type: 'file', accept: 'image/*,audio/*,video/*', className: 'oculto' });
   fileInput.addEventListener('change', safeClick(async () => {
     const file = fileInput.files?.[0];

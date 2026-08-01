@@ -74,8 +74,11 @@ export function createAnalyticsPanel(signal?: AbortSignal): { element: HTMLEleme
   const root = createEl('div', { className: 'analyticsPanel' });
   const panel = createEl('div', { className: 'analyticsPanel__contenido' });
   const toolbar = createEl('div', { className: 'analyticsPanel__toolbar' });
+  /* [018A-67] Icono+texto: receta boton-con-icono (flex + SVG del token).
+   * Antes .boton a secas: la superficie inline-block rompía la línea y el
+   * SVG de 24px desbordaba, igual que el botón de subida de media. */
   const exportButton = createEl('button', {
-    type: 'button', className: 'boton', ariaLabel: 'Exportar estadísticas',
+    type: 'button', className: 'boton boton-con-icono', ariaLabel: 'Exportar estadísticas',
   }, createElement(Download), createEl('span', { textContent: 'Exportar' }));
   toolbar.appendChild(exportButton);
   root.append(toolbar, panel);
