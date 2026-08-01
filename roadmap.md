@@ -379,16 +379,29 @@ Cada fase termina con esta revisión antes de marcar su salida. La revisión deb
 - [ ] **297A-15 Comercio:** pago, webhook, entitlement y grants son servicios independientes; otro proveedor o versión no cambia la autoridad server-side.
 - [ ] **297A-16 Analytics:** catálogo, dispatcher y agregados son extensibles; añadir un evento no expone datos ni obliga a reescribir paneles existentes.
 - [ ] **297A-17 Hardening:** las reglas se ejecutan igual en local/CI y el runbook cubre rollback; ninguna excepción de Sentinel/VarSense oculta deuda estructural.
-- [ ] **297A-29 Retiro Configuración legacy:** el toolbar expone acciones por capacidad sin `if/else` en el shell; eliminar la app Configuración no toca Perfil/Cuenta/Admin; añadir una acción admin futura es un comando más, no un cambio de shell.
+- [ ] **297A-29 Configuración legacy + Perfil admin:** el toolbar expone acciones por capacidad sin `if/else` en el shell; la app Configuración se conserva y queda pendiente de escalar a otra cosa (p. ej. panel de ajustes del sistema); añadir una acción admin futura es un comando más, no un cambio de shell.
 
-### 297A-29 — Retiro de la app Configuración: fuentes/tamaños estáticos + Perfil configurable por admin
+### 297A-29 — App Configuración conservada + Perfil configurable por admin (fuentes/tamaños estáticos)
 
-**Depende de:** 297A-27 (overlay), 297A-28 (guardado settings), 297A-13 (capacidades) y 297A-19 (toolbar). Plan: `Agente/planes/plan-retiro-configuracion-legacy-2026-07-31.md`. Petición del usuario: borrar las configuraciones de fuentes y tamaños (todo estático con JetBrains Mono y valores fijos), eliminar la app Configuración y dejar la configuración de Perfil dentro de la ventana Perfil con un botón en el toolbar visible solo para admins.
+**Depende de:** 297A-27 (overlay), 297A-28 (guardado settings), 297A-13 (capacidades) y 297A-19 (toolbar). Plan: `Agente/planes/plan-configuracion-legacy-2026-07-31.md`. Petición del usuario: borrar las configuraciones de fuentes y tamaños (todo estático con JetBrains Mono y valores fijos), **NO eliminar la app Configuración** (queda pendiente de escalar a otra cosa en el futuro) y dejar la configuración de Perfil dentro de la ventana Perfil con un botón en el toolbar visible solo para admins.
 
 - [x] Fase 1 — Fuentes/tamaños estáticos: neutralizar `fontStore` y `loadSavedFonts()`, fijar tokens en `variables.css` (JetBrains Mono en todo, `--nav-width` fijo ≥360px), migrar consumidores legacy, eliminar `font-constants.ts`/`font-helpers.ts`/tab Fuentes/Tamaños. *(commit 297A-29 F1)*
 - [x] Fase 2 — Toolbar reactivo a capacidad: `createAppToolbar` se suscribe a `authStore` (login/logout en vivo) y se crea el comando genérico admin-only con `isAvailable` (sin `if/else` en el shell). *(commit 297A-29 F2)*
 - [x] Fase 3 — Perfil configurable: extraer controles de perfil a `profile-settings.ts`, toolbar en `shell-profile` con botón admin-only, fix del borde (`.desktop-profile-window .profile-foto` respeta el token) y persistencia vía `POST /api/admin/settings`. *(commit 297A-29 F3)*
-- [ ] Fase 4 — Eliminar la app Configuración: quitar registro `settings`, nodo admin, botón de menú, tab `'fuentes'` de Admin y CSS muerto; sin referencias residuales.
-- [ ] Fase 5 — (futuro, no implementar) Panel de control del usuario para fuentes con buena arquitectura cuando exista el panel de control.
+- [ ] Fase 4 — (pendiente, NO eliminar) Escalar la app Configuración: se conserva tal cual (registro `settings`, nodo admin, botón de menú y tab `'fuentes'` de Admin). Futuro: decidir si se convierte en panel de ajustes del sistema o se integra en otra app. No hay eliminación ni reescritura ahora.
+- [ ] Fase 5 — (futuro, no implementar) Escalar la app Configuración a un panel de ajustes del sistema y re-introducir el selector de fuente de usuario con buena arquitectura cuando exista el panel de control.
 
-**Salida:** sin icono/menú de Configuración; Perfil se configura desde su ventana con botón admin-only; fuentes/tamaños 100% estáticos; bug del borde y límite de nav resueltos; mecanismo genérico de toolbar por capacidad.
+**Salida:** app Configuración conservada (pendiente de escalar, sin eliminación); Perfil se configura desde su ventana con botón admin-only; fuentes/tamaños 100% estáticos; bug del borde y límite de nav resueltos; mecanismo genérico de toolbar por capacidad.
+
+### 317A-1 — Barra de pestañas universal (createTabs) para Admin y futuras apps
+
+**Petición del usuario:** las tabs del HTML de Admin deben ser un componente universal y autocontenido — sin depender del padding/margin del contenedor — porque otras apps tendrán tabs también y no queremos complicar la vida. Motivo: evita duplicar recetas de navegación por pestaña en cada app.
+
+- [x] Crear `frontend/src/components/ui/tabs.ts` (`createTabs`): role=tablist/tab + aria-selected, clase activa, `select()` programático, `onSwitch` al cambiar e inicial. *(317A-1)*
+- [x] CSS en `components.css` (`@layer components`): `.barra-tabs` autocontenida (gap/margin/border propios), `.barra-tabs__tab` y `.barra-tabs__tab--activa`.
+- [x] Migrar `admin.ts`: eliminar el hack inline de `style.fontWeight` y las utilidades externas (`flex-fila gap-lg mb-lg border-bottom`); usar `createTabs` con las 6 tabs.
+- [x] Eliminar CSS muerto en `pages.css`: `.config-tabs-nav` y `.config-tabs-content` (prototipo local; la receta ahora vive en el componente).
+- [x] Test `tabs.test.ts`: render, estado activo por defecto, `initial`, onSwitch por clic, `select()` programático, onSwitch inicial. 6/6 PASS.
+- [x] Validación: `tsc --noEmit` OK, suite vitest 322/322 PASS, gate `task:check -- 317A-1`.
+
+**Salida:** cualquier app puede usar `createTabs({tabs, initial, onSwitch})` y obtener una barra de pestañas accesible y autocontenida; Admin migrado sin inline styles; CSS muerto retirado.

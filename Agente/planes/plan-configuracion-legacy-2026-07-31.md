@@ -1,15 +1,18 @@
-# Plan: retiro de la app Configuración legacy — fuentes/tamaños estáticos + Perfil configurable por admin
+# Plan: app Configuración legacy (conservada) — fuentes/tamaños estáticos + Perfil configurable por admin
 
 > **Epic:** 297A-4 (OS persistente) · **Tarea:** 297A-29 (pendiente de roadmap)
-> **Fecha:** 2026-07-31 · **Estado:** plan aprobado por el usuario; pendiente de ejecución
-> **Próximo paso:** fase 1 (neutralizar fuentes/tamaños dinámicos) tras gate de planificación
+> **Fecha:** 2026-07-31 (renombrado el 2026-07-31: ya NO es "retiro")
+> **Estado:** Fases 1-3 completadas (commits 297A-29 F1/F2/F3); Fase 4 redefinida por decisión del usuario
+> **Próximo paso:** Fase 4 = conservar la app Configuración y dejarla pendiente de escalar a otra cosa en el futuro (ver §4)
 > **Archivo de completados:** `Agente/completados/tareas-2026-07-31.md`
+>
+> **Cambio de alcance (2026-07-31, usuario):** "no eliminemos la app de configuración, dejemos pendiente escalarla a otra cosa después". La app Configuración NO se borra; queda como está y su evolución (panel de ajustes del sistema u otra cosa) se decide en el futuro. Este archivo antes se llamaba `plan-retiro-configuracion-legacy-2026-07-31.md`.
 
 ---
 
 ## 1. Objetivo y límites
 
-**Objetivo:** eliminar la app "Configuración" del escritorio y el modelo configurable de fuentes/tamaños; el OS queda con **JetBrains Mono en todo y tamaños fijos** definidos en `variables.css`. La configuración de **Perfil** (foto, tamaños del avatar, borde, enlaces sociales, layout de redes) **no se elimina**: se mueve a la ventana Perfil y se abre con un **botón en el toolbar visible solo para admins**.
+**Objetivo:** dejar fijas las fuentes/tamaños (el OS queda con **JetBrains Mono en todo y tamaños fijos** en `variables.css`) y mover la configuración de **Perfil** (foto, tamaños del avatar, borde, enlaces sociales, layout de redes) a la ventana Perfil con un **botón en el toolbar visible solo para admins**. La app "Configuración" **se conserva** tal cual (registro `settings`, nodo admin, botón de menú y tab `'fuentes'` de Admin); su escalado futuro a otra cosa (p. ej. panel de ajustes del sistema) queda pendiente y se decide más adelante.
 
 **Límites explícitos:**
 - NO se implementa todavía el panel de control del usuario para cambiar fuentes. Se deja nota como trabajo futuro (fase 5) para cuando exista un panel de control de usuario con buena arquitectura.
@@ -33,7 +36,7 @@
 ## 3. Dependencias
 
 - Fase 2 (toolbar reactivo) **antes** de fase 3 (botón admin en Perfil): el botón necesita el mecanismo de toolbar solo-admin.
-- Fase 3 (mover perfil) **antes** de fase 4 (eliminar app Configuración): no se borra hasta migrar.
+- Fase 3 (mover perfil) completa; ya no condiciona ninguna eliminación porque la Fase 4 dejó de ser un borrado (2026-07-31): la app Configuración se conserva.
 - Fase 1 (estático) puede ejecutarse primero o en paralelo con 3; no depende de 2/3.
 - La 297A-28 (ruta `POST /api/admin/settings` ya corregida en `settings.service.ts`) es prerequisito funcional: el guardado de Perfil depende de ella.
 
@@ -65,18 +68,18 @@
 - [ ] Conservar guardado: `profile_image`, `social_links`, `redes_layout`, tamaños avatar y borde vía `SettingsService.save` (`POST /api/admin/settings`).
 - **Gate F3:** type-check, Vitest (tests del nuevo panel + regresión del fix borde), `task:check`; visual: admin ve botón "Configurar" en toolbar de Perfil, abre el panel, cambia foto/borde/enlaces y persiste tras reload; invitado no ve el botón.
 
-### Fase 4 — Eliminar la app Configuración
+### Fase 4 — (PENDIENTE, NO eliminar) Escalar la app Configuración a otra cosa
 
-- [ ] Quitar registro `settings` de `app-registration.ts:117-132`.
-- [ ] Quitar `ADMIN_NODES.settings` de `default-release.ts:39-43`.
-- [ ] Quitar botón de menú `desktop-menu-bar.ts:224-229` y el tab `'fuentes'` de `pages/admin.ts:63`.
-- [ ] Eliminar `font-panel.ts` (si queda algo sin migrar) y CSS muerto (`.desktop-settings-window`, `desktop-window--settings`).
-- [ ] Verificar que no quedan referencias (grep `settings`/`createFontPanel`/`loadAllFonts`).
-- **Gate F4:** type-check, Vitest, `task:check`; visual: ya no existe icono/menú/tab de Configuración; nada roto en Perfil/Cuenta/Admin.
+**Decisión del usuario (2026-07-31):** la app Configuración NO se elimina. Se conserva tal cual: registro `settings` en `app-registration.ts`, nodo `ADMIN_NODES.settings`, botón de menú y tab `'fuentes'` de Admin. **No ejecutar ninguna acción de borrado.**
 
-### Fase 5 — (FUTURO, fuera de alcance) Panel de control del usuario para fuentes
+- [ ] (FUTURO, sin fecha) Decidir el destino de la app Configuración: convertirla en panel de ajustes del sistema, integrarla en otra app, o mantenerla como está. La decisión la toma el usuario; no inventar alcance.
+- [ ] Cuando se decida el destino, actualizar este plan con fases concretas y gate por fase.
+- [ ] Mientras tanto: solo mantenimiento reactivo (no agregar lógica nueva a `font-panel.ts`; ya es delegación a `profile-settings`).
+- **Gate F4:** no aplica hasta que el usuario defina el destino. Estado: pendiente de decisión.
 
-- [ ] NOTA: cuando exista un panel de control de usuario con buena arquitectura, re-introducir selector de fuente con persistencia de cuenta (reutilizando el transporte de preferencias/overlay de 297A-13). No implementar ahora.
+### Fase 5 — (FUTURO, fuera de alcance) Escalar Configuración + panel de fuentes de usuario
+
+- [ ] NOTA: cuando exista un panel de control de usuario con buena arquitectura (posiblemente la propia app Configuración escalada), re-introducir selector de fuente con persistencia de cuenta (reutilizando el transporte de preferencias/overlay de 297A-13). No implementar ahora.
 
 ## 5. Gate/criterio de salida por fase
 
@@ -86,7 +89,7 @@
 
 ## 6. Definition of Done
 
-- [ ] `Configuración` eliminada del AppRegistry, escritorio, menú y Admin sin referencias residuales.
+- [ ] `Configuración` conservada en AppRegistry, escritorio, menú y Admin (NO eliminada); su escalado futuro queda pendiente de decisión del usuario.
 - [ ] Fuentes/tamaños 100% estáticos (JetBrains Mono + tokens fijos en `variables.css`); sin `fontStore` inyectando variables dinámicas.
 - [ ] Perfil configurable desde su toolbar con botón admin-only; foto/borde/tamaños/enlaces persisten en BD.
 - [ ] Toolbar de ventanas reacciona a cambio de capacidad en vivo (mecanismo genérico, no hardcodeado a Perfil).
@@ -95,6 +98,7 @@
 
 ## 7. Notas de arquitectura (decisiones)
 
+- **2026-07-31:** la app Configuración se conserva por decisión explícita del usuario ("dejemos pendiente escalarla a otra cosa después"). No hay eliminación ni reescritura; el plan original de retiro queda anulado en su Fase 4.
 - El toolbar solo-admin se resuelve con el mecanismo existente de `Command.isAvailable` + `CommandContext.capability`, sin introducir `if (isAdmin)` en el shell (OCP: se extiende por comandos).
 - El panel de Perfil reutiliza recetas compartidas del sistema de diseño; no crea recetas visuales locales (regla 9.1).
 - La persistencia de perfil conserva `SettingsService.save` (ya corregido a `POST /api/admin/settings` en 297A-28) y `SettingsService.getAll` público para carga.

@@ -258,17 +258,8 @@
 }
 
 /* === CONFIGURADOR FUENTES === */
-.config-tabs-nav {
-  display: flex;
-  gap: var(--espacio-lg);
-  margin-bottom: var(--espacio-lg);
-  border-bottom: var(--borde);
-  padding-bottom: var(--espacio-sm);
-}
-
-.config-tabs-content {
-  min-height: 200px;
-}
+/* [317A-1] .config-tabs-nav y .config-tabs-content eran el prototipo local de la
+ * barra de pestañas; la receta universal vive ahora en components.css (.barra-tabs). */
 
 .config-tab-separador {
   width: 100%;

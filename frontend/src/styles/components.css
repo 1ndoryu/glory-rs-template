@@ -51,6 +51,25 @@
   font-size: var(--tamano-grande);
 }
 
+/* === BARRA DE PESTAÑAS — Componente universal (Admin y futuras apps) ===
+ * Autocontenida: posee su propio gap/margin/border para que el consumidor no
+ * dependa de utilidades externas (regla 9.1: receta compartida en el sistema). */
+.barra-tabs {
+  display: flex;
+  gap: var(--espacio-lg);
+  margin-bottom: var(--espacio-lg);
+  padding-bottom: var(--espacio-sm);
+  border-bottom: var(--borde);
+}
+
+.barra-tabs__tab {
+  font-weight: var(--peso-normal);
+}
+
+.barra-tabs__tab--activa {
+  font-weight: var(--peso-medio);
+}
+
 /* === INPUT === */
 .campo {
   display: flex;

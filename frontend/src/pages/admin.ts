@@ -11,6 +11,7 @@ import { safeClick, safeRun, safeEffect } from '../utils/safe-async';
 import { renderArticleList, openEditor, disposeAdminArticleLists } from './admin-articles';
 import { renderProjectList, disposeAdminProjectLists } from './admin-projects';
 import { renderProductList, disposeAdminProductLists } from './admin-products';
+import { createTabs } from '../components/ui/tabs';
 import { createEl } from '../utils/dom';
 
 /** Cleanup de recursos editoriales antes de desmontar la página Admin. */
@@ -28,15 +29,12 @@ export async function renderAdmin(): Promise<HTMLElement> {
   /* El header (h1 "admin" + botón "salir") duplicaba la barra de título de la
    * ventana y el logout de la app Cuenta ("cerrar sesión" en account-view.ts).
    * Eliminado: la ventana ya se titula "Admin" y el logout vive en Cuenta. */
-  const tabs = createEl('div', { className: 'flex-fila gap-lg mb-lg border-bottom' });
+  /* Barra de pestañas universal (components/ui/tabs.ts). El estado activo lo
+   * resuelve el componente (clase + aria-selected), sin inline styles ni
+   * utilidades externas de padding/margin. [317A-1] */
   const contentArea = createEl('div', { id: 'admin-articulos' });
 
-  const tabNames = ['articulos', 'proyectos', 'productos', 'fuentes', 'sitio', 'estadisticas'];
-
   function switchTab(name: string): void {
-    tabs.querySelectorAll('.boton').forEach(b => {
-      (b as HTMLElement).style.fontWeight = b.textContent === name ? 'var(--peso-medio)' : 'var(--peso-normal)';
-    });
     disposeAdminPage(page);
     contentArea.innerHTML = '';
     contentArea.id = `admin-${name}`;
@@ -75,14 +73,20 @@ export async function renderAdmin(): Promise<HTMLElement> {
     }
   }
 
-  for (const name of tabNames) {
-    const btn = createEl('button', { className: 'boton', textContent: name });
-    btn.addEventListener('click', () => switchTab(name));
-    tabs.appendChild(btn);
-  }
+  const tabs = createTabs({
+    tabs: [
+      { id: 'articulos', label: 'articulos' },
+      { id: 'proyectos', label: 'proyectos' },
+      { id: 'productos', label: 'productos' },
+      { id: 'fuentes', label: 'fuentes' },
+      { id: 'sitio', label: 'sitio' },
+      { id: 'estadisticas', label: 'estadisticas' },
+    ],
+    initial: 'articulos',
+    onSwitch: switchTab,
+  });
 
-  page.append(tabs, contentArea);
-  switchTab('articulos');
+  page.append(tabs.el, contentArea);
   return page;
 }
 
