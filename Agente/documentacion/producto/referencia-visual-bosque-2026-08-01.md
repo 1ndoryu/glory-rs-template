@@ -1,7 +1,7 @@
 # Referencia visual — Bosque de tinta/mapa
 
-> **Fecha:** 2026-08-01  
-> **Uso:** moodboard y guía de dirección artística para GAME-01.  
+> **Fecha:** 2026-08-01
+> **Uso:** moodboard y guía de dirección artística para GAME-01.
 > **Procedencia:** imagen proporcionada por el usuario; autoría/licencia no verificada.
 
 ![Referencia visual del bosque](./referencias/bosque-tinta-mapa-2026-08-01.png)
