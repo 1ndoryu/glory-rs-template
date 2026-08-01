@@ -322,12 +322,13 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 
 **Criterio de salida:** teléfono funciona como launcher sin lógica/app duplicada y tablet conserva escritorio.
 
-## 11. 297A-13 — Registro y overlay remoto *(parcial: Cuenta base implementada; registro avanzado pendiente)*
+## 11. 297A-13 — Registro y overlay remoto *(parcial: Cuenta base y formularios implementados; registro verificado avanzado pendiente)*
 
 **Dependencias:** sesiones 297A-8, workspace 297A-11 e integración móvil 297A-12.
 
 - [x] Implementar registro solo detrás de `registration_enabled=false`; la activación sigue bloqueada hasta completar correo/UI/MFA/E2E.
 - [x] **018A-57 —** Añadir registro y recuperación como modos dentro de Cuenta, sin habilitar el flag ni persistir tokens en el cliente.
+- [x] **018A-58 —** Sincronizar el plan maestro con el alcance real: formularios internos hechos; token UI, proveedor de correo, MFA y E2E permanecen pendientes.
 - [x] Crear `user_preferences` y el contrato de preferencia de tema con `revision`. *(migration `20260731100000_297a13_preferences`)*
 - [x] Sync con `expected_revision`, actualización condicional y conflicto 409 sin overwrite silencioso. *(PreferencesService + preferences-sync)*
 - [x] Autorizar solo cuentas activas y mantener CSRF/CORS con credenciales en las mutaciones.
@@ -337,12 +338,12 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [x] Crear `user_workspace_overlays` para posiciones/estado del workspace, con contrato JSON validado, importación local/remota/reset, merge por ID/campo, tombstones y rebase ante release nuevo. *(migration `20260731120000_297a13_workspace_overlays`; service/repository/handler + `overlay-sync.ts`; gate PASS)*
 - [x] Verificar autorización, CSRF, payload inválido, corrupción persistida, revisión inicial sin fila fantasma y que una cuenta no restaure recursos retirados. *(tests unitarios/HTTP del overlay; `cargo test` PASS)*
 - [ ] Prueba E2E de dos pestañas/dispositivos y decisión de merge semántico para cambios concurrentes.
-- [x] **Cuenta como app del escritorio:** registrar en AppRegistry como singleton público con estados invitado/autenticado/admin; verificación pendiente y MFA quedan como estados futuros del backend. *(account-view.ts + AppRegistry)*
+- [x] **Cuenta como app del escritorio:** registrar en AppRegistry como singleton público con estados invitado/autenticado/admin; registro/recuperación son modos internos y verificación/MFA quedan como estados futuros del backend. *(account-view.ts + AppRegistry)*
 - [x] **Estado de sesión visible:** control en barra superior y launcher móvil junto al tema; abre Cuenta y refleja Entrar/Cuenta/Cuenta · admin con etiqueta accesible. *(desktop-menu-bar.ts + mobile-shell.ts)*
-- [x] **Login dentro de la app:** deslogueado, Cuenta muestra login dentro de su ventana; `/login` es deep link canónico y el wrapper legacy reutiliza la misma vista. Registro y `/register` permanecen cerrados hasta completar backend verificado.
-- [x] Recovery backend con token hashado/expirable, revocación de sesiones, rate limit de login y auditoría hash; UI, rate limit específico y E2E quedan pendientes. Logout limpia clipboard/undo.
+- [x] **Login dentro de la app:** deslogueado, Cuenta muestra login dentro de su ventana; `/login` es deep link canónico, el wrapper legacy reutiliza la misma vista y registro/recuperación se alternan dentro de ella. `/register` permanece cerrado hasta completar backend verificado.
+- [x] Recovery backend con token hashado/expirable, revocación de sesiones, rate limit de login y auditoría hash; UI de solicitud está integrada, mientras token UI, rate limit específico y E2E quedan pendientes. Logout limpia clipboard/undo.
 
-**Criterio de salida:** configuración privada y organización del workspace tienen transporte autenticado, revisión optimista, fallback offline, validación y conflicto explícito sin overwrite silencioso. Cuenta base, registro verificado y recovery backend quedan implementados detrás de flag; 297A-13 permanece abierto por UI/correo real, MFA, auditoría específica y E2E multi-dispositivo/móvil.
+**Criterio de salida:** configuración privada y organización del workspace tienen transporte autenticado, revisión optimista, fallback offline, validación y conflicto explícito sin overwrite silencioso. Cuenta base, formularios y backend verificado quedan implementados detrás de flag; 297A-13 permanece abierto por UI de tokens/correo real, MFA, auditoría específica y E2E multi-dispositivo/móvil.
 
 ## 12. 297A-14 — Programas editoriales
 
