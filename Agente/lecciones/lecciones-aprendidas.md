@@ -362,3 +362,11 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 - El patrón que sí funciona: redefinir el token COMPUESTO (`--borde`) en el scope de tema que ya redefine el token interno, de modo que se compute blanco allí y se herede a todos los descendientes legacy. Es el mismo mecanismo por el que `--sistema-borde` invertía: su `--sistema-texto` se sobreescribe en el propio `:root`.
 - Un data URI SVG no puede usar `currentColor`; la flecha de un select necesita un token propio (`--color-select-flecha`) con versión clara/oscura.
 - Antes de dar por buena la "auto-inversión" de un token compuesto, verificar empíricamente en el navegador el computed value dentro del scope de tema (getComputedStyle sobre el elemento real), no razonar sobre la intención del comentario.
+
+## 018A-74 — Un campo necesita CSS de campo; una utilidad de borde no es un campo
+
+- Una app de escritorio sin hoja CSS propia hereda solo utilidades genéricas: `.article-editor__content` con la clase `.border-bottom` se veía como texto con una línea inferior, mientras `.campo-textarea` (CSS propio en `components.css`) se veía como campo real. La discrepancia visual entre "campo" y "no campo" suele ser CSS faltante, no JS roto.
+- Cada app de escritorio debe tener su hoja `desktop-{app}.css` importada en `main.ts` (patrón de `desktop-media-library.css`); los desktop-*.css son CSS plano sin `@layer`, así que gana el orden de importación. No volcar más reglas en `components.css` (ya supera el límite, deuda 018A-73).
+- El tratamiento de campo compartido: borde completo `var(--borde)`, padding `--espacio-sm`, `min-height`, y foco que engrosa el borde a 2px (aquí `:focus-within` porque el elemento editable real es el `.ProseMirror` interno).
+- El reset global elimina `list-style` de `ul`/`ol`; dentro de un editor de contenido hay que restaurarlos explícitamente (incluidas listas anidadas).
+- Al verificar UI tras una recarga, recordar que la sesión solo restaura algunas ventanas: el editor de artículos se cierra y hay que reabrirlo vía Admin → "editar" para validar el estilo.
