@@ -68,6 +68,21 @@
   line-height: normal;
 }
 
+/* [018A-65] Receta compartida: .boton OS con icono + texto centrados.
+ * La regla de superficie (.desktop-window .boton) fuerza display inline-block
+ * con más especificidad que .boton, así que cualquier botón que combine icono
+ * y texto necesita esta clase (misma especificidad de superficie, definida
+ * después) para recuperar el layout flex centrado. Consumida por account-app;
+ * futuros botones con icono+texto la reutilizan en vez de duplicar display. */
+.desktop-window .boton-con-icono,
+.movilApp .boton-con-icono,
+.modal-contenido .boton-con-icono,
+.confirm-contenido .boton-con-icono {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espacio-sm);
+}
+
 /* [317A-4] Los tabs (barra-tabs) son navegación, no botones de acción: aunque
  * usen la clase .boton, nunca llevan el borde de botón OS. */
 .barra-tabs .boton {

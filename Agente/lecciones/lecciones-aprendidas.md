@@ -315,3 +315,9 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 - **El quality gate exige el ID en `roadmap.md`, `Agente/planes/` o `Agente/completados/`** (`preflight.mjs`). Si la tarea aún no figura, `npm run task:check -- {ID}` falla con "no existe". Registrar la tarea en el roadmap (pendiente) → gate → archivar en completados → quitar del roadmap. El roadmap debe volver a quedar idéntico a HEAD si las tareas se cierran en el mismo bloque.
 - **`ON CONFLICT` contra índice parcial exige repetir el predicado `WHERE`** en el arbiter (42P10): `ON CONFLICT (col) WHERE col IS NOT NULL DO NOTHING`. Un índice UNIQUE parcial no matchea un `ON CONFLICT (col)` sin predicado.
 - **Desajuste utoipa ↔ cliente generado ↔ servicio manual** causa fallos silenciosos del frontend pese a HTTP correcto (login 204 mostrado como "credenciales incorrectas"). Alinear el contrato y aceptar el status real en `unwrapGeneratedResponse`; regenerar el cliente después.
+
+## 018A-65 — Especificidad de superficie rompe el flex de los botones
+
+- La regla `.desktop-window .boton { display: inline-block }` (0,2,0) sobreescribe cualquier `display: flex/inline-flex` puesto en una clase `.boton` (0,1,0): icono+texto quedan inline con alineación por baseline (SVG arriba, texto abajo).
+- Solución reutilizable: receta compartida `.boton-con-icono` definida con los mismos selectores de superficie y DESPUÉS en el archivo, para ganar por orden de fuente y recuperar `display: inline-flex; align-items: center; gap`.
+- Antes de escribir `display`/`align-items`/`gap` en un componente `.boton`, comprobar que no lo anula una regla de superficie; si lo anula, la capacidad debe vivir en la receta del sistema, no duplicada en el componente.

@@ -26,7 +26,9 @@ function createActionButton(
 ): HTMLButtonElement {
   const button = createEl('button', {
     type: 'button',
-    className: 'boton account-app__action',
+    // [018A-65] boton-con-icono: receta compartida que centra icono+texto en
+    // botones OS (la superficie .desktop-window .boton rompería el flex).
+    className: 'boton boton-con-icono account-app__action',
     ariaLabel,
   }, icon(iconNode), createEl('span', { textContent: label }));
   button.addEventListener('click', () => onClick());
@@ -90,7 +92,9 @@ function renderGuest(container: HTMLElement): void {
     feedback.hidden = true;
     const submit = createEl('button', {
       type: 'button',
-      className: 'boton boton-grande account-app__submit',
+      // [018A-65] boton-con-icono: centra icono+texto en el botón de envío
+      // (entrar/registrar/recuperar), igual que en las acciones secundarias.
+      className: 'boton boton-con-icono boton-grande account-app__submit',
       ariaLabel: copy.aria,
     }, icon(copy.icon), createEl('span', { textContent: copy.submit }));
 

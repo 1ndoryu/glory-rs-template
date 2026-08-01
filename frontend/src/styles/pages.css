@@ -196,11 +196,13 @@
   gap: var(--espacio-lg);
 }
 
+/* [018A-65] El layout flex (icono+texto centrados) lo aporta la receta
+ * compartida .boton-con-icono de components.css; aquí solo queda la alineación
+ * propia dentro del contenedor de acciones. Los declarations display/align/gap
+ * anteriores eran código muerto: la superficie .desktop-window .boton los
+ * sobreescribía con más especificidad. */
 .account-app__submit,
 .account-app__action {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--espacio-sm);
   align-self: flex-start;
 }
 
@@ -208,11 +210,13 @@
   cursor: wait;
 }
 
+/* [018A-65] El icono usa espacio-md menos 1px para que el SVG quede un punto
+ * más compacto respecto a la caja del botón; sigue derivado de token. */
 .account-app__icon {
   display: inline-grid;
   place-items: center;
-  width: var(--espacio-md);
-  height: var(--espacio-md);
+  width: calc(var(--espacio-md) - 1px);
+  height: calc(var(--espacio-md) - 1px);
 }
 
 .account-app__icon svg {
