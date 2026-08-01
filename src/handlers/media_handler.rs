@@ -9,7 +9,10 @@ use uuid::Uuid;
 
 use crate::errors::AppError;
 use crate::middleware::AdminUser;
-use crate::models::media::{CreateMediaRequest, Media, MediaQueryParams};
+use crate::models::media::{
+    CreateMediaRequest, Media, MediaAdminResponse, MediaPublicResponse, MediaQueryParams,
+    MediaUploadResponse,
+};
 use crate::repositories::media_repo::MediaRepository;
 use crate::services::commerce::resolve_private_download_path;
 use crate::services::media_svc::{classify_media_type, MediaService};
@@ -98,7 +101,7 @@ pub struct AdminMediaQueryParams {
     post,
     path = "/api/admin/media",
     responses(
-        (status = 201, description = "Media subida", body = Media),
+        (status = 201, description = "Media subida", body = MediaUploadResponse),
         (status = 401, description = "No autorizado", body = ErrorResponse),
         (status = 422, description = "Archivo inválido", body = ErrorResponse)
     ),
@@ -108,7 +111,7 @@ pub async fn upload_media(
     State(state): State<AppState>,
     _auth: AdminUser,
     mut multipart: Multipart,
-) -> Result<(StatusCode, Json<Media>), AppError> {
+) -> Result<(StatusCode, Json<MediaUploadResponse>), AppError> {
     let mut file_path = String::new();
     let mut file_type = String::new();
     let mut file_size: i64 = 0;
@@ -193,7 +196,7 @@ pub async fn upload_media(
         return Err(AppError::BadRequest("No se proporciono archivo".into()));
     }
 
-    let mut media = MediaService::create(
+    let media = MediaService::create(
         &state.pool,
         CreateMediaRequest {
             article_id,
@@ -205,11 +208,9 @@ pub async fn upload_media(
     )
     .await?;
 
-    /* La respuesta conserva el contrato `file_path`, pero solo contiene la
-     * URL autorizada; el path real de storage nunca vuelve al navegador. */
-    media.file_path = public_preview_path(media.id);
-
-    Ok((StatusCode::CREATED, Json(media)))
+    let id = media.id;
+    let response = media.into_upload_response(public_preview_path(id), admin_preview_path(id));
+    Ok((StatusCode::CREATED, Json(response)))
 }
 
 /// Listar archivos media (publico): solo envelope active + public + clean.
@@ -217,19 +218,24 @@ pub async fn upload_media(
     get,
     path = "/api/media",
     params(MediaQueryParams),
-    responses((status = 200, description = "Media pública", body = [Media]))
+    responses((status = 200, description = "Media pública", body = [MediaPublicResponse]))
 )]
 pub async fn list_media(
     State(state): State<AppState>,
     Query(params): Query<MediaQueryParams>,
-) -> Result<Json<Vec<Media>>, AppError> {
-    let mut media =
+) -> Result<Json<Vec<MediaPublicResponse>>, AppError> {
+    let media =
         MediaService::list_public(&state.pool, params.file_type.as_deref(), params.article_id)
             .await?;
-    for item in &mut media {
-        item.file_path = public_preview_path(item.id);
-    }
-    Ok(Json(media))
+    Ok(Json(
+        media
+            .into_iter()
+            .map(|item| {
+                let id = item.id;
+                item.into_public_response(public_preview_path(id))
+            })
+            .collect(),
+    ))
 }
 
 /// Listar archivos media (admin): envelope activo, todos los estados de asset.
@@ -238,7 +244,7 @@ pub async fn list_media(
     path = "/api/admin/media",
     params(AdminMediaQueryParams),
     responses(
-        (status = 200, description = "Media administrable", body = [Media]),
+        (status = 200, description = "Media administrable", body = [MediaAdminResponse]),
         (status = 401, description = "No autorizado", body = ErrorResponse)
     ),
     security(("session_cookie" = []))
@@ -247,18 +253,23 @@ pub async fn list_admin_media(
     State(state): State<AppState>,
     _auth: AdminUser,
     Query(params): Query<AdminMediaQueryParams>,
-) -> Result<Json<Vec<Media>>, AppError> {
-    let mut media = MediaService::list_admin(
+) -> Result<Json<Vec<MediaAdminResponse>>, AppError> {
+    let media = MediaService::list_admin(
         &state.pool,
         params.file_type.as_deref(),
         params.article_id,
         params.asset_state.as_deref(),
     )
     .await?;
-    for item in &mut media {
-        item.file_path = admin_preview_path(item.id);
-    }
-    Ok(Json(media))
+    Ok(Json(
+        media
+            .into_iter()
+            .map(|item| {
+                let id = item.id;
+                item.into_admin_response(public_preview_path(id), admin_preview_path(id))
+            })
+            .collect(),
+    ))
 }
 
 /// Listar media en la papelera (admin): envelope trashed.
@@ -266,7 +277,7 @@ pub async fn list_admin_media(
     get,
     path = "/api/admin/media/trashed",
     responses(
-        (status = 200, description = "Media en papelera", body = [Media]),
+        (status = 200, description = "Media en papelera", body = [MediaAdminResponse]),
         (status = 401, description = "No autorizado", body = ErrorResponse)
     ),
     security(("session_cookie" = []))
@@ -274,12 +285,17 @@ pub async fn list_admin_media(
 pub async fn list_trashed_media(
     State(state): State<AppState>,
     _auth: AdminUser,
-) -> Result<Json<Vec<Media>>, AppError> {
-    let mut media = MediaService::list_trashed(&state.pool).await?;
-    for item in &mut media {
-        item.file_path = admin_preview_path(item.id);
-    }
-    Ok(Json(media))
+) -> Result<Json<Vec<MediaAdminResponse>>, AppError> {
+    let media = MediaService::list_trashed(&state.pool).await?;
+    Ok(Json(
+        media
+            .into_iter()
+            .map(|item| {
+                let id = item.id;
+                item.into_admin_response(public_preview_path(id), admin_preview_path(id))
+            })
+            .collect(),
+    ))
 }
 
 /// Servir un asset público únicamente si su envelope está publicado y limpio.
@@ -546,11 +562,6 @@ mod tests {
             .expect("cuerpo legible");
         let public_items = serde_json::from_slice::<Vec<serde_json::Value>>(&body_bytes)
             .expect("listado público debe ser JSON");
-        let ids: Vec<String> = public_items
-            .iter()
-            .map(|item| item["id"].as_str().unwrap_or("").to_string())
-            .collect();
-
         cleanup_media_fixture(&state.pool, clean_public).await;
         cleanup_media_fixture(&state.pool, rejected).await;
         cleanup_media_fixture(&state.pool, private_asset).await;
@@ -558,20 +569,37 @@ mod tests {
 
         assert_eq!(status, StatusCode::OK);
         assert!(
-            ids.contains(&clean_public.to_string()),
+            public_items
+                .iter()
+                .any(|item| item["url"] == format!("/api/media/{clean_public}/preview")),
             "clean+public+active visible"
         );
-        assert!(!ids.contains(&rejected.to_string()), "rejected oculto");
-        assert!(!ids.contains(&private_asset.to_string()), "private oculto");
-        assert!(!ids.contains(&trashed.to_string()), "trashed oculto");
+        assert!(
+            !public_items
+                .iter()
+                .any(|item| item["url"] == format!("/api/media/{rejected}/preview")),
+            "rejected oculto"
+        );
+        assert!(
+            !public_items
+                .iter()
+                .any(|item| item["url"] == format!("/api/media/{private_asset}/preview")),
+            "private oculto"
+        );
+        assert!(
+            !public_items
+                .iter()
+                .any(|item| item["url"] == format!("/api/media/{trashed}/preview")),
+            "trashed oculto"
+        );
         let public_item = public_items
             .iter()
-            .find(|item| item["id"] == clean_public.to_string())
-            .expect("media pública debe conservar su id");
+            .find(|item| item["url"] == format!("/api/media/{clean_public}/preview"))
+            .expect("media pública debe conservar su preview");
         assert_eq!(
-            public_item["file_path"],
+            public_item["url"],
             format!("/api/media/{clean_public}/preview"),
-            "el listado no debe filtrar la storage key"
+            "el listado debe exponer la URL autorizada, no la storage key"
         );
     }
 

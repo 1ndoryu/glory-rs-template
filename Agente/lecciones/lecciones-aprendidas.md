@@ -163,3 +163,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 - Un filtro SQL en el listado no protege un archivo si `ServeDir` permite adivinar su nombre; la autorización debe repetirse en el handler que abre los bytes.
 - El mismo confinamiento canónico de path sirve para media y descargas, pero la decisión de visibilidad debe vivir en el envelope (`active/public/clean`) y no en el navegador.
 - Mantener temporalmente el nombre `file_path` como URL de preview permite migrar consumidores sin filtrar la storage key; el contrato DTO público/admin separado debe ser el cleanup siguiente.
+
+## 018A-29 — Separar storage y contrato HTTP
+
+- Un modelo que contiene la storage key no debe ser la respuesta de un handler: aunque se reescriba el valor antes de serializar, el contrato sigue siendo ambiguo y puede filtrar campos privados en una ruta futura.
+- DTOs explícitos (`public`, `admin`, `upload`) permiten que cada boundary declare sus capacidades y que OpenAPI/TypeScript detecten regresiones de nombres como `file_path`.

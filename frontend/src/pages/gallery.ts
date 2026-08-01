@@ -60,17 +60,17 @@ export async function renderGallery(): Promise<HTMLElement> {
   const grid = createEl('div', { className: 'galeria-grid' });
 
   for (const item of media) {
-    const img = createEl('img', { src: item.file_path, alt: item.alt_text || '', loading: 'lazy' });
+    const img = createEl('img', { src: item.url, alt: item.alt_text || '', loading: 'lazy' });
 
     img.addEventListener('click', () => {
-      const fullImg = createEl('img', { src: item.file_path, alt: item.alt_text || '' });
+      const fullImg = createEl('img', { src: item.url, alt: item.alt_text || '' });
       fullImg.style.width = '100%';
       fullImg.style.border = 'var(--borde)';
 
       const btnDescargar = createEl('button', { className: 'boton', textContent: 'descargar' });
       btnDescargar.addEventListener('click', () => {
-        trackImageDownload(item.file_path);
-        const a = createEl('a', { href: item.file_path, download: item.file_path.split('/').pop() || 'imagen' });
+        trackImageDownload(item.url);
+        const a = createEl('a', { href: item.url, download: item.file_name || 'imagen' });
         a.click();
       });
 

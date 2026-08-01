@@ -5,11 +5,11 @@
 import { createEl } from '../utils/dom';
 import { MediaService } from '../services';
 import { tryCatch } from '../utils/result';
-import type { Media } from '../api/types';
+import type { MediaUpload } from '../api/types';
 
 export interface UploadResult {
   url: string;
-  media: Media;
+  media: MediaUpload;
 }
 
 export async function uploadFile(
@@ -18,7 +18,7 @@ export async function uploadFile(
   altText?: string,
 ): Promise<UploadResult> {
   const media = await MediaService.upload(file, { articleId, altText });
-  return { url: media.file_path, media };
+  return { url: media.url, media };
 }
 
 export async function pickAndUpload(

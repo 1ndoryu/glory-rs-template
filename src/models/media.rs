@@ -29,6 +29,108 @@ pub struct Media {
     pub asset_state: AssetProcessingState,
 }
 
+/* [018A-29] Separamos el modelo de storage de las respuestas HTTP para que
+ * ninguna ruta vuelva a serializar accidentalmente la storage key. Las URLs
+ * son contratos explícitos y pueden evolucionar sin cambiar la persistencia. */
+/// DTO público de media. Nunca incluye la storage key ni el estado privado
+/// del procesamiento; `url` apunta al preview autorizado.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct MediaPublicResponse {
+    pub url: String,
+    pub file_name: String,
+    pub file_type: String,
+    pub file_size: i64,
+    pub alt_text: String,
+    pub created_at: DateTime<Utc>,
+}
+
+/// DTO administrativo: añade el estado de procesamiento, pero nunca expone
+/// el path físico del storage. `url` es el preview público si existe.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct MediaAdminResponse {
+    pub id: Uuid,
+    pub article_id: Option<Uuid>,
+    pub url: String,
+    pub admin_url: String,
+    pub file_name: String,
+    pub file_type: String,
+    pub file_size: i64,
+    pub alt_text: String,
+    pub created_at: DateTime<Utc>,
+    pub asset_state: AssetProcessingState,
+}
+
+/// Respuesta de subida: el editor recibe la URL pública y el admin conserva
+/// una URL separada para previsualizar estados no públicos.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct MediaUploadResponse {
+    pub id: Uuid,
+    pub article_id: Option<Uuid>,
+    pub url: String,
+    pub admin_url: String,
+    pub file_name: String,
+    pub file_type: String,
+    pub file_size: i64,
+    pub alt_text: String,
+    pub created_at: DateTime<Utc>,
+    pub asset_state: AssetProcessingState,
+}
+
+impl Media {
+    fn file_name(&self) -> String {
+        self.file_path
+            .rsplit(['/', '\\'])
+            .next()
+            .filter(|name| !name.is_empty())
+            .unwrap_or("media")
+            .to_string()
+    }
+
+    #[must_use]
+    pub fn into_public_response(self, url: String) -> MediaPublicResponse {
+        MediaPublicResponse {
+            url,
+            file_name: self.file_name(),
+            file_type: self.file_type,
+            file_size: self.file_size,
+            alt_text: self.alt_text,
+            created_at: self.created_at,
+        }
+    }
+
+    #[must_use]
+    pub fn into_admin_response(self, url: String, admin_url: String) -> MediaAdminResponse {
+        MediaAdminResponse {
+            id: self.id,
+            article_id: self.article_id,
+            url,
+            admin_url,
+            file_name: self.file_name(),
+            file_type: self.file_type,
+            file_size: self.file_size,
+            alt_text: self.alt_text,
+            created_at: self.created_at,
+            asset_state: self.asset_state,
+        }
+    }
+
+    #[must_use]
+    pub fn into_upload_response(self, url: String, admin_url: String) -> MediaUploadResponse {
+        MediaUploadResponse {
+            id: self.id,
+            article_id: self.article_id,
+            url,
+            admin_url,
+            file_name: self.file_name(),
+            file_type: self.file_type,
+            file_size: self.file_size,
+            alt_text: self.alt_text,
+            created_at: self.created_at,
+            asset_state: self.asset_state,
+        }
+    }
+}
+
 /// Request para registrar un archivo media
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateMediaRequest {

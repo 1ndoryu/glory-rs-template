@@ -16,12 +16,11 @@ import { showConfirm } from '../../../../components/ui/confirm';
 import {
   assetStateLabel,
   classifyClientType,
-  fileNameFromPath,
   formatFileSize,
   getFileExtension,
   isAllowedUpload,
 } from './media-library-utils';
-import type { Media } from '../../../../api/types';
+import type { MediaAdmin } from '../../../../api/types';
 
 type MediaFilter = 'all' | 'image' | 'audio' | 'video';
 
@@ -61,13 +60,13 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-function createThumbnail(item: Media): HTMLElement {
+function createThumbnail(item: MediaAdmin): HTMLElement {
   const wrapper = createEl('div', { className: 'media-library__thumb' });
   if (item.file_type === 'image') {
     wrapper.appendChild(createEl('img', {
       className: 'media-library__thumb-img',
-      src: item.file_path,
-      alt: item.alt_text || fileNameFromPath(item.file_path),
+      src: item.admin_url,
+      alt: item.alt_text || item.file_name,
       loading: 'lazy',
     }));
   } else {
@@ -78,11 +77,11 @@ function createThumbnail(item: Media): HTMLElement {
 }
 
 function createItemCard(
-  item: Media,
+  item: MediaAdmin,
   isTrashView: boolean,
   onAction: () => void,
 ): HTMLElement {
-  const name = item.alt_text || fileNameFromPath(item.file_path);
+  const name = item.alt_text || item.file_name;
   const label = createEl('span', { className: 'media-library__name', textContent: name, title: name });
   const meta = createEl('div', { className: 'media-library__meta' },
     createEl('span', { textContent: item.file_type }),
@@ -97,7 +96,7 @@ function createItemCard(
   const copyBtn = createEl('button', { type: 'button', className: 'boton boton-pequeno', ariaLabel: 'Copiar URL' },
     createElement(Link));
   copyBtn.addEventListener('click', safeClick(async () => {
-    const ok = await copyToClipboard(item.file_path);
+    const ok = await copyToClipboard(item.url);
     showToast(ok ? 'URL copiada' : 'no se pudo copiar la URL');
   }));
   actions.appendChild(copyBtn);

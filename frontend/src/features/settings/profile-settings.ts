@@ -40,10 +40,10 @@ export function createProfileSettingsPanel(): HTMLElement {
     if (!file) return;
     const result = await safeRun(MediaService.upload(file), 'error al subir imagen');
     if (result.ok) {
-      profileImage.set(result.value.file_path);
-      imgPreview.src = result.value.file_path;
+      profileImage.set(result.value.url);
+      imgPreview.src = result.value.url;
       imgPreview.classList.remove('oculto');
-      SettingsService.save({ profile_image: result.value.file_path }).catch(() => { /* fire-and-forget save */ });
+      SettingsService.save({ profile_image: result.value.url }).catch(() => { /* fire-and-forget save */ });
       showToast('imagen actualizada');
     }
   }));

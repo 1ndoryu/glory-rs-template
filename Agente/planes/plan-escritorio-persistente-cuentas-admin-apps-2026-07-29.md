@@ -129,7 +129,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [x] Slug/ID públicos no devuelven borrador/privado/papelera.
 - [x] **018A-28 —** Media pública solo incluye previews/assets autorizados (`active + public + clean`); el preview admin requiere `AdminUser` y el path se confina al storage configurado.
 - [x] **018A-28 —** Retirar serving estático de entregables: `/uploads` ya no se monta en el router y las respuestas de media no devuelven storage keys.
-- [ ] DTO público dedicado no serializa rutas, storage keys o IDs internos. *(018A-28 elimina el leak en respuestas manteniendo `file_path` como URL de preview por compatibilidad; DTO separado queda como cleanup posterior)*
+- [x] **018A-29 —** DTO público/admin/upload dedicado: el público no expone IDs internos ni storage keys; admin/upload añaden solo los IDs y estados necesarios, con `url`, `admin_url` y `file_name` explícitos.
 - [x] CORS usa allowlist de orígenes y métodos.
 
 ### 5.4 Contención inmediata
@@ -149,7 +149,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [ ] Test demuestra que comercio no entrega sin webhook válido.
 
 **Criterio de salida:** cero escalada autenticado→admin, cero borrador/asset privado público y cuatro ADRs cerrados.
-**Estado:** completado. AdminUser extractor verifica rol en DB; endpoints públicos solo retornan published/active; ADRs cerradas en `adrs-297A-7.md`. El serving de media ahora exige preview autorizado; queda pendiente separar DTO público/admin.
+**Estado:** completado. AdminUser extractor verifica rol en DB; endpoints públicos solo retornan published/active; ADRs cerradas en `adrs-297A-7.md`. El serving de media exige preview autorizado y las respuestas usan DTOs públicos/admin separados.
 
 ## 6. 297A-8 — Sesiones seguras y Cuenta base
 
@@ -429,7 +429,8 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [ ] Matriz de paridad antigua→programa.
 - [x] **018A-26 —** Retirar la ruta legacy `/admin` y el wrapper de página sin ventana; conservar `Admin` como app interna singleton y abrir `project-editor` desde el comando administrativo registrado.
 - [x] Eliminar JWT Bearer, `jsonwebtoken`, secreto/configuración y clientes/tipos de autenticación legacy; la sesión opaca HttpOnly queda como autoridad única. *(018A-18; uploads y CSS/contratos legacy siguen pendientes)*
-- [x] **018A-28 —** Eliminar serving estático de uploads y sustituirlo por previews autorizados; rutas/DTO legacy de media restantes quedan para la matriz de paridad.
+- [x] **018A-28 —** Eliminar serving estático de uploads y sustituirlo por previews autorizados.
+- [x] **018A-29 —** Retirar el contrato `file_path` de respuestas de media mediante DTOs públicos/admin/upload explícitos; la matriz de paridad CSS/cliente manual continúa pendiente.
 - [ ] Eliminar CSS/clases huérfanas con VarSense.
 
 **Criterio de salida:** una sola administración como app registrada, analytics útil/privado y cero rutas/chrome duplicados legacy; uploads y CSS/contratos obsoletos deben desaparecer después de su matriz de paridad.

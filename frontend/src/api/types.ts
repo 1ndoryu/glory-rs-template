@@ -51,17 +51,26 @@ export interface PaginatedArticles {
 /* === Media === */
 export type AssetState = 'processing' | 'clean' | 'rejected';
 
-export interface Media {
-  id: string;
-  article_id: string | null;
-  file_path: string;
+export interface MediaPublic {
+  url: string;
+  file_name: string;
   file_type: 'image' | 'audio' | 'video';
   file_size: number;
   alt_text: string;
   created_at: string;
+}
+
+export interface MediaAdmin extends MediaPublic {
+  id: string;
+  article_id: string | null;
   /** [297A-10] Estado de procesamiento del asset. */
   asset_state: AssetState;
+  /** Preview protegido para assets privados o no publicados. */
+  admin_url: string;
 }
+
+/* La subida conserva la misma metadata base que la biblioteca admin. */
+export type MediaUpload = MediaAdmin;
 
 /* === Products === */
 export interface Product {

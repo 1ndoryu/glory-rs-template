@@ -27,7 +27,7 @@
 - Concepto desktop aprobado; Finder es file browser real (lee workspaceStore); Reader sigue siendo preview.
 - Workspace overlay implementado: release + overlay + merge + clipboard + papelera + crear carpetas.
 - Split de archivos grandes completado: command-registration (725→6), workspace-store (430→4), desktop-shell (419→3), mobile-shell (antes >300; launcher extraído a `mobile-launcher.ts`).
-- Sesiones opacas en cookie operativas; JWT Bearer, `localStorage` y el secreto JWT fueron retirados del backend/frontend. La ruta legacy `/admin` fue retirada en 018A-26 y el serving estático de uploads en 018A-28; CSS/contratos legacy siguen como deuda controlada.
+- Sesiones opacas en cookie operativas; JWT Bearer, `localStorage` y el secreto JWT fueron retirados del backend/frontend. La ruta legacy `/admin` fue retirada en 018A-26, el serving estático de uploads en 018A-28 y los DTOs de media se separaron en 018A-29; CSS/contratos legacy restantes siguen como deuda controlada.
 - **Quality tool sprint:** 13 reglas custom (P0/P1/P2) + 7 Sentinel CLI + 4 VarSense = 24 reglas activas; la cobertura operativa estimada del quality tool es ~65% del inventario de patrones automatizables definido en el plan. VarSense reconoce contratos vanilla de clases con patch reproducible (`a93b8bf0…`, 43 tests del tool). Últimos gates 297A-13/15/16/17/21: PASS, Sentinel 0 errores, VarSense 0 errores, Rust 30 tests, frontend 390 tests en 52 suites. Auditoría v4 reporta por separado 57/78 hallazgos arquitectónicos potencialmente detectables (73%) y 19/23 correcciones del checklist base (83%); no son denominadores comparables. ISP refactor DomAttrs (33→6 sub-interfaces). El contrato OpenAPI ya no ofrece Bearer/JWT: documenta la cookie `session_id` HttpOnly; la cobertura de endpoints y el retiro del cliente manual quedan diferidos.
 - Ejecutar una tarea por vez y en este orden; no saltar dependencias.
 - El plan maestro contiene checklists/gates. El roadmap conserva solo pendientes.
@@ -68,6 +68,7 @@
 - [x] **018A-25 —** Paridad OpenAPI de media: galería pública, biblioteca admin, papelera, restore y respuesta de upload; cliente `media-handler/` regenerado. El request multipart sigue manual por seguridad.
 - [x] **018A-27 —** Cobertura OpenAPI de descargas privadas y webhook Stripe: grant opaco, firma en header, JSON crudo y errores documentados sin exponer storage ni secretos.
 - [x] **018A-28 —** Retirado el serving estático público de `/uploads`; las respuestas de media exponen solo previews autorizados y existen rutas públicas/admin con validación de envelope, estado y confinamiento de path.
+- [x] **018A-29 —** Separados los DTOs públicos, administrativos y de subida de media: las respuestas exponen `url`/`admin_url` y `file_name`, nunca `file_path` ni storage keys; servicios frontend y OpenAPI consumen el contrato explícito.
 
 **Salida:** runtime compartido funciona sin chrome/listas/listeners duplicados. Orval se regenera localmente sin backend vivo; quedan cobertura total del contrato y retiro del cliente manual.
 
@@ -243,7 +244,7 @@ Plan: `Agente/planes/plan-notificaciones-2026-08-01.md`.
 - [x] Batch acotado, inserción multi-fila y deduplicación por `event_id`; eventos críticos de pago permanecen server-side.
 - [x] Agregados y Estadísticas separados del dispatcher; app admin con paneles Overview/Content/OS/Commerce/Reliability y exportación JSON.
 - [x] **018A-26 —** Retirada la ruta frontend legacy `/admin`; Admin permanece como app interna registrada y “Nuevo proyecto” abre `project-editor` mediante `openAppWindow` con guardia admin.
-- [ ] Completar paridad y eliminación de contratos/CSS legacy. *(JWT Bearer retirado en 018A-18; uploads ya usan previews autorizados en 018A-28; la página Admin se conserva como programa interno)*
+- [ ] Completar paridad y eliminación de contratos/CSS legacy. *(JWT Bearer retirado en 018A-18; uploads ya usan previews autorizados en 018A-28; DTOs de media separados en 018A-29; la página Admin se conserva como programa interno)*
 
 **Salida:** una sola administración y métricas privadas/tipadas.
 
@@ -361,6 +362,7 @@ Plan canónico: `Agente/planes/plan-programas-editoriales-2026-07-31.md`.
 - [x] Ingesta batch acotada, multi-fila e idempotente por `event_id`; agregados separados del audit.
 - [x] Completar paneles Overview/Content/OS/Commerce/Reliability y exportación; `analytics` es un programa admin independiente y conserva el panel legacy como compatibilidad.
 - [x] **018A-28 —** Retirar serving estático de `/uploads`: previews públicos solo para `active + public + clean`, previews admin para recursos activos, y paths confinados al storage configurado.
+- [x] **018A-29 —** Separar DTO público/admin/upload de media del modelo interno de storage; `url` y `admin_url` quedan como contratos explícitos para API, OpenAPI y frontend.
 - [ ] Completar la matriz de paridad y retirar contratos/CSS legacy restantes. *(JWT Bearer ya no forma parte del contrato)*
 
 ### 297A-17 — Hardening, identidad, accesibilidad y SEO
