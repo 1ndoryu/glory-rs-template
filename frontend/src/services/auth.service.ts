@@ -24,6 +24,23 @@ function capabilityFromRole(role?: MeResponse['role']): AuthCapability {
 }
 
 export const AuthService = {
+  /** Crear cuenta: la sesión solo se habilita después de verificar el correo. */
+  async register(email: string, password: string): Promise<{ message: string }> {
+    return api.post<{ message: string }>('/api/auth/register', { email, password });
+  },
+
+  async verifyEmail(token: string): Promise<{ message: string }> {
+    return api.post<{ message: string }>('/api/auth/verify-email', { token });
+  },
+
+  async requestPasswordReset(email: string): Promise<{ message: string }> {
+    return api.post<{ message: string }>('/api/auth/password-reset', { email });
+  },
+
+  async resetPassword(token: string, password: string): Promise<void> {
+    return api.post<void>('/api/auth/password-reset/confirm', { token, password });
+  },
+
   /** Iniciar sesión con email y contraseña.
    *  Lanza ApiError si las credenciales son inválidas (consistente con otros servicios). */
   async login(email: string, password: string): Promise<void> {

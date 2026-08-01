@@ -14,7 +14,10 @@ use argon2::PasswordVerifier;
 use crate::errors::AppError;
 use crate::middleware::AuthUser;
 use crate::models::user::UserResponse;
-use crate::models::{AuthResponse, LoginRequest, RegisterRequest};
+use crate::models::{
+    ConfirmPasswordResetRequest, LoginRequest, PasswordResetRequest, RegisterRequest,
+    RegistrationResponse, VerifyEmailRequest,
+};
 use crate::repositories::UserRepository;
 use crate::services::{AuthService, SessionService};
 use crate::AppState;
@@ -64,7 +67,7 @@ fn check_rate_limit(rate_limit: &LoginRateLimit, ip: &str) -> Result<(), AppErro
     path = "/api/auth/register",
     request_body = RegisterRequest,
     responses(
-        (status = 201, description = "Usuario registrado", body = AuthResponse),
+        (status = 202, description = "Verificación requerida", body = RegistrationResponse),
         (status = 403, description = "Registro deshabilitado", body = crate::errors::ErrorResponse),
         (status = 409, description = "Email ya registrado", body = crate::errors::ErrorResponse),
         (status = 422, description = "Error de validación", body = crate::errors::ErrorResponse)
@@ -73,7 +76,7 @@ fn check_rate_limit(rate_limit: &LoginRateLimit, ip: &str) -> Result<(), AppErro
 pub async fn register(
     State(state): State<AppState>,
     Json(req): Json<RegisterRequest>,
-) -> Result<(StatusCode, Json<AuthResponse>), AppError> {
+) -> Result<(StatusCode, Json<RegistrationResponse>), AppError> {
     req.validate()
         .map_err(|e| AppError::Validation(e.to_string()))?;
 
@@ -91,8 +94,96 @@ pub async fn register(
         ));
     }
 
-    let response = AuthService::register(&state.pool, req, &state.jwt_secret).await?;
-    Ok((StatusCode::CREATED, Json(response)))
+    let email = req.email.clone();
+    let (_user_id, token) = AuthService::register_verified(&state.pool, &req).await?;
+    if let Some(api_key) = state.resend_api_key.as_deref() {
+        let link = format!("{}/verify-email?token={token}", state.site_url);
+        crate::services::email::EmailService::send_account_link(
+            api_key,
+            &state.email_from,
+            &email,
+            "verifica tu cuenta",
+            "verifica tu correo",
+            &link,
+        )
+        .await?;
+    } else {
+        tracing::warn!("Registro creado sin proveedor de correo configurado");
+    }
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(RegistrationResponse {
+            message: "Revisa tu correo para verificar la cuenta".into(),
+        }),
+    ))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/auth/verify-email",
+    request_body = VerifyEmailRequest,
+    responses((status = 200, body = RegistrationResponse), (status = 400, body = crate::errors::ErrorResponse))
+)]
+pub async fn verify_email(
+    State(state): State<AppState>,
+    Json(req): Json<VerifyEmailRequest>,
+) -> Result<Json<RegistrationResponse>, AppError> {
+    req.validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+    AuthService::verify_email(&state.pool, &req.token).await?;
+    Ok(Json(RegistrationResponse {
+        message: "Cuenta verificada. Ya puedes iniciar sesión".into(),
+    }))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/auth/password-reset",
+    request_body = PasswordResetRequest,
+    responses((status = 202, body = RegistrationResponse))
+)]
+pub async fn request_password_reset(
+    State(state): State<AppState>,
+    Json(req): Json<PasswordResetRequest>,
+) -> Result<(StatusCode, Json<RegistrationResponse>), AppError> {
+    req.validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+    if let Some(token) = AuthService::issue_password_reset(&state.pool, &req.email).await? {
+        if let Some(api_key) = state.resend_api_key.as_deref() {
+            let link = format!("{}/reset-password?token={token}", state.site_url);
+            crate::services::email::EmailService::send_account_link(
+                api_key,
+                &state.email_from,
+                &req.email,
+                "restablece tu contraseña",
+                "restablecer contraseña",
+                &link,
+            )
+            .await?;
+        }
+    }
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(RegistrationResponse {
+            message: "Si la cuenta existe, recibirás instrucciones por correo".into(),
+        }),
+    ))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/auth/password-reset/confirm",
+    request_body = ConfirmPasswordResetRequest,
+    responses((status = 204), (status = 400, body = crate::errors::ErrorResponse))
+)]
+pub async fn reset_password(
+    State(state): State<AppState>,
+    Json(req): Json<ConfirmPasswordResetRequest>,
+) -> Result<StatusCode, AppError> {
+    req.validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+    AuthService::reset_password(&state.pool, &req.token, &req.password).await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// Iniciar sesión — [297A-8] crea sesión opaca en cookie `HttpOnly`
@@ -150,6 +241,12 @@ pub async fn login(
         )
         .await?;
         return Err(AppError::Unauthorized);
+    }
+
+    if !UserRepository::is_email_verified(&state.pool, user.id).await? {
+        return Err(AppError::Forbidden(
+            "Debes verificar tu correo antes de iniciar sesión".into(),
+        ));
     }
 
     /* [297A-8] Crear sesión opaca */
@@ -288,6 +385,9 @@ pub async fn revoke_session(
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/auth/register", post(register))
+        .route("/auth/verify-email", post(verify_email))
+        .route("/auth/password-reset", post(request_password_reset))
+        .route("/auth/password-reset/confirm", post(reset_password))
         .route("/auth/login", post(login))
         .route("/auth/me", get(me))
         .route("/auth/logout", post(logout))

@@ -53,7 +53,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 | 5 | 297A-10 | recursos + migraciones | bloqueado |
 | 6 | 297A-11 | workspace + overlay invitado | bloqueado |
 | 7 | 297A-12 | launcher móvil | bloqueado |
-| 8 | 297A-13 | cuenta + overlay remoto | parcial: Cuenta base, preferencias y overlay remoto implementados; registro avanzado/E2E pendientes |
+| 8 | 297A-13 | cuenta + overlay remoto | parcial: Cuenta base, preferencias, overlay, registro verificado y recovery backend implementados; UI/E2E/MFA pendientes |
 | 9 | 297A-14 | programas editoriales | bloqueado |
 | 10 | 297A-15 | comercio seguro | bloqueado |
 | 11 | 297A-16 | estadísticas + retiro legado | bloqueado |
@@ -176,14 +176,14 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 
 ### 6.3 Preparación de registro
 
-- [ ] Verificación de email.
-- [ ] Recovery con token corto de un solo uso.
-- [ ] Rate limits y auditoría de intentos sensibles.
-- [ ] Pruebas de fijación, expiración y revocación.
-- [ ] Registro permanece apagado hasta completar todo el checklist.
+- [x] Verificación de email detrás de `registration_enabled=false`, con `email_verified_at` y token de 24 h.
+- [x] Recovery con token hashado corto de un solo uso y revocación de sesiones.
+- [x] Rate limit de login y auditoría hash de intentos; rate limit específico de registro/reset queda pendiente.
+- [x] Pruebas unitarias de opacidad/determinismo y consumo atómico; E2E de fijación/expiración/replay queda pendiente.
+- [x] Registro permanece apagado hasta completar correo, UI, MFA y E2E.
 
 **Criterio de salida:** admin opera Cuenta sin token en Web Storage; sesiones pueden revocarse y errores no se silencian.
-**Estado:** completado. Sesiones opacas en cookie operativas; JWT eliminado del frontend; CSRF y rate limit activos. Cuenta base como app del OS quedó implementada y validada en 297A-13; registro verificado, recovery, MFA y auditoría avanzada siguen pendientes.
+**Estado:** parcial avanzado. Sesiones opacas en cookie operativas; JWT eliminado del frontend; CSRF y rate limit activos. Cuenta base, registro verificado y recovery backend están implementados; UI, proveedor de correo real, MFA, E2E y auditoría específica siguen pendientes.
 
 ## 7. 297A-9 — Foundation del runtime desktop/tablet
 
@@ -325,7 +325,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 
 **Dependencias:** sesiones 297A-8, workspace 297A-11 e integración móvil 297A-12.
 
-- [ ] Habilitar registro solo al pasar gate completo.
+- [x] Implementar registro solo detrás de `registration_enabled=false`; la activación sigue bloqueada hasta completar correo/UI/MFA/E2E.
 - [x] Crear `user_preferences` y el contrato de preferencia de tema con `revision`. *(migration `20260731100000_297a13_preferences`)*
 - [x] Sync con `expected_revision`, actualización condicional y conflicto 409 sin overwrite silencioso. *(PreferencesService + preferences-sync)*
 - [x] Autorizar solo cuentas activas y mantener CSRF/CORS con credenciales en las mutaciones.
@@ -338,9 +338,9 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [x] **Cuenta como app del escritorio:** registrar en AppRegistry como singleton público con estados invitado/autenticado/admin; verificación pendiente y MFA quedan como estados futuros del backend. *(account-view.ts + AppRegistry)*
 - [x] **Estado de sesión visible:** control en barra superior y launcher móvil junto al tema; abre Cuenta y refleja Entrar/Cuenta/Cuenta · admin con etiqueta accesible. *(desktop-menu-bar.ts + mobile-shell.ts)*
 - [x] **Login dentro de la app:** deslogueado, Cuenta muestra login dentro de su ventana; `/login` es deep link canónico y el wrapper legacy reutiliza la misma vista. Registro y `/register` permanecen cerrados hasta completar backend verificado.
-- [ ] Recuperación de contraseña, rate limit y auditoría de intentos; logout limpia clipboard/undo.
+- [x] Recovery backend con token hashado/expirable, revocación de sesiones, rate limit de login y auditoría hash; UI, rate limit específico y E2E quedan pendientes. Logout limpia clipboard/undo.
 
-**Criterio de salida:** configuración privada y organización del workspace tienen transporte autenticado, revisión optimista, fallback offline, validación y conflicto explícito sin overwrite silencioso. Cuenta base queda implementada como app del OS con login/logout y estado visible; 297A-13 permanece abierto por registro verificado, MFA, recuperación, auditoría avanzada y E2E multi-dispositivo/móvil.
+**Criterio de salida:** configuración privada y organización del workspace tienen transporte autenticado, revisión optimista, fallback offline, validación y conflicto explícito sin overwrite silencioso. Cuenta base, registro verificado y recovery backend quedan implementados detrás de flag; 297A-13 permanece abierto por UI/correo real, MFA, auditoría específica y E2E multi-dispositivo/móvil.
 
 ## 12. 297A-14 — Programas editoriales
 

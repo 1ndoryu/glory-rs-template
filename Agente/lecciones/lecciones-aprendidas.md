@@ -93,3 +93,9 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 - Tienda debe consumir el mismo `ProductService` que los artículos; el frontend no debe inventar precios ni decidir disponibilidad.
 - Pedidos y Descargas pueden existir como programas desde el principio con estados vacíos honestos; no se debe simular historial antes de tener un endpoint autorizado.
 - La migración del release público debe ser aditiva para conservar posiciones que el admin ya haya publicado.
+
+## 018A-16 — Registro verificado y recuperación sin enumeración
+
+- El correo no se considera verificado por tener contraseña: `email_verified_at` y tokens opacos de un solo uso deben vivir en la base y consumirse atómicamente.
+- Recuperación responde igual exista o no el email; el token se persiste solo como hash, expira pronto y revocar sesiones después del cambio evita reutilización de una sesión robada.
+- Mantener `registration_enabled=false` permite desplegar contratos y migraciones sin abrir el alta pública antes de tener correo real, UI y pruebas E2E.

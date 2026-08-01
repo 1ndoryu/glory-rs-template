@@ -79,3 +79,28 @@ pub struct AuthResponse {
     pub token: String,
     pub user_id: Uuid,
 }
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct RegistrationResponse {
+    pub message: String,
+}
+
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+pub struct VerifyEmailRequest {
+    #[validate(length(min = 32, max = 128))]
+    pub token: String,
+}
+
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+pub struct PasswordResetRequest {
+    #[validate(email(message = "Formato de email inválido"))]
+    pub email: String,
+}
+
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+pub struct ConfirmPasswordResetRequest {
+    #[validate(length(min = 32, max = 128))]
+    pub token: String,
+    #[validate(length(min = 8, message = "La contraseña debe tener al menos 8 caracteres"))]
+    pub password: String,
+}

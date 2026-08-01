@@ -26,6 +26,45 @@ fn escape_html(value: &str) -> String {
 pub struct EmailService;
 
 impl EmailService {
+    /// Envía un enlace de cuenta (verificación o recuperación) sin guardar el
+    /// token en claro ni exponerlo en respuestas de API.
+    pub async fn send_account_link(
+        api_key: &str,
+        from: &str,
+        to_email: &str,
+        subject: &str,
+        heading: &str,
+        link: &str,
+    ) -> Result<(), AppError> {
+        let safe_heading = escape_html(heading);
+        let safe_link = escape_html(link);
+        let html = format!(
+            "<html><body><h1>{safe_heading}</h1><p><a href=\"{safe_link}\">Continuar</a></p></body></html>"
+        );
+        let body = SendEmailRequest {
+            from: from.to_string(),
+            to: vec![to_email.to_string()],
+            subject: subject.to_string(),
+            html,
+        };
+        let response = reqwest::Client::new()
+            .post("https://api.resend.com/emails")
+            .header("Authorization", format!("Bearer {api_key}"))
+            .json(&body)
+            .send()
+            .await
+            .map_err(|error| AppError::Internal(format!("Error enviando email: {error}")))?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let detail = response.text().await.unwrap_or_default();
+            tracing::error!("Resend account email error {status}: {detail}");
+            return Err(AppError::Internal(format!(
+                "Error enviando email: {status}"
+            )));
+        }
+        Ok(())
+    }
+
     /// Envia un email con el enlace de descarga de un producto digital
     pub async fn send_download_link(
         api_key: &str,

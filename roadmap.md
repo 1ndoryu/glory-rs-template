@@ -185,19 +185,19 @@ Plan: `Agente/planes/plan-notificaciones-2026-08-01.md`.
 
 **Depende de:** 297A-8/11; integra móvil 297A-12.
 
-- [ ] Habilitar registro verificado.
+- [x] Implementar registro verificado detrás de `registration_enabled=false`: cuenta pendiente, token opaco de 24 h, consumo único y login bloqueado hasta verificar. *(UI/correo real quedan diferidos)*
 - [x] Transporte de preferencias de cuenta: `user_preferences`, revisión optimista, endpoint protegido, CSRF/CORS, fallback local y guardas contra respuestas obsoletas. *(migraciones 297A-13 + `preferences-sync.ts`; type-check, 209 tests, Rust y gate PASS)*
 - [x] UI de resolución `remote/local` para conflictos 409; adaptador separado, modal único/idempotente, cierre al resolver/logout y etiquetado ARIA. *(preferences-conflict-ui.ts + 4 regresiones UI)*
 - [x] Pruebas HTTP/integración de 401 sin sesión, 403 sin CSRF, preflight CORS con credenciales y carrera 409 con dos actualizaciones de la misma revisión; verifican router de producción, cuerpos JSON y revisión final. *(4 tests en `preferences_handler.rs`; `cargo test` PASS)*
 - [x] Overlay remoto del workspace: `user_workspace_overlays`, contrato JSON validado, revisión optimista, importación local/remota, reset, merge por ID/campo, tombstones, rebase ante release nuevo y conflicto visible. *(migration `20260731120000_297a13_workspace_overlays`; `overlay-sync.ts` + `overlay-conflict-ui.ts`; type-check, 221 tests, Rust y gate PASS)*
 - [ ] Prueba E2E real de dos pestañas/dispositivos y política de merge semántico entre cambios concurrentes.
-- [x] **Cuenta como app del escritorio:** registrar en AppRegistry como singleton público con estados invitado/autenticado/admin; verificación pendiente y MFA quedan como estados futuros del backend. *(account-view.ts + AppRegistry)*
+- [x] **Cuenta como app del escritorio:** registrar en AppRegistry como singleton público con estados invitado/autenticado/admin; la UI de verificación y MFA quedan como estados futuros del backend. *(account-view.ts + AppRegistry)*
 - [x] **Estado de sesión visible:** control en barra superior y launcher móvil junto al tema; abre Cuenta y refleja Entrar/Cuenta/Cuenta · admin con etiqueta accesible. *(desktop-menu-bar.ts + mobile-shell.ts)*
 - [x] **Login dentro de la app:** deslogueado, Cuenta muestra login dentro de su ventana; `/login` es deep link canónico y el wrapper legacy reutiliza la misma vista. Registro y `/register` permanecen cerrados hasta completar backend verificado.
-- [ ] Recuperación de contraseña y verificación avanzada.
+- [x] Backend de recuperación: solicitud no enumerable, token hashado de 1 h, cambio de contraseña y revocación de sesiones. *(UI, MFA/passkey y E2E quedan diferidos)*
 - [x] Rate limit de login, auditoría hash de intentos y logout limpia clipboard/undo. *(migration `20260801030000_297a13_auth_audit` + handler)*
 
-**Salida:** preferencias, overlay remoto y Cuenta base tienen transporte seguro, control de revisión, validación server-side, resolución visible `remote/local`, login/logout y pruebas frontend; 297A-13 permanece abierto por registro verificado, E2E multi-dispositivo/móvil, MFA, recuperación y auditoría avanzada.
+**Salida:** preferencias, overlay remoto y Cuenta base tienen transporte seguro, control de revisión, validación server-side, resolución visible `remote/local`, login/logout y pruebas frontend; 297A-13 permanece abierto por UI/correo real, E2E multi-dispositivo/móvil, MFA y auditoría específica.
 
 ### 297A-14 — Programas editoriales *(parcial)*
 
@@ -326,7 +326,7 @@ Este bloque amplía el alcance verificable sin duplicar los manuales canónicos.
 
 ### 297A-13 — Registro y overlay remoto
 
-- [ ] Implementar registro verificado y recuperación detrás de feature flag; rate limit/login/logout, auditoría hash y limpieza de clipboard ya están operativos.
+- [x] Implementar registro verificado y recuperación detrás de feature flag; rate limit/login/logout, auditoría hash y limpieza de clipboard están operativos. *(correo real, UI y MFA quedan diferidos)*
 - [x] Sincronizar preferencias y overlay con revisión esperada, actualización optimista, validación server-side, fallback offline y conflicto 409 visible. *(preferencias + `user_workspace_overlays`; gate y self-check PASS)*
 - [x] Definir importación local, uso remoto, reset explícito, merge por ID/campo, tombstones y rebase ante release nuevo; probar autorización, payload inválido, corrupción persistida y revisión inicial sin fila fantasma.
 - [ ] Probar E2E dos pestañas/dispositivos y decidir merge semántico para cambios concurrentes no resolubles por reemplazo local/remoto.

@@ -16,4 +16,7 @@ pub use notification::{
     CreateNotificationRequest, Notification, NotificationList, UpdateNotificationStatusRequest,
 };
 pub use resource::{EditorialState, LifecycleState, Resource, ResourceKind, VisibilityState};
-pub use user::{AuthResponse, LoginRequest, RegisterRequest, User, UserResponse};
+pub use user::{
+    AuthResponse, ConfirmPasswordResetRequest, LoginRequest, PasswordResetRequest, RegisterRequest,
+    RegistrationResponse, User, UserResponse, VerifyEmailRequest,
+};
