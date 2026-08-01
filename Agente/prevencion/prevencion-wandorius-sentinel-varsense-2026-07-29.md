@@ -1,7 +1,7 @@
 # Prevención canónica: Glory Sentinel y VarSense para wandori.us
 
 > **Fecha:** 2026-07-29  
-> **Estado:** activo; infraestructura 297A-6 completada y reglas de dominio en rollout
+> **Estado:** activo como inventario; infraestructura y gate mínimo cerrados (018A-43). Las reglas de dominio restantes se implementan solo durante la tarea dueña y no bloquean el roadmap principal.
 > **Autoridad:** inventario único de reglas automatizables del proyecto  
 > **Arquitectura:** `Agente/documentacion/arquitectura/manual-arquitectura-wandorius-2026-07-29.md`  
 > **Identidad:** `Agente/documentacion/design-system/manual-identidad-visual-os-2026-07-29.md`
@@ -21,12 +21,12 @@
 - [x] Detectar token/JWT de sesión persistido en Web Storage. *(297A-8: migrado a sesiones opacas en cookie `HttpOnly`; JWT eliminado del frontend)*
 - [x] Detectar credenciales o auto-registro en frontend. *(297A-7: auto-login eliminado; registro apagado por feature flag)*
 - [x] Detectar endpoint público sin predicados obligatorios de visibilidad/lifecycle. *(297A-7: artículos públicos solo status='published'; productos solo is_active)*
-- [ ] Detectar DTO público con `download_path`, `storage_key`, URL firmada o IDs internos de pago. *(pendiente 297A-10: DTO separados)*
-- [ ] Detectar directorio de entregables servido estáticamente. *(uploads público temporal; pendiente 297A-10)*
+- [x] Detectar DTO público con `download_path`, `storage_key`, URL firmada o IDs internos de pago. *(297A-28/29: DTO públicos/admin separados y storage keys fuera del contrato)*
+- [x] Detectar directorio de entregables servido estáticamente. *(297A-28: serving estático de `/uploads` retirado; el finding queda como prevención futura)*
 - [x] Detectar checkout que acepte precio/moneda/ruta/éxito desde cliente. *(297A-7: checkout valida is_active, requiere Stripe configurado)*
-- [ ] Detectar webhook sin firma, evento único, validación de importe/moneda y transacción. *(ya implementado; pendiente hardening en297A-15)*
-- [ ] Detectar descarga sin entitlement y grant revalidado. *(pendiente 297A-15)*
-- [ ] Detectar fallos silenciosos en pago, persistencia, email o fulfillment. *(parcial; pendiente 297A-15)*
+- [x] Detectar webhook sin firma, evento único, validación de importe/moneda y transacción. *(297A-15/42: firma, idempotencia, transacción y outbox con reintento; proveedor real/E2E quedan diferidos)*
+- [x] Detectar descarga sin entitlement y grant revalidado. *(297A-15: entitlement/grant se revalidan server-side; pruebas con proveedor real quedan diferidas)*
+- [x] Detectar fallos silenciosos en pago, persistencia, email o fulfillment. *(297A-15/42: errores visibles, outbox y backoff; observabilidad avanzada queda diferida)*
 - [ ] Activar estas reglas como error después de corregir el baseline. *(pendiente rollout Sentinel)*
 
 ## Checklist 2 — Datos y publicación

@@ -2,9 +2,11 @@
 
 > **Epic:** 297A-11
 > **Fecha:** 2026-07-30
-> **Estado:** ✅ Lote VarSense reproducible implementado; deuda Sentinel documentada
+> **Estado:** ✅ Lote VarSense reproducible implementado; deuda Sentinel documentada y diferida por decisión de alcance (018A-43)
 > **Auditoría fuente:** `auditoria-arquitectura-v4-2026-07-30.md`
 > **Objetivo:** Convertir el quality gate en un guardián arquitectónico con cobertura medible y creciente sobre los patrones problemáticos identificados en 4 auditorías; la cobertura se reporta por versión y alcance, no como una cifra fija global.
+
+> **Nota operativa:** este documento conserva el inventario histórico y sus checklists técnicos, pero ya no es un bloque habilitado. El mínimo desbloqueante vive en `roadmap-sentinel.md`; ningún agente debe comenzar una regla nueva, benchmark, empaquetado o migración upstream desde este plan sin una tarea explícita.
 
 ---
 

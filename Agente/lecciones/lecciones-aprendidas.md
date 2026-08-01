@@ -228,3 +228,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Un webhook debe confirmar rápido la autoridad del pago y encolar un evento; una llamada externa lenta o fallida dentro del request puede dejar el evento marcado sin una entrega recuperable.
 - La rotación del grant debe actualizar solo el hash persistido y devolver el token raw únicamente al adaptador de correo; así el reintento genera un enlace nuevo sin convertir la cola en un almacén de credenciales.
+
+## 018A-43 — Separar gate mínimo de backlog de tooling
+
+- Un roadmap de calidad puede mantener una visión amplia sin convertir cada regla futura, benchmark o paridad de adapters en una dependencia del producto.
+- La fuente canónica debe declarar explícitamente qué checklist desbloquea el trabajo y qué backlog queda diferido; así el agente ejecuta el gate reproducible sin inflar el contexto ni iniciar migraciones upstream innecesarias.
