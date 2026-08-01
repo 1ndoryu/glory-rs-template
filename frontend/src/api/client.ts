@@ -26,10 +26,59 @@ interface RequestOptions {
   signal?: AbortSignal;
 }
 
+export interface GeneratedResponse<T> {
+  data: T;
+  status: number;
+  headers: Headers;
+}
+
 /* [297A-8] Leer cookie CSRF del browser */
 function getCsrfToken(): string | null {
   const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/);
   return match ? match[1] : null;
+}
+
+function withSession(options: RequestInit): RequestInit {
+  const method = (options.method || 'GET').toUpperCase();
+  const headers = new Headers(options.headers);
+  const isMutation = !['GET', 'HEAD', 'OPTIONS'].includes(method);
+  if (isMutation) {
+    const csrf = getCsrfToken();
+    if (csrf) headers.set('X-CSRF-Token', csrf);
+  }
+  return { ...options, credentials: 'include', headers };
+}
+
+async function parseResponseBody(response: Response): Promise<unknown> {
+  const text = await response.text();
+  if (!text || response.status === 204) return undefined;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return text;
+  }
+}
+
+/* [018A-32] Orval uses this single transport so generated clients inherit the
+ * same cookie, CSRF, base URL and response-envelope rules as the manual API. */
+export async function generatedFetcher<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const response = await fetch(`${BASE_URL}${path}`, withSession(options));
+  const data = await parseResponseBody(response);
+  return { data, status: response.status, headers: response.headers } as T;
+}
+
+export function unwrapGeneratedResponse<T>(
+  response: GeneratedResponse<unknown>,
+  successStatuses: readonly number[],
+): T {
+  if (successStatuses.includes(response.status)) return response.data as T;
+  if (response.status === 401) {
+    authStore.set({ isAuthenticated: false, userId: null, capability: 'public' });
+  }
+  throw new ApiError(response.status, response.data, `API Error: ${response.status}`);
 }
 
 /* Request genérico con auth automática (cookies) y CSRF */
@@ -38,36 +87,20 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   const requestHeaders: Record<string, string> = { ...headers };
 
-  /* [297A-8] Las cookies se envían automáticamente con credentials: 'include'.
-   * Para mutaciones, añadir token CSRF desde la cookie. */
-  const isMutation = method !== 'GET';
-  if (isMutation) {
-    const csrf = getCsrfToken();
-    if (csrf) {
-      requestHeaders['X-CSRF-Token'] = csrf;
-    }
-  }
-
   /* Solo setear Content-Type para JSON, no para FormData */
   if (!formData) {
     requestHeaders['Content-Type'] = 'application/json';
   }
 
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const response = await fetch(`${BASE_URL}${path}`, withSession({
     method,
     headers: requestHeaders,
-    credentials: 'include',
     body: formData ?? (body ? JSON.stringify(body) : undefined),
     signal,
-  });
+  }));
 
   if (!response.ok) {
-    let errorBody: unknown;
-    try {
-      errorBody = await response.json();
-    } catch {
-      errorBody = await response.text();
-    }
+    const errorBody = await parseResponseBody(response);
 
     /* [297A-8] Si 401, limpiar estado de auth */
     if (response.status === 401) {
@@ -77,13 +110,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     throw new ApiError(response.status, errorBody, `API Error: ${response.status}`);
   }
 
-  /* 204 No Content o body vacío */
-  const text = await response.text();
-  if (!text || response.status === 204) {
-    return undefined as T;
-  }
-
-  return JSON.parse(text) as T;
+  return (await parseResponseBody(response)) as T;
 }
 
 /* Métodos de conveniencia */

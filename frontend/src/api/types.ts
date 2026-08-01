@@ -2,6 +2,13 @@
  * Tipos TypeScript para las respuestas de la API.
  * La superficie se migra gradualmente a los contratos generados por Orval. */
 
+import type {
+  AssetProcessingState,
+  MediaAdminResponse,
+  MediaPublicResponse,
+  MediaUploadResponse,
+} from './generated/index.schemas';
+
 /* === Auth === */
 export interface LoginRequest {
   email: string;
@@ -49,28 +56,11 @@ export interface PaginatedArticles {
 }
 
 /* === Media === */
-export type AssetState = 'processing' | 'clean' | 'rejected';
-
-export interface MediaPublic {
-  url: string;
-  file_name: string;
-  file_type: 'image' | 'audio' | 'video';
-  file_size: number;
-  alt_text: string;
-  created_at: string;
-}
-
-export interface MediaAdmin extends MediaPublic {
-  id: string;
-  article_id: string | null;
-  /** [297A-10] Estado de procesamiento del asset. */
-  asset_state: AssetState;
-  /** Preview protegido para assets privados o no publicados. */
-  admin_url: string;
-}
-
+export type AssetState = AssetProcessingState;
+export type MediaPublic = MediaPublicResponse;
+export type MediaAdmin = MediaAdminResponse;
 /* La subida conserva la misma metadata base que la biblioteca admin. */
-export type MediaUpload = MediaAdmin;
+export type MediaUpload = MediaUploadResponse;
 
 /* === Products === */
 export interface Product {

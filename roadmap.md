@@ -71,6 +71,7 @@
 - [x] **018A-29 —** Separados los DTOs públicos, administrativos y de subida de media: las respuestas exponen `url`/`admin_url` y `file_name`, nunca `file_path` ni storage keys; servicios frontend y OpenAPI consumen el contrato explícito.
 - [x] **018A-30 —** Alineadas las referencias activas del roadmap y planes: el shape de media usa DTOs con URLs explícitas y las validaciones visuales/E2E quedan diferidas sin reabrir bloques técnicos cerrados.
 - [x] **018A-31 —** Retirados estilos CSS huérfanos confirmados (`arrow-select` y `.font-panel`); se conservan clases dinámicas usadas por el runtime y sus avisos quedan documentados como falsos positivos de análisis estático.
+- [x] **018A-32 —** Orval usa un mutator compartido con cookie/CSRF/base URL y `MediaService` migra al cliente generado; CI regenera el contrato antes del gate. Los demás servicios manuales quedan para migraciones por dominio.
 
 **Salida:** runtime compartido funciona sin chrome/listas/listeners duplicados. Orval se regenera localmente sin backend vivo; quedan cobertura total del contrato y retiro del cliente manual.
 
@@ -218,7 +219,7 @@ Plan: `Agente/planes/plan-notificaciones-2026-08-01.md`.
 - [x] Vertical de artículos/About: `article-editor` lazy, admin-only, lifecycle abortable, create→update, multimedia asociada al ID actual, evento tipado y listado Admin sin carreras.
 - [x] Editor de proyectos: app lazy admin-only, listado separado, lifecycle/eventos, GET por ID, create→update, URL tri-state y sincronización transaccional de título/visibilidad/lifecycle del resource envelope.
 - [x] Editor de productos: app lazy admin-only, CRUD admin completo en `/api/admin/products`, nace inactivo/private, validación backend de precio/moneda, sincronización transaccional del envelope y filtro público `active + public`.
-- [x] Contrato de rutas admin alineado: servicios frontend migrados a `/api/admin/...` (backend anida todo bajo `/api`); `GET /api/admin/workspace/releases/{version}` para rollback; `MediaService`/galería usan `MediaPublic`/`MediaAdmin` con URLs explícitas.
+- [x] Contrato de rutas admin alineado: servicios frontend migrados a `/api/admin/...` (backend anida todo bajo `/api`); `GET /api/admin/workspace/releases/{version}` para rollback; `MediaService`/galería usan `MediaPublic`/`MediaAdmin` con URLs explícitas y cliente generado.
 - [x] Biblioteca de media. *(app lazy admin-only, papelera soft delete + restore, object URLs revocadas, utils test 6/6 — F4)*
 - [x] Menú Admin por capacidades y paridad sin ampliar `admin.ts`. *(matriz de paridad congelada en `matriz-paridad-admin-2026-07-31.md`; comandos `resource:edit/publish/unpublish` materializan acciones declaradas; menú por capacidades del Admin queda con el resto de 297A-14)*
 - [x] Paridad F5 técnica: autosave compartido por tipo de recurso — `utils/autosave.ts` (`createDebouncedSaver` genérico) aplicado a artículos, proyectos y productos (create→update idempotente, sin tocar editorial, evento de dominio solo en created) — y comandos de recurso fail-closed con tests (15/15).
@@ -366,6 +367,7 @@ Plan canónico: `Agente/planes/plan-programas-editoriales-2026-07-31.md`.
 - [x] **018A-28 —** Retirar serving estático de `/uploads`: previews públicos solo para `active + public + clean`, previews admin para recursos activos, y paths confinados al storage configurado.
 - [x] **018A-29 —** Separar DTO público/admin/upload de media del modelo interno de storage; `url` y `admin_url` quedan como contratos explícitos para API, OpenAPI y frontend.
 - [x] **018A-31 —** Limpiar CSS huérfano confirmado con VarSense; las clases construidas dinámicamente no se eliminan por un falso positivo.
+- [x] **018A-32 —** Añadir mutator único de Orval y migrar MediaService al contrato generado; la migración del resto de servicios sigue como matriz por dominio.
 - [ ] Completar la matriz de paridad y retirar contratos/CSS legacy restantes. *(JWT Bearer ya no forma parte del contrato)*
 
 ### 297A-17 — Hardening, identidad, accesibilidad y SEO

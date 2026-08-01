@@ -15,6 +15,12 @@ export default defineConfig({
       target: './src/api/generated/index.ts',
       client: 'fetch',
       mode: 'tags-split',
+      override: {
+        mutator: {
+          path: './src/api/generated-fetch.ts',
+          name: 'customFetcher',
+        },
+      },
     },
   },
 });

@@ -176,3 +176,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 ## 018A-31 — Validar CSS dinámico antes de eliminarlo
 
 - Un selector reportado como huérfano puede construirse desde una cadena o plantilla en TypeScript; antes de borrarlo hay que buscar consumidores dinámicos y conservarlos si forman parte del runtime.
+
+## 018A-32 — Generación y autenticación deben compartir boundary
+
+- Generar funciones `fetch` no las hace seguras automáticamente: el mutator debe centralizar cookie, CSRF, base URL y envelope de errores antes de migrar un servicio.
+- Los clientes generados ignorados son reproducibles solo si CI ejecuta codegen antes del type-check; el workflow debe validar esa dependencia explícitamente.

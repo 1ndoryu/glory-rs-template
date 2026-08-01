@@ -4,7 +4,15 @@
  * (solo clean+public+active); admin bajo /api/admin/media con subida,
  * listado (incluye processing/rejected), papelera, soft delete y restore. */
 
-import { api } from '../api/client';
+import { unwrapGeneratedResponse } from '../api/client';
+import {
+  deleteMedia,
+  listAdminMedia,
+  listMedia,
+  listTrashedMedia,
+  restoreMedia,
+  uploadMedia,
+} from '../api/generated/media-handler/media-handler';
 import type { MediaAdmin, MediaPublic, MediaUpload } from '../api/types';
 
 export const MediaService = {
@@ -14,31 +22,37 @@ export const MediaService = {
     formData.append('file', file);
     if (options?.articleId) formData.append('article_id', options.articleId);
     if (options?.altText) formData.append('alt_text', options.altText);
-    return api.upload<MediaUpload>('/api/admin/media', formData);
+    const response = await uploadMedia({ body: formData });
+    return unwrapGeneratedResponse<MediaUpload>(response, [201]);
   },
 
   /** Listar archivos multimedia públicos: solo clean + public + active. */
   async list(): Promise<MediaPublic[]> {
-    return api.get<MediaPublic[]>('/api/media');
+    const response = await listMedia();
+    return unwrapGeneratedResponse<MediaPublic[]>(response, [200]);
   },
 
   /** Listar media admin: envelope activo, incluye processing/rejected. */
   async listAdmin(): Promise<MediaAdmin[]> {
-    return api.get<MediaAdmin[]>('/api/admin/media');
+    const response = await listAdminMedia();
+    return unwrapGeneratedResponse<MediaAdmin[]>(response, [200]);
   },
 
   /** Listar media en la papelera (admin). */
   async listTrashed(): Promise<MediaAdmin[]> {
-    return api.get<MediaAdmin[]>('/api/admin/media/trashed');
+    const response = await listTrashedMedia();
+    return unwrapGeneratedResponse<MediaAdmin[]>(response, [200]);
   },
 
   /** Eliminar media (admin) — soft delete: pasa a la papelera. */
   async delete(id: string): Promise<void> {
-    return api.delete<void>(`/api/admin/media/${id}`);
+    const response = await deleteMedia(id);
+    unwrapGeneratedResponse<void>(response, [204]);
   },
 
   /** Restaurar media desde la papelera (admin). */
   async restore(id: string): Promise<void> {
-    return api.post<void>(`/api/admin/media/${id}/restore`, {});
+    const response = await restoreMedia(id);
+    unwrapGeneratedResponse<void>(response, [204]);
   },
 };

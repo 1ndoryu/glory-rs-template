@@ -48,6 +48,8 @@ jobs:
         run: npm run quality:test
       - name: Preparar base de datos
         run: node scripts/prepare-ci-db.mjs
+      - name: Regenerar cliente OpenAPI
+        run: npm run codegen:local
       - name: Ejecutar gate completo
         run: npm run task:check -- 297A-6 --ci
       - name: Publicar reportes
