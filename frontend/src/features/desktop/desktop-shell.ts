@@ -6,6 +6,9 @@ import { FileUser } from 'lucide';
 import { createEl } from '../../utils/dom';
 import { createDesktopMenuBar } from './components/desktop-menu-bar';
 import { createDesktopWindow } from './components/desktop-window';
+import { createProfileSettingsPanel } from '../settings/profile-settings';
+import { setProfileSettingsToggle } from '../runtime/commands/profile-commands';
+import type { AppToolbarGroup } from '../runtime/app-registry';
 import {
   windowStore, focusWindow, restoreWindow, closeWindow,
   minimizeWindow, toggleMaximizeWindow, setWorkspaceBounds, registerShellWindow,
@@ -34,17 +37,55 @@ export function createDesktopShell(
   const shell = createEl('section', { className: 'desktop-shell', ariaLabel: 'Escritorio' });
   const workspace = createEl('div', { className: 'desktop-workspace' });
 
-  /* Profile como shell window */
+  /* Profile como shell window.
+   * [297A-29 F3] El contenido es un wrapper: header del perfil + panel de
+   * configuración SOLO para admins. Un invitado no debe tener el panel en el
+   * DOM ni handler registrado: el panel se monta/desmonta reactivamente según
+   * authStore (login/logout en vivo), igual que el toolbar. El toggle lo
+   * registra el shell y se limpia al destruir. */
   const profileInstanceId = 'shell-profile';
+  const profileWindowContent = createEl('div', { className: 'desktop-profile-window__content' });
+  profileWindowContent.append(profile);
+
+  let profileSettingsPanel: HTMLElement | null = null;
+  function syncProfileSettingsPanel(): void {
+    const isAdmin = authStore.get().capability === 'admin';
+    if (isAdmin && !profileSettingsPanel) {
+      profileSettingsPanel = createProfileSettingsPanel();
+      /* Oculto por defecto; se abre con el comando 'profile:settings'.
+       * Clase canónica .oculto (display:none !important): el atributo HTML
+       * hidden NO funciona porque config-tab-content define display:flex y
+       * anula el [hidden] del browser. */
+      profileSettingsPanel.classList.add('oculto');
+      profileWindowContent.append(profileSettingsPanel);
+    } else if (!isAdmin && profileSettingsPanel) {
+      profileSettingsPanel.remove();
+      profileSettingsPanel = null;
+    }
+  }
+  /* subscribe llama al listener inmediatamente (estado inicial) */
+  const stopAuthSync = authStore.subscribe(syncProfileSettingsPanel);
+
+  /* Toolbar de la ventana Perfil: solo admins ven el botón (adminOnly). */
+  const profileToolbar: AppToolbarGroup[] = [
+    { label: 'Perfil', items: ['profile:settings'] },
+  ];
+
+  setProfileSettingsToggle(() => {
+    if (!profileSettingsPanel) return; /* fail-closed: no hay panel montado */
+    profileSettingsPanel.classList.toggle('oculto');
+  });
+
   registerShellWindow({
     instanceId: profileInstanceId,
     title: 'Perfil',
     icon: FileUser,
-    content: profile,
+    content: profileWindowContent,
     initialBounds: { x: 44, y: 42, w: 470, h: 264 },
     focused: true,
     cssClass: 'desktop-profile-window',
     layout: 'full-bleed',
+    toolbar: profileToolbar,
   });
 
   /* Ventana legacy para páginas no-app */
@@ -69,11 +110,12 @@ export function createDesktopShell(
           instanceId: profileInstanceId,
           title: 'Perfil',
           icon: FileUser,
-          content: profile,
+          content: profileWindowContent,
           initialBounds: { x: 44, y: 42, w: 470, h: 224 },
           focused: true,
           cssClass: 'desktop-profile-window',
           layout: 'full-bleed',
+          toolbar: profileToolbar,
         });
       }
     },
@@ -202,6 +244,9 @@ export function createDesktopShell(
   function destroy(): void {
     if (destroyed) return;
     destroyed = true;
+    /* [297A-29 F3] Liberar toggle del panel y suscripción de capacidad. */
+    setProfileSettingsToggle(null);
+    stopAuthSync();
     stopWindows();
     stopGlobalDrop();
     iconGrid.destroy();

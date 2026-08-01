@@ -11,12 +11,14 @@ import { createFontPanel } from '../features/settings/font-panel';
 import { safeClick, safeRun, safeEffect } from '../utils/safe-async';
 import { renderArticleList, openEditor, disposeAdminArticleLists } from './admin-articles';
 import { renderProjectList, disposeAdminProjectLists } from './admin-projects';
+import { renderProductList, disposeAdminProductLists } from './admin-products';
 import { createEl } from '../utils/dom';
 
 /** Cleanup de recursos editoriales antes de desmontar la página Admin. */
 export function disposeAdminPage(page: HTMLElement): void {
   disposeAdminArticleLists(page);
   disposeAdminProjectLists(page);
+  disposeAdminProductLists(page);
 }
 
 export async function renderAdmin(): Promise<HTMLElement> {
@@ -40,7 +42,7 @@ export async function renderAdmin(): Promise<HTMLElement> {
   const tabs = createEl('div', { className: 'flex-fila gap-lg mb-lg border-bottom' });
   const contentArea = createEl('div', { id: 'admin-articulos' });
 
-  const tabNames = ['articulos', 'proyectos', 'fuentes', 'sitio', 'estadisticas'];
+  const tabNames = ['articulos', 'proyectos', 'productos', 'fuentes', 'sitio', 'estadisticas'];
 
   function switchTab(name: string): void {
     tabs.querySelectorAll('.boton').forEach(b => {
@@ -64,6 +66,12 @@ export async function renderAdmin(): Promise<HTMLElement> {
         const lista = createEl('div', { className: 'admin-lista' });
         contentArea.appendChild(lista);
         renderProjectList(lista);
+        break;
+      }
+      case 'productos': {
+        const lista = createEl('div', { className: 'admin-lista' });
+        contentArea.appendChild(lista);
+        renderProductList(lista);
         break;
       }
       case 'fuentes':

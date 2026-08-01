@@ -25,7 +25,7 @@ export const ArticleService = {
   ): Promise<PaginatedArticles> {
     const params = new URLSearchParams({ page: String(page), per_page: String(perPage) });
     if (status !== 'all') params.set('status', status);
-    return api.get<PaginatedArticles>(`/admin/articles?${params}`);
+    return api.get<PaginatedArticles>(`/api/admin/articles?${params}`);
   },
 
   /** Obtener un artículo por slug (público). */
@@ -35,7 +35,7 @@ export const ArticleService = {
 
   /** Obtener un artículo por ID (admin). */
   async getById(id: string): Promise<Article> {
-    return api.get<Article>(`/admin/articles/${id}`);
+    return api.get<Article>(`/api/admin/articles/${id}`);
   },
 
   /** Obtener artículo por alias (About, etc). */
@@ -45,26 +45,17 @@ export const ArticleService = {
 
   /** Crear un nuevo artículo (admin). */
   async create(data: CreateArticleRequest): Promise<Article> {
-    return api.post<Article>('/admin/articles', data);
+    return api.post<Article>('/api/admin/articles', data);
   },
 
   /** Actualizar un artículo existente (admin). */
   async update(id: string, data: UpdateArticleRequest): Promise<Article> {
-    return api.put<Article>(`/admin/articles/${id}`, data);
+    return api.put<Article>(`/api/admin/articles/${id}`, data);
   },
 
   /** Eliminar un artículo (admin). */
   async delete(id: string): Promise<void> {
-    return api.delete<void>(`/admin/articles/${id}`);
+    return api.delete<void>(`/api/admin/articles/${id}`);
   },
 
-  /** Publicar un artículo (admin). */
-  async publish(id: string): Promise<Article> {
-    return api.post<Article>(`/admin/articles/${id}/publish`, {});
-  },
-
-  /** Obtener slugs de artículos publicados (para sitemap/SEO). */
-  async listPublishedSlugs(): Promise<Array<{ slug: string; date: string }>> {
-    return api.get<Array<{ slug: string; date: string }>>('/api/articles/slugs');
-  },
 };

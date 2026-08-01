@@ -54,6 +54,8 @@ export interface PaginatedArticles {
 }
 
 /* === Media === */
+export type AssetState = 'processing' | 'clean' | 'rejected';
+
 export interface Media {
   id: string;
   article_id: string | null;
@@ -62,12 +64,14 @@ export interface Media {
   file_size: number;
   alt_text: string;
   created_at: string;
+  /** [297A-10] Estado de procesamiento del asset. */
+  asset_state: AssetState;
 }
 
 /* === Products === */
 export interface Product {
   id: string;
-  article_id: string;
+  article_id: string | null;
   name: string;
   description: string;
   price_cents: number;
@@ -77,11 +81,20 @@ export interface Product {
 }
 
 export interface CreateProductRequest {
-  article_id: string;
+  article_id?: string;
   name: string;
   description?: string;
   price_cents: number;
   currency?: string;
+  is_active?: boolean;
+}
+
+export interface UpdateProductRequest {
+  name?: string;
+  description?: string;
+  price_cents?: number;
+  currency?: string;
+  is_active?: boolean;
 }
 
 /* === Orders === */

@@ -28,26 +28,43 @@ pub struct Product {
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 pub struct CreateProductRequest {
     pub article_id: Option<Uuid>,
+    #[validate(length(
+        min = 1,
+        max = 500,
+        message = "El nombre debe tener entre 1 y 500 caracteres"
+    ))]
     pub name: String,
     #[serde(default)]
     pub description: String,
+    #[validate(range(min = 1, message = "El precio debe ser mayor que cero"))]
     pub price_cents: i32,
     #[serde(default = "default_currency")]
+    #[validate(length(equal = 3, message = "La moneda debe tener 3 caracteres"))]
     pub currency: String,
     pub download_path: Option<String>,
+    /// [297A-14] Los productos nuevos nacen inactivos/ocultos por defecto.
+    #[serde(default)]
+    pub is_active: bool,
 }
 
 fn default_currency() -> String {
     "USD".to_string()
 }
 
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize, Validate, ToSchema)]
 pub struct UpdateProductRequest {
+    #[validate(length(
+        min = 1,
+        max = 500,
+        message = "El nombre debe tener entre 1 y 500 caracteres"
+    ))]
     pub name: Option<String>,
     pub description: Option<String>,
+    #[validate(range(min = 1, message = "El precio debe ser mayor que cero"))]
     pub price_cents: Option<i32>,
+    #[validate(length(equal = 3, message = "La moneda debe tener 3 caracteres"))]
+    pub currency: Option<String>,
     pub is_active: Option<bool>,
-    pub download_path: Option<String>,
 }
 
 /// Orden de compra
@@ -74,4 +91,39 @@ pub struct CreateOrderRequest {
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CheckoutRequest {
     pub email: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CreateProductRequest, UpdateProductRequest};
+    use validator::Validate;
+
+    #[test]
+    fn producto_nuevo_nace_inactivo() {
+        let req: CreateProductRequest =
+            serde_json::from_str(r#"{"name":"tema","price_cents":1000}"#).unwrap();
+        assert!(!req.is_active);
+        assert_eq!(req.currency, "USD");
+    }
+
+    #[test]
+    fn valida_precio_no_positivo() {
+        let req: CreateProductRequest =
+            serde_json::from_str(r#"{"name":"tema","price_cents":0}"#).unwrap();
+        assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn valida_moneda_de_tres_caracteres() {
+        let req: CreateProductRequest =
+            serde_json::from_str(r#"{"name":"tema","price_cents":100,"currency":"US"}"#).unwrap();
+        assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn update_con_campos_parciales_es_valido() {
+        let req: UpdateProductRequest = serde_json::from_str(r#"{"is_active":true}"#).unwrap();
+        assert!(req.validate().is_ok());
+        assert_eq!(req.is_active, Some(true));
+    }
 }

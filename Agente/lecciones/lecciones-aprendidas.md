@@ -25,4 +25,10 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 ## 297A-24 — El chrome del shell no es una ruta runtime
 
-`Perfil` se registra como `shell-profile` en `windowStore`, no en `AppRegistry`, y por diseño no tiene URL pública. El sincronizador de URL debe proyectar únicamente apps runtime; si enfocar una entrada shell sin ruta fuerza `/`, la reconciliación puede interpretar una acción visual como navegación fuera del OS y cerrar todas las apps. La guardia debe considerar la superficie activa y cualquier app runtime abierta, mientras que el cierre masivo queda reservado a una navegación documental explícita. Esta separación se protege con tests de foco de Perfil, app no canónica, cierre de la última app y desktop/móvil.
+`Perfil` se registra como `shell-profile` en `windowStore`, no en `AppRegistry`, y por diseño no tiene URL pública. El sincronizador de URL debe proyectar únicamente apps runtime; si enfocar una entrada shell sin ruta fuerza `/`, la reconciliación puede interpretar una acción visual como navegación fuera del OS y cerrar todas las apps. La guardia debe considerar la superficie activa y cualquier app runtime abierta, mientras que el cierre masivo queda reservado a una navegación documental explícita. ## 297A-14 — El 404 silencioso de la sintaxis de rutas
+
+- axum 0.7.9 documenta `{id}`, pero el parámetro real lo decide matchit resuelto por `Cargo.lock`: este proyecto tiene matchit 0.7.3, que parsea `:param` (estilo axum 0.6). `{id}` se registra como segmento literal y devuelve 404 sin error de compilación ni warning.
+- Un contrato de rutas nunca debe asumirse por la doc del framework: verificar empíricamente la sintaxis con un router mínimo + `oneshot` contra el build real y leer el README/parser de la versión exacta de matchit en el lock.
+- `utoipa::path` conserva `{id}` (templating OpenAPI) y convive con `:param` en el routing; no «corregirlo».
+- Cuando un test HTTP devuelve 404 donde el contrato exige 401/403, sospechar de la ruta antes del middleware: el router de producción y un router mínimo deben coincidir.
+- Regla Sentinel candidata: detectar `{` en strings de `.route()`.

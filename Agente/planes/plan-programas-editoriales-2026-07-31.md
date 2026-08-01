@@ -1,7 +1,7 @@
 # Plan 297A-14 — Programas editoriales
 
 > **Fecha:** 2026-07-31
-> **Estado:** verticales de artículos y proyectos completados; productos, media, paridad y E2E visual pendientes.
+> **Estado:** verticales de artículos, proyectos y productos completados; media, paridad y E2E visual pendientes.
 > **Epic:** 297A-4 — OS persistente, cuentas, programas y comercio.
 > **Depende de:** 297A-9, 297A-10 y 297A-11.
 > **Bloquea:** cierre completo de la administración editorial y 297A-15 Comercio.
@@ -48,10 +48,13 @@ Migrar la administración editorial desde el monolito Admin hacia programas reut
 
 ### Fase 3 — Productos versionados
 
-- [ ] Diseñar `product-editor` admin-only con producto inactivo/private por defecto.
-- [ ] Mantener versiones de entrega inmutables y separar metadatos editables de archivos privados.
-- [ ] Validar precio, moneda, disponibilidad y MIME únicamente en backend.
-- [ ] Probar permisos negativos y no exposición de drafts/assets/grants.
+- [x] Diseñar `product-editor` admin-only con producto inactivo/private por defecto.
+- [x] Validar precio, moneda y disponibilidad únicamente en backend (validator + filtros de envelope).
+- [x] Añadir CRUD admin completo (`/api/admin/products` con GET/POST/GET:id/PUT:id/DELETE:id) y sincronización transaccional del resource envelope.
+- [ ] Mantener versiones de entrega inmutables y separar metadatos editables de archivos privados (queda con 297A-15 Comercio: storage privado, grants y webhook).
+- [ ] Probar permisos negativos y no exposición de drafts/assets/grants (extender cuando exista el delivery privado).
+
+**Evidencia F3 — 2026-07-31:** `product-editor` lazy admin-only sin deep link; CRUD admin completo con DTOs tipados; nace inactivo+private; `is_active`/título sincronizan el envelope; eliminar marca `trashed`; público filtra `active + public`; tests Rust de defaults/validación; frontend typecheck, Vitest **291/291**, build, backend **22/22**, `task:check -- 297A-14 --fresh` y `self-check` PASS. Además se corrigió la deriva de contrato de rutas: los servicios frontend admin ahora usan `/api/admin/...` (backend anida todo bajo `/api`), se añadió `GET /api/admin/workspace/releases/{version}` para rollback y `MediaService`/`gallery.ts` usan el shape real `Vec<Media>`.
 
 ### Fase 4 — Biblioteca de media
 

@@ -1,7 +1,9 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::models::resource::{CreateResourceParams, EditorialState, Resource, VisibilityState};
+use crate::models::resource::{
+    CreateResourceParams, EditorialState, Resource, ResourceKind, VisibilityState,
+};
 
 pub struct ResourceRepository;
 
@@ -59,11 +61,12 @@ impl ResourceRepository {
         .await
     }
 
-    /// Sincronizar título y visibilidad del envelope de un proyecto.
+    /// Sincronizar título y visibilidad del envelope de un recurso dentro de su transacción.
     /// El estado editorial se modifica únicamente mediante publicación explícita.
-    pub async fn update_project_state(
+    pub async fn update_resource_metadata(
         conn: &mut sqlx::PgConnection,
         id: Uuid,
+        kind: ResourceKind,
         title: Option<&str>,
         is_visible: Option<bool>,
     ) -> Result<bool, sqlx::Error> {
@@ -76,26 +79,29 @@ impl ResourceRepository {
                     ELSE 'private'::visibility_state \
                 END, \
                 updated_at = NOW() \
-             WHERE id = $3 AND kind = 'project'::resource_kind",
+             WHERE id = $3 AND kind = $4",
         )
         .bind(title)
         .bind(is_visible)
         .bind(id)
+        .bind(kind)
         .execute(&mut *conn)
         .await?;
         Ok(result.rows_affected() > 0)
     }
 
     /// Soft delete dentro de una transacción: conserva el envelope para restauración.
-    pub async fn soft_delete_tx(
+    pub async fn soft_delete_kind_tx(
         conn: &mut sqlx::PgConnection,
         id: Uuid,
+        kind: ResourceKind,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
             "UPDATE resources SET lifecycle = 'trashed', deleted_at = NOW(), updated_at = NOW() \
-             WHERE id = $1 AND kind = 'project'::resource_kind AND lifecycle = 'active'",
+             WHERE id = $1 AND kind = $2 AND lifecycle = 'active'",
         )
         .bind(id)
+        .bind(kind)
         .execute(&mut *conn)
         .await?;
         Ok(result.rows_affected() > 0)
@@ -120,6 +126,24 @@ impl ResourceRepository {
              WHERE id = $1 AND lifecycle = 'trashed'",
         )
         .bind(id)
+        .execute(pool)
+        .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    /// [297A-14 F4] Restaurar de trashed a active verificando el kind.
+    /// Evita restaurar un recurso de otro tipo mediante el endpoint de media.
+    pub async fn restore_kind(
+        pool: &PgPool,
+        id: Uuid,
+        kind: ResourceKind,
+    ) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query(
+            "UPDATE resources SET lifecycle = 'active', deleted_at = NULL, updated_at = NOW() \
+             WHERE id = $1 AND kind = $2 AND lifecycle = 'trashed'",
+        )
+        .bind(id)
+        .bind(kind)
         .execute(pool)
         .await?;
         Ok(result.rows_affected() > 0)

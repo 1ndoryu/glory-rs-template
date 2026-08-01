@@ -101,9 +101,10 @@ impl ProjectService {
         .await?
         .ok_or_else(|| AppError::NotFound("Proyecto no encontrado".into()))?;
 
-        let envelope_updated = ResourceRepository::update_project_state(
+        let envelope_updated = ResourceRepository::update_resource_metadata(
             &mut tx,
             id,
+            ResourceKind::Project,
             req.title.as_deref(),
             req.is_visible,
         )
@@ -120,7 +121,8 @@ impl ProjectService {
 
     pub async fn delete(pool: &PgPool, id: Uuid) -> Result<(), AppError> {
         let mut tx = pool.begin().await?;
-        let trashed = ResourceRepository::soft_delete_tx(&mut tx, id).await?;
+        let trashed =
+            ResourceRepository::soft_delete_kind_tx(&mut tx, id, ResourceKind::Project).await?;
         if !trashed {
             return Err(AppError::NotFound("Proyecto no encontrado".into()));
         }

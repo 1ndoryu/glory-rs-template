@@ -230,16 +230,16 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         /* Públicos: solo artículos publicados */
         .route("/articles", get(list_articles))
-        .route("/articles/slug/{slug}", get(get_article_by_slug))
-        .route("/articles/alias/{alias}", get(get_article_by_alias))
+        .route("/articles/slug/:slug", get(get_article_by_slug))
+        .route("/articles/alias/:alias", get(get_article_by_alias))
         /* Admin: CRUD completo */
         .route(
             "/admin/articles",
             post(create_article).get(list_articles_admin),
         )
         .route(
-            "/admin/articles/{id}",
+            "/admin/articles/:id",
             get(get_article).put(update_article).delete(delete_article),
         )
-        .route("/admin/articles/{id}/alias", put(set_article_alias))
+        .route("/admin/articles/:id/alias", put(set_article_alias))
 }

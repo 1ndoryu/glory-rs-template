@@ -387,7 +387,7 @@ Cada fase termina con esta revisión antes de marcar su salida. La revisión deb
 
 - [x] Fase 1 — Fuentes/tamaños estáticos: neutralizar `fontStore` y `loadSavedFonts()`, fijar tokens en `variables.css` (JetBrains Mono en todo, `--nav-width` fijo ≥360px), migrar consumidores legacy, eliminar `font-constants.ts`/`font-helpers.ts`/tab Fuentes/Tamaños. *(commit 297A-29 F1)*
 - [x] Fase 2 — Toolbar reactivo a capacidad: `createAppToolbar` se suscribe a `authStore` (login/logout en vivo) y se crea el comando genérico admin-only con `isAvailable` (sin `if/else` en el shell). *(commit 297A-29 F2)*
-- [ ] Fase 3 — Perfil configurable: extraer controles de perfil a `profile-settings.ts`, toolbar en `shell-profile` con botón admin-only, fix del borde (`.desktop-profile-window .profile-foto` respeta el token) y persistencia vía `POST /api/admin/settings`.
+- [x] Fase 3 — Perfil configurable: extraer controles de perfil a `profile-settings.ts`, toolbar en `shell-profile` con botón admin-only, fix del borde (`.desktop-profile-window .profile-foto` respeta el token) y persistencia vía `POST /api/admin/settings`. *(commit 297A-29 F3)*
 - [ ] Fase 4 — Eliminar la app Configuración: quitar registro `settings`, nodo admin, botón de menú, tab `'fuentes'` de Admin y CSS muerto; sin referencias residuales.
 - [ ] Fase 5 — (futuro, no implementar) Panel de control del usuario para fuentes con buena arquitectura cuando exista el panel de control.
 

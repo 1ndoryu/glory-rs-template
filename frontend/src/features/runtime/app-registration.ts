@@ -3,7 +3,7 @@
  * Cada app define su id, título, icono, capacidades y render function.
  * Las apps solo devuelven contenido; el shell crea la ventana. */
 
-import { FileUser, Folder, Settings, FileText, FolderCode, Trash2, ShieldUser, UserRound } from 'lucide';
+import { FileUser, Folder, Settings, FileText, FolderCode, Trash2, ShieldUser, UserRound, ShoppingBag, FolderOpen } from 'lucide';
 import { createEl } from '../../utils/dom';
 import { AppRegistry } from './app-registry';
 import { createPathDeepLink } from './deep-links';
@@ -263,6 +263,44 @@ AppRegistry.registerLazy({
   layout: 'padded',
   load: () => import('../desktop/apps/project-editor/project-editor').then(m => ({
     render: (ctx: RenderContext): MountedView => m.renderProjectEditor(ctx),
+  })),
+});
+
+/* === Product Editor — programa editorial admin === */
+AppRegistry.registerLazy({
+  id: 'product-editor',
+  title: 'Editor de productos',
+  icon: ShoppingBag,
+  iconType: 'application',
+  singleton: false,
+  requires: 'admin',
+  layout: 'padded',
+  load: () => import('../desktop/apps/product-editor/product-editor').then(m => ({
+    render: (ctx: RenderContext): MountedView => m.renderProductEditor(ctx),
+  })),
+});
+
+/* === Media Library — biblioteca de media admin === */
+AppRegistry.registerLazy({
+  id: 'media-library',
+  title: 'Biblioteca de media',
+  icon: FolderOpen,
+  iconType: 'folder',
+  singleton: true,
+  requires: 'admin',
+  layout: 'padded',
+  load: () => import('../desktop/apps/media-library/media-library').then(m => ({
+    render: (ctx: RenderContext): MountedView => {
+      dispatchEvent({ type: 'app_opened', appId: 'media-library' });
+      const view = m.createMediaLibraryPreview({ signal: ctx.signal });
+      return {
+        element: view.element,
+        destroy: () => {
+          view.destroy();
+          dispatchEvent({ type: 'app_closed', appId: 'media-library' });
+        },
+      };
+    },
   })),
 });
 

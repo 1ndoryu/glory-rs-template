@@ -152,6 +152,10 @@ pub fn create_router(pool: sqlx::PgPool, config: crate::config::AppConfig) -> Ro
 }
 
 fn api_routes() -> Router<AppState> {
+    /* [297A-14] Sintaxis de rutas: este build (axum 0.7.9 + matchit 0.7.3)
+     * parsea parámetros con `:param`, NO con `{param}` (el `{id}` de la doc
+     * de axum 0.7 devuelve 404 silencioso). Usar SIEMPRE `:id` en `.route()`;
+     * los atributos `utoipa::path` sí conservan `{id}` (formato OpenAPI). */
     Router::new()
         .merge(health::routes())
         .merge(auth::routes())

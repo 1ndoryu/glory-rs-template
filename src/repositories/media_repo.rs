@@ -1,9 +1,12 @@
-use sqlx::PgPool;
+use sqlx::{PgPool, QueryBuilder};
 use uuid::Uuid;
 
 use crate::models::media::Media;
 
 pub struct MediaRepository;
+
+/// Columnas compartidas de los listados (m = media, join resources r).
+const LIST_COLS: &str = "m.id, m.article_id, m.file_path, m.file_type, m.file_size, m.alt_text, m.created_at, m.asset_state";
 
 impl MediaRepository {
     /// [297A-10] Crear media dentro de una transacción.
@@ -31,54 +34,66 @@ impl MediaRepository {
         .await
     }
 
-    pub async fn list(
+    /// Listado público: solo envelope active + public + asset clean.
+    /// [297A-14 F4] El público nunca recibe processing/rejected/private/trashed.
+    pub async fn list_public(
         pool: &PgPool,
         file_type: Option<&str>,
         article_id: Option<Uuid>,
     ) -> Result<Vec<Media>, sqlx::Error> {
-        let cols =
-            "id, article_id, file_path, file_type, file_size, alt_text, created_at, asset_state";
-        match (file_type, article_id) {
-            (Some(ft), Some(aid)) => {
-                sqlx::query_as::<_, Media>(&format!(
-                    "SELECT {cols} FROM media WHERE file_type = $1 AND article_id = $2 ORDER BY created_at DESC"
-                ))
-                .bind(ft)
-                .bind(aid)
-                .fetch_all(pool)
-                .await
-            }
-            (Some(ft), None) => {
-                sqlx::query_as::<_, Media>(&format!(
-                    "SELECT {cols} FROM media WHERE file_type = $1 ORDER BY created_at DESC"
-                ))
-                .bind(ft)
-                .fetch_all(pool)
-                .await
-            }
-            (None, Some(aid)) => {
-                sqlx::query_as::<_, Media>(&format!(
-                    "SELECT {cols} FROM media WHERE article_id = $1 ORDER BY created_at DESC"
-                ))
-                .bind(aid)
-                .fetch_all(pool)
-                .await
-            }
-            (None, None) => {
-                sqlx::query_as::<_, Media>(&format!(
-                    "SELECT {cols} FROM media ORDER BY created_at DESC"
-                ))
-                .fetch_all(pool)
-                .await
-            }
+        let mut qb = QueryBuilder::new(format!(
+            "SELECT {LIST_COLS} FROM media m \
+             INNER JOIN resources r ON r.id = m.id \
+             WHERE r.lifecycle = 'active'::lifecycle_state \
+               AND r.visibility = 'public'::visibility_state \
+               AND m.asset_state = 'clean'::asset_processing_state"
+        ));
+        if let Some(ft) = file_type {
+            qb.push(" AND m.file_type = ").push_bind(ft);
         }
+        if let Some(aid) = article_id {
+            qb.push(" AND m.article_id = ").push_bind(aid);
+        }
+        qb.push(" ORDER BY m.created_at DESC");
+        qb.build_query_as::<Media>().fetch_all(pool).await
     }
 
-    pub async fn delete(pool: &PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query("DELETE FROM media WHERE id = $1")
-            .bind(id)
-            .execute(pool)
-            .await?;
-        Ok(result.rows_affected() > 0)
+    /// Listado admin: envelope activo, incluye processing/rejected.
+    pub async fn list_admin(
+        pool: &PgPool,
+        file_type: Option<&str>,
+        article_id: Option<Uuid>,
+        asset_state: Option<&str>,
+    ) -> Result<Vec<Media>, sqlx::Error> {
+        let mut qb = QueryBuilder::new(format!(
+            "SELECT {LIST_COLS} FROM media m \
+             INNER JOIN resources r ON r.id = m.id \
+             WHERE r.lifecycle = 'active'::lifecycle_state"
+        ));
+        if let Some(ft) = file_type {
+            qb.push(" AND m.file_type = ").push_bind(ft);
+        }
+        if let Some(aid) = article_id {
+            qb.push(" AND m.article_id = ").push_bind(aid);
+        }
+        if let Some(state) = asset_state {
+            qb.push(" AND m.asset_state = ")
+                .push_bind(state)
+                .push("::asset_processing_state");
+        }
+        qb.push(" ORDER BY m.created_at DESC");
+        qb.build_query_as::<Media>().fetch_all(pool).await
+    }
+
+    /// Listado de la papelera: envelope trashed (restauración).
+    pub async fn list_trashed(pool: &PgPool) -> Result<Vec<Media>, sqlx::Error> {
+        sqlx::query_as::<_, Media>(&format!(
+            "SELECT {LIST_COLS} FROM media m \
+             INNER JOIN resources r ON r.id = m.id \
+             WHERE r.lifecycle = 'trashed'::lifecycle_state \
+             ORDER BY m.created_at DESC"
+        ))
+        .fetch_all(pool)
+        .await
     }
 }

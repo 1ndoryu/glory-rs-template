@@ -1,48 +1,45 @@
 /* wandori.us — Product Service
  * Capa de servicio para operaciones con productos.
- * [Auditoría v4 §4.1] — Rompe acoplamiento a api.get/post en pages/article.ts y checkout.ts. */
+ * [297A-14] Alineado al contrato canónico: admin bajo /api/admin/products,
+ * público por artículo y checkout en rutas públicas reales. */
 
 import { api } from '../api/client';
-import type { Product, CreateProductRequest } from '../api/types';
+import type { CreateProductRequest, Product, UpdateProductRequest } from '../api/types';
 
 export const ProductService = {
-  /** Obtener un producto por ID. */
-  async getById(id: string): Promise<Product> {
-    return api.get<Product>(`/api/products/${id}`);
+  /** Obtener un producto por ID (admin). */
+  async getById(id: string, options?: { signal?: AbortSignal }): Promise<Product> {
+    return api.get<Product>(`/api/admin/products/${id}`, options);
   },
 
-  /** Obtener producto asociado a un artículo. */
+  /** Obtener productos activos asociados a un artículo (público). */
   async getByArticleId(articleId: string): Promise<Product | null> {
     try {
-      return await api.get<Product>(`/api/products/by-article/${articleId}`);
+      const products = await api.get<Product[]>(`/api/articles/${articleId}/products`);
+      return products[0] ?? null;
     } catch {
       return null;
     }
   },
 
-  /** Listar productos activos (público). */
-  async listActive(): Promise<Product[]> {
-    return api.get<Product[]>('/api/products');
-  },
-
   /** Listar todos los productos (admin). */
   async listAll(): Promise<Product[]> {
-    return api.get<Product[]>('/admin/products');
+    return api.get<Product[]>('/api/admin/products');
   },
 
-  /** Crear un nuevo producto (admin). */
+  /** Crear un nuevo producto (admin). Nace inactivo/private por defecto. */
   async create(data: CreateProductRequest): Promise<Product> {
-    return api.post<Product>('/admin/products', data);
+    return api.post<Product>('/api/admin/products', data);
   },
 
   /** Actualizar un producto (admin). */
-  async update(id: string, data: Partial<CreateProductRequest & { is_active: boolean }>): Promise<Product> {
-    return api.put<Product>(`/admin/products/${id}`, data);
+  async update(id: string, data: UpdateProductRequest): Promise<Product> {
+    return api.put<Product>(`/api/admin/products/${id}`, data);
   },
 
   /** Eliminar un producto (admin). */
   async delete(id: string): Promise<void> {
-    return api.delete<void>(`/admin/products/${id}`);
+    return api.delete<void>(`/api/admin/products/${id}`);
   },
 
   /** Crear sesión de checkout para un producto (público). */

@@ -49,8 +49,7 @@ export async function renderGallery(): Promise<HTMLElement> {
     return page;
   }
 
-  const mediaResponse = mediaResult.value;
-  const media = mediaResponse.items;
+  const media = mediaResult.value;
   page.innerHTML = '';
   page.appendChild(titulo);
 

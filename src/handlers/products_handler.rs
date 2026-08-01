@@ -7,11 +7,13 @@ use validator::Validate;
 
 use crate::errors::AppError;
 use crate::middleware::AdminUser;
-use crate::models::product::{CheckoutRequest, CreateProductRequest, Order, Product};
+use crate::models::product::{
+    CheckoutRequest, CreateProductRequest, Order, Product, UpdateProductRequest,
+};
 use crate::services::product_svc::ProductService;
 use crate::AppState;
 
-/// Crear producto (admin)
+/// Crear producto (admin) — nace inactivo/private por defecto
 pub async fn create_product(
     State(state): State<AppState>,
     _auth: AdminUser,
@@ -24,7 +26,26 @@ pub async fn create_product(
     Ok((StatusCode::CREATED, Json(product)))
 }
 
-/// Listar productos de un articulo (publico)
+/// Obtener producto por ID (admin)
+pub async fn get_product(
+    State(state): State<AppState>,
+    _auth: AdminUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Product>, AppError> {
+    let product = ProductService::get(&state.pool, id).await?;
+    Ok(Json(product))
+}
+
+/// Listar todos los productos (admin)
+pub async fn list_all_products(
+    State(state): State<AppState>,
+    _auth: AdminUser,
+) -> Result<Json<Vec<Product>>, AppError> {
+    let products = ProductService::list_all(&state.pool).await?;
+    Ok(Json(products))
+}
+
+/// Listar productos de un articulo (publico — solo activos)
 pub async fn list_products_by_article(
     State(state): State<AppState>,
     Path(article_id): Path<Uuid>,
@@ -33,7 +54,21 @@ pub async fn list_products_by_article(
     Ok(Json(products))
 }
 
-/// Eliminar producto (admin)
+/// Actualizar producto (admin) — sincroniza envelope en transacción
+pub async fn update_product(
+    State(state): State<AppState>,
+    _auth: AdminUser,
+    Path(id): Path<Uuid>,
+    Json(req): Json<UpdateProductRequest>,
+) -> Result<Json<Product>, AppError> {
+    req.validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+
+    let product = ProductService::update(&state.pool, id, req).await?;
+    Ok(Json(product))
+}
+
+/// Eliminar producto (admin) — soft delete del envelope
 pub async fn delete_product(
     State(state): State<AppState>,
     _auth: AdminUser,
@@ -131,17 +166,13 @@ async fn create_stripe_checkout(
 
 /// Iniciar checkout de Stripe.
 /// [297A-7] Solo acepta productos activos. Modo demo deshabilitado.
+/// [297A-14] `get_public` exige envelope active + public e `is_active` en SQL.
 pub async fn checkout(
     State(state): State<AppState>,
     Path(product_id): Path<Uuid>,
     Json(req): Json<CheckoutRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let product = ProductService::get(&state.pool, product_id).await?;
-
-    /* [297A-7] Checkout solo acepta productos activos */
-    if !product.is_active {
-        return Err(AppError::BadRequest("Producto no disponible".into()));
-    }
+    let product = ProductService::get_public(&state.pool, product_id).await?;
 
     /* [297A-7] Modo demo deshabilitado — requiere Stripe configurado */
     let stripe_key = state
@@ -162,11 +193,19 @@ pub async fn checkout(
 
 pub fn routes() -> Router<AppState> {
     Router::new()
-        .route("/products", post(create_product))
+        /* Públicos */
         .route(
-            "/articles/{article_id}/products",
+            "/articles/:article_id/products",
             get(list_products_by_article),
         )
-        .route("/products/{id}", axum::routing::delete(delete_product))
-        .route("/products/{id}/checkout", post(checkout))
+        .route("/products/:id/checkout", post(checkout))
+        /* Admin — contrato canónico /admin/products */
+        .route(
+            "/admin/products",
+            get(list_all_products).post(create_product),
+        )
+        .route(
+            "/admin/products/:id",
+            get(get_product).put(update_product).delete(delete_product),
+        )
 }

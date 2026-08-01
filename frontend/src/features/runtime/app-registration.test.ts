@@ -37,6 +37,24 @@ describe('Account app registration', () => {
     expect(editor?.routePatterns).toBeUndefined();
   });
 
+  it('registers product editor as an internal admin app', () => {
+    const editor = AppRegistry.get('product-editor');
+    expect(editor).toBeDefined();
+    expect(editor?.requires).toBe('admin');
+    expect(editor?.singleton).toBe(false);
+    expect(editor?.deepLink).toBeUndefined();
+    expect(editor?.routePatterns).toBeUndefined();
+  });
+
+  it('registers media library as an admin-only singleton without public deep link', () => {
+    const library = AppRegistry.get('media-library');
+    expect(library).toBeDefined();
+    expect(library?.requires).toBe('admin');
+    expect(library?.singleton).toBe(true);
+    expect(library?.deepLink).toBeUndefined();
+    expect(library?.routePatterns).toBeUndefined();
+  });
+
   it('does not reinterpret an internal resourceId as a public Reader slug', async () => {
     const reader = AppRegistry.get('reader');
     expect(reader).toBeDefined();

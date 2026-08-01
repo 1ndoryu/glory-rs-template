@@ -44,4 +44,8 @@ export const ADMIN_NODES: Record<string, WorkspaceNode> = {
     id: 'admin', parentId: 'desktop', type: 'app', label: 'Admin', refId: 'admin',
     position: { col: 0, row: 5 }, mobilePosition: { col: 0, row: 2 }, mobileOrder: 5, requires: 'admin',
   },
+  mediaLibrary: {
+    id: 'mediaLibrary', parentId: 'desktop', type: 'app', label: 'Biblioteca de media', refId: 'media-library',
+    position: { col: 1, row: 1 }, mobilePosition: { col: 2, row: 2 }, mobileOrder: 7, requires: 'admin',
+  },
 };

@@ -76,7 +76,7 @@ pub fn routes() -> Router<AppState> {
             get(list_all_projects).post(create_project),
         )
         .route(
-            "/admin/projects/{id}",
+            "/admin/projects/:id",
             get(get_project).put(update_project).delete(delete_project),
         )
 }

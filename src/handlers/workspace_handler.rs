@@ -1,4 +1,4 @@
-use axum::extract::State;
+use axum::extract::{Path, State};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::Serialize;
@@ -29,6 +29,25 @@ pub async fn get_active_release(
     State(state): State<AppState>,
 ) -> Result<Json<WorkspaceReleasePublic>, AppError> {
     let release = WorkspaceService::get_active_release(&state.pool).await?;
+    Ok(Json(release))
+}
+
+/// Obtener un release por versión (admin — rollback).
+#[utoipa::path(
+    get,
+    path = "/admin/workspace/releases/{version}",
+    params(("version" = i32, Path, description = "Versión del release")),
+    responses(
+        (status = 200, description = "Release encontrado", body = WorkspaceReleasePublic),
+        (status = 404, description = "No encontrado", body = crate::errors::ErrorResponse)
+    )
+)]
+pub async fn get_release_by_version(
+    State(state): State<AppState>,
+    _admin: AdminUser,
+    Path(version): Path<i32>,
+) -> Result<Json<WorkspaceReleasePublic>, AppError> {
+    let release = WorkspaceService::get_release_by_version(&state.pool, version).await?;
     Ok(Json(release))
 }
 
@@ -73,5 +92,9 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/workspace/release", get(get_active_release))
         .route("/admin/workspace/releases", get(list_releases))
+        .route(
+            "/admin/workspace/releases/:version",
+            get(get_release_by_version),
+        )
         .route("/admin/workspace/publish", post(publish_release))
 }

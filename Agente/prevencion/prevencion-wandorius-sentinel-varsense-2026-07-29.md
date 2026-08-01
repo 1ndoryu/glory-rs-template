@@ -72,6 +72,7 @@
 - [ ] Evento analítico requiere ID, versión, nombre allowlisted y metadata limitada.
 - [ ] Batch analítico exige límite, idempotencia y transacción.
 - [ ] El cliente no puede declarar éxito de pago, auth, publicación o descarga.
+- [ ] Detectar `{param}` en strings de `.route()` de axum: este build (matchit 0.7.3) parsea `:param`; `{id}` devuelve 404 silencioso sin error de compilación. *(hallazgo 297A-14: corregido en código; regla Sentinel pendiente)*
 - [ ] Analytics no contiene email, contenido, token, URL firmada o datos de pago.
 - [ ] Audit y analytics usan contratos/tablas separados.
 

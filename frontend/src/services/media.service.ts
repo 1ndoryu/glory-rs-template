@@ -1,39 +1,44 @@
 /* wandori.us — Media Service
  * Capa de servicio para operaciones con archivos multimedia.
- * [Auditoría v4 §4.1] — Rompe acoplamiento a api.upload en font-panel.ts y admin-articles.ts. */
+ * [297A-14] Alineado al contrato real del backend: público GET /api/media
+ * (solo clean+public+active); admin bajo /api/admin/media con subida,
+ * listado (incluye processing/rejected), papelera, soft delete y restore. */
 
 import { api } from '../api/client';
 import type { Media } from '../api/types';
 
 export const MediaService = {
-  /** Subir un archivo multimedia.
-   *  @param file - Archivo a subir
-   *  @param articleId - ID del artículo asociado (opcional)
-   *  @param altText - Texto alternativo (opcional)
-   *  @param folder - Carpeta de destino (opcional) */
-  async upload(file: File, options?: { articleId?: string; altText?: string; folder?: string }): Promise<Media> {
+  /** Subir un archivo multimedia (admin). El tipo lo decide el backend. */
+  async upload(file: File, options?: { articleId?: string; altText?: string }): Promise<Media> {
     const formData = new FormData();
     formData.append('file', file);
     if (options?.articleId) formData.append('article_id', options.articleId);
     if (options?.altText) formData.append('alt_text', options.altText);
-    if (options?.folder) formData.append('folder', options.folder);
-    return api.upload<Media>('/api/media/upload', formData);
+    return api.upload<Media>('/api/admin/media', formData);
   },
 
-  /** Obtener metadatos de un archivo multimedia. */
-  async getById(id: string): Promise<Media> {
-    return api.get<Media>(`/api/media/${id}`);
+  /** Listar archivos multimedia públicos: solo clean + public + active. */
+  async list(): Promise<Media[]> {
+    return api.get<Media[]>('/api/media');
   },
 
-  /** Listar archivos multimedia (admin). */
-  async list(page = 1, perPage = 50): Promise<{ items: Media[]; total: number }> {
-    return api.get<{ items: Media[]; total: number }>(
-      `/admin/media?page=${page}&per_page=${perPage}`,
-    );
+  /** Listar media admin: envelope activo, incluye processing/rejected. */
+  async listAdmin(): Promise<Media[]> {
+    return api.get<Media[]>('/api/admin/media');
   },
 
-  /** Eliminar un archivo multimedia (admin). */
+  /** Listar media en la papelera (admin). */
+  async listTrashed(): Promise<Media[]> {
+    return api.get<Media[]>('/api/admin/media/trashed');
+  },
+
+  /** Eliminar media (admin) — soft delete: pasa a la papelera. */
   async delete(id: string): Promise<void> {
-    return api.delete<void>(`/admin/media/${id}`);
+    return api.delete<void>(`/api/admin/media/${id}`);
+  },
+
+  /** Restaurar media desde la papelera (admin). */
+  async restore(id: string): Promise<void> {
+    return api.post<void>(`/api/admin/media/${id}/restore`, {});
   },
 };

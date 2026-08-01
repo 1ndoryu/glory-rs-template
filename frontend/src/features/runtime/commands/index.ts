@@ -10,5 +10,6 @@ import './workspace-reorder-commands';
 import './toolbar-commands';
 import './navigation-commands';
 import './theme-commands';
+import './profile-commands';
 
 export { initKeyboardShortcuts } from './keyboard-handler';

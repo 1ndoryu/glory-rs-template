@@ -99,13 +99,30 @@
   padding: var(--espacio-xl);
 }
 
+/* [297A-29 F3] Fix borde: respeta el token configurable --profile-border
+ * (el checkbox "borde" del panel escribe ese token vía profileStore) en lugar
+ * de forzar var(--sistema-borde), que ignoraba la preferencia del usuario. */
 .desktop-profile-window .profile-foto {
   grid-row: 1 / 3;
   grid-column: 1;
   max-width: var(--sistema-perfil-foto-max);
   max-height: var(--sistema-perfil-foto-max);
-  border: var(--sistema-borde);
+  border: var(--profile-border);
   image-rendering: auto;
+}
+
+/* [297A-29 F3] Wrapper del contenido de la ventana Perfil:
+ * header del perfil + panel de configuración (oculto por defecto).
+ * El panel es un bloque dentro de la ventana, no un modal global. */
+.desktop-profile-window__content {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.desktop-profile-window__content .profile-settings-panel {
+  border-top: var(--sistema-borde);
+  padding: var(--espacio-lg);
 }
 
 .desktop-profile-window .profile-nombre {

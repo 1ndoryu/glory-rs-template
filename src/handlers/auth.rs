@@ -263,5 +263,5 @@ pub fn routes() -> Router<AppState> {
         .route("/auth/me", get(me))
         .route("/auth/logout", post(logout))
         .route("/auth/sessions", get(list_sessions))
-        .route("/auth/sessions/{id}", delete(revoke_session))
+        .route("/auth/sessions/:id", delete(revoke_session))
 }

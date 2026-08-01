@@ -40,20 +40,20 @@ export const WorkspaceService = {
     }
   },
 
-  /** Obtener un release por versión. */
+  /** Obtener un release por versión (admin). */
   async getReleaseByVersion(version: number): Promise<ReleaseInfo> {
-    return api.get<ReleaseInfo>(`/api/workspace/release/${version}`);
+    return api.get<ReleaseInfo>(`/api/admin/workspace/releases/${version}`);
   },
 
   /** Listar historial de releases (admin). */
   async listReleases(): Promise<ReleaseListItem[]> {
-    const res = await api.get<{ items: ReleaseListItem[] }>('/admin/workspace/releases');
+    const res = await api.get<{ items: ReleaseListItem[] }>('/api/admin/workspace/releases');
     return res.items;
   },
 
   /** Publicar un nuevo release (admin). */
   async publish(tree: WorkspaceTree): Promise<ReleaseInfo> {
-    return api.post<ReleaseInfo>('/admin/workspace/publish', { tree });
+    return api.post<ReleaseInfo>('/api/admin/workspace/publish', { tree });
   },
 
   /** Guardar/actualizar el overlay remoto con revisión optimista. */

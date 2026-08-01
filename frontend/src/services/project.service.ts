@@ -13,31 +13,27 @@ export const ProjectService = {
 
   /** Listar todos los proyectos (admin). */
   async listAll(): Promise<Project[]> {
-    return api.get<Project[]>('/admin/projects');
+    return api.get<Project[]>('/api/admin/projects');
   },
 
   /** Obtener un proyecto por ID; opcionalmente abortable con el lifecycle. */
   async getById(id: string, options?: { signal?: AbortSignal }): Promise<Project> {
-    return api.get<Project>(`/admin/projects/${id}`, options);
+    return api.get<Project>(`/api/admin/projects/${id}`, options);
   },
 
   /** Crear un nuevo proyecto (admin). */
   async create(data: CreateProjectRequest): Promise<Project> {
-    return api.post<Project>('/admin/projects', data);
+    return api.post<Project>('/api/admin/projects', data);
   },
 
   /** Actualizar un proyecto (admin). */
   async update(id: string, data: UpdateProjectRequest): Promise<Project> {
-    return api.put<Project>(`/admin/projects/${id}`, data);
+    return api.put<Project>(`/api/admin/projects/${id}`, data);
   },
 
   /** Eliminar un proyecto (admin). */
   async delete(id: string): Promise<void> {
-    return api.delete<void>(`/admin/projects/${id}`);
+    return api.delete<void>(`/api/admin/projects/${id}`);
   },
 
-  /** Reordenar proyectos (admin). */
-  async reorder(ids: string[]): Promise<void> {
-    return api.post<void>('/admin/projects/reorder', { ids });
-  },
 };
