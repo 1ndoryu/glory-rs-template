@@ -17,6 +17,7 @@ import './styles/desktop/desktop-context-menu.css';
 import './styles/desktop/desktop-app-toolbar.css';
 import './styles/desktop/desktop-trash.css';
 import './styles/desktop/desktop-media-library.css';
+import './styles/desktop/desktop-article-editor.css';
 import './styles/desktop/desktop-properties.css';
 import './styles/mobile/mobile-prototype.css';
 

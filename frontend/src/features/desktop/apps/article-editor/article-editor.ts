@@ -122,8 +122,11 @@ export function renderArticleEditor(ctx: RenderContext): MountedView {
         pinButton.textContent = isPinned ? 'fijado ✓' : 'fijar articulo';
       });
 
+      /* [018A-74] El borde del campo ya lo define desktop-article-editor.css
+       * (borde completo, igual que .campo-textarea); se retiró la utilidad
+       * .border-bottom que solo pintaba la línea inferior. */
       const editorContainer = createEl('div', {
-        className: 'article-editor__content border-bottom',
+        className: 'article-editor__content',
         ariaLabel: 'Contenido del artículo',
       });
       const cover = createCoverField(article, isActive, () => scheduleAutosave());
