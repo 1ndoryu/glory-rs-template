@@ -1,0 +1,296 @@
+# Roadmap Sentinel / VarSense / Quality Gate — wandori.us
+
+> **Fecha:** 2026-08-01  
+> **Alcance:** exclusivamente Glory Sentinel, VarSense y el orquestador `scripts/quality`.  
+> **Fuera de alcance:** funcionalidades del OS, frontend, backend, comercio, móvil y roadmap principal.  
+> **Objetivo:** convertir los hallazgos y scripts nacidos en este proyecto en capacidades agnósticas, rápidas, portables y mantenibles para cualquier proyecto.
+
+## Cómo usar este roadmap
+
+- Los IDs `SNT-*` son identificadores internos de este roadmap; al ejecutar una tarea se les asignará el task ID diario exigido por `AGENTS.md`.
+- Una casilla solo se marca con evidencia: fixture, prueba CLI/LSP/VS Code equivalente, reporte y quality gate.
+- El core de Sentinel/VarSense no recibe reglas, rutas, nombres de clases, idiomas ni decisiones de wandori.us.
+- El proyecto configura políticas mediante `sentinel.config.json`, `varsense.config.json`, `quality.config.json` y `quality-tools.json`.
+- Mientras exista una regla en scripts locales, el adaptador debe marcarla como puente temporal y registrar su paridad con el core.
+- Cada fase termina con revisión SOLID, rendimiento, falsos positivos, seguridad de paths/secretos y compatibilidad Windows/Linux/macOS.
+
+## Estado inicial auditado
+
+### Herramientas fijadas
+
+| Herramienta | Versión/commit fijado | Estado observado |
+| --- | --- | --- |
+| Glory Sentinel | `0.4.0` / `7970dc29e0ba62139e00a0546f4b252e2893e4eb` | CLI JSON versionado y config estricta; faltan varias reglas que hoy viven en shell scripts. |
+| VarSense | `2.2.0` / `b299040d2daa4b4dd3c3aeb4cca7dd5998b29901` | Core/CLI/LSP equivalentes; el proyecto aún aplica un parche local para el índice de clases dinámicas. |
+| Quality gate | `scripts/quality/*.mjs` | Tiene preflight, lock, cache, redacción, reportes y perfiles; necesita endurecer errores, portabilidad y paralelismo. |
+
+### Hallazgos prioritarios del orquestador
+
+- `scripts/quality/adapters/custom.mjs` mantiene `hasErrors = false` y nunca lo actualiza; un script custom puede terminar con violaciones y el stage queda en PASS.
+- Los scripts custom se ejecutan con `bash`, dependen de `grep`, `awk`, `sed`, `find` y parsean emojis/salida humana; el comportamiento no es portable ni tiene contrato estructurado.
+- `runCustom` convierte en warnings los códigos de salida de reglas que deberían poder bloquear; además no conserva el severity declarado por cada regla.
+- `runVarsense` ejecuta `scan` y `orphan-classes` como procesos separados, por lo que puede reconstruir índices y recorrer archivos dos veces.
+- La cache de stages necesita incorporar explícitamente versión/commit de la herramienta, versión del parser, configuración efectiva y plataforma; el hash de archivos por sí solo puede reutilizar un PASS obsoleto.
+- `quality-tools.json` mantiene un parche de 12 KB para VarSense; la solución correcta es subir el soporte de clases dinámicas al core y retirar el parche local.
+- La detección incremental y los reportes son reutilizables, pero `docs.mjs`, reminders en español, IDs de roadmap y rutas `frontend/src` son políticas del proyecto.
+
+## Frontera de reutilización
+
+### Debe migrarse al core agnóstico
+
+| Procedencia actual | Regla/capacidad reusable | Destino propuesto |
+| --- | --- | --- |
+| `check-sentinel-extended.sh` | límite de líneas por archivo/módulo | Sentinel static analyzer, umbral configurable por lenguaje y exclusiones declarativas |
+| `check-sentinel-extended.sh` | `any`, `@ts-ignore`, `@ts-expect-error` | Sentinel TypeScript/JavaScript AST rule |
+| `check-sentinel-extended.sh` | default exports | Sentinel style rule opt-in, nunca política global obligatoria |
+| `check-sentinel-extended.sh` | `console.*` en producción | Sentinel rule con allowlist de logger, tests y tooling configurables |
+| `check-sentinel-extended.sh` | subscribe sin cleanup | Sentinel lifecycle rule basada en AST y contratos de framework, no regex |
+| `check-sentinel-extended.sh` | API fuera de service layer | regla genérica de límites de capas con `layers`/`allowedImports` en configuración |
+| `check-sentinel-extended.sh` | imports directos de stores | regla genérica de dependencias prohibidas por capa |
+| `check-sentinel-extended.sh` | interfaces grandes | regla ISP configurable por campos y tipos excluidos |
+| `check-sentinel-extended.sh` | catch silencioso | regla multi-lenguaje con clasificación de catch vacío, comentario, log-only y propagación |
+| `check-sentinel-extended.sh` | módulo con re-export + lógica | regla de barrel/lógica separada |
+| `check-sentinel-extended.sh` | export no usado | preferir índice semántico TypeScript; fallback explícito como finding de baja confianza |
+| `check-dom-abstraction.sh` | DOM directo fuera del adaptador UI | Sentinel browser-architecture rule con paths de boundary configurables |
+| `check-window-refs.sh` | `window.*` fuera de plataforma/navegación | Sentinel platform-boundary rule con APIs permitidas por proyecto |
+| `check-singleton-state.sh` | singleton mutable | Sentinel state-architecture rule; detectar instancia, módulo mutable y store global con excepciones justificadas |
+| `varsense-class-index.patch` | clases dinámicas en factories/template strings | VarSense `ClassIndexBuilder` del core; eliminar parche downstream |
+| `varsense.config.json` | inline Vanilla TS/JS, tokens y clases dinámicas | capacidades generales de VarSense; nombres de clases y exclusiones quedan en config local |
+
+### Debe permanecer específico del proyecto
+
+- Rutas concretas (`frontend/src`, `Agente/`, `roadmap.md`), nombres de clases españolas y excepciones visuales de wandori.us.
+- `docs.mjs`: validar task ID, roadmap y planes de `Agente/`; debe quedar como adapter de documentación configurable, no regla de Sentinel.
+- `reminders.mjs`: recordatorios del OS, móvil, Coolify y documentación; el motor puede aceptar perfiles, pero el texto no va al core.
+- Perfiles `desktop`, `mobile`, `workspace`, `commerce` y sus patrones de este repositorio; el esquema de perfiles sí puede ser agnóstico.
+- `quality-tools.json`: manifiesto por proyecto; la estructura de lock/commit/hash es reusable, los repositorios y versiones son datos del consumidor.
+- Excepciones como `frontend/src/utils/dom.ts`, clases `desktop-*`, `perfil-redes` o recetas del sistema visual; nunca convertirlas en defaults upstream.
+- Checks que conocen `workspaceStore`, `CommandRegistry`, `WindowManager`, `/admin`, Rust/Axum o contratos concretos del OS; solo se generalizan si se modelan como límites configurables.
+
+## Arquitectura objetivo
+
+### Sentinel
+
+Separar claramente cinco capas:
+
+1. **Discovery:** normaliza paths, detecta lenguaje, respeta includes/excludes y protege contra symlinks/rutas fuera del workspace.
+2. **Indexación:** parsea cada archivo una sola vez y comparte AST, símbolos, imports, exports, scopes y posiciones entre reglas.
+3. **Rule engine:** ejecuta reglas declarativas/AST con contrato común, severidad, confianza, categoría, autofix y cancellation token.
+4. **Policy:** aplica configuración del proyecto, severidad, baseline, suppressions justificadas y límites de findings.
+5. **Adapters:** CLI JSON, LSP y VS Code consumen el mismo resultado normalizado; ningún analyzer core importa `vscode`.
+
+Contrato mínimo de una regla:
+
+```text
+ruleId, language, category, severityDefault, confidence,
+sourceRange, message, remediation, safeFix?, docsUrl, analyzerVersion
+```
+
+Una regla no ejecuta procesos, no escribe archivos, no imprime salida humana y no conoce nombres de este proyecto.
+
+### VarSense
+
+- Mantener `core` como fuente única para variable index, class index, parser, resolver y análisis documental.
+- Construir un índice compartido por snapshot de workspace; `scan` y `orphan-classes` deben consumirlo en una ejecución combinada.
+- Mantener CLI, LSP y extensión como adapters finos, equivalentes mediante fixtures.
+- Separar parser CSS/valores, indexadores, política de tokens y presentación; ningún core importa VS Code.
+- Migrar el parche de clases dinámicas upstream y versionar el contrato de extracción de clases para factories, `className`, objetos y template strings.
+
+### Quality gate
+
+- Mantener el flujo público `npm run task:check -- <task-id>` y un output JSON/Markdown estable.
+- Reemplazar el adapter de scripts humanos por invocaciones CLI estructuradas con `outputSchemaVersion`.
+- Ejecutar etapas independientes en paralelo con límite de concurrencia y cancelación; mantener orden determinista en el reporte.
+- Separar `tool error`, `rule error`, `blocking finding`, `warning` e `information`; nunca degradar un error de infraestructura a warning.
+- Cachear por contenido + config efectiva + commit/version de herramienta + parser + plataforma; invalidar por cambio de lock, patch o schema.
+- Mantener lock, timeout, redacción, escritura atómica y cleanup como librería reusable del orquestador, no como lógica duplicada por adapter.
+
+## Fases y checklist
+
+### SNT-01 — Baseline, contratos y seguridad del gate
+
+**Objetivo:** congelar el comportamiento actual y eliminar PASS falsos antes de añadir reglas.
+
+- [ ] Reproducir `runCustom` con una fixture que falle y corregir la propagación de `hasErrors`/exit code.
+- [ ] Definir contrato estructurado para scripts legacy o marcar cada script como puente temporal; eliminar parseo de emojis y texto humano.
+- [ ] Diferenciar severity declarada, código de herramienta, timeout, crash y finding bloqueante en `common.mjs`/reporter.
+- [ ] Añadir pruebas de regresión para `custom` con error, warning, información, timeout y salida malformada.
+- [ ] Verificar que logs/reportes redaccionan secretos, paths sensibles y credenciales sin truncar el diagnóstico esencial.
+- [ ] Ejecutar `npm run quality:test` y un `task:check` full; guardar baseline de duración, findings, warnings y tamaño de reportes.
+
+**Gate:** ninguna regla que falle puede producir PASS; todos los resultados tienen schema, severity y causa distinguibles.
+
+### SNT-02 — Sustituir shell scripts por analyzers portables
+
+**Objetivo:** retirar dependencia de Bash/grep/awk/sed y mover la semántica al core de Sentinel.
+
+- [ ] Diseñar fixtures negativos/positivos para cada regla de `check-sentinel-extended.sh`, `check-dom-abstraction.sh`, `check-window-refs.sh` y `check-singleton-state.sh`.
+- [ ] Implementar reglas AST/índice para `any`, exports, console, catches, interfaces, barrels y exports no usados con confianza explícita.
+- [ ] Implementar límites de capas, DOM/platform boundary y singleton state mediante configuración portable.
+- [ ] Añadir severidad, allowlist, paths de boundary y exclusiones por regla en `sentinel.config.json`; no hardcodear rutas de wandori.us.
+- [ ] Ejecutar la misma fixture en CLI, LSP y VS Code; comparar JSON normalizado, líneas, columnas, severity y regla.
+- [ ] Mantener los scripts como bridge de comparación durante una sola fase; borrarlos solo cuando la paridad esté demostrada.
+
+**Gate:** Sentinel cubre todas las reglas portables, funciona sin Bash en Windows/Linux/macOS y la salida coincide con fixtures de equivalencia.
+
+### SNT-03 — VarSense upstream y análisis de una sola pasada
+
+**Objetivo:** eliminar el parche local y reducir el trabajo duplicado del escaneo CSS/TS.
+
+- [ ] Llevar `varsense-class-index.patch` al repositorio upstream mediante prueba reproducible de clases dinámicas.
+- [ ] Diseñar un comando/servicio combinado que construya una vez `VariableIndex` y `ClassIndex` para `scan` + `orphan-classes`.
+- [ ] Invalidar índices por archivo y dependencias, no por workspace completo; cancelar trabajo obsoleto cuando cambia el documento.
+- [ ] Añadir fixtures para clases estáticas, template strings, objetos `className`, factories, multilinea y falsos positivos.
+- [ ] Garantizar paridad CLI/LSP/VS Code y reporte de progreso basado en archivos reales, no contadores estimados.
+- [ ] Eliminar el parche de `quality-tools.json` cuando el commit upstream esté fijado y verificado.
+
+**Gate:** una ejecución comparte índices, conserva los hallazgos actuales y mejora tiempo/memoria frente al baseline.
+
+### SNT-04 — Motor SOLID de reglas y adaptadores
+
+**Objetivo:** hacer que añadir una regla no obligue a modificar analyzers, CLI, LSP y extensión por separado.
+
+- [ ] Crear registry tipado de reglas con metadata, capabilities de lenguaje, dependencias de índice y versión.
+- [ ] Separar `RuleContext`, `Finding`, `Fix`, `Policy` y `Report`; aplicar DIP entre engine y parser/indexer.
+- [ ] Eliminar condicionales globales por proyecto/framework; usar profiles/capabilities declarativos.
+- [ ] Definir límites de tamaño para archivos, analizadores, adapters y servicios; dividir módulos antes de superar el límite.
+- [ ] Añadir cancellation, concurrencia acotada, timeout por regla y métricas de duración/hallazgos/falsos positivos.
+- [ ] Prohibir imports editor-specific en `core`, con check automático en CI para Sentinel y VarSense.
+
+**Gate:** una regla de prueba se registra una sola vez y aparece de forma equivalente en CLI/LSP/VS Code sin tocar adapters existentes.
+
+### SNT-05 — Cache, incrementalidad y rendimiento
+
+**Objetivo:** reducir tiempo de feedback sin sacrificar determinismo ni seguridad.
+
+- [ ] Definir fingerprint completo: contenido, config efectiva, tool commit, parser version, OS, Node y dependencia de archivos.
+- [ ] Compartir parse/index cache entre reglas y entre comandos relacionados; invalidar por grafo de imports/variables/clases.
+- [ ] Ejecutar Sentinel, VarSense y validaciones independientes en paralelo con límite configurable y backpressure.
+- [ ] Cancelar procesos hijos y trabajo de workers en timeout/interrupción; comprobar que no quedan procesos huérfanos.
+- [ ] Añadir presupuesto de tiempo/memoria para incremental y full, con reporte de cache hit/miss y causa de invalidación.
+- [ ] Escribir cache/reportes de forma atómica y resistente a dos agentes/procesos concurrentes.
+
+**Gate:** benchmark reproducible demuestra mejora; dos ejecuciones iguales producen el mismo JSON ordenado y no reutilizan PASS obsoleto.
+
+### SNT-06 — Reglas de seguridad, contratos y arquitectura
+
+**Objetivo:** cubrir riesgos recurrentes de proyectos web sin convertir políticas de wandori.us en defaults.
+
+- [ ] Añadir reglas configurables para secretos, credenciales en URL/logs, open redirects, input no validado y permisos client-only.
+- [ ] Detectar errores enmascarados, `ok: true` tras catch, updates optimistas sin rollback y operaciones críticas sin resultado.
+- [ ] Detectar SQL/interpolación peligrosa, procesos con shell, I/O sin manejo, `unwrap`/panic de producción y webhooks no idempotentes donde el lenguaje lo permita.
+- [ ] Generalizar arquitectura de capas: UI → contrato → servicio → repository/adaptador, con imports y llamadas prohibidas configurables.
+- [ ] Añadir reglas de lifecycle: listeners/subscriptions sin teardown, async stale, AbortSignal ausente y cleanup incompleto.
+- [ ] Clasificar findings por confianza para que heurísticas complejas no bloqueen sin evidencia suficiente.
+
+**Gate:** cada regla nueva tiene fixture positivo/negativo, documentación, severity rationale, falso positivo conocido y paridad en los tres adapters.
+
+### SNT-07 — VarSense visual y diseño portable
+
+**Objetivo:** convertir las necesidades visuales de este proyecto en capacidades de tokens reutilizables.
+
+- [ ] Mantener detección de variables no definidas, fallbacks hardcoded, inline styles y propiedades prohibidas como reglas configurables.
+- [ ] Añadir detección de tokens duplicados, tokens no usados y referencias circulares con severidad independiente.
+- [ ] Añadir perfiles de tema claro/oscuro y cobertura de roles semánticos sin imponer paleta, idioma o nombres de variables.
+- [ ] Detectar clases huérfanas cross-file con índice compartido y excluir únicamente patrones declarados por el consumidor.
+- [ ] Separar `autofix` seguro de sugerencia; nunca reescribir CSS masivamente sin preview, diff y rollback.
+- [ ] Medir precisión sobre CSS, SCSS, LESS, Vanilla TS/JS y plantillas soportadas; mantener límites de parsing claros.
+
+**Gate:** un proyecto sin diseño 1-bit puede usar VarSense con otra convención de tokens sin cambiar el core.
+
+### SNT-08 — Orquestador portable y CI
+
+**Objetivo:** convertir `scripts/quality` en una librería/adaptador reutilizable, no en una colección de scripts de wandori.us.
+
+- [ ] Extraer `runner`, `redaction`, `atomic-file`, `lock`, `cache`, `preflight`, `reporter` y `scope` a módulos con contratos agnósticos.
+- [ ] Hacer adapters declarativos por herramienta: executable, args, schema, timeout, capabilities y policy de severity.
+- [ ] Ejecutar stages independientes en paralelo y conservar el orden canónico solo al consolidar el reporte.
+- [ ] Mantener `docs` y reminders como plugins del proyecto; no acoplar el runner a `roadmap.md` ni `Agente/`.
+- [ ] Definir modo local incremental, modo `--full` y modo CI reproducible; no instalar ni mutar dependencias durante un check.
+- [ ] Publicar reporte Markdown/JSON, exit codes documentados y artifacts sin secretos; conservar detalle en `.quality-reports/`.
+- [ ] Validar ejecución en Windows PowerShell, Git Bash, Linux CI y macOS sin asumir comandos POSIX.
+
+**Gate:** un segundo repositorio puede adoptar el orquestador cambiando solo manifest, profiles, paths y policies.
+
+### SNT-09 — Migración, release y mantenimiento
+
+**Objetivo:** retirar deuda local sin romper consumidores existentes.
+
+- [ ] Crear matriz de paridad: regla local, ruleId upstream, severidad, fixture, estado CLI/LSP/VS Code y fecha de retiro del bridge.
+- [ ] Publicar primero releases compatibles de Sentinel/VarSense; fijar commits y schemas en manifests consumidores.
+- [ ] Reinstalar `.vsix` solo después de compilar, probar y autorizar; nunca reiniciar VS Code automáticamente.
+- [ ] Eliminar scripts shell y el parche VarSense cuando las equivalencias pasen en CI y el reporte no cambie sin justificación.
+- [ ] Versionar migraciones de config, aliases de ruleId y suppressions; no invalidar silenciosamente pipelines existentes.
+- [ ] Registrar changelog, ADR, guía de migración y benchmark de cada release.
+
+**Gate:** rollback a la versión anterior funciona, ningún consumidor pierde diagnósticos críticos y el bridge local queda eliminado o con fecha explícita de retiro.
+
+## Nuevas reglas propuestas por prioridad
+
+### Bloqueantes (P0)
+
+- `quality-tool-error-propagation`: timeout/crash/schema inválido nunca puede producir PASS.
+- `hardcoded-secret-context`: ampliar detección a URLs, logs, JSON de configuración y archivos temporales sin exponer el secreto en el reporte.
+- `unsafe-process-shell`: detectar `shell: true`, comandos concatenados y argumentos no separados.
+- `private-route-client-only`: detectar rutas protegidas cuya autorización solo existe en UI/guard cliente; requiere configuración de boundary.
+- `error-enmascarado`: detectar éxito sintético después de catch o fallback vacío en operaciones críticas.
+
+### Alta prioridad (P1)
+
+- `layer-boundary-import`: imports/calls fuera de capas permitidas.
+- `async-stale-without-abort`: fetch/listener async sin AbortSignal o cleanup verificable.
+- `subscription-without-dispose`: subscribe/observer/event listener sin retorno de cleanup.
+- `optimistic-update-without-rollback`: estado mutado antes de confirmación sin reversión.
+- `api-call-outside-service`: configurable para fetch/client SDK fuera de adapters/services.
+- `dom-access-outside-platform`: `document`/`window` directo fuera del boundary declarado.
+- `singleton-mutable-state`: instancias globales mutables sin contrato de ciclo de vida.
+- `large-interface-isp`: interfaces/types por encima del umbral con propuesta de composición.
+- `mixed-barrel-logic`: barrel que exporta y contiene lógica ejecutable.
+
+### Calidad visual y mantenibilidad (P2)
+
+- `unused-export-confidence`: export no usado con índice semántico y clasificación de barrel/public API.
+- `token-duplicate`: tokens equivalentes con nombres distintos.
+- `token-unused`: variables declaradas sin uso, excluyendo contratos públicos declarados.
+- `theme-role-missing`: tema configurado sin roles semánticos equivalentes.
+- `class-index-dynamic-confidence`: clase dinámica no indexable, separando warning de falso positivo.
+- `file-size-budget`: presupuesto por lenguaje/módulo y no un único umbral rígido.
+
+## Pruebas y evidencia obligatoria
+
+- [ ] Fixtures de equivalencia para cada regla: fuente, expected JSON, severity, línea/columna, mensaje estable y falso positivo.
+- [ ] Mismos fixtures ejecutados por CLI, LSP y VS Code; diferencias solo en transporte/presentación.
+- [ ] Tests de config estricta: unknown keys, paths fuera del workspace, globs peligrosos, severity inválida y ruleId desconocido.
+- [ ] Tests de seguridad: secretos redacted, symlink/path traversal, shell injection, timeout, cancelación y procesos huérfanos.
+- [ ] Tests de cache: hit válido, cambio de contenido, config, commit, parser, schema y plataforma.
+- [ ] Benchmarks small/medium/full con límite de memoria, tiempo, concurrencia y cantidad de findings.
+- [ ] Tests de reporte: máximo de hallazgos/reminders, detalle completo en artifact, salida determinista y exit code.
+- [ ] Pruebas de migración: versión anterior, versión nueva, rollback y supresión documentada.
+
+## Definition of Done global
+
+- [ ] Toda regla portátil dejó de depender de Bash, regex frágil o rutas de wandori.us.
+- [ ] Sentinel y VarSense mantienen core editor-agnóstico y paridad CLI/LSP/VS Code.
+- [ ] El quality gate propaga errores reales, no duplica análisis y tiene cache/versionado correcto.
+- [ ] Las configuraciones del proyecto contienen solo política, paths y excepciones locales.
+- [ ] Cada regla tiene fixture, documentación, severity, confianza, remediation y criterio de retiro.
+- [ ] Windows/Linux/macOS y CI producen reportes equivalentes.
+- [ ] Sentinel/VarSense pasan sus propios checks SOLID, rendimiento, seguridad y calidad.
+- [ ] `roadmap-sentinel.md` se actualiza como fuente única de esta iniciativa; el roadmap principal no se modifica desde este bloque.
+
+## Comandos de cierre por bloque
+
+```text
+npm run quality:test
+npm run task:check -- <task-id-real>
+```
+
+Para cambios en los repositorios upstream, además:
+
+```text
+npm test
+npm run compile
+npm run check:core
+```
+
+El empaquetado `.vsix`, instalación y cualquier cambio de extensión requieren validación completa y autorización aplicable. No se reinicia VS Code automáticamente.
