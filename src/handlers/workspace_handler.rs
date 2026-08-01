@@ -35,12 +35,13 @@ pub async fn get_active_release(
 /// Obtener un release por versión (admin — rollback).
 #[utoipa::path(
     get,
-    path = "/admin/workspace/releases/{version}",
+    path = "/api/admin/workspace/releases/{version}",
     params(("version" = i32, Path, description = "Versión del release")),
     responses(
         (status = 200, description = "Release encontrado", body = WorkspaceReleasePublic),
         (status = 404, description = "No encontrado", body = ErrorResponse)
-    )
+    ),
+    security(("session_cookie" = []))
 )]
 pub async fn get_release_by_version(
     State(state): State<AppState>,
@@ -54,10 +55,12 @@ pub async fn get_release_by_version(
 /// Listar todos los releases (admin — historial).
 #[utoipa::path(
     get,
-    path = "/admin/workspace/releases",
+    path = "/api/admin/workspace/releases",
     responses(
-        (status = 200, description = "Historial de releases", body = ReleaseListResponse)
-    )
+        (status = 200, description = "Historial de releases", body = ReleaseListResponse),
+        (status = 401, description = "No autorizado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
 )]
 pub async fn list_releases(
     State(state): State<AppState>,
@@ -71,13 +74,14 @@ pub async fn list_releases(
 /// [297A-11 §9.2] Publicación transaccional a release inmutable.
 #[utoipa::path(
     post,
-    path = "/admin/workspace/publish",
+    path = "/api/admin/workspace/publish",
     request_body = PublishReleaseRequest,
     responses(
         (status = 201, description = "Release publicado", body = WorkspaceRelease),
         (status = 401, description = "No autorizado", body = ErrorResponse),
         (status = 403, description = "Prohibido", body = ErrorResponse)
-    )
+    ),
+    security(("session_cookie" = []))
 )]
 pub async fn publish_release(
     State(state): State<AppState>,

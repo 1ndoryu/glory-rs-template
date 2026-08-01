@@ -3,6 +3,7 @@ use rand::Rng;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::errors::AppError;
@@ -14,7 +15,7 @@ const SESSION_DURATION_HOURS: i64 = 168;
 const TOKEN_BYTES: usize = 32;
 
 /// Datos de una sesión almacenada
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, ToSchema, sqlx::FromRow)]
 pub struct Session {
     pub id: Uuid,
     pub user_id: Uuid,

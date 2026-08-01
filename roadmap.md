@@ -64,6 +64,7 @@
 - [x] **018A-21 —** Paridad OpenAPI del dominio de proyectos: catálogo público y CRUD admin anotados; cliente `projects-handler/` regenerado. Productos, media y demás dominios siguen pendientes.
 - [x] **018A-22 —** Paridad OpenAPI del dominio de productos: catálogo, CRUD admin y checkout tipado; cliente `products-handler/` regenerado. Media y demás dominios siguen pendientes.
 - [x] **018A-23 —** Paridad OpenAPI de notificaciones, analytics y settings; clientes `notifications/` y `settings-handler/` regenerados. Media, workspace y auth restante siguen pendientes.
+- [x] **018A-24 —** Paridad OpenAPI de sesión/cuenta y workspace: `me/logout/sessions`, release activo e historial/publicación admin con rutas `/api` correctas; clientes regenerados. Media/multipart y auth avanzada siguen pendientes.
 
 **Salida:** runtime compartido funciona sin chrome/listas/listeners duplicados. Orval se regenera localmente sin backend vivo; quedan cobertura total del contrato y retiro del cliente manual.
 

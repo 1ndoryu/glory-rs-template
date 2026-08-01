@@ -11,6 +11,7 @@ use uuid::Uuid;
 pub struct WorkspaceRelease {
     pub id: Uuid,
     pub version: i32,
+    #[schema(value_type = Object)]
     pub tree: JsonValue,
     pub published_at: DateTime<Utc>,
     pub published_by: Option<Uuid>,
@@ -20,6 +21,7 @@ pub struct WorkspaceRelease {
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct PublishReleaseRequest {
     /// Árbol del workspace a publicar (formato JSON del `WorkspaceTree` frontend).
+    #[schema(value_type = Object)]
     pub tree: JsonValue,
 }
 
@@ -27,6 +29,7 @@ pub struct PublishReleaseRequest {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct WorkspaceReleasePublic {
     pub version: i32,
+    #[schema(value_type = Object)]
     pub tree: JsonValue,
     pub published_at: DateTime<Utc>,
 }

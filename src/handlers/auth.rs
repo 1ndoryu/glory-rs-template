@@ -19,6 +19,7 @@ use crate::models::{
     RegistrationResponse, VerifyEmailRequest,
 };
 use crate::repositories::UserRepository;
+use crate::services::session::Session;
 use crate::services::{AuthService, SessionService};
 use crate::AppState;
 
@@ -304,6 +305,17 @@ pub async fn login(
 }
 
 /// Obtener usuario actual — [297A-8] lee sesión de cookie
+/* [018A-24] Las rutas de sesión se documentan con la misma cookie opaca que
+ * consume el middleware; no se expone token ni contrato Bearer. */
+#[utoipa::path(
+    get,
+    path = "/api/auth/me",
+    responses(
+        (status = 200, description = "Usuario autenticado", body = UserResponse),
+        (status = 401, description = "No autorizado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
 pub async fn me(
     State(state): State<AppState>,
     auth: AuthUser,
@@ -317,6 +329,15 @@ pub async fn me(
 }
 
 /// Cerrar sesión — [297A-8] revoca sesión y limpia cookies
+#[utoipa::path(
+    post,
+    path = "/api/auth/logout",
+    responses(
+        (status = 204, description = "Sesión cerrada"),
+        (status = 401, description = "No autorizado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
 pub async fn logout(
     State(state): State<AppState>,
     _auth: AuthUser,
@@ -358,15 +379,35 @@ pub async fn logout(
 }
 
 /// Listar sesiones activas del usuario — [297A-8]
+#[utoipa::path(
+    get,
+    path = "/api/auth/sessions",
+    responses(
+        (status = 200, description = "Sesiones activas", body = [Session]),
+        (status = 401, description = "No autorizado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
 pub async fn list_sessions(
     State(state): State<AppState>,
     auth: AuthUser,
-) -> Result<Json<Vec<crate::services::session::Session>>, AppError> {
+) -> Result<Json<Vec<Session>>, AppError> {
     let sessions = SessionService::list_for_user(&state.pool, auth.user_id).await?;
     Ok(Json(sessions))
 }
 
 /// Revocar una sesión específica — [297A-8]
+#[utoipa::path(
+    delete,
+    path = "/api/auth/sessions/{id}",
+    params(("id" = uuid::Uuid, Path, description = "ID de la sesión")),
+    responses(
+        (status = 204, description = "Sesión revocada"),
+        (status = 401, description = "No autorizado", body = ErrorResponse),
+        (status = 404, description = "No encontrado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
 pub async fn revoke_session(
     State(state): State<AppState>,
     auth: AuthUser,

@@ -6,7 +6,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 /// Rol del usuario en el sistema
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, sqlx::Type)]
 #[serde(rename_all = "lowercase")]
 #[sqlx(type_name = "user_role", rename_all = "lowercase")]
 pub enum UserRole {

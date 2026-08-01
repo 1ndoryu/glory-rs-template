@@ -135,3 +135,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Notificaciones, analytics y settings deben aparecer en el mismo contrato que sus servicios frontend; dejar uno fuera obliga a reintroducir `fetch` y tipos manuales.
 - Las respuestas públicas pueden documentarse sin exponer metadata privada; la autorización sigue en `AuthUser`/`AdminUser`, no en el schema.
+
+## 018A-24 — Revisar prefijos al anotar rutas anidadas
+
+- `ApiDoc` se sirve bajo `/api`; las anotaciones admin de workspace sin ese prefijo producían URLs documentadas imposibles aunque Axum respondiera correctamente.
+- Las sesiones listadas pueden exponerse como DTO serializable sin tokens; el esquema debe mostrar solo metadata operativa.
