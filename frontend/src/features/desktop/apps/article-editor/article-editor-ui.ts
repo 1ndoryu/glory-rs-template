@@ -6,8 +6,7 @@
 
 import { createEl } from '../../../../utils/dom';
 import { pickAndUpload } from '../../../../utils/upload';
-import { safeRun, safeClick } from '../../../../utils/safe-async';
-import type { Article } from '../../../../api/types';
+import { safeRun } from '../../../../utils/safe-async';
 import type { EditorInstance } from './article-editor-types';
 /* [317A-3] La toolbar usa iconos Lucide de 1px (receta .boton-icono) con
  * nombre accesible por aria-label, en lugar de texto. */
@@ -86,54 +85,7 @@ export function createToolbar(
   return toolbar;
 }
 
-/** Campo de imagen de portada con vista previa, subida y borrado. */
-export function createCoverField(
-  article: Article | undefined,
-  isActive: () => boolean,
-  onCoverChange?: () => void,
-): {
-  element: HTMLElement;
-  getValue: () => string | undefined;
-} {
-  let coverImage = article?.cover_image || '';
-  const container = createEl('div', { className: 'campo article-editor__cover' });
-  const label = createEl('label', { className: 'campo-etiqueta', textContent: 'imagen de portada' });
-  const preview = createEl('img', {
-    className: `config-imagen-preview${coverImage ? '' : ' oculto'}`,
-    alt: 'Vista previa de portada',
-  });
-  if (coverImage) preview.src = coverImage;
-
-  const removeButton = createEl('button', {
-    type: 'button',
-    className: `boton${coverImage ? '' : ' oculto'}`,
-    textContent: 'quitar',
-  });
-  const uploadButton = createEl('button', {
-    type: 'button',
-    className: 'boton',
-    textContent: coverImage ? 'cambiar portada' : 'subir portada',
-  });
-  uploadButton.addEventListener('click', safeClick(async () => {
-    const result = await safeRun(pickAndUpload('image/*'), 'error al subir portada');
-    if (!isActive() || !result.ok || !result.value) return;
-    coverImage = result.value.url;
-    preview.src = coverImage;
-    preview.classList.remove('oculto');
-    uploadButton.textContent = 'cambiar portada';
-    removeButton.classList.remove('oculto');
-    onCoverChange?.();
-  }));
-  removeButton.addEventListener('click', () => {
-    if (!isActive()) return;
-    coverImage = '';
-    preview.src = '';
-    preview.classList.add('oculto');
-    removeButton.classList.add('oculto');
-    uploadButton.textContent = 'subir portada';
-    onCoverChange?.();
-  });
-
-  container.append(label, preview, createEl('div', { className: 'flex-fila gap-md' }, uploadButton, removeButton));
-  return { element: container, getValue: () => coverImage || undefined };
-}
+/* [018A-85] El campo de portada ahora vive en components/ui/cover-field.ts
+ * (compartido con el editor de proyectos). Se re-exporta aquí para no romper
+ * los imports existentes de article-editor.ts. */
+export { createCoverField } from '../../../../components/ui/cover-field';

@@ -60,9 +60,16 @@ export async function renderProjects(): Promise<HTMLElement> {
   const lista = createEl('div');
 
   for (const project of projects) {
-    const info = createEl('div', {},
-      createEl('span', { className: 'proyecto-titulo', textContent: project.title }),
-    );
+    const info = createEl('div', {});
+    /* [018A-85] La portada opcional del proyecto se muestra arriba del título. */
+    if (project.cover_image) {
+      info.appendChild(createEl('img', {
+        className: 'proyecto-imagen',
+        src: project.cover_image,
+        alt: '',
+      }));
+    }
+    info.appendChild(createEl('span', { className: 'proyecto-titulo', textContent: project.title }));
 
     if (project.description) {
       info.appendChild(createEl('p', { className: 'proyecto-descripcion', textContent: project.description }));

@@ -177,4 +177,16 @@ describe('createExternalLink', () => {
     const el = createExternalLink('https://test.com', 'Test', 'link-externo');
     expect(el.className).toBe('link-externo');
   });
+
+  /* [018A-84] Sin esquema la URL sería relativa y el click no navegaba. */
+  it('normaliza URL sin esquema anteponiendo https://', () => {
+    const el = createExternalLink('nakomi.studio', 'ver');
+    expect(el.getAttribute('href')).toBe('https://nakomi.studio');
+  });
+
+  it('conserva URLs con esquema (http, mailto, ftp...)', () => {
+    expect(createExternalLink('http://ejemplo.com', 'x').getAttribute('href')).toBe('http://ejemplo.com');
+    expect(createExternalLink('https://ejemplo.com', 'x').getAttribute('href')).toBe('https://ejemplo.com');
+    expect(createExternalLink('mailto:a@b.com', 'x').getAttribute('href')).toBe('mailto:a@b.com');
+  });
 });

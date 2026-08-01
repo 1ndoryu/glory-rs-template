@@ -161,6 +161,15 @@
   margin-top: var(--espacio-xs);
 }
 
+/* [018A-85] Portada opcional del proyecto en el catálogo público. */
+.proyecto-imagen {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: var(--borde);
+  margin-bottom: var(--espacio-sm);
+}
+
 /* === CUENTA === */
 .account-app {
   display: flex;

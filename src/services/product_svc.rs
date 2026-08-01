@@ -117,6 +117,7 @@ impl ProductService {
             ResourceKind::Product,
             req.name.as_deref(),
             req.is_active,
+            None,
         )
         .await?;
         if !envelope_updated {

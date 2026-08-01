@@ -129,7 +129,9 @@ export function renderArticleEditor(ctx: RenderContext): MountedView {
         className: 'article-editor__content',
         ariaLabel: 'Contenido del artículo',
       });
-      const cover = createCoverField(article, isActive, () => scheduleAutosave());
+      /* [018A-85] createCoverField ahora recibe la URL inicial (componente
+       * compartido) en lugar del artículo completo. */
+      const cover = createCoverField(article?.cover_image || '', isActive, () => scheduleAutosave());
       const StarterKit = StarterKitModule.default;
       const Image = ImageModule.default;
 

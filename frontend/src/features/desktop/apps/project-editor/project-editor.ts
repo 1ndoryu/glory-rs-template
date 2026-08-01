@@ -7,6 +7,7 @@ import { ProjectService } from '../../../../services';
 import { createInput } from '../../../../components/ui/input';
 import { createTextarea } from '../../../../components/ui/textarea';
 import { createSelect } from '../../../../components/ui/select';
+import { createCoverField } from '../../../../components/ui/cover-field';
 import { createEl } from '../../../../utils/dom';
 import { createVacio } from '../../../../components/ui/empty-state';
 import { safeClick, safeRun } from '../../../../utils/safe-async';
@@ -57,6 +58,9 @@ export function renderProjectEditor(ctx: RenderContext): MountedView {
       let url = project?.url || '';
       let sortOrder = project?.sort_order ?? 0;
       let isVisible = project?.is_visible ?? false;
+      /* [018A-85] La portada se gestiona con el componente compartido
+       * cover-field; su estado interno lo lee getValue() al guardar. */
+      const coverField = createCoverField(project?.cover_image || '', isActive, () => scheduleAutosave());
       currentProjectId = project?.id;
 
       /* [297A-14 F5] Sincroniza la etiqueta del botón (crear/guardar) también
@@ -118,7 +122,7 @@ export function renderProjectEditor(ctx: RenderContext): MountedView {
         saveButton.textContent = currentProjectId ? 'guardar' : 'crear';
       };
 
-      /* Autosave: guarda el contenido (título/descripción/url/orden); la
+      /* Autosave: guarda el contenido (título/descripción/url/portada/orden); la
        * visibilidad editorial solo cambia con el guardado manual explícito. */
       autosave = createProjectAutosave({
         getProjectId: () => currentProjectId,
@@ -130,6 +134,7 @@ export function renderProjectEditor(ctx: RenderContext): MountedView {
           title,
           description,
           url,
+          coverImage: coverField.getValue() ?? '',
           sortOrder,
         }),
         isActive,
@@ -148,6 +153,9 @@ export function renderProjectEditor(ctx: RenderContext): MountedView {
           title: title.trim(),
           description,
           url: url.trim() || null,
+          /* [018A-85] La portada vacía se manda como null para limpiarla en
+           * actualizaciones; undefined en create se omite. */
+          cover_image: coverField.getValue() ?? null,
           sort_order: sortOrder,
           is_visible: isVisible,
         };
@@ -157,6 +165,7 @@ export function renderProjectEditor(ctx: RenderContext): MountedView {
             title: projectData.title,
             description: projectData.description,
             url: projectData.url || undefined,
+            cover_image: projectData.cover_image || undefined,
             sort_order: projectData.sort_order,
             is_visible: projectData.is_visible,
           });
@@ -175,6 +184,7 @@ export function renderProjectEditor(ctx: RenderContext): MountedView {
         titleInput,
         descriptionInput,
         urlInput,
+        coverField.element,
         orderInput,
         visibilitySelect,
       );

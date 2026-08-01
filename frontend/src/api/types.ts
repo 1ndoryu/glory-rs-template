@@ -118,6 +118,8 @@ export interface ProjectAdminResponse {
   title: string;
   description: string;
   url: string | null;
+  /** [018A-85] URL de la imagen de portada (null = sin portada). */
+  cover_image: string | null;
   sort_order: number;
   is_visible: boolean;
   created_at: string;
@@ -128,6 +130,8 @@ export interface ProjectPublicResponse {
   title: string;
   description: string;
   url: string | null;
+  /** [018A-85] URL de la imagen de portada (null = sin portada). */
+  cover_image: string | null;
   created_at: string;
 }
 
@@ -138,6 +142,7 @@ export interface CreateProjectRequest {
   title: string;
   description?: string;
   url?: string;
+  cover_image?: string;
   sort_order?: number;
   is_visible?: boolean;
 }
@@ -146,6 +151,8 @@ export interface UpdateProjectRequest {
   title?: string;
   description?: string;
   url?: string | null;
+  /** [018A-85] Ausente = no tocar; null = limpiar; string = reemplazar. */
+  cover_image?: string | null;
   sort_order?: number;
   is_visible?: boolean;
 }

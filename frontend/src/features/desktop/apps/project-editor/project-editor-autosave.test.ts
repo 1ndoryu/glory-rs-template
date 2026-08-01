@@ -27,7 +27,7 @@ vi.mock('../../../../services', () => ({
 function makeDeps() {
   let projectId: string | undefined;
   const payload: ProjectDraftPayload = {
-    title: 'mi proyecto', description: 'desc', url: 'https://x', sortOrder: 1,
+    title: 'mi proyecto', description: 'desc', url: 'https://x', coverImage: '', sortOrder: 1,
   };
   return {
     deps: {
@@ -86,7 +86,7 @@ describe('project-editor autosave [297A-14 F5]', () => {
   });
 
   it('no guarda sin título (guardia en saveDraft)', async () => {
-    const payload: ProjectDraftPayload = { title: '   ', description: '', url: '', sortOrder: 0 };
+    const payload: ProjectDraftPayload = { title: '   ', description: '', url: '', coverImage: '', sortOrder: 0 };
     const { deps } = makeDeps();
     const autosave = createProjectAutosave({
       ...deps,

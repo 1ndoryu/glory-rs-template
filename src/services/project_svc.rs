@@ -19,9 +19,15 @@ impl ProjectService {
     /// Crear proyecto y resource envelope en una transacción.
     pub async fn create(pool: &PgPool, req: CreateProjectRequest) -> Result<Project, AppError> {
         let id = Uuid::new_v4();
-        /* Editorial y visibilidad son estados independientes. La publicación
-         * editorial tendrá su propio comando; is_visible solo proyecta acceso. */
-        let editorial = EditorialState::Draft;
+        /* [018A-83] El control de visibilidad del editor es el mecanismo de
+         * publicación de proyectos: visible => ready + public, oculto => draft +
+         * private. El catálogo público exige editorial='ready', así que un
+         * proyecto 'visible' sin ready nunca aparecía (bug 018A-83). */
+        let editorial = if req.is_visible {
+            EditorialState::Ready
+        } else {
+            EditorialState::Draft
+        };
         let visibility = if req.is_visible {
             VisibilityState::Public
         } else {
@@ -49,6 +55,7 @@ impl ProjectService {
                 title: &req.title,
                 description: &req.description,
                 url: req.url.as_deref(),
+                cover_image: req.cover_image.as_deref(),
                 sort_order: req.sort_order,
                 is_visible: req.is_visible,
             },
@@ -85,6 +92,23 @@ impl ProjectService {
             ProjectUrlUpdate::Set(value) => (Some(value.as_str()), false),
         };
 
+        /* [018A-85] Misma semántica que la URL: None conserva la portada,
+         * Some(None) la limpia, Some(Some(url)) la reemplaza. */
+        let (cover_image, clear_cover) = match &req.cover_image {
+            Some(Some(value)) => (Some(value.as_str()), false),
+            Some(None) => (None, true),
+            None => (None, false),
+        };
+
+        /* [018A-83] La visibilidad explícita del proyecto sincroniza el estado
+         * editorial del envelope (ready/draft). None (autosave sin tocar
+         * visibilidad) conserva el editorial actual. */
+        let editorial = match req.is_visible {
+            Some(true) => Some(EditorialState::Ready),
+            Some(false) => Some(EditorialState::Draft),
+            None => None,
+        };
+
         let mut tx = pool.begin().await?;
         let project = ProjectRepository::update(
             &mut tx,
@@ -94,6 +118,8 @@ impl ProjectService {
                 description: req.description.as_deref(),
                 url,
                 clear_url,
+                cover_image,
+                clear_cover,
                 sort_order: req.sort_order,
                 is_visible: req.is_visible,
             },
@@ -107,6 +133,7 @@ impl ProjectService {
             ResourceKind::Project,
             req.title.as_deref(),
             req.is_visible,
+            editorial,
         )
         .await?;
         if !envelope_updated {

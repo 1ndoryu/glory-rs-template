@@ -17,6 +17,8 @@ export interface ProjectDraftPayload {
   title: string;
   description: string;
   url: string;
+  /** [018A-85] URL de la imagen de portada ('' = sin portada). */
+  coverImage: string;
   sortOrder: number;
 }
 
@@ -53,6 +55,9 @@ async function saveDraft(
     title: payload.title,
     description: payload.description,
     url: payload.url.trim() || null,
+    /* [018A-85] El autosave persiste la portada actual del formulario;
+     * vacía se manda como null (limpiar) para mantener paridad con el editor. */
+    cover_image: payload.coverImage || null,
     sort_order: payload.sortOrder,
   };
 

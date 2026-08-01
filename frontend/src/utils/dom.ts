@@ -167,10 +167,21 @@ export function createText(text: string, className?: string): HTMLParagraphEleme
   return createEl('p', { className, textContent: text });
 }
 
+/** Normalizar una URL externa para navegación.
+ * [018A-84] Un href sin esquema ("nakomi.studio") se interpreta como ruta
+ * relativa del sitio y "ver" no navegaba. Si no hay esquema (scheme://), se
+ * antepone https://. Cubre cualquier superficie que use enlaces externos. */
+export function normalizeExternalUrl(href: string): string {
+  const trimmed = href.trim();
+  if (!trimmed) return trimmed;
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
 /** Crear un enlace externo. */
 export function createExternalLink(href: string, text: string, className?: string): HTMLAnchorElement {
   return createEl('a', {
-    href,
+    href: normalizeExternalUrl(href),
     textContent: text,
     className,
     target: '_blank',

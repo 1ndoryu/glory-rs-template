@@ -61,14 +61,17 @@ impl ResourceRepository {
         .await
     }
 
-    /// Sincronizar título y visibilidad del envelope de un recurso dentro de su transacción.
-    /// El estado editorial se modifica únicamente mediante publicación explícita.
+    /// Sincronizar título, visibilidad y estado editorial del envelope dentro de su
+    /// transacción. [018A-83] El estado editorial se sincroniza con la visibilidad
+    /// pública del tipo (proyectos): visible => ready, oculto => draft. Los tipos
+    /// que no publican via visibilidad pasan None y conservan su editorial.
     pub async fn update_resource_metadata(
         conn: &mut sqlx::PgConnection,
         id: Uuid,
         kind: ResourceKind,
         title: Option<&str>,
         is_visible: Option<bool>,
+        editorial: Option<EditorialState>,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
             "UPDATE resources SET \
@@ -78,6 +81,7 @@ impl ResourceRepository {
                     WHEN $2 THEN 'public'::visibility_state \
                     ELSE 'private'::visibility_state \
                 END, \
+                editorial = COALESCE($5, editorial), \
                 updated_at = NOW() \
              WHERE id = $3 AND kind = $4",
         )
@@ -85,6 +89,7 @@ impl ResourceRepository {
         .bind(is_visible)
         .bind(id)
         .bind(kind)
+        .bind(editorial)
         .execute(&mut *conn)
         .await?;
         Ok(result.rows_affected() > 0)

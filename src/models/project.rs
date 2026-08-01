@@ -11,6 +11,8 @@ pub struct Project {
     pub title: String,
     pub description: String,
     pub url: Option<String>,
+    /// [018A-85] Imagen de portada opcional para el catálogo público.
+    pub cover_image: Option<String>,
     pub sort_order: i32,
     pub is_visible: bool,
     pub created_at: DateTime<Utc>,
@@ -24,6 +26,7 @@ pub struct ProjectAdminResponse {
     pub title: String,
     pub description: String,
     pub url: Option<String>,
+    pub cover_image: Option<String>,
     pub sort_order: i32,
     pub is_visible: bool,
     pub created_at: DateTime<Utc>,
@@ -37,6 +40,7 @@ pub struct ProjectPublicResponse {
     pub title: String,
     pub description: String,
     pub url: Option<String>,
+    pub cover_image: Option<String>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -47,6 +51,7 @@ impl From<&Project> for ProjectAdminResponse {
             title: project.title.clone(),
             description: project.description.clone(),
             url: project.url.clone(),
+            cover_image: project.cover_image.clone(),
             sort_order: project.sort_order,
             is_visible: project.is_visible,
             created_at: project.created_at,
@@ -61,9 +66,21 @@ impl From<&Project> for ProjectPublicResponse {
             title: project.title.clone(),
             description: project.description.clone(),
             url: project.url.clone(),
+            cover_image: project.cover_image.clone(),
             created_at: project.created_at,
         }
     }
+}
+
+/* [018A-85] Helper serde: distingue campo ausente (None) de null (Some(None))
+ * en Option<Option<T>>. Sin él, serde colapsa null y ausente en None y no se
+ * podría limpiar la portada con un PUT { "cover_image": null }. */
+fn deserialize_some<'de, T, D>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    T: Deserialize<'de>,
+    D: Deserializer<'de>,
+{
+    Deserialize::deserialize(deserializer).map(Some)
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -72,6 +89,8 @@ pub struct CreateProjectRequest {
     #[serde(default)]
     pub description: String,
     pub url: Option<String>,
+    #[serde(default)]
+    pub cover_image: Option<String>,
     #[serde(default)]
     pub sort_order: i32,
     /// Los proyectos nuevos nacen privados/ocultos salvo publicación explícita.
@@ -128,6 +147,10 @@ pub struct UpdateProjectRequest {
     /// Ausente conserva la URL; null la limpia; una cadena la reemplaza.
     #[serde(default)]
     pub url: ProjectUrlUpdate,
+    /// [018A-85] Ausente conserva la portada; null la limpia; una cadena la
+    /// reemplaza (Option<Option<String>>: None = no tocar, Some(None) = borrar).
+    #[serde(default, deserialize_with = "deserialize_some")]
+    pub cover_image: Option<Option<String>>,
     pub sort_order: Option<i32>,
     pub is_visible: Option<bool>,
 }
@@ -181,6 +204,7 @@ mod tests {
             title: "Proyecto".into(),
             description: "Descripción".into(),
             url: Some("https://example.com".into()),
+            cover_image: Some("https://example.com/cover.png".into()),
             sort_order: 7,
             is_visible: true,
             created_at: Utc::now(),
@@ -189,6 +213,10 @@ mod tests {
         let public = serde_json::to_value(ProjectPublicResponse::from(&project)).unwrap();
         assert!(public.get("sort_order").is_none());
         assert!(public.get("is_visible").is_none());
+        assert_eq!(
+            public.get("cover_image").and_then(|value| value.as_str()),
+            Some("https://example.com/cover.png")
+        );
 
         let admin = serde_json::to_value(ProjectAdminResponse::from(&project)).unwrap();
         assert_eq!(
@@ -198,6 +226,25 @@ mod tests {
         assert_eq!(
             admin.get("is_visible").and_then(|value| value.as_bool()),
             Some(true)
+        );
+    }
+
+    /* [018A-85] La portada distingue omitir (conservar), null (limpiar) y
+     * cadena (reemplazar) — mismo contrato semántico que la URL. */
+    #[test]
+    fn portada_distingue_omitida_nula_y_con_valor() {
+        let omitted: UpdateProjectRequest = serde_json::from_str(r#"{}"#).unwrap();
+        assert_eq!(omitted.cover_image, None);
+
+        let cleared: UpdateProjectRequest =
+            serde_json::from_str(r#"{"cover_image":null}"#).unwrap();
+        assert_eq!(cleared.cover_image, Some(None));
+
+        let replaced: UpdateProjectRequest =
+            serde_json::from_str(r#"{"cover_image":"https://x.com/a.png"}"#).unwrap();
+        assert_eq!(
+            replaced.cover_image,
+            Some(Some("https://x.com/a.png".to_string()))
         );
     }
 }
