@@ -123,6 +123,30 @@ export function openWindow(
   return instanceId;
 }
 
+/** Actualizar la identidad de una ventana tras su creación.
+ * Recalcula _paramKey cuando cambian los params para que la deduplicación
+ * de findExistingWindow siga siendo correcta tras navegación interna.
+ * [018A-77] El Finder navega dentro de la misma ventana; sin esta operación
+ * el store queda desincronizado: la taskbar conserva el título viejo y
+ * reabrir la carpeta de origen no produce efecto (match por _paramKey viejo). */
+export function updateWindowInstance(
+  instanceId: string,
+  patch: { title?: string; params?: Record<string, string> },
+): void {
+  const windows = windowStore.get();
+  const updated = windows.map((w) => {
+    if (w.instanceId !== instanceId) return w;
+    const params = patch.params !== undefined ? { ...patch.params } : w.params;
+    return {
+      ...w,
+      title: patch.title ?? w.title,
+      params,
+      _paramKey: params ? stableParamsKey(params) : undefined,
+    };
+  });
+  windowStore.set(updated);
+}
+
 /** Cerrar una ventana (destruye contenido y aborta signal). */
 export function closeWindow(instanceId: string, source: StoreSource = 'user'): void {
   const windows = windowStore.get();

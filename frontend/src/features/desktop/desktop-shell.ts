@@ -235,6 +235,13 @@ export function createDesktopShell(
       el.style.setProperty('--win-y', `${win.bounds.y}px`);
       el.style.setProperty('--win-w', `${win.bounds.w}px`);
       el.style.setProperty('--win-h', `${win.bounds.h}px`);
+
+      /* [018A-77] El título de la barra se deriva del store (única fuente de
+       * verdad). La navegación interna del Finder actualiza win.title y aquí
+       * se sincroniza el DOM; antes se mutaba el DOM a mano y la taskbar
+       * (fiel al store) quedaba desincronizada. */
+      const titleEl = el.querySelector('.desktop-window__title');
+      if (titleEl && titleEl.textContent !== win.title) titleEl.textContent = win.title;
     }
   });
 

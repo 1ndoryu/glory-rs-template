@@ -7,6 +7,7 @@ import { FileUser, Folder, FileText, FolderCode, Trash2, UserRound, Bell, Store,
 import { createEl } from '../../utils/dom';
 import { AppRegistry } from './app-registry';
 import { createPathDeepLink } from './deep-links';
+import { updateWindowInstance, windowStore } from './window-manager';
 import { createFinderPreview } from '../desktop/apps/finder/finder-preview';
 import { createReaderPreview, type ReaderOptions } from '../desktop/apps/reader/reader-preview';
 import { createTrashPreview } from '../desktop/apps/trash/trash-preview';
@@ -49,11 +50,15 @@ AppRegistry.register({
           void CommandRegistry.execute('finder:new-folder');
         });
       },
-      onNavigate: (_folderId: string, label: string) => {
-        const windowEl = content.closest('.desktop-window');
-        if (!windowEl) return;
-        const titleEl = windowEl.querySelector('.desktop-window__title');
-        if (titleEl) titleEl.textContent = label;
+      onNavigate: (folderId: string, label: string) => {
+        /* [018A-77] La navegación interna del Finder debe propagarse al
+         * windowStore (title + params/_paramKey), no solo al DOM. Sin esto la
+         * taskbar queda desincronizada y reabrir la carpeta de origen no hace
+         * nada: findExistingWindow matchea por _paramKey viejo y solo enfoca
+         * una ventana que ya está mostrando otra carpeta. El shell deriva el
+         * título de la barra desde el store en su update. */
+        const win = windowStore.get().find(w => w.content === content);
+        if (win) updateWindowInstance(win.instanceId, { title: label, params: { folderId } });
       },
     });
 
