@@ -533,10 +533,6 @@
   gap: var(--espacio-md);
 }
 
-.preferences-conflict__action {
-  text-decoration: underline;
-}
-
 /* [297A-26] Panel de preferencias embebido en la ventana Cuenta (reemplaza el
  * modal global). Separador superior consistente con modales/paneles del
  * sistema. El selector de tema usa la misma receta de botones del OS. */
@@ -571,10 +567,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--espacio-md);
-}
-
-.preferences-panel__tema {
-  text-decoration: underline;
 }
 
 .preferences-panel__tema[aria-pressed='true'] {
@@ -624,10 +616,6 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--espacio-md);
-}
-
-.workspace-overlay-conflict__action {
-  text-decoration: underline;
 }
 
 /* === TOAST / NOTIFICACIÓN === */

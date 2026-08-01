@@ -47,11 +47,8 @@
   opacity: 1;
 }
 
-.desktop-menu-bar__entry--open > .desktop-menu-bar__item {
-  text-decoration: underline;
-  text-underline-offset: var(--espacio-xs);
-}
-
+/* [018A-64] Sin subrayado en botones: el menú abierto se indica con el propio
+ * desplegable, no con subrayado del ítem de la barra. */
 .desktop-menu-bar__item,
 .desktop-menu-bar__clock {
   white-space: nowrap;

@@ -101,7 +101,7 @@ describe('workspace overlay sync', () => {
     expect(overlaySyncStore.get()).toMatchObject({ revision: 2, remoteOverlay, status: 'conflict' });
   });
 
-  it('conservar dispositivo usa la última mutación hecha durante el conflicto', async () => {
+  it('conservar lo de este dispositivo usa la última mutación hecha durante el conflicto', async () => {
     vi.spyOn(WorkspaceService, 'getOverlay').mockResolvedValueOnce({
       overlay: EMPTY_OVERLAY,
       revision: 1,

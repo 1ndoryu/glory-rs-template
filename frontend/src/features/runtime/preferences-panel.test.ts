@@ -106,7 +106,7 @@ describe('preferences panel', () => {
     expect(element.querySelector('.preferences-conflict')).not.toBeNull();
 
     const conservar = Array.from(element.querySelectorAll('.preferences-conflict__action'))
-      .find((b) => b.textContent === 'conservar dispositivo') as HTMLButtonElement;
+      .find((b) => b.textContent === 'conservar lo de este dispositivo') as HTMLButtonElement;
     conservar.click();
 
     await vi.waitFor(() => expect(preferencesSyncStore.get().status).toBe('ready'));
@@ -126,7 +126,7 @@ describe('preferences panel', () => {
     const element = mountPanel();
 
     const usarCuenta = Array.from(element.querySelectorAll('.preferences-conflict__action'))
-      .find((b) => b.textContent === 'usar preferencia de cuenta') as HTMLButtonElement;
+      .find((b) => b.textContent === 'usar lo de mi cuenta') as HTMLButtonElement;
     usarCuenta.click();
 
     expect(themeStore.get()).toBe('oscuro');

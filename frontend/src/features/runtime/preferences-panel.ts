@@ -40,17 +40,19 @@ function buildConflictContent(state: PreferencesSyncState): HTMLElement {
     createEl('dd', { textContent: themeLabel(state.remoteTheme) }),
   );
 
+  /* [018A-64] Mismas etiquetas simplificadas que el conflicto de overlay:
+   * paralelas y sin jerga de dominio. */
   const keepLocal = createEl('button', {
     className: 'boton preferences-conflict__action',
     type: 'button',
-    textContent: 'conservar dispositivo',
+    textContent: 'conservar lo de este dispositivo',
     'aria-label': 'Conservar la preferencia de este dispositivo',
   });
   const useRemote = createEl('button', {
     className: 'boton preferences-conflict__action',
     type: 'button',
-    textContent: 'usar preferencia de cuenta',
-    'aria-label': 'Usar la preferencia de la cuenta',
+    textContent: 'usar lo de mi cuenta',
+    'aria-label': 'Usar la preferencia de mi cuenta',
   });
   const actions = createEl('div', { className: 'preferences-conflict__actions' }, keepLocal, useRemote);
 

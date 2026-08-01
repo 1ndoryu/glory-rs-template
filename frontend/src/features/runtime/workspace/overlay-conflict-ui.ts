@@ -55,17 +55,19 @@ function openConflictModal(state: OverlaySyncState): void {
     createEl('dt', { textContent: 'en tu cuenta' }),
     createEl('dd', { textContent: overlaySummary(state.remoteOverlay) }),
   );
+  /* [018A-64] Etiquetas simplificadas: "lo de este dispositivo" / "lo de mi
+   * cuenta" dicen qué estado se conserva sin jerga de dominio. */
   const keepLocal = createEl('button', {
     className: 'boton workspace-overlay-conflict__action',
     type: 'button',
-    textContent: 'conservar dispositivo',
+    textContent: 'conservar lo de este dispositivo',
     'aria-label': 'Conservar la organización de este dispositivo',
   });
   const useRemote = createEl('button', {
     className: 'boton workspace-overlay-conflict__action',
     type: 'button',
-    textContent: 'usar organización de cuenta',
-    'aria-label': 'Usar la organización de la cuenta',
+    textContent: 'usar lo de mi cuenta',
+    'aria-label': 'Usar la organización de mi cuenta',
   });
   const actions = createEl(
     'div',

@@ -202,7 +202,6 @@
   align-items: center;
   gap: var(--espacio-sm);
   align-self: flex-start;
-  text-decoration: underline;
 }
 
 .account-app__submit:disabled {
