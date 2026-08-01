@@ -112,6 +112,27 @@ describe('createEl', () => {
     const el = createEl('br');
     expect(el.tagName).toBe('BR');
   });
+
+  /* [018A-81] Regresión: `setAttribute('value', ...)` no rellena <textarea>
+   * (su contenido vive en la propiedad .value), por eso el extracto de un
+   * artículo se abría vacío aunque estuviera guardado. El fix asigna la
+   * propiedad para input/textarea/select y conserva el atributo para el resto. */
+  it('asigna value a textarea por propiedad (no atributo)', () => {
+    const el = createEl('textarea', { value: 'extracto guardado' });
+    expect(el.value).toBe('extracto guardado');
+    expect(el.getAttribute('value')).toBeNull();
+  });
+
+  it('asigna value a input por propiedad', () => {
+    const el = createEl('input', { value: 'titulo' });
+    expect(el.value).toBe('titulo');
+  });
+
+  it('conserva value como atributo en option', () => {
+    const el = createEl('option', { value: 'draft', textContent: 'borrador' });
+    expect(el.getAttribute('value')).toBe('draft');
+    expect((el as HTMLOptionElement).value).toBe('draft');
+  });
 });
 
 describe('createContainer', () => {

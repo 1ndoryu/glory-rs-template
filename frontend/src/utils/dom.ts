@@ -106,7 +106,18 @@ export function createEl<K extends keyof HTMLElementTagNameMap>(
     if (attrs.alt) el.setAttribute('alt', attrs.alt);
     if (attrs.src) el.setAttribute('src', attrs.src);
     if (attrs.loading) el.setAttribute('loading', attrs.loading);
-    if (attrs.value) el.setAttribute('value', attrs.value);
+    /* [018A-81] `setAttribute('value', ...)` no rellena <textarea>: su
+     * contenido vive en la propiedad .value, no en un atributo (por eso el
+     * extracto del artículo se abría vacío aunque estuviera guardado). Se
+     * asigna la propiedad para input/textarea/select y el atributo para el
+     * resto (option, li, etc.). */
+    if (attrs.value) {
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {
+        el.value = attrs.value;
+      } else {
+        el.setAttribute('value', attrs.value);
+      }
+    }
     if (attrs.name) el.setAttribute('name', attrs.name);
     if (attrs.disabled) el.setAttribute('disabled', attrs.disabled);
     if (attrs.download) el.setAttribute('download', attrs.download);
