@@ -11,5 +11,6 @@ import './toolbar-commands';
 import './navigation-commands';
 import './theme-commands';
 import './profile-commands';
+import './resource-commands';
 
 export { initKeyboardShortcuts } from './keyboard-handler';

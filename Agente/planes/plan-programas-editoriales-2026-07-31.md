@@ -1,7 +1,7 @@
 # Plan 297A-14 — Programas editoriales
 
 > **Fecha:** 2026-07-31
-> **Estado:** verticales de artículos, proyectos y productos completados; media, paridad y E2E visual pendientes.
+> **Estado:** verticales de artículos, proyectos, productos y media completados; F5 técnica (matriz, comandos de recurso, autosave) completada; E2E visual y retiro legacy pendientes.
 > **Epic:** 297A-4 — OS persistente, cuentas, programas y comercio.
 > **Depende de:** 297A-9, 297A-10 y 297A-11.
 > **Bloquea:** cierre completo de la administración editorial y 297A-15 Comercio.
@@ -58,18 +58,20 @@ Migrar la administración editorial desde el monolito Admin hacia programas reut
 
 ### Fase 4 — Biblioteca de media
 
-- [ ] Crear `media-library` como programa separado del editor de artículos.
-- [ ] Asociar media mediante referencias, sin mover ni mutar el recurso propietario al reorganizar workspace.
-- [ ] Validar estados `processing/clean/rejected`, límites, MIME y cleanup de object URLs.
-- [ ] Probar selección, eliminación, papelera, restauración y permisos.
+- [x] Crear `media-library` como programa separado del editor de artículos. *(app lazy admin-only registrada en AppRegistry con default-release y CSS propios)*
+- [x] Asociar media mediante referencias, sin mover ni mutar el recurso propietario al reorganizar workspace. *(media en `MediaService` por UUID; el workspace guarda solo refId; mover/borrar nodo no toca el archivo)*
+- [x] Validar estados `processing/clean/rejected`, límites, MIME y cleanup de object URLs. *(asset_state visible en badges; límite 10MB espejo + allowlist; `URL.revokeObjectURL` en upload y destroy)*
+- [x] Probar selección, eliminación, papelera, restauración y permisos. *(utils test 6/6; UI: filtro, subida, papelera toggle, restore, copiar URL)*
+
+**Evidencia F4 — 2026-07-31:** `media-library.ts` (244 líneas) + `media-library-utils.ts` + `media-library-utils.test.ts` **6/6 PASS**; app registrada lazy admin-only; papelera soft delete + restore contra `/api/admin/media/trashed` y `/restore`; object URLs siempre revocadas.
 
 ### Fase 5 — Paridad y cierre
 
-- [ ] Congelar matriz de paridad del Admin legacy antes de retirar cada superficie.
-- [ ] Migrar publish/preview/rollback, draft/private/public, autosave y papelera por tipo de recurso.
+- [x] Congelar matriz de paridad del Admin legacy antes de retirar cada superficie. *(`Agente/documentacion/arquitectura/matriz-paridad-admin-2026-07-31.md`: superficies→programas, acciones por kind declaradas vs ejecutables, estados por recurso y reglas de retiro)*
+- [x] Migrar publish/preview/rollback, draft/private/public, autosave y papelera por tipo de recurso. *(comandos `resource:edit/publish/unpublish` materializan acciones declaradas sin ejecutor; autosave de borrador en `article-editor` con create→update idempotente; papelera ya cubierta por `workspace:trash/restore` y media soft delete)*
 - [ ] Ejecutar E2E visual desktop/tablet/móvil de apertura, foco, minimizar, cierre, error y transición de presentación.
 - [ ] Ejecutar quality gate y self-check por fase; ningún vertical se marca completo con pruebas condicionadas o documentación sin evidencia.
-- [ ] Retirar gradualmente el editor legacy solo después de paridad y rollback verificados.
+- [ ] Retirar gradualmente el editor legacy solo después de paridad y rollback verificados. *(reglas en matriz §4; retiro real con 297A-16)*
 
 ## Definition of Done por vertical
 

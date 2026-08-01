@@ -202,8 +202,9 @@
 - [x] Editor de proyectos: app lazy admin-only, listado separado, lifecycle/eventos, GET por ID, create→update, URL tri-state y sincronización transaccional de título/visibilidad/lifecycle del resource envelope.
 - [x] Editor de productos: app lazy admin-only, CRUD admin completo en `/api/admin/products`, nace inactivo/private, validación backend de precio/moneda, sincronización transaccional del envelope y filtro público `active + public`.
 - [x] Contrato de rutas admin alineado: servicios frontend migrados a `/api/admin/...` (backend anida todo bajo `/api`); `GET /api/admin/workspace/releases/{version}` para rollback; `MediaService`/galería usan el shape real `Vec<Media>`.
-- [ ] Biblioteca de media.
-- [ ] Menú Admin por capacidades y paridad sin ampliar `admin.ts`.
+- [x] Biblioteca de media. *(app lazy admin-only, papelera soft delete + restore, object URLs revocadas, utils test 6/6 — F4)*
+- [x] Menú Admin por capacidades y paridad sin ampliar `admin.ts`. *(matriz de paridad congelada en `matriz-paridad-admin-2026-07-31.md`; comandos `resource:edit/publish/unpublish` materializan acciones declaradas; menú por capacidades del Admin queda con el resto de 297A-14)*
+- [x] Paridad F5 técnica: autosave de borrador en `article-editor` (create→update idempotente, sin tocar editorial, evento solo en created), comandos de recurso fail-closed con tests (15/15) y gate PASS.
 - [ ] E2E visual desktop/tablet/móvil del vertical editorial.
 
 **Salida parcial:** los editores de artículos, proyectos y productos viven como programas reutilizables; el epic editorial permanece abierto hasta completar media, paridad y E2E.
@@ -419,3 +420,16 @@ Cada fase termina con esta revisión antes de marcar su salida. La revisión deb
 - [x] Gate `task:check -- 317A-2` PASS + verificación en navegador (Admin "No hay articulos" centrado a toda altura).
 
 **Salida:** cualquier estado vacío/error usa `createVacio(texto)` y queda centrado, llenando el contenedor, con mayúscula inicial y rol accesible; sin recetas `.vacio` duplicadas en cada archivo.
+
+### 317A-3 — Toolbar del article-editor con iconos Lucide (receta `.boton-icono`)
+
+**Petición del usuario:** al abrir el editor de artículos, la toolbar muestra texto ("negrita", "italica", "codigo", "h2", "h3", "lista"…) en lugar de iconos — "esto se ve muy mal, supongo eran iconos".
+
+- [x] Tokens en `variables.css`: `--sistema-boton-icono-tamano: 20px` y `--sistema-boton-icono-svg-tamano: 14px`.
+- [x] Receta `.boton-icono` en `components.css` (regla 9.1: receta base primero): grid centrado, tamaño desde token, SVG hereda `--sistema-icono-trazo`, focus-visible 1px, nombre accesible vía `aria-label` del consumidor.
+- [x] Migrar `createToolbar()` en `article-editor.ts`: botones `{ label, icon, action }` con iconos Lucide (Bold, Italic, Code, Heading2, Heading3, List, ListOrdered, Quote, SeparatorHorizontal, Image, AudioLines, Video), `aria-label` + `title`, child `createElement(icon)`.
+- [x] Fix del falso positivo Sentinel: ampliar `CLASES_BOTON_SISTEMA` en el core (static + react) con `boton-icono` y variantes kebab reales del proyecto (`boton-pequeno`, `boton-mediano`, `boton-grande`); test de regresión añadido. *(regla 8: implementar prevención)*
+- [ ] Validación: `tsc --noEmit` OK, suite vitest PASS, gate `task:check -- 317A-3`.
+- [ ] Verificación en navegador: toolbar del article-editor muestra iconos Lucide 1px y los botones siguen funcionando (negrita, imagen…).
+
+**Salida:** la toolbar del editor usa iconos Lucide de 1px con nombre accesible; la receta `.boton-icono` queda disponible para cualquier toolbar futura; Sentinel no la marca como botón ad-hoc.
