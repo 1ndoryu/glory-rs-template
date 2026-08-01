@@ -200,12 +200,13 @@
 
 - [x] Vertical de artículos/About: `article-editor` lazy, admin-only, lifecycle abortable, create→update, multimedia asociada al ID actual, evento tipado y listado Admin sin carreras.
 - [x] Editor de proyectos: app lazy admin-only, listado separado, lifecycle/eventos, GET por ID, create→update, URL tri-state y sincronización transaccional de título/visibilidad/lifecycle del resource envelope.
-- [ ] Editor de productos privado/inactivo por defecto.
+- [x] Editor de productos: app lazy admin-only, CRUD admin completo en `/api/admin/products`, nace inactivo/private, validación backend de precio/moneda, sincronización transaccional del envelope y filtro público `active + public`.
+- [x] Contrato de rutas admin alineado: servicios frontend migrados a `/api/admin/...` (backend anida todo bajo `/api`); `GET /api/admin/workspace/releases/{version}` para rollback; `MediaService`/galería usan el shape real `Vec<Media>`.
 - [ ] Biblioteca de media.
 - [ ] Menú Admin por capacidades y paridad sin ampliar `admin.ts`.
 - [ ] E2E visual desktop/tablet/móvil del vertical editorial.
 
-**Salida parcial:** los editores de artículos y proyectos viven como programas reutilizables; el epic editorial permanece abierto hasta completar productos, media, paridad y E2E.
+**Salida parcial:** los editores de artículos, proyectos y productos viven como programas reutilizables; el epic editorial permanece abierto hasta completar media, paridad y E2E.
 
 ### 297A-15 — Comercio seguro
 
@@ -384,7 +385,7 @@ Cada fase termina con esta revisión antes de marcar su salida. La revisión deb
 
 **Depende de:** 297A-27 (overlay), 297A-28 (guardado settings), 297A-13 (capacidades) y 297A-19 (toolbar). Plan: `Agente/planes/plan-retiro-configuracion-legacy-2026-07-31.md`. Petición del usuario: borrar las configuraciones de fuentes y tamaños (todo estático con JetBrains Mono y valores fijos), eliminar la app Configuración y dejar la configuración de Perfil dentro de la ventana Perfil con un botón en el toolbar visible solo para admins.
 
-- [ ] Fase 1 — Fuentes/tamaños estáticos: neutralizar `fontStore` y `loadSavedFonts()`, fijar tokens en `variables.css` (JetBrains Mono en todo, `--nav-width` fijo ≥360px), migrar consumidores legacy, eliminar `font-constants.ts`/`font-helpers.ts`/tab Fuentes/Tamaños.
+- [x] Fase 1 — Fuentes/tamaños estáticos: neutralizar `fontStore` y `loadSavedFonts()`, fijar tokens en `variables.css` (JetBrains Mono en todo, `--nav-width` fijo ≥360px), migrar consumidores legacy, eliminar `font-constants.ts`/`font-helpers.ts`/tab Fuentes/Tamaños. *(commit 297A-29 F1)*
 - [ ] Fase 2 — Toolbar reactivo a capacidad: `createAppToolbar` se suscribe a `authStore` (login/logout en vivo) y se crea el comando genérico admin-only con `isAvailable` (sin `if/else` en el shell).
 - [ ] Fase 3 — Perfil configurable: extraer controles de perfil a `profile-settings.ts`, toolbar en `shell-profile` con botón admin-only, fix del borde (`.desktop-profile-window .profile-foto` respeta el token) y persistencia vía `POST /api/admin/settings`.
 - [ ] Fase 4 — Eliminar la app Configuración: quitar registro `settings`, nodo admin, botón de menú, tab `'fuentes'` de Admin y CSS muerto; sin referencias residuales.

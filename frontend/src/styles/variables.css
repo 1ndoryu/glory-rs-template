@@ -22,32 +22,36 @@
   --borde: 1px solid var(--color-borde);
   --radio: 0;
 
-  /* === TIPOGRAFÍA — Configurable por el usuario === */
-  --fuente-menu: 'Inter', system-ui, sans-serif;
-  --fuente-titulo: 'Inter', system-ui, sans-serif;
-  --fuente-texto: 'Inter', system-ui, sans-serif;
+  /* === TIPOGRAFÍA — Estática: JetBrains Mono en todo el OS ===
+   * [297A-29 F1] Se retiró la configuración de fuentes/tamaños del usuario.
+   * Todo el texto usa --fuente-sistema (JetBrains Mono) y tamaños fijos.
+   * Los tokens legacy se conservan como alias para no romper consumidores
+   * del layout clásico; ya no son sobreescritos en runtime. */
+  --fuente-menu: var(--fuente-sistema);
+  --fuente-titulo: var(--fuente-sistema);
+  --fuente-texto: var(--fuente-sistema);
 
-  --tamano-texto: 15px;
-  --tamano-pequeno: 13px;
-  --tamano-grande: 18px;
-  --tamano-titulo: 24px;
-  --tamano-titulo-grande: 32px;
+  --tamano-texto: 13px;
+  --tamano-pequeno: 11px;
+  --tamano-grande: 15px;
+  --tamano-titulo: 16px;
+  --tamano-titulo-grande: 20px;
 
   --linea-altura: 1.6;
   --linea-altura-titulo: 1.2;
 
-  --menu-size: 15px;
+  --menu-size: 13px;
   --menu-spacing: 0px;
-  --menu-line-height: 2;
+  --menu-line-height: 1.8;
   --menu-opacity: 1;
-  --entrada-title-size: 13px;
+  --entrada-title-size: 12px;
   --entrada-size: 13px;
   --entrada-opacity: 1;
-  --nav-width: calc(20% + 60px);
+  --nav-width: 360px;
   --profile-width: 120px;
   --profile-height: 120px;
   --profile-border: var(--borde);
-  --sidebar-sep-height: 24px;
+  --sidebar-sep-height: 16px;
   --redes-size: 13px;
   --redes-gap: 8px;
 

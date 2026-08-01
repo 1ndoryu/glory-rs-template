@@ -4,7 +4,7 @@
 
 import { socialLinksStore, redesLayoutStore, type RedesLayout } from '../../store';
 import { SettingsService } from '../../services';
-import { createSizeSlider } from './font-helpers';
+import { createSizeSlider } from '../../components/ui/slider';
 import { createEl, createContainer } from '../../utils/dom';
 
 let socialSaveTimer: ReturnType<typeof setTimeout> | null = null;

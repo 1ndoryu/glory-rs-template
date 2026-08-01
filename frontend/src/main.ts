@@ -32,7 +32,7 @@ import { initWindowUrlSync } from './features/runtime/window-url-sync';
 import { AppRegistry } from './features/runtime/app-registry';
 import { initResourceTypeRegistry } from './features/runtime/resource-type-registry';
 import { setActorCategory } from './features/analytics/dispatcher';
-import { loadSavedFonts } from './features/settings/font-panel';
+import { loadProfileSettings } from './features/settings/settings-repo';
 import { initTracking, trackPageView } from './features/analytics/tracker';
 import { initThemeStore } from './features/runtime/theme-store';
 import { initPreferencesSync } from './features/runtime/preferences-sync';
@@ -112,8 +112,8 @@ async function initApp(): Promise<void> {
     setActorCategory('anonymous');
   }
 
-  /* Cargar fuentes y settings antes de renderizar */
-  await loadSavedFonts();
+  /* Cargar settings de perfil/redes antes de renderizar */
+  await loadProfileSettings();
 
   /* Limpiar */
   app.innerHTML = '';

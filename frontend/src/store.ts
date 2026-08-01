@@ -1,7 +1,8 @@
 /* wandori.us — Store (State Management)
  * Patrón pub/sub simple. Sin dependencias.
  * Cada store es un objeto reactivo que notifica suscriptores al cambiar.
- * [Auditoría v4 §3.1] FontConfig dividido en sub-interfaces (ISP). */
+ * [297A-29 F1] Se retiró fontStore (fuentes/tamaños estáticos); solo queda
+ * profileStore para la configuración de perfil y redes. */
 
 import type { Capability } from './features/runtime/capability';
 
@@ -73,83 +74,29 @@ export const authStore = createStore<AuthState>({
   capability: 'public',
 });
 
-/* [Auditoría v4 §3.1] FontConfig dividido en sub-interfaces (ISP).
- * Cada consumidor puede importar solo el subtipo que necesita.
- * FontConfig sigue siendo la intersección completa para backward compatibility. */
-
-/** Fuentes seleccionadas (nombres de Google Fonts). */
-export interface FontTypography {
-  menu: string;
-  titulo: string;
-  texto: string;
-}
-
-/** Tamaños de fuente en px. */
-export interface FontSizes {
-  tamanoTexto: number;
-  tamanoTitulo: number;
-  tamanoPequeno: number;
-  tamanoGrande: number;
-  tamanoTituloGrande: number;
-  menuSize: number;
-  entradaTitleSize: number;
-  entradaSize: number;
-}
-
-/** Opacidades (0-1). */
-export interface FontOpacity {
-  menuOpacity: number;
-  entradaOpacity: number;
-}
-
-/** Layout del sidebar, profile y entradas. */
-export interface LayoutConfig {
-  menuSpacing: number;
-  menuLineHeight: number;
-  navWidth: number;
+/* [297A-29 F1] Configuración de perfil y redes.
+ * Las fuentes y tamaños son ahora estáticos (JetBrains Mono + tokens fijos
+ * en variables.css). El único estado configurable que se conserva es el del
+ * perfil: dimensiones de la foto, borde, y tamaño/separación de las redes. */
+export interface ProfileConfig {
   profileWidth: number;
   profileHeight: number;
   profileBorder: boolean;
-  sidebarSepHeight: number;
   redesSize: number;
   redesGap: number;
 }
 
-/** Configuración completa de fuentes y layout (intersección de ISP). */
-export interface FontConfig extends FontTypography, FontSizes, FontOpacity, LayoutConfig {}
-
-export const fontStore = createStore<FontConfig>({
-  menu: 'Inter', titulo: 'Inter', texto: 'Inter',
-  tamanoTexto: 15, tamanoTitulo: 24, tamanoPequeno: 13, tamanoGrande: 18, tamanoTituloGrande: 32,
-  menuSize: 15, menuSpacing: 0, menuLineHeight: 2, menuOpacity: 1,
-  entradaTitleSize: 13, entradaSize: 13, entradaOpacity: 1,
-  navWidth: 320, profileWidth: 120, profileHeight: 120, profileBorder: true,
-  sidebarSepHeight: 24, redesSize: 13, redesGap: 8,
+export const profileStore = createStore<ProfileConfig>({
+  profileWidth: 120, profileHeight: 120, profileBorder: true,
+  redesSize: 13, redesGap: 8,
 });
 
-/* Aplicar fuentes y tamaños al cambiar */
-fontStore.subscribe((config) => {
+/* Aplicar solo los tokens de perfil/redes al cambiar (los demás son estáticos) */
+profileStore.subscribe((config) => {
   const root = document.documentElement;
-  root.style.setProperty('--fuente-menu', `'${config.menu}', system-ui, sans-serif`);
-  root.style.setProperty('--fuente-titulo', `'${config.titulo}', system-ui, sans-serif`);
-  root.style.setProperty('--fuente-texto', `'${config.texto}', system-ui, sans-serif`);
-  root.style.setProperty('--tamano-texto', `${config.tamanoTexto}px`);
-  root.style.setProperty('--tamano-titulo', `${config.tamanoTitulo}px`);
-  root.style.setProperty('--tamano-pequeno', `${config.tamanoPequeno}px`);
-  root.style.setProperty('--tamano-grande', `${config.tamanoGrande}px`);
-  root.style.setProperty('--tamano-titulo-grande', `${config.tamanoTituloGrande}px`);
-  root.style.setProperty('--menu-size', `${config.menuSize}px`);
-  root.style.setProperty('--menu-spacing', `${config.menuSpacing}px`);
-  root.style.setProperty('--menu-line-height', String(config.menuLineHeight));
-  root.style.setProperty('--menu-opacity', String(config.menuOpacity));
-  root.style.setProperty('--entrada-title-size', `${config.entradaTitleSize}px`);
-  root.style.setProperty('--entrada-size', `${config.entradaSize}px`);
-  root.style.setProperty('--entrada-opacity', String(config.entradaOpacity));
-  root.style.setProperty('--nav-width', `${config.navWidth}px`);
   root.style.setProperty('--profile-width', `${config.profileWidth}px`);
   root.style.setProperty('--profile-height', `${config.profileHeight}px`);
   root.style.setProperty('--profile-border', config.profileBorder ? 'var(--borde)' : 'none');
-  root.style.setProperty('--sidebar-sep-height', `${config.sidebarSepHeight}px`);
   root.style.setProperty('--redes-size', `${config.redesSize}px`);
   root.style.setProperty('--redes-gap', `${config.redesGap}px`);
 });
