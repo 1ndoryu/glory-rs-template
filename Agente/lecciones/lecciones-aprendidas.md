@@ -140,3 +140,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - `ApiDoc` se sirve bajo `/api`; las anotaciones admin de workspace sin ese prefijo producían URLs documentadas imposibles aunque Axum respondiera correctamente.
 - Las sesiones listadas pueden exponerse como DTO serializable sin tokens; el esquema debe mostrar solo metadata operativa.
+
+## 018A-25 — Documentar multipart sin delegar confianza al cliente
+
+- Media puede publicar filtros, estados y respuesta de upload aunque el cuerpo multipart permanezca en el adaptador manual; el tipo/extensión siempre los decide el backend.
+- Papelera y restore deben conservar operaciones separadas en OpenAPI para que una app futura no confunda soft delete con borrado permanente.

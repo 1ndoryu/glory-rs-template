@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 /// Estado de procesamiento de un asset multimedia
@@ -41,7 +41,7 @@ pub struct CreateMediaRequest {
 }
 
 /// Query params para filtrar media
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, IntoParams)]
 pub struct MediaQueryParams {
     pub file_type: Option<String>,
     pub article_id: Option<Uuid>,

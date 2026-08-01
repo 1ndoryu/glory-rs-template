@@ -2,6 +2,7 @@ use axum::extract::{Multipart, Path, Query, State};
 use axum::http::StatusCode;
 use axum::routing::{delete, get, post};
 use axum::{Json, Router};
+use utoipa::IntoParams;
 use uuid::Uuid;
 
 use crate::errors::AppError;
@@ -14,7 +15,7 @@ use crate::AppState;
 const MAX_FILE_SIZE: usize = 10 * 1024 * 1024;
 
 /// Parametros del listado admin de media.
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, IntoParams)]
 pub struct AdminMediaQueryParams {
     pub file_type: Option<String>,
     pub article_id: Option<Uuid>,
@@ -22,6 +23,18 @@ pub struct AdminMediaQueryParams {
 }
 
 /// Subir archivo (admin) — el backend decide el tipo por extensión.
+/* [018A-25] La forma de upload sigue siendo multipart manual; el contrato
+ * documenta respuesta/filtros sin permitir que el cliente decida el tipo. */
+#[utoipa::path(
+    post,
+    path = "/api/admin/media",
+    responses(
+        (status = 201, description = "Media subida", body = Media),
+        (status = 401, description = "No autorizado", body = ErrorResponse),
+        (status = 422, description = "Archivo inválido", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
 pub async fn upload_media(
     State(state): State<AppState>,
     _auth: AdminUser,
@@ -127,6 +140,12 @@ pub async fn upload_media(
 }
 
 /// Listar archivos media (publico): solo envelope active + public + clean.
+#[utoipa::path(
+    get,
+    path = "/api/media",
+    params(MediaQueryParams),
+    responses((status = 200, description = "Media pública", body = [Media]))
+)]
 pub async fn list_media(
     State(state): State<AppState>,
     Query(params): Query<MediaQueryParams>,
@@ -138,6 +157,16 @@ pub async fn list_media(
 }
 
 /// Listar archivos media (admin): envelope activo, todos los estados de asset.
+#[utoipa::path(
+    get,
+    path = "/api/admin/media",
+    params(AdminMediaQueryParams),
+    responses(
+        (status = 200, description = "Media administrable", body = [Media]),
+        (status = 401, description = "No autorizado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
 pub async fn list_admin_media(
     State(state): State<AppState>,
     _auth: AdminUser,
@@ -154,6 +183,15 @@ pub async fn list_admin_media(
 }
 
 /// Listar media en la papelera (admin): envelope trashed.
+#[utoipa::path(
+    get,
+    path = "/api/admin/media/trashed",
+    responses(
+        (status = 200, description = "Media en papelera", body = [Media]),
+        (status = 401, description = "No autorizado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
 pub async fn list_trashed_media(
     State(state): State<AppState>,
     _auth: AdminUser,
@@ -163,6 +201,17 @@ pub async fn list_trashed_media(
 }
 
 /// Eliminar media (admin) — soft delete del envelope.
+#[utoipa::path(
+    delete,
+    path = "/api/admin/media/{id}",
+    params(("id" = Uuid, Path, description = "ID de media")),
+    responses(
+        (status = 204, description = "Media enviada a papelera"),
+        (status = 401, description = "No autorizado", body = ErrorResponse),
+        (status = 404, description = "No encontrado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
 pub async fn delete_media(
     State(state): State<AppState>,
     _auth: AdminUser,
@@ -173,6 +222,17 @@ pub async fn delete_media(
 }
 
 /// Restaurar media desde la papelera (admin).
+#[utoipa::path(
+    post,
+    path = "/api/admin/media/{id}/restore",
+    params(("id" = Uuid, Path, description = "ID de media")),
+    responses(
+        (status = 204, description = "Media restaurada"),
+        (status = 401, description = "No autorizado", body = ErrorResponse),
+        (status = 404, description = "No encontrado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
 pub async fn restore_media(
     State(state): State<AppState>,
     _auth: AdminUser,
