@@ -33,11 +33,24 @@
  * y regla muerta .desktop-finder__document-icon retirada.
  * 018A-80: columnas automáticas (auto-fill, como el escritorio) en vez de fijar
  * 3, e icono un poco más pequeño (--sistema-finder-icono-tamano 40px). El
- * override móvil de 2 columnas quedó redundante y se retiró. */
+ * override móvil de 2 columnas quedó redundante y se retiró.
+ * [018A-89] El grid debe ocupar todo el alto del panel: con pocos ítems
+ * quedaba espacio vacío debajo del grid (fuera de su área), así que el clic
+ * derecho en esa zona no abría el menú contextual. min-height: 100% en el
+ * contenedor + flex: 1 en el grid lo estiran; align-content: start evita que
+ * las filas implícitas se estiren (iconos espaciados verticalmente). */
+.desktop-finder {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
 .desktop-finder__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, var(--sistema-icono-celda));
   justify-content: center;
+  align-content: start;
+  flex: 1;
   gap: var(--espacio-md);
   padding: var(--espacio-md);
 }
