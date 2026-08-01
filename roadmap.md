@@ -176,7 +176,7 @@ Plan: `Agente/planes/plan-notificaciones-2026-08-01.md`.
 
 - [x] Definir qué genera una notificación (release público nuevo), cuándo se marca leída y política anti-spam local sin envío inmediato. *(release versionado como ID estable; estado leído acotado a 100 IDs)*
 - [x] Campana en la barra superior y launcher móvil junto al tema, con contador, icono Lucide 1px, accesibilidad y estado local.
-- [x] Entrega server-side por release y lectura por cuenta: `notifications` + `notification_reads`, dedupe por `release_version`, endpoints admin para crear/publicar/archivar. *(la UI visual admin queda diferida; no bloquea comercio)*
+- [x] Entrega server-side por release y lectura por cuenta: `notifications` + `notification_reads`, dedupe por `release_version`, endpoints y panel admin dentro de Novedades para crear/publicar/archivar.
 - [ ] Pruebas E2E: overlay personalizado, sin spam, leídas, logout/login y dos dispositivos.
 
 **Salida:** los usuarios saben que hay novedades aunque su escritorio esté personalizado; el admin gestiona desde un panel, sin notificaciones inmediatas.

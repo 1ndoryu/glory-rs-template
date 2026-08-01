@@ -86,6 +86,7 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 - El release y su aviso deben confirmarse en la misma transacción para no mostrar una novedad de un escritorio que no llegó a publicarse.
 - `notification_reads` es un overlay por usuario; los avisos públicos siguen siendo una lista server-side y el navegador solo conserva fallback offline.
 - Un índice único parcial por release evita spam incluso si el endpoint de publicación se reintenta.
+- El panel admin debe reutilizar la app pública y sus servicios; añadir otra ventana de publicación crea dos fuentes de estado.
 
 ## 018A-14 — Comercio como apps sin duplicar checkout
 

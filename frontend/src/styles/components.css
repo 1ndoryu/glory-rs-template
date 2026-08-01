@@ -166,6 +166,29 @@
   font-weight: var(--peso-medio);
 }
 
+.notificacionesAdmin {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-sm);
+  border-top: var(--borde);
+  padding-top: var(--espacio-md);
+}
+
+.notificacionesAdmin__form,
+.notificacionesAdmin__item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espacio-sm);
+  align-items: center;
+}
+
+.notificacionesAdmin__form textarea { flex: 1 1 100%; min-height: 56px; }
+.notificacionesAdmin__form input { min-width: 120px; }
+.notificacionesAdmin__lista { display: grid; gap: var(--espacio-sm); overflow: auto; }
+.notificacionesAdmin__item { border: var(--borde); padding: var(--espacio-sm); justify-content: space-between; }
+.notificacionesAdmin__item p { flex: 1 1 100%; margin: 0; }
+.notificacionesAdmin__feedback { flex-basis: 100%; min-height: 1.25em; }
+
 /* === COMERCIO (apps Tienda/Pedidos/Descargas) === */
 .comercio {
   display: flex;

@@ -30,4 +30,16 @@ export const NotificationsService = {
   markRead(id: string): Promise<void> {
     return api.post<void>(`/api/notifications/${encodeURIComponent(id)}/read`, {});
   },
+
+  listAdmin(): Promise<NotificationsResponse> {
+    return api.get<NotificationsResponse>('/api/admin/notifications');
+  },
+
+  createAdmin(data: { kind: string; title: string; body: string; status: 'draft' | 'published' }): Promise<ApiNotification> {
+    return api.post<ApiNotification>('/api/admin/notifications', data);
+  },
+
+  updateStatus(id: string, status: 'draft' | 'published' | 'archived'): Promise<ApiNotification> {
+    return api.patch<ApiNotification>(`/api/admin/notifications/${encodeURIComponent(id)}/status`, { status });
+  },
 };

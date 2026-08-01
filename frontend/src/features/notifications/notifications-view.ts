@@ -11,6 +11,8 @@ import {
   notificationsStore,
   type NotificationsState,
 } from './notifications-store';
+import { authStore } from '../../store';
+import { createNotificationsAdminView } from './notifications-admin';
 
 export function createNotificationsView(): { element: HTMLElement; destroy: () => void } {
   const root = createEl('section', { className: 'notificaciones', ariaLabel: 'Novedades' });
@@ -21,6 +23,12 @@ export function createNotificationsView(): { element: HTMLElement; destroy: () =
   }, createElement(RefreshCw), createEl('span', { textContent: 'Recargar' }));
   reload.addEventListener('click', () => { void loadNotifications(); });
   root.append(title, reload, list);
+  let adminView: { destroy: () => void } | null = null;
+  if (authStore.get().capability === 'admin') {
+    const mounted = createNotificationsAdminView();
+    adminView = mounted;
+    root.appendChild(mounted.element);
+  }
 
   const render = (state: NotificationsState): void => {
     list.replaceChildren();
@@ -59,5 +67,5 @@ export function createNotificationsView(): { element: HTMLElement; destroy: () =
 
   const stop = notificationsStore.subscribeSimple(render);
   void loadNotifications();
-  return { element: root, destroy: stop };
+  return { element: root, destroy: () => { stop(); adminView?.destroy(); } };
 }

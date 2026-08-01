@@ -31,7 +31,7 @@ Avisar de releases públicos sin duplicar el catálogo de workspace ni inventar 
 - [x] Endpoint público y endpoint de lectura por usuario; `notification_reads` sincroniza el estado entre dispositivos.
 - [x] Endpoints admin para crear, publicar, archivar y listar avisos; los releases crean el aviso en la misma transacción.
 - [x] Política anti-spam por release mediante índice único server-side y límite de lectura pública.
-- [ ] Panel visual admin para operar los endpoints sin API manual.
+- [x] Panel visual admin dentro de la app Novedades para crear, publicar y archivar avisos sin API manual.
 - [ ] Casos E2E: overlay personalizado, logout/login, dos dispositivos y permisos.
 
 **Diferido:** panel visual y E2E; no bloquean continuar con comercio ni el resto del runtime.
