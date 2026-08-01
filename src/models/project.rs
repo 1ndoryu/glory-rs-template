@@ -93,10 +93,31 @@ impl<'de> Deserialize<'de> for ProjectUrlUpdate {
     where
         D: Deserializer<'de>,
     {
-        Ok(match Option::<String>::deserialize(deserializer)? {
-            Some(value) => Self::Set(value),
-            None => Self::Clear,
-        })
+        use serde::de::Error as _;
+        /* [018A-82] El contrato OpenAPI generado por ToSchema (y consumido por
+         * Orval) serializa el enum como "Unchanged" | "Clear" | { "Set": "..." }
+         * (externally-tagged), pero el Deserialize previo solo aceptaba string
+         * plana/null y rechazaba { "Set": "..." } con 422 — por eso guardar un
+         * proyecto con URL fallaba en update y autosave.
+         * Ahora se acepta el formato canónico del schema más el legacy
+         * (null → Clear, string plana → Set) para compatibilidad con clientes
+         * previos. El frontend (Orval) ya enviaba el formato correcto; el
+         * backend incumplía su propio contrato (regla 13: OpenAPI manda). */
+        match serde_json::Value::deserialize(deserializer)? {
+            serde_json::Value::Null => Ok(Self::Clear),
+            serde_json::Value::String(s) if s == "Unchanged" => Ok(Self::Unchanged),
+            serde_json::Value::String(s) if s == "Clear" => Ok(Self::Clear),
+            serde_json::Value::String(s) => Ok(Self::Set(s)),
+            serde_json::Value::Object(mut map) => match map.remove("Set") {
+                Some(serde_json::Value::String(s)) => Ok(Self::Set(s)),
+                _ => Err(D::Error::custom(
+                    "url: expected { \"Set\": \"<url>\" }, a variant string or null",
+                )),
+            },
+            _ => Err(D::Error::custom(
+                "url: expected { \"Set\": \"<url>\" }, a variant string or null",
+            )),
+        }
     }
 }
 
@@ -134,6 +155,23 @@ mod tests {
             replaced.url,
             ProjectUrlUpdate::Set("https://example.com".to_string())
         );
+
+        /* [018A-82] Formato canónico del contrato OpenAPI (externally-tagged)
+         * que envía el cliente Orval; antes rechazado con 422. */
+        let replaced_tagged: UpdateProjectRequest =
+            serde_json::from_str(r#"{"url":{"Set":"https://example.com"}}"#).unwrap();
+        assert_eq!(
+            replaced_tagged.url,
+            ProjectUrlUpdate::Set("https://example.com".to_string())
+        );
+
+        let cleared_tagged: UpdateProjectRequest =
+            serde_json::from_str(r#"{"url":"Clear"}"#).unwrap();
+        assert_eq!(cleared_tagged.url, ProjectUrlUpdate::Clear);
+
+        let unchanged_tagged: UpdateProjectRequest =
+            serde_json::from_str(r#"{"url":"Unchanged"}"#).unwrap();
+        assert_eq!(unchanged_tagged.url, ProjectUrlUpdate::Unchanged);
     }
 
     #[test]

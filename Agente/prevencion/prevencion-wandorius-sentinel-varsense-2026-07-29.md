@@ -90,6 +90,7 @@
 - [ ] Detectar token CSS inexistente o huérfano.
 - [x] Detectar clase usada sin definición y clase huérfana en contratos vanilla (`createEl({ className/class })`, `createContainer`, `createExternalLink`, `classList.add`, `className/contentClass`, templates/ternarios estáticos); ignorar comentarios/cadenas no ejecutables y mantener clases realmente huérfanas detectables. *(VarSense core patch hashado 2026-07-31 + 43 fixtures/tests)*
 - [ ] Detectar app con receta local equivalente a ventana, título, acciones, formulario o card compartidos.
+- [ ] Detectar `<select>` nativo del navegador dentro de componentes/features del OS (se usa `createSelect` custom en su lugar). *(018A-82: el select nativo se retiró; evaluado — la prohibición visual vive en el manual de identidad §select y una regla Sentinel por carpeta es frágil/ruidosa; pendiente decisión de implementarla como regla genérica en Glory Sentinel con fixtures)*
 
 ## Checklist 7 — Configuración y CI
 
