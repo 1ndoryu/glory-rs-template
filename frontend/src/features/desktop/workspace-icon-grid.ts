@@ -17,6 +17,7 @@ import { selectSingle, clearSelection } from '../runtime/selection-store';
 import { workspaceStore, reorderDesktopNodes } from '../runtime/workspace/workspace-store';
 import type { ResolvedNode } from '../runtime/workspace/types';
 import { AppRegistry } from '../runtime/app-registry';
+import { resolveResourceIcon, resolveResourceIconType } from '../runtime/resource-type-registry';
 import { enableDrag } from './utils/icon-drag';
 import { DESKTOP_MIN_WIDTH, getGridMetrics, planPlacement, reflowPositions } from './utils/icon-grid';
 import { moveNodesPosition } from '../runtime/workspace/overlay-mutations';
@@ -34,6 +35,11 @@ export function resolveNodeIcon(node: ResolvedNode): IconNode {
     const app = AppRegistry.get(node.refId);
     if (app) return app.icon;
   }
+  /* [018A-79] Los recursos resuelven su icono en ResourceTypeRegistry (fuente
+   * única con Finder y móvil); antes el fallback genérico devolvía carpeta. */
+  if (node.type === 'resource' && node.resourceKind) {
+    return resolveResourceIcon(node.resourceKind);
+  }
   return SHELL_ICON_MAP[node.id] ?? Folder;
 }
 
@@ -43,8 +49,11 @@ export function resolveNodeIconType(node: ResolvedNode): 'folder' | 'document' |
     if (app?.iconType) return app.iconType;
   }
   if (node.type === 'folder') return 'folder';
+  /* [018A-79] El tipo semántico también sale del registro (iconType por kind). */
+  if (node.type === 'resource' && node.resourceKind) {
+    return resolveResourceIconType(node.resourceKind);
+  }
   if (node.type === 'shortcut') return 'document';
-  if (node.type === 'resource') return 'document';
   return 'application';
 }
 

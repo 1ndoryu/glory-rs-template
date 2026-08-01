@@ -10,7 +10,7 @@ import { bindLongPressDrag } from './mobile-gestures';
 import { authStore } from '../../store';
 import { createMobileAccountControl, type MobileAccountControl } from './mobile-account-control';
 import { AppRegistry } from '../runtime/app-registry';
-import { resolveResourceType, type ResourceKind } from '../runtime/resource-type-registry';
+import { resolveResourceIcon } from '../runtime/resource-type-registry';
 import { moveMobileNodesPosition, workspaceStore } from '../runtime/workspace/workspace-store';
 import { getMobileCellAt, getMobileGridMetrics, planMobilePlacement, sortMobileNodes } from '../runtime/workspace/mobile-grid';
 import type { ResolvedNode } from '../runtime/workspace/types';
@@ -32,9 +32,11 @@ export interface MobileLauncher {
 function resolveNodeIcon(node: ResolvedNode): IconNode {
   if (node.id === 'profile' || node.refId === 'shell-profile') return FileUser;
   if (node.type === 'app' && node.refId) return AppRegistry.get(node.refId)?.icon ?? Circle;
-  if (node.type === 'folder') return AppRegistry.get('finder')?.icon ?? Circle;
+  /* [018A-79] Carpetas y recursos usan el icono oficial del registro (fuente única),
+   * no el icono de la app destino (product ya no hereda la carpeta de Galería). */
+  if (node.type === 'folder') return resolveResourceIcon('folder');
   if (node.type === 'resource' && node.resourceKind) {
-    return AppRegistry.get(resolveResourceType(node.resourceKind as ResourceKind)?.appId ?? '')?.icon ?? Circle;
+    return resolveResourceIcon(node.resourceKind);
   }
   return Circle;
 }

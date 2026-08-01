@@ -7,11 +7,6 @@
  */
 
 import {
-  Folder,
-  FileText,
-  Image,
-  Music,
-  Video,
   File,
   Package,
   createElement,
@@ -25,6 +20,8 @@ import { enableDrag, makeDropTarget } from '../../utils/icon-drag';
 import { authStore } from '../../../../store';
 import type { ResolvedNode } from '../../../runtime/workspace/types';
 import { resolvePublicResourceTarget } from '../../../runtime/workspace/public-resource-locator';
+import { AppRegistry } from '../../../runtime/app-registry';
+import { resolveResourceIcon, resolveResourceIconType } from '../../../runtime/resource-type-registry';
 import { showToast } from '../../../../components/ui/toast';
 
 export interface FinderOptions {
@@ -34,33 +31,25 @@ export interface FinderOptions {
   onNavigate?: (folderId: string, label: string) => void;
 }
 
-const RESOURCE_ICON_MAP: Record<string, IconNode> = {
-  article: FileText,
-  about: FileText,
-  project: Package,
-  product: Package,
-  image: Image,
-  audio: Music,
-  video: Video,
-  document: FileText,
-  folder: Folder,
-  generic: File,
-};
-
+/* [018A-79] Los iconos ya no viven en un mapa local: los recursos resuelven en
+ * ResourceTypeRegistry (fuente única con escritorio y móvil) y las apps en
+ * AppRegistry. Antes este mapa local divergía del escritorio (artículo → carpeta). */
 function getNodeIcon(node: ResolvedNode): IconNode {
-  if (node.type === 'folder') return Folder;
+  if (node.type === 'folder') return resolveResourceIcon('folder');
   if (node.type === 'resource' && node.resourceKind) {
-    return RESOURCE_ICON_MAP[node.resourceKind] ?? File;
+    return resolveResourceIcon(node.resourceKind);
   }
-  if (node.type === 'app') {
-    return RESOURCE_ICON_MAP[node.refId ?? ''] ?? Package;
+  if (node.type === 'app' && node.refId) {
+    return AppRegistry.get(node.refId)?.icon ?? Package;
   }
   return File;
 }
 
 function getNodeIconType(node: ResolvedNode): 'folder' | 'document' | 'application' {
   if (node.type === 'folder') return 'folder';
-  if (node.type === 'resource') return 'document';
+  if (node.type === 'resource' && node.resourceKind) {
+    return resolveResourceIconType(node.resourceKind);
+  }
   if (node.type === 'app') return 'application';
   return 'document';
 }

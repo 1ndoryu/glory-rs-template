@@ -1,10 +1,13 @@
 /* wandori.us — Resource Type Registry
  * [Plan §7] Asociación de tipos de archivo/programa.
- * Registry resourceKind/mime → appId + preview + acciones.
+ * Registry resourceKind/mime → appId + preview + acciones + icono oficial.
+ * [018A-79] Fuente única del icono por resourceKind: escritorio, Finder y
+ * launcher móvil consumen resolveResourceIcon en vez de mapas locales.
  * Separado del AppRegistry pero validado contra él.
  * Extensión y MIME del cliente no son autoridad; backend entrega tipo normalizado. */
 
 import { AppRegistry } from './app-registry';
+import { File, FileText, Folder, Image, Music, Package, Video, type IconNode } from 'lucide';
 import type { Capability } from './capability';
 import { hasCapability } from './capability';
 
@@ -35,6 +38,9 @@ export type ResourceAction =
   | 'download'
   | 'properties';
 
+/** Tipo semántico del pictograma (clase CSS del icono). */
+export type ResourceIconType = 'folder' | 'document' | 'application';
+
 /** Entrada de asociación tipo → app. */
 export interface ResourceTypeEntry {
   /** Tipo de recurso. */
@@ -49,6 +55,10 @@ export interface ResourceTypeEntry {
   readonly mimePatterns?: readonly string[];
   /** Si requiere capacidad específica. */
   readonly requires?: Capability;
+  /** Icono Lucide oficial del tipo (trazo del sistema). Fuente única para escritorio/Finder/móvil. */
+  readonly icon: IconNode;
+  /** Tipo semántico del pictograma (clase CSS); por defecto 'document'. */
+  readonly iconType?: ResourceIconType;
 }
 
 /* === Catálogo de asociaciones === */
@@ -69,6 +79,16 @@ export function registerResourceType(entry: ResourceTypeEntry): void {
 /** Resolver tipo de recurso → entrada de asociación. */
 export function resolveResourceType(kind: ResourceKind): ResourceTypeEntry | undefined {
   return registry.get(kind);
+}
+
+/** [018A-79] Icono oficial del tipo de recurso. Fuente única para escritorio, Finder y móvil. */
+export function resolveResourceIcon(kind: ResourceKind): IconNode {
+  return registry.get(kind)?.icon ?? File;
+}
+
+/** [018A-79] Tipo semántico del pictograma (clase CSS del icono). */
+export function resolveResourceIconType(kind: ResourceKind): ResourceIconType {
+  return registry.get(kind)?.iconType ?? 'document';
 }
 
 /** Resolver MIME type → entrada de asociación. */
@@ -117,6 +137,8 @@ export function initResourceTypeRegistry(): void {
     canPreview: true,
     actions: ['open', 'preview', 'edit', 'publish', 'unpublish', 'copy_reference', 'trash', 'restore', 'properties'],
     requires: 'public',
+    icon: FileText,
+    iconType: 'document',
   });
 
   /* About → Reader */
@@ -126,6 +148,8 @@ export function initResourceTypeRegistry(): void {
     canPreview: true,
     actions: ['open', 'preview', 'edit', 'copy_reference', 'properties'],
     requires: 'public',
+    icon: FileText,
+    iconType: 'document',
   });
 
   /* Proyecto → Projects */
@@ -135,6 +159,8 @@ export function initResourceTypeRegistry(): void {
     canPreview: true,
     actions: ['open', 'preview', 'edit', 'publish', 'unpublish', 'copy_reference', 'trash', 'restore', 'properties'],
     requires: 'public',
+    icon: Package,
+    iconType: 'document',
   });
 
   /* Producto → Finder (vista tienda) o Editor según capacidad */
@@ -144,6 +170,8 @@ export function initResourceTypeRegistry(): void {
     canPreview: true,
     actions: ['open', 'preview', 'edit', 'publish', 'unpublish', 'copy_reference', 'trash', 'restore', 'download', 'properties'],
     requires: 'public',
+    icon: Package,
+    iconType: 'document',
   });
 
   /* Imagen → Finder */
@@ -154,6 +182,8 @@ export function initResourceTypeRegistry(): void {
     actions: ['open', 'preview', 'download', 'copy_reference', 'trash', 'restore', 'properties'],
     mimePatterns: ['image/*'],
     requires: 'public',
+    icon: Image,
+    iconType: 'document',
   });
 
   /* Audio → Finder */
@@ -164,6 +194,8 @@ export function initResourceTypeRegistry(): void {
     actions: ['open', 'preview', 'download', 'copy_reference', 'trash', 'restore', 'properties'],
     mimePatterns: ['audio/*'],
     requires: 'public',
+    icon: Music,
+    iconType: 'document',
   });
 
   /* Video → Finder */
@@ -174,6 +206,8 @@ export function initResourceTypeRegistry(): void {
     actions: ['open', 'preview', 'download', 'copy_reference', 'trash', 'restore', 'properties'],
     mimePatterns: ['video/*'],
     requires: 'public',
+    icon: Video,
+    iconType: 'document',
   });
 
   /* Documento genérico → Finder */
@@ -184,6 +218,8 @@ export function initResourceTypeRegistry(): void {
     actions: ['open', 'download', 'copy_reference', 'properties'],
     mimePatterns: ['application/pdf', 'text/*'],
     requires: 'public',
+    icon: FileText,
+    iconType: 'document',
   });
 
   /* Carpeta → Finder */
@@ -193,6 +229,8 @@ export function initResourceTypeRegistry(): void {
     canPreview: true,
     actions: ['open', 'copy_reference', 'trash', 'restore', 'properties'],
     requires: 'public',
+    icon: Folder,
+    iconType: 'folder',
   });
 
   /* Genérico → propiedades/download si hay grant */
@@ -202,5 +240,7 @@ export function initResourceTypeRegistry(): void {
     canPreview: false,
     actions: ['properties', 'download'],
     requires: 'public',
+    icon: File,
+    iconType: 'document',
   });
 }
