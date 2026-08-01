@@ -1,5 +1,5 @@
 use axum::extract::{Path, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use uuid::Uuid;
@@ -118,9 +118,14 @@ async fn create_stripe_checkout(
     params.push(("metadata[order_id]", order.id.to_string()));
     params.push(("metadata[product_id]", product.id.to_string()));
 
+    let stripe_idempotency = order
+        .idempotency_key
+        .clone()
+        .unwrap_or_else(|| order.id.to_string());
     let response = reqwest::Client::new()
         .post("https://api.stripe.com/v1/checkout/sessions")
         .header("Authorization", format!("Bearer {stripe_key}"))
+        .header("Idempotency-Key", stripe_idempotency)
         .form(&params)
         .send()
         .await
@@ -170,8 +175,11 @@ async fn create_stripe_checkout(
 pub async fn checkout(
     State(state): State<AppState>,
     Path(product_id): Path<Uuid>,
+    headers: HeaderMap,
     Json(req): Json<CheckoutRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
+    req.validate()
+        .map_err(|error| AppError::Validation(error.to_string()))?;
     let product = ProductService::get_public(&state.pool, product_id).await?;
 
     /* [297A-7] Modo demo deshabilitado — requiere Stripe configurado */
@@ -180,11 +188,21 @@ pub async fn checkout(
         .as_ref()
         .ok_or_else(|| AppError::Internal("Pasarela de pago no configurada".into()))?;
 
-    let order = crate::repositories::product_repo::OrderRepository::create(
+    /* [297A-15] El header tiene precedencia; el body permite clientes que no
+     * puedan añadir headers. Si falta, se genera una clave única para no
+     * romper clientes legacy, pero los reintentos seguros deben reutilizarla. */
+    let idempotency_key = headers
+        .get("idempotency-key")
+        .and_then(|value| value.to_str().ok())
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+        .or(req.idempotency_key)
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
+    let order = crate::repositories::product_repo::OrderRepository::create_with_idempotency(
         &state.pool,
         product.id,
         &req.email,
-        None,
+        &idempotency_key,
     )
     .await?;
 

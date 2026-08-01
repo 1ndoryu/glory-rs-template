@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use utoipa::ToSchema;
 use uuid::Uuid;
+use validator::Validate;
 
 /// Configuracion del sitio (clave-valor)
 #[derive(Debug, Clone, FromRow, Serialize, ToSchema)]
@@ -32,14 +33,17 @@ pub struct AnalyticsEvent {
 }
 
 /// Request batch de eventos
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize, Serialize, Validate, ToSchema)]
 pub struct TrackEventsRequest {
+    #[validate(length(max = 50, message = "El lote no puede superar 50 eventos"))]
     pub events: Vec<TrackEvent>,
 }
 
 /// Evento individual
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize, Serialize, Validate, ToSchema)]
 pub struct TrackEvent {
+    pub event_id: Option<Uuid>,
+    #[validate(length(min = 1, max = 50, message = "Tipo de evento inválido"))]
     pub event_type: String,
     pub target_type: Option<String>,
     pub target_id: Option<Uuid>,

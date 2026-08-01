@@ -37,6 +37,7 @@ type NavigationEvent =
   | { type: 'page_view'; path: string }
   | { type: 'route_viewed'; path: string }
   | { type: 'external_nav_toggled'; expanded: boolean }
+  | { type: 'deep_link_opened'; routeName: string; appId: string }
   | {
       type: 'share_url_copied';
       success: boolean;
@@ -53,7 +54,7 @@ type AppEvent =
 
 /** Eventos de ventanas. */
 type WindowEvent =
-  | { type: 'window_focused'; appId: string }
+  | { type: 'window_focus_changed'; appId: string; previousAppId?: string }
   | { type: 'window_minimized'; appId: string }
   | { type: 'window_restored'; appId: string }
   | { type: 'window_moved'; appId: string }

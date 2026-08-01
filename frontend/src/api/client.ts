@@ -90,8 +90,8 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 export const api = {
   get: <T>(path: string, options?: { signal?: AbortSignal }) => request<T>(path, options),
 
-  post: <T>(path: string, body: unknown) =>
-    request<T>(path, { method: 'POST', body }),
+  post: <T>(path: string, body: unknown, options?: { headers?: Record<string, string>; signal?: AbortSignal }) =>
+    request<T>(path, { method: 'POST', body, ...options }),
 
   put: <T>(path: string, body: unknown) =>
     request<T>(path, { method: 'PUT', body }),

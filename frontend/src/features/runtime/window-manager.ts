@@ -11,13 +11,66 @@ import type { IconNode } from 'lucide';
 import {
   windowStore, workspaceW, workspaceH,
   clampWindowBounds, generateWindowId, generateNextZIndex,
-  type WindowEntry, type WindowBounds,
+  type WindowEntry, type WindowBounds, type WindowState,
 } from './window-store';
 
 /* Re-export todo desde window-store para backward compatibility.
  * Los consumidores existentes importan de 'window-manager' y seguirán funcionando. */
-export { windowStore, setWorkspaceBounds, clampWindowBounds, getWindows, getFocusedWindow, findOpenWindow } from './window-store';
+export { windowStore, setWorkspaceBounds, clampWindowBounds, getWindows, getFocusedWindow, findOpenWindow, ensureNextZIndexAbove } from './window-store';
 export type { WindowState, WindowBounds, WindowEntry, WindowIdentity, WindowGeometry, WindowContent } from './window-store';
+
+/** Estado persistido de una ventana restaurada de sesión. [317A-5] */
+export interface RestoredWindowState {
+  readonly bounds: WindowBounds;
+  readonly state: WindowState;
+  readonly zIndex: number;
+  readonly focused: boolean;
+  readonly params?: Readonly<Record<string, string>>;
+  readonly titleOverride?: string;
+  readonly preMaximizeBounds?: WindowBounds;
+}
+
+/** Abrir una ventana restaurada de sesión con geometría/estado explícitos.
+ * A diferencia de openWindow, no aplica defaults de apertura nueva: la sesión
+ * define bounds, state, zIndex, focused y preMaximizeBounds exactos.
+ * [317A-5] El content se re-instantía en restore; aquí solo se monta la entrada. */
+export function openRestoredWindow(
+  app: AppDefinition,
+  view: MountedView,
+  controller: AbortController,
+  saved: RestoredWindowState,
+): string {
+  const instanceId = generateWindowId();
+  const existing = windowStore.get();
+  const bounds = clampWindowBounds(saved.bounds.x, saved.bounds.y, saved.bounds.w, saved.bounds.h);
+
+  /* Solo la ventana enfocada de la sesión roba foco; las demás no. */
+  const updated = saved.focused
+    ? existing.map(w => ({ ...w, focused: false }))
+    : existing;
+
+  const entry: WindowEntry = {
+    instanceId,
+    appId: app.id,
+    title: saved.titleOverride ?? app.title,
+    state: saved.state,
+    bounds,
+    zIndex: saved.zIndex,
+    focused: saved.focused,
+    content: view.element,
+    controller,
+    app,
+    layout: app.layout,
+    toolbar: app.toolbar,
+    params: saved.params ? { ...saved.params } : undefined,
+    _paramKey: saved.params ? stableParamsKey(saved.params) : undefined,
+    onDestroy: view.destroy,
+    preMaximizeBounds: saved.preMaximizeBounds,
+  };
+
+  windowStore.set([...updated, entry]);
+  return instanceId;
+}
 
 /** Abrir una nueva ventana para una app. */
 export function openWindow(

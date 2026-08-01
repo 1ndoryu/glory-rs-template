@@ -1,4 +1,4 @@
-use sqlx::PgPool;
+use sqlx::{PgPool, Postgres, QueryBuilder};
 use uuid::Uuid;
 
 use crate::models::settings::{AnalyticsStats, RecentEvent, TopArticle, TrackEvent};
@@ -12,22 +12,27 @@ impl AnalyticsRepository {
         ip_hash: Option<&str>,
         user_agent: Option<&str>,
     ) -> Result<(), sqlx::Error> {
-        for event in events {
-            let id = Uuid::new_v4();
-            sqlx::query(
-                "INSERT INTO analytics_events (id, event_type, target_type, target_id, metadata, ip_hash, user_agent) \
-                 VALUES ($1, $2, $3, $4, $5, $6, $7)",
-            )
-            .bind(id)
-            .bind(&event.event_type)
-            .bind(&event.target_type)
-            .bind(event.target_id)
-            .bind(&event.metadata)
-            .bind(ip_hash)
-            .bind(user_agent)
+        if events.is_empty() {
+            return Ok(());
+        }
+        let mut builder = QueryBuilder::<Postgres>::new(
+            "INSERT INTO analytics_events (id, event_id, event_type, target_type, target_id, metadata, ip_hash, user_agent) ",
+        );
+        builder.push_values(events, |mut row, event| {
+            row.push_bind(Uuid::new_v4())
+                .push_bind(event.event_id.unwrap_or_else(Uuid::new_v4))
+                .push_bind(&event.event_type)
+                .push_bind(&event.target_type)
+                .push_bind(event.target_id)
+                .push_bind(&event.metadata)
+                .push_bind(ip_hash)
+                .push_bind(user_agent);
+        });
+        builder
+            .push(" ON CONFLICT (event_id) WHERE event_id IS NOT NULL DO NOTHING")
+            .build()
             .execute(pool)
             .await?;
-        }
         Ok(())
     }
 

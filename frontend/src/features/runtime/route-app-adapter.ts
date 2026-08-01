@@ -30,10 +30,27 @@ function reconcileRuntimeForRoute(pathname: string): void {
   clearRuntimePresentation();
 }
 
+export interface RouteAppAdapterOptions {
+  /**
+   * El shell restaura ventanas antes de inicializar el router. La ruta raíz
+   * representa el escritorio y no debe cerrar esas ventanas en ese primer
+   * reconcile; las navegaciones posteriores conservan el comportamiento
+   * normal de limpiar runtime al volver a una ruta documental. [317A-5]
+   */
+  readonly preserveRootOnInit?: boolean;
+}
+
 /** Registrar el interceptor de rutas en el router.
  * Llamar una vez desde main.ts. */
-export function initRouteAppAdapter(): () => void {
-  const stopRouteReconciliation = onNavigate(reconcileRuntimeForRoute);
+export function initRouteAppAdapter(options: RouteAppAdapterOptions = {}): () => void {
+  let preserveRootOnInit = options.preserveRootOnInit === true;
+  const stopRouteReconciliation = onNavigate((pathname) => {
+    if (preserveRootOnInit && pathname === '/') {
+      preserveRootOnInit = false;
+      return;
+    }
+    reconcileRuntimeForRoute(pathname);
+  });
   const stopInterceptor = setRouteInterceptor(async (pathname: string, params: RouteParams): Promise<boolean> => {
     const app = AppRegistry.findByRoute(pathname);
     if (!app) return false; /* No es ruta de app → router renderiza normalmente */
@@ -50,12 +67,21 @@ export function initRouteAppAdapter(): () => void {
       return true;
     }
 
+    /* [297A-19] Solo una ruta válida y autorizada llega a esta medición. El
+     * nombre es el primer segmento público; no se envían parámetros, IDs
+     * internos ni la URL completa. El foco se mide en window-url-sync, que
+     * también cubre clicks, taskbar, teclado y móvil sin duplicar eventos. */
+    dispatchEvent({
+      type: 'deep_link_opened',
+      routeName: pathname.split('/').filter(Boolean)[0] ?? 'root',
+      appId: app.id,
+    });
+
     /* Una instancia existente se enfoca; no se duplica. */
     const existing = findExistingWindow(windowStore.get(), app, access.params);
     if (existing) {
       if (existing.state === 'minimized') restoreWindow(existing.instanceId);
       focusWindow(existing.instanceId);
-      dispatchEvent({ type: 'window_focused', appId: app.id });
       return true; /* Interceptor manejó la ruta */
     }
 

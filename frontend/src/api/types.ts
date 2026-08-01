@@ -142,6 +142,7 @@ export interface SiteSettings {
 
 /* === Analytics === */
 export interface AnalyticsEvent {
+  event_id?: string;
   event_type: string;
   target_type?: string;
   target_id?: string;

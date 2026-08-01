@@ -4,7 +4,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { authStore } from '../../../store';
 import { CommandRegistry, adminOnly, type Command } from '../../runtime/command-registry';
-import { createAppToolbar } from './desktop-window';
+import { createAppToolbar, createDesktopWindow } from './desktop-window';
+import { createEl } from '../../../utils/dom';
 import type { AppToolbarGroup } from '../../runtime/app-registry';
 
 /* Mock del dropdown: el test solo valida visibilidad/reactividad del toolbar,
@@ -96,6 +97,41 @@ describe('createAppToolbar (reactivo a capacidad)', () => {
     toolbar.destroy();
     authStore.set({ isAuthenticated: false, userId: null, capability: 'public' }, 'sync');
     expect(toolbar.element.querySelectorAll('.desktop-app-toolbar__item').length).toBe(1);
+    document.body.innerHTML = '';
+  });
+});
+
+/* [018A-1 F4] Prevención: la franja de acciones es parte del chrome de la
+ * ventana — hija directa de .desktop-window, DESPUÉS del body (fuera de su
+ * padding y de su scroll). Si una app deja de aportar actions, no debe
+ * quedar una franja vacía visible. */
+describe('createDesktopWindow (slot de acciones)', () => {
+  it('coloca la franja de acciones después del body como última hija', () => {
+    const content = createEl('div', { className: 'contenido-prueba' });
+    const actions = createEl('div', { className: 'desktop-window__actions' });
+    const win = createDesktopWindow({ title: 'Prueba', content, actions });
+
+    const body = win.element.querySelector('.desktop-window__body');
+    const bar = win.element.querySelector('.desktop-window__actions');
+    expect(body).not.toBeNull();
+    expect(bar).not.toBeNull();
+    expect(win.element.lastElementChild).toBe(bar);
+    expect(body!.contains(bar)).toBe(false);
+
+    win.destroy();
+    document.body.innerHTML = '';
+  });
+
+  it('sin actions no crea franja alguna', () => {
+    const content = createEl('div', { className: 'contenido-prueba' });
+    const win = createDesktopWindow({ title: 'Prueba', content });
+
+    expect(win.element.querySelector('.desktop-window__actions')).toBeNull();
+    expect(win.element.lastElementChild).toBe(
+      win.element.querySelector('.desktop-window__body'),
+    );
+
+    win.destroy();
     document.body.innerHTML = '';
   });
 });

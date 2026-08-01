@@ -6,6 +6,7 @@
 import { api } from '../api/client';
 import { authStore, type AuthCapability } from '../store';
 import { clearPreferencesSync, syncPreferencesForUser } from '../features/runtime/preferences-sync';
+import { clearClipboard } from '../features/runtime/workspace/workspace-store';
 
 export interface MeResult {
   isAuthenticated: boolean;
@@ -38,10 +39,13 @@ export const AuthService = {
   async logout(): Promise<void> {
     try {
       await api.post<void>('/api/auth/logout', {});
-    } catch {
-      /* Error al cerrar sesión no crítico — limpiar estado igual */
+    } catch (error) {
+      /* La cookie puede haber expirado; el estado local se limpia igual, pero
+       * el fallo queda observable para diagnóstico y no se silencia. */
+      console.error('[auth] logout request failed', error);
     }
     clearPreferencesSync();
+    clearClipboard();
     authStore.set({ isAuthenticated: false, userId: null, capability: 'public' });
   },
 

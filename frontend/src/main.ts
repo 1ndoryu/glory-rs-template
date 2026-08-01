@@ -30,6 +30,8 @@ import './features/runtime/commands';
 import { initKeyboardShortcuts } from './features/runtime/commands';
 import { initRouteAppAdapter, setMobileOpenHandler, openAppWindow } from './features/runtime/route-app-adapter';
 import { initWindowUrlSync } from './features/runtime/window-url-sync';
+import { initWindowSessionPersistence } from './features/runtime/window-session';
+import { restoreWindowSession } from './features/runtime/window-session-restore';
 import { AppRegistry } from './features/runtime/app-registry';
 import { initResourceTypeRegistry } from './features/runtime/resource-type-registry';
 import { setActorCategory } from './features/analytics/dispatcher';
@@ -231,8 +233,17 @@ async function initApp(): Promise<void> {
   const stopMobileAdapter = (): void => {
     setMobileOpenHandler(null);
   };
-  const stopRouteAdapter = initRouteAppAdapter();
+  /* [317A-5] restoreWindowSession corre antes de initRouter para evitar
+   * duplicados de deep-link. En la primera ruta `/`, el escritorio restaurado
+   * es la presentación válida y no debe ser limpiado por la reconciliación. */
+  const stopRouteAdapter = initRouteAppAdapter({ preserveRootOnInit: true });
   const stopWindowUrlSync = initWindowUrlSync();
+
+  /* [317A-5] Persistir la sesión de ventanas y restaurarla ANTES de que el
+   * router resuelva la URL: la app enfocada ya estará abierta y el interceptor
+   * la enfocará sin duplicar; el resto de ventanas recupera geometría/estado. */
+  const stopWindowSession = initWindowSessionPersistence();
+  await restoreWindowSession();
 
   /* Iniciar router — cleanup almacenado */
   const stopRouter = initRouter();
@@ -274,12 +285,25 @@ async function initApp(): Promise<void> {
         : (desktop?.contentWindow ?? mobile?.routerOutlet);
       if (transientRoot) captureTransientState(transientRoot, transientKey);
 
+      /* [317A-5] Pausar la persistencia de sesión durante la transición:
+       * unmountPresentation llama a closeAllWindows y NO debe persistir un
+       * escritorio vacío que sobrescribiría la sesión previa. */
+      stopWindowSession.pause();
       stopWindowUrlSync.pause();
       try {
         unmountPresentation();
         mountPresentation(event.matches);
         await refreshRoute();
 
+        if (requestId !== transitionRequest) {
+          discardTransientState(transientKey);
+          return;
+        }
+        /* [317A-5] Al volver a una presentación, restaurar la sesión completa
+         * (ventanas desktop o stack móvil que había antes de cambiar). La app
+         * activa ya estaba en la sesión y openAppWindow/restore la enfocan
+         * sin duplicar; lo visible queda igual a lo que restauraría una recarga. */
+        await restoreWindowSession();
         if (requestId !== transitionRequest) {
           discardTransientState(transientKey);
           return;
@@ -312,7 +336,10 @@ async function initApp(): Promise<void> {
         /* Una transición obsoleta no puede reactivar el sincronizador mientras
          * otra más reciente sigue en cola; así nunca se proyecta '/' de forma
          * transitoria sobre una deep link válida. */
-        if (requestId === transitionRequest) stopWindowUrlSync.resume();
+        if (requestId === transitionRequest) {
+          stopWindowUrlSync.resume();
+          stopWindowSession.resume();
+        }
       }
     }).catch((error: unknown) => {
       /* La transición no debe romper futuros cambios; deja diagnóstico sin
@@ -336,6 +363,7 @@ async function initApp(): Promise<void> {
     stopRouter();
     stopRouteAdapter();
     stopWindowUrlSync.stop();
+    stopWindowSession.stop();
     stopMobileAdapter();
     clearTransientState();
     unmountPresentation();

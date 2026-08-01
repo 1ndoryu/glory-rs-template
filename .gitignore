@@ -57,3 +57,8 @@ glory-rust-template.code-workspace
 .quality-tools/
 .quality-reports/
 .cargo/config.toml
+.tmp-sentinel/edit.mjs
+.tmp-sentinel/expected-findings.json
+.tmp-sentinel/newfunc.txt
+.tmp-sentinel/rustRouteSyntaxRule.test.ts
+.tmp-sentinel/sample.rs

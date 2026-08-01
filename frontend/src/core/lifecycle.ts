@@ -15,9 +15,11 @@ export interface RenderContext {
 export interface MountedView {
   /** Elemento raíz que el shell inserta en el DOM. */
   readonly element: HTMLElement;
-  /** [018A-1] Franja de acciones opcional que el shell coloca como barra
-   * inferior de la ventana (debajo del body, fuera de su padding y de su
-   * scroll). Solo aplica a ventanas desktop; el móvil la ignora. */
+  /** [018A-1] Franja de acciones opcional que la app aporta como barra
+   * inferior fija. Desktop la coloca como hija de .desktop-window (debajo
+   * del body padded, fuera de su padding y de su scroll) y el stack móvil
+   * debajo del contenido full-screen; es la misma instancia, sin duplicar
+   * lógica por plataforma. Una app sin acciones no cambia de comportamiento. */
   readonly actions?: HTMLElement;
   /** Cleanup opcional que el shell invoca antes de destruir la vista. */
   destroy?: () => void;

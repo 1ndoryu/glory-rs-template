@@ -3,6 +3,7 @@ use axum::http::StatusCode;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use std::collections::HashMap;
+use validator::Validate;
 
 use crate::errors::AppError;
 use crate::middleware::AdminUser;
@@ -34,6 +35,13 @@ pub async fn track_events(
     headers: axum::http::HeaderMap,
     Json(req): Json<TrackEventsRequest>,
 ) -> Result<StatusCode, AppError> {
+    req.validate()
+        .map_err(|error| AppError::Validation(error.to_string()))?;
+    for event in &req.events {
+        event
+            .validate()
+            .map_err(|error| AppError::Validation(error.to_string()))?;
+    }
     let ip_hash = headers
         .get("x-forwarded-for")
         .or_else(|| headers.get("x-real-ip"))

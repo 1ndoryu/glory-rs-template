@@ -14,6 +14,15 @@ struct SendEmailRequest {
     html: String,
 }
 
+fn escape_html(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
+}
+
 pub struct EmailService;
 
 impl EmailService {
@@ -25,17 +34,19 @@ impl EmailService {
         product_name: &str,
         download_url: &str,
     ) -> Result<(), AppError> {
+        let safe_product_name = escape_html(product_name);
+        let safe_download_url = escape_html(download_url);
         let html = format!(
             r#"<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
 <body style="font-family: system-ui, sans-serif; color: #000; background: #fff; padding: 32px;">
   <h1 style="font-size: 20px; font-weight: 400; margin-bottom: 16px;">gracias por tu compra</h1>
-  <p style="margin-bottom: 16px;">tu archivo <strong>{product_name}</strong> esta listo para descargar:</p>
-  <p style="margin-bottom: 24px;">
-    <a href="{download_url}" style="text-decoration: underline; font-size: 14px;">descargar archivo</a>
+    <p style="margin-bottom: 16px;">tu archivo <strong>{safe_product_name}</strong> esta listo para descargar:</p>
+    <p style="margin-bottom: 24px;">
+    <a href="{safe_download_url}" style="text-decoration: underline; font-size: 14px;">descargar archivo</a>
   </p>
-  <p style="font-size: 13px; color: #555;">si el enlace no funciona, copia y pega esta url en tu navegador:<br>{download_url}</p>
+  <p style="font-size: 13px; color: #555;">si el enlace no funciona, copia y pega esta url en tu navegador:<br>{safe_download_url}</p>
   <hr style="border: none; border-top: 1px solid #000; margin: 24px 0;">
   <p style="font-size: 12px; color: #999;">wandori.us</p>
 </body>

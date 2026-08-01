@@ -8,6 +8,7 @@ import type { AnalyticsStats } from '../api/types';
 export const AnalyticsService = {
   /** Enviar eventos de analytics (batch). */
   async trackEvents(events: Array<{
+    event_id?: string;
     event_type: string;
     target_type?: string;
     target_id?: string;

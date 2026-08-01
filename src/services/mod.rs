@@ -1,5 +1,6 @@
 pub mod article;
 mod auth;
+pub mod commerce;
 pub mod email;
 pub mod media_svc;
 mod note;

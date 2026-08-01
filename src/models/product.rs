@@ -72,9 +72,12 @@ pub struct UpdateProductRequest {
 pub struct Order {
     pub id: Uuid,
     pub product_id: Uuid,
+    pub product_version_id: Option<Uuid>,
+    pub user_id: Option<Uuid>,
     pub stripe_session_id: Option<String>,
     pub stripe_payment_intent: Option<String>,
     pub customer_email: String,
+    pub idempotency_key: Option<String>,
     pub status: String,
     pub paid_at: Option<DateTime<Utc>>,
     pub delivered_at: Option<DateTime<Utc>>,
@@ -88,9 +91,13 @@ pub struct CreateOrderRequest {
 }
 
 /// Request de checkout
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize, Validate, ToSchema)]
 pub struct CheckoutRequest {
+    #[validate(email(message = "Formato de email inválido"))]
     pub email: String,
+    #[serde(default)]
+    #[validate(length(max = 128, message = "La clave de idempotencia es demasiado larga"))]
+    pub idempotency_key: Option<String>,
 }
 
 #[cfg(test)]

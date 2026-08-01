@@ -97,6 +97,12 @@ export function createMobileShell(
         createAppHeader(entry.title),
         createEl('div', { className: contentClass }, entry.view.element),
       );
+      /* [018A-1 F1] La franja de acciones es el mismo slot que desktop: la
+       * app la aporta en MountedView.actions y ambas presentaciones la
+       * colocan como barra inferior fija (fuera del scroll del contenido),
+       * sin duplicar lógica por plataforma. Si la app no aporta actions,
+       * no hay tercera fila. */
+      if (entry.view.actions) app.appendChild(entry.view.actions);
       currentView = app;
       viewport.prepend(app);
     } else if (legacyContentVisible) {

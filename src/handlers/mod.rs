@@ -2,6 +2,7 @@
 
 pub mod articles;
 pub mod auth;
+pub mod download_handler;
 mod health;
 pub mod media_handler;
 mod notes;
@@ -162,6 +163,7 @@ fn api_routes() -> Router<AppState> {
         .merge(notes::routes())
         .merge(articles::routes())
         .merge(media_handler::routes())
+        .merge(download_handler::routes())
         .merge(preferences_handler::routes())
         .merge(settings_handler::routes())
         .merge(products_handler::routes())

@@ -92,10 +92,15 @@ export function createAdminWindowView(): { page: Promise<HTMLElement>; actions: 
         contentArea.appendChild(createFontPanel());
         setWindowActions([]);
         break;
-      case 'sitio':
-        contentArea.appendChild(renderSitioTab());
-        setWindowActions([]);
+      case 'sitio': {
+        /* [018A-1 F3] La acción primaria del tab sitio (guardar contenido)
+         * vive en la franja de la ventana como el resto de tabs; el body
+         * solo renderiza el formulario. */
+        const sitio = renderSitioTab();
+        contentArea.appendChild(sitio.element);
+        setWindowActions([sitio.createSaveAction()]);
         break;
+      }
       case 'estadisticas':
         renderEstadisticasTab(contentArea);
         setWindowActions([]);
@@ -126,7 +131,7 @@ export async function renderAdmin(): Promise<HTMLElement> {
   return createAdminWindowView().page;
 }
 
-function renderSitioTab(): HTMLElement {
+function renderSitioTab(): { element: HTMLElement; createSaveAction: () => HTMLElement } {
   const container = createEl('div', { className: 'flex-columna gap-lg' });
   container.appendChild(createEl('h3', { textContent: 'contenido del sitio' }));
 
@@ -146,13 +151,14 @@ function renderSitioTab(): HTMLElement {
     if (textarea) textarea.value = aboutContent;
   })();
 
+  /* [018A-1 F3] El botón se crea aquí (closure sobre aboutContent) pero el
+   * shell lo coloca en la franja de la ventana vía setWindowActions. */
   const btnGuardarSitio = createEl('button', { className: 'boton', textContent: 'guardar' });
   btnGuardarSitio.addEventListener('click', safeClick(async () => {
     const result = await safeRun(SettingsService.save({ about_content: aboutContent }), 'error al guardar');
     if (result.ok) showToast('contenido actualizado');
   }));
-  container.appendChild(btnGuardarSitio);
-  return container;
+  return { element: container, createSaveAction: () => btnGuardarSitio };
 }
 
 function renderEstadisticasTab(contentArea: HTMLElement): void {

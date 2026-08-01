@@ -28,7 +28,7 @@
 - Workspace overlay implementado: release + overlay + merge + clipboard + papelera + crear carpetas.
 - Split de archivos grandes completado: command-registration (725→6), workspace-store (430→4), desktop-shell (419→3), mobile-shell (antes >300; launcher extraído a `mobile-launcher.ts`).
 - Sesiones opacas en cookie operativas; JWT localStorage eliminado del frontend. `/admin` legacy y uploads públicos siguen como deuda controlada.
-- **Quality tool sprint:** 13 reglas custom (P0/P1/P2) + 7 Sentinel CLI + 4 VarSense = 24 reglas activas; la cobertura operativa estimada del quality tool es ~65% del inventario de patrones automatizables definido en el plan. VarSense reconoce contratos vanilla de clases con patch reproducible (`a93b8bf0…`, 43 tests del tool). Último gate 297A-19: PASS, VarSense 0 errores/2 avisos informativos, Sentinel 0 errores + 75 warnings heredados, custom 0 errores/3 informativos. Auditoría v4 reporta por separado 57/78 hallazgos arquitectónicos potencialmente detectables (73%) y 19/23 correcciones del checklist base (83%); no son denominadores comparables. ISP refactor DomAttrs (33→6 sub-interfaces). Frontend: 203 tests en 19 suites.
+- **Quality tool sprint:** 13 reglas custom (P0/P1/P2) + 7 Sentinel CLI + 4 VarSense = 24 reglas activas; la cobertura operativa estimada del quality tool es ~65% del inventario de patrones automatizables definido en el plan. VarSense reconoce contratos vanilla de clases con patch reproducible (`a93b8bf0…`, 43 tests del tool). Últimos gates 297A-13/15/16: PASS, Sentinel 0 errores, VarSense 0 errores, Rust 28 tests, frontend 382 tests en 49 suites. Auditoría v4 reporta por separado 57/78 hallazgos arquitectónicos potencialmente detectables (73%) y 19/23 correcciones del checklist base (83%); no son denominadores comparables. ISP refactor DomAttrs (33→6 sub-interfaces).
 - Ejecutar una tarea por vez y en este orden; no saltar dependencias.
 - El plan maestro contiene checklists/gates. El roadmap conserva solo pendientes.
 - El quality gate está operativo; toda tarea futura debe cerrarse con `npm run task:check -- {ID}`.
@@ -106,6 +106,7 @@
 - [x] Back/Home y carpetas consumen workspace/registry; Back/Home sincronizan URL; long press y reorder accesible consumen CommandRegistry y `mobilePosition` (`mobileOrder` solo fallback legacy).
 - [x] Transición dinámica móvil↔tablet sin recarga mediante reinstanciación segura.
 - [x] Cambio móvil↔tablet conserva app/recurso por URL/params; el sincronizador pausa/reanuda durante la reinstanciación y evita entradas duplicadas. El snapshot transitorio opt-in conserva formularios/scroll seguros durante la reinstanciación; la validación E2E visual sigue pendiente.
+- [x] Refresh móvil reconstruye el stack seguro antes del router y conserva la app superior sin duplicarla; verificado en 390×844 con Galería.
 - [ ] Pruebas visuales/E2E 320/360/390 y tablet 768; tablet `768×1024` ya fue inspeccionada sin overflow; quedan drag táctil estable, orientación, safe areas, teclado virtual, foco, scroll/formularios y apps críticas.
 
 **Salida:** teléfono funciona como launcher sin duplicar lógica; tablet sigue como escritorio.
@@ -133,7 +134,8 @@
 - [x] Conectar `replacePath` a todos los cambios de foco y reservar `pushPath` para aperturas explícitas; `window-url-sync` deriva de los stores sin router paralelo.
 - [ ] Mantener Back/Forward, refresh y transición desktop/tablet/móvil para el foco completo; la reconciliación de rutas documentales, parámetros inseguros, capacidades y semántica `push/replace` ya está implementada y probada, pero falta E2E real de `goBack()`/`popstate`/interacción móvil.
 - [x] Añadir `Copiar URL` como comando global del toolbar, con feedback, fallback de Clipboard API/execCommand y URL canónica allowlisted. *(navigation-commands.ts + desktop-window.ts)*
-- [ ] Medir `deep_link_opened` y `window_focus_changed`; `share_url_copied` ya emite metadatos allowlisted (`routeName`, `appId`, `presentationMode`, `success`). Probar sesión limpia, varias ventanas, permisos, rutas inválidas y viewports. El boundary y las rutas inválidas ya tienen cobertura unitaria.
+- [x] Emitir `deep_link_opened` y `window_focus_changed` con propiedades allowlisted; el foco se centraliza en `window-url-sync` para no duplicar eventos entre clicks, taskbar, teclado, URL y móvil. `share_url_copied` conserva `routeName`, `appId`, `presentationMode` y `success`.
+- [ ] Probar la instrumentación en sesión limpia, varias ventanas, permisos, rutas inválidas y viewports; el boundary y las rutas inválidas ya tienen cobertura unitaria.
 
 **Salida:** copiar una URL desde cualquier app abre o enfoca esa app/recurso en otra sesión, con historial, seguridad, analítica y presentación móvil coherentes.
 
@@ -190,7 +192,8 @@
 - [x] **Cuenta como app del escritorio:** registrar en AppRegistry como singleton público con estados invitado/autenticado/admin; verificación pendiente y MFA quedan como estados futuros del backend. *(account-view.ts + AppRegistry)*
 - [x] **Estado de sesión visible:** control en barra superior y launcher móvil junto al tema; abre Cuenta y refleja Entrar/Cuenta/Cuenta · admin con etiqueta accesible. *(desktop-menu-bar.ts + mobile-shell.ts)*
 - [x] **Login dentro de la app:** deslogueado, Cuenta muestra login dentro de su ventana; `/login` es deep link canónico y el wrapper legacy reutiliza la misma vista. Registro y `/register` permanecen cerrados hasta completar backend verificado.
-- [ ] Recuperación de contraseña, rate limit y auditoría de intentos; logout limpia clipboard/undo.
+- [ ] Recuperación de contraseña y verificación avanzada.
+- [x] Rate limit de login, auditoría hash de intentos y logout limpia clipboard/undo. *(migration `20260801030000_297a13_auth_audit` + handler)*
 
 **Salida:** preferencias, overlay remoto y Cuenta base tienen transporte seguro, control de revisión, validación server-side, resolución visible `remote/local`, login/logout y pruebas frontend; 297A-13 permanece abierto por registro verificado, E2E multi-dispositivo/móvil, MFA, recuperación y auditoría avanzada.
 
@@ -213,11 +216,11 @@
 
 **Depende de:** 297A-7/10/14.
 
-- [ ] Tienda como carpeta, Compra y Pedidos.
-- [ ] Product versions y storage privado.
-- [ ] Orden idempotente y webhook validado/transaccional.
-- [ ] Entitlements, grants y outbox.
-- [ ] Compra invitada, reembolso/revocación y pruebas negativas.
+- [ ] Tienda como carpeta, programa Compra y programa Pedidos (UI/runtime pendiente).
+- [x] Product versions inmutables y endpoint de descarga privado con path traversal fail-closed.
+- [x] Orden idempotente por cliente + clave y webhook firmado con registro de eventos repetibles.
+- [x] Entitlements, grants opacos temporales y outbox deduplicado.
+- [x] Compra invitada soportada por checkout público; quedan reembolso/chargeback, worker outbox y pruebas E2E con Stripe/Resend.
 
 **Salida:** cliente no concede acceso; comprador recibe la versión adquirida.
 
@@ -225,9 +228,9 @@
 
 **Depende de:** 297A-9/11–15.
 
-- [ ] Consentimiento/retención y eventos esenciales/opcionales.
-- [ ] Batch idempotente y eventos críticos server-side.
-- [ ] Agregados, Estadísticas y audit separado.
+- [ ] Consentimiento/retención y eventos esenciales/opcionales (UI/política pendiente).
+- [x] Batch acotado, inserción multi-fila y deduplicación por `event_id`; eventos críticos de pago permanecen server-side.
+- [x] Agregados y Estadísticas separados del dispatcher; audit/retención operativa pendiente.
 - [ ] Paridad y eliminación de `/admin`, JWT, uploads y contratos/CSS legacy.
 
 **Salida:** una sola administración y métricas privadas/tipadas.
@@ -236,7 +239,8 @@
 
 **Depende de:** 297A-6–16.
 
-- [ ] MFA/passkey, estrategia SEO, sitemap y metadata.
+- [ ] MFA/passkey y recuperación avanzada.
+- [x] Estrategia SEO base: sitemap/robots dinámicos, metadata OG/Twitter, canonical y JSON-LD sin incluir drafts.
 - [ ] Manual visual en desktop/tablet/móvil.
 - [ ] Teclado, foco, zoom, reduced motion y multimedia accesible.
 - [ ] Quality gate/CI completos y E2E críticos.
@@ -298,29 +302,29 @@ Este bloque amplía el alcance verificable sin duplicar los manuales canónicos.
 
 ### 297A-9 — Foundation del runtime
 
-- [ ] Definir la matriz de `AppRegistry`, `CommandRegistry` y `RouteAppAdapter`: capacidades, rutas profundas, evento emitido y teardown con `AbortSignal`.
-- [ ] Conectar OpenAPI y Orval en modo `tags-split`, sin editar `generated.ts`; mantener la misma envoltura de éxito/error entre cliente y servidor.
-- [ ] Cubrir IDs únicos, capacidades, disponibilidad por presentación e idempotencia con Vitest; eventos críticos deben quedar server-side.
-- [ ] Ejecutar prueba visual del shell en 1440x900, 1024x768, 390x844 y 320px, incluyendo foco, teclado y zoom 200%.
+- [x] Matriz de `AppRegistry`, `CommandRegistry` y `RouteAppAdapter` con capacidades, rutas, eventos y teardown.
+- [ ] Generar OpenAPI/Orval en modo `tags-split` cuando exista un backend ejecutándose; la configuración portable ya está preparada.
+- [x] Tests de IDs, capacidades, disponibilidad por presentación e idempotencia; eventos críticos quedan server-side.
+- [ ] Prueba visual completa del shell en todos los viewports y zoom 200% (pendiente de servidor/navegador estable).
 
 ### 297A-12 — Experiencia móvil tipo launcher
 
-- [ ] Completar validación visual/E2E de long press, menú contextual y reorder accesible; la posición personal se guarda como `mobilePosition` y no altera el release público (`mobileOrder` queda como fallback legacy).
-- [ ] Probar Back/Home, carpetas, deep links, refresco, orientación, safe areas, teclado virtual, overflow y cambio móvil/tablet sin perder URL, foco, scroll o formularios.
-- [ ] Verificar 320/360/390px y tablet 768px, rendimiento y apps críticas: Cuenta, Finder, Reader, Editor, Store, Checkout, Descargas, Configuración y Estadísticas.
-- [ ] Confirmar que móvil reutiliza comandos, permisos, recursos y analítica del escritorio; solo cambia `presentationMode`.
+- [x] Long press, menú contextual, reorder accesible y `mobilePosition` implementados con `CommandRegistry` compartido.
+- [x] Back/Home, carpetas, deep links, refresco y transición móvil/tablet conservan el estado en código y tests.
+- [ ] Validación visual/E2E final en 320/360/390/768px, safe areas, teclado virtual, foco, scroll y apps críticas.
+- [x] Móvil reutiliza comandos, permisos, recursos y analítica del escritorio; solo cambia `presentationMode`.
 
 ### 297A-19 — URLs canónicas, deep links y ventana enfocada
 
-- [ ] Definir gramática versionada y mapping `app/resource/instance` con singleton o multiinstancia explícitos; parámetros son input no confiable.
-- [ ] Resolver URL en `RouteAppAdapter` con capacidades server-side, 403/404 seguro, sin enumerar privados ni incluir tokens, grants o rutas internas.
-- [ ] Sincronizar foco/z-order con History API: `replaceState` para foco, `pushState` para navegación, Back/Home según presentación y sin listeners stale.
-- [ ] Probar URL desde sesión limpia, refresh, dos ventanas, recurso privado, app inexistente, cambio de breakpoint, scroll/formulario y deduplicación de instancia.
-- [ ] Emitir un único evento de navegación/deep link y verificar SEO solo para recursos públicos activos.
+- [x] Gramática versionada y mapping allowlisted `app/resource/instance`; parámetros son input no confiable.
+- [x] `RouteAppAdapter` valida capacidades y devuelve 403/404 seguro sin enumerar privados ni serializar tokens.
+- [x] Foco/z-order se sincroniza con History API y Back/Home sin listeners stale.
+- [ ] E2E en sesión limpia, refresh, varias ventanas, permisos, breakpoint, scroll/formulario y deduplicación.
+- [x] Un único evento de navegación/deep link; SEO queda limitado a recursos públicos activos.
 
 ### 297A-13 — Registro y overlay remoto
 
-- [ ] Implementar registro verificado, login/logout, recuperación, rate limit y auditoría detrás de feature flag; logout limpia clipboard/undo.
+- [ ] Implementar registro verificado y recuperación detrás de feature flag; rate limit/login/logout, auditoría hash y limpieza de clipboard ya están operativos.
 - [x] Sincronizar preferencias y overlay con revisión esperada, actualización optimista, validación server-side, fallback offline y conflicto 409 visible. *(preferencias + `user_workspace_overlays`; gate y self-check PASS)*
 - [x] Definir importación local, uso remoto, reset explícito, merge por ID/campo, tombstones y rebase ante release nuevo; probar autorización, payload inválido, corrupción persistida y revisión inicial sin fila fantasma.
 - [ ] Probar E2E dos pestañas/dispositivos y decidir merge semántico para cambios concurrentes no resolubles por reemplazo local/remoto.
@@ -329,28 +333,27 @@ Este bloque amplía el alcance verificable sin duplicar los manuales canónicos.
 
 Plan canónico: `Agente/planes/plan-programas-editoriales-2026-07-31.md`.
 
-- [x] Completar el vertical de artículos/About mediante `article-editor`; evidencia F1: 281/281 tests frontend, build, backend 17/17, quality gate y self-check PASS.
-- [ ] Congelar la matriz de paridad del Admin legado y migrar acciones restantes a programas con capacidades server-side y audit trail.
-- [ ] Cubrir proyectos, productos versionados y media con draft/private/public, preview, publicación inmutable, rollback, papelera y autosave.
-- [ ] Validar que mover referencias no muta recursos, que MIME lo decide el backend y que copiar/cortar/pegar respeta colisiones, historial y permisos.
+- [x] Vertical de artículos/About, proyectos, productos versionados y media con draft/private/public, papelera, rollback y autosave.
+- [x] Matriz de paridad del Admin y acciones por capacidades server-side; Finder/clipboard preservan referencias y permisos.
+- [ ] E2E visual desktop/tablet/móvil del vertical editorial.
 
 ### 297A-15 — Comercio seguro
 
-- [ ] Modelar Tienda como carpeta y Product/Checkout/Orders/Descargas como programas; validar precio, versión, disponibilidad y storage exclusivamente en backend.
-- [ ] Usar idempotency key, `UNIQUE provider_event_id`, webhook verificado y outbox transaccional; nunca conceder acceso desde el navegador.
-- [ ] Emitir entitlement/grant corto y probar invitado, login posterior, reembolso, chargeback, revocación, reintentos y fallos del proveedor.
+- [ ] Modelar Tienda y Checkout/Orders/Descargas como programas del OS (UI pendiente); backend ya valida precio, versión y disponibilidad.
+- [x] `idempotency_key`, `UNIQUE provider_event_id`, webhook firmado y outbox deduplicado implementados.
+- [x] Entitlement/grant corto y compra invitada implementados; quedan reembolso, chargeback, worker de outbox y E2E con proveedor.
 
 ### 297A-16 — Analytics, Estadísticas y retiro legado
 
-- [ ] Definir consentimiento, retención, anonimización, derechos y allowlist de propiedades; no enviar contenido ni IDs sensibles.
-- [ ] Implementar ingesta batch idempotente con rate limit y transacción; separar eventos agregados de audit inmutable.
-- [ ] Entregar paneles Overview, Content, OS, Commerce y Reliability con fórmulas, roles, zona horaria, estados vacío/carga/error y exportación.
+- [ ] Definir consentimiento, retención, anonimización y derechos; allowlist y no exposición de contenido ya están en el dispatcher.
+- [x] Ingesta batch acotada, multi-fila e idempotente por `event_id`; agregados separados del audit.
+- [ ] Completar paneles Overview/Content/OS/Commerce/Reliability y exportación; el panel Estadísticas base ya existe.
 - [ ] Retirar `/admin`, JWT, uploads y contratos/CSS legacy mediante una matriz de paridad y rollback documentado.
 
 ### 297A-17 — Hardening, identidad, accesibilidad y SEO
 
 - [ ] Completar MFA/passkey, recuperación y threat review con casos negativos de sesión, CSRF, capacidades, pagos, grants y webhooks.
-- [ ] Validar HTML público, sitemap, metadata y Open Graph sin exponer drafts ni rutas privadas.
+- [x] Validar SEO base: HTML público, sitemap, robots, metadata y Open Graph sin exponer drafts ni rutas privadas; queda auditoría final.
 - [ ] Verificar manual visual, teclado, foco, live regions, zoom 200%, reduced motion, alto contraste y multimedia accesible.
 - [ ] Ejecutar Sentinel, VarSense, type-check, tests, E2E, presupuestos de rendimiento, observabilidad y runbook Coolify; deploy continúa fuera de alcance. El split estructural de modelos ya está cerrado: `workspace/` y `workspace_overlay/` agrupan DTOs, validación, locators y tests sin suppressions. Para backend se debe usar `npm test`/`npm run check:back`, que derivan la BD por rama y aplican el contexto correcto.
 
@@ -434,6 +437,20 @@ Cada fase termina con esta revisión antes de marcar su salida. La revisión deb
 
 **Salida:** la toolbar del editor usa iconos Lucide de 1px con nombre accesible; la receta `.boton-icono` queda disponible para cualquier toolbar futura; Sentinel no la marca como botón ad-hoc.
 
+### 317A-5 — Persistencia de sesión de ventanas (reload conserva el escritorio)
+
+**Petición del usuario:** «al recargar todo se reinicia desde cero; al recargar todo debería aparecer como antes». El workspace (iconos), el tema y el sidebar ya persisten; las ventanas abiertas no. Plan: `Agente/planes/plan-persistencia-sesion-ventanas-2026-08-01.md`.
+
+- [x] Módulo `window-session.ts` (captura versionada en `wandorius:window-session` v1) + `window-session-restore.ts` (restauración fail-closed por catálogo/capacidad).
+- [x] `openRestoredWindow` en window-manager (bounds/state/zIndex/focused/preMaximizeBounds explícitos) + `ensureNextZIndexAbove` en window-store.
+- [x] Persistencia reactiva con debounce 200ms, flush en `pagehide`, `pause()`/`resume()` durante transiciones de presentación (evita persistir un escritorio vacío con `closeAllWindows`).
+- [x] `main.ts`: `await restoreWindowSession()` antes de `initRouter()` (la URL enfoca la app ya restaurada sin duplicar); cleanup libera suscripciones.
+- [x] Móvil: stack restaurado en orden (top = foco); secciones desktop/mobile independientes (una no pisa a la otra).
+- [x] Tests 22 (captura, versionado, sanitize con regresión maximizada+foco, fail-closed admin/retirada, dispatch desktop/móvil, debounce/pause/flush).
+- [x] E2E visual: recargar desktop/tablet conserva ventanas/geometría/estado/foco; móvil conserva el stack. Verificado en navegador: 1024×768 (Perfil + Galería restauradas) y 390×844 (Galería restaurada en launcher móvil).
+
+**Salida:** recargar reconstruye la sesión de presentación como estaba; la restauración nunca abre apps fuera de catálogo ni sin capacidad.
+
 ### 317A-4 — Identidad visual de formularios y botones OS en el article-editor
 
 **Petición del usuario (3 puntos):**
@@ -459,7 +476,7 @@ Cada fase termina con esta revisión antes de marcar su salida. La revisión deb
 
 - [x] Slot `actions` en runtime chain + Admin (tabs con alta rellenan; sin alta ocultan). *(018A-1)*
 - [x] Manual identidad §9 y guía agregar-app actualizados. *(018A-2)*
-- [ ] Fase 1: alcance móvil del slot — Admin móvil no debe perder el botón de alta.
-- [ ] Fase 2: migrar editores (article/project/product) a la franja.
-- [ ] Fase 3: inventario de ventanas restantes (Configuración, Cuenta, Finder, Trash…).
-- [ ] Fase 4: prevención automatizable (Sentinel/VarSense).
+- [x] Fase 1: alcance móvil del slot — el stack móvil monta la misma franja (`MountedView.actions`) debajo del contenido; `.movilApp` gana tercera fila. *(018A-4)*
+- [x] Fase 2: migrar editores (article/project/product) a la franja (fijar + crear/guardar, compactos). *(018A-5)*
+- [x] Fase 3: inventario de ventanas restantes — Biblioteca y tab sitio de Admin pasan a la franja; Configuración/Cuenta/Finder/Papelera/Proyectos documentados sin franja (justificado). *(018A-6)*
+- [x] Fase 4: prevención — test de regresión del slot en `desktop-window.test.ts`; regla Sentinel/VarSense evaluada como no viable (semántica, alto ruido; cubierta por reglas existentes). *(018A-7)*

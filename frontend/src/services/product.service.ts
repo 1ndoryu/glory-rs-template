@@ -42,8 +42,14 @@ export const ProductService = {
     return api.delete<void>(`/api/admin/products/${id}`);
   },
 
-  /** Crear sesión de checkout para un producto (público). */
-  async createCheckout(productId: string, email: string): Promise<{ checkout_url: string }> {
-    return api.post<{ checkout_url: string }>(`/api/products/${productId}/checkout`, { email });
+  /** Crear sesión de checkout para un producto (público).
+   * [297A-15] La misma clave viaja en body y header para que un reintento
+   * del navegador no cree una segunda orden/cobro. */
+  async createCheckout(productId: string, email: string, idempotencyKey = crypto.randomUUID()): Promise<{ checkout_url: string }> {
+    return api.post<{ checkout_url: string }>(
+      `/api/products/${productId}/checkout`,
+      { email, idempotency_key: idempotencyKey },
+      { headers: { 'Idempotency-Key': idempotencyKey } },
+    );
   },
 };

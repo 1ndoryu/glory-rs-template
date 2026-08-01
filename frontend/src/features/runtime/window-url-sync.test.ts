@@ -1,7 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AppRegistry } from './app-registry';
 import { createPathDeepLink } from './deep-links';
-import { hasOpenRuntimeApp, resolveFocusedPath } from './window-url-sync';
+import { hasOpenRuntimeApp, initWindowUrlSync, resolveFocusedPath } from './window-url-sync';
+import { windowStore } from './window-store';
+import { mobileStackStore } from '../mobile/mobile-stack';
+import { clearQueue, getQueuedEvents } from '../analytics/dispatcher';
 
 const publicAppId = 'window-url-sync-public-test';
 const localAppId = 'window-url-sync-local-test';
@@ -86,5 +89,81 @@ describe('resolveFocusedPath', () => {
 
   it('vuelve a la raíz sin app activa', () => {
     expect(resolveFocusedPath([], [], 'tablet')).toBe('/');
+  });
+});
+
+describe('window focus analytics', () => {
+  beforeEach(() => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 });
+    windowStore.set([]);
+    mobileStackStore.set([]);
+    clearQueue();
+  });
+
+  afterEach(() => {
+    windowStore.set([]);
+    mobileStackStore.set([]);
+    clearQueue();
+  });
+
+  it('emite un evento al cambiar el foco entre apps runtime', () => {
+    const stop = initWindowUrlSync();
+    windowStore.set([{
+      instanceId: 'focus-one',
+      appId: publicAppId,
+      title: 'Artículo',
+      focused: true,
+      state: 'open',
+      bounds: { x: 0, y: 0, w: 400, h: 300 },
+      zIndex: 1,
+      content: document.createElement('div'),
+      params: { slug: 'uno' },
+    }]);
+    windowStore.set([{
+      instanceId: 'focus-one',
+      appId: publicAppId,
+      title: 'Artículo',
+      focused: false,
+      state: 'open',
+      bounds: { x: 0, y: 0, w: 400, h: 300 },
+      zIndex: 1,
+      content: document.createElement('div'),
+      params: { slug: 'uno' },
+    }, {
+      instanceId: 'focus-two',
+      appId: localAppId,
+      title: 'Finder local',
+      focused: true,
+      state: 'open',
+      bounds: { x: 10, y: 10, w: 400, h: 300 },
+      zIndex: 2,
+      content: document.createElement('div'),
+    }]);
+
+    expect(getQueuedEvents().at(-1)).toMatchObject({
+      eventName: 'window_focus_changed',
+      properties: { appId: localAppId, previousAppId: publicAppId },
+    });
+    stop.stop();
+  });
+
+  it('mide también la app superior de la pila móvil', () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    const stop = initWindowUrlSync();
+    mobileStackStore.set([{
+      instanceId: 'mobile-focus-one',
+      appId: publicAppId,
+      title: 'Artículo',
+      params: { slug: 'móvil' },
+      view: { element: document.createElement('div') },
+      controller: new AbortController(),
+    }]);
+
+    expect(getQueuedEvents().at(-1)).toMatchObject({
+      eventName: 'window_focus_changed',
+      properties: { appId: publicAppId },
+      presentationMode: 'mobile',
+    });
+    stop.stop();
   });
 });

@@ -119,20 +119,49 @@ pub async fn login(
     check_rate_limit(&state.login_rate_limit, &ip)?;
 
     /* Verificar credenciales */
-    let user = UserRepository::find_by_email(&state.pool, &req.email)
+    let Some(user) = UserRepository::find_by_email(&state.pool, &req.email)
         .await
         .map_err(|e| AppError::Internal(format!("Error buscando usuario: {e}")))?
-        .ok_or(AppError::Unauthorized)?;
+    else {
+        crate::repositories::auth_audit_repo::AuthAuditRepository::record(
+            &state.pool,
+            None,
+            "login_failed",
+            &ip,
+            false,
+        )
+        .await?;
+        return Err(AppError::Unauthorized);
+    };
 
     let parsed_hash = argon2::PasswordHash::new(&user.password_hash)
         .map_err(|e| AppError::Internal(format!("Hash almacenado inválido: {e}")))?;
 
-    argon2::Argon2::default()
+    if argon2::Argon2::default()
         .verify_password(req.password.as_bytes(), &parsed_hash)
-        .map_err(|_| AppError::Unauthorized)?;
+        .is_err()
+    {
+        crate::repositories::auth_audit_repo::AuthAuditRepository::record(
+            &state.pool,
+            Some(user.id),
+            "login_failed",
+            &ip,
+            false,
+        )
+        .await?;
+        return Err(AppError::Unauthorized);
+    }
 
     /* [297A-8] Crear sesión opaca */
     let session_result = SessionService::create(&state.pool, user.id, Some(&ip), None).await?;
+    crate::repositories::auth_audit_repo::AuthAuditRepository::record(
+        &state.pool,
+        Some(user.id),
+        "login_succeeded",
+        &ip,
+        true,
+    )
+    .await?;
 
     /* Construir cookies */
     let mut headers = HeaderMap::new();

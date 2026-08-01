@@ -44,6 +44,12 @@ function createLoadingView(): HTMLElement {
  */
 export function renderArticleEditor(ctx: RenderContext): MountedView {
   const container = createLoadingView();
+  /* [018A-1 F2] Franja de acciones inferior (chrome de la ventana): se crea
+   * síncrona para que el shell la coloque debajo del body antes de que
+   * termine la hidratación; hydrate la rellena (fijar + crear/guardar) y la
+   * oculta mientras carga o si falla. El body absorbe su scroll. */
+  const actionsBar = createEl('div', { className: 'desktop-window__actions' });
+  actionsBar.hidden = true;
   let editor: EditorInstance | null = null;
   let disposed = false;
   /* Cleanup del autosave (timer + suscripción Tiptap). Se registra tras la
@@ -159,9 +165,11 @@ export function renderArticleEditor(ctx: RenderContext): MountedView {
       };
 
       const toolbar = createToolbar(editor, () => currentArticleId, isActive);
+      /* [018A-1 F2] En la franja el botón es compacto (receta .boton OS), no
+       * boton-grande: el tamaño lo gobierna el chrome, no el contenido. */
       const saveButton = createEl('button', {
         type: 'button',
-        className: 'boton boton-grande',
+        className: 'boton',
         textContent: currentArticleId ? 'guardar' : 'crear',
       });
       updateSaveLabel = () => {
@@ -197,7 +205,12 @@ export function renderArticleEditor(ctx: RenderContext): MountedView {
       }));
 
       container.textContent = '';
-      container.append(titleInput, excerptInput, cover.element, toolbar, editorContainer, statusSelect, pinButton, saveButton);
+      container.append(titleInput, excerptInput, cover.element, toolbar, editorContainer, statusSelect);
+      /* [018A-1 F2] Las acciones primarias viven en la franja inferior, no en
+       * el contenido: el body absorbe su scroll y la franja queda fija. */
+      actionsBar.textContent = '';
+      actionsBar.append(pinButton, saveButton);
+      actionsBar.hidden = false;
     } catch {
       if (!isActive()) return;
       /* Cerrar timers de autosave aunque la hidratación falle a medias. */
@@ -206,6 +219,9 @@ export function renderArticleEditor(ctx: RenderContext): MountedView {
       destroyEditor();
       container.textContent = '';
       container.appendChild(createVacio('error al cargar el editor'));
+      /* [018A-1 F2] Sin botones de acción si el editor no cargó. */
+      actionsBar.hidden = true;
+      actionsBar.textContent = '';
     }
   };
 
@@ -219,6 +235,7 @@ export function renderArticleEditor(ctx: RenderContext): MountedView {
 
   return {
     element: container,
+    actions: actionsBar,
     destroy: () => {
       disposed = true;
       ctx.signal.removeEventListener('abort', abortHandler);

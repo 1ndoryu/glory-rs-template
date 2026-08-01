@@ -34,6 +34,11 @@ async function loadProduct(ctx: RenderContext): Promise<Product | undefined> {
 /** Renderiza un editor de producto nuevo o existente como vista del OS. */
 export function renderProductEditor(ctx: RenderContext): MountedView {
   const container = createLoadingView();
+  /* [018A-1 F2] Franja de acciones inferior (chrome): síncrona para que el
+   * shell la coloque; hydrate la rellena (crear/guardar) y la oculta mientras
+   * carga o si falla. El body absorbe su scroll y la franja queda fija. */
+  const actionsBar = createEl('div', { className: 'desktop-window__actions' });
+  actionsBar.hidden = true;
   let disposed = false;
   let currentProductId: string | undefined;
   /* Cleanup del autosave (timer + I/O pendientes). Se invoca en destroy y en
@@ -103,9 +108,10 @@ export function renderProductEditor(ctx: RenderContext): MountedView {
         value: isActiveState ? 'active' : 'inactive',
         onChange: value => { isActiveState = value === 'active'; },
       });
+      /* [018A-1 F2] En la franja el botón es compacto (receta .boton OS). */
       const saveButton = createEl('button', {
         type: 'button',
-        className: 'boton boton-grande',
+        className: 'boton',
         textContent: currentProductId ? 'guardar' : 'crear',
       });
       updateSaveLabel = () => {
@@ -170,8 +176,11 @@ export function renderProductEditor(ctx: RenderContext): MountedView {
         priceInput,
         currencyInput,
         activeSelect,
-        saveButton,
       );
+      /* [018A-1 F2] La acción primaria vive en la franja inferior. */
+      actionsBar.textContent = '';
+      actionsBar.append(saveButton);
+      actionsBar.hidden = false;
     } catch {
       if (!isActive()) return;
       /* Cerrar timers de autosave aunque la hidratación falle a medias. */
@@ -179,6 +188,9 @@ export function renderProductEditor(ctx: RenderContext): MountedView {
       autosaveCleanup = undefined;
       container.textContent = '';
       container.appendChild(createVacio('error al cargar el editor de productos'));
+      /* [018A-1 F2] Sin botones de acción si el editor no cargó. */
+      actionsBar.hidden = true;
+      actionsBar.textContent = '';
     }
   };
 
@@ -191,6 +203,7 @@ export function renderProductEditor(ctx: RenderContext): MountedView {
 
   return {
     element: container,
+    actions: actionsBar,
     destroy: () => {
       disposed = true;
       ctx.signal.removeEventListener('abort', abortHandler);

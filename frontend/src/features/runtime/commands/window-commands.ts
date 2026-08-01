@@ -106,8 +106,6 @@ CommandRegistry.register({
     const instanceId = ctx?.targets?.[0]?.id;
     if (!instanceId) return { status: 'failure', reason: 'no target' };
     focusWindow(instanceId);
-    const win = getWindows().find(w => w.instanceId === instanceId);
-    if (win) dispatchEvent({ type: 'window_focused', appId: win.appId });
     return { status: 'success' };
   },
 });
@@ -137,7 +135,6 @@ CommandRegistry.register({
     } else {
       focusWindow(next.instanceId);
     }
-    dispatchEvent({ type: 'window_focused', appId: next.appId });
     return { status: 'success' };
   },
 });

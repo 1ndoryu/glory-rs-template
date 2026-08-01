@@ -11,6 +11,7 @@ import { AppRegistry } from './app-registry';
 import { getCanonicalAppPath } from './deep-links';
 import { windowStore, type WindowEntry } from './window-store';
 import type { StoreSource } from '../../store';
+import { dispatchEvent } from '../analytics/dispatcher';
 
 export interface FocusedEntrySnapshot {
   readonly appId: string;
@@ -94,9 +95,21 @@ export interface WindowUrlSyncHandle {
   readonly stop: () => void;
 }
 
+function resolveFocusedRuntimeAppId(
+  windows: readonly FocusedEntrySnapshot[],
+  mobileStack: readonly FocusedEntrySnapshot[],
+  presentation: 'desktop' | 'tablet' | 'mobile',
+): string | null {
+  const active = presentation === 'mobile'
+    ? mobileStack.at(-1)
+    : windows.find((entry) => entry.focused);
+  return active && AppRegistry.get(active.appId) ? active.appId : null;
+}
+
 export function initWindowUrlSync(): WindowUrlSyncHandle {
   let windowsInitialized = false;
   let mobileInitialized = false;
+  let lastFocusedAppId: string | null | undefined;
   let paused = false;
   let stopped = false;
 
@@ -105,6 +118,15 @@ export function initWindowUrlSync(): WindowUrlSyncHandle {
     const windows = windowStore.get();
     const mobileStack = mobileStackStore.get();
     const presentation = getPresentationMode();
+    const focusedAppId = resolveFocusedRuntimeAppId(windows, mobileStack, presentation);
+    if (lastFocusedAppId !== undefined && focusedAppId && focusedAppId !== lastFocusedAppId) {
+      dispatchEvent({
+        type: 'window_focus_changed',
+        appId: focusedAppId,
+        ...(lastFocusedAppId ? { previousAppId: lastFocusedAppId } : {}),
+      });
+    }
+    lastFocusedAppId = focusedAppId;
     const targetPath = resolveFocusedPath(windows, mobileStack, presentation);
 
     /* [297A-24 / S1] Una app runtime sin deep link no debe navegar a `/`.
@@ -122,6 +144,7 @@ export function initWindowUrlSync(): WindowUrlSyncHandle {
     /* No sobrescribir una deep link antes de que el router monte su app inicial. */
     if (!windowsInitialized) {
       windowsInitialized = true;
+      lastFocusedAppId = resolveFocusedRuntimeAppId(windowStore.get(), mobileStackStore.get(), getPresentationMode());
       return;
     }
     sync();
@@ -130,6 +153,7 @@ export function initWindowUrlSync(): WindowUrlSyncHandle {
     if (source === 'sync') return;
     if (!mobileInitialized) {
       mobileInitialized = true;
+      lastFocusedAppId = resolveFocusedRuntimeAppId(windowStore.get(), mobileStackStore.get(), getPresentationMode());
       return;
     }
     sync();

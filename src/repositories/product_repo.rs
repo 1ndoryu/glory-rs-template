@@ -174,7 +174,7 @@ impl OrderRepository {
         sqlx::query_as::<_, Order>(
             "INSERT INTO orders (id, product_id, customer_email, stripe_session_id) \
              VALUES ($1, $2, $3, $4) \
-             RETURNING id, product_id, stripe_session_id, stripe_payment_intent, customer_email, status, paid_at, delivered_at, created_at",
+             RETURNING id, product_id, product_version_id, user_id, stripe_session_id, stripe_payment_intent, customer_email, idempotency_key, status, paid_at, delivered_at, created_at",
         )
         .bind(id)
         .bind(product_id)
@@ -184,12 +184,38 @@ impl OrderRepository {
         .await
     }
 
+    /// Crear una orden con clave de idempotencia. Un reintento del mismo
+    /// cliente/producto devuelve la orden original y nunca crea un segundo
+    /// cobro. La clave sigue siendo opcional para conservar compatibilidad con
+    /// órdenes legacy; el endpoint público siempre genera o acepta una.
+    pub async fn create_with_idempotency(
+        pool: &PgPool,
+        product_id: Uuid,
+        customer_email: &str,
+        idempotency_key: &str,
+    ) -> Result<Order, sqlx::Error> {
+        let id = Uuid::new_v4();
+        sqlx::query_as::<_, Order>(
+            "INSERT INTO orders (id, product_id, customer_email, idempotency_key) \
+             VALUES ($1, $2, $3, $4) \
+             ON CONFLICT (customer_email, idempotency_key) \
+             WHERE idempotency_key IS NOT NULL DO UPDATE SET product_id = orders.product_id \
+             RETURNING id, product_id, product_version_id, user_id, stripe_session_id, stripe_payment_intent, customer_email, idempotency_key, status, paid_at, delivered_at, created_at",
+        )
+        .bind(id)
+        .bind(product_id)
+        .bind(customer_email)
+        .bind(idempotency_key)
+        .fetch_one(pool)
+        .await
+    }
+
     pub async fn find_by_session(
         pool: &PgPool,
         session_id: &str,
     ) -> Result<Option<Order>, sqlx::Error> {
         sqlx::query_as::<_, Order>(
-            "SELECT id, product_id, stripe_session_id, stripe_payment_intent, customer_email, status, paid_at, delivered_at, created_at \
+            "SELECT id, product_id, product_version_id, user_id, stripe_session_id, stripe_payment_intent, customer_email, idempotency_key, status, paid_at, delivered_at, created_at \
              FROM orders WHERE stripe_session_id = $1",
         )
         .bind(session_id)
@@ -232,8 +258,8 @@ impl OrderRepository {
     /// Buscar orden por ID
     pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Order>, sqlx::Error> {
         sqlx::query_as::<_, Order>(
-            "SELECT id, product_id, stripe_session_id, stripe_payment_intent, \
-             customer_email, status, paid_at, delivered_at, created_at \
+            "SELECT id, product_id, product_version_id, user_id, stripe_session_id, stripe_payment_intent, \
+             customer_email, idempotency_key, status, paid_at, delivered_at, created_at \
              FROM orders WHERE id = $1",
         )
         .bind(id)

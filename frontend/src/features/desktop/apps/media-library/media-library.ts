@@ -31,6 +31,9 @@ interface MediaLibraryOptions {
 
 export interface MediaLibraryView {
   readonly element: HTMLElement;
+  /** [018A-1 F3] Franja de acciones inferior (subir archivo), chrome de la
+   * ventana; el shell (desktop y móvil) la coloca fuera del scroll. */
+  readonly actions?: HTMLElement;
   readonly destroy: () => void;
 }
 
@@ -133,6 +136,11 @@ function createItemCard(
 
 export function createMediaLibraryPreview(options: MediaLibraryOptions): MediaLibraryView {
   const container = createEl('div', { className: 'media-library' });
+  /* [018A-1 F3] Franja de acciones inferior (chrome): se crea síncrona para
+   * que el shell la coloque; la acción primaria (subir archivo) vive aquí,
+   * no en el toolbar del contenido. */
+  const actionsBar = createEl('div', { className: 'desktop-window__actions' });
+  actionsBar.hidden = true;
   const pendingObjectUrls = new Set<string>();
   let disposed = false;
   let filter: MediaFilter = 'all';
@@ -197,10 +205,15 @@ export function createMediaLibraryPreview(options: MediaLibraryOptions): MediaLi
   }));
   uploadBtn.addEventListener('click', () => fileInput.click());
 
+  /* [018A-1 F3] El toolbar conserva solo controles de vista (filtro y toggle
+   * papelera/biblioteca); la acción primaria de creación (subir archivo)
+   * vive en la franja inferior fija, fuera del scroll de la lista. */
   const toolbar = createEl('div', { className: 'media-library__toolbar' },
-    uploadBtn, fileInput, filterSelect, trashToggle);
+    filterSelect, trashToggle);
   const list = createEl('div', { className: 'media-library__grid' });
   container.append(toolbar, list);
+  actionsBar.append(uploadBtn, fileInput);
+  actionsBar.hidden = false;
 
   /* === Listado con descarte de respuestas obsoletas === */
   let generation = 0;
@@ -240,5 +253,5 @@ export function createMediaLibraryPreview(options: MediaLibraryOptions): MediaLi
   };
   options.signal.addEventListener('abort', destroy, { once: true });
 
-  return { element: container, destroy };
+  return { element: container, actions: actionsBar, destroy };
 }

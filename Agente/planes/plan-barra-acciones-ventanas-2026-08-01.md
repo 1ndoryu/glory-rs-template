@@ -2,8 +2,7 @@
 
 - **Epic:** 297A-4 — OS persistente, cuentas, programas y comercio
 - **Fecha:** 2026-08-01
-- **Estado:** activo
-- **Siguiente paso:** decidir el alcance móvil del slot `actions` (Fase 1) y migrar los editores (Fase 2)
+- **Estado:** completado (fases 1-4 implementadas; verificación visual + gate al cierre)
 - **Gate de tarea:** `npm run task:check -- 018A-1` (o el ID de cada fase)
 
 ## Objetivo
@@ -47,11 +46,11 @@ Regla aprobada visualmente por el usuario el 2026-08-01.
 Problema: la presentación móvil (MobileAppStack) no renderiza `actions`, pero
 Admin/otros con lista + alta perderían el botón de alta en móvil.
 
-- [ ] Decidir mecanismo: (a) MobileAppStack también coloca la franja debajo del
-      contenido (mismo slot, sin duplicar lógica) o (b) el contenido móvil
-      aporta CTA propio (duplica lógica — evitar).
-- [ ] Si (a): implementar slot en mobile-stack, actualizar manual §9 (quitar
-      "el móvil la ignora") y guía agregar-app.
+- [x] Decidir mecanismo: (a) MobileAppStack también coloca la franja debajo del
+      contenido (mismo slot, sin duplicar lógica).
+- [x] Implementar slot en mobile-shell (misma instancia `view.actions` debajo
+      del contenido), `.movilApp` gana tercera fila `auto`, manual §9 (quitar
+      "el móvil la ignora") y guía agregar-app actualizados. *(018A-4)*
 - [ ] Validar en viewport 320/390 que la franja móvil no roba altura crítica
       (launcher a pantalla completa) y que el scroll del contenido sigue.
 
@@ -62,12 +61,12 @@ Admin/otros con lista + alta perderían el botón de alta en móvil.
 Hoy los editores tienen botones (guardar/publicar/cancelar) dentro del contenido.
 Con contenido largo, deben quedar fijos en la franja.
 
-- [ ] Inventariar cómo abre cada editor (`openEditor`, `openProjectEditor`,
-      `openProductEditor`): ¿ventana propia o reemplazo en Admin?
-- [ ] Si el editor es ventana propia: devolver `actions` con guardar/publicar/
-      cancelar; el formulario absorbe su scroll.
-- [ ] Si reemplaza el contenido de Admin: rellenar la franja del mismo view según
-      el estado (lista → alta; editor → guardar/cancelar).
+- [x] Inventariar cómo abre cada editor: los tres son apps con ventana propia
+      (lazy, padded) — devuelven `actions` en `MountedView`. *(018A-5)*
+- [x] Los tres editores devuelven `actions` con fijar (solo artículo) + crear/
+      guardar; el body absorbe su scroll y la franja queda fija.
+- [x] La franja se crea síncrona (oculta), se rellena tras hydrate y se oculta
+      en el catch de error (sin botones huérfanos).
 - [ ] Confirmar que el foco/enter del formulario no colisiona con la franja.
 - [ ] Verificar estados: nuevo vs edición, guardando (disabled), error visible.
 
@@ -77,25 +76,29 @@ Con contenido largo, deben quedar fijos en la franja.
 
 Revisar cada app que abre ventana y decidir si aporta acciones:
 
-- [ ] Configuración: ¿acciones de guardar/aplicar o todo inline?
-- [ ] Cuenta: cerrar sesión → ¿franja o queda donde está (inline)?
-- [ ] Galería/Finder: nueva carpeta / subir / acciones de selección → franja.
-- [ ] Trash: vaciar papelera → franja.
-- [ ] Perfil/About/Reader/Snake: sin acciones → sin franja (oculta).
-- [ ] Verificar que ninguna app conserva botones de acción primaria sueltos
-      dentro del body (inconsistencia que originó 018A-1).
-- [ ] Registrar decisiones en el manual §9/§13 (qué apps usan franja y cuáles no).
+- [x] Configuración: paneles de aplicación inmediata → sin franja (justificado).
+- [x] Cuenta: login + logout inline → sin franja (justificado).
+- [x] Biblioteca de media: `subir archivo` pasa a la franja (acciones por ítem
+      quedan inline en cada tarjeta). *(018A-6)*
+- [x] Trash: acciones vía comandos de toolbar → sin franja (justificado).
+- [x] Finder/Galería/Proyectos: creación vía comandos de toolbar/contexto → sin
+      franja (justificado). Perfil/About/Reader: solo lectura → sin franja.
+- [x] Admin tab `sitio`: el botón `guardar` pasa a la franja (consistencia).
+- [x] Registrar decisiones en el manual §9/§13 (qué apps usan franja y cuáles no).
 
 **Gate Fase 3:** type-check + gate + barrido visual de ventanas.
 
 ### Fase 4 — Prevención automatizable
 
-- [ ] Evaluar regla Sentinel: "botón `.boton` dentro de `.admin-lista`/listas
-      admin que debiera estar en la franja" (o equivalente de bajo ruido).
-- [ ] Evaluar VarSense: clases `barra-acciones` locales en apps (ya eliminada la
-      receta muerta) — detectar recetas locales duplicadas.
-- [ ] Si una regla es viable y de bajo ruido: implementarla en el tool, probarla
-      contra el caso original y archivar el MD de prevención.
+- [x] Evaluar regla Sentinel: NO viable — semántica (qué botón "debiera" estar
+      en la franja) y alto ruido (acciones por ítem legítimas); cubierta por
+      `css-especificacion-diseno-local` + contrato estructural.
+- [x] Evaluar VarSense: receta muerta `barra-acciones` ya eliminada; la única
+      receta es `.desktop-window__actions`, y una duplicación local la detecta
+      el orphan/duplicate detection existente. No se añade regla.
+- [x] Prevención implementada en su lugar: test de regresión del slot en
+      `desktop-window.test.ts` (franja como última hija, después del body;
+      sin actions no hay franja). *(018A-7)*
 
 **Gate Fase 4:** fixture de regla nueva pasa + caso original detectado.
 

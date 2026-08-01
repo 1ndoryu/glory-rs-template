@@ -111,7 +111,7 @@ la validación visual real y la prueba E2E de resize/orientación sin perder est
 - [x] Home vuelve al launcher y libera la pila explícitamente.
 - [x] Deep link entrega params al mismo AppRegistry/MountedView full-screen.
 - [x] Back de un deep link delega a History API; Home vuelve a `/` y limpia el stack.
-- [ ] Refresh reconstruye estado seguro desde URL/bootstrap.
+- [x] Refresh reconstruye el estado seguro del stack desde la sesión versionada antes del router; la URL sigue enfocando la app superior sin duplicarla. *(317A-5, verificado en 390×844)*
 - [x] Rutas legacy no gestionadas por AppRegistry se muestran en el outlet móvil; el launcher permanece en `/`.
 - [x] Pasar móvil→tablet transforma la app activa en una ventana recuperable mediante reinstanciación.
 - [x] Pasar tablet→móvil selecciona la ventana activa como app full-screen mediante reinstanciación.

@@ -5,7 +5,6 @@ import { CommandRegistry, type CommandContext, type CommandResult } from '../com
 import { focusWindow, findOpenWindow, restoreWindow } from '../window-manager';
 import { AppRegistry } from '../app-registry';
 import { hasCapability } from '../capability';
-import { dispatchEvent } from '../../analytics/dispatcher';
 
 CommandRegistry.register({
   id: 'app:open',
@@ -55,7 +54,6 @@ CommandRegistry.register({
     if (!win) return { status: 'failure', reason: 'app not open' };
     if (win.state === 'minimized') restoreWindow(win.instanceId);
     focusWindow(win.instanceId);
-    dispatchEvent({ type: 'window_focused', appId });
     return { status: 'success' };
   },
 });

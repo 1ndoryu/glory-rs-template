@@ -1,5 +1,7 @@
 pub mod analytics_repo;
 pub mod article;
+pub mod auth_audit_repo;
+pub mod commerce_repo;
 pub mod media_repo;
 mod note;
 pub mod preferences_repo;

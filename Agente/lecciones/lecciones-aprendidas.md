@@ -49,3 +49,22 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Una herramienta de calidad puede seguir mejorando indefinidamente; para no bloquear el producto hay que separar explícitamente el gate mínimo reproducible del backlog de benchmarks, paridad y releases.
 - Si el gate mínimo pasa y no hay errores de infraestructura, las mejoras diferidas solo se reactivan cuando una tarea concreta las necesita o aparece una regresión medible.
+
+## 317A-5 — Restaurar antes del router sin cerrar la raíz
+
+- La restauración de ventanas debe ocurrir antes de inicializar el router para conservar foco y deep links, pero la primera reconciliación de `/` no puede interpretar el escritorio como navegación documental y cerrar el estado restaurado.
+- Una opción explícita de inicialización (`preserveRootOnInit`) mantiene esa excepción solo una vez; las navegaciones posteriores siguen limpiando el runtime cuando corresponde.
+- La evidencia mínima útil combina navegador real en desktop/tablet y móvil con una suite completa y un gate único; no basta con tests unitarios del serializador.
+
+## 018A-8 — Instrumentar foco desde una sola frontera
+
+- Emitir eventos de foco desde cada botón o comando crea duplicados y deja fuera los clicks directos del shell; el store/sincronizador de foco es la frontera única.
+- Las rutas protegidas deben medirse solo después de validar capacidad y parámetros, evitando que la analítica revele la existencia de recursos privados.
+
+## 018A-9 — Reintentos seguros de comercio y analytics
+
+- La idempotencia debe existir en dos fronteras: la orden local y el proveedor de pago; una sola no evita cobros o grants duplicados.
+- Un webhook repetido no debe depender de memoria: `provider_event_id`, entitlement por orden y outbox con `dedupe_key` permiten reanudar sin duplicar efectos.
+- Los enlaces de descarga se envían en claro solo una vez; la base conserva únicamente el hash y el endpoint vuelve a comprobar expiración y confinamiento de path.
+- Un batch de analytics necesita `event_id` antes de reintentar; de lo contrario una caída de red infla las métricas aunque el inserto sea multi-fila.
+- La auditoría de login debe hashear IP y omitir email/credenciales; registrarla después de validar la entrada evita convertir el log en una fuente de secretos.

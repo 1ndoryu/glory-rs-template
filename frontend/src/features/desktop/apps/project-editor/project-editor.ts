@@ -34,6 +34,11 @@ async function loadProject(ctx: RenderContext): Promise<Project | undefined> {
 /** Renderiza un editor de proyecto nuevo o existente como vista del OS. */
 export function renderProjectEditor(ctx: RenderContext): MountedView {
   const container = createLoadingView();
+  /* [018A-1 F2] Franja de acciones inferior (chrome): síncrona para que el
+   * shell la coloque; hydrate la rellena (crear/guardar) y la oculta mientras
+   * carga o si falla. El body absorbe su scroll y la franja queda fija. */
+  const actionsBar = createEl('div', { className: 'desktop-window__actions' });
+  actionsBar.hidden = true;
   let disposed = false;
   let currentProjectId: string | undefined;
   /* Cleanup del autosave (timer + I/O pendientes). Se invoca en destroy y en
@@ -103,9 +108,10 @@ export function renderProjectEditor(ctx: RenderContext): MountedView {
         value: isVisible ? 'visible' : 'hidden',
         onChange: value => { isVisible = value === 'visible'; },
       });
+      /* [018A-1 F2] En la franja el botón es compacto (receta .boton OS). */
       const saveButton = createEl('button', {
         type: 'button',
-        className: 'boton boton-grande',
+        className: 'boton',
         textContent: currentProjectId ? 'guardar' : 'crear',
       });
       updateSaveLabel = () => {
@@ -171,8 +177,11 @@ export function renderProjectEditor(ctx: RenderContext): MountedView {
         urlInput,
         orderInput,
         visibilitySelect,
-        saveButton,
       );
+      /* [018A-1 F2] La acción primaria vive en la franja inferior. */
+      actionsBar.textContent = '';
+      actionsBar.append(saveButton);
+      actionsBar.hidden = false;
     } catch {
       if (!isActive()) return;
       /* Cerrar timers de autosave aunque la hidratación falle a medias. */
@@ -180,6 +189,9 @@ export function renderProjectEditor(ctx: RenderContext): MountedView {
       autosaveCleanup = undefined;
       container.textContent = '';
       container.appendChild(createVacio('error al cargar el editor de proyectos'));
+      /* [018A-1 F2] Sin botones de acción si el editor no cargó. */
+      actionsBar.hidden = true;
+      actionsBar.textContent = '';
     }
   };
 
@@ -192,6 +204,7 @@ export function renderProjectEditor(ctx: RenderContext): MountedView {
 
   return {
     element: container,
+    actions: actionsBar,
     destroy: () => {
       disposed = true;
       ctx.signal.removeEventListener('abort', abortHandler);

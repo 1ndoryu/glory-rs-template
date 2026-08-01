@@ -7,15 +7,11 @@ export default defineConfig({
       target: 'http://localhost:3000/api-docs/openapi.json',
     },
     output: {
-      target: './src/api/generated.ts',
-      client: 'react-query',
-      mode: 'single',
-      override: {
-        mutator: {
-          path: './src/api/axios-instance.ts',
-          name: 'customInstance',
-        },
-      },
+      /* Vanilla TS usa el cliente fetch compartido; tags-split evita un
+       * generated.ts monolítico y permite regenerar por dominio. */
+      target: './src/api/generated/index.ts',
+      client: 'fetch',
+      mode: 'tags-split',
     },
   },
 });

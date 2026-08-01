@@ -21,7 +21,7 @@ interface RenderContext {
 }
 interface MountedView {
     readonly element: HTMLElement;
-    readonly actions?: HTMLElement; // [018A-1] franja de acciones inferior (chrome desktop; el móvil la ignora)
+    readonly actions?: HTMLElement; // [018A-1] franja de acciones inferior (chrome; la monta desktop y móvil)
     destroy?: () => void;
 }
 type AppRenderFn = (ctx: RenderContext) => MountedView | Promise<MountedView>;
@@ -56,7 +56,7 @@ Reglas del contrato:
 - `render` recibe `ctx.signal` (abort) y `ctx.params` (parámetros de instancia). Usar `ctx.signal.aborted` antes de manipular DOM asíncrono (patrón Admin).
 - `destroy()` se invoca en `closeWindow` junto con `controller.abort()`; limpiar listeners/analytics (`app_closed`).
 - La app **nunca** crea su ventana, z-index, chrome ni toolbar.
-- [018A-1] Si la app tiene acciones primarias, puede devolver `actions` en `MountedView`: el shell la coloca como franja inferior de la ventana (debajo del body padded, fuera de su scroll). La app la rellena y la oculta (`hidden`) según su estado; el móvil la ignora.
+- [018A-1] Si la app tiene acciones primarias, puede devolver `actions` en `MountedView`: el shell la coloca como franja inferior fija — en desktop debajo del body padded (fuera de su scroll) y en móvil debajo del contenido a pantalla completa (`.movilApp` gana una tercera fila). La app la rellena y la oculta (`hidden`) según su estado; la misma instancia sirve a ambas presentaciones. Si la app no aporta `actions`, no hay franja.
 - `findByRoute` usa `deepLink?.patterns ?? routePatterns` — el `deepLink` gana. Las apps locales (sin ruta) se abren solo por comando/icono.
 
 ## 2. Receta paso a paso (app nueva)

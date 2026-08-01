@@ -204,8 +204,9 @@ Estados obligatorios:
 - Lleva las acciones primarias del contexto activo de la app (p. ej. `+ nuevo artículo` en Admin). Los botones van **al final de la franja (derecha)** (`justify-content: flex-end`), con `gap-md` entre ellos.
 - El contenido de la ventana absorbe su propio scroll (`.admin-lista` con `overflow-y: auto`) para que la franja permanezca fija con listas largas.
 - Se oculta (`hidden`, sin espacio residual) cuando el contexto no tiene acciones.
-- La rellena la app según su estado (en Admin, el tab activo); el shell solo la coloca. El slot es opcional en `MountedView`/`WindowContent`; una app que no aporta acciones no cambia de comportamiento.
-- Solo aplica a la presentación desktop: el móvil no tiene ventanas y la ignora; las apps móviles resuelven sus acciones dentro de su propia superficie.
+- [018A-1 F1] **Misma franja en móvil:** el stack móvil coloca el mismo slot (`MountedView.actions`) debajo del contenido a pantalla completa (`.movilApp` gana una tercera fila `auto` solo cuando la app aporta acciones). No hay lógica duplicada por plataforma: la app rellena la franja una vez y ambas presentaciones la montan como barra inferior fija, fuera del scroll.
+- [018A-1 F1] El botón dentro de la franja es compacto (receta `.boton` OS), no `boton-grande`: el tamaño lo gobierna el chrome, no el contenido.
+
 
 ## 10. Barra superior
 
@@ -277,6 +278,14 @@ Cerrar desde taskbar no cambia el foco accidentalmente. Cuando no caben tareas s
 - Formularios consumen componentes UI compartidos.
 - No modal de página completa ni overlay que oscurezca el OS.
 - Tablas, vacíos, errores y confirmaciones reutilizan recetas, no clases locales equivalentes.
+
+### Franja de acciones por programa
+
+- [018A-1 F3] Inventario decidido de qué apps aportan `MountedView.actions` (franja inferior) y cuáles no:
+  - **Con franja:** Admin (por tab: `+ nuevo artículo/proyecto/producto`, `guardar` en sitio), editores de artículo/proyecto/producto (`fijar` + `crear`/`guardar`), Biblioteca de media (`subir archivo`).
+  - **Sin franja (justificado):** Finder/Galería (creación vía comandos de toolbar/contexto), Reader/About (solo lectura), Cuenta (formulario de login + logout inline), Configuración (paneles de aplicación inmediata), Acerca de (estático), Papelera (acciones vía comandos de toolbar), Proyectos (creación vía comando de toolbar).
+- Las acciones por ítem (copiar/restaurar/eliminar en cada tarjeta de media) son de ámbito del ítem y siguen en el contenido; la franja es para acciones primarias del contexto de la ventana.
+- Toda app nueva con acciones primarias de ventana debe aportar `actions`; prohibido dejar botones primarios sueltos en el body (prevención: test `createDesktopWindow (slot de acciones)`).
 
 ### Barra de pestañas (tabs)
 

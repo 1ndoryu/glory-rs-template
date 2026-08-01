@@ -32,6 +32,11 @@ impl AnalyticsService {
         ip_hash: Option<&str>,
         user_agent: Option<&str>,
     ) -> Result<(), AppError> {
+        if events.len() > 50 {
+            return Err(AppError::Validation(
+                "El lote de analytics no puede superar 50 eventos".into(),
+            ));
+        }
         AnalyticsRepository::insert_events(pool, events, ip_hash, user_agent).await?;
         Ok(())
     }

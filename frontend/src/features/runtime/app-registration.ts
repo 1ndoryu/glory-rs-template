@@ -298,8 +298,11 @@ AppRegistry.registerLazy({
     render: (ctx: RenderContext): MountedView => {
       dispatchEvent({ type: 'app_opened', appId: 'media-library' });
       const view = m.createMediaLibraryPreview({ signal: ctx.signal });
+      /* [018A-1 F3] La franja de acciones (subir archivo) viaja en
+       * MountedView.actions; el shell la coloca igual en desktop y móvil. */
       return {
         element: view.element,
+        actions: view.actions,
         destroy: () => {
           view.destroy();
           dispatchEvent({ type: 'app_closed', appId: 'media-library' });

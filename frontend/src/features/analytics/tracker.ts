@@ -11,11 +11,13 @@ const FLUSH_INTERVAL = 5000; /* 5 segundos */
 
 let eventQueue: AnalyticsEvent[] = [];
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
+let flushInFlight: Promise<void> | null = null;
 
 /* Registrar un evento */
 export function track(event: AnalyticsEvent): void {
   eventQueue.push({
     ...event,
+    event_id: crypto.randomUUID(),
     metadata: {
       ...event.metadata,
       timestamp: Date.now(),
@@ -36,6 +38,16 @@ export function track(event: AnalyticsEvent): void {
 
 /* Enviar eventos acumulados al backend */
 async function flush(): Promise<void> {
+  if (flushInFlight) return flushInFlight;
+  flushInFlight = flushBatch();
+  try {
+    await flushInFlight;
+  } finally {
+    flushInFlight = null;
+  }
+}
+
+async function flushBatch(): Promise<void> {
   if (flushTimer) {
     clearTimeout(flushTimer);
     flushTimer = null;
@@ -48,7 +60,9 @@ async function flush(): Promise<void> {
 
   const result = await tryCatch(AnalyticsService.trackEvents(events));
     if (!result.ok) {
-      /* Silencioso: analytics no debe romper la experiencia */
+      /* Analytics nunca bloquea la UI, pero el fallo queda observable y el
+       * lote vuelve a la cola para un reintento acotado. */
+      console.warn('[analytics] batch failed', result.error);
       eventQueue = [...events, ...eventQueue];
     }
 }

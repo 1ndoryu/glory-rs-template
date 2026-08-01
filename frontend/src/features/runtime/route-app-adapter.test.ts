@@ -15,6 +15,7 @@ import { addRoute, navigate, replacePath, setOutlet } from '../../router';
 import { authStore } from '../../store';
 import { clearMobileStack, mobileStackStore, openMobileView } from '../mobile/mobile-stack';
 import type { MountedView } from '../../core/lifecycle';
+import { clearQueue, getQueuedEvents } from '../analytics/dispatcher';
 
 const routedAppId = 'route-adapter-reconcile-test';
 const invalidParamsAppId = 'route-adapter-invalid-params-test';
@@ -76,6 +77,7 @@ beforeEach(() => {
   clearMobileStack();
   setOutlet(document.createElement('main'));
   authStore.set({ isAuthenticated: false, userId: null, capability: 'public' });
+  clearQueue();
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 });
   replacePath('/');
 });
@@ -86,6 +88,7 @@ afterEach(() => {
   closeAllWindows();
   clearMobileStack();
   authStore.set({ isAuthenticated: false, userId: null, capability: 'public' });
+  clearQueue();
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 });
 });
 
@@ -95,6 +98,27 @@ describe('RouteAppAdapter runtime reconciliation', () => {
     openWindow(routedApp, createTestView(), new AbortController());
 
     replacePath('/runtime-test');
+
+    expect(windowStore.get().some((window) => window.appId === routedAppId)).toBe(true);
+  });
+
+  it('mide la apertura de un deep link válido sin exponer parámetros', async () => {
+    stopAdapter = initRouteAppAdapter();
+
+    navigate('/runtime-test');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(getQueuedEvents()).toContainEqual(expect.objectContaining({
+      eventName: 'deep_link_opened',
+      properties: { routeName: 'runtime-test', appId: routedAppId },
+    }));
+  });
+
+  it('conserva ventanas restauradas al reconciliar la raíz inicial', () => {
+    stopAdapter = initRouteAppAdapter({ preserveRootOnInit: true });
+    openWindow(routedApp, createTestView(), new AbortController());
+
+    replacePath('/');
 
     expect(windowStore.get().some((window) => window.appId === routedAppId)).toBe(true);
   });

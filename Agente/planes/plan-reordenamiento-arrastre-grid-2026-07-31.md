@@ -130,6 +130,7 @@ con grid" en móvil, con paridad de comportamiento.
 - [x] **Fase 4 — Separación de superficies.** Finder no hereda orden móvil; desktop conserva `position`.
 - [x] **Fase 5 — Alternativa accesible.** Move prev/next opera sobre celdas y solo está disponible en presentación móvil.
 - [x] **Fase 6 — Compatibilidad.** `mobileOrder` queda como fallback de lectura; no se elimina mientras existan overlays legacy.
+- [x] El launcher usa `touch-action: manipulation` en sus controles y `touch-action: none` solo durante edición, evitando que el gesto compita con zoom de doble toque. *(297A-22, ajuste preventivo)*
 - [ ] **Fase 7 — Validación visual/E2E.** 320/360/390/768+, drag táctil real, foco, teclado, reload/sync y móvil↔tablet.
 
 ## 7. Gate y criterio de salida

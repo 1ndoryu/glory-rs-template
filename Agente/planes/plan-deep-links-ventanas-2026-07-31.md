@@ -39,7 +39,7 @@ Cada aplicación y cada recurso abierto debe tener una URL canónica compartible
 ## Historial, analítica y SEO
 
 - [x] Diferenciar primitivas `pushPath` y `replacePath` sin crear un segundo router; la integración con foco desktop/mobile y la política de apertura ya están conectadas.
-- [ ] Emitir `deep_link_opened` y `window_focus_changed`; `share_url_copied` implementado con `routeName`, `appId`, `presentationMode` y `success`, sin enviar URL, contenido ni IDs sensibles.
+- [x] Emitir `deep_link_opened` y `window_focus_changed`; `share_url_copied` implementado con `routeName`, `appId`, `presentationMode` y `success`, sin enviar URL, contenido ni IDs sensibles. `window-url-sync` centraliza el foco para cubrir desktop, tablet y móvil sin duplicar eventos.
 - [ ] Preparar metadata/sitemap solo para recursos públicos; no indexar rutas del Admin, overlays, drafts ni grants.
 - [ ] Documentar canonical URL y título accesible por app para compartir y lectores de pantalla.
 
@@ -50,11 +50,11 @@ Cada aplicación y cada recurso abierto debe tener una URL canónica compartible
 - [ ] Abrir una URL de Finder, Reader/artículo, About, proyecto, producto, Configuración y Estadísticas desde sesión limpia. *(Base cubierta para rutas públicas migradas; integración/E2E pendiente.)*
 - [ ] Probar varias ventanas, foco alterno, Copiar URL, refresh, Back/Forward, deep link directo y colisión de instancia; Copiar URL y la reconciliación de rutas, parámetros inseguros, capacidades y semántica `push/replace` tienen tests unitarios; E2E real sigue pendiente.
 - [ ] Probar 1440x900, 1024x768, 768px, 390px y 320px; incluir usuario anónimo, admin, usuario sin capacidad, recurso privado y grant expirado.
-- [ ] Ejecutar E2E completo de RouteAppAdapter/WindowManager + MobileShell/popstate y viewports; type-check, **195 tests en 17 suites**, quality gate y self-check pasan. Chrome verificó `/projects` en desktop `1440×900` y carga del shell móvil en `/projects` con URL conservada; interacción móvil completa sigue pendiente por automatización.
+- [ ] Ejecutar E2E completo de RouteAppAdapter/WindowManager + MobileShell/popstate y viewports; type-check, **382 tests en 49 suites**, quality gate y self-check pasan. Chrome verificó `/projects` en desktop `1440×900` y carga del shell móvil en `/projects` con URL conservada; interacción móvil completa sigue pendiente por automatización.
 
 ## Definition of Done
 
 - [ ] Cada app/recurso soportado tiene URL versionada, parser, serializer, permisos y fallback. *(Contrato base implementado para apps públicas migradas; versionado de gramática y recursos privados pendientes.)*
 - [ ] La URL compartida abre/enfoca solo la ventana representada, sin filtrar la sesión del emisor.
-- [ ] Historial, móvil/tablet, seguridad, analítica y accesibilidad están probados completamente; la lógica base y `Copiar URL` están cubiertas, pero faltan E2E, `deep_link_opened`, `window_focus_changed` y recursos privados.
+- [ ] Historial, móvil/tablet, seguridad, analítica y accesibilidad están probados completamente; la instrumentación analítica ya está implementada, pero faltan E2E, recursos privados y el pipeline remoto de 297A-16.
 - [ ] Manual de arquitectura, contratos, roadmap e índice se actualizan con la decisión final.
