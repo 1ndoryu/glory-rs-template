@@ -23,9 +23,12 @@ describe('workspace/AppRegistry anti-drift contract', () => {
       { nodeId: 'about', appId: 'about' },
       { nodeId: 'admin', appId: 'admin' },
       { nodeId: 'analytics', appId: 'analytics' },
+      { nodeId: 'downloads', appId: 'downloads' },
       { nodeId: 'mediaLibrary', appId: 'media-library' },
+      { nodeId: 'orders', appId: 'orders' },
       { nodeId: 'projects', appId: 'projects' },
       { nodeId: 'settings', appId: 'settings' },
+      { nodeId: 'store', appId: 'store' },
       { nodeId: 'trash', appId: 'trash' },
     ]);
     expect(issues).toEqual([]);

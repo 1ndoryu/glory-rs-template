@@ -30,6 +30,18 @@ export const DEFAULT_RELEASE: WorkspaceTree = {
       id: 'trash', parentId: 'desktop', type: 'app', label: 'Papelera', refId: 'trash',
       position: { col: 1, row: 0 }, mobilePosition: { col: 1, row: 1 }, mobileOrder: 6, requires: 'public',
     },
+    store: {
+      id: 'store', parentId: 'desktop', type: 'app', label: 'Tienda', refId: 'store',
+      position: { col: 1, row: 3 }, mobilePosition: { col: 1, row: 3 }, mobileOrder: 9, requires: 'public',
+    },
+    orders: {
+      id: 'orders', parentId: 'desktop', type: 'app', label: 'Pedidos', refId: 'orders',
+      position: { col: 1, row: 4 }, mobilePosition: { col: 2, row: 3 }, mobileOrder: 10, requires: 'public',
+    },
+    downloads: {
+      id: 'downloads', parentId: 'desktop', type: 'app', label: 'Descargas', refId: 'downloads',
+      position: { col: 1, row: 5 }, mobilePosition: { col: 0, row: 4 }, mobileOrder: 11, requires: 'public',
+    },
   },
 };
 

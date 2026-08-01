@@ -119,6 +119,23 @@ impl ProductRepository {
         .await
     }
 
+    /// Catálogo público de la Tienda. La visibilidad se resuelve en SQL para
+    /// no filtrar borradores o productos privados por error.
+    pub async fn list_public(pool: &PgPool) -> Result<Vec<Product>, sqlx::Error> {
+        sqlx::query_as::<_, Product>(
+            "SELECT p.id, p.article_id, p.name, p.description, p.price_cents, p.currency,
+                    p.stripe_product_id, p.stripe_price_id, p.download_path, p.is_active, p.created_at
+             FROM products p
+             INNER JOIN resources r ON r.id = p.id
+             WHERE r.lifecycle = 'active'::lifecycle_state
+               AND r.visibility = 'public'::visibility_state
+               AND p.is_active = true
+             ORDER BY p.created_at DESC LIMIT 100",
+        )
+        .fetch_all(pool)
+        .await
+    }
+
     pub async fn update(
         conn: &mut sqlx::PgConnection,
         params: ProductUpdateParams<'_>,

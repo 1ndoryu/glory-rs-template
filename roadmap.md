@@ -218,7 +218,7 @@ Plan: `Agente/planes/plan-notificaciones-2026-08-01.md`.
 
 **Depende de:** 297A-7/10/14.
 
-- [ ] Tienda como carpeta, programa Compra y programa Pedidos (UI/runtime pendiente).
+- [x] Tienda como programa/carpeta visual, checkout dentro del OS y programas Pedidos/Descargas con estados vacíos seguros; catálogo público SQL filtra privados. *(worker, historial server-side y proveedor real quedan diferidos)*
 - [x] Product versions inmutables y endpoint de descarga privado con path traversal fail-closed.
 - [x] Orden idempotente por cliente + clave y webhook firmado con registro de eventos repetibles.
 - [x] Entitlements, grants opacos temporales y outbox deduplicado.
@@ -341,7 +341,7 @@ Plan canónico: `Agente/planes/plan-programas-editoriales-2026-07-31.md`.
 
 ### 297A-15 — Comercio seguro
 
-- [ ] Modelar Tienda y Checkout/Orders/Descargas como programas del OS (UI pendiente); backend ya valida precio, versión y disponibilidad.
+- [x] Modelar Tienda, Checkout, Pedidos y Descargas como programas del OS; checkout usa ProductService/idempotencia y el release incluye sus nodos. *(historial/grants consultables y UI operativa avanzada quedan diferidos)*
 - [x] `idempotency_key`, `UNIQUE provider_event_id`, webhook firmado y outbox deduplicado implementados.
 - [x] Entitlement/grant corto y compra invitada implementados; quedan reembolso, chargeback, worker de outbox y E2E con proveedor.
 

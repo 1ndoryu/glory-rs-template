@@ -86,6 +86,10 @@ impl ProductService {
         Ok(ProductRepository::find_by_article(pool, article_id).await?)
     }
 
+    pub async fn list_public(pool: &PgPool) -> Result<Vec<Product>, AppError> {
+        Ok(ProductRepository::list_public(pool).await?)
+    }
+
     /// [297A-14] Actualiza producto y envelope juntos para evitar estados divergentes.
     pub async fn update(
         pool: &PgPool,

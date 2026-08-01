@@ -7,6 +7,10 @@ import { api } from '../api/client';
 import type { CreateProductRequest, Product, UpdateProductRequest } from '../api/types';
 
 export const ProductService = {
+  /** Catálogo público de la app Tienda. */
+  async listPublic(): Promise<Product[]> {
+    return api.get<Product[]>('/api/products');
+  },
   /** Obtener un producto por ID (admin). */
   async getById(id: string, options?: { signal?: AbortSignal }): Promise<Product> {
     return api.get<Product>(`/api/admin/products/${id}`, options);

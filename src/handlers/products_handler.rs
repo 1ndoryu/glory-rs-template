@@ -54,6 +54,13 @@ pub async fn list_products_by_article(
     Ok(Json(products))
 }
 
+/// Catálogo público de la Tienda.
+pub async fn list_public_products(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<Product>>, AppError> {
+    Ok(Json(ProductService::list_public(&state.pool).await?))
+}
+
 /// Actualizar producto (admin) — sincroniza envelope en transacción
 pub async fn update_product(
     State(state): State<AppState>,
@@ -216,6 +223,7 @@ pub fn routes() -> Router<AppState> {
             "/articles/:article_id/products",
             get(list_products_by_article),
         )
+        .route("/products", get(list_public_products))
         .route("/products/:id/checkout", post(checkout))
         /* Admin — contrato canónico /admin/products */
         .route(

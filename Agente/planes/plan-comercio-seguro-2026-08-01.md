@@ -1,6 +1,6 @@
 # Plan de comercio seguro — 2026-08-01
 
-Estado: implementación técnica autónoma completada en el primer bloque; quedan integración de proveedor, UI y operación humana.
+Estado: backend y primera superficie OS completados; quedan worker, proveedor real, reembolsos y E2E.
 
 ## Alcance
 
@@ -27,11 +27,21 @@ Gate: `cargo check`, tests Rust y type-check frontend pasan; una misma clave no 
 
 Gate: tests de firma/evento duplicado/grant y descarga con archivo válido, expirado, revocado y ruta inválida.
 
-## Fase 3 — Pendiente con intervención humana
+## Fase 3 — Superficie OS (completada en alcance mínimo)
+
+- [x] Registrar `Tienda`, `Pedidos` y `Descargas` en AppRegistry con las mismas rutas en desktop/tablet/móvil.
+- [x] Añadir catálogo público SQL que solo devuelve productos `active + public + is_active`.
+- [x] Mostrar checkout dentro de la app Tienda: validación de email, clave de idempotencia delegada al servicio y redirección solo a la URL de Stripe devuelta por backend.
+- [x] Dejar estados vacíos explícitos para Pedidos/Descargas hasta que exista endpoint de historial por cuenta y grants consultables.
+- [x] Añadir los programas al release público existente con migración no destructiva y posiciones publicables.
+
+Gate: type-check, suite Rust/frontend y quality gate pasan; ningún producto privado aparece en Tienda.
+
+## Fase 4 — Pendiente con intervención humana
 
 - [ ] Worker/outbox que, si el correo falla, emita un grant nuevo de forma explícita, reintente correo y marque `commerce_outbox.processed_at` con backoff observable.
 - [ ] Integrar Resend/Stripe en entorno de staging con secretos reales y webhook firmado.
-- [ ] Panel OS de Tienda, checkout, Pedidos y estado de entrega.
+- [ ] Historial server-side de Pedidos/Descargas por cuenta y panel de estado de entrega.
 - [ ] Reembolso, chargeback, revocación manual y política de retención de grants.
 - [ ] Migrar archivos legacy de `/uploads` a storage privado y retirar el servicio estático público.
 
