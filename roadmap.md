@@ -380,6 +380,7 @@ Plan canónico: `Agente/planes/plan-programas-editoriales-2026-07-31.md`.
 - [x] **018A-37 —** `test:changed` selecciona tests por grafo de imports en vez de ejecutar toda la suite ante cualquier cambio fuente; `writeAtomic` reintenta carreras Windows. `test:full` sigue siendo el modo explícito total.
 - [x] **018A-38 —** Dividir el contrato frontend `Article` en identidad, contenido y publicación para cumplir ISP sin cambiar el tipo público; el warning `large-interface-isp` queda resuelto.
 - [x] **018A-39 —** Completar la acción `properties` de la matriz de recursos y registrar la app `properties`; el menú contextual ya no declara una acción sin ejecutor.
+- [x] **018A-40 —** Retirar tres utilidades CSS huérfanas (`gap-sm`, `mt-md`, `mb-lg`) tras búsqueda estática en fuentes y estilos; se conservan clases dinámicas con consumidores comprobados.
 - [ ] Completar la matriz de paridad y retirar contratos/CSS legacy restantes. *(JWT Bearer ya no forma parte del contrato)*
 
 ### 297A-17 — Hardening, identidad, accesibilidad y SEO

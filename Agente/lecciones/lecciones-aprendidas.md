@@ -213,3 +213,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Una matriz de recursos puede aparentar paridad aunque solo enumere acciones: cada acción visible debe resolver target, declarar capacidad y abrir/ejecutar una única ruta del runtime.
 - Las propiedades pueden empezar como una lectura local segura; no se debe inventar un endpoint ni mostrar `refId` interno hasta que exista un contrato público y una decisión de privacidad.
+
+## 018A-40 — Un warning de clase huérfana exige búsqueda dinámica
+
+- Antes de borrar una utilidad CSS hay que buscarla en TypeScript, HTML y plantillas; nombres interpolados (`badge--${estado}`) no aparecen como literal completo y deben conservarse con evidencia.
+- La limpieza incremental de utilidades sin consumidores reduce la deuda sin convertir los falsos positivos de VarSense en cambios visuales riesgosos.

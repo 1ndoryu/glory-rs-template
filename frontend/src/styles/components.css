@@ -5,7 +5,9 @@
  * borde 1px para aspecto OS. Inputs = 1px border. Modales = overlay + panel.
  * PROHIBIDO: sombras, colores, bordes redondeados, hover effects.
  * [317A-4] Borde 1px en botones dentro de superficies OS.
- * [Auditoría v3 §2.4] @layer components — specificity management. */
+ * [Auditoría v3 §2.4] @layer components — specificity management.
+ * [018A-40] Las utilidades gap-sm/mt-md/mb-lg se retiraron tras confirmar
+ * ausencia de consumidores; las variantes restantes siguen siendo públicas. */
 
 @layer components {
 
@@ -14,15 +16,12 @@
 .flex-columna { display: flex; flex-direction: column; }
 .flex-fila { display: flex; }
 .flex-wrap { flex-wrap: wrap; }
-.gap-sm { gap: var(--espacio-sm); }
 .gap-md { gap: var(--espacio-md); }
 .gap-lg { gap: var(--espacio-lg); }
 .mt-sm { margin-top: var(--espacio-sm); }
-.mt-md { margin-top: var(--espacio-md); }
 .mt-lg { margin-top: var(--espacio-lg); }
 .mb-sm { margin-bottom: var(--espacio-sm); }
 .mb-md { margin-bottom: var(--espacio-md); }
-.mb-lg { margin-bottom: var(--espacio-lg); }
 .ml-sm { margin-left: var(--espacio-sm); }
 .align-start { align-self: flex-start; }
 .border-bottom { border-bottom: var(--borde); }
