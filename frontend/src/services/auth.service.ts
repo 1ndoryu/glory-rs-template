@@ -60,9 +60,11 @@ export const AuthService = {
   /** Iniciar sesión con email y contraseña.
    *  Lanza ApiError si las credenciales son inválidas (consistente con otros servicios). */
   async login(email: string, password: string): Promise<void> {
-    /* La sesión responde 200; la capacidad se confirma en /me. */
+    /* [018A-63] El backend responde 204 (cookie en Set-Cookie, sin cuerpo),
+     * consistente con logout/resetPassword; la capacidad se confirma en /me.
+     * El contrato utoipa se corrigió a 204; regenerar cliente tras restart. */
     const response = await login({ email, password });
-    unwrapGeneratedResponse<void>(response, [200]);
+    unwrapGeneratedResponse<void>(response, [204]);
     const session = await this.me();
     if (!session.isAuthenticated) {
       throw new Error('La sesión no pudo confirmarse');

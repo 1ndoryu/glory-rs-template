@@ -266,12 +266,15 @@ pub async fn reset_password(
 }
 
 /// Iniciar sesión — [297A-8] crea sesión opaca en cookie `HttpOnly`
+/* [018A-63] El contrato declara 204 (no 200): la sesión viaja en Set-Cookie sin
+ * cuerpo, igual que logout/resetPassword. Antes el cliente esperaba 200 y
+ * mostraba "credenciales incorrectas" pese al login exitoso. */
 #[utoipa::path(
     post,
     path = "/api/auth/login",
     request_body = LoginRequest,
     responses(
-        (status = 200, description = "Login exitoso"),
+        (status = 204, description = "Login exitoso; la sesión viaja en cookie Set-Cookie"),
         (status = 401, description = "Credenciales inválidas", body = ErrorResponse),
         (status = 403, description = "Rate limit", body = ErrorResponse)
     )
