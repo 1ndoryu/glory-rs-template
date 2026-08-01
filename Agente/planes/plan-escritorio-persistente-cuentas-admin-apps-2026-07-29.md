@@ -4,7 +4,7 @@
 > **Fecha:** 2026-07-29  
 > **Prioridad:** máxima  
 > **Estado:** en ejecución; identidad visual, seguridad inmediata, sesiones seguras, runtime, recursos, workspace y Cuenta base implementados
-> **Siguiente bloque técnico:** 297A-16 — cerrar paridad de contratos/CSS legacy. Las validaciones visuales/E2E se mantienen diferidas hasta una pasada dedicada de navegador.
+> **Siguiente bloque habilitado:** 297A-17 — hardening, identidad, accesibilidad y SEO. La paridad automatizable de contratos quedó cerrada en 018A-50; CSS/clases legacy y fachadas manuales quedan como deuda no bloqueante hasta una revisión visual/migración dedicada.
 
 ## 1. Autoridad y alcance
 
@@ -449,7 +449,8 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [x] **018A-47 —** Restringir settings públicos a una allowlist de presentación y eliminar el nombre ambiguo `getAll` del cliente; auth y configuración administrativa permanecen server-side.
 - [x] **018A-48 —** Separar DTOs públicos/admin de proyectos; `sort_order` e `is_visible` quedan en el boundary administrativo y el catálogo público recibe solo contenido de presentación.
 - [x] **018A-49 —** Separar DTOs de notificaciones públicas, cuenta y admin; estado editorial y autor quedan confinados al panel admin, mientras la cuenta conserva `read` por usuario.
-- [ ] Eliminar CSS/clases huérfanas con VarSense.
+- [x] **018A-50 —** Cerrar paridad automatizable de contratos públicos/admin y aislar el backlog residual de CSS/fachadas manuales para una fase visual posterior.
+- [ ] Eliminar CSS/clases huérfanas con VarSense tras revisión visual; diferido y no bloquea 297A-17.
 
 **Criterio de salida:** una sola administración como app registrada, analytics útil/privado y cero rutas/chrome duplicados legacy; uploads y CSS/contratos obsoletos deben desaparecer después de su matriz de paridad.
 

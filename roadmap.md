@@ -35,7 +35,7 @@
 
 ## Siguiente bloque habilitado
 
-**Siguiente bloque técnico: 297A-16 — cerrar paridad de contratos/CSS legacy.** Los bloques de runtime, seguridad de media y DTOs ya están cerrados. Las validaciones visuales/E2E de móvil, deep links, notificaciones y editores quedan diferidas para una pasada dedicada de navegador, no bloquean este tramo técnico.
+**Siguiente bloque habilitado: 297A-17 — hardening, identidad, accesibilidad y SEO.** La paridad de contratos automatizable quedó cerrada en 018A-48/49; la limpieza residual de CSS/clases y fachadas manuales queda diferida porque requiere revisión visual o migración amplia. Las validaciones visuales/E2E de móvil, deep links, notificaciones y editores permanecen diferidas para una pasada dedicada de navegador.
 
 > **297A-22 — Reordenamiento por arrastre con grid (implementación técnica completada).** Se adoptó `mobilePosition {col,row}` con grid compacto de 2/3 columnas; `mobileOrder` queda como fallback legacy. El drag requiere long press, Finder no hereda el orden móvil y los comandos move prev/next son alternativa accesible solo en presentación móvil. Typecheck, suite y gate pasan; queda validación visual/E2E antes del cierre documental.
 
@@ -252,7 +252,8 @@ Plan: `Agente/planes/plan-notificaciones-2026-08-01.md`.
 - [x] Agregados y Estadísticas separados del dispatcher; app admin con paneles Overview/Content/OS/Commerce/Reliability y exportación JSON.
 - [x] **018A-26 —** Retirada la ruta frontend legacy `/admin`; Admin permanece como app interna registrada y “Nuevo proyecto” abre `project-editor` mediante `openAppWindow` con guardia admin.
 - [x] **018A-39 —** Estadísticas queda reflejada como app `analytics` y la acción declarada `properties` se ejecuta mediante `resource:properties`, que abre una ventana reutilizable de metadatos locales sin exponer IDs internos.
-- [ ] Completar paridad y eliminación de contratos/CSS legacy. *(JWT Bearer retirado en 018A-18; uploads ya usan previews autorizados en 018A-28; DTOs de media separados en 018A-29; la página Admin se conserva como programa interno)*
+- [x] **018A-50 —** Cerrar la paridad automatizable de contratos públicos/admin (media, artículos, productos, proyectos, notificaciones y settings); JWT Bearer, uploads estáticos y DTOs internos ya no forman parte de los boundaries públicos.
+- [ ] Revisar y retirar CSS/clases legacy restantes con VarSense y validación visual; queda diferido y no bloquea hardening.
 
 **Salida:** una sola administración y métricas privadas/tipadas.
 
@@ -381,7 +382,8 @@ Plan canónico: `Agente/planes/plan-programas-editoriales-2026-07-31.md`.
 - [x] **018A-38 —** Dividir el contrato frontend `Article` en identidad, contenido y publicación para cumplir ISP sin cambiar el tipo público; el warning `large-interface-isp` queda resuelto.
 - [x] **018A-39 —** Completar la acción `properties` de la matriz de recursos y registrar la app `properties`; el menú contextual ya no declara una acción sin ejecutor.
 - [x] **018A-40 —** Retirar tres utilidades CSS huérfanas (`gap-sm`, `mt-md`, `mb-lg`) tras búsqueda estática en fuentes y estilos; se conservan clases dinámicas con consumidores comprobados.
-- [ ] Completar la matriz de paridad y retirar contratos/CSS legacy restantes. *(JWT Bearer ya no forma parte del contrato)*
+- [x] **018A-50 —** Completar la matriz de paridad de contratos automatizables y documentar el backlog residual de CSS/fachadas manuales como deuda no bloqueante.
+- [ ] Retirar CSS/clases huérfanas restantes con VarSense tras revisión visual; diferido.
 
 ### 297A-17 — Hardening, identidad, accesibilidad y SEO
 

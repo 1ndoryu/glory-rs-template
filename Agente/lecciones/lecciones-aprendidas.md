@@ -263,3 +263,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Las notificaciones parecen una lista única, pero `read` depende de la cuenta y `status`/`created_by` dependen de admin; reutilizar el modelo SQL en los tres endpoints mezcla capacidades y expone metadata.
 - Separar las listas por boundary permite que el servicio conserve una sola consulta/repositorio, mientras cada handler decide exactamente qué campos puede devolver.
+
+## 018A-50 — Cerrar lo automatizable sin ocultar deuda visual
+
+- Una matriz de paridad puede cerrarse técnicamente aunque queden CSS huérfanos o fachadas manuales que necesitan revisión visual; conviene separarlos como backlog no bloqueante en vez de falsear el criterio de salida.
+- El roadmap debe habilitar el siguiente epic solo cuando sus dependencias de contratos estén cerradas y dejar las migraciones de alto riesgo con criterio explícito de reanudación.
