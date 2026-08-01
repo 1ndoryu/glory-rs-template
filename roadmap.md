@@ -35,9 +35,9 @@
 
 ## Siguiente bloque habilitado
 
-**297A-20 — Iconos libres con snap-grid (completado).** Posición libre por celda con colisión resuelta, drop geométrico (ya no se pierde bajo ventanas), reflow por resolución y persistencia en overlay. Validado por el usuario en navegador; detalle en `Agente/completados/tareas-2026-07-31.md`.
+**Siguiente bloque técnico: 297A-16 — cerrar paridad de contratos/CSS legacy.** Los bloques de runtime, seguridad de media y DTOs ya están cerrados. Las validaciones visuales/E2E de móvil, deep links, notificaciones y editores quedan diferidas para una pasada dedicada de navegador, no bloquean este tramo técnico.
 
-> **297A-22 — Reordenamiento por arrastre con grid (implementación técnica completada).** Se adoptó `mobilePosition {col,row}` con grid compacto de 2/3 columnas; `mobileOrder` queda como fallback legacy. El drag requiere long press, Finder no hereda el orden móvil y los comandos move prev/next son alternativa accesible solo en presentación móvil. Typecheck, suite y gate deben repetirse tras cada cambio; queda validación visual/E2E antes del cierre documental.
+> **297A-22 — Reordenamiento por arrastre con grid (implementación técnica completada).** Se adoptó `mobilePosition {col,row}` con grid compacto de 2/3 columnas; `mobileOrder` queda como fallback legacy. El drag requiere long press, Finder no hereda el orden móvil y los comandos move prev/next son alternativa accesible solo en presentación móvil. Typecheck, suite y gate pasan; queda validación visual/E2E antes del cierre documental.
 
 **297A-12 — Runtime móvil parcial implementado.** Shell/stack, `MobileLauncher`, transición dinámica, long press, menú contextual compartido, reorder accesible, frontera de capacidades y snapshot transitorio opt-in están validados por type-check, **278 tests en 34 suites**, quality gate y self-check. La inspección de navegador confirmó tablet `768×1024`; quedan E2E táctil móvil estable, viewports 320/360/390, safe areas, teclado virtual, foco y apps críticas.
 
@@ -69,6 +69,7 @@
 - [x] **018A-27 —** Cobertura OpenAPI de descargas privadas y webhook Stripe: grant opaco, firma en header, JSON crudo y errores documentados sin exponer storage ni secretos.
 - [x] **018A-28 —** Retirado el serving estático público de `/uploads`; las respuestas de media exponen solo previews autorizados y existen rutas públicas/admin con validación de envelope, estado y confinamiento de path.
 - [x] **018A-29 —** Separados los DTOs públicos, administrativos y de subida de media: las respuestas exponen `url`/`admin_url` y `file_name`, nunca `file_path` ni storage keys; servicios frontend y OpenAPI consumen el contrato explícito.
+- [x] **018A-30 —** Alineadas las referencias activas del roadmap y planes: el shape de media usa DTOs con URLs explícitas y las validaciones visuales/E2E quedan diferidas sin reabrir bloques técnicos cerrados.
 
 **Salida:** runtime compartido funciona sin chrome/listas/listeners duplicados. Orval se regenera localmente sin backend vivo; quedan cobertura total del contrato y retiro del cliente manual.
 
@@ -216,7 +217,7 @@ Plan: `Agente/planes/plan-notificaciones-2026-08-01.md`.
 - [x] Vertical de artículos/About: `article-editor` lazy, admin-only, lifecycle abortable, create→update, multimedia asociada al ID actual, evento tipado y listado Admin sin carreras.
 - [x] Editor de proyectos: app lazy admin-only, listado separado, lifecycle/eventos, GET por ID, create→update, URL tri-state y sincronización transaccional de título/visibilidad/lifecycle del resource envelope.
 - [x] Editor de productos: app lazy admin-only, CRUD admin completo en `/api/admin/products`, nace inactivo/private, validación backend de precio/moneda, sincronización transaccional del envelope y filtro público `active + public`.
-- [x] Contrato de rutas admin alineado: servicios frontend migrados a `/api/admin/...` (backend anida todo bajo `/api`); `GET /api/admin/workspace/releases/{version}` para rollback; `MediaService`/galería usan el shape real `Vec<Media>`.
+- [x] Contrato de rutas admin alineado: servicios frontend migrados a `/api/admin/...` (backend anida todo bajo `/api`); `GET /api/admin/workspace/releases/{version}` para rollback; `MediaService`/galería usan `MediaPublic`/`MediaAdmin` con URLs explícitas.
 - [x] Biblioteca de media. *(app lazy admin-only, papelera soft delete + restore, object URLs revocadas, utils test 6/6 — F4)*
 - [x] Menú Admin por capacidades y paridad sin ampliar `admin.ts`. *(matriz de paridad congelada en `matriz-paridad-admin-2026-07-31.md`; comandos `resource:edit/publish/unpublish` materializan acciones declaradas; menú por capacidades del Admin queda con el resto de 297A-14)*
 - [x] Paridad F5 técnica: autosave compartido por tipo de recurso — `utils/autosave.ts` (`createDebouncedSaver` genérico) aplicado a artículos, proyectos y productos (create→update idempotente, sin tocar editorial, evento de dominio solo en created) — y comandos de recurso fail-closed con tests (15/15).

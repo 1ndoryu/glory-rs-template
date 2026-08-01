@@ -4,7 +4,7 @@
 > **Fecha:** 2026-07-29  
 > **Prioridad:** máxima  
 > **Estado:** en ejecución; identidad visual, seguridad inmediata, sesiones seguras, runtime, recursos, workspace y Cuenta base implementados
-> **Siguiente bloque:** 297A-22 — reordenamiento por arrastre con grid, pendiente de revisión de decisiones abiertas
+> **Siguiente bloque técnico:** 297A-16 — cerrar paridad de contratos/CSS legacy. Las validaciones visuales/E2E se mantienen diferidas hasta una pasada dedicada de navegador.
 
 ## 1. Autoridad y alcance
 
@@ -257,7 +257,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 
 ### 8.3 API y pruebas
 
-- [ ] DTO público/admin separado. *(pendiente)*
+- [x] DTO público/admin/upload separado. *(018A-29; público sin IDs internos, admin/upload con capacidades explícitas)*
 - [ ] Resolver público usa nodo + recurso + capacidad. *(pendiente)*
 - [ ] Mover referencia no altera recurso. *(pendiente)*
 - [ ] Referencias múltiples no duplican contenido. *(pendiente)*

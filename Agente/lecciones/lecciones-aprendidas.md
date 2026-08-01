@@ -168,3 +168,7 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Un modelo que contiene la storage key no debe ser la respuesta de un handler: aunque se reescriba el valor antes de serializar, el contrato sigue siendo ambiguo y puede filtrar campos privados en una ruta futura.
 - DTOs explícitos (`public`, `admin`, `upload`) permiten que cada boundary declare sus capacidades y que OpenAPI/TypeScript detecten regresiones de nombres como `file_path`.
+
+## 018A-30 — El roadmap también es un contrato
+
+- Cuando una implementación cambia un shape o el orden de fases, las referencias históricas activas deben actualizarse en la misma tarea; una línea obsoleta puede hacer que el siguiente agente reintroduzca un contrato retirado.
