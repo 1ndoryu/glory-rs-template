@@ -1,0 +1,131 @@
+/* GAME-01 — Superficie del fixture jugable. Solo chrome y controles; la escena
+ * 3D conserva sus materiales en el adaptador Three.js. */
+
+.juegoFixture {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 320px;
+  overflow: hidden;
+  color: var(--sistema-texto);
+  background: var(--sistema-superficie);
+  isolation: isolate;
+}
+
+.juegoFixture__escena,
+.juegoFixture__escena canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.juegoFixture__escena {
+  touch-action: none;
+}
+
+.juegoFixture__guia {
+  position: absolute;
+  inset: var(--espacio-sm) var(--espacio-sm) auto;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.juegoFixture__titulo,
+.juegoFixture__ayuda,
+.juegoFixture__estado {
+  width: fit-content;
+  margin: 0;
+  padding: var(--espacio-xs) var(--espacio-sm);
+  border: var(--sistema-borde);
+  color: var(--sistema-texto);
+  background: var(--sistema-superficie);
+  font-family: var(--fuente-sistema);
+  font-weight: var(--peso-normal);
+}
+
+.juegoFixture__titulo {
+  border-bottom: 0;
+  font-size: var(--tamano-texto);
+}
+
+.juegoFixture__ayuda,
+.juegoFixture__estado {
+  font-size: var(--tamano-pequeno);
+}
+
+.juegoFixture__estado {
+  position: absolute;
+  right: var(--espacio-sm);
+  bottom: var(--espacio-sm);
+  z-index: 2;
+}
+
+.juegoFixture__estado[data-state='error'] {
+  max-width: 260px;
+  text-align: center;
+}
+
+.juegoFixture__controles {
+  position: absolute;
+  right: var(--espacio-md);
+  bottom: var(--espacio-md);
+  z-index: 3;
+  display: grid;
+  grid-template: repeat(3, var(--areaControlSistemaMovil)) / repeat(3, var(--areaControlSistemaMovil));
+  gap: 2px;
+  pointer-events: none;
+}
+
+.juegoFixture__control {
+  min-width: var(--areaControlSistemaMovil);
+  min-height: var(--areaControlSistemaMovil);
+  padding: 0;
+  border: var(--sistema-borde);
+  color: var(--sistema-texto);
+  background: var(--sistema-superficie);
+  font: inherit;
+  font-size: var(--tamano-texto);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.juegoFixture__control:hover,
+.juegoFixture__control:focus-visible,
+.juegoFixture__control:active {
+  color: var(--sistema-superficie);
+  background: var(--sistema-texto);
+}
+
+.juegoFixture__control--up { grid-area: 1 / 2; }
+.juegoFixture__control--left { grid-area: 2 / 1; }
+.juegoFixture__control--down { grid-area: 3 / 2; }
+.juegoFixture__control--right { grid-area: 2 / 3; }
+
+[data-tema='oscuro'] .juegoFixture__escena canvas {
+  filter: invert(1);
+}
+
+@media (max-width: 767px) {
+  .juegoFixture {
+    min-height: 100%;
+  }
+
+  .juegoFixture__guia {
+    top: max(var(--espacio-sm), env(safe-area-inset-top));
+  }
+
+  .juegoFixture__ayuda {
+    max-width: 220px;
+  }
+
+  .juegoFixture__estado {
+    right: auto;
+    bottom: max(var(--espacio-sm), env(safe-area-inset-bottom));
+    left: var(--espacio-sm);
+  }
+
+  .juegoFixture__controles {
+    right: var(--espacio-sm);
+    bottom: calc(max(var(--espacio-sm), env(safe-area-inset-bottom)) + var(--areaControlSistemaMovil));
+  }
+}

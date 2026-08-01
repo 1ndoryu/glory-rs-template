@@ -59,6 +59,24 @@ export const DEFAULT_RELEASE: WorkspaceTree = {
       id: 'downloads', parentId: 'desktop', type: 'app', label: 'Descargas', refId: 'downloads',
       position: { col: 1, row: 5 }, mobilePosition: { col: 0, row: 4 }, mobileOrder: 11, requires: 'public',
     },
+    /* [GAME-01-VIS] Entrada pública del boceto visual. La app es lazy y no
+     * carga su SVG/CSS hasta abrirse; esta referencia solo la hace visible en
+     * el escritorio/launcher fallback, sin añadir lógica de juego. */
+    game: {
+      id: 'game', parentId: 'desktop', type: 'app', label: 'Bosque', refId: 'game',
+      position: { col: 2, row: 0 }, mobilePosition: { col: 1, row: 4 }, mobileOrder: 12, requires: 'public',
+    },
+    /* [GAME-01-VIS-3D] Alternativa isométrica conservada junto al boceto 2D. */
+    game3d: {
+      id: 'game3d', parentId: 'desktop', type: 'app', label: 'Bosque 3D', refId: 'game-3d',
+      position: { col: 2, row: 1 }, mobilePosition: { col: 2, row: 4 }, mobileOrder: 13, requires: 'public',
+    },
+    /* [GAME-01-F3] Entrada separada del fixture jugable; no convierte los
+     * previews visuales en gameplay ni carga Three.js en el arranque. */
+    gamePlayable: {
+      id: 'gamePlayable', parentId: 'desktop', type: 'app', label: 'Bosque · prueba', refId: 'game-playable',
+      position: { col: 2, row: 2 }, mobilePosition: { col: 0, row: 5 }, mobileOrder: 14, requires: 'public',
+    },
   },
 };
 

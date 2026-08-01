@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" role="img" aria-labelledby="titulo descripcion">
+  <title id="titulo">Boceto cenital de un bosque de tinta</title>
+  <desc id="descripcion">Un bosque original en blanco y negro con coníferas, árboles frondosos, lagos, senderos y dos pequeñas figuras para mostrar la escala.</desc>
+  <defs>
+    <pattern id="papel" width="18" height="18" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="3" r="0.7" fill="#111" opacity="0.14"/>
+      <circle cx="12" cy="11" r="0.55" fill="#111" opacity="0.1"/>
+    </pattern>
+    <pattern id="agua" width="24" height="16" patternUnits="userSpaceOnUse">
+      <path d="M2 5h9m5 0h5M7 12h12" fill="none" stroke="#111" stroke-width="1.5" stroke-linecap="round" opacity="0.7"/>
+    </pattern>
+    <pattern id="pasto" width="22" height="22" patternUnits="userSpaceOnUse">
+      <path d="M5 18l2-7m6 6 1-8m4 10 2-6" fill="none" stroke="#111" stroke-width="1.2" stroke-linecap="round" opacity="0.35"/>
+    </pattern>
+    <pattern id="sendero" width="12" height="12" patternUnits="userSpaceOnUse">
+      <circle cx="3" cy="4" r="1" fill="#111" opacity="0.22"/>
+      <circle cx="9" cy="9" r="0.8" fill="#111" opacity="0.18"/>
+    </pattern>
+    <g id="pino" fill="none" stroke="#111" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M26 68V14M26 14 14 29m12-9 14 15M26 29 10 44m16-8 18 15M26 43 7 59m19-9 21 17" stroke-width="2.2"/>
+      <path d="M19 69h14" stroke-width="1.4"/>
+    </g>
+    <g id="pino-denso" fill="none" stroke="#111" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M28 74V12M28 12 15 27m13-8 15 15M28 27 10 43m18-8 20 17M28 42 6 59m22-9 24 18M28 57 13 72m15-7 15 10" stroke-width="2.8"/>
+      <path d="M19 75h18" stroke-width="1.6"/>
+    </g>
+    <g id="frondoso" stroke="#111" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M29 76V48" fill="none" stroke-width="2.4"/>
+      <path d="M29 54 20 43m9 8 10-13" fill="none" stroke-width="1.5"/>
+      <path d="M13 47C4 42 7 30 14 28c-3-9 5-18 13-14 6-10 19-4 18 6 10 0 14 12 7 18 5 8-2 18-11 16-6 7-18 5-21-2-3 2-5 0-7-5Z" fill="#fff" stroke-width="2.2"/>
+      <path d="M20 76h18" fill="none" stroke-width="1.4"/>
+    </g>
+    <g id="roca" fill="#fff" stroke="#111" stroke-width="2">
+      <path d="M5 31 12 12 28 6 43 13 49 31 37 43 17 42Z"/>
+      <path d="m13 14 13 8 16-7M9 31l17-9 15 17" fill="none" stroke-width="1" opacity="0.55"/>
+    </g>
+  </defs>
+
+  <rect width="1200" height="760" fill="#fff"/>
+  <rect x="18" y="18" width="1164" height="724" fill="url(#papel)" stroke="#111" stroke-width="2"/>
+
+  <path d="M0 522C167 455 254 459 357 501c80 33 160 38 227 2 70-37 117-114 199-120 100-8 156 77 241 70 68-5 113-59 176-85v374H18Z" fill="url(#pasto)" opacity="0.9"/>
+  <path d="M508 742c33-101 29-177-7-225-48-65-142-66-180-127-28-45-12-104 34-151 36-37 91-64 124-116" fill="none" stroke="#111" stroke-width="86" opacity="0.07" stroke-linecap="round"/>
+  <path d="M508 742c33-101 29-177-7-225-48-65-142-66-180-127-28-45-12-104 34-151 36-37 91-64 124-116" fill="none" stroke="url(#sendero)" stroke-width="68" stroke-linecap="round"/>
+
+  <path d="M780 118c79-39 198-17 233 58 28 60-12 131-89 153-83 23-180-13-198-80-15-55 4-106 54-131Z" fill="url(#agua)" stroke="#111" stroke-width="3"/>
+  <path d="M806 487c45-28 121-17 143 29 22 44-9 96-63 110-58 15-124-10-135-60-9-36 12-61 55-79Z" fill="url(#agua)" stroke="#111" stroke-width="3"/>
+  <path d="M122 558c35-16 79-5 91 26 11 30-11 63-48 70-42 8-81-13-83-47-2-23 13-39 40-49Z" fill="url(#agua)" stroke="#111" stroke-width="2"/>
+
+  <g opacity="0.98">
+    <use href="#pino-denso" x="54" y="72"/>
+    <use href="#pino" x="102" y="43"/>
+    <use href="#pino-denso" x="152" y="91"/>
+    <use href="#pino" x="207" y="52"/>
+    <use href="#pino-denso" x="258" y="82"/>
+    <use href="#pino" x="307" y="38"/>
+    <use href="#pino-denso" x="360" y="80"/>
+    <use href="#pino" x="60" y="151"/>
+    <use href="#pino-denso" x="119" y="137"/>
+    <use href="#pino" x="177" y="164"/>
+    <use href="#pino-denso" x="231" y="129"/>
+    <use href="#pino" x="291" y="151"/>
+    <use href="#pino-denso" x="347" y="137"/>
+    <use href="#pino" x="88" y="228"/>
+    <use href="#pino-denso" x="148" y="222"/>
+    <use href="#pino" x="212" y="244"/>
+    <use href="#pino-denso" x="275" y="213"/>
+    <use href="#pino" x="342" y="233"/>
+    <use href="#pino-denso" x="116" y="310"/>
+    <use href="#pino" x="183" y="299"/>
+    <use href="#pino-denso" x="245" y="318"/>
+  </g>
+
+  <g>
+    <use href="#frondoso" x="410" y="135"/>
+    <use href="#frondoso" x="468" y="101"/>
+    <use href="#frondoso" x="533" y="142"/>
+    <use href="#frondoso" x="598" y="105"/>
+    <use href="#frondoso" x="654" y="158"/>
+    <use href="#frondoso" x="430" y="221"/>
+    <use href="#frondoso" x="499" y="194"/>
+    <use href="#frondoso" x="567" y="226"/>
+    <use href="#frondoso" x="637" y="218"/>
+    <use href="#frondoso" x="696" y="274"/>
+    <use href="#frondoso" x="416" y="323"/>
+    <use href="#frondoso" x="475" y="347"/>
+    <use href="#frondoso" x="617" y="351"/>
+    <use href="#frondoso" x="676" y="329"/>
+    <use href="#frondoso" x="397" y="438"/>
+    <use href="#frondoso" x="446" y="493"/>
+    <use href="#frondoso" x="529" y="523"/>
+    <use href="#frondoso" x="601" y="501"/>
+    <use href="#frondoso" x="666" y="452"/>
+  </g>
+
+  <g opacity="0.9">
+    <use href="#pino" x="1005" y="326"/>
+    <use href="#pino-denso" x="1071" y="379"/>
+    <use href="#pino" x="1014" y="618"/>
+    <use href="#pino" x="939" y="649"/>
+    <use href="#frondoso" x="1068" y="91"/>
+    <use href="#frondoso" x="1090" y="534"/>
+    <use href="#roca" x="738" y="390"/>
+    <use href="#roca" x="1022" y="232" transform="scale(.8) translate(260 67)"/>
+    <use href="#roca" x="272" y="625" transform="scale(.72) translate(108 243)"/>
+  </g>
+
+  <g aria-label="Avatar local" transform="translate(575 405)">
+    <circle r="23" fill="#fff" stroke="#111" stroke-width="4"/>
+    <circle cy="-5" r="7" fill="#111"/>
+    <path d="M-11 16c2-13 6-17 11-17s9 4 11 17" fill="#111"/>
+    <circle r="30" fill="none" stroke="#111" stroke-width="1.5" stroke-dasharray="3 6"/>
+  </g>
+  <g aria-label="Figura remota" transform="translate(842 395)" opacity="0.6">
+    <circle r="17" fill="#fff" stroke="#111" stroke-width="2"/>
+    <circle cy="-4" r="5" fill="#111"/>
+    <path d="M-8 12c1-9 4-13 8-13s7 4 8 13" fill="#111"/>
+  </g>
+
+  <path d="M535 449c30 13 63 13 92 0" fill="none" stroke="#111" stroke-width="1.5" stroke-dasharray="4 7" opacity="0.55"/>
+  <text x="42" y="716" fill="#111" font-family="JetBrains Mono, monospace" font-size="16" letter-spacing="2">BOSQUE / BOCETO 01</text>
+</svg>

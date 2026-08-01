@@ -4,6 +4,41 @@ import { AppRegistry } from './app-registry';
 import './app-registration';
 
 describe('Account app registration', () => {
+  it('registers the Bosque preview as a lazy public full-bleed app', async () => {
+    const game = AppRegistry.get('game');
+    expect(game).toBeDefined();
+    expect(game?.singleton).toBe(true);
+    expect(game?.requires).toBe('public');
+    expect(game?.layout).toBe('full-bleed');
+    expect(game?.deepLink?.stringify()).toBe('/forest-2d');
+    expect(game?.routePatterns).toBeUndefined();
+
+    const view = await AppRegistry.instantiate('game', {
+      signal: new AbortController().signal,
+    });
+    expect(view?.element.classList.contains('bosqueBoceto')).toBe(true);
+    expect(() => view?.destroy?.()).not.toThrow();
+  });
+
+  it('keeps the 3D alternative separate and lazy', () => {
+    const game3d = AppRegistry.get('game-3d');
+    expect(game3d).toBeDefined();
+    expect(game3d?.singleton).toBe(true);
+    expect(game3d?.requires).toBe('public');
+    expect(game3d?.layout).toBe('full-bleed');
+    expect(game3d?.deepLink?.stringify()).toBe('/forest-3d');
+  });
+
+  it('registers the playable fixture separately from both visual previews', () => {
+    const playable = AppRegistry.get('game-playable');
+    expect(playable).toBeDefined();
+    expect(playable?.singleton).toBe(true);
+    expect(playable?.requires).toBe('public');
+    expect(playable?.layout).toBe('full-bleed');
+    expect(playable?.deepLink?.stringify()).toBe('/forest-playable');
+    expect(playable?.routePatterns).toBeUndefined();
+  });
+
   it('registers a public singleton with the /login deep link', () => {
     const account = AppRegistry.get('account');
     expect(account).toBeDefined();

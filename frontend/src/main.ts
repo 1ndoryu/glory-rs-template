@@ -388,3 +388,4 @@ if (document.readyState === 'loading') {
 } else {
   initApp();
 }
+import './features/runtime/app-registration-game-routes';

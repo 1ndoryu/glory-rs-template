@@ -6,6 +6,7 @@
 import { WorkspaceService } from '../../../services';
 import { showToast } from '../../../components/ui/toast';
 import { rebaseOverlay } from './merge';
+import { withLocalPrototypeNodes } from './local-development-release';
 import type {
   NodeId,
   WorkspaceNode,
@@ -24,15 +25,23 @@ export async function fetchWorkspaceRelease(): Promise<void> {
   try {
     const data = await WorkspaceService.getActiveRelease();
     if (data?.tree?.nodes) {
+      const release = withLocalPrototypeNodes(data.tree);
       const currentRelease = releaseStore.get();
-      if (data.tree.version !== currentRelease.version) {
+      const releaseNodeIds = Object.keys(release.nodes);
+      const currentNodeIds = Object.keys(currentRelease.nodes);
+      const nodeSetChanged = releaseNodeIds.length !== currentNodeIds.length
+        || releaseNodeIds.some((id) => !currentRelease.nodes[id]);
+      /* Un release antiguo puede conservar la misma versión pero no conocer
+       * los nodos del prototipo. En ese caso también hay que rebasar el
+       * overlay para que sus posiciones/tombstones no se pierdan. */
+      if (release.version !== currentRelease.version || nodeSetChanged) {
         const currentOverlay = overlayStore.get();
-        const rebased = rebaseOverlay(data.tree, currentOverlay);
+        const rebased = rebaseOverlay(release, currentOverlay);
         if (rebased !== currentOverlay) {
           overlayStore.set(rebased);
         }
       }
-      releaseStore.set(data.tree);
+      releaseStore.set(release);
     }
   } catch {
     /* API no disponible — usar DEFAULT_RELEASE */

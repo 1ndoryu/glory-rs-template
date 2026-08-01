@@ -1,0 +1,98 @@
+/* [GAME-01-VIS] Superficie estática del boceto visual del Bosque.
+ * Consume tokens del OS; la escena SVG es el único asset de dirección
+ * artística y se invierte como unidad en modo oscuro. */
+
+.bosqueBoceto {
+  position: relative;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  color: var(--sistema-texto);
+  background: var(--sistema-fondo);
+}
+
+.bosqueBoceto__lienzo {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  background: var(--sistema-superficie);
+}
+
+.bosqueBoceto__imagen {
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.bosqueBoceto__etiqueta {
+  grid-area: 1 / 1;
+  align-self: start;
+  justify-self: start;
+  margin: var(--espacio-md);
+  padding: var(--espacio-xs) var(--espacio-sm);
+  border: var(--sistema-borde);
+  color: var(--sistema-texto);
+  background: var(--sistema-fondo);
+  font-size: var(--tamano-pequeno);
+  text-transform: lowercase;
+}
+
+.bosqueBoceto__leyenda {
+  position: absolute;
+  right: var(--espacio-md);
+  bottom: var(--espacio-md);
+  display: flex;
+  gap: var(--espacio-md);
+  padding: var(--espacio-xs) var(--espacio-sm);
+  border: var(--sistema-borde);
+  background: var(--sistema-fondo);
+  font-size: var(--tamano-pequeno);
+}
+
+.bosqueBoceto__leyenda > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espacio-xs);
+}
+
+.bosqueBoceto__marca {
+  width: var(--espacio-sm);
+  height: var(--espacio-sm);
+  border: var(--sistema-borde);
+  border-radius: 50%;
+}
+
+.bosqueBoceto__marca--local {
+  background: var(--sistema-texto);
+}
+
+.bosqueBoceto__marca--remota {
+  background: var(--sistema-fondo);
+}
+
+[data-tema='oscuro'] .bosqueBoceto__imagen {
+  filter: invert(1);
+}
+
+@media (max-width: 767px) {
+  .bosqueBoceto__imagen {
+    object-position: 54% center;
+  }
+
+  .bosqueBoceto__etiqueta {
+    margin: var(--espacio-sm);
+  }
+
+  .bosqueBoceto__leyenda {
+    right: var(--espacio-sm);
+    bottom: var(--espacio-sm);
+    flex-direction: column;
+    gap: var(--espacio-xs);
+  }
+}

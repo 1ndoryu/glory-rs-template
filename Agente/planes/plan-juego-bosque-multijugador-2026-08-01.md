@@ -1,21 +1,21 @@
-# Plan — Bosque multijugador 2D dentro del OS
+# Plan — Bosque multijugador dentro del OS
 
 > **Fecha:** 2026-08-01
 > **ID:** GAME-01
-> **Estado:** planificado y bloqueado; no iniciar implementación hasta cerrar las dependencias del runtime/OS y aprobar las decisiones abiertas.
+> **Estado:** dirección Three.js 3D aprobada; previews y fixture offline jugable integrados; núcleo lógico defensivo validado; realtime, persistencia, identidad y editor siguen bloqueados por dependencias/decisiones abiertas.
 > **Prioridad:** futura, después del bloque actualmente habilitado en `roadmap.md`.
 > **Dependencias globales:** runtime `AppRegistry`/`MountedView`, ciclo de vida y carga lazy, sesiones/capacidades, contratos de workspace y quality gate.
-> **Fuentes canónicas:** `roadmap.md`, `Agente/documentacion/arquitectura/manual-arquitectura-wandorius-2026-07-29.md`, `Agente/documentacion/arquitectura/guia-agregar-app-2026-07-31.md`, `Agente/documentacion/arquitectura/adr-carga-apps-pesadas-2026-07-31.md`, `Agente/documentacion/producto/referencia-visual-bosque-2026-08-01.md`.
+> **Fuentes canónicas:** `roadmap.md`, `Agente/documentacion/arquitectura/adr-bosque-3d-assets-terreno-2d-2026-08-01.md`, `Agente/planes/plan-assets-terreno-bosque-3d-2026-08-01.md`, `Agente/planes/plan-glory-render-motor-juegos-2026-08-01.md`, `Agente/documentacion/arquitectura/adr-glory-render-repositorio-agnostico-2026-08-01.md`, `Agente/documentacion/arquitectura/adr-carga-apps-pesadas-2026-07-31.md`, `Agente/documentacion/producto/referencia-visual-bosque-2026-08-01.md`.
 
 ## 1. Objetivo
 
 Agregar una app del OS que abra y cierre como cualquier otro programa y que permita, en una primera versión controlada:
 
-- explorar un bosque 2D con cámara centrada en el personaje;
+- explorar un bosque 3D isométrico renderizado con Three.js sobre un mundo lógico finito X/Z;
 - mover un personaje propio;
 - ver a otros jugadores próximos en la misma sala;
 - entrar como invitado temporal o como usuario con cuenta;
-- editar mapa, assets de escenario y catálogo de personajes desde un modo admin dentro del juego;
+- editar terreno/colocación desde un programa 2D y administrar modelos externos desde `Assets 3D`, sin modelar geometría dentro del OS;
 - editar un personaje sencillo mediante opciones previamente autorizadas;
 - publicar cambios de forma versionada sin romper una partida activa.
 
@@ -45,8 +45,10 @@ El objetivo no es construir todavía un MMO ni un motor general. La primera entr
 | Área | Decisión inicial |
 |---|---|
 | Acceso | Invitado + cuenta. El invitado tiene identidad temporal; la cuenta permite conservar personaje y preferencias. |
-| Geometría | Plano libre 2D para la presentación y colocación de objetos. El servidor usará una partición espacial fija para buscar vecinos y colisiones; no se hará una búsqueda contra todos los objetos. |
-| Administración | Modo edición dentro de la misma app-juego. El modo se activa por capacidad server-side; no es una bandera confiable del cliente. |
+| Renderer | Three.js 3D isométrico, lazy y con teardown GPU. El boceto cenital se conserva como referencia histórica, no como renderer candidato. |
+| Geometría | Presentación 3D sobre simulación lógica X/Z. La altura proviene de un terreno determinista finito y el servidor mantiene spatial index/colisión autoritativos. |
+| Administración | Dos programas admin: `Assets 3D` gestiona GLB/versiones y `Editor de mapa` edita terreno/instancias en 2D con preview 3D. Ninguno modela mallas. |
+| Assets | Autoría externa; runtime GLB/glTF 2.0, versiones inmutables, storage por hash, metadata/proxies allowlisted y validación server-side. |
 | Sala inicial | Máximo objetivo de 8 jugadores por sala. El límite debe ser configurable y rechazará conexiones nuevas antes de degradar la sala. |
 | Dirección visual | Bosque dibujado de tinta/mapa: árboles, rocas, agua y terreno con líneas orgánicas, capas y lectura clara. La imagen compartida se registra como referencia de atmósfera y composición, no como asset final ni como textura que se copie sin licencia. |
 | Presentación OS | Una app `registerLazy`, `full-bleed`, con el mismo `MountedView` en desktop/tablet y móvil. No habrá `MobileGameApp` paralelo. |
@@ -66,8 +68,8 @@ La referencia proporcionada el 2026-08-01 queda descrita como: bosque visto desd
 5. Salas pequeñas, con un snapshot server-authoritative y visibilidad por proximidad.
 6. Invitado temporal y usuario autenticado.
 7. Un catálogo pequeño de assets: terreno, árbol, roca, agua y al menos un punto de spawn.
-8. Modo admin in-game para seleccionar, colocar, mover, duplicar, ocultar y eliminar objetos del borrador.
-9. Subida/gestión de assets a través del pipeline existente de media; no habrá URLs de imagen arbitrarias ni scripts dentro del mapa.
+8. `Editor de mapa` admin en vista 2D para pintar altura/superficie y seleccionar, colocar, mover, duplicar u ocultar instancias.
+9. `Assets 3D` admin para importar GLB privado, analizar, previsualizar, configurar proxy/metadata, versionar y publicar.
 10. Editor de personaje con slots y valores allowlisted: por ejemplo cuerpo, cabello, ropa y color; sin editor de píxeles ni contenido arbitrario.
 11. Guardado de borrador, preview jugable y publicación de una versión inmutable.
 12. Cierre de la app con liberación comprobable de `requestAnimationFrame`, listeners, WebSocket, timers, caches y object URLs.
@@ -78,7 +80,8 @@ La referencia proporcionada el 2026-08-01 queda descrita como: bosque visto desd
 - chat global o voz;
 - físicas complejas, navegación de agentes, agua dinámica o destrucción del escenario;
 - mundo único ilimitado sin salas;
-- editor de tiles profesional, scripting de assets o código ejecutable por admin;
+- editor de mallas/UV/materiales/rigs, scripting de assets o código ejecutable por admin;
+- cuevas, voladizos, terreno infinito, escultura libre o generación procedural en el MVP;
 - generación procedural, login social, ranking y moderación avanzada;
 - sincronización de cada frame o posición de todos los usuarios del mundo completo.
 
@@ -98,15 +101,20 @@ GameController
   ├─ simulation visual/interpolación
   ├─ cámara
   ├─ WebSocket client
-  ├─ renderer Canvas 2D
+  ├─ ThreeRendererAdapter (mundo lógico X/Z + terreno por chunks)
   └─ modo player/admin
+
+El núcleo puro offline vive en `frontend/src/features/game-core/` y no importa DOM,
+Three.js, WebSocket ni persistencia. El fixture `game-playable` lo consume mediante
+un controlador y adaptador visual separados; `game` y `game-3d` siguen siendo
+previews visuales independientes.
 ```
 
 - `app-registration.ts` solo registra metadatos y carga lazy; no importa un motor pesado.
 - La app devuelve contenido full-bleed; nunca crea `DesktopWindow`, taskbar, launcher ni z-index.
 - `destroy()` cancela el frame loop, aborta operaciones, cierra el socket, elimina listeners y libera recursos.
 - El núcleo de movimiento, snapshots, spatial queries y comandos será independiente del DOM para probarlo con Vitest.
-- Se prioriza Canvas 2D propio y pequeño. No se incorpora Phaser, Pixi ni otro motor hasta demostrar que el renderer propio no alcanza el presupuesto; una dependencia pesada requeriría una decisión documentada y medición.
+- Three.js queda elegido para la dirección 3D y permanece detrás de un adaptador/lazy chunk. Su presupuesto de memoria/GPU, accesibilidad y pipeline de assets todavía debe medirse; si falla, se reduce alcance/calidad visible antes de contaminar el shell o abandonar la autoridad server-side.
 - El mismo contenido recibe controles de teclado/pointer/touch según la presentación. El shell móvil solo cambia el marco, no las reglas del juego.
 
 ### 4.2 Mundo libre con estructuras eficientes
@@ -219,56 +227,137 @@ La edición en vivo no debe modificar el snapshot que usan otros jugadores. El m
 
 ## 7. Fases de ejecución
 
-### Fase 0 — Preflight de producto, arte e integración (sin código de juego)
+### Fase 0 — Dirección visual 3D aprobada
 
-Esta fase existe para que no se empiece por Canvas o WebSocket antes de saber qué se está construyendo, cómo encaja en el OS y qué se puede publicar.
+Esta fase define únicamente qué debe verse. No decide todavía movimiento, red, salas, persistencia, colisiones ni editor.
 
-- [ ] Redactar una ficha de vertical slice: mapa pequeño, un avatar, movimiento, un segundo jugador simulado y criterio de “jugable” en menos de cinco minutos.
-- [ ] Aprobar qué significa “bosque multijugador” en el primer release: exploración/presencia únicamente, sin combate, chat, economía ni progresión.
-- [ ] Aprobar la referencia visual guardada en `Agente/documentacion/producto/referencia-visual-bosque-2026-08-01.md` y producir tres bocetos originales: mapa, avatar y UI de estado.
-- [ ] Fijar gramática visual: escala de cámara, grosor de línea, densidad, capas, siluetas, contraste local/remoto, agua/terreno y variante monocroma o paleta restringida.
-- [ ] Verificar autoría/licencia de cada asset futuro; registrar la imagen compartida como inspiración, nunca como asset final ni como textura para calcar.
-- [ ] Definir el contrato con el OS: `appId`, ruta allowlisted, deep link, capacidades, entrada en workspace, taskbar, full-bleed, comandos y presentación móvil.
-- [ ] Decidir la restauración de sesión: se restaura el contenedor de la app si corresponde, pero nunca un WebSocket, ticket, identidad invitada ni sala automáticamente.
-- [ ] Definir controles y accesibilidad del vertical slice: teclado, touch/joystick, foco, reduced motion, zoom, contraste y fallback si Canvas no es utilizable.
-- [ ] Fijar presupuestos iniciales de frame, memoria, mapa, mensajes, latencia, reconexión y tiempo de apertura; cada presupuesto debe tener una métrica y un umbral.
-- [ ] Crear fixtures originales y un mapa pequeño de prueba que no dependa de la imagen de referencia.
-- [ ] Registrar qué lógica es agnóstica y candidata a Glory (validador de mapa, spatial index, reloj/simulación, protocolo) y qué queda específico de wandori.us.
+- [ ] Aprobar la referencia guardada en `Agente/documentacion/producto/referencia-visual-bosque-2026-08-01.md` como atmósfera, no como asset para copiar.
+- [x] Comparar ambos bocetos y elegir Three.js 3D isométrico; conservar el cenital sin usarlo como renderer final.
+- [ ] Fijar gramática visual: escala de cámara, grosor de línea, densidad, capas, siluetas, agua/terreno y variante monocroma o paleta restringida.
+- [ ] Definir el marco mínimo del OS: nombre `Bosque`, icono Lucide, ventana full-bleed en desktop/tablet y pantalla completa móvil.
+- [ ] Confirmar que los elementos del boceto serán originales y que la referencia no se incrusta, calca ni distribuye dentro de la app.
 
-**Gate:** ficha de vertical slice, bocetos aprobados, referencia/licencia documentada, contrato OS/realtime y presupuesto aceptados; no se escribe código de juego ni se instala un motor gráfico.
+**Gate:** dirección 3D aprobada; todavía no existe movimiento de personaje, WebSocket, backend, base de datos ni editor.
 
-### Fase 1 — ADR, contratos y presupuesto
+**Auditoría de cierre — Fase 0:**
+- [ ] **SOLID/arquitectura:** renderer, shell, contratos, assets y realtime tienen límites explícitos; no aparece un segundo runtime paralelo.
+- [ ] **Rendimiento/escalabilidad:** presupuesto inicial, perfiles de dispositivo y límite de mapa/sala están medidos o marcados como hipótesis verificable.
+- [ ] **Seguridad/observabilidad:** procedencia de referencia, permisos, datos no sensibles y eventos mínimos están documentados; la fase no avanza sin evidencia en el plan/ADR.
 
+### Fase 1 — Dos bocetos visuales ejecutables dentro del OS
+
+Planes específicos: `Agente/planes/plan-boceto-visual-bosque-2026-08-01.md` y `Agente/planes/plan-boceto-visual-bosque-3d-2026-08-01.md`.
+
+- [ ] Registrar una app lazy `game`/`Bosque` que abra y cierre mediante el runtime existente.
+- [ ] Mostrar una escena estática original con HTML/SVG y CSS dedicado; no usar game loop, Canvas animado ni estado de juego.
+- [ ] Registrar `game-3d`/`Bosque 3D` sin reemplazar el primero, con Three.js lazy, primitivas low-poly y cámara orbital limitada.
+- [ ] Liberar en el boceto 3D controles, observers, animation loop, geometrías, materiales, renderer y contexto WebGL al cerrar.
+- [ ] Integrar el boceto como contenido full-bleed, sin crear ventanas, taskbar, menús o z-index propios.
+- [ ] Verificar desktop 1440×900, tablet 1024×768, móvil 390×844 y 320px.
+- [ ] Presentar capturas y la app real al usuario; iterar densidad, escala, árboles, agua, avatar, contraste y posible paleta hasta recibir aprobación explícita.
+- [ ] Mantener fuera del boceto: movimiento, controles, colisiones, salas, jugadores reales, login, guardado, analytics propio, admin y publicación.
+
+**Gate:** superado para la dirección 3D; faltan cierre técnico/commit del prototipo y parámetros de cámara, relieve y assets.
+
+**Auditoría de cierre — Fase 1:**
+- [ ] **SOLID:** ambos bocetos usan `AppRegistry`/`MountedView` y no duplican chrome, navegación ni estado del shell.
+- [ ] **Rendimiento:** la app es lazy, el chunk pesado no afecta el arranque y abrir/cerrar repetidamente no deja canvas, listeners, timers ni GPU vivos.
+- [ ] **Escalabilidad/UX:** la dirección elegida conserva una ruta para mapa finito, assets externos, móvil/tablet, accesibilidad y métricas sin rehacer la app.
+
+### Fase 2A — Núcleo lógico offline defensivo
+
+Esta subfase no abre salas ni convierte los previews en gameplay. Entrega una base
+pura que podrá reutilizar el futuro cliente y cuya semántica podrá portarse al
+servidor sin depender de Three.js.
+
+- [x] Definir contratos JSON-safe de bounds, colliders estáticos, jugadores, inputs y snapshots en `frontend/src/features/game-core/contracts.ts`.
+- [x] Validar mapas con esquema/bounds/IDs/formas/cuotas y rechazo fail-closed de documentos JSON corruptos.
+- [x] Implementar spatial hash determinista con límites de celdas y consultas acotadas.
+- [x] Implementar movimiento X/Z determinista con velocidad, delta y subpasos presupuestados; solo obstáculos estáticos, sin colisión jugador-jugador.
+- [x] Implementar deduplicación/rechazo de secuencias e inputs, normalización de dirección e interpolación de snapshots.
+- [x] Proteger diccionarios contra prototipos, IDs especiales y entradas no finitas.
+- [x] Cubrir invariantes con 18 tests deterministas y validar type-check, regresiones de previews/registro/workspace, build y `git diff --check`.
+
+**Evidencia:** `frontend/src/features/game-core/`; type-check PASS; 18 tests del núcleo PASS; 18 tests de regresión PASS; build PASS; diff-check PASS.
+
+**Gate:** base lógica offline estable; no implica que exista movimiento visible, servidor autoritativo, WebSocket, identidad, persistencia ni editor.
+
+### Fase 2 — ADR, contratos y presupuesto
+
+- [x] Aceptar `adr-bosque-3d-assets-terreno-2d-2026-08-01.md`: Three.js, GLB externo, mundo X/Z y terreno 2D finito.
+- [ ] Ejecutar `plan-assets-terreno-bosque-3d-2026-08-01.md` por fases, sin adelantar editor o importador.
 - [ ] Registrar GAME-01 en roadmap/índice y confirmar dependencias cerradas.
 - [ ] Decidir sala única vs matchmaking/instancias pequeñas.
+- [ ] Medir y aprobar presupuesto de chunk, GPU, memoria, mapa, assets, móvil y teardown para completar el ADR.
 - [ ] Definir identidad de invitado y cómo se vincula posteriormente a una cuenta.
 - [ ] Definir contrato de ticket compatible con UUID y separación Glory/wandori.us.
 - [ ] Fijar esquema de mensajes, tick, límites, desconexión y códigos de error.
 - [ ] Fijar licencia/dirección final de assets a partir de la referencia visual.
+- [ ] Redactar la ficha del vertical slice jugable: mapa pequeño, avatar con movimiento, segundo jugador simulado y criterio de “jugable”.
+- [ ] Confirmar que el primer release es exploración/presencia, sin combate, chat, economía ni progresión.
+- [ ] Decidir la restauración segura de sesión y fijar presupuestos de frame, memoria, mapa, mensajes, latencia y reconexión.
+- [ ] Registrar qué lógica es agnóstica y candidata a Glory y qué queda específica de wandori.us.
 
-**Gate:** ADR realtime, ADR de identidad de invitado y contrato de mapa aprobados; sin código de juego todavía.
+**Gate:** ADR realtime, ADR de identidad de invitado y contrato de mapa aprobados; el núcleo offline puede existir, pero no se habilita gameplay conectado hasta cerrar estos contratos.
 
-### Fase 2 — Esqueleto de app y renderer sin red
+**Auditoría de cierre — Fase 2:**
+- [ ] **SOLID/OCP/DIP:** cada contrato puede extenderse por versión/adaptador; ninguna decisión futura exige `if` repartidos por renderer, shell y backend.
+- [ ] **Rendimiento/escalabilidad:** están definidos límites de bytes, entidades, frecuencia, chunks, concurrencia y estrategia single-instance antes de escribir código.
+- [ ] **Seguridad/observabilidad:** capacidades server-side, threat model, nombres/unidades/cardinalidad de métricas y retención tienen ADR y casos negativos asociados.
 
-- [ ] Registrar `game` como app lazy/full-bleed.
-- [ ] Montar Canvas 2D, cámara, bounds, input y loop abortable.
-- [ ] Dibujar mapa fixture y avatar local con assets de prueba originales.
-- [ ] Probar apertura/cierre repetidos en desktop, tablet y móvil.
-- [ ] Confirmar que el bundle principal no descarga el chunk del juego antes de abrirlo.
+### Fase 3 — Esqueleto Three.js sin red
 
-**Gate:** app abre/cierra sin leaks visibles, el shell no cambia y el fixture se mueve offline.
+- [x] Registrar `game-playable` como app lazy/full-bleed separada de `game` y `game-3d`.
+- [x] Montar Three.js detrás de un adaptador, con cámara ortográfica limitada, bounds, input y loop abortable.
+- [x] Dibujar mapa fixture, props originales y avatar local desde `game-core`.
+- [x] Añadir teclado WASD/flechas y controles táctiles DOM con etiquetas accesibles.
+- [x] Pausar el loop al pasar a background, observar resize y liberar input, observers, RAF, geometrías, materiales, renderer y contexto WebGL al cerrar.
+- [x] Proteger la carrera de carga lazy cuando `AbortSignal` ya está abortado.
+- [ ] Probar apertura/cierre repetidos en desktop, tablet y móvil con evidencia de memoria/GPU.
+- [x] Confirmar por build que el juego se mantiene en carga lazy; la medición Network detallada queda pendiente.
 
-### Fase 3 — Mundo estático y contratos de mapa
+**Evidencia del bloque offline:**
+`frontend/src/features/desktop/apps/game-playable/`,
+`frontend/src/features/desktop/apps/game-shared/forest-models.ts`,
+`frontend/src/features/runtime/app-registration-game-playable.ts` y
+`frontend/src/styles/desktop/desktop-game-playable.css`.
+Type-check PASS; 40 tests del bloque/regresiones PASS; build PASS; diff-check PASS.
+Navegador PASS en `/forest-playable`: `section.juegoFixture`, canvas, control
+`Mover a la derecha` y consola sin errores.
 
-- [ ] Implementar parser/validador de snapshot.
-- [ ] Implementar spatial index, capas, hitboxes simples y cámara.
-- [ ] Cargar solo assets visibles con cache limitada.
-- [ ] Crear endpoint/servicio de mapa publicado y fixture de versión.
-- [ ] Probar documento inválido, exceso de entidades, asset inexistente y bounds malformados.
+**Gate:** fixture offline funcional y aislado del realtime; faltan mediciones
+repetidas de memoria/GPU y validación multi-viewport antes de cerrar la fase completa.
 
-**Gate:** el mismo mapa validado se renderiza de forma determinista y no permite datos ejecutables o fuera de límites.
+**Auditoría de cierre — Fase 3:**
+- [ ] **SOLID:** `WorldQuery`, cámara, input, renderer y lifecycle son interfaces separadas; Three.js no se filtra a lógica de dominio.
+- [ ] **Rendimiento:** se registra frame p50/p95, memoria y carga del chunk; se prueba pausa background, resize, minimized y destrucción idempotente.
+- [ ] **Escalabilidad/calidad:** el fixture permite agregar un segundo asset/personaje sin duplicar escena; Sentinel/VarSense detectan imports eager, loops sin teardown y módulos sobredimensionados.
 
-### Fase 4 — Realtime de una sala
+### Fase 4 — Mundo estático y contratos de mapa
+
+- [x] Implementar en frontend el contrato JSON-safe versionado de `TerrainDocument`, `GameAssetVersion`, instancias, spawns y `MapVersion`, con validador fail-closed y cuotas hard.
+- [x] Adaptar `MapVersion` a `WorldMap` mediante proxies estáticos allowlisted; el núcleo sigue siendo X/Z y no inventa todavía altura de gameplay.
+- [ ] Generar terreno por chunks desde alturas/superficies 2D e implementar spatial index/proxies simples en el renderer real.
+- [ ] Cargar solo chunks/assets visibles con cache limitada e instancing para props repetidos.
+- [ ] Crear endpoint/servicio de mapa publicado y fixture de versión persistido.
+- [x] Probar documento inválido, exceso de chunks, referencias de asset inexistentes, IDs reservados, transforms, spawns y bounds malformados.
+
+**Evidencia parcial:** `frontend/src/features/game-core/map-version.ts` y
+`map-version.test.ts`; el fixture `game-playable` consume
+`FIXTURE_MAP_VERSION → mapVersionToWorldMap → game-core`. Type-check, 41 tests,
+build, diff-check y navegador `/forest-playable` pasan. No implica endpoint,
+persistencia, publicación server-side, chunks visibles ni editor.
+
+**Gate:** contrato frontend puro cerrado; la fase completa queda pendiente hasta
+validar el mismo documento en backend, cargar chunks/instancias de forma acotada
+y crear el servicio de mapa publicado.
+
+**Auditoría de cierre — Fase 4:**
+- [ ] **SOLID/OCP:** parser, validación, navegación, serialización y renderer consumen el contrato versionado sin acoplamiento circular.
+- [ ] **Rendimiento/escalabilidad:** chunks, índices y manifests tienen tamaño máximo, consulta por lote y coste medido; no se usa JSON monolítico ni escaneo global.
+- [ ] **Seguridad/observabilidad:** bounds, schema, extensiones, URIs y payloads se rechazan en el boundary; métricas de parseo/error no contienen coordenadas privadas.
+
+### Fase 5 — Realtime de una sala
 
 - [ ] Integrar upgrade/ticket WebSocket en el backend de wandori.us.
 - [ ] Crear actor de sala bajo demanda con TTL, cap de 8 y backpressure.
@@ -278,7 +367,12 @@ Esta fase existe para que no se empiece por Canvas o WebSocket antes de saber qu
 
 **Gate:** ocho clientes pueden moverse en una sala sin aceptar posiciones falsificadas, sin fanout ilimitado y sin dejar salas vivas vacías.
 
-### Fase 5 — Invitados, cuentas y personaje base
+**Auditoría de cierre — Fase 5:**
+- [ ] **SOLID:** autoridad de movimiento, transporte, sala, spatial index y broadcast son módulos sustituibles; el cliente nunca decide estado válido.
+- [ ] **Rendimiento/escalabilidad:** se mide p95 de tick/join/snapshot, bytes por jugador, cola de conexión, 1/4/8 jugadores, sala llena y dos salas; se verifica TTL y límite global.
+- [ ] **Seguridad/observabilidad:** rate limit, secuencias, reconexión y mensajes inválidos dejan eventos agregados y auditables sin identidad innecesaria.
+
+### Fase 6 — Invitados, cuentas y personaje base
 
 - [ ] Emitir identidad temporal para invitados con límites de abuso.
 - [ ] Asociar cuenta autenticada con perfil de juego persistente.
@@ -288,18 +382,29 @@ Esta fase existe para que no se empiece por Canvas o WebSocket antes de saber qu
 
 **Gate:** ningún invitado puede invocar admin ni reclamar el estado de otra identidad; el perfil no depende de datos enviados sin validar.
 
-### Fase 6 — Editor admin y publicación
+**Auditoría de cierre — Fase 6:**
+- [ ] **SOLID/seguridad:** identidad temporal, cuenta, personaje, capacidades y ticket tienen servicios separados y validación server-side.
+- [ ] **Rendimiento/escalabilidad:** join/leave/reconnect, expiración y migración invitado→cuenta se prueban bajo concurrencia y sin duplicar jugadores o sockets.
+- [ ] **Observabilidad/privacidad:** audit y analytics están separados, con retención definida; no se registran tokens, coordenadas precisas ni datos privados.
 
-- [ ] Añadir modo edición dentro de la app solo para admin.
-- [ ] Añadir comandos de selección/colocación/movimiento/duplicado/borrado.
-- [ ] Añadir asset catalog y pipeline de versiones.
+### Fase 7 — Assets 3D, editor 2D y publicación
+
+- [ ] Crear `Assets 3D` admin para importar/analizar/previsualizar/versionar GLB; no editar geometría.
+- [ ] Crear `Editor de mapa` admin 2D para altura, superficie, agua, caminos, spawn y colocación de instancias.
+- [ ] Reutilizar el renderer del juego para preview 3D; no crear un segundo motor dentro del editor.
+- [ ] Añadir command stack de selección/colocación/movimiento/duplicado/borrado y undo/redo.
 - [ ] Persistir borrador con revisión optimista y conflicto visible.
 - [ ] Añadir preview de borrador y publicación atómica.
 - [ ] Auditar cambios sensibles y garantizar que la sala activa conserva su versión.
 
-**Gate:** un admin puede editar bosque/roca/árbol, guardar, previsualizar y publicar; un usuario normal recibe rechazo server-side aunque fuerce el cliente.
+**Gate:** un admin importa un GLB, crea terreno 2D, coloca instancias, guarda, previsualiza y publica; un usuario normal recibe rechazo server-side aunque fuerce el cliente.
 
-### Fase 7 — Hardening y operación
+**Auditoría de cierre — Fase 7:**
+- [ ] **SOLID/OCP:** `Assets 3D`, `Editor de mapa`, publicación y runtime reutilizan servicios/contratos; agregar otra categoría no duplica analizadores ni escenas.
+- [ ] **Rendimiento/escalabilidad:** análisis, manifests y referencias se procesan por lote; se mide tamaño de GLB, draw calls, memoria y coste de preview antes de publicar.
+- [ ] **Seguridad/operación:** validación server-side, revisión optimista, rollback, dependency checks y auditoría de cambios sensibles tienen casos negativos y transacciones claras.
+
+### Fase 8 — Hardening y operación
 
 - [ ] Tests de carga acotados hasta el límite de 8 por sala y prueba de rechazo al noveno.
 - [ ] Soak de abrir/cerrar/reconectar y dos salas concurrentes dentro del presupuesto acordado.
@@ -309,6 +414,29 @@ Esta fase existe para que no se empiece por Canvas o WebSocket antes de saber qu
 - [ ] Runbook de rollback de versión de mapa y assets; deploy queda fuera de alcance salvo instrucción explícita.
 
 **Gate:** Definition of Done completa, reporte de presupuesto y ausencia de errores bloqueantes.
+
+**Auditoría de cierre — Fase 8:**
+- [ ] **SOLID:** Sentinel confirma límites de módulos, dependencias dirigidas y ausencia de suppressions sin ADR; se registra cualquier deuda aceptada.
+- [ ] **Rendimiento/escalabilidad:** carga 1/4/8, dos salas, soak, background, reconexión, memoria GPU/CPU y rollback tienen comparación contra presupuesto y criterio de regresión.
+- [ ] **Seguridad/observabilidad/operación:** negativos, consentimiento, métricas, alertas, runbook y recuperación están probados; no se marca DoD con warnings bloqueantes.
+
+### Fase 9 — Extracción del motor agnóstico `glory-render`
+
+Esta fase ocurre después de estabilizar Fase 8. El `game-core` provisional que ya vive en `frontend/src/features/game-core/` se considera candidato, no API definitiva.
+
+- [ ] Auditar qué lógica se repite o puede probarse con un segundo juego: bounds, colisión, spatial hash, simulación, snapshots, interpolación, reloj y contratos de lifecycle.
+- [ ] Crear `glory-render/` dentro de `glory-rust-template/` con repositorio Git, CI, versionado y quality gate propios; no mover código antes de aprobar la frontera del ADR.
+- [ ] Separar `packages/core`, `packages/contracts` y `packages/three`; el core no importa DOM, Vite, Three, Axum, SQLx, AppRegistry, cuentas, red ni secretos.
+- [ ] Migrar Bosque mediante exports públicos fijados por commit/submódulo, sin copiar ni mantener una segunda implementación.
+- [ ] Añadir un juego mínimo de conformidad que consuma el mismo motor y fixtures deterministas; si el segundo caso no existe, no extraer abstracciones especulativas.
+- [ ] Documentar SemVer, deprecaciones, changelog, compatibilidad, rollback y procedimiento para añadir nuevas utilidades agnósticas.
+
+**Auditoría de cierre — Fase 9:**
+- [ ] **SOLID/DIP:** el núcleo depende de contratos; renderer, OS, transporte, persistencia e identidad son adaptadores reemplazables.
+- [ ] **Rendimiento/escalabilidad:** Bosque y el segundo juego comparan bundle, frame p50/p95, memoria, entidades y teardown; importar `core` no arrastra Three ni el shell.
+- [ ] **Seguridad/operación:** el repo no ejecuta assets/scripts externos ni conoce secretos; sus releases son reproducibles, auditables y reversibles.
+
+**Gate:** Bosque y un segundo juego consumen `glory-render` por API pública, sin código duplicado ni dependencia específica de wandori.us; el repositorio tiene CI y rollback documentados.
 
 ## 8. Presupuesto inicial de seguridad y rendimiento
 
@@ -365,13 +493,14 @@ Cada fase ejecutable cerrará con `npm run task:check -- GAME-01-Fn` o el ID que
 | El mundo libre genera colisiones costosas | spatial hash fijo y formas simples; no escanear entidades globalmente. |
 | Salas permanentes consumen memoria | creación bajo demanda, TTL vacío y límites globales. |
 | Admin modifica una partida activa | snapshots inmutables por sala; publicación afecta nuevas salas. |
-| Asset malicioso o pesado | pipeline media existente, MIME/dimensiones/peso, versiones y sin scripts. |
+| Asset malicioso o pesado | parser GLB server-side, extensiones/URIs allowlisted, límites por perfil, storage privado, versiones y sin scripts/shaders arbitrarios. |
 | La referencia visual deriva en copia o assets sin licencia | moodboard separado, bocetos originales, registro de procedencia y revisión antes de importar cualquier recurso. |
 | Fuga al cerrar ventana | `AbortSignal` + `destroy()` idempotente y prueba repetida. |
 | Recarga restaura un ticket o duplica jugador | `window-session` solo restaura UI segura; ticket nuevo y join idempotente al reconectar. |
 | Invitado suplanta cuenta/admin | ticket server-side, identidad temporal separada y capacidad comprobada en backend. |
 | Editor se vuelve un motor general | catálogo y propiedades allowlisted, sin scripting ni físicas complejas. |
-| Dependencia gráfica infla el OS | Canvas 2D propio y `registerLazy`; cualquier motor requiere medición/ADR. |
+| Dependencia gráfica infla el OS | Three.js lazy en chunk separado; medir Network/GPU y reducir mapa, draw calls o perfil visible antes de afectar el arranque del OS. |
+| Terreno 3D vuelve complejo el editor | documento finito de celdas/alturas/superficies en vista 2D; Three.js genera chunks y no existe escultura libre. |
 | Pestaña en background produce estado divergente | política de pausa/reconciliación y snapshot server-authoritative al volver al primer plano. |
 | Escalado horizontal prematuro | primera fase single-instance documentada; no prometer multiinstancia hasta decidir estado compartido. |
 
@@ -385,11 +514,12 @@ Cada fase ejecutable cerrará con `npm run task:check -- GAME-01-Fn` o el ID que
 - [ ] Jugador local y otros 7 como máximo se ven y se mueven con interpolación.
 - [ ] Servidor autoritativo rechaza posiciones, velocidades y comandos inválidos.
 - [ ] Invitado y cuenta tienen identidades separadas y capacidades correctas.
-- [ ] Admin edita mapa/assets/personajes dentro de la app, guarda borrador, previsualiza y publica.
+- [ ] Admin gestiona GLB/versiones en `Assets 3D` y edita terreno/instancias en `Editor de mapa` 2D, guarda, previsualiza y publica.
 - [ ] Assets y personajes usan versiones/allowlists y no ejecutan contenido arbitrario.
 - [ ] Capacidad, ancho de banda, memoria, reconexión y teardown tienen evidencia.
 - [ ] Métricas operacionales, analytics/audit separados y política de consentimiento/retención documentada.
 - [ ] Dirección visual aprobada sobre assets originales que reinterpretan la referencia sin copiarla.
+- [ ] El motor reutilizable está aislado en `glory-render/` cuando exista un segundo consumidor real; no se extraen piezas específicas de Bosque.
 - [ ] Tests, navegador, quality gate, documentación y rollback están completos.
 
 ## 12. Decisiones aún abiertas
@@ -402,9 +532,10 @@ Cada fase ejecutable cerrará con `npm run task:check -- GAME-01-Fn` o el ID que
 6. **Escalado futuro:** single-instance primero; si se requieren varias réplicas habrá que elegir almacenamiento/coordination realtime antes de prometerlo.
 7. **Restauración de sesión:** restaurar solo el contenedor de la app (recomendado) o reingresar automáticamente a la última sala; la segunda opción exige consentimiento y ticket nuevo.
 8. **Contrato de URL:** decidir si se comparte un mapa público/sala pública o si el deep link solo abre la app sin unirse; no se expondrán salas privadas ni identidades invitadas.
-9. **Accesibilidad de Canvas:** overlay DOM con estado y controles accesibles, modo reducido y fallback informativo, o alcance explícito si alguna parte no puede hacerse accesible.
+9. **Accesibilidad del renderer:** overlay DOM con estado y controles accesibles, modo reducido y fallback informativo, o alcance explícito si alguna parte no puede hacerse accesible.
 10. **Feature flag/lanzamiento:** decidir quién puede ver la app durante el piloto y cómo se desactiva sin romper workspace ni sesiones.
 11. **Métricas y consentimiento:** confirmar catálogo de eventos, retención y separación entre analytics de producto, audit de admin y telemetría operacional.
-12. **Asset pipeline:** decidir si el blanco/negro es obligatorio para el mapa o si se permite una paleta restringida, siempre con assets originales/versionados.
+12. **Relieve y assets iniciales:** confirmar alturas discretas sin cuevas, cámara orbital limitada, monocromo/paleta y si el primer personaje necesita rig `idle/walk`.
+13. **Extracción:** confirmar el commit de `glory-render` que consumirá Bosque y el tipo de integración (submódulo/artefacto); la carpeta permanece dentro de `glory-rust-template`, pero su historial Git es independiente.
 
-Estas decisiones deben registrarse en ADR antes de Fase 1/3 según corresponda. Ninguna debe resolverse agregando flags ad hoc al cliente.
+Estas decisiones deben registrarse en ADR antes de Fase 2/5 según corresponda. Ninguna debe resolverse agregando flags ad hoc al cliente.
