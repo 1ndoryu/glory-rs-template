@@ -13,7 +13,7 @@ import { createDesktopIcon } from './components/desktop-icon';
 import { openAppWindow } from '../runtime/route-app-adapter';
 import { authStore } from '../../store';
 import { openContextMenu } from './components/desktop-context-menu';
-import { selectSingle, clearSelection } from '../runtime/selection-store';
+import { selectionStore, selectSingle, clearSelection, isSelected } from '../runtime/selection-store';
 import { workspaceStore, reorderDesktopNodes } from '../runtime/workspace/workspace-store';
 import type { ResolvedNode } from '../runtime/workspace/types';
 import { AppRegistry } from '../runtime/app-registry';
@@ -79,6 +79,16 @@ export interface WorkspaceIconGrid {
   readonly destroy: () => void;
 }
 
+/* [018A-88] Reflejo visual de la selección en el escritorio: clase
+ * .desktop-icon--selected + aria-selected. La clase ya existía en
+ * createDesktopIcon y su CSS, pero nadie la cableaba al selectionStore
+ * (la selección solo vivía en el store, sin estado visible). */
+function applyIconSelection(el: HTMLElement, nodeId: string): void {
+  const selected = isSelected(nodeId);
+  el.classList.toggle('desktop-icon--selected', selected);
+  el.setAttribute('aria-selected', String(selected));
+}
+
 /** [297A-20] Aplica la posición snap del nodo al elemento (o lo devuelve a auto-flow).
  * Usa custom properties para que el CSS decida la colocación y el media query
  * móvil pueda ignorarla sin JS. */
@@ -125,11 +135,13 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
         const iconEl = createDesktopIcon({
           label: node.label,
           type: resolveNodeIconType(node),
+          selected: isSelected(node.id),
           lucideIcon: resolveNodeIcon(node),
           onActivate,
         });
 
         iconEl.setAttribute('data-node-id', node.id);
+        applyIconSelection(iconEl, node.id);
 
         iconEl.addEventListener('mousedown', (e) => {
           if (e.button === 0 && e.detail === 1) {
@@ -201,9 +213,20 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
         const newType = resolveNodeIconType(node);
         el.classList.remove('desktop-icon--folder', 'desktop-icon--document', 'desktop-icon--application');
         el.classList.add(`desktop-icon--${newType}`);
+        applyIconSelection(el, node.id);
         applyIconPosition(el, node);
       },
     );
+  });
+
+  /* [018A-88] Reflejo en vivo de la selección: al cambiar selectionStore
+   * (clic en un icono, Ctrl+clic, clic en fondo) se re-aplica el estado
+   * visual sin reconstruir el grid. */
+  const stopSelection = selectionStore.subscribe(() => {
+    for (const el of grid.children) {
+      const id = el.getAttribute('data-node-id');
+      if (id) applyIconSelection(el as HTMLElement, id);
+    }
   });
 
   grid.addEventListener('mousedown', (e) => {
@@ -309,6 +332,7 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
 
   const destroy = (): void => {
     stopWorkspace();
+    stopSelection();
     window.removeEventListener('resize', onWindowResize);
     window.removeEventListener('keydown', onKeyDown);
     window.clearTimeout(resizeTimer);

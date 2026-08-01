@@ -13,6 +13,11 @@ const ALLOWED_EXTENSIONS = new Set([
   'mp4', 'webm', 'mov', 'mkv',
 ]);
 
+/* [018A-88] Filtro `accept` del input file derivado de la allowlist (fuente
+ * única con el backend). Se usa en el menú contextual del Finder y en la
+ * biblioteca de media. */
+export const MEDIA_ACCEPT = [...ALLOWED_EXTENSIONS].map((ext) => `.${ext}`).join(',');
+
 /** Extraer extensión en minúsculas de un nombre de archivo. */
 export function getFileExtension(name: string): string {
   const dot = name.lastIndexOf('.');

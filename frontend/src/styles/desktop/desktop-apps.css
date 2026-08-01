@@ -82,6 +82,14 @@
   white-space: nowrap;
 }
 
+/* [018A-88] Estado de selección del Finder: mismo patrón y tokens que el
+ * escritorio (.desktop-icon--selected en desktop-shell.css). Sin colores
+ * ad-hoc — consume --sistema-inverso-* del sistema de diseño. */
+.desktop-finder__item--selected .desktop-finder__label {
+  color: var(--sistema-inverso-texto);
+  background: var(--sistema-inverso-fondo);
+}
+
 .desktop-reader {
   padding: var(--espacio-xl);
   font-family: var(--fuente-sistema);

@@ -8,6 +8,7 @@ import './app-commands';
 import './workspace-commands';
 import './workspace-reorder-commands';
 import './toolbar-commands';
+import './finder-commands';
 import './navigation-commands';
 import './theme-commands';
 import './profile-commands';

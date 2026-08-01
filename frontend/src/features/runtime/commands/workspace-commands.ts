@@ -203,7 +203,9 @@ CommandRegistry.register({
   label: 'Pegar',
   shortcut: 'ctrl+v',
   order: 42,
-  contexts: ['desktop', 'folder', 'icon'],
+  /* [018A-88] El fondo de carpeta del Finder (contexto 'finder') también
+   * permite pegar desde el portapapeles del workspace. */
+  contexts: ['desktop', 'folder', 'icon', 'finder'],
   undoPolicy: 'none',
   analyticsEvent: 'workspace.paste',
   isAvailable: () => {

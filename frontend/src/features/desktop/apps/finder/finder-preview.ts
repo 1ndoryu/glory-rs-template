@@ -15,7 +15,13 @@ import {
 import { createEl } from '../../../../utils/dom';
 import { workspaceStore, getChildren } from '../../../runtime/workspace/workspace-store';
 import { openContextMenu } from '../../components/desktop-context-menu';
-import { selectSingle } from '../../../runtime/selection-store';
+import {
+  selectionStore,
+  selectSingle,
+  selectBackground,
+  isSelected,
+  clearSelection,
+} from '../../../runtime/selection-store';
 import { enableDrag, makeDropTarget } from '../../utils/icon-drag';
 import { authStore } from '../../../../store';
 import type { ResolvedNode } from '../../../runtime/workspace/types';
@@ -29,7 +35,6 @@ import { trackImageDownload } from '../../../analytics/tracker';
 export interface FinderOptions {
   folderId: string;
   onOpenApp: (appId: string, params?: Record<string, string>) => void;
-  onCreateFolder?: () => void;
   onNavigate?: (folderId: string, label: string) => void;
 }
 
@@ -84,6 +89,9 @@ export function createFinderPreview(options: FinderOptions): HTMLElement {
 
   function navigateTo(folderId: string): void {
     currentFolderId = folderId;
+    /* [018A-88] Al cambiar de carpeta la selección anterior deja de existir:
+     * se limpia para que no queden ids huérfanos en el store global. */
+    clearSelection();
     render();
 
     makeDropTarget({ el: grid, dropId: currentFolderId, context: 'finder' });
@@ -96,6 +104,24 @@ export function createFinderPreview(options: FinderOptions): HTMLElement {
   }
 
   makeDropTarget({ el: grid, dropId: currentFolderId, context: 'finder' });
+
+  /* [018A-88] Menú contextual del fondo de carpeta: el grid (o su estado
+   * vacío) abre las acciones de creación del contexto 'finder'. Los ítems
+   * del grid tienen su propio handler con stopPropagation, así que este
+   * solo dispara sobre el fondo. Patrón espejo de desktop-shell.ts. */
+  grid.addEventListener('contextmenu', ((e: MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target !== grid && !target.classList.contains('desktop-finder__empty')) return;
+    e.preventDefault();
+    selectBackground();
+    openContextMenu({
+      context: 'finder',
+      targets: [{ id: currentFolderId, kind: 'folder' }],
+      capability: authStore.get().capability,
+      x: e.clientX,
+      y: e.clientY,
+    });
+  }) as EventListener);
 
   finder.append(pathEl, grid);
 
@@ -141,6 +167,11 @@ export function createFinderPreview(options: FinderOptions): HTMLElement {
 
   workspaceStore.subscribe(() => { render(); });
 
+  /* [018A-88] Re-render al cambiar la selección: los ítems aplican la clase
+   * --selected según selectionStore (antes la selección existía solo en el
+   * store, sin reflejo visual). */
+  selectionStore.subscribe(() => { render(); });
+
   return finder;
 }
 
@@ -159,6 +190,12 @@ function createFinderItem(
         type: 'button', className: `desktop-finder__item desktop-finder__item--${getNodeIconType(node)}`, ariaLabel: node.label,
       });
   item.setAttribute('data-node-id', node.id);
+
+  /* [018A-88] Estado de selección visible: la clase --selected reutiliza los
+   * tokens de selección del OS (--sistema-inverso-*) igual que el escritorio. */
+  const selected = isSelected(node.id);
+  item.classList.toggle('desktop-finder__item--selected', selected);
+  item.setAttribute('aria-selected', String(selected));
 
   if (isImage && node.refId) {
     const img = createEl('img', {
