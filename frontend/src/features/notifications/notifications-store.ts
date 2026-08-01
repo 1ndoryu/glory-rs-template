@@ -1,9 +1,11 @@
 /* wandori.us — Notification Store
- * La versión publicada del workspace es la fuente canónica de novedades.
- * El estado leído se guarda por navegador hasta que 297A-13 habilite la
- * sincronización por cuenta; no se inventa una segunda API de publicación. */
+ * La API de notificaciones es la fuente canónica; el release activo queda
+ * como fallback offline para que una migración o backend temporal no rompa la UI.
+ * El estado leído local se conserva como degradación para visitantes. */
 
 import { createStore, type Store } from '../../store';
+import { authStore } from '../../store';
+import { NotificationsService, type ApiNotification } from '../../services/notifications.service';
 import { WorkspaceService } from '../../services/workspace.service';
 
 export interface NotificationItem {
@@ -36,6 +38,17 @@ function persistRead(ids: Set<string>): void {
   localStorage.setItem(READ_KEY, JSON.stringify(Array.from(ids).slice(-100)));
 }
 
+function mapRemote(item: ApiNotification, ids: Set<string>): NotificationItem {
+  return {
+    id: item.id,
+    title: item.title,
+    body: item.body,
+    releaseVersion: item.release_version ?? 0,
+    publishedAt: item.published_at ?? item.created_at,
+    read: item.read || ids.has(item.id),
+  };
+}
+
 export const notificationsStore: Store<NotificationsState> = createStore({
   items: [],
   loading: false,
@@ -44,9 +57,28 @@ export const notificationsStore: Store<NotificationsState> = createStore({
 
 export async function loadNotifications(): Promise<void> {
   notificationsStore.set({ ...notificationsStore.get(), loading: true, error: null }, 'api');
+  const ids = readIds();
   try {
-    const release = await WorkspaceService.getActiveRelease();
-    const ids = readIds();
+    const publicResponse = await NotificationsService.listPublic();
+    let items = publicResponse.items.map(item => mapRemote(item, ids));
+    /* La cuenta obtiene sus lecturas persistentes sin cambiar la experiencia
+     * pública ni convertir un fallo de sesión en un fallo de novedades. */
+    if (authStore.get().isAuthenticated) {
+      try {
+        const mine = await NotificationsService.listMine();
+        items = mine.items.map(item => mapRemote(item, ids));
+      } catch {
+        /* El listado público sigue siendo válido si la sesión expiró. */
+      }
+    }
+    notificationsStore.set({ items, loading: false, error: null }, 'api');
+  } catch {
+    let release = null;
+    try {
+      release = await WorkspaceService.getActiveRelease();
+    } catch {
+      /* El fallback también puede estar offline; se muestra el error en la app. */
+    }
     const items = release ? [{
       id: `workspace-release:${release.version}`,
       title: 'Novedades del escritorio',
@@ -55,9 +87,11 @@ export async function loadNotifications(): Promise<void> {
       publishedAt: release.published_at,
       read: ids.has(`workspace-release:${release.version}`),
     }] : [];
-    notificationsStore.set({ items, loading: false, error: null }, 'api');
-  } catch {
-    notificationsStore.set({ ...notificationsStore.get(), loading: false, error: 'No se pudieron cargar las novedades.' }, 'api');
+    notificationsStore.set({
+      items,
+      loading: false,
+      error: items.length > 0 ? null : 'No se pudieron cargar las novedades.',
+    }, 'api');
   }
 }
 
@@ -69,6 +103,11 @@ export function markNotificationRead(id: string): void {
     ...state,
     items: state.items.map(item => item.id === id ? { ...item, read: true } : item),
   }), 'user');
+  if (authStore.get().isAuthenticated && !id.startsWith('workspace-release:')) {
+    void NotificationsService.markRead(id).catch(() => {
+      /* El estado local ya evita que el usuario pierda la interacción offline. */
+    });
+  }
 }
 
 export function unreadNotificationCount(state: NotificationsState = notificationsStore.get()): number {

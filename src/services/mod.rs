@@ -4,6 +4,7 @@ pub mod commerce;
 pub mod email;
 pub mod media_svc;
 mod note;
+pub mod notification_svc;
 pub mod preferences_svc;
 pub mod product_svc;
 pub mod project_svc;

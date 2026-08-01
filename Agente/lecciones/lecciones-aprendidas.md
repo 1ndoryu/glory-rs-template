@@ -80,3 +80,9 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 - Bloquear el tracker en el navegador no basta: el backend también debe rechazar lotes sin un header explícito de consentimiento.
 - IP y user-agent se anonimizan en el boundary antes del repository; una migración de privacidad no debe intentar restaurar datos que fueron eliminados.
 - Una purga parametrizada y acotada permite operar retención sin SQL manual ni intervalos interpolados.
+
+## 018A-13 — Notificaciones persistentes sin duplicar publicación
+
+- El release y su aviso deben confirmarse en la misma transacción para no mostrar una novedad de un escritorio que no llegó a publicarse.
+- `notification_reads` es un overlay por usuario; los avisos públicos siguen siendo una lista server-side y el navegador solo conserva fallback offline.
+- Un índice único parcial por release evita spam incluso si el endpoint de publicación se reintenta.

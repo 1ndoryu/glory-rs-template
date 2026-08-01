@@ -10,3 +10,4 @@ export { MediaService } from './media.service';
 export { WorkspaceService } from './workspace.service';
 export { SettingsService } from './settings.service';
 export { AnalyticsService } from './analytics.service';
+export { NotificationsService } from './notifications.service';

@@ -4,6 +4,7 @@ pub mod auth_audit_repo;
 pub mod commerce_repo;
 pub mod media_repo;
 mod note;
+pub mod notification_repo;
 pub mod preferences_repo;
 pub mod product_repo;
 pub mod project_repo;

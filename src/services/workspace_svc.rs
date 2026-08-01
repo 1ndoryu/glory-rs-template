@@ -4,6 +4,7 @@ use uuid::Uuid;
 use crate::errors::AppError;
 use crate::models::workspace::{WorkspaceRelease, WorkspaceReleasePublic};
 use crate::models::workspace_overlay::validate_public_locators_in_tree;
+use crate::repositories::notification_repo::NotificationRepository;
 use crate::repositories::workspace_repo::WorkspaceRepository;
 
 pub struct WorkspaceService;
@@ -60,6 +61,13 @@ impl WorkspaceService {
         /* Crear release inmutable */
         let release =
             WorkspaceRepository::create(&mut *tx, next_version, &tree, Some(published_by)).await?;
+
+        NotificationRepository::create_release_notification(
+            &mut *tx,
+            release.version,
+            published_by,
+        )
+        .await?;
 
         tx.commit().await?;
         Ok(release)

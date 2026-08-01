@@ -1,6 +1,6 @@
 # Plan de notificaciones — 2026-08-01
 
-> Estado: bloque autónomo parcial; la entrega por cuenta y el panel admin quedan diferidos hasta cerrar registro verificado/overlay remoto.
+> Estado: entrega server-side y endpoints admin completados; UI admin avanzada y E2E quedan diferidos.
 
 ## Objetivo y límites
 
@@ -26,17 +26,19 @@ Avisar de releases públicos sin duplicar el catálogo de workspace ni inventar 
 
 **Gate:** app registrada por `AppRegistry`; chrome no conoce la fuente de datos.
 
-### Fase 3 — Cuenta y administración (diferida)
+### Fase 3 — Cuenta y administración (backend completado)
 
-- [ ] Endpoint de lectura por usuario y sincronización entre dispositivos.
-- [ ] Panel admin para crear, publicar y descartar avisos sin publicar manualmente un release.
-- [ ] Política anti-spam por recurso/evento y dedupe server-side.
+- [x] Endpoint público y endpoint de lectura por usuario; `notification_reads` sincroniza el estado entre dispositivos.
+- [x] Endpoints admin para crear, publicar, archivar y listar avisos; los releases crean el aviso en la misma transacción.
+- [x] Política anti-spam por release mediante índice único server-side y límite de lectura pública.
+- [ ] Panel visual admin para operar los endpoints sin API manual.
 - [ ] Casos E2E: overlay personalizado, logout/login, dos dispositivos y permisos.
 
-**Bloquea:** registro verificado, overlay remoto estable y decisión del formato de avisos editoriales/comerciales.
+**Diferido:** panel visual y E2E; no bloquean continuar con comercio ni el resto del runtime.
 
 ## Definition of Done de la fase autónoma
 
 - [x] `npm run task:check -- 297A-21` pasa para el alcance frontend.
 - [x] La fuente no crea un segundo estado de publicación.
+- [x] El backend no expone drafts y crea avisos de release de forma atómica.
 - [x] El roadmap deja explícitos los pendientes que requieren decisión/credenciales.

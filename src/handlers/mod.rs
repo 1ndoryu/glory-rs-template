@@ -6,6 +6,7 @@ pub mod download_handler;
 mod health;
 pub mod media_handler;
 mod notes;
+pub mod notifications;
 pub mod preferences_handler;
 pub mod products_handler;
 pub mod projects_handler;
@@ -78,6 +79,10 @@ impl utoipa::Modify for SecurityAddon {
         crate::models::UpdateNoteRequest,
         crate::models::PaginatedNotes,
         crate::errors::ErrorResponse,
+        crate::models::notification::Notification,
+        crate::models::notification::NotificationList,
+        crate::models::notification::CreateNotificationRequest,
+        crate::models::notification::UpdateNotificationStatusRequest,
     )),
     modifiers(&SecurityAddon),
     info(
@@ -163,6 +168,7 @@ fn api_routes() -> Router<AppState> {
         .merge(notes::routes())
         .merge(articles::routes())
         .merge(media_handler::routes())
+        .merge(notifications::routes())
         .merge(download_handler::routes())
         .merge(preferences_handler::routes())
         .merge(settings_handler::routes())
