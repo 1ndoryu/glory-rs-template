@@ -434,6 +434,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [x] **018A-31 —** Retirar estilos huérfanos verificados por VarSense (`arrow-select`, `.font-panel`) sin tocar clases generadas dinámicamente.
 - [x] **018A-32 —** Centralizar el transporte generado de Orval (cookie, CSRF, base URL y envelope) y migrar `MediaService`; los dominios restantes se migrarán por bloques y el cliente manual se retira solo al completar la matriz.
 - [x] **018A-33 —** Migrar `ArticleService`, `ProjectService` y `ProductService` al cliente generado, incluyendo checkout e idempotency header; adaptar `ProjectUrlUpdate` en el boundary y dejar auth/workspace/settings/analytics/notifications/preferences para bloques separados.
+- [x] **018A-34 —** Migrar `AuthService`, `PreferencesService`, `NotificationsService`, `SettingsService` y `AnalyticsService` al cliente generado; conservar stores, consentimiento y logout observable. `WorkspaceService` queda separado por sus tipos de overlay/release.
 - [ ] Eliminar CSS/clases huérfanas con VarSense.
 
 **Criterio de salida:** una sola administración como app registrada, analytics útil/privado y cero rutas/chrome duplicados legacy; uploads y CSS/contratos obsoletos deben desaparecer después de su matriz de paridad.

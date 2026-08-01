@@ -1,13 +1,16 @@
 /* wandori.us — Settings Service
  * Capa de servicio para configuración del sitio y perfil.
- * [Auditoría v4 §4.1] — Rompe acoplamiento a api.get/post en 5+ archivos. */
+ * [Auditoría v4 §4.1] — Rompe acoplamiento a api.get/post en 5+ archivos.
+ * [018A-34] Lecturas/escrituras usan el cliente generado de settings. */
 
-import { api } from '../api/client';
+import { unwrapGeneratedResponse } from '../api/client';
+import { getSettings, updateSettings } from '../api/generated/settings-handler/settings-handler';
 
 export const SettingsService = {
   /** Obtener todas las configuraciones. */
   async getAll(): Promise<Record<string, string>> {
-    return api.get<Record<string, string>>('/api/settings');
+    const response = await getSettings();
+    return unwrapGeneratedResponse<Record<string, string>>(response, [200]);
   },
 
   /** Guardar configuraciones parciales. */
@@ -15,12 +18,13 @@ export const SettingsService = {
    * refactor de seguridad 297A-7 (AdminUser + CSRF). GET /api/settings quedó
    * público, pero el POST ya no existe en esa ruta → 405. */
   async save(settings: Record<string, string>): Promise<void> {
-    return api.post<void>('/api/admin/settings', { settings });
+    const response = await updateSettings({ settings });
+    unwrapGeneratedResponse<void>(response, [204]);
   },
 
   /** Obtener el contenido de About. */
   async getAboutContent(): Promise<string> {
-    const s = await api.get<Record<string, string>>('/api/settings');
+    const s = await SettingsService.getAll();
     return s.about_content || '';
   },
 

@@ -1,8 +1,13 @@
 /* wandori.us — Preferences Service
  * Cliente HTTP de preferencias privadas por cuenta.
- * No conoce themeStore ni decide conflictos: solo transporta el contrato API. */
+ * No conoce themeStore ni decide conflictos: solo transporta el contrato API.
+ * [018A-34] Usa el contrato generado y deja la resolución de conflictos al sync. */
 
-import { api } from '../api/client';
+import { unwrapGeneratedResponse } from '../api/client';
+import {
+  getPreferences,
+  updatePreferences,
+} from '../api/generated/preferences-handler/preferences-handler';
 
 export type AccountThemeMode = 'system' | 'claro' | 'oscuro';
 
@@ -19,10 +24,12 @@ export interface UpdateUserPreferencesRequest {
 
 export const PreferencesService = {
   async get(): Promise<UserPreferences> {
-    return api.get<UserPreferences>('/api/me/preferences');
+    const response = await getPreferences();
+    return unwrapGeneratedResponse<UserPreferences>(response, [200]);
   },
 
   async update(request: UpdateUserPreferencesRequest): Promise<UserPreferences> {
-    return api.put<UserPreferences>('/api/me/preferences', request);
+    const response = await updatePreferences(request);
+    return unwrapGeneratedResponse<UserPreferences>(response, [200]);
   },
 };

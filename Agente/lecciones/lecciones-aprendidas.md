@@ -186,3 +186,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Migrar servicios completos al cliente generado evita que editores conozcan rutas HTTP. Cuando el contrato usa un parche semántico (`ProjectUrlUpdate`), la conversión debe vivir en el servicio y conservar omitir/limpiar/reemplazar.
 - Los errores de catálogo no deben convertirse en `null` silenciosamente: si la API falla, el servicio propaga el resultado; `null` queda reservado para una respuesta exitosa sin elementos.
+
+## 018A-34 — Migrar transporte sin perder efectos de dominio
+
+- Un servicio de auth no es solo HTTP: la limpieza de clipboard/preferencias y la actualización de `authStore` deben permanecer fuera del mutator, después de validar el estado generado.
+- Los headers de consentimiento y de seguridad son parte del contrato del servicio; al migrar a Orval se pasan como `RequestInit` y no se duplican en el cliente generado.

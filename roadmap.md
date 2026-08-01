@@ -73,6 +73,7 @@
 - [x] **018A-31 —** Retirados estilos CSS huérfanos confirmados (`arrow-select` y `.font-panel`); se conservan clases dinámicas usadas por el runtime y sus avisos quedan documentados como falsos positivos de análisis estático.
 - [x] **018A-32 —** Orval usa un mutator compartido con cookie/CSRF/base URL y `MediaService` migra al cliente generado; CI regenera el contrato antes del gate. Los demás servicios manuales quedan para migraciones por dominio.
 - [x] **018A-33 —** `ArticleService`, `ProjectService` y `ProductService` migran CRUD, listados y checkout al cliente Orval; se conserva la adaptación explícita de `url` y el envelope compartido. Auth, workspace, settings y analytics quedan para bloques posteriores.
+- [x] **018A-34 —** Auth, preferencias, notificaciones, settings y analytics usan funciones Orval con estados explícitos; se conserva la sincronización de stores y el header de consentimiento. Workspace queda aislado para su propia adaptación de overlay/release.
 
 **Salida:** runtime compartido funciona sin chrome/listas/listeners duplicados. Orval se regenera localmente sin backend vivo; quedan cobertura total del contrato y retiro del cliente manual.
 
@@ -370,6 +371,7 @@ Plan canónico: `Agente/planes/plan-programas-editoriales-2026-07-31.md`.
 - [x] **018A-31 —** Limpiar CSS huérfano confirmado con VarSense; las clases construidas dinámicamente no se eliminan por un falso positivo.
 - [x] **018A-32 —** Añadir mutator único de Orval y migrar MediaService al contrato generado.
 - [x] **018A-33 —** Migrar ArticleService, ProjectService y ProductService al cliente generado; la matriz restante queda acotada a auth, workspace, settings, analytics, notifications y preferences.
+- [x] **018A-34 —** Migrar auth, preferences, notifications, settings y analytics al cliente generado; workspace queda como último dominio frontend con adaptación propia.
 - [ ] Completar la matriz de paridad y retirar contratos/CSS legacy restantes. *(JWT Bearer ya no forma parte del contrato)*
 
 ### 297A-17 — Hardening, identidad, accesibilidad y SEO

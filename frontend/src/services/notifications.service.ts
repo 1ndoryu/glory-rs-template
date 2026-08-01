@@ -1,4 +1,12 @@
-import { api } from '../api/client';
+import { unwrapGeneratedResponse } from '../api/client';
+import {
+  createAdmin,
+  listAdmin,
+  listMine,
+  listPublic,
+  markRead,
+  updateStatusAdmin,
+} from '../api/generated/notifications/notifications';
 
 export interface ApiNotification {
   id: string;
@@ -20,26 +28,30 @@ export interface NotificationsResponse {
 
 export const NotificationsService = {
   listPublic(): Promise<NotificationsResponse> {
-    return api.get<NotificationsResponse>('/api/notifications');
+    return listPublic().then((response) => unwrapGeneratedResponse<NotificationsResponse>(response, [200]));
   },
 
   listMine(): Promise<NotificationsResponse> {
-    return api.get<NotificationsResponse>('/api/me/notifications');
+    return listMine().then((response) => unwrapGeneratedResponse<NotificationsResponse>(response, [200]));
   },
 
-  markRead(id: string): Promise<void> {
-    return api.post<void>(`/api/notifications/${encodeURIComponent(id)}/read`, {});
+  async markRead(id: string): Promise<void> {
+    const response = await markRead(encodeURIComponent(id));
+    unwrapGeneratedResponse<void>(response, [204]);
   },
 
-  listAdmin(): Promise<NotificationsResponse> {
-    return api.get<NotificationsResponse>('/api/admin/notifications');
+  async listAdmin(): Promise<NotificationsResponse> {
+    const response = await listAdmin();
+    return unwrapGeneratedResponse<NotificationsResponse>(response, [200]);
   },
 
-  createAdmin(data: { kind: string; title: string; body: string; status: 'draft' | 'published' }): Promise<ApiNotification> {
-    return api.post<ApiNotification>('/api/admin/notifications', data);
+  async createAdmin(data: { kind: string; title: string; body: string; status: 'draft' | 'published' }): Promise<ApiNotification> {
+    const response = await createAdmin(data);
+    return unwrapGeneratedResponse<ApiNotification>(response, [200]);
   },
 
-  updateStatus(id: string, status: 'draft' | 'published' | 'archived'): Promise<ApiNotification> {
-    return api.patch<ApiNotification>(`/api/admin/notifications/${encodeURIComponent(id)}/status`, { status });
+  async updateStatus(id: string, status: 'draft' | 'published' | 'archived'): Promise<ApiNotification> {
+    const response = await updateStatusAdmin(encodeURIComponent(id), { status });
+    return unwrapGeneratedResponse<ApiNotification>(response, [200]);
   },
 };
