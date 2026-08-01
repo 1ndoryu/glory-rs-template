@@ -111,3 +111,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 - Cuando la cookie opaca ya cubre login, CSRF, revocación y capacidades, conservar un fallback Bearer solo amplía la superficie de ataque y hace ambiguo el contrato; debe retirarse junto con su secreto y dependencia.
 - La regresión mínima debe enviar un Bearer legacy al router de producción y comprobar `401`, además de mantener los casos de cookie/CSRF existentes.
 - El retiro de JWT no autoriza a eliminar `/uploads`: los descargables privados y las imágenes públicas necesitan primero un contrato de asset autorizado y una migración de URLs.
+
+## 018A-19 — El contrato generado debe reflejar la autoridad real
+
+- Retirar JWT del runtime no basta: Swagger/utoipa y los clientes generados pueden seguir publicando Bearer como si fuera válido.
+- La seguridad de sesión se documenta como `ApiKey::Cookie("session_id")`; CSRF queda explícito como header de mutación, sin inventar una segunda autoridad.

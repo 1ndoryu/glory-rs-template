@@ -21,7 +21,7 @@ use crate::AppState;
         (status = 401, description = "No autorizado", body = ErrorResponse),
         (status = 422, description = "Error de validación", body = ErrorResponse)
     ),
-    security(("bearer_auth" = []))
+    security(("session_cookie" = []))
 )]
 pub async fn create_note(
     State(state): State<AppState>,
@@ -45,7 +45,7 @@ pub async fn create_note(
         (status = 404, description = "Nota no encontrada", body = ErrorResponse),
         (status = 401, description = "No autorizado", body = ErrorResponse)
     ),
-    security(("bearer_auth" = []))
+    security(("session_cookie" = []))
 )]
 pub async fn get_note(
     State(state): State<AppState>,
@@ -65,7 +65,7 @@ pub async fn get_note(
         (status = 200, description = "Lista de notas", body = PaginatedNotes),
         (status = 401, description = "No autorizado", body = ErrorResponse)
     ),
-    security(("bearer_auth" = []))
+    security(("session_cookie" = []))
 )]
 pub async fn list_notes(
     State(state): State<AppState>,
@@ -87,7 +87,7 @@ pub async fn list_notes(
         (status = 404, description = "No encontrada", body = ErrorResponse),
         (status = 401, description = "No autorizado", body = ErrorResponse)
     ),
-    security(("bearer_auth" = []))
+    security(("session_cookie" = []))
 )]
 pub async fn update_note(
     State(state): State<AppState>,
@@ -112,7 +112,7 @@ pub async fn update_note(
         (status = 404, description = "No encontrada", body = ErrorResponse),
         (status = 401, description = "No autorizado", body = ErrorResponse)
     ),
-    security(("bearer_auth" = []))
+    security(("session_cookie" = []))
 )]
 pub async fn delete_note(
     State(state): State<AppState>,

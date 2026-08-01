@@ -24,7 +24,7 @@ use crate::AppState;
         (status = 401, description = "No autorizado", body = ErrorResponse),
         (status = 422, description = "Error de validacion", body = ErrorResponse)
     ),
-    security(("bearer_auth" = []))
+    security(("session_cookie" = []))
 )]
 pub async fn create_article(
     State(state): State<AppState>,
@@ -47,7 +47,7 @@ pub async fn create_article(
         (status = 200, description = "Articulo encontrado", body = Article),
         (status = 404, description = "No encontrado", body = ErrorResponse)
     ),
-    security(("bearer_auth" = []))
+    security(("session_cookie" = []))
 )]
 pub async fn get_article(
     State(state): State<AppState>,
@@ -112,7 +112,7 @@ pub async fn list_articles(
     responses(
         (status = 200, description = "Lista de articulos", body = PaginatedArticles)
     ),
-    security(("bearer_auth" = []))
+    security(("session_cookie" = []))
 )]
 pub async fn list_articles_admin(
     State(state): State<AppState>,
@@ -140,7 +140,7 @@ pub async fn list_articles_admin(
         (status = 404, description = "No encontrado", body = ErrorResponse),
         (status = 401, description = "No autorizado", body = ErrorResponse)
     ),
-    security(("bearer_auth" = []))
+    security(("session_cookie" = []))
 )]
 pub async fn update_article(
     State(state): State<AppState>,
@@ -165,7 +165,7 @@ pub async fn update_article(
         (status = 404, description = "No encontrado", body = ErrorResponse),
         (status = 401, description = "No autorizado", body = ErrorResponse)
     ),
-    security(("bearer_auth" = []))
+    security(("session_cookie" = []))
 )]
 pub async fn delete_article(
     State(state): State<AppState>,
@@ -212,7 +212,7 @@ pub struct SetAliasRequest {
         (status = 404, description = "No encontrado", body = ErrorResponse),
         (status = 401, description = "No autorizado", body = ErrorResponse)
     ),
-    security(("bearer_auth" = []))
+    security(("session_cookie" = []))
 )]
 pub async fn set_article_alias(
     State(state): State<AppState>,

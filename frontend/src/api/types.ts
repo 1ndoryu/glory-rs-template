@@ -1,16 +1,11 @@
 /* wandori.us — API Types
  * Tipos TypeScript para las respuestas de la API.
- * Se pueden generar automáticamente con Orval más adelante. */
+ * La superficie se migra gradualmente a los contratos generados por Orval. */
 
 /* === Auth === */
 export interface LoginRequest {
   email: string;
   password: string;
-}
-
-export interface AuthResponse {
-  token: string;
-  user_id: string;
 }
 
 /* === Articles === */

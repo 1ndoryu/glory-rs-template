@@ -28,7 +28,7 @@
 - Workspace overlay implementado: release + overlay + merge + clipboard + papelera + crear carpetas.
 - Split de archivos grandes completado: command-registration (725→6), workspace-store (430→4), desktop-shell (419→3), mobile-shell (antes >300; launcher extraído a `mobile-launcher.ts`).
 - Sesiones opacas en cookie operativas; JWT Bearer, `localStorage` y el secreto JWT fueron retirados del backend/frontend. `/admin` legacy y uploads públicos siguen como deuda controlada.
-- **Quality tool sprint:** 13 reglas custom (P0/P1/P2) + 7 Sentinel CLI + 4 VarSense = 24 reglas activas; la cobertura operativa estimada del quality tool es ~65% del inventario de patrones automatizables definido en el plan. VarSense reconoce contratos vanilla de clases con patch reproducible (`a93b8bf0…`, 43 tests del tool). Últimos gates 297A-13/15/16/17/21: PASS, Sentinel 0 errores, VarSense 0 errores, Rust 30 tests, frontend 390 tests en 52 suites. Auditoría v4 reporta por separado 57/78 hallazgos arquitectónicos potencialmente detectables (73%) y 19/23 correcciones del checklist base (83%); no son denominadores comparables. ISP refactor DomAttrs (33→6 sub-interfaces).
+- **Quality tool sprint:** 13 reglas custom (P0/P1/P2) + 7 Sentinel CLI + 4 VarSense = 24 reglas activas; la cobertura operativa estimada del quality tool es ~65% del inventario de patrones automatizables definido en el plan. VarSense reconoce contratos vanilla de clases con patch reproducible (`a93b8bf0…`, 43 tests del tool). Últimos gates 297A-13/15/16/17/21: PASS, Sentinel 0 errores, VarSense 0 errores, Rust 30 tests, frontend 390 tests en 52 suites. Auditoría v4 reporta por separado 57/78 hallazgos arquitectónicos potencialmente detectables (73%) y 19/23 correcciones del checklist base (83%); no son denominadores comparables. ISP refactor DomAttrs (33→6 sub-interfaces). El contrato OpenAPI ya no ofrece Bearer/JWT: documenta la cookie `session_id` HttpOnly; la cobertura de endpoints y el retiro del cliente manual quedan diferidos.
 - Ejecutar una tarea por vez y en este orden; no saltar dependencias.
 - El plan maestro contiene checklists/gates. El roadmap conserva solo pendientes.
 - El quality gate está operativo; toda tarea futura debe cerrarse con `npm run task:check -- {ID}`.
@@ -58,7 +58,8 @@
 - [x] Drag y resize de ventanas por bordes con boundary clamping.
 - [x] Atajos de teclado (Escape, Meta+m, Ctrl+Shift+ArrowRight).
 - [x] contentWindow oculto en rutas manejadas por apps.
-- [x] **018A-17 —** Orval Fetch `tags-split`: `npm run codegen:local` exporta OpenAPI sin BD/servidor y regenera clientes por etiqueta; cobertura completa de endpoints y retiro del cliente manual siguen pendientes.
+- [x] **018A-17 —** Orval Fetch `tags-split`: `npm run codegen:local` exporta OpenAPI sin BD/servidor y regenera clientes por etiqueta; el esquema de seguridad usa `session_cookie`; cobertura completa de endpoints y retiro del cliente manual siguen pendientes.
+- [x] **018A-19 —** Swagger/utoipa documenta la sesión opaca `session_id` como cookie y elimina referencias de Bearer/JWT del contrato; cobertura completa y retiro del cliente manual siguen diferidos.
 
 **Salida:** runtime compartido funciona sin chrome/listas/listeners duplicados. Orval se regenera localmente sin backend vivo; quedan cobertura total del contrato y retiro del cliente manual.
 

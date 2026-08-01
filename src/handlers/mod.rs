@@ -28,18 +28,22 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::AppState;
 
-/// Define el esquema de seguridad Bearer para Swagger UI
+/// Define el esquema de seguridad de la sesión opaca para Swagger UI.
 struct SecurityAddon;
 
 impl utoipa::Modify for SecurityAddon {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
         /* components existe porque el derive ya registra schemas */
         if let Some(components) = openapi.components.as_mut() {
+            /* [018A-19] La cookie HttpOnly es la autoridad única; documentarla
+             * como ApiKey de cookie evita que Swagger y los clientes generados
+             * vuelvan a ofrecer un Bearer JWT retirado. CSRF se envía como
+             * header en mutaciones y no se modela como autorización separada. */
             components.add_security_scheme(
-                "bearer_auth",
-                utoipa::openapi::security::SecurityScheme::Http(
-                    utoipa::openapi::security::Http::new(
-                        utoipa::openapi::security::HttpAuthScheme::Bearer,
+                "session_cookie",
+                utoipa::openapi::security::SecurityScheme::ApiKey(
+                    utoipa::openapi::security::ApiKey::Cookie(
+                        utoipa::openapi::security::ApiKeyValue::new("session_id"),
                     ),
                 ),
             );

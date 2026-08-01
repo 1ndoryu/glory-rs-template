@@ -34,7 +34,7 @@ impl From<UserPreferences> for UserPreferencesResponse {
         (status = 200, description = "Preferencias de la cuenta", body = UserPreferencesResponse),
         (status = 401, description = "No autorizado", body = ErrorResponse)
     ),
-    security(("bearer_auth" = []))
+    security(("session_cookie" = []))
 )]
 pub async fn get_preferences(
     State(state): State<AppState>,
@@ -58,7 +58,7 @@ pub async fn get_preferences(
         (status = 409, description = "Revisión en conflicto", body = ErrorResponse),
         (status = 422, description = "Preferencia inválida", body = ErrorResponse)
     ),
-    security(("bearer_auth" = []))
+    security(("session_cookie" = []))
 )]
 pub async fn update_preferences(
     State(state): State<AppState>,

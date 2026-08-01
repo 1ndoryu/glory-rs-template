@@ -69,7 +69,7 @@ npm run codegen
 │   ├── config/             # Configuración desde env vars
 │   ├── errors/             # Tipos de error → HTTP status codes
 │   ├── handlers/           # Capa HTTP (routing, request/response)
-│   ├── middleware/          # Auth middleware (JWT extractor)
+│   ├── middleware/          # Auth middleware (sesion opaca HttpOnly)
 │   ├── models/             # Structs de dominio y DTOs
 │   ├── repositories/       # Capa de base de datos (queries)
 │   └── services/           # Lógica de negocio
@@ -94,7 +94,7 @@ El backend sigue separación en capas:
 - **repositories/** → Queries a PostgreSQL via SQLx
 - **models/** → Structs de dominio, DTOs de request/response, schemas OpenAPI
 - **errors/** → Enum de errores que mapean a HTTP status codes
-- **middleware/** → Extractores de Axum (auth JWT)
+- **middleware/** → Extractores de Axum (sesion opaca HttpOnly y CSRF)
 
 ## API de ejemplo
 
