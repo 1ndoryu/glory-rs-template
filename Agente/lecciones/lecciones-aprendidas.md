@@ -332,3 +332,20 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 - Un botón de solo icono con `className: 'boton'`/`boton-pequeno` + `createElement(Icon)` deja el SVG de Lucide a 24px por defecto y sin caja coherente. La receta canónica es `.boton-icono` (caja 20px, SVG 14px del token, sin borde).
 - Un botón de icono+texto sin `.boton-con-icono` rompe la línea por la regla de superficie `inline-block`. Antes de crear un botón con icono, elegir la receta del sistema: `.boton-icono` (solo icono) o `.boton-con-icono` (icono+texto).
 - Cuando el type-check falla por un status del contrato (p. ej. `'204' is not assignable to '200 | 401 | 403'`) y el backend ya está actualizado, el cliente Orval está stale: `npm run codegen:local` lo regenera. Los generados están en `.gitignore`, así que no generan diff de commit.
+
+## 018A-68 — Los controles de toolbar son segmentados, no formularios
+
+- Un filtro o modo de vista dentro de una toolbar de app NO es un formulario: `.campo`/`.campo-select` (etiqueta + select con subrayado) y `.boton` con borde de superficie rompen el lenguaje visual de toolbar del OS. La receta es `.control-segmentado` (activo invertido, Mac clásico) + contenedor `.barra-herramientas`.
+- Un toggle que cambia su etiqueta según el estado (p. ej. `papelera`⇄`biblioteca`) se modela mejor como un control segmentado de dos opciones: el estado activo es evidente y no hay texto mutable.
+- Antes de decidir el control, preguntar por el contexto: toolbar de contenido → segmentado/íconos; formulario → `.campo`. El componente `createSegmentedControl` gestiona su propio estado activo, así el padre no depende de re-render para pintar el activo.
+
+## 018A-69 — Restauración debe copiar todo el contrato de MountedView
+
+- Cuando se crea una ventana desde una app hay dos rutas distintas: apertura
+  normal y restauración desde sesión. Si una de ellas no copia un campo nuevo
+  del contrato (`actions`, toolbar o parámetros), la app funciona al abrirla
+  pero se degrada tras recargar. Toda ampliación de `MountedView` debe añadir
+  una regresión en ambas rutas.
+- El DOM de una barra no debe guardarse en `localStorage`; la sesión conserva
+  solo estado de presentación y la app debe reinstanciar sus acciones al
+  restaurarse.

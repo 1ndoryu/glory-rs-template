@@ -58,6 +58,11 @@ export function openRestoredWindow(
     zIndex: saved.zIndex,
     focused: saved.focused,
     content: view.element,
+    /* [018A-69] La restauración vuelve a instanciar la app; sus acciones
+     * también deben viajar al WindowEntry para que el shell reconstruya la
+     * franja inferior igual que en una apertura normal. No se persiste el DOM,
+     * se deriva nuevamente desde MountedView. */
+    actions: view.actions,
     controller,
     app,
     layout: app.layout,

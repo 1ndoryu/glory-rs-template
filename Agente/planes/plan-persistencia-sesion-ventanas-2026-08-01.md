@@ -85,6 +85,21 @@ Restauración móvil: mismo filtro de catálogo/capacidad; el stack se reconstru
 - [x] Actualizar `roadmap.md` (tarea 317A-5) y crear `Agente/completados/tareas-2026-08-01.md`.
 - [x] Commit propio no forzado: `main.ts` y el runtime comparten cambios de otro agente; el quality report deja recordatorio condicional de staging/commit para el bloque entregable.
 
+## Regresión 018A-69 — Slot de acciones durante la restauración
+
+La apertura normal copiaba `MountedView.actions` al `WindowEntry`, pero la ruta
+de recarga (`openRestoredWindow`) no lo hacía. El resultado era una Biblioteca
+restaurada sin su franja inferior aunque la app siguiera devolviendo las
+acciones correctamente.
+
+- [x] Propagar `view.actions` al `WindowEntry` restaurado.
+- [x] Cubrir una app restaurable con acciones en `window-session-restore.test.ts`.
+- [x] Ejecutar pruebas dirigidas de restauración y chrome (17/17).
+- [ ] Repetir la comprobación visual real de Biblioteca tras recarga en el navegador del proyecto.
+
+**Regla:** no persistir elementos DOM ni acciones; las acciones siempre se
+reconstruyen al reinstanciar `MountedView` y se montan por el shell.
+
 ## 7. Criterio de salida
 
 - [x] Recargar en desktop/tablet restaura ventanas; verificado en navegador a 1024×768 con Perfil y Galería abiertas y taskbar coherente.

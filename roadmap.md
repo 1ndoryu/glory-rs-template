@@ -47,6 +47,17 @@
 
 ## Pendientes ordenados
 
+### 018A-69 — Restauración de ventanas conserva la barra de acciones
+
+**Depende de:** 317A-5 (persistencia de sesión) y 018A-1 (slot `MountedView.actions`).
+
+- [x] Propagar `MountedView.actions` al `WindowEntry` en `openRestoredWindow`, igual que en una apertura normal.
+- [x] Añadir regresión que restaura una app con acciones y verifica que la franja inferior llegue al shell.
+- [x] Ejecutar pruebas dirigidas de restauración y `createDesktopWindow` (17/17).
+- [ ] Confirmar visualmente en el navegador: abrir Biblioteca, recargar y verificar que `.desktop-window__actions` permanezca visible.
+
+**Salida:** una app restaurada reconstruye el mismo chrome inferior que tenía antes de recargar; el DOM de acciones se deriva de `MountedView` y no se persiste.
+
 ### 018A-66 — Separar overlay personal de la sesión admin
 
 **Depende de:** 297A-13 (overlay remoto y capacidades server-side).

@@ -45,10 +45,23 @@ const singletonApp: AppDefinition = {
   singleton: true,
 };
 
+const actionsApp: AppDefinition = {
+  ...publicApp,
+  id: 'test-actions',
+  title: 'App con acciones',
+  render: () => ({
+    element: document.createElement('div'),
+    actions: Object.assign(document.createElement('div'), {
+      className: 'desktop-window__actions',
+    }),
+  }),
+};
+
 /* Registro único: el registry es singleton y no expone unregister. */
 AppRegistry.register(publicApp);
 AppRegistry.register(adminApp);
 AppRegistry.register(singletonApp);
+AppRegistry.register(actionsApp);
 
 function makeWindow(overrides: Partial<WindowEntry> & { appId: string }): WindowEntry {
   const { appId, ...rest } = overrides;
@@ -162,6 +175,21 @@ describe('restoreDesktopWindows [317A-5]', () => {
 
     await restoreDesktopWindows(saved);
     expect(generateNextZIndex()).toBeGreaterThan(40);
+  });
+
+  it('conserva las acciones derivadas de MountedView al restaurar', async () => {
+    const saved: SavedWindow[] = [{
+      appId: 'test-actions',
+      bounds: { x: 0, y: 0, w: 300, h: 200 },
+      state: 'open',
+      zIndex: 50,
+      focused: true,
+    }];
+
+    await restoreDesktopWindows(saved);
+
+    const restored = windowStore.get()[0];
+    expect(restored.actions?.className).toBe('desktop-window__actions');
   });
 });
 
