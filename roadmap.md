@@ -16,6 +16,7 @@
 - Quality gate: `Agente/planes/completados/plan-escalabilidad-sentinel-wandorius-2026-07-29.md`
 - Prevención: `Agente/prevencion/prevencion-wandorius-sentinel-varsense-2026-07-29.md`
 - Tema claro/oscuro: `Agente/planes/plan-modo-oscuro-os-2026-07-31.md`
+- Juego bosque multijugador 2D: `Agente/planes/plan-juego-bosque-multijugador-2026-08-01.md`
 - Deep links: `Agente/planes/plan-deep-links-ventanas-2026-07-31.md`
 - Apps editoriales: `Agente/planes/plan-programas-editoriales-2026-07-31.md`
 - Interacción y medición: `Agente/planes/plan-contratos-interaccion-comandos-medicion-2026-07-29.md`
@@ -41,22 +42,24 @@
 - **Layout de iconos:** escritorio usa `position` snap-grid; móvil usa `mobilePosition` con fallback `mobileOrder`; colisiones, reflow y Finder están separados por presentación.
 - **Contratos y seguridad:** OpenAPI `tags-split`, mutator compartido, clientes Orval por dominio y retiro del cliente manual; sin Bearer/JWT público, sin serving estático de uploads, sin DTOs internos ni storage keys en respuestas públicas.
 - **Calidad y arquitectura:** quality gate incremental local/full CI con Sentinel + VarSense, cachés separadas, `test:changed`, suite frontend completa en CI, builds/budgets gzip, runbook Coolify y checkpoints SOLID/OCP/DIP/SRP documentados. El mínimo desbloqueante está cerrado: `quality:test` 31/31 y 24 reglas activas.
-- **Correcciones recientes relevantes:** se resolvieron la ruta legacy `/admin`, visibilidad editorial de proyectos (018A-83), contratos de URL/autosave, select nativo, `createEl` para `textarea`, Reader TipTap, sincronización del Finder, iconos por registro único, rejilla compacta y bordes/flechas del tema oscuro. La carpeta vacía "Galería" se sustituyó por "Documentos" con subcarpetas por tipo y sync de media al workspace (018A-87): los archivos subidos aparecen en el Finder, se abren con visor, se retiran al moverlos a la papelera y se restauran. El menú contextual ahora funciona dentro de las carpetas con acciones de creación (nuevo artículo/proyecto/producto, subir archivo, nueva carpeta, pegar) y el clic en ítems del Finder y del escritorio muestra selección visual con los tokens del OS (018A-88). El clic derecho dentro de las carpetas responde en todo el alto del panel del Finder, no solo sobre los ítems (018A-89). El menú sobre una carpeta dentro del Finder ofrece gestión completa — Abrir, Renombrar, Cortar, Copiar, Pegar en y Eliminar con borrado seguro (confirmación + subárbol restaurable) y `Ctrl+V` con destino (018A-90); el crear permanece en el fondo. Los detalles y gotchas permanecen archivados.
+- **Correcciones recientes relevantes:** se resolvieron la ruta legacy `/admin`, visibilidad editorial de proyectos (018A-83), contratos de URL/autosave, select nativo, `createEl` para `textarea`, Reader TipTap, sincronización del Finder, iconos por registro único, rejilla compacta y bordes/flechas del tema oscuro. La carpeta vacía "Galería" se sustituyó por "Documentos" con subcarpetas por tipo y sync de media al workspace (018A-87): los archivos subidos aparecen en el Finder, se abren con visor, se retiran al moverlos a la papelera y se restauran. El menú contextual ahora funciona dentro de las carpetas con acciones de creación (nuevo artículo/proyecto/producto, subir archivo, nueva carpeta, pegar) y el clic en ítems del Finder y del escritorio muestra selección visual con los tokens del OS (018A-88). El clic derecho dentro de las carpetas responde en todo el alto del panel del Finder, no solo sobre los ítems (018A-89). El menú sobre una carpeta dentro del Finder ofrece gestión completa — Abrir, Renombrar, Cortar, Copiar, Pegar en y Eliminar con borrado seguro (confirmación + subárbol restaurable) y `Ctrl+V` con destino (018A-90); el crear permanece en el fondo. La restauración de sesión conserva el chrome inferior de las apps (`MountedView.actions`) validado visualmente en desktop y tablet sin duplicar ventanas ni alterar geometría/taskbar/URL (018A-69). Los detalles y gotchas permanecen archivados.
 
 ## Siguiente bloque habilitado
 
-**018A-69 — Restauración de ventanas conserva la barra de acciones.** La propagación de `MountedView.actions` y la regresión automatizada ya están implementadas; falta la prueba visual en desktop y tablet (barra inferior restaurada sin duplicar ventana ni alterar geometría/taskbar/URL). Después se valida 018A-66 y se continúa con hardening/E2E.
+**018A-66 — Separar overlay personal de la sesión admin.** Validar en navegador login, logout y recarga con usuario admin: no debe aparecer el modal de conflicto ni el aviso `workspace actualizado`; con cuenta no-admin el conflicto solo aparece ante revisiones local/remota incompatibles. Después se continúa con hardening/E2E.
 
 ## Pendientes ordenados
 
-### 018A-69 — Restauración de ventanas conserva la barra de acciones
+### GAME-01 — Bosque multijugador 2D dentro del OS (planificado, bloqueado)
 
-**Depende de:** 317A-5 y 018A-1. La propagación de `MountedView.actions` y la regresión automatizada ya están implementadas.
+**Depende de:** cerrar el bloque habilitado actual y sus gates de runtime, sesiones/capacidades, workspace, carga lazy y validación visual. Plan canónico: `Agente/planes/plan-juego-bosque-multijugador-2026-08-01.md`.
 
-- [ ] Abrir Biblioteca en desktop y recargar; confirmar que la ventana restaurada conserva la franja `.desktop-window__actions`, sus botones y el estado de foco.
-- [ ] Repetir en tablet y comprobar que la restauración no duplica la ventana ni altera geometría, taskbar o URL enfocada.
+- [ ] Aprobar ADRs de identidad temporal, salas, contrato realtime, presupuesto y mapa versionado.
+- [ ] Implementar por fases: app lazy/Canvas 2D, mapa estático, sala server-authoritative, presencia, personaje, editor admin y publicación.
+- [ ] Mantener el objetivo inicial en salas de 8 jugadores, snapshots a baja frecuencia, interés por proximidad y salas bajo demanda.
+- [ ] Validar teardown al cerrar, límites de mensajes/mapa/assets, permisos server-side, reconexión y rollback de versiones.
 
-**Gate/salida:** prueba visual documentada; la app restaurada tiene el mismo chrome inferior que una apertura normal.
+**Gate/salida:** el plan GAME-01 queda aprobado y cada fase tiene su propio ID, gate `task:check`, pruebas de navegador y evidencia de carga antes de iniciar la siguiente.
 
 ### 018A-66 — Separar overlay personal de la sesión admin
 
