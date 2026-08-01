@@ -48,6 +48,7 @@ import { AuthService } from './services';
 import { fetchWorkspaceRelease } from './features/runtime/workspace/workspace-store';
 import { initOverlaySync } from './features/runtime/workspace/overlay-sync';
 import { initOverlayConflictUI } from './features/runtime/workspace/overlay-conflict-ui';
+import { initArticleNotasSync } from './features/runtime/workspace/article-notas-sync';
 import { createAccountView } from './features/runtime/account-view';
 import { getTopMobileApp } from './features/mobile/mobile-stack';
 import { closeAllWindows, windowStore } from './features/runtime/window-manager';
@@ -90,6 +91,9 @@ async function initApp(): Promise<void> {
   const stopPreferencesSync = initPreferencesSync();
   const stopOverlaySync = initOverlaySync();
   const stopOverlayConflictUI = initOverlayConflictUI();
+  /* [018A-76] Puente artículo → escritorio: al publicar, garantiza la carpeta
+   * real "Notas" y coloca el artículo dentro. Idempotente. */
+  const stopArticleNotasSync = initArticleNotasSync();
   const app = document.getElementById('app');
   if (!app) return;
   let isMobile = getPresentationMode() === 'mobile';
@@ -364,6 +368,7 @@ async function initApp(): Promise<void> {
     stopPreferencesSync();
     stopOverlaySync();
     stopOverlayConflictUI();
+    stopArticleNotasSync();
     stopRouter();
     stopRouteAdapter();
     stopWindowUrlSync.stop();

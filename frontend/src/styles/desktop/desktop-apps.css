@@ -113,6 +113,69 @@
   font-style: italic;
 }
 
+/* [018A-75] Tipografía del contenido renderizado (ProseMirror → HTML).
+ * El reset global elimina los marcadores de lista; se restauran con tokens
+ * del sistema. La tipografía base (p, h1-h3, blockquote, hr, code) ya la
+ * aporta base.css y aplica dentro del Reader. */
+.desktop-reader__body h1,
+.desktop-reader__body h2,
+.desktop-reader__body h3,
+.desktop-reader__body h4,
+.desktop-reader__body h5,
+.desktop-reader__body h6 {
+  margin: var(--espacio-lg) 0 var(--espacio-sm);
+}
+
+.desktop-reader__body p {
+  margin-bottom: var(--espacio-md);
+}
+
+.desktop-reader__body ul {
+  list-style: disc;
+  padding-left: var(--espacio-xl);
+  margin-bottom: var(--espacio-md);
+}
+
+.desktop-reader__body ol {
+  list-style: decimal;
+  padding-left: var(--espacio-xl);
+  margin-bottom: var(--espacio-md);
+}
+
+.desktop-reader__body ul ul {
+  list-style: circle;
+}
+
+.desktop-reader__body ol ol {
+  list-style: lower-alpha;
+}
+
+.desktop-reader__body pre {
+  padding: var(--espacio-sm);
+  border: var(--borde);
+  margin-bottom: var(--espacio-md);
+  white-space: pre-wrap;
+}
+
+.desktop-reader__body pre code {
+  border: none;
+  padding: 0;
+}
+
+.desktop-reader__body img {
+  display: block;
+  max-width: 100%;
+  margin: var(--espacio-lg) 0;
+  border: var(--sistema-borde);
+}
+
+.desktop-reader__body audio,
+.desktop-reader__body video {
+  display: block;
+  max-width: 100%;
+  margin-bottom: var(--espacio-md);
+}
+
 @media (max-width: 768px) {
   .desktop-finder-window,
   .desktop-reader-window {

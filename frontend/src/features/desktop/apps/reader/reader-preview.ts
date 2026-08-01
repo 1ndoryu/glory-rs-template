@@ -7,6 +7,7 @@ import { createEl } from '../../../../utils/dom';
 import { ArticleService } from '../../../../services';
 import { appendSanitizedHtml } from '../../../../utils/sanitize-html';
 import { tryCatch } from '../../../../utils/result';
+import type { JSONContent } from '@tiptap/core';
 
 export interface ReaderOptions {
   slug?: string;
@@ -44,7 +45,25 @@ async function loadArticle(
   }
 
   const article = articleResult.value;
-  const content = typeof article.content === 'string' ? article.content : JSON.stringify(article.content);
+
+  /* [018A-75] El contenido se guarda como documento ProseMirror (JSON); se
+   * convierte a HTML con las mismas extensiones del editor y luego pasa por
+   * el sanitizador allowlist. El contenido legacy (string) se conserva como
+   * HTML plano. La carga es dinámica para no inflar el bundle principal. */
+  let html: string;
+  if (typeof article.content === 'string') {
+    html = article.content;
+  } else {
+    const [{ generateHTML }, StarterKitModule, ImageModule] = await Promise.all([
+      import('@tiptap/core'),
+      import('@tiptap/starter-kit'),
+      import('@tiptap/extension-image'),
+    ]);
+    html = generateHTML(
+      article.content as unknown as JSONContent,
+      [StarterKitModule.default, ImageModule.default.configure({ inline: false })],
+    );
+  }
 
   titleEl.textContent = article.title;
 
@@ -62,8 +81,8 @@ async function loadArticle(
     }));
   }
 
-  if (content) {
-    appendSanitizedHtml(body, content);
+  if (html) {
+    appendSanitizedHtml(body, html);
   } else {
     body.appendChild(createEl('p', { className: 'desktop-reader__empty', textContent: 'Este artículo no tiene contenido.' }));
   }
