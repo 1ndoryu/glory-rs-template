@@ -21,7 +21,6 @@ use crate::handlers::auth::LoginRateLimit;
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
-    pub jwt_secret: String,
     pub upload_dir: String,
     pub resend_api_key: Option<String>,
     pub email_from: String,

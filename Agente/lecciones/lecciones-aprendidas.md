@@ -105,3 +105,9 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 - Un comando de codegen no debe exigir una base de datos ni dejar un servidor vivo: `--emit-openapi` puede serializar `ApiDoc` antes del bootstrap de configuración/pool.
 - Los alias de `serde_json::Value` y tipos plenamente calificados en atributos utoipa producen referencias OpenAPI inválidas; los campos dinámicos deben declarar `value_type` y las respuestas usar nombres de esquema estables.
 - En Windows, invocar `npm.cmd` con `spawnSync` puede devolver `EINVAL`; ejecutar el binario Orval con `process.execPath` evita shell, quoting y advertencias de seguridad.
+
+## 018A-18 — Una sola autoridad de sesión
+
+- Cuando la cookie opaca ya cubre login, CSRF, revocación y capacidades, conservar un fallback Bearer solo amplía la superficie de ataque y hace ambiguo el contrato; debe retirarse junto con su secreto y dependencia.
+- La regresión mínima debe enviar un Bearer legacy al router de producción y comprobar `401`, además de mantener los casos de cookie/CSRF existentes.
+- El retiro de JWT no autoriza a eliminar `/uploads`: los descargables privados y las imágenes públicas necesitan primero un contrato de asset autorizado y una migración de URLs.

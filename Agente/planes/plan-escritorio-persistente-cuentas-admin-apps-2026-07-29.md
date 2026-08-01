@@ -428,7 +428,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 
 - [ ] Matriz de paridad antigua→programa.
 - [ ] Eliminar ruta/página/icono/estilos Admin.
-- [ ] Eliminar JWT y clientes/tipos legacy.
+- [x] Eliminar JWT Bearer, `jsonwebtoken`, secreto/configuración y clientes/tipos de autenticación legacy; la sesión opaca HttpOnly queda como autoridad única. *(018A-18; `/admin`, uploads y CSS legacy siguen pendientes)*
 - [ ] Eliminar uploads públicos y rutas/DTO obsoletos.
 - [ ] Eliminar CSS/clases huérfanas con VarSense.
 

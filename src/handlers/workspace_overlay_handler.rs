@@ -102,7 +102,6 @@ mod tests {
             .expect("la base de datos de pruebas debe estar disponible");
         AppState {
             pool,
-            jwt_secret: "workspace-overlay-http-test-secret".to_string(),
             upload_dir: "target/workspace-overlay-http-test-uploads".to_string(),
             resend_api_key: None,
             email_from: "test@example.invalid".to_string(),
@@ -121,7 +120,6 @@ mod tests {
             state.pool.clone(),
             AppConfig {
                 database_url,
-                jwt_secret: "workspace-overlay-http-test-secret".to_string(),
                 host: "127.0.0.1".to_string(),
                 port: 3000,
                 stripe_secret_key: None,

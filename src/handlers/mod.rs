@@ -70,7 +70,6 @@ impl utoipa::Modify for SecurityAddon {
         health::HealthResponse,
         crate::models::RegisterRequest,
         crate::models::LoginRequest,
-        crate::models::AuthResponse,
         crate::models::RegistrationResponse,
         crate::models::VerifyEmailRequest,
         crate::models::PasswordResetRequest,
@@ -107,7 +106,6 @@ pub fn create_router(pool: sqlx::PgPool, config: crate::config::AppConfig) -> Ro
 
     let state = AppState {
         pool,
-        jwt_secret: config.jwt_secret,
         upload_dir: config.upload_dir,
         resend_api_key: config.resend_api_key,
         email_from: config.email_from,

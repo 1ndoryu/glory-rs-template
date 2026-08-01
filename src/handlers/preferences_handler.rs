@@ -107,7 +107,6 @@ mod tests {
 
         AppState {
             pool,
-            jwt_secret: "preferences-http-test-secret".to_string(),
             upload_dir: "target/preferences-http-test-uploads".to_string(),
             resend_api_key: None,
             email_from: "test@example.invalid".to_string(),
@@ -123,7 +122,6 @@ mod tests {
     fn test_config(database_url: String) -> AppConfig {
         AppConfig {
             database_url,
-            jwt_secret: "preferences-http-test-secret".to_string(),
             host: "127.0.0.1".to_string(),
             port: 3000,
             stripe_secret_key: None,
@@ -246,6 +244,26 @@ mod tests {
                     .uri("/api/me/preferences")
                     .body(Body::empty())
                     .expect("request sin sesión válida"),
+            )
+            .await
+            .expect("router debe responder");
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn preferences_bearer_token_is_not_accepted() {
+        /* [018A-18] La sesión opaca es la única autoridad; un Bearer legacy
+         * nunca debe recuperar identidad ni saltarse CSRF/cookie. */
+        let state = test_state().await;
+        let response = production_router(&state)
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/me/preferences")
+                    .header("authorization", "Bearer legacy-token")
+                    .body(Body::empty())
+                    .expect("request Bearer legacy válida"),
             )
             .await
             .expect("router debe responder");

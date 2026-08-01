@@ -219,7 +219,6 @@ mod tests {
 
         AppState {
             pool,
-            jwt_secret: "media-http-test-secret".to_string(),
             upload_dir: "target/media-http-test-uploads".to_string(),
             resend_api_key: None,
             email_from: "test@example.invalid".to_string(),
@@ -235,7 +234,6 @@ mod tests {
     fn test_config(database_url: String) -> AppConfig {
         AppConfig {
             database_url,
-            jwt_secret: "media-http-test-secret".to_string(),
             host: "127.0.0.1".to_string(),
             port: 3000,
             stripe_secret_key: None,

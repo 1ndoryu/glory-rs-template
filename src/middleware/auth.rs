@@ -7,7 +7,7 @@ use uuid::Uuid;
 use crate::errors::AppError;
 use crate::models::user::UserRole;
 use crate::repositories::UserRepository;
-use crate::services::{AuthService, SessionService};
+use crate::services::SessionService;
 use crate::AppState;
 
 /// Nombre de la cookie de sesión
@@ -15,8 +15,8 @@ const SESSION_COOKIE: &str = "session_id";
 /// Nombre de la cookie CSRF
 const CSRF_COOKIE: &str = "csrf_token";
 
-/// Extractor que valida sesión (cookie o JWT fallback) y extrae el `user_id`.
-/// [297A-8] Lee cookie `session_id` primero, fallback a JWT Bearer.
+/// Extractor que valida la sesión opaca `HttpOnly` y extrae el `user_id`.
+/// [018A-18] La cookie es la única autoridad; no se aceptan tokens Bearer.
 pub struct AuthUser {
     pub user_id: Uuid,
 }
@@ -41,7 +41,6 @@ impl FromRequestParts<AppState> for AuthUser {
 }
 
 /// Extractor que valida sesión Y verifica que el usuario sea admin.
-/// [297A-8] Lee cookie `session_id` primero, fallback a JWT Bearer.
 pub struct AdminUser {
     pub user_id: Uuid,
 }
@@ -75,9 +74,8 @@ impl FromRequestParts<AppState> for AdminUser {
     }
 }
 
-/// Resuelve el `user_id` intentando cookie de sesión primero, luego JWT Bearer.
+/// Resuelve el `user_id` únicamente desde la cookie de sesión opaca.
 async fn resolve_user_id(parts: &Parts, state: &AppState) -> Result<Uuid, AppError> {
-    /* Intento 1: cookie de sesión opaca */
     if let Some(raw_token) = extract_cookie(parts, SESSION_COOKIE) {
         if let Some(session) = SessionService::validate(&state.pool, raw_token)
             .await
@@ -88,18 +86,6 @@ async fn resolve_user_id(parts: &Parts, state: &AppState) -> Result<Uuid, AppErr
                 .map_err(|e| AppError::Internal(format!("Error verificando usuario: {e}")))?;
             if active_user.is_some() {
                 return Ok(session.user_id);
-            }
-        }
-    }
-
-    /* Intento 2 (fallback): JWT Bearer header — compatibilidad durante transición */
-    if let Ok(token) = extract_bearer_token(parts) {
-        if let Ok(claims) = AuthService::verify_token(token, &state.jwt_secret) {
-            let active_user = UserRepository::find_by_id(&state.pool, claims.sub)
-                .await
-                .map_err(|e| AppError::Internal(format!("Error verificando usuario: {e}")))?;
-            if active_user.is_some() {
-                return Ok(claims.sub);
             }
         }
     }
@@ -148,17 +134,4 @@ fn is_mutation(method: &Method) -> bool {
 /// Verifica si existe cookie de sesión
 fn has_session_cookie(parts: &Parts) -> bool {
     extract_cookie(parts, SESSION_COOKIE).is_some()
-}
-
-/// Extrae el token Bearer del header Authorization (fallback JWT)
-fn extract_bearer_token(parts: &Parts) -> Result<&str, AppError> {
-    let auth_header = parts
-        .headers
-        .get("Authorization")
-        .and_then(|value| value.to_str().ok())
-        .ok_or(AppError::Unauthorized)?;
-
-    auth_header
-        .strip_prefix("Bearer ")
-        .ok_or(AppError::Unauthorized)
 }

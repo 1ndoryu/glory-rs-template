@@ -73,13 +73,6 @@ pub struct LoginRequest {
     pub password: String,
 }
 
-/// Response con token JWT después de autenticarse
-#[derive(Debug, Serialize, ToSchema)]
-pub struct AuthResponse {
-    pub token: String,
-    pub user_id: Uuid,
-}
-
 #[derive(Debug, Serialize, ToSchema)]
 pub struct RegistrationResponse {
     pub message: String,
