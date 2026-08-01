@@ -5,6 +5,7 @@
 
 import { createModal, type ModalOptions } from '../../../components/ui/modal';
 import { createEl } from '../../../utils/dom';
+import { authStore } from '../../../store';
 import { overlayStore } from './stores';
 import {
   overlaySyncStore,
@@ -101,6 +102,13 @@ function openConflictModal(state: OverlaySyncState): void {
 }
 
 function render(state: OverlaySyncState): void {
+  /* [018A-66] La sesión admin publica el release global y nunca resuelve un
+   * conflicto de overlay personal. Esta guardia evita un flash si el estado
+   * de auth y el store de sync notifican en distinto orden. */
+  if (authStore.get().capability === 'admin') {
+    closeActiveModal();
+    return;
+  }
   if (state.status === 'conflict') openConflictModal(state);
   else closeActiveModal();
 }

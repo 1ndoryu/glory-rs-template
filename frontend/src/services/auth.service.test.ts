@@ -10,10 +10,11 @@ describe('AuthService.login', () => {
   });
 
   it('rechaza si login responde pero /auth/me no confirma la sesión', async () => {
-    /* [018A-35] El test verifica el boundary generado, no el cliente manual. */
+    /* [018A-66] Login responde 204 sin cuerpo; el test verifica primero ese
+     * contrato generado y después la confirmación independiente de /me. */
     vi.spyOn(generatedAuth, 'login').mockResolvedValue({
       data: undefined,
-      status: 200,
+      status: 204,
       headers: new Headers(),
     });
     vi.spyOn(generatedAuth, 'me').mockRejectedValue(new Error('sesión no confirmada'));

@@ -129,6 +129,14 @@ function queueLocalUpdate(overlay: WorkspaceOverlay): void {
 
 /** Sincroniza el overlay después de confirmar una cuenta con /auth/me. */
 export async function syncOverlayForUser(userId: string): Promise<void> {
+  /* [018A-66] El admin organiza/publica el release global; no participa en
+   * el overlay personal de una cuenta. Evitar esta ruta también impide que un
+   * overlay local antiguo se compare contra el remoto y abra conflictos al
+   * recargar la sesión administrativa. */
+  if (authStore.get().capability === 'admin') {
+    clearOverlaySync();
+    return;
+  }
   const generation = ++syncGeneration;
   activeUserId = userId;
   remoteRevision = null;
@@ -202,6 +210,10 @@ export function initOverlaySync(): () => void {
   });
   stopAuthSubscription = authStore.subscribe((state) => {
     if (!state.isAuthenticated || !state.userId) {
+      clearOverlaySync();
+      return;
+    }
+    if (state.capability === 'admin') {
       clearOverlaySync();
       return;
     }

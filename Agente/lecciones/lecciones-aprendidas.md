@@ -321,3 +321,14 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 - La regla `.desktop-window .boton { display: inline-block }` (0,2,0) sobreescribe cualquier `display: flex/inline-flex` puesto en una clase `.boton` (0,1,0): icono+texto quedan inline con alineación por baseline (SVG arriba, texto abajo).
 - Solución reutilizable: receta compartida `.boton-con-icono` definida con los mismos selectores de superficie y DESPUÉS en el archivo, para ganar por orden de fuente y recuperar `display: inline-flex; align-items: center; gap`.
 - Antes de escribir `display`/`align-items`/`gap` en un componente `.boton`, comprobar que no lo anula una regla de superficie; si lo anula, la capacidad debe vivir en la receta del sistema, no duplicada en el componente.
+
+## 018A-66 — Admin y overlay personal son ámbitos distintos
+
+- La capacidad `admin` no es solo una autorización superior: cambia el ámbito de persistencia. El admin publica el release global; sincronizar además su overlay de cuenta crea conflictos que reaparecen en cada recarga.
+- La corrección debe cortar el transporte en el boundary de auth y mantener una guardia de presentación para transiciones; ocultar solamente el modal deja requests y estado incorrectos.
+
+## 018A-67 — Botones con iconos: usar las recetas del sistema, nunca `.boton` + SVG crudo
+
+- Un botón de solo icono con `className: 'boton'`/`boton-pequeno` + `createElement(Icon)` deja el SVG de Lucide a 24px por defecto y sin caja coherente. La receta canónica es `.boton-icono` (caja 20px, SVG 14px del token, sin borde).
+- Un botón de icono+texto sin `.boton-con-icono` rompe la línea por la regla de superficie `inline-block`. Antes de crear un botón con icono, elegir la receta del sistema: `.boton-icono` (solo icono) o `.boton-con-icono` (icono+texto).
+- Cuando el type-check falla por un status del contrato (p. ej. `'204' is not assignable to '200 | 401 | 403'`) y el backend ya está actualizado, el cliente Orval está stale: `npm run codegen:local` lo regenera. Los generados están en `.gitignore`, así que no generan diff de commit.

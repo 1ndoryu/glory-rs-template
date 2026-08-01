@@ -47,6 +47,17 @@
 
 ## Pendientes ordenados
 
+### 018A-66 — Separar overlay personal de la sesión admin
+
+**Depende de:** 297A-13 (overlay remoto y capacidades server-side).
+
+- [x] La sincronización de `user_workspace_overlays` se omite para `capability: 'admin'`; el admin conserva el overlay local para publicar el release global.
+- [x] La UI de conflicto se cierra/ignora si una sesión admin aparece durante una transición de autenticación.
+- [x] Regresión de sesión admin: no solicita overlay remoto, no entra en `conflict` y no abre el modal `workspace actualizado`.
+- [ ] Validación visual en navegador después de login/recarga; el contrato automatizado queda cubierto.
+
+**Salida:** el mensaje `workspace actualizado` solo puede aparecer para overlays personales de cuentas no-admin; la organización admin se resuelve mediante publicación del workspace.
+
 ### 297A-9 — Foundation del runtime
 
 **Depende de:** 297A-6/7; coordina identidad 297A-8.

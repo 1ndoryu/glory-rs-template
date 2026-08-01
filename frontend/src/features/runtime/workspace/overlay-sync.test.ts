@@ -39,6 +39,22 @@ beforeEach(() => {
 });
 
 describe('workspace overlay sync', () => {
+  it('no sincroniza ni abre conflictos de overlay para una sesión admin', async () => {
+    const getOverlay = vi.spyOn(WorkspaceService, 'getOverlay');
+    stop = initOverlaySync();
+
+    authStore.set({ isAuthenticated: true, userId: 'admin-1', capability: 'admin' }, 'sync');
+    await syncOverlayForUser('admin-1');
+
+    expect(getOverlay).not.toHaveBeenCalled();
+    expect(overlaySyncStore.get()).toEqual({
+      userId: null,
+      revision: null,
+      remoteOverlay: null,
+      status: 'idle',
+    });
+  });
+
   it('carga el overlay remoto cuando el local está vacío', async () => {
     vi.spyOn(WorkspaceService, 'getOverlay').mockResolvedValue({
       overlay: remoteOverlay,
