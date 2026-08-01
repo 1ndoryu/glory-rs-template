@@ -75,6 +75,7 @@
 - [x] **018A-33 —** `ArticleService`, `ProjectService` y `ProductService` migran CRUD, listados y checkout al cliente Orval; se conserva la adaptación explícita de `url` y el envelope compartido. Auth, workspace, settings y analytics quedan para bloques posteriores.
 - [x] **018A-34 —** Auth, preferencias, notificaciones, settings y analytics usan funciones Orval con estados explícitos; se conserva la sincronización de stores y el header de consentimiento. Workspace queda aislado para su propia adaptación de overlay/release.
 - [x] **018A-35 —** `WorkspaceService` migra releases, publicación y overlay al cliente generado; las conversiones de `WorkspaceTree`/`WorkspaceOverlay` quedan confinadas al boundary y el cliente manual deja de tener consumidores frontend.
+- [x] **018A-36 —** Se retira el objeto `api` manual del frontend; `client.ts` conserva solo `ApiError`, el mutator Orval y `unwrapGeneratedResponse`. La matriz de transporte queda cerrada; lo pendiente es cobertura visual/E2E y dominios externos.
 
 **Salida:** runtime compartido funciona sin chrome/listas/listeners duplicados. Orval se regenera localmente sin backend vivo; quedan cobertura total del contrato y retiro del cliente manual.
 
@@ -374,6 +375,7 @@ Plan canónico: `Agente/planes/plan-programas-editoriales-2026-07-31.md`.
 - [x] **018A-33 —** Migrar ArticleService, ProjectService y ProductService al cliente generado; la matriz restante queda acotada a auth, workspace, settings, analytics, notifications y preferences.
 - [x] **018A-34 —** Migrar auth, preferences, notifications, settings y analytics al cliente generado; workspace queda como último dominio frontend con adaptación propia.
 - [x] **018A-35 —** Migrar `WorkspaceService` y retirar el último consumidor frontend del cliente manual; mantener el modelo rico del runtime separado de los DTOs OpenAPI.
+- [x] **018A-36 —** Retirar el cliente manual sin borrar la política común de sesión/CSRF/errores; verificar que no quedan consumidores de `api.get/post/...`.
 - [ ] Completar la matriz de paridad y retirar contratos/CSS legacy restantes. *(JWT Bearer ya no forma parte del contrato)*
 
 ### 297A-17 — Hardening, identidad, accesibilidad y SEO

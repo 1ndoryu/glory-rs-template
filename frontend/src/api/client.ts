@@ -1,6 +1,7 @@
-/* wandori.us — API Client
- * Fetch wrapper con auth automática, JSON parsing y manejo de errores.
- * [297A-8] Auth vía cookie HttpOnly + CSRF token para mutaciones. */
+/* wandori.us — Generated API boundary
+ * [297A-8] Auth vía cookie HttpOnly + CSRF token para mutaciones.
+ * [018A-36] El cliente manual se retiró; este módulo conserva solo el mutator
+ * compartido y la política de errores para Orval. */
 
 import { authStore } from '../store';
 
@@ -15,15 +16,6 @@ export class ApiError extends Error {
     super(message);
     this.name = 'ApiError';
   }
-}
-
-interface RequestOptions {
-  method?: string;
-  body?: unknown;
-  headers?: Record<string, string>;
-  formData?: FormData;
-  /** AbortSignal opcional para cancelar el fetch con el lifecycle de la app. */
-  signal?: AbortSignal;
 }
 
 export interface GeneratedResponse<T> {
@@ -60,12 +52,15 @@ async function parseResponseBody(response: Response): Promise<unknown> {
 }
 
 /* [018A-32] Orval uses this single transport so generated clients inherit the
- * same cookie, CSRF, base URL and response-envelope rules as the manual API. */
+ * same cookie, CSRF, base URL and response-envelope rules. */
 export async function generatedFetcher<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const response = await fetch(`${BASE_URL}${path}`, withSession(options));
+  const response = await fetch(`${BASE_URL}${path}`, {
+    ...withSession(options),
+    signal: options.signal,
+  });
   const data = await parseResponseBody(response);
   return { data, status: response.status, headers: response.headers } as T;
 }
@@ -80,55 +75,3 @@ export function unwrapGeneratedResponse<T>(
   }
   throw new ApiError(response.status, response.data, `API Error: ${response.status}`);
 }
-
-/* Request genérico con auth automática (cookies) y CSRF */
-async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, headers = {}, formData, signal } = options;
-
-  const requestHeaders: Record<string, string> = { ...headers };
-
-  /* Solo setear Content-Type para JSON, no para FormData */
-  if (!formData) {
-    requestHeaders['Content-Type'] = 'application/json';
-  }
-
-  const response = await fetch(`${BASE_URL}${path}`, withSession({
-    method,
-    headers: requestHeaders,
-    body: formData ?? (body ? JSON.stringify(body) : undefined),
-    signal,
-  }));
-
-  if (!response.ok) {
-    const errorBody = await parseResponseBody(response);
-
-    /* [297A-8] Si 401, limpiar estado de auth */
-    if (response.status === 401) {
-      authStore.set({ isAuthenticated: false, userId: null, capability: 'public' });
-    }
-
-    throw new ApiError(response.status, errorBody, `API Error: ${response.status}`);
-  }
-
-  return (await parseResponseBody(response)) as T;
-}
-
-/* Métodos de conveniencia */
-export const api = {
-  get: <T>(path: string, options?: { signal?: AbortSignal }) => request<T>(path, options),
-
-  post: <T>(path: string, body: unknown, options?: { headers?: Record<string, string>; signal?: AbortSignal }) =>
-    request<T>(path, { method: 'POST', body, ...options }),
-
-  put: <T>(path: string, body: unknown) =>
-    request<T>(path, { method: 'PUT', body }),
-
-  patch: <T>(path: string, body: unknown) =>
-    request<T>(path, { method: 'PATCH', body }),
-
-  delete: <T>(path: string) =>
-    request<T>(path, { method: 'DELETE' }),
-
-  upload: <T>(path: string, formData: FormData) =>
-    request<T>(path, { method: 'POST', formData }),
-};

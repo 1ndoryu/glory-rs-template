@@ -195,3 +195,7 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 ## 018A-35 — Los modelos ricos deben adaptarse en un único boundary
 
 - Cuando OpenAPI expresa árboles u overlays como mapas genéricos, la conversión debe quedar en funciones nombradas del servicio. Así el runtime conserva invariantes (`version`, `nodes`, tipos de nodo) y el cliente generado conserva el contrato HTTP sin duplicación.
+
+## 018A-36 — Retirar una abstracción solo después de cerrar consumidores
+
+- La eliminación segura del cliente manual se confirma con búsqueda estática, type-check y tests del mutator; conservar `ApiError` evita romper boundaries de sincronización que no son transporte.
