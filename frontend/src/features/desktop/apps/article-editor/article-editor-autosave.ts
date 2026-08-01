@@ -1,15 +1,17 @@
 /* wandori.us — Article Editor Autosave
- * Autosave (borrador) con debounce y create→update idempotente.
- * [297A-14 F5] Paridad: el editor legacy guardaba manualmente; el programa
- * del OS guarda borradores automáticamente sin publicar (editorial sigue
- * siendo independiente y se publica explícitamente).
+ * Adaptador de autosave del editor de artículos.
+ * [297A-14 F5] El mecanismo de debounce/teardown vive en utils/autosave.ts
+ * (compartido con proyecto y producto); este módulo aporta el payload,
+ * la persistencia vía ArticleService y el evento de dominio.
  *
  * Contrato: recibe un payload y decide crear o actualizar conservando el ID.
- * El teardown cancela timers pendientes; el abort del lifecycle evita I/O. */
+ * El autosave nunca cambia el estado editorial: guarda borradores sin
+ * publicar (editorial independiente, publicación explícita). */
 
 import { safeRun } from '../../../../utils/safe-async';
 import { showToast } from '../../../../components/ui/toast';
 import { ArticleService } from '../../../../services';
+import { createDebouncedSaver } from '../../../../utils/autosave';
 import { publishArticleEditorSaved } from '../../../runtime/article-editor-events';
 import type { CreateArticleRequest, UpdateArticleRequest } from '../../../../api/types';
 
@@ -30,8 +32,6 @@ interface AutosaveDeps {
   getPayload: () => ArticleDraftPayload;
   /** Guarda true si el editor sigue activo (no abortado/desmontado). */
   isActive: () => boolean;
-  /** Marcar como sucio cuando el usuario edita. */
-  onDirty?: () => void;
 }
 
 export interface ArticleAutosave {
@@ -46,10 +46,10 @@ export interface ArticleAutosave {
 /** Debounce del autosave. Exportada para los tests (evita drift). */
 export const AUTOSAVE_DELAY_MS = 2500;
 
-/** Guardar el borrador (crear o actualizar) y publicar el evento de dominio. */
+/** Guardar el borrador (crear o actualizar) y anunciar solo CREATES. */
 async function saveDraft(
   deps: AutosaveDeps,
-): Promise<{ ok: boolean; operation?: 'created' | 'updated' }> {
+): Promise<{ ok: boolean; created?: boolean }> {
   if (!deps.isActive()) return { ok: false };
   const payload = deps.getPayload();
   if (!payload.title.trim()) return { ok: false };
@@ -71,73 +71,24 @@ async function saveDraft(
   const result = await safeRun(request, 'error al autoguardar');
   if (!deps.isActive() || !result.ok) return { ok: false };
 
-  const operation = articleId ? 'updated' : 'created';
+  const created = !articleId;
   deps.setArticleId(result.value.id);
   /* [297A-14 F5] El autosave solo anuncia CREATES: el listado del Admin debe
    * ver aparecer artículos nuevos, pero re-renderizar la lista completa en
    * cada guardado debounced (2.5s) es churn innecesario. El 'updated' lo
    * emite el guardado manual explícito. */
-  if (operation === 'created') {
-    publishArticleEditorSaved({ articleId: result.value.id, operation });
+  if (created) {
+    publishArticleEditorSaved({ articleId: result.value.id, operation: 'created' });
   }
-  return { ok: true, operation };
+  return { ok: true, created };
 }
 
-/** Crear el autosave del editor de artículos con debounce y teardown. */
+/** Crear el autosave del editor de artículos (delega en el saver genérico). */
 export function createArticleAutosave(deps: AutosaveDeps): ArticleAutosave {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  let destroyed = false;
-  let inFlight = false;
-  let dirtyAgain = false;
-
-  const run = async (): Promise<void> => {
-    if (destroyed || inFlight) return;
-    inFlight = true;
-    try {
-      const result = await saveDraft(deps);
-      /* Si el usuario siguió editando durante el guardado, reprogramar. */
-      if (dirtyAgain && !destroyed) {
-        dirtyAgain = false;
-        timer = setTimeout(() => { void run(); }, AUTOSAVE_DELAY_MS);
-      } else if (result.ok && result.operation === 'created') {
-        showToast('borrador creado');
-      }
-    } finally {
-      inFlight = false;
-    }
-  };
-
-  return {
-    schedule: () => {
-      if (destroyed) return;
-      deps.onDirty?.();
-      if (inFlight) {
-        dirtyAgain = true;
-        return;
-      }
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        timer = undefined;
-        void run();
-      }, AUTOSAVE_DELAY_MS);
-    },
-    /* [297A-14 F5] cancel() no aborta un save ya inFlight: el guardado
-     * manual y el autosave escriben el mismo payload (idempotente,
-     * last-write-wins); el evento de dominio se emite una vez por save. */
-    cancel: () => {
-      if (timer) {
-        clearTimeout(timer);
-        timer = undefined;
-      }
-      dirtyAgain = false;
-    },
-    destroy: () => {
-      destroyed = true;
-      if (timer) {
-        clearTimeout(timer);
-        timer = undefined;
-      }
-      dirtyAgain = false;
-    },
-  };
+  return createDebouncedSaver({
+    delayMs: AUTOSAVE_DELAY_MS,
+    isActive: deps.isActive,
+    save: () => saveDraft(deps),
+    onCreated: () => showToast('borrador creado'),
+  });
 }

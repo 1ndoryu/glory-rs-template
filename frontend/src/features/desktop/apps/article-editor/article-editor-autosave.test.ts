@@ -3,7 +3,7 @@
  * - Idempotencia create→update: el primer guardado crea (status draft) y
  *   conserva el ID; los siguientes actualizan con el mismo ID.
  * - Sin título no guarda; cancel()/destroy() limpian timers.
- * - El evento de dominio se emite por cada guardado. */
+ * - El evento de dominio solo se emite en 'created' (evita churn del listado). */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createArticleAutosave, AUTOSAVE_DELAY_MS, type ArticleDraftPayload } from './article-editor-autosave';
@@ -40,7 +40,6 @@ function makeDeps() {
       setArticleId: (id: string) => { articleId = id; },
       getPayload: () => payload,
       isActive: () => true,
-      onDirty: vi.fn(),
     },
     getArticleId: () => articleId,
   };
@@ -61,7 +60,6 @@ describe('article-editor autosave [297A-14 F5]', () => {
     const autosave = createArticleAutosave(deps);
     autosave.schedule();
 
-    expect(deps.onDirty).toHaveBeenCalledTimes(1);
     expect(ArticleService.create).not.toHaveBeenCalled();
 
     await vi.advanceTimersByTimeAsync(AUTOSAVE_DELAY + 100);

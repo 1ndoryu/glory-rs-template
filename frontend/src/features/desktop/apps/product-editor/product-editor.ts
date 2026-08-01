@@ -13,6 +13,7 @@ import { safeClick, safeRun } from '../../../../utils/safe-async';
 import { showToast } from '../../../../components/ui/toast';
 import { tryCatch } from '../../../../utils/result';
 import { publishProductEditorSaved } from '../../../runtime/product-editor-events';
+import { createProductAutosave, type ProductDraftPayload } from './product-editor-autosave';
 import type { MountedView, RenderContext } from '../../../../core/lifecycle';
 import type { Product } from '../../../../api/types';
 
@@ -35,6 +36,9 @@ export function renderProductEditor(ctx: RenderContext): MountedView {
   const container = createLoadingView();
   let disposed = false;
   let currentProductId: string | undefined;
+  /* Cleanup del autosave (timer + I/O pendientes). Se invoca en destroy y en
+   * el catch de hydrate; nunca como código muerto en hydrate. [297A-14 F5] */
+  let autosaveCleanup: (() => void) | undefined;
 
   const isActive = (): boolean => !disposed && !ctx.signal.aborted;
 
@@ -50,18 +54,29 @@ export function renderProductEditor(ctx: RenderContext): MountedView {
       let isActiveState = product?.is_active ?? false;
       currentProductId = product?.id;
 
+      /* [297A-14 F5] Sincroniza la etiqueta del botón (crear/guardar) también
+       * cuando el autosave crea el producto; los clicks ocurren tras hidratar. */
+      let updateSaveLabel: () => void = () => {};
+
+      /* El autosave se crea tras el saveButton; los closures de onInput solo
+       * se ejecutan al escribir (después de que autosave ya existe). Mismo
+       * patrón defensivo que article-editor (evita TDZ si un componente
+       * disparara onInput síncronamente). */
+      let autosave: ReturnType<typeof createProductAutosave> | null = null;
+      const scheduleAutosave = (): void => autosave?.schedule();
+
       const nameInput = createInput({
         label: 'nombre',
         placeholder: 'nombre del producto',
         value: name,
-        onInput: value => { name = value; },
+        onInput: value => { name = value; scheduleAutosave(); },
       });
       const descriptionInput = createTextarea({
         label: 'descripcion',
         placeholder: 'descripcion del producto',
         value: description,
         rows: 3,
-        onInput: value => { description = value; },
+        onInput: value => { description = value; scheduleAutosave(); },
       });
       const priceInput = createInput({
         label: 'precio (centavos)',
@@ -70,13 +85,14 @@ export function renderProductEditor(ctx: RenderContext): MountedView {
         onInput: value => {
           const parsed = Number.parseInt(value, 10);
           priceCents = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+          scheduleAutosave();
         },
       });
       const currencyInput = createInput({
         label: 'moneda (ISO 4217)',
         placeholder: 'USD',
         value: currency,
-        onInput: value => { currency = value.toUpperCase(); },
+        onInput: value => { currency = value.toUpperCase(); scheduleAutosave(); },
       });
       const activeSelect = createSelect({
         label: 'estado',
@@ -92,6 +108,28 @@ export function renderProductEditor(ctx: RenderContext): MountedView {
         className: 'boton boton-grande',
         textContent: currentProductId ? 'guardar' : 'crear',
       });
+      updateSaveLabel = () => {
+        saveButton.textContent = currentProductId ? 'guardar' : 'crear';
+      };
+
+      /* Autosave: guarda el contenido (nombre/descripción/precio/moneda);
+       * `is_active` (venta) solo cambia con el guardado manual explícito y
+       * la validación de precio/moneda es del backend. */
+      autosave = createProductAutosave({
+        getProductId: () => currentProductId,
+        setProductId: (id) => {
+          currentProductId = id;
+          updateSaveLabel();
+        },
+        getPayload: (): ProductDraftPayload => ({
+          name,
+          description,
+          priceCents,
+          currency,
+        }),
+        isActive,
+      });
+      autosaveCleanup = () => { autosave.destroy(); };
 
       saveButton.addEventListener('click', safeClick(async () => {
         if (!isActive()) return;
@@ -103,6 +141,7 @@ export function renderProductEditor(ctx: RenderContext): MountedView {
           showToast('el precio debe ser mayor que cero');
           return;
         }
+        autosave.cancel();
 
         const productData = {
           name: name.trim(),
@@ -119,7 +158,7 @@ export function renderProductEditor(ctx: RenderContext): MountedView {
 
         const operation = currentProductId ? 'updated' : 'created';
         currentProductId = result.value.id;
-        saveButton.textContent = 'guardar';
+        updateSaveLabel();
         publishProductEditorSaved({ productId: currentProductId, operation });
         showToast(operation === 'updated' ? 'producto actualizado' : 'producto creado');
       }));
@@ -135,6 +174,9 @@ export function renderProductEditor(ctx: RenderContext): MountedView {
       );
     } catch {
       if (!isActive()) return;
+      /* Cerrar timers de autosave aunque la hidratación falle a medias. */
+      autosaveCleanup?.();
+      autosaveCleanup = undefined;
       container.textContent = '';
       container.appendChild(createVacio('error al cargar el editor de productos'));
     }
@@ -152,6 +194,8 @@ export function renderProductEditor(ctx: RenderContext): MountedView {
     destroy: () => {
       disposed = true;
       ctx.signal.removeEventListener('abort', abortHandler);
+      autosaveCleanup?.();
+      autosaveCleanup = undefined;
     },
   };
 }

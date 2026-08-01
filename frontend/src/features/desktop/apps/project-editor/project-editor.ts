@@ -13,6 +13,7 @@ import { safeClick, safeRun } from '../../../../utils/safe-async';
 import { showToast } from '../../../../components/ui/toast';
 import { tryCatch } from '../../../../utils/result';
 import { publishProjectEditorSaved } from '../../../runtime/project-editor-events';
+import { createProjectAutosave, type ProjectDraftPayload } from './project-editor-autosave';
 import type { MountedView, RenderContext } from '../../../../core/lifecycle';
 import type { Project } from '../../../../api/types';
 
@@ -35,6 +36,9 @@ export function renderProjectEditor(ctx: RenderContext): MountedView {
   const container = createLoadingView();
   let disposed = false;
   let currentProjectId: string | undefined;
+  /* Cleanup del autosave (timer + I/O pendientes). Se invoca en destroy y en
+   * el catch de hydrate; nunca como código muerto en hydrate. [297A-14 F5] */
+  let autosaveCleanup: (() => void) | undefined;
 
   const isActive = (): boolean => !disposed && !ctx.signal.aborted;
 
@@ -50,24 +54,35 @@ export function renderProjectEditor(ctx: RenderContext): MountedView {
       let isVisible = project?.is_visible ?? false;
       currentProjectId = project?.id;
 
+      /* [297A-14 F5] Sincroniza la etiqueta del botón (crear/guardar) también
+       * cuando el autosave crea el proyecto; los clicks ocurren tras hidratar. */
+      let updateSaveLabel: () => void = () => {};
+
+      /* El autosave se crea tras el saveButton; los closures de onInput solo
+       * se ejecutan al escribir (después de que autosave ya existe). Mismo
+       * patrón defensivo que article-editor (evita TDZ si un componente
+       * disparara onInput síncronamente). */
+      let autosave: ReturnType<typeof createProjectAutosave> | null = null;
+      const scheduleAutosave = (): void => autosave?.schedule();
+
       const titleInput = createInput({
         label: 'titulo',
         placeholder: 'titulo del proyecto',
         value: title,
-        onInput: value => { title = value; },
+        onInput: value => { title = value; scheduleAutosave(); },
       });
       const descriptionInput = createTextarea({
         label: 'descripcion',
         placeholder: 'descripcion del proyecto',
         value: description,
         rows: 3,
-        onInput: value => { description = value; },
+        onInput: value => { description = value; scheduleAutosave(); },
       });
       const urlInput = createInput({
         label: 'url',
         placeholder: 'https://...',
         value: url,
-        onInput: value => { url = value; },
+        onInput: value => { url = value; scheduleAutosave(); },
       });
       const orderInput = createInput({
         label: 'orden',
@@ -76,6 +91,7 @@ export function renderProjectEditor(ctx: RenderContext): MountedView {
         onInput: value => {
           const parsed = Number.parseInt(value, 10);
           sortOrder = Number.isFinite(parsed) ? parsed : 0;
+          scheduleAutosave();
         },
       });
       const visibilitySelect = createSelect({
@@ -92,6 +108,27 @@ export function renderProjectEditor(ctx: RenderContext): MountedView {
         className: 'boton boton-grande',
         textContent: currentProjectId ? 'guardar' : 'crear',
       });
+      updateSaveLabel = () => {
+        saveButton.textContent = currentProjectId ? 'guardar' : 'crear';
+      };
+
+      /* Autosave: guarda el contenido (título/descripción/url/orden); la
+       * visibilidad editorial solo cambia con el guardado manual explícito. */
+      autosave = createProjectAutosave({
+        getProjectId: () => currentProjectId,
+        setProjectId: (id) => {
+          currentProjectId = id;
+          updateSaveLabel();
+        },
+        getPayload: (): ProjectDraftPayload => ({
+          title,
+          description,
+          url,
+          sortOrder,
+        }),
+        isActive,
+      });
+      autosaveCleanup = () => { autosave.destroy(); };
 
       saveButton.addEventListener('click', safeClick(async () => {
         if (!isActive()) return;
@@ -99,6 +136,7 @@ export function renderProjectEditor(ctx: RenderContext): MountedView {
           showToast('el titulo es obligatorio');
           return;
         }
+        autosave.cancel();
 
         const projectData = {
           title: title.trim(),
@@ -121,7 +159,7 @@ export function renderProjectEditor(ctx: RenderContext): MountedView {
 
         const operation = currentProjectId ? 'updated' : 'created';
         currentProjectId = result.value.id;
-        saveButton.textContent = 'guardar';
+        updateSaveLabel();
         publishProjectEditorSaved({ projectId: currentProjectId, operation });
         showToast(operation === 'updated' ? 'proyecto actualizado' : 'proyecto creado');
       }));
@@ -137,6 +175,9 @@ export function renderProjectEditor(ctx: RenderContext): MountedView {
       );
     } catch {
       if (!isActive()) return;
+      /* Cerrar timers de autosave aunque la hidratación falle a medias. */
+      autosaveCleanup?.();
+      autosaveCleanup = undefined;
       container.textContent = '';
       container.appendChild(createVacio('error al cargar el editor de proyectos'));
     }
@@ -154,6 +195,8 @@ export function renderProjectEditor(ctx: RenderContext): MountedView {
     destroy: () => {
       disposed = true;
       ctx.signal.removeEventListener('abort', abortHandler);
+      autosaveCleanup?.();
+      autosaveCleanup = undefined;
     },
   };
 }

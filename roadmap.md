@@ -204,7 +204,7 @@
 - [x] Contrato de rutas admin alineado: servicios frontend migrados a `/api/admin/...` (backend anida todo bajo `/api`); `GET /api/admin/workspace/releases/{version}` para rollback; `MediaService`/galería usan el shape real `Vec<Media>`.
 - [x] Biblioteca de media. *(app lazy admin-only, papelera soft delete + restore, object URLs revocadas, utils test 6/6 — F4)*
 - [x] Menú Admin por capacidades y paridad sin ampliar `admin.ts`. *(matriz de paridad congelada en `matriz-paridad-admin-2026-07-31.md`; comandos `resource:edit/publish/unpublish` materializan acciones declaradas; menú por capacidades del Admin queda con el resto de 297A-14)*
-- [x] Paridad F5 técnica: autosave de borrador en `article-editor` (create→update idempotente, sin tocar editorial, evento solo en created), comandos de recurso fail-closed con tests (15/15) y gate PASS.
+- [x] Paridad F5 técnica: autosave compartido por tipo de recurso — `utils/autosave.ts` (`createDebouncedSaver` genérico) aplicado a artículos, proyectos y productos (create→update idempotente, sin tocar editorial, evento de dominio solo en created) — y comandos de recurso fail-closed con tests (15/15).
 - [ ] E2E visual desktop/tablet/móvil del vertical editorial.
 
 **Salida parcial:** los editores de artículos, proyectos y productos viven como programas reutilizables; el epic editorial permanece abierto hasta completar media, paridad y E2E.
@@ -429,7 +429,25 @@ Cada fase termina con esta revisión antes de marcar su salida. La revisión deb
 - [x] Receta `.boton-icono` en `components.css` (regla 9.1: receta base primero): grid centrado, tamaño desde token, SVG hereda `--sistema-icono-trazo`, focus-visible 1px, nombre accesible vía `aria-label` del consumidor.
 - [x] Migrar `createToolbar()` en `article-editor.ts`: botones `{ label, icon, action }` con iconos Lucide (Bold, Italic, Code, Heading2, Heading3, List, ListOrdered, Quote, SeparatorHorizontal, Image, AudioLines, Video), `aria-label` + `title`, child `createElement(icon)`.
 - [x] Fix del falso positivo Sentinel: ampliar `CLASES_BOTON_SISTEMA` en el core (static + react) con `boton-icono` y variantes kebab reales del proyecto (`boton-pequeno`, `boton-mediano`, `boton-grande`); test de regresión añadido. *(regla 8: implementar prevención)*
-- [ ] Validación: `tsc --noEmit` OK, suite vitest PASS, gate `task:check -- 317A-3`.
-- [ ] Verificación en navegador: toolbar del article-editor muestra iconos Lucide 1px y los botones siguen funcionando (negrita, imagen…).
+- [x] Validación: `tsc --noEmit` OK, suite vitest 341/341 PASS, gate `task:check -- 317A-3` PASS (sentinel 0e/0w, varsense 0e/14w, frontend PASS).
+- [x] Verificación en navegador: toolbar del article-editor muestra iconos Lucide 1px horizontales; el usuario confirmó el orden y el aspecto.
 
 **Salida:** la toolbar del editor usa iconos Lucide de 1px con nombre accesible; la receta `.boton-icono` queda disponible para cualquier toolbar futura; Sentinel no la marca como botón ad-hoc.
+
+### 317A-4 — Identidad visual de formularios y botones OS en el article-editor
+
+**Petición del usuario (3 puntos):**
+1. Los labels de formulario ("extracto", "imagen de portada") deben tener la primera letra en mayúscula.
+2. Los botones dentro de una ventana del OS deben llevar borde 1px sin redondear (aspecto OS); fuera de ventanas (páginas públicas) siguen como texto subrayado.
+3. Los botones de solo icono de la toolbar del editor no llevan borde (están bien), solo necesitan más separación.
+4. *(Refinamiento posterior)* Los tabs de `.barra-tabs` NO deben llevar borde aunque usen `.boton` — son navegación, no botones de acción.
+
+- [x] Header de `components.css` actualizado: regla de botones según superficie (borde 1px dentro de `.desktop-window`, `.movilApp`, `.modal-contenido`, `.confirm-contenido`; texto subrayado fuera).
+- [x] Regla contextual de botones OS: `.desktop-window .boton, .movilApp .boton, .modal-contenido .boton, .confirm-contenido .boton { border: var(--borde); padding: var(--espacio-xs) var(--espacio-sm); }` + exclusión `.barra-tabs .boton` (tabs sin borde).
+- [x] Labels de formulario capitalizados: `.campo-etiqueta` y `.preferences-panel__etiqueta` con `::first-letter { text-transform: uppercase }` (NO `capitalize`, que subiría preposiciones).
+- [x] Toolbar del article-editor con más separación: `gap-sm` → `gap-md` en `article-editor-ui.ts`.
+- [x] Manual de identidad visual actualizado: regla de mayúscula inicial en labels (§6) y regla de botones según superficie (§13).
+- [ ] Validación: `tsc --noEmit` OK, gate `task:check -- 317A-4`.
+- [ ] Verificación en navegador: labels con mayúscula inicial, botones OS con borde 1px dentro de la ventana, tabs sin borde, toolbar más separada.
+
+**Salida:** los formularios del OS capitalizan la primera letra de sus labels, los botones de acción dentro de superficies OS ganan borde 1px (los tabs y botones de icono no), y la toolbar del editor respira mejor; la identidad visual queda documentada en el manual.
