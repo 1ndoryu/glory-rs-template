@@ -12,35 +12,40 @@ import {
   listProjects,
   updateProject,
 } from '../api/generated/projects-handler/projects-handler';
-import type { Project, CreateProjectRequest, UpdateProjectRequest } from '../api/types';
+import type {
+  CreateProjectRequest,
+  ProjectAdminResponse,
+  ProjectPublicResponse,
+  UpdateProjectRequest,
+} from '../api/types';
 
 export const ProjectService = {
   /** Listar proyectos públicos (visibles). */
-  async list(): Promise<Project[]> {
+  async list(): Promise<ProjectPublicResponse[]> {
     const response = await listProjects();
-    return unwrapGeneratedResponse<Project[]>(response, [200]);
+    return unwrapGeneratedResponse<ProjectPublicResponse[]>(response, [200]);
   },
 
   /** Listar todos los proyectos (admin). */
-  async listAll(): Promise<Project[]> {
+  async listAll(): Promise<ProjectAdminResponse[]> {
     const response = await listAllProjects();
-    return unwrapGeneratedResponse<Project[]>(response, [200]);
+    return unwrapGeneratedResponse<ProjectAdminResponse[]>(response, [200]);
   },
 
   /** Obtener un proyecto por ID; opcionalmente abortable con el lifecycle. */
-  async getById(id: string, options?: { signal?: AbortSignal }): Promise<Project> {
+  async getById(id: string, options?: { signal?: AbortSignal }): Promise<ProjectAdminResponse> {
     const response = await getProject(id, options);
-    return unwrapGeneratedResponse<Project>(response, [200]);
+    return unwrapGeneratedResponse<ProjectAdminResponse>(response, [200]);
   },
 
   /** Crear un nuevo proyecto (admin). */
-  async create(data: CreateProjectRequest): Promise<Project> {
+  async create(data: CreateProjectRequest): Promise<ProjectAdminResponse> {
     const response = await createProject(data);
-    return unwrapGeneratedResponse<Project>(response, [201]);
+    return unwrapGeneratedResponse<ProjectAdminResponse>(response, [201]);
   },
 
   /** Actualizar un proyecto (admin). */
-  async update(id: string, data: UpdateProjectRequest): Promise<Project> {
+  async update(id: string, data: UpdateProjectRequest): Promise<ProjectAdminResponse> {
     const response = await updateProject(id, {
       ...data,
       url: data.url === undefined
@@ -49,7 +54,7 @@ export const ProjectService = {
           ? 'Clear'
           : { Set: data.url },
     });
-    return unwrapGeneratedResponse<Project>(response, [200]);
+    return unwrapGeneratedResponse<ProjectAdminResponse>(response, [200]);
   },
 
   /** Eliminar un proyecto (admin). */

@@ -5,7 +5,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 /// Proyecto del portfolio
-#[derive(Debug, Clone, FromRow, Serialize, ToSchema)]
+#[derive(Debug, Clone, FromRow)]
 pub struct Project {
     pub id: Uuid,
     pub title: String,
@@ -14,6 +14,56 @@ pub struct Project {
     pub sort_order: i32,
     pub is_visible: bool,
     pub created_at: DateTime<Utc>,
+}
+
+/// [018A-48] Contrato administrativo completo. Los metadatos de orden y
+/// visibilidad solo se devuelven tras autorización de administrador.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct ProjectAdminResponse {
+    pub id: Uuid,
+    pub title: String,
+    pub description: String,
+    pub url: Option<String>,
+    pub sort_order: i32,
+    pub is_visible: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+/// [018A-48] Contrato público mínimo. El repository ya filtra y ordena los
+/// proyectos visibles; no se filtran al visitante detalles de presentación.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct ProjectPublicResponse {
+    pub id: Uuid,
+    pub title: String,
+    pub description: String,
+    pub url: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
+impl From<&Project> for ProjectAdminResponse {
+    fn from(project: &Project) -> Self {
+        Self {
+            id: project.id,
+            title: project.title.clone(),
+            description: project.description.clone(),
+            url: project.url.clone(),
+            sort_order: project.sort_order,
+            is_visible: project.is_visible,
+            created_at: project.created_at,
+        }
+    }
+}
+
+impl From<&Project> for ProjectPublicResponse {
+    fn from(project: &Project) -> Self {
+        Self {
+            id: project.id,
+            title: project.title.clone(),
+            description: project.description.clone(),
+            url: project.url.clone(),
+            created_at: project.created_at,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -63,7 +113,12 @@ pub struct UpdateProjectRequest {
 
 #[cfg(test)]
 mod tests {
-    use super::{ProjectUrlUpdate, UpdateProjectRequest};
+    use super::{
+        Project, ProjectAdminResponse, ProjectPublicResponse, ProjectUrlUpdate,
+        UpdateProjectRequest,
+    };
+    use chrono::Utc;
+    use uuid::Uuid;
 
     #[test]
     fn distingue_url_omitida_nula_y_con_valor() {
@@ -78,6 +133,33 @@ mod tests {
         assert_eq!(
             replaced.url,
             ProjectUrlUpdate::Set("https://example.com".to_string())
+        );
+    }
+
+    #[test]
+    fn contrato_publico_no_expone_orden_ni_visibilidad() {
+        let project = Project {
+            id: Uuid::new_v4(),
+            title: "Proyecto".into(),
+            description: "Descripción".into(),
+            url: Some("https://example.com".into()),
+            sort_order: 7,
+            is_visible: true,
+            created_at: Utc::now(),
+        };
+
+        let public = serde_json::to_value(ProjectPublicResponse::from(&project)).unwrap();
+        assert!(public.get("sort_order").is_none());
+        assert!(public.get("is_visible").is_none());
+
+        let admin = serde_json::to_value(ProjectAdminResponse::from(&project)).unwrap();
+        assert_eq!(
+            admin.get("sort_order").and_then(|value| value.as_i64()),
+            Some(7)
+        );
+        assert_eq!(
+            admin.get("is_visible").and_then(|value| value.as_bool()),
+            Some(true)
         );
     }
 }

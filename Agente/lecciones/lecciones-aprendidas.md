@@ -253,3 +253,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Devolver un mapa completo de configuración convierte cada clave futura en una exposición pública accidental; la allowlist debe vivir en el repository y crecer solo mediante revisión explícita.
 - Nombrar el cliente como `getPublic` mantiene la frontera visible también en el frontend y evita que una futura pantalla confunda configuración pública con secretos o flags administrativos.
+
+## 018A-48 — Los metadatos de orden también son internos
+
+- Un endpoint público puede filtrar correctamente los registros y aun así revelar cómo se organiza el escritorio si serializa el modelo SQL completo; orden y visibilidad deben pertenecer al DTO administrativo.
+- Cuando el backend ya filtra/ordena, el frontend público debe renderizar el resultado directamente. Mantener un segundo filtro en el navegador crea dependencia accidental del contrato interno y facilita que vuelva a filtrarse de forma inconsistente.

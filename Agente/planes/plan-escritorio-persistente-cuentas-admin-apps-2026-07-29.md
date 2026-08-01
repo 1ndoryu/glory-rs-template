@@ -447,6 +447,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [x] **018A-45 —** Retirar tokens CSS legacy sin consumidores después de validar referencias globales y VarSense; no se modifican tokens del chrome activo.
 - [x] **018A-46 —** Separar DTOs públicos/admin de productos del modelo interno; el catálogo no expone `download_path` ni IDs de Stripe y checkout/webhook mantienen su boundary privado.
 - [x] **018A-47 —** Restringir settings públicos a una allowlist de presentación y eliminar el nombre ambiguo `getAll` del cliente; auth y configuración administrativa permanecen server-side.
+- [x] **018A-48 —** Separar DTOs públicos/admin de proyectos; `sort_order` e `is_visible` quedan en el boundary administrativo y el catálogo público recibe solo contenido de presentación.
 - [ ] Eliminar CSS/clases huérfanas con VarSense.
 
 **Criterio de salida:** una sola administración como app registrada, analytics útil/privado y cero rutas/chrome duplicados legacy; uploads y CSS/contratos obsoletos deben desaparecer después de su matriz de paridad.

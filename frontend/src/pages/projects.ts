@@ -52,16 +52,14 @@ export async function renderProjects(): Promise<HTMLElement> {
   const projects = projectsResult.value;
   page.innerHTML = '';
 
-  const visibles = projects.filter(p => p.is_visible).sort((a, b) => a.sort_order - b.sort_order);
-
-  if (visibles.length === 0) {
+  if (projects.length === 0) {
     page.appendChild(createVacio('no hay proyectos todavia'));
     return page;
   }
 
   const lista = createEl('div');
 
-  for (const project of visibles) {
+  for (const project of projects) {
     const info = createEl('div', {},
       createEl('span', { className: 'proyecto-titulo', textContent: project.title }),
     );

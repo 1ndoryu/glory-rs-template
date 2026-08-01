@@ -113,7 +113,7 @@ export interface Order {
 }
 
 /* === Projects === */
-export interface Project {
+export interface ProjectAdminResponse {
   id: string;
   title: string;
   description: string;
@@ -122,6 +122,17 @@ export interface Project {
   is_visible: boolean;
   created_at: string;
 }
+
+export interface ProjectPublicResponse {
+  id: string;
+  title: string;
+  description: string;
+  url: string | null;
+  created_at: string;
+}
+
+/** Alias de compatibilidad para editores administrativos existentes. */
+export type Project = ProjectAdminResponse;
 
 export interface CreateProjectRequest {
   title: string;

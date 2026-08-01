@@ -37,11 +37,12 @@ impl SettingsRepository {
             .iter()
             .map(|key| (*key).to_string())
             .collect();
-        let rows = sqlx::query_as!(
-            SiteSetting,
+        // Dynamic query keeps the repository usable by the local OpenAPI
+        // exporter, which intentionally runs without a live database schema.
+        let rows = sqlx::query_as::<_, SiteSetting>(
             "SELECT key, value, updated_at FROM site_settings WHERE key = ANY($1)",
-            &keys
         )
+        .bind(&keys)
         .fetch_all(pool)
         .await?;
 
