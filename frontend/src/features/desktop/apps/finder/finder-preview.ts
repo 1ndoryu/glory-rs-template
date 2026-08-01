@@ -7,6 +7,7 @@
  */
 
 import {
+  ArrowLeft,
   File,
   Package,
   createElement,
@@ -84,10 +85,16 @@ export function createFinderPreview(options: FinderOptions): HTMLElement {
 
   let currentFolderId = options.folderId;
 
+  /* [018A-91] Historial de navegación del Finder: cada navigateTo empuja la
+   * carpeta anterior; el botón 'volver' la recupera sin re-empujar (push=false)
+   * para no duplicar entradas. Los crumbs navegan con push (entran al historial). */
+  const backStack: string[] = [];
+
   const pathEl = createEl('div', { className: 'desktop-finder__path' });
   const grid = createEl('div', { className: 'desktop-finder__grid' });
 
-  function navigateTo(folderId: string): void {
+  function navigateTo(folderId: string, push = true): void {
+    if (push && folderId !== currentFolderId) backStack.push(currentFolderId);
     currentFolderId = folderId;
     /* [018A-88] Al cambiar de carpeta la selección anterior deja de existir:
      * se limpia para que no queden ids huérfanos en el store global. */
@@ -105,13 +112,14 @@ export function createFinderPreview(options: FinderOptions): HTMLElement {
 
   makeDropTarget({ el: grid, dropId: currentFolderId, context: 'finder' });
 
-  /* [018A-88] Menú contextual del fondo de carpeta: el grid (o su estado
-   * vacío) abre las acciones de creación del contexto 'finder'. Los ítems
-   * del grid tienen su propio handler con stopPropagation, así que este
-   * solo dispara sobre el fondo. Patrón espejo de desktop-shell.ts. */
+  /* [018A-88] Menú contextual del fondo de carpeta: el grid (que ya no tiene
+   * estado vacío desde 018A-91) abre las acciones de creación del contexto
+   * 'finder'. Los ítems del grid tienen su propio handler con
+   * stopPropagation, así que este solo dispara sobre el fondo. Patrón espejo
+   * de desktop-shell.ts. */
   grid.addEventListener('contextmenu', ((e: MouseEvent) => {
     const target = e.target as HTMLElement;
-    if (target !== grid && !target.classList.contains('desktop-finder__empty')) return;
+    if (target !== grid) return;
     e.preventDefault();
     selectBackground();
     openContextMenu({
@@ -138,8 +146,26 @@ export function createFinderPreview(options: FinderOptions): HTMLElement {
   function render(): void {
     const ws = workspaceStore.get();
 
-    const crumbs = buildBreadcrumb(currentFolderId, ws.nodes as Readonly<Record<string, ResolvedNode>>);
     pathEl.innerHTML = '';
+
+    /* [018A-91] Botón 'volver' a la carpeta anterior: deshabilitado cuando no
+     * hay historial (carpeta raíz del Finder). Se reconstruye en cada render
+     * porque pathEl se vacía; el listener navega con push=false para no
+     * re-empujar la carpeta de la que se vuelve. */
+    const backBtn = createEl('button', {
+      type: 'button',
+      className: 'desktop-finder__back',
+      ariaLabel: 'Volver a la carpeta anterior',
+    });
+    backBtn.appendChild(createEl('span', { className: 'desktop-finder__back-icon' }, createElement(ArrowLeft)));
+    backBtn.disabled = backStack.length === 0;
+    backBtn.addEventListener('click', () => {
+      const prev = backStack.pop();
+      if (prev) navigateTo(prev, false);
+    });
+    pathEl.appendChild(backBtn);
+
+    const crumbs = buildBreadcrumb(currentFolderId, ws.nodes as Readonly<Record<string, ResolvedNode>>);
     for (let i = 0; i < crumbs.length; i++) {
       if (i > 0) {
         pathEl.appendChild(createEl('span', { className: 'desktop-finder__path-sep', textContent: ' / ' }));
@@ -155,10 +181,9 @@ export function createFinderPreview(options: FinderOptions): HTMLElement {
     const children = getChildren(currentFolderId);
     grid.innerHTML = '';
 
-    if (children.length === 0) {
-      grid.appendChild(createEl('div', { className: 'desktop-finder__empty', textContent: 'Carpeta vacía' }));
-      return;
-    }
+    /* [018A-91] Sin estado vacío textual: una carpeta sin hijos deja el grid
+     * en blanco (el clic derecho sobre el fondo sigue abriendo el menú porque
+     * target === grid). */
 
     for (const child of children) {
       const item = createFinderItem(child, navigateTo, options);

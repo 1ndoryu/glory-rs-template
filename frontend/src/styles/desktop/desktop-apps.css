@@ -24,8 +24,47 @@
 }
 
 .desktop-finder__path {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-xs);
   padding: var(--espacio-sm) var(--espacio-md);
   border-bottom: var(--sistema-borde);
+}
+
+/* [018A-91] Botón 'volver' a la carpeta anterior: mismo patrón de botón de
+ * toolbar (sin borde, hover inverso) integrado a la izquierda de los crumbs.
+ * Deshabilitado se atenúa con opacity como desktop-app-toolbar. */
+.desktop-finder__back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--sistema-titulo-alto);
+  height: var(--sistema-titulo-alto);
+  margin-right: var(--espacio-sm);
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--sistema-texto);
+  cursor: pointer;
+  font-family: var(--fuente-sistema);
+}
+
+.desktop-finder__back:hover:not(:disabled) {
+  background: var(--sistema-texto);
+  color: var(--sistema-superficie);
+}
+
+.desktop-finder__back:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.desktop-finder__back-icon svg {
+  width: var(--sistema-tema-boton-tamano);
+  height: var(--sistema-tema-boton-tamano);
+  stroke-width: var(--sistema-icono-trazo);
 }
 
 /* [018A-78][018A-80] Iconos del Finder compactos y coherentes con el escritorio.
