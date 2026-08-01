@@ -288,3 +288,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Un runbook útil debe definir señales de salida, límites y orden de rollback, pero no debe fingir que una operación de producción fue probada cuando solo se revisó el procedimiento.
 - Mantener Coolify Manager como único canal evita que una urgencia reintroduzca SSH y deja cualquier hueco como mejora explícita de la herramienta.
+
+## 018A-57 — Una UI de registro no debe habilitar registro
+
+- El formulario puede vivir dentro de Cuenta y reutilizar el servicio generado, pero la autoridad para crear sesiones sigue en el flag server-side y la verificación de correo.
+- Las respuestas de recuperación deben conservar el mensaje no enumerable; tokens de verificación/reset requieren un contrato de URL separado antes de entrar al cliente.

@@ -17,9 +17,10 @@
 - [x] Cambio de contraseña invalida el token y revoca todas las sesiones.
 - [x] Servicio frontend preparado para registro, verificación y recuperación.
 
-## Fase 3 — Operación pendiente
+## Fase 3 — Operación parcial
 
-- [ ] UI dentro de Cuenta para registro, verificación y recuperación.
+- [x] UI dentro de Cuenta para registro y solicitud de recuperación; mantiene mensajes no enumerables y respeta `registration_enabled=false`.
+- [ ] UI de consumo de tokens para verificación y cambio de contraseña; requiere definir el enlace de correo y su tratamiento de URL sin filtrar secretos.
 - [ ] Resend real con Resend/SMTP, secretos de staging y reintentos observables.
 - [ ] Rate limit específico de registro/reset y auditoría de cada intento sensible.
 - [ ] MFA/passkey, E2E de expiración/replay y pruebas de dos dispositivos.

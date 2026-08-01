@@ -179,7 +179,8 @@
 
 .account-app__message,
 .account-app__secondary,
-.account-app__error {
+.account-app__error,
+.account-app__feedback {
   margin: 0;
   line-height: var(--linea-altura);
 }

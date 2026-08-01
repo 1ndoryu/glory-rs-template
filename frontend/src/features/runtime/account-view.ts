@@ -4,7 +4,7 @@
  * verdad de sesión. La vista no crea router ni estado paralelo.
  * [297A-13] */
 
-import { createElement, LogIn, LogOut, ShieldCheck, UserRound, type IconNode } from 'lucide';
+import { ArrowLeft, createElement, KeyRound, LogIn, LogOut, Mail, ShieldCheck, UserPlus, UserRound, type IconNode } from 'lucide';
 import { AuthService } from '../../services';
 import { authStore, type AuthState } from '../../store';
 import { createInput } from '../../components/ui/input';
@@ -33,78 +33,129 @@ function createActionButton(
   return button;
 }
 
+type GuestMode = 'login' | 'register' | 'recover';
+
 function renderGuest(container: HTMLElement): void {
-  const title = createEl('h1', {
-    className: 'account-app__title',
-    textContent: 'cuenta',
-  });
-  const message = createEl('p', {
-    className: 'account-app__message',
-    textContent: 'inicia sesión para sincronizar tu organización y preferencias.',
-  });
-  const emailField = createInput({
-    label: 'email',
-    type: 'email',
-    placeholder: 'email',
-    required: true,
-  });
-  const passwordField = createInput({
-    label: 'password',
-    type: 'password',
-    placeholder: 'password',
-    required: true,
-  });
-  const emailInput = emailField.querySelector<HTMLInputElement>('input');
-  const passwordInput = passwordField.querySelector<HTMLInputElement>('input');
-  const error = createEl('p', {
-    className: 'campo-mensaje-error account-app__error',
-    textContent: '',
-  });
-  error.hidden = true;
-  const submit = createEl('button', {
-    type: 'button',
-    className: 'boton boton-grande account-app__submit',
-    ariaLabel: 'Iniciar sesión',
-  }, icon(LogIn), createEl('span', { textContent: 'entrar' }));
+  let mode: GuestMode = 'login';
 
-  submit.addEventListener('click', safeClick(async () => {
-    const email = emailInput?.value.trim() ?? '';
-    const password = passwordInput?.value ?? '';
-    if (!email || !password) {
-      error.textContent = 'completa todos los campos';
-      error.hidden = false;
-      return;
+  const renderMode = (): void => {
+    container.replaceChildren();
+    const copy = {
+      login: {
+        title: 'cuenta',
+        message: 'inicia sesión para sincronizar tu organización y preferencias.',
+        submit: 'entrar',
+        aria: 'Iniciar sesión',
+        icon: LogIn,
+      },
+      register: {
+        title: 'crear cuenta',
+        message: 'solicita una cuenta. el acceso se activa después de verificar el correo.',
+        submit: 'registrar',
+        aria: 'Crear cuenta',
+        icon: UserPlus,
+      },
+      recover: {
+        title: 'recuperar acceso',
+        message: 'recibe instrucciones si existe una cuenta con ese correo.',
+        submit: 'solicitar recuperación',
+        aria: 'Solicitar recuperación',
+        icon: Mail,
+      },
+    }[mode];
+    const title = createEl('h1', { className: 'account-app__title', textContent: copy.title });
+    const message = createEl('p', { className: 'account-app__message', textContent: copy.message });
+    const emailField = createInput({ label: 'email', type: 'email', placeholder: 'email', required: true });
+    const emailInput = emailField.querySelector<HTMLInputElement>('input');
+    const fields: HTMLElement[] = [emailField];
+    let passwordInput: HTMLInputElement | null = null;
+    let confirmationInput: HTMLInputElement | null = null;
+
+    if (mode === 'login' || mode === 'register') {
+      const passwordField = createInput({ label: 'password', type: 'password', placeholder: 'password', required: true });
+      passwordInput = passwordField.querySelector<HTMLInputElement>('input');
+      fields.push(passwordField);
+    }
+    if (mode === 'register') {
+      const confirmationField = createInput({ label: 'confirmar password', type: 'password', placeholder: 'confirmar password', required: true });
+      confirmationInput = confirmationField.querySelector<HTMLInputElement>('input');
+      fields.push(confirmationField);
     }
 
-    submit.disabled = true;
-    error.hidden = true;
-    const label = submit.querySelector('span:last-child');
-    if (label) label.textContent = 'entrando…';
-    const result = await safeRun(AuthService.login(email, password), 'credenciales incorrectas');
-    submit.disabled = false;
-    if (label) label.textContent = 'entrar';
-    if (!result.ok) {
-      error.textContent = 'no se pudo iniciar sesión';
-      error.hidden = false;
-      return;
+    const feedback = createEl('p', {
+      className: 'account-app__feedback',
+      role: 'status',
+      textContent: '',
+    });
+    feedback.hidden = true;
+    const submit = createEl('button', {
+      type: 'button',
+      className: 'boton boton-grande account-app__submit',
+      ariaLabel: copy.aria,
+    }, icon(copy.icon), createEl('span', { textContent: copy.submit }));
+
+    submit.addEventListener('click', safeClick(async () => {
+      const email = emailInput?.value.trim() ?? '';
+      const password = passwordInput?.value ?? '';
+      const confirmation = confirmationInput?.value ?? '';
+      feedback.hidden = true;
+      if (!email || ((mode !== 'recover') && !password) || (mode === 'register' && !confirmation)) {
+        feedback.textContent = 'completa todos los campos';
+        feedback.hidden = false;
+        return;
+      }
+      if (mode === 'register' && password !== confirmation) {
+        feedback.textContent = 'las contraseñas no coinciden';
+        feedback.hidden = false;
+        return;
+      }
+
+      submit.disabled = true;
+      const label = submit.querySelector('span:last-child');
+      if (label) label.textContent = 'procesando…';
+      const result = mode === 'login'
+        ? await safeRun(AuthService.login(email, password), 'credenciales incorrectas')
+        : mode === 'register'
+          ? await safeRun(AuthService.register(email, password), 'no se pudo solicitar el registro')
+          : await safeRun(AuthService.requestPasswordReset(email), 'no se pudo solicitar la recuperación');
+      submit.disabled = false;
+      if (label) label.textContent = copy.submit;
+      if (!result.ok) {
+        feedback.textContent = mode === 'login' ? 'no se pudo iniciar sesión' : 'la solicitud no pudo completarse';
+        feedback.hidden = false;
+        return;
+      }
+      feedback.textContent = mode === 'login'
+        ? 'sesión iniciada'
+        : mode === 'register'
+          ? 'solicitud recibida; revisa tu correo cuando el registro esté habilitado'
+          : 'si el correo existe, recibirás instrucciones';
+      feedback.hidden = false;
+      if (mode === 'login') showToast('sesión iniciada');
+    }));
+
+    const form = createEl('div', {
+      className: 'account-app__form',
+      role: 'form',
+      ariaLabel: copy.aria,
+    }, ...fields, feedback, submit);
+    form.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') submit.click();
+    });
+
+    const actions = createEl('div', { className: 'account-app__actions' });
+    if (mode !== 'login') {
+      actions.appendChild(createActionButton('volver a entrar', ArrowLeft, () => { mode = 'login'; renderMode(); }, 'Volver a iniciar sesión'));
+    } else {
+      actions.append(
+        createActionButton('crear cuenta', UserPlus, () => { mode = 'register'; renderMode(); }, 'Crear cuenta'),
+        createActionButton('recuperar acceso', KeyRound, () => { mode = 'recover'; renderMode(); }, 'Recuperar acceso'),
+      );
     }
-    showToast('sesión iniciada');
-  }));
+    container.append(title, message, form, actions);
+  };
 
-  const form = createEl('div', {
-    className: 'account-app__form',
-    role: 'form',
-    ariaLabel: 'Inicio de sesión',
-  }, emailField, passwordField, error, submit);
-  form.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') submit.click();
-  });
-
-  const unavailable = createEl('p', {
-    className: 'account-app__secondary',
-    textContent: 'registro cerrado temporalmente.',
-  });
-  container.append(title, message, form, unavailable);
+  renderMode();
 }
 
 function renderAuthenticated(container: HTMLElement, state: AuthState): void {

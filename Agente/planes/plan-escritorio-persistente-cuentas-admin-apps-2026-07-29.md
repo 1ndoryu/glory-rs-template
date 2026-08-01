@@ -170,7 +170,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [x] Estados invitado, autenticado y admin. *(verificación pendiente y MFA permanecen fuera del alcance implementado)*
 - [x] Login/logout/me con feedback y abort.
 - [x] Lista/revocación de sesiones activas.
-- [x] Deep link `/login` abre Cuenta; `/register` permanece cerrado hasta completar registro verificado.
+- [x] Deep link `/login` abre Cuenta; el formulario de registro/recuperación vive dentro de la app y la ruta directa `/register` permanece cerrada hasta completar el flujo verificado.
 - [x] Icono de estado de sesión en la barra superior y launcher móvil; abre Cuenta y refleja login/logout con etiqueta accesible.
 - [x] Deslogueado, la app Cuenta muestra el formulario de login en su propia ventana, sin overlay de página completa. Registro permanece cerrado.
 
@@ -179,11 +179,12 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [x] Verificación de email detrás de `registration_enabled=false`, con `email_verified_at` y token de 24 h.
 - [x] Recovery con token hashado corto de un solo uso y revocación de sesiones.
 - [x] Rate limit de login y auditoría hash de intentos; rate limit específico de registro/reset queda pendiente.
+- [x] **018A-57 —** La app Cuenta ofrece formularios de registro y recuperación con feedback no enumerable; el feature flag server-side sigue apagado y los tokens/correo real quedan fuera de alcance.
 - [x] Pruebas unitarias de opacidad/determinismo y consumo atómico; E2E de fijación/expiración/replay queda pendiente.
 - [x] Registro permanece apagado hasta completar correo, UI, MFA y E2E.
 
 **Criterio de salida:** admin opera Cuenta sin token en Web Storage; sesiones pueden revocarse y errores no se silencian.
-**Estado:** parcial avanzado. Sesiones opacas en cookie operativas; JWT eliminado del frontend; CSRF y rate limit activos. Cuenta base, registro verificado y recovery backend están implementados; UI, proveedor de correo real, MFA, E2E y auditoría específica siguen pendientes.
+**Estado:** parcial avanzado. Sesiones opacas en cookie operativas; JWT eliminado del frontend; CSRF y rate limit activos. Cuenta base, backend verificado y formularios de registro/recuperación están implementados; UI de tokens, proveedor de correo real, MFA, E2E y auditoría específica siguen pendientes.
 
 ## 7. 297A-9 — Foundation del runtime desktop/tablet
 
@@ -326,6 +327,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 **Dependencias:** sesiones 297A-8, workspace 297A-11 e integración móvil 297A-12.
 
 - [x] Implementar registro solo detrás de `registration_enabled=false`; la activación sigue bloqueada hasta completar correo/UI/MFA/E2E.
+- [x] **018A-57 —** Añadir registro y recuperación como modos dentro de Cuenta, sin habilitar el flag ni persistir tokens en el cliente.
 - [x] Crear `user_preferences` y el contrato de preferencia de tema con `revision`. *(migration `20260731100000_297a13_preferences`)*
 - [x] Sync con `expected_revision`, actualización condicional y conflicto 409 sin overwrite silencioso. *(PreferencesService + preferences-sync)*
 - [x] Autorizar solo cuentas activas y mantener CSRF/CORS con credenciales en las mutaciones.

@@ -14,14 +14,15 @@ beforeEach(() => {
 });
 
 describe('account-view', () => {
-  it('muestra login y registro cerrado para invitado', () => {
+  it('muestra login y accesos de registro y recuperación para invitado', () => {
     const { element } = mount();
 
     expect(element.getAttribute('aria-label')).toBe('Cuenta');
     expect(element.querySelector('.account-app__title')?.textContent).toBe('cuenta');
     expect(element.querySelector('input[type="email"]')).not.toBeNull();
     expect(element.querySelector('input[type="password"]')).not.toBeNull();
-    expect(element.textContent).toContain('registro cerrado temporalmente.');
+    expect(element.querySelector('[aria-label="Crear cuenta"]')).not.toBeNull();
+    expect(element.querySelector('[aria-label="Recuperar acceso"]')).not.toBeNull();
   });
 
   it('valida campos antes de invocar login', async () => {
@@ -30,7 +31,7 @@ describe('account-view', () => {
     element.querySelector<HTMLButtonElement>('.account-app__submit')?.click();
 
     expect(login).not.toHaveBeenCalled();
-    expect(element.querySelector('.account-app__error')?.textContent)
+    expect(element.querySelector('.account-app__feedback')?.textContent)
       .toBe('completa todos los campos');
   });
 
@@ -47,6 +48,49 @@ describe('account-view', () => {
     element.querySelector<HTMLButtonElement>('.account-app__submit')?.click();
 
     await vi.waitFor(() => expect(login).toHaveBeenCalledWith('user@example.com', 'secret'));
+  });
+
+  it('muestra y envía el formulario de registro desde Cuenta', async () => {
+    const register = vi.spyOn(AuthService, 'register').mockResolvedValue({ message: 'ok' });
+    const { element } = mount();
+    element.querySelector<HTMLButtonElement>('[aria-label="Crear cuenta"]')?.click();
+
+    const fields = element.querySelectorAll<HTMLInputElement>('input');
+    fields[0].value = 'new@example.com';
+    fields[1].value = 'secret';
+    fields[2].value = 'secret';
+    element.querySelector<HTMLButtonElement>('.account-app__submit')?.click();
+
+    await vi.waitFor(() => expect(register).toHaveBeenCalledWith('new@example.com', 'secret'));
+    await vi.waitFor(() => expect(element.textContent).toContain('solicitud recibida'));
+  });
+
+  it('muestra recuperación con respuesta no enumerable', async () => {
+    const recover = vi.spyOn(AuthService, 'requestPasswordReset').mockResolvedValue({ message: 'ok' });
+    const { element } = mount();
+    element.querySelector<HTMLButtonElement>('[aria-label="Recuperar acceso"]')?.click();
+
+    const email = element.querySelector<HTMLInputElement>('input[type="email"]');
+    if (!email) throw new Error('formulario no montado');
+    email.value = 'user@example.com';
+    element.querySelector<HTMLButtonElement>('.account-app__submit')?.click();
+
+    await vi.waitFor(() => expect(recover).toHaveBeenCalledWith('user@example.com'));
+    await vi.waitFor(() => expect(element.textContent).toContain('si el correo existe'));
+  });
+
+  it('rechaza contraseñas de registro que no coinciden', () => {
+    const register = vi.spyOn(AuthService, 'register');
+    const { element } = mount();
+    element.querySelector<HTMLButtonElement>('[aria-label="Crear cuenta"]')?.click();
+    const fields = element.querySelectorAll<HTMLInputElement>('input');
+    fields[0].value = 'new@example.com';
+    fields[1].value = 'secret';
+    fields[2].value = 'different';
+    element.querySelector<HTMLButtonElement>('.account-app__submit')?.click();
+
+    expect(register).not.toHaveBeenCalled();
+    expect(element.querySelector('.account-app__feedback')?.textContent).toBe('las contraseñas no coinciden');
   });
 
   it('cambia reactivamente a sesión admin sin remontar la vista', () => {
