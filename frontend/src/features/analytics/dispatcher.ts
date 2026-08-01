@@ -57,6 +57,8 @@ type WindowEvent =
   | { type: 'window_focus_changed'; appId: string; previousAppId?: string }
   | { type: 'window_minimized'; appId: string }
   | { type: 'window_restored'; appId: string }
+  | { type: 'window_maximized'; appId: string; maximized: boolean }
+  | { type: 'windows_reframed'; count: number }
   | { type: 'window_moved'; appId: string }
   | { type: 'window_resized'; appId: string }
   | { type: 'window_closed'; appId: string };

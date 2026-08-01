@@ -2,7 +2,7 @@
 
 > **Epic:** 297A-4
 > **Fecha:** 2026-07-29
-> **Estado:** parcialmente implementado; contratos base de 297A-9/10 cerrados, pendientes 297A-11–17
+> **Estado:** contratos base de 297A-9/10 cerrados; 018A-61 alineó navegación externa, maximizar/restaurar y reencuadre batch. Los pendientes restantes requieren validación visual/E2E, proveedores o decisiones de producto.
 > **Tareas dueñas:** 297A-9, 297A-10, 297A-11, 297A-12, 297A-14, 297A-15 y 297A-16
 > **Arquitectura:** `Agente/documentacion/arquitectura/manual-arquitectura-wandorius-2026-07-29.md`
 > **Identidad:** `Agente/documentacion/design-system/manual-identidad-visual-os-2026-07-29.md`
@@ -30,16 +30,16 @@ Cerrar antes de implementar los contratos que conectan ventanas, menús, selecci
 - [x] CommandRegistry es la única fuente para label, icono Lucide, atajo, orden y handler. *(command-registry.ts)*
 - [x] Menú superior, contextual, taskbar, launcher y teclado proyectan el Registry; no mantienen listas paralelas. *(desktop-context-menu.ts, command-registration.ts)*
 - [ ] Comandos repetibles incluyen `commandId`/idempotency key cuando llegan al servidor. *(pendiente: requiere backend integration en 297A-13)*
-- [ ] Tests prueban que una superficie no puede registrar un comando duplicado ni ejecutar uno no disponible. *(pendiente: requiere vitest)*
+- [x] Tests prueban que una superficie no puede registrar un comando duplicado ni ejecutar uno no disponible. *(command-registry.test.ts; evidencia consolidada en 018A-61)*
 
 ### 2.2 Catálogo mínimo de shell y ventanas
 
-- [ ] `navigation.toggleExternalNav`: pliega/restaura el nav exterior sin desmontar OS, apps ni rutas.
+- [x] `navigation:toggle-external-nav` (alias documental `navigation.toggleExternalNav`): pliega/restaura el nav exterior sin desmontar OS, apps ni rutas y emite `external_nav_toggled`. *(018A-61)*
 - [x] `app.open`/`app.focus`: abre o enfoca según singleton/multiinstancia y capacidades. *(command-registration.ts)*
 - [x] `window.focus`, `window.minimize`, `window.restore` y `window.close`. *(command-registration.ts)*
 - [x] `window.move` y `window.resize`: actualizan preview durante gesto y confirman un solo comando al terminar. *(command-registration.ts + drag-resize.ts)*
-- [ ] `window.maximize`/`window.unmaximize`: contrato disponible; el control visual se añade solo si se aprueba.
-- [ ] `window.reframeAll`: recupera ventanas fuera de bounds tras resize, zoom o cambio de pantalla.
+- [x] `window:maximize`: maximiza/restaura la ventana enfocada o el target explícito; titlebar, toolbar y doble clic delegan en el mismo comando. *(018A-61)*
+- [x] `window:reframe-all`: recupera ventanas fuera de bounds tras resize, zoom o cambio de pantalla con una mutación batch; las maximizadas ocupan el workspace vigente. *(018A-61)*
 - [ ] Cerrar app decide explícitamente si conserva estado interno recuperable o lo destruye mediante teardown.
 - [x] Taskbar usa los mismos comandos para enfocar/restaurar/cerrar; cerrar con X no cambia foco accidentalmente. *(desktop-shell.ts)*
 

@@ -2,7 +2,8 @@
  * Patrón estándar: pointerdown inicia, document-level pointermove/pointerup terminan.
  * Lógica de cálculo en resize-edges.ts; detección de cursor en resize-edges.ts. */
 
-import { updateWindowBounds, focusWindow, clampWindowBounds, toggleMaximizeWindow } from '../../runtime/window-manager';
+import { updateWindowBounds, focusWindow, clampWindowBounds } from '../../runtime/window-manager';
+import { CommandRegistry } from '../../runtime/command-registry';
 import { detectEdge, cursorForEdge, calculateResizeBounds, type ResizeEdge } from './resize-edges';
 
 export interface DragResizeOptions {
@@ -26,7 +27,10 @@ export function enableDragResize(opts: DragResizeOptions): () => void {
 
   function onTitleBarDblClick(e: MouseEvent): void {
     if ((e.target as HTMLElement).closest('button')) return;
-    toggleMaximizeWindow(instanceId);
+    focusWindow(instanceId);
+    void CommandRegistry.execute('window:maximize', {
+      targets: [{ id: instanceId, kind: 'window' }],
+    });
   }
 
   function onDragPointerDown(e: PointerEvent): void {

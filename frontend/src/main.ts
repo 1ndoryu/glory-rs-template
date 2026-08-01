@@ -29,6 +29,7 @@ import { createMobileShell } from './features/mobile/mobile-shell';
 import './features/runtime/app-registration';
 import './features/runtime/commands';
 import { initKeyboardShortcuts } from './features/runtime/commands';
+import { CommandRegistry } from './features/runtime/command-registry';
 import { initRouteAppAdapter, setMobileOpenHandler, openAppWindow } from './features/runtime/route-app-adapter';
 import { initWindowUrlSync } from './features/runtime/window-url-sync';
 import { initWindowSessionPersistence } from './features/runtime/window-session';
@@ -148,7 +149,9 @@ async function initApp(): Promise<void> {
   function mountPresentation(mobileMode: boolean): void {
     isMobile = mobileMode;
     if (mobileMode) {
-      mobile = createMobileShell(profile, () => showSidebar.update((visible) => !visible));
+      mobile = createMobileShell(profile, () => {
+        void CommandRegistry.execute('navigation:toggle-external-nav');
+      });
       columnaDerecha.appendChild(mobile.element);
     } else {
       desktop = createDesktopShell(profile, contenido);

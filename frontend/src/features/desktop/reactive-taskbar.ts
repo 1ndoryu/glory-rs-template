@@ -11,6 +11,7 @@ import { createEl } from '../../utils/dom';
 import type { WindowIdentity, WindowContent } from '../runtime/window-store';
 import { windowStore, closeWindow, restoreWindow, focusWindow } from '../runtime/window-manager';
 import { showSidebar } from '../../store';
+import { CommandRegistry } from '../runtime/command-registry';
 
 import { reconcileChildren } from '../../utils/reconcile';
 
@@ -25,13 +26,15 @@ export function createReactiveTaskbar(): { element: HTMLElement; taskList: HTMLE
   const taskbar = createEl('footer', { className: 'desktop-taskbar', ariaLabel: 'Ventanas abiertas' });
 
   const navControl = createEl('button', { type: 'button', className: 'desktop-taskbar__nav-control' });
-  navControl.setAttribute('aria-label', showSidebar.get() ? 'Ocultar navegación' : 'Mostrar navegación');
   const navIcon = createElement(PanelLeft);
   navIcon.classList.add('desktop-taskbar__icon');
   navControl.appendChild(navIcon);
+  const updateNavLabel = (visible: boolean): void => {
+    navControl.setAttribute('aria-label', visible ? 'Ocultar navegación' : 'Mostrar navegación');
+  };
+  const stopSidebar = showSidebar.subscribe((visible) => updateNavLabel(visible));
   navControl.addEventListener('click', () => {
-    showSidebar.update(v => !v);
-    navControl.setAttribute('aria-label', showSidebar.get() ? 'Ocultar navegación' : 'Mostrar navegación');
+    void CommandRegistry.execute('navigation:toggle-external-nav');
   });
 
   const taskList = createEl('div', { className: 'desktop-taskbar__tasks' });
@@ -94,6 +97,7 @@ export function createReactiveTaskbar(): { element: HTMLElement; taskList: HTMLE
 
   const destroy = (): void => {
     stopWindows();
+    stopSidebar();
     taskList.replaceChildren();
   };
 

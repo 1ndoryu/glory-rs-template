@@ -1,5 +1,6 @@
 /* wandori.us — Window Commands
- * Comandos de gestión de ventanas: cerrar, minimizar, restaurar, enfocar, ciclar. */
+ * Comandos de gestión de ventanas: cerrar, minimizar, maximizar, restaurar,
+ * reencuadrar, enfocar y ciclar. */
 
 import { CommandRegistry, type CommandContext, type CommandResult } from '../command-registry';
 import {
@@ -9,8 +10,17 @@ import {
   restoreWindow,
   focusWindow,
   getWindows,
+  toggleMaximizeWindow,
+  reframeAllWindows,
 } from '../window-manager';
 import { dispatchEvent } from '../../analytics/dispatcher';
+
+function resolveWindow(ctx?: CommandContext) {
+  const targetId = ctx?.targets?.find(target => target.kind === 'window')?.id;
+  return targetId
+    ? getWindows().find(window => window.instanceId === targetId)
+    : getFocusedWindow();
+}
 
 CommandRegistry.register({
   id: 'window:close',
@@ -86,9 +96,56 @@ CommandRegistry.register({
 });
 
 CommandRegistry.register({
+  id: 'window:maximize',
+  label: 'Maximizar/restaurar',
+  order: 13,
+  contexts: ['window', 'toolbar'],
+  undoPolicy: 'local',
+  analyticsEvent: 'window.maximized',
+  isAvailable: (ctx) => {
+    const win = resolveWindow(ctx);
+    if (!win) return { state: 'disabled', reason: 'no window' };
+    return win.state === 'minimized'
+      ? { state: 'disabled', reason: 'window minimized' }
+      : { state: 'enabled' };
+  },
+  execute: (ctx?: CommandContext): CommandResult => {
+    const win = resolveWindow(ctx);
+    if (!win || win.state === 'minimized') {
+      return { status: 'failure', reason: !win ? 'no window' : 'window minimized' };
+    }
+    toggleMaximizeWindow(win.instanceId);
+    const next = getWindows().find(window => window.instanceId === win.instanceId);
+    dispatchEvent({
+      type: 'window_maximized',
+      appId: win.appId,
+      maximized: next?.state === 'maximized',
+    });
+    return { status: 'success' };
+  },
+});
+
+CommandRegistry.register({
+  id: 'window:reframe-all',
+  label: 'Reencuadrar ventanas',
+  order: 16,
+  contexts: ['desktop', 'window'],
+  undoPolicy: 'local',
+  analyticsEvent: 'windows.reframed',
+  isAvailable: () => getWindows().length > 0
+    ? { state: 'enabled' }
+    : { state: 'disabled', reason: 'no windows' },
+  execute: (): CommandResult => {
+    const count = reframeAllWindows('user');
+    dispatchEvent({ type: 'windows_reframed', count });
+    return { status: 'success' };
+  },
+});
+
+CommandRegistry.register({
   id: 'window:focus',
   label: 'Enfocar ventana',
-  order: 13,
+  order: 14,
   contexts: ['taskbar'],
   undoPolicy: 'local',
   analyticsEvent: 'window.focused',
@@ -113,7 +170,7 @@ CommandRegistry.register({
 CommandRegistry.register({
   id: 'window:focus-next',
   label: 'Siguiente ventana',
-  order: 14,
+  order: 15,
   contexts: ['window'],
   undoPolicy: 'local',
   analyticsEvent: 'window.cycle',

@@ -303,3 +303,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Los eventos de auth pueden registrar tipo, éxito, usuario e IP hasheada sin copiar email, contraseña, sesión ni token; el servicio de tokens sigue siendo la única frontera que maneja el secreto crudo.
 - Registrar también los fallos de consumo permite detectar replay/abuso, pero el fallo de la propia auditoría debe propagarse para no presentar una acción sensible como completada sin evidencia.
+
+## 018A-61 — Una acción del shell debe tener un solo dueño
+
+- Si taskbar, móvil y titlebar mutan stores directamente, la misma acción puede quedar sin analítica, sin disponibilidad uniforme o con teardown distinto. El contrato debe vivir en `CommandRegistry` y las superficies solo proyectarlo.
+- El reencuadre por resize debe ser batch: una sola escritura al store evita N persistencias y mantiene el historial de rutas estable; los cambios ambientales usan `source='sync'`.

@@ -251,6 +251,44 @@ export function toggleMaximizeWindow(instanceId: string): void {
   }
 }
 
+/** Reencuadrar todas las ventanas tras un cambio de superficie.
+ * [018A-61] Una sola mutación batch evita recalcular/persistir cada ventana
+ * por separado; las maximizadas ocupan el workspace nuevo y las demás usan
+ * el mismo clamp que drag/resize. `sync` evita que un ResizeObserver altere
+ * el historial de rutas.
+ */
+export function reframeAllWindows(source: StoreSource = 'sync'): number {
+  const windows = windowStore.get();
+  let changed = 0;
+  const updated = windows.map((window) => {
+    const bounds = window.state === 'maximized'
+      ? { x: 0, y: 0, w: workspaceW, h: workspaceH }
+      : clampWindowBounds(window.bounds.x, window.bounds.y, window.bounds.w, window.bounds.h);
+    const preMaximizeBounds = window.preMaximizeBounds
+      ? clampWindowBounds(
+        window.preMaximizeBounds.x,
+        window.preMaximizeBounds.y,
+        window.preMaximizeBounds.w,
+        window.preMaximizeBounds.h,
+      )
+      : undefined;
+    const sameBounds = Object.entries(bounds).every(([key, value]) =>
+      window.bounds[key as keyof WindowBounds] === value,
+    );
+    const samePreMaximize =
+      (window.preMaximizeBounds === undefined && preMaximizeBounds === undefined)
+      || Object.entries(preMaximizeBounds ?? {}).every(([key, value]) =>
+        window.preMaximizeBounds?.[key as keyof WindowBounds] === value,
+      );
+    if (sameBounds && samePreMaximize) return window;
+    changed += 1;
+    return { ...window, bounds, preMaximizeBounds };
+  });
+
+  if (changed > 0) windowStore.set(updated, source);
+  return changed;
+}
+
 /** Actualizar bounds de una ventana (drag/resize/keyboard). */
 export function updateWindowBounds(instanceId: string, bounds: Partial<WindowBounds>): void {
   const windows = windowStore.get();

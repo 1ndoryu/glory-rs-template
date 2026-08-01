@@ -456,7 +456,10 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [x] **018A-51 —** Hacer que el gate `--ci` ejecute `frontend/test:full` además de type-check, manteniendo en local el selector incremental para evitar consumo innecesario.
 - [x] **018A-52 —** Separar el fingerprint de caché por modo local/CI y cubrirlo con regresión para que el reporte nunca reclame cobertura no ejecutada.
 - [x] **018A-53 —** Construir el frontend en CI y aplicar budgets gzip configurables al entry JS, entry CSS y chunk JS mayor; mantener local ligero.
+- [x] **018A-61 —** Consolidar navegación externa, maximizar/restaurar y reencuadre batch como comandos únicos del shell; las superficies delegan en `CommandRegistry` y emiten eventos medibles. La evidencia ejecutable está en `roadmap.md` y el plan de contratos; validación visual/E2E continúa diferida.
 - [ ] Eliminar CSS/clases huérfanas con VarSense tras revisión visual; diferido y no bloquea 297A-17.
+
+> **Sincronización 2026-08-01:** los checklists históricos de esta sección no se reabren por sí solos. `roadmap.md` es la fuente ejecutable; solo se añade una nueva tarea cuando existe una brecha reproducible y un criterio de salida verificable.
 
 **Criterio de salida:** una sola administración como app registrada, analytics útil/privado y cero rutas/chrome duplicados legacy; uploads y CSS/contratos obsoletos deben desaparecer después de su matriz de paridad.
 

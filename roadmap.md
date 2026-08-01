@@ -76,6 +76,7 @@
 - [x] **018A-34 —** Auth, preferencias, notificaciones, settings y analytics usan funciones Orval con estados explícitos; se conserva la sincronización de stores y el header de consentimiento. Workspace queda aislado para su propia adaptación de overlay/release.
 - [x] **018A-35 —** `WorkspaceService` migra releases, publicación y overlay al cliente generado; las conversiones de `WorkspaceTree`/`WorkspaceOverlay` quedan confinadas al boundary y el cliente manual deja de tener consumidores frontend.
 - [x] **018A-36 —** Se retira el objeto `api` manual del frontend; `client.ts` conserva solo `ApiError`, el mutator Orval y `unwrapGeneratedResponse`. La matriz de transporte queda cerrada; lo pendiente es cobertura visual/E2E y dominios externos.
+- [x] **018A-61 —** El toggle de navegación, maximizar/restaurar y reencuadrar ventanas usan comandos del `CommandRegistry`; taskbar, móvil y titlebar ya no mutan esos estados directamente. El reencuadre batch conserva límites/maximización y emite medición semántica; validación visual/E2E permanece en 297A-17.
 
 **Salida:** runtime compartido funciona sin chrome/listas/listeners duplicados. Orval se regenera localmente sin backend vivo; quedan cobertura total del contrato y retiro del cliente manual.
 
@@ -331,6 +332,7 @@ Este bloque amplía el alcance verificable sin duplicar los manuales canónicos.
 - [x] Matriz de `AppRegistry`, `CommandRegistry` y `RouteAppAdapter` con capacidades, rutas, eventos y teardown.
 - [x] Exportar OpenAPI sin levantar backend y generar Orval `tags-split` con configuración portable (`npm run codegen:local`); quedan cobertura total de endpoints y retiro del cliente manual.
 - [x] Tests de IDs, capacidades, disponibilidad por presentación e idempotencia; eventos críticos quedan server-side.
+- [x] **018A-61 —** Navegación externa, maximizar/restaurar y reencuadre batch están registrados como comandos únicos; las superficies delegan en ellos y los eventos `external_nav_toggled`, `window_maximized` y `windows_reframed` quedan tipados.
 - [ ] Prueba visual completa del shell en todos los viewports y zoom 200% (pendiente de servidor/navegador estable).
 
 ### 297A-12 — Experiencia móvil tipo launcher

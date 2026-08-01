@@ -11,8 +11,9 @@ import { setProfileSettingsToggle } from '../runtime/commands/profile-commands';
 import type { AppToolbarGroup } from '../runtime/app-registry';
 import {
   windowStore, focusWindow, restoreWindow, closeWindow,
-  minimizeWindow, toggleMaximizeWindow, setWorkspaceBounds, registerShellWindow,
+  minimizeWindow, reframeAllWindows, setWorkspaceBounds, registerShellWindow,
 } from '../runtime/window-manager';
+import { CommandRegistry } from '../runtime/command-registry';
 import { authStore } from '../../store';
 import { enableDragResize } from './utils/drag-resize';
 import { openContextMenu } from './components/desktop-context-menu';
@@ -156,6 +157,7 @@ export function createDesktopShell(
 
   const resizeObserver = new ResizeObserver(() => {
     setWorkspaceBounds(windowContainer.clientWidth, windowContainer.clientHeight);
+    reframeAllWindows('sync');
   });
   resizeObserver.observe(windowContainer);
 
@@ -180,7 +182,11 @@ export function createDesktopShell(
             closeWindow(win.instanceId);
           },
           onMinimize: () => { minimizeWindow(win.instanceId); },
-          onMaximize: () => { toggleMaximizeWindow(win.instanceId); },
+          onMaximize: () => {
+            void CommandRegistry.execute('window:maximize', {
+              targets: [{ id: win.instanceId, kind: 'window' }],
+            });
+          },
         });
         const el = windowHandle.element;
 
