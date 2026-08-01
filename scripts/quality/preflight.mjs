@@ -90,5 +90,7 @@ export async function preflight(args) {
   const reportRoot = path.join(projectRoot, '.quality-reports', args.taskId);
   const logsRoot = path.join(reportRoot, 'logs');
   await mkdir(logsRoot, { recursive: true });
-  return { projectRoot, qualityConfig, toolManifest, tools, reportRoot, logsRoot };
+  /* [018A-51] El modo CI puede ampliar la validación frontend sin hacer que
+   * cada agente ejecute la suite completa localmente. */
+  return { projectRoot, qualityConfig, toolManifest, tools, reportRoot, logsRoot, ci: args.ci };
 }

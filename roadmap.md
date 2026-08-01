@@ -383,6 +383,8 @@ Plan canónico: `Agente/planes/plan-programas-editoriales-2026-07-31.md`.
 - [x] **018A-39 —** Completar la acción `properties` de la matriz de recursos y registrar la app `properties`; el menú contextual ya no declara una acción sin ejecutor.
 - [x] **018A-40 —** Retirar tres utilidades CSS huérfanas (`gap-sm`, `mt-md`, `mb-lg`) tras búsqueda estática en fuentes y estilos; se conservan clases dinámicas con consumidores comprobados.
 - [x] **018A-50 —** Completar la matriz de paridad de contratos automatizables y documentar el backlog residual de CSS/fachadas manuales como deuda no bloqueante.
+- [x] **018A-51 —** El gate CI ejecuta la suite frontend completa; el trabajo local conserva alcance incremental y no inicia procesos innecesarios.
+- [x] **018A-52 —** La caché del quality gate separa huellas local/CI para impedir que un PASS de `test:full` se reutilice como cobertura local sin ejecutar la suite.
 - [ ] Retirar CSS/clases huérfanas restantes con VarSense tras revisión visual; diferido.
 
 ### 297A-17 — Hardening, identidad, accesibilidad y SEO
@@ -390,7 +392,8 @@ Plan canónico: `Agente/planes/plan-programas-editoriales-2026-07-31.md`.
 - [ ] Completar MFA/passkey, recuperación y threat review con casos negativos de sesión, CSRF, capacidades, pagos, grants y webhooks.
 - [x] Validar SEO base: HTML público, sitemap, robots, metadata y Open Graph sin exponer drafts ni rutas privadas; queda auditoría final.
 - [ ] Verificar manual visual, teclado, foco, live regions, zoom 200%, reduced motion, alto contraste y multimedia accesible.
-- [ ] Ejecutar Sentinel, VarSense, type-check, tests, E2E, presupuestos de rendimiento, observabilidad y runbook Coolify; deploy continúa fuera de alcance. El split estructural de modelos ya está cerrado: `workspace/` y `workspace_overlay/` agrupan DTOs, validación, locators y tests sin suppressions. Para backend se debe usar `npm test`/`npm run check:back`, que derivan la BD por rama y aplican el contexto correcto.
+- [x] **018A-51 —** CI ejecuta `type-check` y `test:full` frontend solo con `task:check --ci`; local mantiene type-check y selección incremental para no degradar el equipo.
+- [ ] Ejecutar E2E críticos, presupuestos de rendimiento, observabilidad y runbook Coolify; deploy continúa fuera de alcance. El split estructural de modelos ya está cerrado: `workspace/` y `workspace_overlay/` agrupan DTOs, validación, locators y tests sin suppressions. Para backend se debe usar `npm test`/`npm run check:back`, que derivan la BD por rama y aplican el contexto correcto.
 - [x] **018A-37 —** El selector frontend incremental y la escritura atómica Windows quedan cubiertos por fixtures del orquestador; la suite completa sigue reservada para `test:full`/CI.
 - [x] **018A-38 —** Separar el contrato Article en subinterfaces composables; type-check y Sentinel confirman que las vistas conservan el mismo boundary.
 - [x] **018A-41 —** Separar el registro de apps públicas y administrativas; `app-registration.ts` queda bajo 300 líneas y los registros/capacidades permanecen sin cambios.

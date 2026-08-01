@@ -9,7 +9,8 @@
     "sentinel": 120000,
     "varsense": 120000,
     "rust": 300000,
-    "frontend": 120000
+    "frontend": 120000,
+    "frontendTest": 300000
   },
   "fullPatterns": [
     "Cargo.toml",

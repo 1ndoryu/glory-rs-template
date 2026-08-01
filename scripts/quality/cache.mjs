@@ -3,7 +3,7 @@ import { mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { writeAtomic } from './atomic-file.mjs';
 
-const CACHE_FORMAT_VERSION = 2;
+const CACHE_FORMAT_VERSION = 3;
 
 async function hashFile(hash, root, relativePath) {
   try {
@@ -18,6 +18,9 @@ export async function fingerprint(context, scope, stage) {
    * del runner aunque el conjunto de archivos permanezca igual. */
   hash.update(`quality-cache-v${CACHE_FORMAT_VERSION}\0`);
   hash.update(`${process.version}\0${process.platform}\0${process.arch}\0`);
+  /* [018A-52] CI ejecuta la suite frontend completa y local no; un PASS de
+   * un modo nunca puede reutilizarse para afirmar cobertura del otro. */
+  hash.update(`mode:${context.ci ? 'ci' : 'local'}\0`);
   hash.update(stage);
   hash.update(JSON.stringify(context.qualityConfig));
   hash.update(JSON.stringify(context.toolManifest));

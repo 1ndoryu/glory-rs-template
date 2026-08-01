@@ -268,3 +268,13 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Una matriz de paridad puede cerrarse técnicamente aunque queden CSS huérfanos o fachadas manuales que necesitan revisión visual; conviene separarlos como backlog no bloqueante en vez de falsear el criterio de salida.
 - El roadmap debe habilitar el siguiente epic solo cuando sus dependencias de contratos estén cerradas y dejar las migraciones de alto riesgo con criterio explícito de reanudación.
+
+## 018A-51 — Suite completa en CI, alcance incremental en local
+
+- Un gate local que ejecuta toda la suite en cada tarea degrada el equipo a medida que crecen los tests; el modo incremental debe seguir siendo la ruta rápida.
+- La cobertura completa no debe desaparecer: se activa con una señal explícita de CI, comparte el mismo reporte y falla el gate si cualquier etapa devuelve error.
+
+## 018A-52 — El caché debe incluir el nivel de evidencia
+
+- Dos ejecuciones con los mismos archivos no tienen la misma evidencia si una ejecuta solo type-check y otra ejecuta la suite completa; el modo de validación forma parte del fingerprint.
+- Al cambiar el contrato del caché hay que incrementar su versión para invalidar resultados antiguos en vez de asumir que describen el nuevo gate.

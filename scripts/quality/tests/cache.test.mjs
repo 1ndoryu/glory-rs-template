@@ -30,3 +30,21 @@ test('cache de calidad distingue pass, cambios de archivo y formato', async () =
     await rm(projectRoot, { recursive: true, force: true });
   }
 });
+
+test('cache separa el modo local del gate CI', async () => {
+  const projectRoot = await mkdtemp(path.join(os.tmpdir(), 'quality-cache-mode-'));
+  try {
+    await writeFile(path.join(projectRoot, 'input.ts'), 'export const value = 1;\n', 'utf8');
+    const base = {
+      projectRoot,
+      qualityConfig: { schemaVersion: 1, lockWaitMs: 0 },
+      toolManifest: { schemaVersion: 1, tools: {} },
+    };
+    const scope = { files: ['input.ts'], fingerprintFiles: ['input.ts'] };
+    const local = await fingerprint({ ...base, ci: false }, scope, 'frontend');
+    const ci = await fingerprint({ ...base, ci: true }, scope, 'frontend');
+    assert.notEqual(local, ci);
+  } finally {
+    await rm(projectRoot, { recursive: true, force: true });
+  }
+});

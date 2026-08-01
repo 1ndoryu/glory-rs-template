@@ -450,6 +450,8 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [x] **018A-48 —** Separar DTOs públicos/admin de proyectos; `sort_order` e `is_visible` quedan en el boundary administrativo y el catálogo público recibe solo contenido de presentación.
 - [x] **018A-49 —** Separar DTOs de notificaciones públicas, cuenta y admin; estado editorial y autor quedan confinados al panel admin, mientras la cuenta conserva `read` por usuario.
 - [x] **018A-50 —** Cerrar paridad automatizable de contratos públicos/admin y aislar el backlog residual de CSS/fachadas manuales para una fase visual posterior.
+- [x] **018A-51 —** Hacer que el gate `--ci` ejecute `frontend/test:full` además de type-check, manteniendo en local el selector incremental para evitar consumo innecesario.
+- [x] **018A-52 —** Separar el fingerprint de caché por modo local/CI y cubrirlo con regresión para que el reporte nunca reclame cobertura no ejecutada.
 - [ ] Eliminar CSS/clases huérfanas con VarSense tras revisión visual; diferido y no bloquea 297A-17.
 
 **Criterio de salida:** una sola administración como app registrada, analytics útil/privado y cero rutas/chrome duplicados legacy; uploads y CSS/contratos obsoletos deben desaparecer después de su matriz de paridad.
