@@ -332,6 +332,30 @@ describe('rebaseOverlay', () => {
     expect(result.addedItems['userItem']).toBeDefined();
   });
 
+  it('debe preservar overrides de nodos admin dinámicos (ADMIN_NODES) durante rebase', () => {
+    /* [297A-29] Regresión: el release publicado puede no incluir un nodo admin
+     * (p. ej. mediaLibrary), pero el merge lo inyecta desde ADMIN_NODES. El
+     * override de su posición debe sobrevivir al rebase; si se descartaba, el
+     * overlay remoto quedaba distinto del local → falso conflicto. */
+    const overlay: WorkspaceOverlay = {
+      ...emptyOverlay,
+      fieldOverrides: {
+        mediaLibrary: { position: { col: 2, row: 1 } },
+      },
+    };
+    const result = rebaseOverlay(newRelease, overlay);
+    expect(result.fieldOverrides['mediaLibrary']).toEqual({ position: { col: 2, row: 1 } });
+  });
+
+  it('debe preservar tombstones de nodos admin dinámicos (ADMIN_NODES) durante rebase', () => {
+    const overlay: WorkspaceOverlay = {
+      ...emptyOverlay,
+      tombstones: ['mediaLibrary'],
+    };
+    const result = rebaseOverlay(newRelease, overlay);
+    expect(result.tombstones).toContain('mediaLibrary');
+  });
+
   it('debe preservar version del overlay', () => {
     const overlay: WorkspaceOverlay = { ...emptyOverlay, version: 2 };
     const result = rebaseOverlay(newRelease, overlay);

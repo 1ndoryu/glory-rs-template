@@ -2,6 +2,7 @@
  * Algoritmo puro: merge release + overlay → resolved workspace. */
 
 import { hasCapability, type Capability } from '../capability';
+import { ADMIN_NODES } from './default-release';
 import type {
   NodeId,
   WorkspaceNode,
@@ -79,7 +80,14 @@ export function rebaseOverlay(
   newRelease: WorkspaceTree,
   currentOverlay: WorkspaceOverlay,
 ): WorkspaceOverlay {
-  const releaseIds = new Set(Object.keys(newRelease.nodes));
+  /* [297A-29] Los nodos admin dinámicos (ADMIN_NODES) también son ids válidos:
+   * el merge los inyecta en el workspace resuelto, así que un override o
+   * tombstone sobre ellos (p. ej. mediaLibrary) debe sobrevivir al rebase.
+   * Sin esto, si el release publicado no incluye un nodo admin, el rebase lo
+   * descartaba del overlay remoto y producía un falso conflicto ("workspace
+   * actualizado") al comparar con el local, y fetchWorkspaceRelease perdía
+   * el override local (movimiento del icono) de ese nodo. */
+  const releaseIds = new Set([...Object.keys(newRelease.nodes), ...Object.keys(ADMIN_NODES)]);
 
   const validTombstones = currentOverlay.tombstones.filter((id) => releaseIds.has(id));
 
