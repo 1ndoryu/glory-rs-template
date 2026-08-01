@@ -35,6 +35,16 @@ pub async fn list_all_projects(
     Ok(Json(projects))
 }
 
+/// Obtener un proyecto por ID (admin)
+pub async fn get_project(
+    State(state): State<AppState>,
+    _auth: AdminUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Project>, AppError> {
+    let project = ProjectService::get_by_id(&state.pool, id).await?;
+    Ok(Json(project))
+}
+
 /// Actualizar proyecto (admin)
 pub async fn update_project(
     State(state): State<AppState>,
@@ -67,6 +77,6 @@ pub fn routes() -> Router<AppState> {
         )
         .route(
             "/admin/projects/{id}",
-            axum::routing::put(update_project).delete(delete_project),
+            get(get_project).put(update_project).delete(delete_project),
         )
 }

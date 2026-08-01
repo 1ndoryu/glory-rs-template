@@ -8,45 +8,61 @@ use crate::models::project::{
 use crate::models::resource::{
     CreateResourceParams, EditorialState, ResourceKind, VisibilityState,
 };
-use crate::repositories::project_repo::{ProjectRepository, ProjectUpdateParams};
+use crate::repositories::project_repo::{
+    ProjectCreateParams, ProjectRepository, ProjectUpdateParams,
+};
 use crate::repositories::resource_repo::ResourceRepository;
 
 pub struct ProjectService;
 
 impl ProjectService {
-    /// [297A-10] Crear proyecto con resource envelope en transacción. Defaults: draft, private.
-    #[allow(clippy::explicit_auto_deref)]
+    /// Crear proyecto y resource envelope en una transacción.
     pub async fn create(pool: &PgPool, req: CreateProjectRequest) -> Result<Project, AppError> {
-        let id = uuid::Uuid::new_v4();
+        let id = Uuid::new_v4();
+        /* Editorial y visibilidad son estados independientes. La publicación
+         * editorial tendrá su propio comando; is_visible solo proyecta acceso. */
+        let editorial = EditorialState::Draft;
+        let visibility = if req.is_visible {
+            VisibilityState::Public
+        } else {
+            VisibilityState::Private
+        };
 
         let mut tx = pool.begin().await?;
 
-        /* 1. Insertar resource envelope */
         ResourceRepository::create(
-            &mut *tx,
+            &mut tx,
             CreateResourceParams {
                 id,
                 kind: ResourceKind::Project,
                 title: &req.title,
-                editorial: EditorialState::Draft,
-                visibility: VisibilityState::Private,
+                editorial,
+                visibility,
             },
         )
         .await?;
 
-        /* 2. Insertar proyecto */
         let project = ProjectRepository::create(
-            &mut *tx,
-            id,
-            &req.title,
-            &req.description,
-            req.url.as_deref(),
-            req.sort_order,
+            &mut tx,
+            ProjectCreateParams {
+                id,
+                title: &req.title,
+                description: &req.description,
+                url: req.url.as_deref(),
+                sort_order: req.sort_order,
+                is_visible: req.is_visible,
+            },
         )
         .await?;
 
         tx.commit().await?;
         Ok(project)
+    }
+
+    pub async fn get_by_id(pool: &PgPool, id: Uuid) -> Result<Project, AppError> {
+        ProjectRepository::find_by_id(pool, id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Proyecto no encontrado".into()))
     }
 
     pub async fn list_all(pool: &PgPool) -> Result<Vec<Project>, AppError> {
@@ -57,6 +73,7 @@ impl ProjectService {
         Ok(ProjectRepository::list_visible(pool).await?)
     }
 
+    /// Actualiza proyecto y envelope juntos para evitar estados divergentes.
     pub async fn update(
         pool: &PgPool,
         id: Uuid,
@@ -68,8 +85,9 @@ impl ProjectService {
             ProjectUrlUpdate::Set(value) => (Some(value.as_str()), false),
         };
 
-        ProjectRepository::update(
-            pool,
+        let mut tx = pool.begin().await?;
+        let project = ProjectRepository::update(
+            &mut tx,
             ProjectUpdateParams {
                 id,
                 title: req.title.as_deref(),
@@ -81,13 +99,32 @@ impl ProjectService {
             },
         )
         .await?
-        .ok_or_else(|| AppError::NotFound("Proyecto no encontrado".into()))
+        .ok_or_else(|| AppError::NotFound("Proyecto no encontrado".into()))?;
+
+        let envelope_updated = ResourceRepository::update_project_state(
+            &mut tx,
+            id,
+            req.title.as_deref(),
+            req.is_visible,
+        )
+        .await?;
+        if !envelope_updated {
+            return Err(AppError::NotFound(
+                "Envelope de proyecto no encontrado".into(),
+            ));
+        }
+
+        tx.commit().await?;
+        Ok(project)
     }
 
     pub async fn delete(pool: &PgPool, id: Uuid) -> Result<(), AppError> {
-        if !ProjectRepository::delete(pool, id).await? {
+        let mut tx = pool.begin().await?;
+        let trashed = ResourceRepository::soft_delete_tx(&mut tx, id).await?;
+        if !trashed {
             return Err(AppError::NotFound("Proyecto no encontrado".into()));
         }
+        tx.commit().await?;
         Ok(())
     }
 }

@@ -22,6 +22,8 @@ interface RequestOptions {
   body?: unknown;
   headers?: Record<string, string>;
   formData?: FormData;
+  /** AbortSignal opcional para cancelar el fetch con el lifecycle de la app. */
+  signal?: AbortSignal;
 }
 
 /* [297A-8] Leer cookie CSRF del browser */
@@ -32,7 +34,7 @@ function getCsrfToken(): string | null {
 
 /* Request genérico con auth automática (cookies) y CSRF */
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, headers = {}, formData } = options;
+  const { method = 'GET', body, headers = {}, formData, signal } = options;
 
   const requestHeaders: Record<string, string> = { ...headers };
 
@@ -56,6 +58,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     headers: requestHeaders,
     credentials: 'include',
     body: formData ?? (body ? JSON.stringify(body) : undefined),
+    signal,
   });
 
   if (!response.ok) {
@@ -85,7 +88,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
 /* Métodos de conveniencia */
 export const api = {
-  get: <T>(path: string) => request<T>(path),
+  get: <T>(path: string, options?: { signal?: AbortSignal }) => request<T>(path, options),
 
   post: <T>(path: string, body: unknown) =>
     request<T>(path, { method: 'POST', body }),

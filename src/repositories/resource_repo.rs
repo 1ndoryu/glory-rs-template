@@ -59,6 +59,48 @@ impl ResourceRepository {
         .await
     }
 
+    /// Sincronizar título y visibilidad del envelope de un proyecto.
+    /// El estado editorial se modifica únicamente mediante publicación explícita.
+    pub async fn update_project_state(
+        conn: &mut sqlx::PgConnection,
+        id: Uuid,
+        title: Option<&str>,
+        is_visible: Option<bool>,
+    ) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query(
+            "UPDATE resources SET \
+                title = COALESCE($1, title), \
+                visibility = CASE \
+                    WHEN $2 IS NULL THEN visibility \
+                    WHEN $2 THEN 'public'::visibility_state \
+                    ELSE 'private'::visibility_state \
+                END, \
+                updated_at = NOW() \
+             WHERE id = $3 AND kind = 'project'::resource_kind",
+        )
+        .bind(title)
+        .bind(is_visible)
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    /// Soft delete dentro de una transacción: conserva el envelope para restauración.
+    pub async fn soft_delete_tx(
+        conn: &mut sqlx::PgConnection,
+        id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query(
+            "UPDATE resources SET lifecycle = 'trashed', deleted_at = NOW(), updated_at = NOW() \
+             WHERE id = $1 AND kind = 'project'::resource_kind AND lifecycle = 'active'",
+        )
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
     /// Soft delete: mover a trashed.
     pub async fn soft_delete(pool: &PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(

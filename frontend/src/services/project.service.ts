@@ -16,9 +16,9 @@ export const ProjectService = {
     return api.get<Project[]>('/admin/projects');
   },
 
-  /** Obtener un proyecto por ID. */
-  async getById(id: string): Promise<Project> {
-    return api.get<Project>(`/admin/projects/${id}`);
+  /** Obtener un proyecto por ID; opcionalmente abortable con el lifecycle. */
+  async getById(id: string, options?: { signal?: AbortSignal }): Promise<Project> {
+    return api.get<Project>(`/admin/projects/${id}`, options);
   },
 
   /** Crear un nuevo proyecto (admin). */

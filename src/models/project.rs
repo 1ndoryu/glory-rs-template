@@ -24,6 +24,9 @@ pub struct CreateProjectRequest {
     pub url: Option<String>,
     #[serde(default)]
     pub sort_order: i32,
+    /// Los proyectos nuevos nacen privados/ocultos salvo publicación explícita.
+    #[serde(default)]
+    pub is_visible: bool,
 }
 
 /// Parche explícito de URL: distingue omitir, limpiar y reemplazar.

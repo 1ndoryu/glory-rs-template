@@ -24,7 +24,7 @@ function createLoadingView(): HTMLElement {
 async function loadProject(ctx: RenderContext): Promise<Project | undefined> {
   const projectId = ctx.params?.projectId;
   if (!projectId) return undefined;
-  const result = await tryCatch(ProjectService.getById(projectId));
+  const result = await tryCatch(ProjectService.getById(projectId, { signal: ctx.signal }));
   if (!result.ok) throw new Error('No se pudo cargar el proyecto');
   return result.value;
 }
@@ -113,6 +113,7 @@ export function renderProjectEditor(ctx: RenderContext): MountedView {
             description: projectData.description,
             url: projectData.url || undefined,
             sort_order: projectData.sort_order,
+            is_visible: projectData.is_visible,
           });
         const result = await safeRun(request, 'error al guardar proyecto');
         if (!isActive() || !result.ok) return;

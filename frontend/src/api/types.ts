@@ -111,6 +111,7 @@ export interface CreateProjectRequest {
   description?: string;
   url?: string;
   sort_order?: number;
+  is_visible?: boolean;
 }
 
 export interface UpdateProjectRequest {
