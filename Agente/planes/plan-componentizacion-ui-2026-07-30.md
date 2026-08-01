@@ -3,10 +3,12 @@
 > **Epic:** 297A-11 (limpieza post-arquitectura)
 > **Fecha:** 2026-07-30
 > **Revisión:** v2 — corregido tras auditoría (v3 hallazgo 2.14+)
-> **Estado:** ⏸️ Pendiente ejecución
+> **Estado:** ⏸️ Backlog diferido; no bloquea el roadmap principal (actualizado 018A-44)
 > **Dependencias:** auditoría v3 completada (16/16 fixes), quality gate 297A-11 PASS
 > **Bloquea:** 297A-14 (programas editoriales reutilizan componentes admin)
 > **Source:** `frontend/src/components/ui/` (6 existentes) + auditoría de patrones DOM
+
+> **Nota de alcance:** este plan conserva ideas históricas de componentización, pero sus fases sobre páginas legacy, `font-panel.ts` y mover settings no son un bloque habilitado. La app Configuración permanece en `features/settings/`; el alias `font-panel.ts` ya fue sustituido por `settings-panel.ts` en 018A-44. Reactivar este plan requiere una tarea explícita y revisar primero el roadmap principal.
 
 ---
 
@@ -244,12 +246,11 @@ export function createAdminList(options: {items: AdminListItem[]; onNew?: () => 
 
 **Qué:** Reubicar componentes de settings que sobreviven al refactor.
 
-**Contexto:** font-panel.ts ya se dividió en font-panel.ts (UI, ~220 líneas) + settings-repo.ts (persistencia, ~60 líneas). Social-links.ts y font-helpers.ts son UI pura. Todos pertenecen a `components/admin/` porque son interfaces de administración, no features del OS.
+**Contexto histórico:** el antiguo `font-panel.ts` se dividió en panel y repositorio. La responsabilidad actual vive en `settings-panel.ts` + `profile-settings.ts`; no mover estos módulos a `components/admin/` sin una decisión nueva de arquitectura.
 
-- [ ] Mover `features/settings/font-panel.ts` → `components/admin/font-panel.ts`
-- [ ] Mover `features/settings/social-links.ts` → `components/admin/social-links.ts`
-- [ ] Mover `features/settings/font-helpers.ts` → `components/admin/font-helpers.ts`
-- [ ] Mover `features/settings/settings-repo.ts` → `utils/settings-repo.ts` (no es UI)
+- [x] Retirar el alias `features/settings/font-panel.ts`; `settings-panel.ts` es la entrada vigente (018A-44).
+- [ ] Mover `features/settings/social-links.ts` → `components/admin/social-links.ts` *(diferido; requiere decisión de dominio)*
+- [ ] Mover `features/settings/settings-repo.ts` → `utils/settings-repo.ts` *(diferido; revisar boundary de servicios primero)*
 - [ ] Actualizar imports en `app-registration.ts` (lazy load), `main.ts`, y otros
 - [ ] **Gate:** `npm run type-check` + panel configuración funciona, lazy load no se rompe
 - [ ] **Esfuerzo:** 30 min

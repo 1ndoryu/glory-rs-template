@@ -1,5 +1,5 @@
 /* wandori.us — Profile Settings Panel
- * [297A-29 F3] Controles de perfil extraídos de font-panel.ts: imagen,
+ * [297A-29 F3] Controles de perfil extraídos del panel legacy: imagen,
  * dimensiones de la foto, borde, entradas en inicio y redes sociales.
  * Se monta DENTRO de la ventana Perfil (no es un modal global) y se abre
  * con el comando admin-only 'profile:settings' del toolbar.

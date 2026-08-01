@@ -3,7 +3,7 @@
 > **Epic:** 297A-4 (OS persistente) · **Tarea:** 297A-29 (pendiente de roadmap)
 > **Fecha:** 2026-07-31 (renombrado el 2026-07-31: ya NO es "retiro")
 > **Estado:** Fases 1-3 completadas (commits 297A-29 F1/F2/F3); Fase 4 redefinida por decisión del usuario
-> **Próximo paso:** Fase 4 = conservar la app Configuración y dejarla pendiente de escalar a otra cosa en el futuro (ver §4)
+> **Próximo paso:** Fase 4 = conservar la app Configuración y dejarla pendiente de escalar a otra cosa en el futuro (ver §4). El alias legacy `font-panel.ts` fue retirado en 018A-44.
 > **Archivo de completados:** `Agente/completados/tareas-2026-07-31.md`
 >
 > **Cambio de alcance (2026-07-31, usuario):** "no eliminemos la app de configuración, dejemos pendiente escalarla a otra cosa después". La app Configuración NO se borra; queda como está y su evolución (panel de ajustes del sistema u otra cosa) se decide en el futuro. Este archivo antes se llamaba `plan-retiro-configuracion-legacy-2026-07-31.md`.
@@ -25,11 +25,11 @@
 ## 2. Contexto verificado (evidencia 2026-07-31)
 
 - La app `settings` se registra en `frontend/src/features/runtime/app-registration.ts:117-132` (`registerLazy`, `requires: 'admin'`, sin deep link). Se abre por menú (`desktop-menu-bar.ts:224-229`), icono admin del escritorio (`default-release.ts:39-43` `ADMIN_NODES.settings`) y tab `'fuentes'` de `pages/admin.ts:63`.
-- Componentes en `frontend/src/features/settings/`: `font-panel.ts` (3 tabs: Perfil/Fuentes/Tamaños), `font-helpers.ts` (selectores/sliders), `font-constants.ts` (23 Google Fonts), `settings-repo.ts` (persistencia debounced), `social-links.ts` (editor de enlaces).
+- Componentes en `frontend/src/features/settings/`: `settings-panel.ts` (entrada conservada de la app Configuración), `profile-settings.ts`, `settings-repo.ts` (persistencia debounced), `social-links.ts` (editor de enlaces) y el primitive compartido `components/ui/slider.ts`.
 - **Perfil es una shell window** (`registerShellWindow`, `instanceId 'shell-profile'`, `desktop-shell.ts:40-54`), NO una app del registry. Comparte el mismo elemento en desktop y móvil (`main.ts:143`). Consume `profileImage`, `socialLinksStore`, `redesLayoutStore`.
 - **Toolbar con gating por capacidad YA EXISTE**: `createAppToolbar` (`desktop-window.ts:110-149`) construye `CommandContext { capability: authStore.get().capability }` y omite comandos cuyo `isAvailable(ctx)` devuelve `{state:'hidden'}`. Ningún comando usa todavía `ctx.capability`. **Hueco:** la capability se captura UNA vez al crear la ventana; no reacciona a login/logout en vivo.
 - **Bug borde confirmado:** `.desktop-profile-window .profile-foto { border: var(--sistema-borde) }` (`desktop-window.css:104-106`) sobreescribe `--profile-border` que el checkbox escribe; mayor especificidad que `layout.css:118`. El checkbox solo funcionaría en el layout legacy en desuso.
-- **Bug nav width:** slider actual 200–500 con default 320 (`font-panel.ts:137`); el usuario pide un máximo mayor. Al pasar a estático se fija un valor en `variables.css`.
+- **Bug nav width:** el valor quedó estático en `variables.css` (`--nav-width: 360px`); ya no existe slider de fuentes/tamaños que pueda sobrescribirlo.
 - El OS ya usa `--fuente-sistema` (JetBrains Mono) en todo el chrome; lo configurable solo afecta al **layout legacy** (sidebar/nav, profile, entradas). El `fontStore` (`store.ts:107-159`) sobreescribe tokens en runtime desde BD (`main.ts:107` llama `await loadSavedFonts()`).
 - `prerendered/` es código muerto de Nakomi Studio, no se relaciona.
 
@@ -44,28 +44,28 @@
 
 ### Fase 1 — Fuentes/tamaños estáticos (JetBrains en todo)
 
-- [ ] Neutralizar `fontStore`: eliminar/neutralizar el suscriptor que inyecta variables dinámicas (`store.ts:107-159`) para `--nav-width`, `--profile-*`, `--menu-*`, `--tamano-*`, `--entrada-*`, `--redes-*`.
-- [ ] Dejar de llamar `loadSavedFonts()` en `main.ts:107` (o reducir a solo perfil: `profile_image`, `social_links`, `redes_layout`, `show_entries_on_home`).
-- [ ] Fijar tokens en `variables.css`: `--fuente-menu/-titulo/-texto` → JetBrains Mono (o migrar el layout legacy a `--fuente-sistema`); tamaños fijos (reutilizar bloque `--sistema-*`); `--nav-width` fijo a valor acordado (≥360px, ver bug nav width).
-- [ ] Migrar consumidores legacy de tokens configurables (`layout.css:11,43,118,222,240`, `base.css:9`, `reset.css:15`, `components.css`, `pages.css`) a los tokens estáticos.
-- [ ] Eliminar `font-constants.ts`, `font-helpers.ts` y el tab Fuentes/Tamaños de `font-panel.ts`.
-- [ ] Decidir destino de `settings-repo.ts`: conservar solo las funciones de perfil (`loadProfileSettings`, `saveProfileSettings`), quitar `saveSettings()` de fuentes/tamaños.
+- [x] Neutralizar `fontStore`: el store solo conserva configuración de perfil/redes; ningún suscriptor inyecta tokens de fuentes o tamaños.
+- [x] Dejar de llamar `loadSavedFonts()` en `main.ts`: el arranque carga únicamente `loadProfileSettings()`.
+- [x] Fijar tokens en `variables.css`: JetBrains Mono, tamaños estáticos y `--nav-width: 360px`.
+- [x] Migrar consumidores legacy de tokens configurables a los tokens estáticos; los alias conservados son inertes y no reciben configuración de BD.
+- [x] Eliminar `font-constants.ts`/`font-helpers.ts` y retirar la lógica de Fuentes/Tamaños; el acceso visible conservado delega al panel de settings sin selector de fuentes.
+- [x] Mantener `settings-repo.ts` únicamente para perfil, redes, imagen y preferencias de inicio.
 - **Gate F1:** type-check, Vitest (ajustar tests que dependan de fontStore dinámico), `task:check`; visual: el OS y las páginas renderizan con JetBrains Mono y tamaños fijos sin regresión.
 
 ### Fase 2 — Toolbar reactivo a capacidad + comando admin-only genérico
 
-- [ ] Cubrir el hueco de `createAppToolbar` (`desktop-window.ts`): suscribirse a `authStore` (subscribeSimple) y reconstruir el toolbar cuando cambia `capability` (login/logout en ventana abierta).
-- [ ] Crear comando genérico (p. ej. `profile:settings` o helper `adminOnlyCommand`) con `isAvailable: (ctx) => ctx.capability === 'admin' ? {state:'enabled'} : {state:'hidden'}`.
-- [ ] Test: toolbar de una ventana oculta/muestra el item admin-only según estado de `authStore` en vivo.
+- [x] `createAppToolbar` reacciona a cambios de `authStore` y reconstruye el toolbar cuando cambia `capability`.
+- [x] El comando admin-only genérico usa `CommandContext.capability` y no una rama hardcodeada del shell.
+- [x] Test de toolbar: una ventana abierta actualiza la acción al pasar de invitado a admin y de vuelta.
 - **Gate F2:** type-check, Vitest, `task:check`; visual: abrir ventana como invitado (sin item) y como admin (item visible) sin recargar.
 
 ### Fase 3 — Perfil configurable desde la ventana Perfil (solo admin)
 
-- [ ] Extraer controles del tab Perfil de `font-panel.ts` a un nuevo `frontend/src/features/settings/profile-settings.ts` (foto, tamaños avatar 40–600, borde, enlaces sociales, layout redes).
-- [ ] Añadir toolbar a la shell window `shell-profile` (`registerShellWindow` ya acepta `toolbar`, `window-manager.ts:95-120`) con el comando admin-only de fase 2.
-- [ ] Montar `profile-settings` dentro de la ventana Perfil (panel/overlay dentro de la ventana, no modal global; reutilizar recetas compartidas).
-- [ ] **Fix borde:** ajustar `.desktop-profile-window .profile-foto` para que respete el token configurado (o eliminar el override fijo de `desktop-window.css:104-106`).
-- [ ] Conservar guardado: `profile_image`, `social_links`, `redes_layout`, tamaños avatar y borde vía `SettingsService.save` (`POST /api/admin/settings`).
+- [x] Extraer controles del Perfil a `frontend/src/features/settings/profile-settings.ts` (foto, tamaños avatar 40–600, borde, enlaces sociales, layout redes).
+- [x] Añadir toolbar a la shell window `shell-profile` con el comando admin-only de fase 2.
+- [x] Montar `profile-settings` dentro de la ventana Perfil, reutilizando las recetas compartidas y sin modal global.
+- [x] **Fix borde:** `.desktop-profile-window .profile-foto` respeta `--profile-border`.
+- [x] Conservar guardado de `profile_image`, `social_links`, `redes_layout`, tamaños avatar y borde vía `SettingsService.save`.
 - **Gate F3:** type-check, Vitest (tests del nuevo panel + regresión del fix borde), `task:check`; visual: admin ve botón "Configurar" en toolbar de Perfil, abre el panel, cambia foto/borde/enlaces y persiste tras reload; invitado no ve el botón.
 
 ### Fase 4 — (PENDIENTE, NO eliminar) Escalar la app Configuración a otra cosa
@@ -74,7 +74,7 @@
 
 - [ ] (FUTURO, sin fecha) Decidir el destino de la app Configuración: convertirla en panel de ajustes del sistema, integrarla en otra app, o mantenerla como está. La decisión la toma el usuario; no inventar alcance.
 - [ ] Cuando se decida el destino, actualizar este plan con fases concretas y gate por fase.
-- [ ] Mientras tanto: solo mantenimiento reactivo (no agregar lógica nueva a `font-panel.ts`; ya es delegación a `profile-settings`).
+- [ ] Mientras tanto: solo mantenimiento reactivo (no agregar lógica nueva al panel conservado; `settings-panel.ts` delega a `profile-settings`).
 - **Gate F4:** no aplica hasta que el usuario defina el destino. Estado: pendiente de decisión.
 
 ### Fase 5 — (FUTURO, fuera de alcance) Escalar Configuración + panel de fuentes de usuario
@@ -90,10 +90,10 @@
 ## 6. Definition of Done
 
 - [ ] `Configuración` conservada en AppRegistry, escritorio, menú y Admin (NO eliminada); su escalado futuro queda pendiente de decisión del usuario.
-- [ ] Fuentes/tamaños 100% estáticos (JetBrains Mono + tokens fijos en `variables.css`); sin `fontStore` inyectando variables dinámicas.
-- [ ] Perfil configurable desde su toolbar con botón admin-only; foto/borde/tamaños/enlaces persisten en BD.
-- [ ] Toolbar de ventanas reacciona a cambio de capacidad en vivo (mecanismo genérico, no hardcodeado a Perfil).
-- [ ] Bug borde resuelto; nav width fijo ≥360px.
+- [x] Fuentes/tamaños 100% estáticos (JetBrains Mono + tokens fijos en `variables.css`); sin `fontStore` inyectando variables dinámicas.
+- [x] Perfil configurable desde su toolbar con botón admin-only; foto/borde/tamaños/enlaces persisten en BD.
+- [x] Toolbar de ventanas reacciona a cambio de capacidad en vivo (mecanismo genérico, no hardcodeado a Perfil).
+- [x] Bug borde resuelto; nav width fijo ≥360px.
 - [ ] Roadmap actualizado, archivado en completados, commit `297A-29: ...` + push.
 
 ## 7. Notas de arquitectura (decisiones)

@@ -18,11 +18,11 @@ AppRegistry.registerLazy({
   iconType: 'application',
   singleton: true,
   requires: 'admin',
-  load: () => import('../settings/font-panel').then(m => ({
+  load: () => import('../settings/settings-panel').then(m => ({
     render: (_ctx: RenderContext): MountedView => {
       dispatchEvent({ type: 'app_opened', appId: 'settings' });
       return {
-        element: m.createFontPanel(),
+        element: m.createSettingsPanel(),
         destroy: () => { dispatchEvent({ type: 'app_closed', appId: 'settings' }); },
       };
     },

@@ -233,3 +233,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Un roadmap de calidad puede mantener una visión amplia sin convertir cada regla futura, benchmark o paridad de adapters en una dependencia del producto.
 - La fuente canónica debe declarar explícitamente qué checklist desbloquea el trabajo y qué backlog queda diferido; así el agente ejecuta el gate reproducible sin inflar el contexto ni iniciar migraciones upstream innecesarias.
+
+## 018A-44 — Retirar nombres legacy después de extraer la responsabilidad
+
+- Cuando un módulo deja de contener la responsabilidad que dio origen a su nombre, conservarlo como alias perpetúa una arquitectura equivocada y hace que futuras apps vuelvan a depender del boundary antiguo.
+- Renombrar el adaptador manteniendo la app y su contrato permite limpiar la deuda sin borrar la compatibilidad funcional ni reintroducir lógica en el shell.

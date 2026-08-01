@@ -18,7 +18,7 @@
 | Editor de productos | `pages/admin-products.ts` (modal legacy) | App `product-editor` | ✅ Migrado F3 |
 | Listado de productos | `pages/admin-products.ts` | Orquestación en `admin` (tab productos) | ✅ Migrado F3 |
 | Biblioteca de media | (no existía en Admin legacy) | App `media-library` | ✅ Migrado F4 |
-| Fuentes/tamaños | `admin.ts` tab fuentes + `font-panel.ts` | Estáticos (297A-29) + app `settings` | ✅ Migrado F1/F29 |
+| Fuentes/tamaños | `admin.ts` tab fuentes + `settings-panel.ts` | Estáticos (297A-29) + app `settings` | ✅ Migrado F1/F29; alias `font-panel.ts` retirado en 018A-44 |
 | About content | `admin.ts` tab sitio | App `about` + `article-editor` (alias) | ✅ Migrado F1 |
 | Estadísticas | `admin.ts` tab estadisticas | App `analytics` | ✅ Migrado 297A-16 |
 | Login legacy | `pages/login.ts` + wrapper | App `account` (login en ventana) | ✅ Migrado 297A-13 |

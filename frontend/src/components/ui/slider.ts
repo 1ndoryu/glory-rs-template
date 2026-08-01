@@ -1,6 +1,6 @@
 /* wandori.us — SizeSlider (UI atómica)
  * Slider de tamaño con etiqueta y valor en vivo.
- * [297A-29 F1] Extraído de font-helpers.ts: al retirar la configuración de
+ * [297A-29 F1] Extraído del panel legacy: al retirar la configuración de
  * fuentes, el slider queda como componente reutilizable del sistema (perfil,
  * redes y futuros paneles). */
 

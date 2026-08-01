@@ -443,6 +443,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [x] **018A-40 —** Eliminar únicamente `gap-sm`, `mt-md` y `mb-lg` de `components.css` después de confirmar que no tienen consumidores; conservar clases construidas dinámicamente.
 - [x] **018A-41 —** Separar `app-registration-admin.ts` del catálogo público para mantener el límite de 300 líneas y conservar el registro único de capacidades, rutas y lifecycle.
 - [x] **018A-42 —** Separar entrega de commerce del webhook con worker CLI acotado, claim atómico, backoff observable y rotación segura del grant; scheduler, proveedor real y reembolsos quedan explícitos.
+- [x] **018A-44 —** Retirar el alias `font-panel.ts` sin lógica de fuentes; Configuración conserva su registro y delega desde `settings-panel.ts`.
 - [ ] Eliminar CSS/clases huérfanas con VarSense.
 
 **Criterio de salida:** una sola administración como app registrada, analytics útil/privado y cero rutas/chrome duplicados legacy; uploads y CSS/contratos obsoletos deben desaparecer después de su matriz de paridad.

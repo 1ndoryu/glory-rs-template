@@ -6,7 +6,7 @@ import { SettingsService, AnalyticsService } from '../services';
 import { showProfile } from '../store';
 import { showToast } from '../components/ui/toast';
 import { createTextarea } from '../components/ui/textarea';
-import { createFontPanel } from '../features/settings/font-panel';
+import { createSettingsPanel } from '../features/settings/settings-panel';
 import { safeClick, safeRun, safeEffect } from '../utils/safe-async';
 import { renderArticleList, openEditor, disposeAdminArticleLists } from './admin-articles';
 import { renderProjectList, openProjectEditor, disposeAdminProjectLists } from './admin-projects';
@@ -89,7 +89,7 @@ export function createAdminWindowView(): { page: Promise<HTMLElement>; actions: 
         break;
       }
       case 'fuentes':
-        contentArea.appendChild(createFontPanel());
+        contentArea.appendChild(createSettingsPanel());
         setWindowActions([]);
         break;
       case 'sitio': {
