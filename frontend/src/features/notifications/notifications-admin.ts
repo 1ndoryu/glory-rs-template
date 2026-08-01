@@ -1,6 +1,6 @@
 import { createEl } from '../../utils/dom';
 import { createVacio } from '../../components/ui/empty-state';
-import { NotificationsService, type ApiNotification } from '../../services/notifications.service';
+import { NotificationsService, type ApiNotificationAdmin } from '../../services/notifications.service';
 
 export function createNotificationsAdminView(signal?: AbortSignal): { element: HTMLElement; destroy: () => void } {
   const root = createEl('section', { className: 'notificacionesAdmin', ariaLabel: 'Administrar novedades' });
@@ -29,7 +29,7 @@ export function createNotificationsAdminView(signal?: AbortSignal): { element: H
     }
   }
 
-  function renderItem(item: ApiNotification): HTMLElement {
+  function renderItem(item: ApiNotificationAdmin): HTMLElement {
     const state = createEl('select', { ariaLabel: `Estado de ${item.title}` });
     for (const value of ['draft', 'published', 'archived']) {
       const option = createEl('option', { value, textContent: value });

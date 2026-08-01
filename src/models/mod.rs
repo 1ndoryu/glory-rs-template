@@ -13,7 +13,9 @@ pub mod workspace_overlay;
 
 pub use note::{CreateNoteRequest, Note, PaginatedNotes, PaginationParams, UpdateNoteRequest};
 pub use notification::{
-    CreateNotificationRequest, Notification, NotificationList, UpdateNotificationStatusRequest,
+    CreateNotificationRequest, Notification, NotificationAccountList, NotificationAccountResponse,
+    NotificationAdminList, NotificationAdminResponse, NotificationPublicList,
+    NotificationPublicResponse, UpdateNotificationStatusRequest,
 };
 pub use resource::{EditorialState, LifecycleState, Resource, ResourceKind, VisibilityState};
 pub use user::{

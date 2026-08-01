@@ -4,7 +4,9 @@ use validator::Validate;
 
 use crate::errors::AppError;
 use crate::models::notification::{
-    CreateNotificationRequest, NotificationList, UpdateNotificationStatusRequest,
+    CreateNotificationRequest, NotificationAccountList, NotificationAccountResponse,
+    NotificationAdminList, NotificationAdminResponse, NotificationPublicList,
+    NotificationPublicResponse, UpdateNotificationStatusRequest,
 };
 use crate::repositories::notification_repo::NotificationRepository;
 
@@ -23,19 +25,25 @@ fn validate_status(status: &str) -> Result<(), AppError> {
 pub struct NotificationService;
 
 impl NotificationService {
-    pub async fn list_public(pool: &PgPool) -> Result<NotificationList, AppError> {
+    pub async fn list_public(pool: &PgPool) -> Result<NotificationPublicList, AppError> {
         let items = NotificationRepository::list_public(pool).await?;
-        Ok(NotificationList {
-            items,
+        Ok(NotificationPublicList {
+            items: items.iter().map(NotificationPublicResponse::from).collect(),
             unread_count: 0,
         })
     }
 
-    pub async fn list_for_user(pool: &PgPool, user_id: Uuid) -> Result<NotificationList, AppError> {
+    pub async fn list_for_user(
+        pool: &PgPool,
+        user_id: Uuid,
+    ) -> Result<NotificationAccountList, AppError> {
         let items = NotificationRepository::list_for_user(pool, user_id).await?;
         let unread_count = NotificationRepository::unread_count(pool, user_id).await?;
-        Ok(NotificationList {
-            items,
+        Ok(NotificationAccountList {
+            items: items
+                .iter()
+                .map(NotificationAccountResponse::from)
+                .collect(),
             unread_count,
         })
     }
@@ -52,10 +60,10 @@ impl NotificationService {
         }
     }
 
-    pub async fn list_admin(pool: &PgPool) -> Result<NotificationList, AppError> {
+    pub async fn list_admin(pool: &PgPool) -> Result<NotificationAdminList, AppError> {
         let items = NotificationRepository::list_admin(pool).await?;
-        Ok(NotificationList {
-            items,
+        Ok(NotificationAdminList {
+            items: items.iter().map(NotificationAdminResponse::from).collect(),
             unread_count: 0,
         })
     }

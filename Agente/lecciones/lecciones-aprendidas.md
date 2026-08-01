@@ -258,3 +258,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Un endpoint público puede filtrar correctamente los registros y aun así revelar cómo se organiza el escritorio si serializa el modelo SQL completo; orden y visibilidad deben pertenecer al DTO administrativo.
 - Cuando el backend ya filtra/ordena, el frontend público debe renderizar el resultado directamente. Mantener un segundo filtro en el navegador crea dependencia accidental del contrato interno y facilita que vuelva a filtrarse de forma inconsistente.
+
+## 018A-49 — Una lista compartida puede necesitar tres DTOs
+
+- Las notificaciones parecen una lista única, pero `read` depende de la cuenta y `status`/`created_by` dependen de admin; reutilizar el modelo SQL en los tres endpoints mezcla capacidades y expone metadata.
+- Separar las listas por boundary permite que el servicio conserve una sola consulta/repositorio, mientras cada handler decide exactamente qué campos puede devolver.
