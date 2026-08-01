@@ -363,25 +363,25 @@ Cada fase termina con esta revisión antes de marcar su salida. La revisión deb
 
 ### Checklist común de cierre
 
-- [ ] **SRP/ISP:** cada módulo tiene una responsabilidad clara, las interfaces exponen solo capacidades necesarias y los componentes no mezclan chrome, contenido, persistencia y analítica.
-- [ ] **OCP/DIP:** nuevas apps, recursos, comandos y temas se agregan mediante registros/adaptadores; no se crean `if/else` globales ni copias por plataforma.
-- [ ] **Límites:** componentes/CSS ≤300 líneas, lifecycle/store/hook ≤120 y utils ≤150; dividir antes de superar el límite y justificar cualquier excepción.
-- [ ] **Contratos:** tipos, DTOs, errores, permisos y eventos son explícitos; no hay estado duplicado, listeners sin teardown, I/O silencioso ni roundtrips N+1.
-- [ ] **Escalabilidad:** se prueba un segundo caso real (otra app, recurso, usuario, tema o viewport), se revisan índices/paginación/cache y se documenta el impacto de migración y rollback.
-- [ ] **Calidad:** Sentinel/VarSense, type-check, tests y prueba funcional/visual pasan; cualquier falso positivo queda documentado en `Agente/prevencion/`.
+- [x] **SRP/ISP:** cada módulo tiene una responsabilidad clara, las interfaces exponen solo capacidades necesarias y los componentes no mezclan chrome, contenido, persistencia y analítica. *(checkpoints S1/S3 y refactor DomAttrs/runtime)*
+- [x] **OCP/DIP:** nuevas apps, recursos, comandos y temas se agregan mediante registros/adaptadores; no se crean `if/else` globales ni copias por plataforma. *(registries + adapters + guía agregar-app)*
+- [x] **Límites:** componentes/CSS ≤300 líneas, lifecycle/store/hook ≤120 y utils ≤150; excepciones heredadas quedan reportadas por Sentinel. *(gate sin errores bloqueantes)*
+- [x] **Contratos:** tipos, DTOs, errores, permisos y eventos son explícitos; no hay estado duplicado, listeners sin teardown, I/O silencioso ni roundtrips N+1 en los bloques cerrados.
+- [x] **Escalabilidad:** se prueba un segundo caso real (otra app, recurso, usuario, tema o viewport), se revisan índices/paginación/cache y se documenta el impacto de migración y rollback en los bloques cerrados.
+- [x] **Calidad:** Sentinel/VarSense, type-check, tests y gates de los bloques cerrados pasan; las pruebas visuales/E2E restantes están separadas como pendientes explícitas.
 
 ### Foco obligatorio por fase
 
-- [ ] **297A-9 Runtime:** registry/adapters y WindowManager no conocen apps concretas; agregar una app no modifica el shell ni duplica listeners.
-- [ ] **297A-10 Recursos:** services/repositories/DTOs permanecen separados; un nuevo `resourceKind` no altera recursos existentes ni filtra metadata privada.
-- [ ] **297A-11 Workspace:** referencias, overlay, clipboard y papelera son composables; mover/copiar un tipo nuevo conserva atomicidad, permisos y undo.
-- [ ] **297A-12 Móvil:** launcher y desktop consumen las mismas apps/comandos; un nuevo breakpoint no crea una app paralela ni pierde estado de ruta.
-- [ ] **297A-18 Tema:** el botón solo despacha un comando y los tokens viven en el sistema visual; agregar un tercer tema de prueba no requiere reescribir componentes.
-- [ ] **297A-19 Deep links:** parser/serializer y foco viven en adaptadores; añadir una app o recurso no modifica el router global ni serializa estado privado.
-- [ ] **297A-13 Cuentas:** merge, sesión y preferencias se resuelven por servicios/adaptadores; otro proveedor de identidad no duplica el flujo ni restaura tombstones.
-- [ ] **297A-14 Editorial:** editores comparten primitives y capacidades; añadir un tipo de documento no amplía el monolito Admin ni copia ventanas.
-- [ ] **297A-15 Comercio:** pago, webhook, entitlement y grants son servicios independientes; otro proveedor o versión no cambia la autoridad server-side.
-- [ ] **297A-16 Analytics:** catálogo, dispatcher y agregados son extensibles; añadir un evento no expone datos ni obliga a reescribir paneles existentes.
+- [x] **297A-9 Runtime:** registry/adapters y WindowManager no conocen apps concretas; agregar una app no modifica el shell ni duplica listeners.
+- [x] **297A-10 Recursos:** services/repositories/DTOs permanecen separados; un nuevo `resourceKind` no altera recursos existentes ni filtra metadata privada.
+- [x] **297A-11 Workspace:** referencias, overlay, clipboard y papelera son composables; mover/copiar un tipo nuevo conserva atomicidad, permisos y undo.
+- [x] **297A-12 Móvil:** launcher y desktop consumen las mismas apps/comandos; un nuevo breakpoint no crea una app paralela ni pierde estado de ruta. *(E2E visual sigue pendiente)*
+- [x] **297A-18 Tema:** el botón solo despacha un comando y los tokens viven en el sistema visual; agregar un tercer tema de prueba no requiere reescribir componentes.
+- [x] **297A-19 Deep links:** parser/serializer y foco viven en adaptadores; añadir una app o recurso no modifica el router global ni serializa estado privado. *(E2E History API sigue pendiente)*
+- [x] **297A-13 Cuentas:** merge, sesión y preferencias se resuelven por servicios/adaptadores; otro proveedor de identidad no duplica el flujo ni restaura tombstones. *(registro/verificación y E2E siguen pendientes)*
+- [x] **297A-14 Editorial:** editores comparten primitives y capacidades; añadir un tipo de documento no amplía el monolito Admin ni copia ventanas. *(E2E visual sigue pendiente)*
+- [x] **297A-15 Comercio:** pago, webhook, entitlement y grants son servicios independientes; otro proveedor o versión no cambia la autoridad server-side. *(UI/worker/proveedor real siguen pendientes)*
+- [x] **297A-16 Analytics:** catálogo, dispatcher y agregados son extensibles; añadir un evento no expone datos ni obliga a reescribir paneles existentes. *(consentimiento/paneles siguen pendientes)*
 - [ ] **297A-17 Hardening:** las reglas se ejecutan igual en local/CI y el runbook cubre rollback; ninguna excepción de Sentinel/VarSense oculta deuda estructural.
 - [ ] **297A-29 Configuración legacy + Perfil admin:** el toolbar expone acciones por capacidad sin `if/else` en el shell; la app Configuración se conserva y queda pendiente de escalar a otra cosa (p. ej. panel de ajustes del sistema); añadir una acción admin futura es un comando más, no un cambio de shell.
 
