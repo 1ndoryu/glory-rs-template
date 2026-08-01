@@ -59,7 +59,10 @@ async function main() {
 
   try {
     const context = await preflight(args);
-    const releaseTaskLock = await acquireTaskLock(context, args.taskId, undefined, {
+    /* [018A-4] Un agente no debe acumular procesos esperando el mismo gate.
+     * La espera larga queda disponible para consumidores de la librería, pero
+     * el comando público falla rápido y deja una acción clara al agente. */
+    const releaseTaskLock = await acquireTaskLock(context, args.taskId, context.qualityConfig.lockWaitMs ?? 0, {
       isCancelled: () => interrupted,
     });
     try {

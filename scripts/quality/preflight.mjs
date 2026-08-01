@@ -58,6 +58,9 @@ export async function preflight(args) {
   if (qualityConfig.schemaVersion !== 1 || toolManifest.schemaVersion !== 1) {
     throw new Error('Config de calidad incompatible: se esperaba schemaVersion 1');
   }
+  if (!Number.isInteger(qualityConfig.lockWaitMs) || qualityConfig.lockWaitMs < 0 || qualityConfig.lockWaitMs > 300_000) {
+    throw new Error('quality.config.json: lockWaitMs debe ser un entero entre 0 y 300000');
+  }
 
   const tools = {};
   for (const [name, config] of Object.entries(toolManifest.tools)) {

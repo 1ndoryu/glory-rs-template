@@ -34,6 +34,21 @@ test('el lock por tarea excluye una segunda ejecución y se libera', async () =>
   }
 });
 
+test('el gate público falla rápido cuando ya existe una ejecución', async () => {
+  const projectRoot = await mkdtemp(path.join(os.tmpdir(), 'quality-lock-'));
+  const context = { projectRoot };
+  try {
+    const release = await acquireTaskLock(context, '297A-12', 0);
+    await assert.rejects(
+      acquireTaskLock(context, '297A-12', 0),
+      /quality gate ocupado para 297A-12/,
+    );
+    await release();
+  } finally {
+    await rm(projectRoot, { recursive: true, force: true });
+  }
+});
+
 test('locks de tareas diferentes no se bloquean entre sí', async () => {
   const projectRoot = await mkdtemp(path.join(os.tmpdir(), 'quality-lock-'));
   const context = { projectRoot };

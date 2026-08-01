@@ -5,6 +5,8 @@
 > **Fuera de alcance:** funcionalidades del OS, frontend, backend, comercio, móvil y roadmap principal.  
 > **Objetivo:** convertir los hallazgos y scripts nacidos en este proyecto en capacidades agnósticas, rápidas, portables y mantenibles para cualquier proyecto.
 
+> **Bloque prioritario activo (018A-4):** rendimiento local del quality gate y de la suite TypeScript. El gate conserva la suite completa como contrato explícito; el feedback local usa selección segura, un worker, lock fail-fast, caché versionada y captura de salida acotada. Las mejoras upstream de Sentinel/VarSense siguen bloqueadas hasta contar con fixtures de paridad y benchmark.
+
 ## Cómo usar este roadmap
 
 - Los IDs `SNT-*` son identificadores internos de este roadmap; al ejecutar una tarea se les asignará el task ID diario exigido por `AGENTS.md`.
@@ -117,6 +119,7 @@ Una regla no ejecuta procesos, no escribe archivos, no imprime salida humana y n
 - [ ] Añadir pruebas de regresión para `custom` con error, warning, información, timeout y salida malformada.
 - [ ] Verificar que logs/reportes redaccionan secretos, paths sensibles y credenciales sin truncar el diagnóstico esencial.
 - [ ] Ejecutar `npm run quality:test` y un `task:check` full; guardar baseline de duración, findings, warnings y tamaño de reportes.
+- [x] Validar `lockWaitMs` como entero seguro; el comando público usa `0` y falla de forma determinista si el task ya está ocupado.
 
 **Gate:** ninguna regla que falle puede producir PASS; todos los resultados tienen schema, severity y causa distinguibles.
 
@@ -170,6 +173,17 @@ Una regla no ejecuta procesos, no escribe archivos, no imprime salida humana y n
 - [ ] Añadir presupuesto de tiempo/memoria para incremental y full, con reporte de cache hit/miss y causa de invalidación.
 - [ ] Escribir cache/reportes de forma atómica y resistente a dos agentes/procesos concurrentes.
 
+#### SNT-05A — Rendimiento local completado en 018A-4
+
+- [x] Mantener Vitest serial por defecto (`maxWorkers=1`, sin paralelismo de archivos); la suite completa queda explícita en `test:full`.
+- [x] Añadir `test:changed` como selección segura: solo tests modificados se ejecutan de forma selectiva; cambios de código/configuración, borrados, renombres o untracked fuerzan suite completa; documentación/backend omiten la etapa.
+- [x] Añadir captura máxima de 64 KiB por stdout/stderr del runner para evitar crecimiento de memoria; el reporte conserva un marcador visible para solicitar el log original cuando el adapter lo soporte.
+- [x] Versionar fingerprint de caché con Node, plataforma, arquitectura, configuración, manifiesto de herramientas y archivos del alcance; añadir prueba de hit/miss por cambio de contenido.
+- [x] Incluir borrados/renombres en detección de alcance y forzar invalidación full ante cambios ambiguos.
+- [x] Añadir pruebas de lock fail-fast, scope/globs, caché y captura ruidosa; confirmar `npm run quality:test` (17/17) y `task:check -- 297A-19 --fresh` PASS.
+
+**Gate SNT-05A:** cerrado. La ejecución local ya no dispara automáticamente workers múltiples ni `--changed HEAD` sobre todo el workspace. El benchmark comparativo de Sentinel/VarSense y el índice compartido quedan pendientes de SNT-03/SNT-05.
+
 **Gate:** benchmark reproducible demuestra mejora; dos ejecuciones iguales producen el mismo JSON ordenado y no reutilizan PASS obsoleto.
 
 ### SNT-06 — Reglas de seguridad, contratos y arquitectura
@@ -209,6 +223,7 @@ Una regla no ejecuta procesos, no escribe archivos, no imprime salida humana y n
 - [ ] Definir modo local incremental, modo `--full` y modo CI reproducible; no instalar ni mutar dependencias durante un check.
 - [ ] Publicar reporte Markdown/JSON, exit codes documentados y artifacts sin secretos; conservar detalle en `.quality-reports/`.
 - [ ] Validar ejecución en Windows PowerShell, Git Bash, Linux CI y macOS sin asumir comandos POSIX.
+- [x] Proveer selector frontend explícito (`npm --prefix frontend run test:changed`) y conservar `test`/`test:full` como suite completa; no usar `passWithNoTests` para ocultar fallos.
 
 **Gate:** un segundo repositorio puede adoptar el orquestador cambiando solo manifest, profiles, paths y policies.
 

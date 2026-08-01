@@ -3,6 +3,8 @@ import { mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { writeAtomic } from './atomic-file.mjs';
 
+const CACHE_FORMAT_VERSION = 2;
+
 async function hashFile(hash, root, relativePath) {
   try {
     hash.update(relativePath);
@@ -12,6 +14,10 @@ async function hashFile(hash, root, relativePath) {
 
 export async function fingerprint(context, scope, stage) {
   const hash = createHash('sha256');
+  /* [018A-4] Un PASS no puede cruzar cambios de runtime, plataforma o formato
+   * del runner aunque el conjunto de archivos permanezca igual. */
+  hash.update(`quality-cache-v${CACHE_FORMAT_VERSION}\0`);
+  hash.update(`${process.version}\0${process.platform}\0${process.arch}\0`);
   hash.update(stage);
   hash.update(JSON.stringify(context.qualityConfig));
   hash.update(JSON.stringify(context.toolManifest));

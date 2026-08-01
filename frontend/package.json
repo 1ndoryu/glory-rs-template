@@ -9,6 +9,9 @@
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
+    "test:changed": "node ../scripts/quality/run-frontend-tests.mjs",
+    "test:full": "vitest run --maxWorkers=1 --no-file-parallelism",
+    "test:file": "vitest run --maxWorkers=1 --no-file-parallelism",
     "test:watch": "vitest",
     "codegen": "orval"
   },

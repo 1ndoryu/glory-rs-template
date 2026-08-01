@@ -7,7 +7,26 @@ const ENV_ALLOWLIST = [
   'NUMBER_OF_PROCESSORS', 'CI', 'NO_COLOR', 'TERM', 'npm_execpath',
   'DATABASE_URL', 'CARGO_TARGET_DIR_BASE', 'GLORY_CARGO_TARGET_DIR',
 ];
+const MAX_CAPTURE_BYTES = 64 * 1024;
 const activeChildren = new Set();
+
+function appendOutput(current, chunk) {
+  const value = String(chunk);
+  if (current.text.length >= MAX_CAPTURE_BYTES) {
+    current.truncated = true;
+    return current;
+  }
+  const remaining = MAX_CAPTURE_BYTES - current.text.length;
+  current.text += value.slice(0, remaining);
+  current.truncated ||= value.length > remaining;
+  return current;
+}
+
+function outputText(capture) {
+  return capture.truncated
+    ? `${capture.text}\n...[quality output truncated at ${MAX_CAPTURE_BYTES} bytes]`
+    : capture.text;
+}
 
 export function safeEnvironment(extra = {}) {
   const env = {};
@@ -41,16 +60,18 @@ export function runProcess(executable, args, options = {}) {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     activeChildren.add(child);
-    let stdout = '';
-    let stderr = '';
+    /* [018A-4] Herramientas ruidosas no deben acumular stdout/stderr sin límite;
+     * el marcador de truncado conserva una señal visible para pedir el log original. */
+    const stdout = { text: '', truncated: false };
+    const stderr = { text: '', truncated: false };
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
       terminateTree(child);
     }, options.timeoutMs ?? 120_000);
 
-    child.stdout.on('data', chunk => { stdout += chunk; });
-    child.stderr.on('data', chunk => { stderr += chunk; });
+    child.stdout.on('data', chunk => appendOutput(stdout, chunk));
+    child.stderr.on('data', chunk => appendOutput(stderr, chunk));
     child.on('error', error => {
       clearTimeout(timer);
       activeChildren.delete(child);
@@ -64,8 +85,8 @@ export function runProcess(executable, args, options = {}) {
         signal,
         timedOut,
         durationMs: Date.now() - startedAt,
-        stdout: truncate(stdout),
-        stderr: truncate(stderr),
+        stdout: truncate(outputText(stdout)),
+        stderr: truncate(outputText(stderr)),
       });
     });
   });

@@ -32,3 +32,9 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 - `utoipa::path` conserva `{id}` (templating OpenAPI) y convive con `:param` en el routing; no «corregirlo».
 - Cuando un test HTTP devuelve 404 donde el contrato exige 401/403, sospechar de la ruta antes del middleware: el router de producción y un router mínimo deben coincidir.
 - Regla Sentinel candidata: detectar `{` en strings de `.route()`.
+
+## 018A-4 — Suite selectiva segura y procesos acotados
+
+- Un selector incremental no debe inferir dependencias desde cualquier `--changed HEAD`: solo tests modificados pueden ejecutarse selectivamente; código, configuración, borrados, renombres y untracked requieren suite completa.
+- El contrato de suite completa debe permanecer explícito (`test`/`test:full`), mientras el modo local selectivo se ofrece como comando separado para no convertir un PASS parcial en una garantía global.
+- Limitar workers y captura de salida evita que varios agentes saturen CPU/memoria; el gate debe fallar rápido ante locks duplicados y dejar el detalle en artifacts, no en stdout/contexto.
