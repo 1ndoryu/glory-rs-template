@@ -51,6 +51,28 @@ async function verifyTool(name, toolConfig, manifest) {
   return { ...toolConfig, cliPath };
 }
 
+export function validateQualityConfig(qualityConfig) {
+  const allowed = new Set(['schemaVersion', 'maxFindings', 'maxReminders', 'maxTerminalLines', 'lockWaitMs', 'maxConcurrentStages', 'timeoutsMs', 'fullPatterns', 'profiles']);
+  const unknown = Object.keys(qualityConfig).filter(key => !allowed.has(key));
+  if (unknown.length > 0) throw new Error(`quality.config.json: claves desconocidas: ${unknown.join(', ')}`);
+  for (const key of ['maxFindings', 'maxReminders', 'maxTerminalLines']) {
+    if (!Number.isInteger(qualityConfig[key]) || qualityConfig[key] < 1) throw new Error(`quality.config.json: ${key} inválido`);
+  }
+  if (!Number.isInteger(qualityConfig.lockWaitMs) || qualityConfig.lockWaitMs < 0 || qualityConfig.lockWaitMs > 300_000) {
+    throw new Error('quality.config.json: lockWaitMs debe ser un entero entre 0 y 300000');
+  }
+  if (!Number.isInteger(qualityConfig.maxConcurrentStages) || qualityConfig.maxConcurrentStages < 1 || qualityConfig.maxConcurrentStages > 4) {
+    throw new Error('quality.config.json: maxConcurrentStages debe ser un entero entre 1 y 4');
+  }
+  if (!Array.isArray(qualityConfig.fullPatterns) || !qualityConfig.fullPatterns.every(item => typeof item === 'string')) {
+    throw new Error('quality.config.json: fullPatterns debe ser una lista de strings');
+  }
+  if (!qualityConfig.profiles || typeof qualityConfig.profiles !== 'object') throw new Error('quality.config.json: profiles inválido');
+  if (!qualityConfig.timeoutsMs || Object.values(qualityConfig.timeoutsMs).some(value => !Number.isInteger(value) || value < 1)) {
+    throw new Error('quality.config.json: timeoutsMs inválido');
+  }
+}
+
 export async function preflight(args) {
   await assertTaskExists(args.taskId);
   const qualityConfig = await readJson(path.join(projectRoot, 'quality.config.json'));
@@ -58,9 +80,7 @@ export async function preflight(args) {
   if (qualityConfig.schemaVersion !== 1 || toolManifest.schemaVersion !== 1) {
     throw new Error('Config de calidad incompatible: se esperaba schemaVersion 1');
   }
-  if (!Number.isInteger(qualityConfig.lockWaitMs) || qualityConfig.lockWaitMs < 0 || qualityConfig.lockWaitMs > 300_000) {
-    throw new Error('quality.config.json: lockWaitMs debe ser un entero entre 0 y 300000');
-  }
+  validateQualityConfig(qualityConfig);
 
   const tools = {};
   for (const [name, config] of Object.entries(toolManifest.tools)) {

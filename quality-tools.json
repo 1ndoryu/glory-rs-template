@@ -4,7 +4,7 @@
   "tools": {
     "sentinel": {
       "repository": "https://github.com/1ndoryu/glory-sentinel.git",
-      "commit": "7970dc29e0ba62139e00a0546f4b252e2893e4eb",
+      "commit": "107be9b61a7ed4676ee89b101ecff4112a039fb2",
       "version": "0.4.0",
       "outputSchemaVersion": "1",
       "buildScript": "compile",
@@ -12,16 +12,12 @@
     },
     "varsense": {
       "repository": "https://github.com/1ndoryu/varsense.git",
-      "commit": "b299040d2daa4b4dd3c3aeb4cca7dd5998b29901",
+      "commit": "b1aa3f06ffbb96a55dd0156a99eae482f41311b8",
       "version": "2.2.0",
       "outputSchemaVersion": "1",
       "buildScript": "compile",
       "cli": "dist/cli/index.js",
-      "testScript": "test",
-      "patch": {
-        "path": "scripts/quality/patches/varsense-class-index.patch",
-        "sha256": "a93b8bf0640d52684268f7ed3c00a9598b13fcb7d7936802948b88fa231fe4bf"
-      }
+      "testScript": "test"
     }
   }
 }

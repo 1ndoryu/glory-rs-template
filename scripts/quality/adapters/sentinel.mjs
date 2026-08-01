@@ -1,6 +1,6 @@
 import path from 'node:path';
-import { runProcess } from '../runner.mjs';
-import { normalizeEntries, readToolReport, resultFromFindings, toolFailure, writeStageLog } from './common.mjs';
+import { normalizeEntries, resultFromFindings } from './common.mjs';
+import { runStructuredTool } from './structured-tool.mjs';
 
 export async function runSentinel(context, scope) {
   const reportPath = path.join(context.reportRoot, 'sentinel.json');
@@ -14,20 +14,11 @@ export async function runSentinel(context, scope) {
   ];
   if (!scope.full) args.push('--files-from', scope.changedFilesPath);
 
-  const execution = await runProcess(process.execPath, args, {
-    cwd: context.projectRoot,
+  const result = await runStructuredTool(context, {
+    name: 'sentinel', executable: process.execPath, args, reportPath,
     timeoutMs: context.qualityConfig.timeoutsMs.sentinel,
+    expectedSchemaVersion: context.tools.sentinel.outputSchemaVersion,
   });
-  const logPath = await writeStageLog(context, 'sentinel', `${execution.stdout}\n${execution.stderr}`);
-  if (execution.code === 2 || execution.timedOut) return toolFailure('sentinel', execution, logPath);
-
-  try {
-    const report = await readToolReport(reportPath);
-    if (String(report.schemaVersion) !== context.tools.sentinel.outputSchemaVersion) {
-      throw new Error(`schema ${report.schemaVersion} incompatible`);
-    }
-    return resultFromFindings('sentinel', normalizeEntries(report.entries), execution.durationMs, logPath);
-  } catch (error) {
-    return toolFailure('sentinel', { ...execution, code: 2, stderr: error.message }, logPath);
-  }
+  if (result.failure) return result.failure;
+  return resultFromFindings('sentinel', normalizeEntries(result.report.entries), result.execution.durationMs, result.logPath);
 }

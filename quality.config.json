@@ -4,6 +4,7 @@
   "maxReminders": 4,
   "maxTerminalLines": 20,
   "lockWaitMs": 0,
+  "maxConcurrentStages": 1,
   "timeoutsMs": {
     "sentinel": 120000,
     "varsense": 120000,

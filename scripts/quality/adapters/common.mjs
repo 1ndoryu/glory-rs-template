@@ -3,8 +3,9 @@ import path from 'node:path';
 import { redact, truncate } from '../redaction.mjs';
 
 export function normalizeSeverity(value) {
-  if (value === 'information' || value === 'hint') return 'info';
-  return value === 'error' ? 'error' : 'warning';
+  if (value === 'information' || value === 'hint' || value === 'info') return 'info';
+  if (value === 'critical' || value === 'error') return 'error';
+  return 'warning';
 }
 
 export function npmInvocation(args) {
@@ -21,10 +22,11 @@ export function normalizeEntries(entries = []) {
   return entries.flatMap(entry => (entry.findings ?? []).map(finding => ({
     ruleId: String(finding.ruleId ?? 'unknown'),
     severity: normalizeSeverity(finding.severity),
-    file: entry.ruta ? String(entry.ruta).replace(/\\/g, '/') : undefined,
+    file: (entry.ruta ?? entry.file ?? finding.file) ? String(entry.ruta ?? entry.file ?? finding.file).replace(/\\/g, '/') : undefined,
     line: Number.isInteger(finding.range?.start?.line) ? finding.range.start.line + 1 : undefined,
     message: redact(finding.message ?? 'Hallazgo sin mensaje'),
-    help: finding.suggestion ? redact(finding.suggestion) : undefined,
+    help: finding.suggestion || finding.remediation ? redact(finding.suggestion ?? finding.remediation) : undefined,
+    confidence: finding.confidence,
   })));
 }
 
@@ -60,12 +62,13 @@ export function toolFailure(stage, execution, logPath) {
 export function resultFromFindings(stage, findings, durationMs, logPath) {
   const errors = findings.filter(item => item.severity === 'error').length;
   const warnings = findings.filter(item => item.severity === 'warning').length;
+  const infos = findings.filter(item => item.severity === 'info').length;
   return {
     stage,
     status: errors > 0 ? 'fail' : 'pass',
     durationMs,
     findings,
-    summary: `${errors} errores, ${warnings} warnings`,
+    summary: `${errors} errores, ${warnings} warnings, ${infos} info`,
     logPath,
   };
 }

@@ -9,3 +9,9 @@ test('recordatorios nunca exceden el límite y son contextuales', () => {
   assert.match(reminders[0], /repite exactamente/);
   assert.ok(reminders.some(item => item.startsWith('UI:')));
 });
+
+test('el cierre distingue commit opcional de trabajo entregable', () => {
+  const reminders = selectReminders({ profiles: new Set() }, [{ status: 'pass' }], 4);
+  assert.match(reminders[0], /si el bloque es entregable/);
+  assert.match(reminders[0], /no fuerces commit/);
+});

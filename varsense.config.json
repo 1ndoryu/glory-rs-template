@@ -46,6 +46,16 @@
     "enabled": true,
     "severity": "information"
   },
+  "tokenDetection": {
+    "duplicate": {
+      "enabled": true,
+      "severity": "warning"
+    },
+    "unused": {
+      "enabled": true,
+      "severity": "hint"
+    }
+  },
   "bannedProperties": {
     "enabled": true,
     "severity": "warning",

@@ -12,6 +12,7 @@ import { runRust } from './adapters/rust.mjs';
 import { runSentinel } from './adapters/sentinel.mjs';
 import { runVarsense } from './adapters/varsense.mjs';
 import { runCustom } from './adapters/custom.mjs';
+import { runBoundedStages } from './stage-runner.mjs';
 
 let interrupted = false;
 function handleInterruption(signal) {
@@ -31,7 +32,7 @@ function stageDefinitions(context, scope, taskId) {
   if (scope.full || scope.profiles.has('frontend')) definitions.push({ name: 'frontend', run: () => runFrontend(context) });
   if (scope.full || scope.profiles.has('docs')) definitions.push({ name: 'docs', run: () => runDocs(context, taskId) });
   /* [Auditoría v4] Custom checks: DOM abstraction, singleton state, window refs */
-  if (scope.full || scope.profiles.has('frontend')) definitions.push({ name: 'custom', run: () => runCustom(context, scope) });
+  if (scope.full || scope.profiles.has('frontend')) definitions.push({ name: 'custom', run: () => runCustom({ ...context, scope }) });
   return definitions;
 }
 
@@ -39,11 +40,11 @@ async function executeStage(context, scope, definition, options) {
   const stageFingerprint = await fingerprint(context, scope, definition.name);
   if (!options.fresh && !options.ci) {
     const cached = await readCachedPass(context, definition.name, stageFingerprint);
-    if (cached) return cached;
+    if (cached) return { ...cached, cache: 'hit' };
   }
   const result = await definition.run();
   await writeCachedPass(context, definition.name, stageFingerprint, result);
-  return result;
+  return { ...result, cache: 'miss' };
 }
 
 async function main() {
@@ -67,11 +68,12 @@ async function main() {
     });
     try {
       const scope = await detectScope(context, args);
-      const stages = [];
-      for (const definition of stageDefinitions(context, scope, args.taskId)) {
-        if (interrupted) throw new Error('quality gate cancelado durante la ejecución');
-        stages.push(await executeStage(context, scope, definition, args));
-      }
+      const definitions = stageDefinitions(context, scope, args.taskId);
+      const stages = await runBoundedStages(
+        definitions,
+        definition => executeStage(context, scope, definition, args),
+        { maxConcurrency: context.qualityConfig.maxConcurrentStages ?? 1, isCancelled: () => interrupted },
+      );
       const reminders = selectReminders(scope, stages, context.qualityConfig.maxReminders);
       const report = await createReport(context, args, scope, stages, reminders, startedAt);
       printCompact(report, context);

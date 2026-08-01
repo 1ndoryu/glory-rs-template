@@ -13,13 +13,15 @@ export function selectReminders(scope, stages, limit = 4) {
   const reminders = [];
   const failed = stages.some(stage => stage.status === 'fail' || stage.status === 'error');
   if (failed) reminders.push('Corrige los primeros hallazgos y repite exactamente el mismo comando.');
+  if (!failed) {
+    /* El cierre es siempre visible aunque el alcance tenga varios perfiles y
+     * maxReminders sea pequeño; evita que el agente olvide revisar el estado. */
+    reminders.push('Cierre: revisa git status; si el bloque es entregable, staging explícito + commit/push. Si es intermedio o compartido, documenta y no fuerces commit.');
+  }
   for (const profile of scope.profiles) {
     if (PROFILE_REMINDERS[profile] && !reminders.includes(PROFILE_REMINDERS[profile])) {
       reminders.push(PROFILE_REMINDERS[profile]);
     }
-  }
-  if (!failed) {
-    reminders.push('Cierre: staging explícito, commit/push y relectura completa del roadmap.');
   }
   return reminders.slice(0, limit);
 }

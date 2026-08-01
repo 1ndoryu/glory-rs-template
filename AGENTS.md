@@ -87,6 +87,8 @@ No dupliques decisiones: actualiza primero la fuente correspondiente y luego sus
 10. Revisar `git status`/`diff`; stage explícito (nunca `git add .`), commit `{ID}: descripción`, pull/rebase y push.
 11. Releer roadmap como última acción y elegir solo el siguiente bloque habilitado.
 
+> **Commit condicional:** el gate y este protocolo recomiendan commit/push al cerrar un bloque entregable. No se debe forzar commit para diagnósticos, prototipos intermedios o cambios compartidos que aún no estén listos; en esos casos el reporte deja el recordatorio de revisar `git status` y documentar el estado.
+
 ## 7. Quality gate por tarea
 
 El orquestador Node multiplataforma se ejecuta con un único comando público:

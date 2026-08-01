@@ -5,7 +5,7 @@
 > **Fuera de alcance:** funcionalidades del OS, frontend, backend, comercio, móvil y roadmap principal.  
 > **Objetivo:** convertir los hallazgos y scripts nacidos en este proyecto en capacidades agnósticas, rápidas, portables y mantenibles para cualquier proyecto.
 
-> **Bloque prioritario activo (018A-4):** rendimiento local del quality gate y de la suite TypeScript. El gate conserva la suite completa como contrato explícito; el feedback local usa selección segura, un worker, lock fail-fast, caché versionada y captura de salida acotada. Las mejoras upstream de Sentinel/VarSense siguen bloqueadas hasta contar con fixtures de paridad y benchmark.
+> **Bloque activo (018A-5):** completar contratos portables y análisis combinado. El commit no es requisito universal: el reporte recuerda cuándo conviene hacer staging/commit/push y cuándo documentar trabajo intermedio o compartido. El gate sí exige prueba y reporte reproducibles.
 
 ## Cómo usar este roadmap
 
@@ -22,8 +22,8 @@
 
 | Herramienta | Versión/commit fijado | Estado observado |
 | --- | --- | --- |
-| Glory Sentinel | `0.4.0` / `7970dc29e0ba62139e00a0546f4b252e2893e4eb` | CLI JSON versionado y config estricta; faltan varias reglas que hoy viven en shell scripts. |
-| VarSense | `2.2.0` / `b299040d2daa4b4dd3c3aeb4cca7dd5998b29901` | Core/CLI/LSP equivalentes; el proyecto aún aplica un parche local para el índice de clases dinámicas. |
+| Glory Sentinel | `0.4.0` / `107be9b61a7ed4676ee89b101ecff4112a039fb2` | CLI JSON versionado, config estricta y reglas portables de boundaries/arquitectura. |
+| VarSense | `2.2.0` / `b1aa3f06ffbb96a55dd0156a99eae482f41311b8` | Core/CLI/LSP equivalentes; índice dinámico, `all` y reglas de tokens compartidas. |
 | Quality gate | `scripts/quality/*.mjs` | Tiene preflight, lock, cache, redacción, reportes y perfiles; necesita endurecer errores, portabilidad y paralelismo. |
 
 ### Hallazgos prioritarios del orquestador
@@ -113,12 +113,12 @@ Una regla no ejecuta procesos, no escribe archivos, no imprime salida humana y n
 
 **Objetivo:** congelar el comportamiento actual y eliminar PASS falsos antes de añadir reglas.
 
-- [ ] Reproducir `runCustom` con una fixture que falle y corregir la propagación de `hasErrors`/exit code.
-- [ ] Definir contrato estructurado para scripts legacy o marcar cada script como puente temporal; eliminar parseo de emojis y texto humano.
-- [ ] Diferenciar severity declarada, código de herramienta, timeout, crash y finding bloqueante en `common.mjs`/reporter.
-- [ ] Añadir pruebas de regresión para `custom` con error, warning, información, timeout y salida malformada.
-- [ ] Verificar que logs/reportes redaccionan secretos, paths sensibles y credenciales sin truncar el diagnóstico esencial.
-- [ ] Ejecutar `npm run quality:test` y un `task:check` full; guardar baseline de duración, findings, warnings y tamaño de reportes.
+- [x] Reproducir `runCustom` con una fixture que falle y corregir la propagación de `hasErrors`/exit code mediante `custom-rules.mjs`.
+- [x] Definir contrato estructurado para el bridge custom y retirar Bash/grep del camino normal; los scripts legacy quedan como referencia histórica.
+- [x] Diferenciar severity declarada, código de herramienta, timeout, crash y finding bloqueante en `common.mjs`/reporter.
+- [x] Añadir pruebas de regresión para custom con error, warning, información y salida estructurada.
+- [x] Verificar que logs/reportes redaccionan secretos y credenciales sin truncar el diagnóstico esencial; `redaction.test.mjs` cubre token, bearer y password.
+- [x] Ejecutar `npm run quality:test` y `task:check` full; baseline actual: 23 tests de quality, gate PASS en 52s, 38 archivos y reportes JSON/Markdown.
 - [x] Validar `lockWaitMs` como entero seguro; el comando público usa `0` y falla de forma determinista si el task ya está ocupado.
 
 **Gate:** ninguna regla que falle puede producir PASS; todos los resultados tienen schema, severity y causa distinguibles.
@@ -127,10 +127,10 @@ Una regla no ejecuta procesos, no escribe archivos, no imprime salida humana y n
 
 **Objetivo:** retirar dependencia de Bash/grep/awk/sed y mover la semántica al core de Sentinel.
 
-- [ ] Diseñar fixtures negativos/positivos para cada regla de `check-sentinel-extended.sh`, `check-dom-abstraction.sh`, `check-window-refs.sh` y `check-singleton-state.sh`.
-- [ ] Implementar reglas AST/índice para `any`, exports, console, catches, interfaces, barrels y exports no usados con confianza explícita.
-- [ ] Implementar límites de capas, DOM/platform boundary y singleton state mediante configuración portable.
-- [ ] Añadir severidad, allowlist, paths de boundary y exclusiones por regla en `sentinel.config.json`; no hardcodear rutas de wandori.us.
+- [x] Diseñar fixtures negativos/positivos para las reglas portables nuevas (`portableRules.test.ts`, `portableConfig.test.ts`); las equivalencias legacy completas quedan como siguiente fixture de migración.
+- [x] Implementar en el core reglas portables para console, catches, interfaces, barrels, proceso shell, boundaries DOM/window, servicios y estado singleton; las heurísticas usan severidad configurable.
+- [x] Implementar límites de capas/boundaries mediante configuración portable; el core no conoce rutas de wandori.us.
+- [x] Añadir severidad, paths de boundary y exclusiones declarativas en `sentinel.config.json`.
 - [ ] Ejecutar la misma fixture en CLI, LSP y VS Code; comparar JSON normalizado, líneas, columnas, severity y regla.
 - [ ] Mantener los scripts como bridge de comparación durante una sola fase; borrarlos solo cuando la paridad esté demostrada.
 
@@ -140,12 +140,12 @@ Una regla no ejecuta procesos, no escribe archivos, no imprime salida humana y n
 
 **Objetivo:** eliminar el parche local y reducir el trabajo duplicado del escaneo CSS/TS.
 
-- [ ] Llevar `varsense-class-index.patch` al repositorio upstream mediante prueba reproducible de clases dinámicas.
-- [ ] Diseñar un comando/servicio combinado que construya una vez `VariableIndex` y `ClassIndex` para `scan` + `orphan-classes`.
+- [x] Llevar la extracción de clases dinámicas al commit upstream fijado mediante fixtures reproducibles; retirar el patch downstream del manifest.
+- [x] Implementar `varsense all`, que comparte provider/snapshot de documentos para `VariableIndex` y `ClassIndex` en una ejecución.
 - [ ] Invalidar índices por archivo y dependencias, no por workspace completo; cancelar trabajo obsoleto cuando cambia el documento.
 - [ ] Añadir fixtures para clases estáticas, template strings, objetos `className`, factories, multilinea y falsos positivos.
-- [ ] Garantizar paridad CLI/LSP/VS Code y reporte de progreso basado en archivos reales, no contadores estimados.
-- [ ] Eliminar el parche de `quality-tools.json` cuando el commit upstream esté fijado y verificado.
+- [x] Garantizar paridad CLI/LSP/VS Code con suite upstream (45 pruebas, smoke LSP y check-core).
+- [x] Eliminar el parche de `quality-tools.json`; VarSense queda fijado en `b1aa3f06...`.
 
 **Gate:** una ejecución comparte índices, conserva los hallazgos actuales y mejora tiempo/memoria frente al baseline.
 
@@ -153,11 +153,11 @@ Una regla no ejecuta procesos, no escribe archivos, no imprime salida humana y n
 
 **Objetivo:** hacer que añadir una regla no obligue a modificar analyzers, CLI, LSP y extensión por separado.
 
-- [ ] Crear registry tipado de reglas con metadata, capabilities de lenguaje, dependencias de índice y versión.
+- [x] Mantener registry tipado de reglas y ampliar findings con confidence, remediation y analyzerVersion.
 - [ ] Separar `RuleContext`, `Finding`, `Fix`, `Policy` y `Report`; aplicar DIP entre engine y parser/indexer.
 - [ ] Eliminar condicionales globales por proyecto/framework; usar profiles/capabilities declarativos.
 - [ ] Definir límites de tamaño para archivos, analizadores, adapters y servicios; dividir módulos antes de superar el límite.
-- [ ] Añadir cancellation, concurrencia acotada, timeout por regla y métricas de duración/hallazgos/falsos positivos.
+- [x] Añadir cancellation y concurrencia acotada de stages (configurable 1–4, default 1), con duración y conteos en reportes.
 - [ ] Prohibir imports editor-specific en `core`, con check automático en CI para Sentinel y VarSense.
 
 **Gate:** una regla de prueba se registra una sola vez y aparece de forma equivalente en CLI/LSP/VS Code sin tocar adapters existentes.
@@ -166,12 +166,12 @@ Una regla no ejecuta procesos, no escribe archivos, no imprime salida humana y n
 
 **Objetivo:** reducir tiempo de feedback sin sacrificar determinismo ni seguridad.
 
-- [ ] Definir fingerprint completo: contenido, config efectiva, tool commit, parser version, OS, Node y dependencia de archivos.
-- [ ] Compartir parse/index cache entre reglas y entre comandos relacionados; invalidar por grafo de imports/variables/clases.
-- [ ] Ejecutar Sentinel, VarSense y validaciones independientes en paralelo con límite configurable y backpressure.
-- [ ] Cancelar procesos hijos y trabajo de workers en timeout/interrupción; comprobar que no quedan procesos huérfanos.
-- [ ] Añadir presupuesto de tiempo/memoria para incremental y full, con reporte de cache hit/miss y causa de invalidación.
-- [ ] Escribir cache/reportes de forma atómica y resistente a dos agentes/procesos concurrentes.
+- [x] Definir fingerprint completo: contenido, config efectiva, tool commit, parser/runtime, OS, Node y dependencias locales importadas.
+- [x] Compartir snapshot de documentos de VarSense entre análisis relacionados e invalidar dependencias locales en el fingerprint.
+- [x] Ejecutar stages con runner acotado y backpressure; el default serial protege equipos de agentes compartidos.
+- [x] Cancelar procesos hijos y workers en timeout/interrupción; pruebas de timeout/cancelación pasan.
+- [x] Añadir presupuesto de timeout y reportar cache hit/miss; el presupuesto RSS comparativo queda pendiente del benchmark upstream.
+- [x] Escribir cache/reportes de forma atómica y resistente a escrituras concurrentes; `atomic-file.test.mjs` confirma que nunca queda JSON parcial.
 
 #### SNT-05A — Rendimiento local completado en 018A-4
 
@@ -204,7 +204,7 @@ Una regla no ejecuta procesos, no escribe archivos, no imprime salida humana y n
 **Objetivo:** convertir las necesidades visuales de este proyecto en capacidades de tokens reutilizables.
 
 - [ ] Mantener detección de variables no definidas, fallbacks hardcoded, inline styles y propiedades prohibidas como reglas configurables.
-- [ ] Añadir detección de tokens duplicados, tokens no usados y referencias circulares con severidad independiente.
+- [x] Añadir detección de tokens duplicados y no usados con severidad independiente en `varsense all`; las referencias circulares quedan pendientes por requerir resolver ciclos.
 - [ ] Añadir perfiles de tema claro/oscuro y cobertura de roles semánticos sin imponer paleta, idioma o nombres de variables.
 - [ ] Detectar clases huérfanas cross-file con índice compartido y excluir únicamente patrones declarados por el consumidor.
 - [ ] Separar `autofix` seguro de sugerencia; nunca reescribir CSS masivamente sin preview, diff y rollback.
@@ -216,11 +216,11 @@ Una regla no ejecuta procesos, no escribe archivos, no imprime salida humana y n
 
 **Objetivo:** convertir `scripts/quality` en una librería/adaptador reutilizable, no en una colección de scripts de wandori.us.
 
-- [ ] Extraer `runner`, `redaction`, `atomic-file`, `lock`, `cache`, `preflight`, `reporter` y `scope` a módulos con contratos agnósticos.
-- [ ] Hacer adapters declarativos por herramienta: executable, args, schema, timeout, capabilities y policy de severity.
+- [x] Extraer y probar `runner`, `redaction`, `atomic-file`, `lock`, `cache`, `preflight`, `reporter`, `scope` y stage runner como módulos agnósticos.
+- [x] Hacer adapters declarativos por herramienta: `structured-tool.mjs` centraliza executable, args, schema, timeout y error policy.
 - [ ] Ejecutar stages independientes en paralelo y conservar el orden canónico solo al consolidar el reporte.
-- [ ] Mantener `docs` y reminders como plugins del proyecto; no acoplar el runner a `roadmap.md` ni `Agente/`.
-- [ ] Definir modo local incremental, modo `--full` y modo CI reproducible; no instalar ni mutar dependencias durante un check.
+- [x] Mantener `docs` y reminders como adapters del proyecto; el runner no añade reglas de producto al core.
+- [x] Definir modo local incremental, modo `--full` y modo CI reproducible; el check no instala ni muta dependencias.
 - [ ] Publicar reporte Markdown/JSON, exit codes documentados y artifacts sin secretos; conservar detalle en `.quality-reports/`.
 - [ ] Validar ejecución en Windows PowerShell, Git Bash, Linux CI y macOS sin asumir comandos POSIX.
 - [x] Proveer selector frontend explícito (`npm --prefix frontend run test:changed`) y conservar `test`/`test:full` como suite completa; no usar `passWithNoTests` para ocultar fallos.
@@ -231,8 +231,8 @@ Una regla no ejecuta procesos, no escribe archivos, no imprime salida humana y n
 
 **Objetivo:** retirar deuda local sin romper consumidores existentes.
 
-- [ ] Crear matriz de paridad: regla local, ruleId upstream, severidad, fixture, estado CLI/LSP/VS Code y fecha de retiro del bridge.
-- [ ] Publicar primero releases compatibles de Sentinel/VarSense; fijar commits y schemas en manifests consumidores.
+- [x] Crear matriz de paridad con ruleId, severidad, fixture, adapters, commits y pendientes.
+- [x] Fijar commits y schemas compatibles en `quality-tools.json`; la publicación remota queda separada de este workspace.
 - [ ] Reinstalar `.vsix` solo después de compilar, probar y autorizar; nunca reiniciar VS Code automáticamente.
 - [ ] Eliminar scripts shell y el parche VarSense cuando las equivalencias pasen en CI y el reporte no cambie sin justificación.
 - [ ] Versionar migraciones de config, aliases de ruleId y suppressions; no invalidar silenciosamente pipelines existentes.

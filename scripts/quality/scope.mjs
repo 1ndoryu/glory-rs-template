@@ -1,4 +1,4 @@
-import { writeFile } from 'node:fs/promises';
+import { access, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { runProcess } from './runner.mjs';
 
@@ -50,6 +50,35 @@ function globToRegex(pattern) {
   return new RegExp(`${expression}$`, 'i');
 }
 
+async function existingPath(candidate) {
+  try { await access(candidate); return candidate; } catch { return null; }
+}
+
+export async function expandLocalDependencies(root, files) {
+  const resolved = new Set(files);
+  const queue = [...files];
+  while (queue.length > 0) {
+    const relative = queue.shift();
+    if (!/\.(?:ts|tsx|js|jsx|mjs)$/.test(relative)) continue;
+    let source;
+    try { source = await readFile(path.join(root, relative), 'utf8'); } catch { continue; }
+    for (const match of source.matchAll(/from\s*['"](\.[^'"]+)['"]|import\s*\(['"](\.[^'"]+)['"]\)/g)) {
+      const specifier = match[1] ?? match[2];
+      const base = path.normalize(path.join(path.dirname(relative), specifier));
+      const candidates = [base, `${base}.ts`, `${base}.tsx`, `${base}.js`, `${base}.jsx`, path.join(base, 'index.ts')];
+      for (const candidate of candidates) {
+        const normalized = candidate.replace(/\\/g, '/');
+        if (await existingPath(path.join(root, normalized)) && !resolved.has(normalized)) {
+          resolved.add(normalized);
+          queue.push(normalized);
+          break;
+        }
+      }
+    }
+  }
+  return [...resolved].sort();
+}
+
 export function matches(pathName, pattern) {
   const lowerPath = pathName.replace(/\\/g, '/').toLowerCase();
   const lowerPattern = pattern.replace(/\\/g, '/').toLowerCase();
@@ -76,7 +105,7 @@ export async function detectScope(context, args) {
   const full = args.full || args.ci || automaticFull;
   const fingerprintFiles = full
     ? [...new Set([...tracked, ...untracked])].sort()
-    : files;
+    : await expandLocalDependencies(context.projectRoot, files);
   const profiles = new Set();
 
   for (const [profile, patterns] of Object.entries(context.qualityConfig.profiles)) {

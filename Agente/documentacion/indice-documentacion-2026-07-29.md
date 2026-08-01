@@ -26,6 +26,7 @@
 | ¿Cómo se paga la deuda SOLID del runtime de apps?       | `Agente/planes/plan-deuda-solid-runtime-2026-07-31.md`                             |
 | ¿Por qué se cierran ventanas al abrir otra y cómo se resuelve? | `Agente/planes/plan-cierre-automatico-ventanas-2026-07-31.md`                |
 | ¿Cómo se implementan los programas editoriales por vertical? | `Agente/planes/plan-programas-editoriales-2026-07-31.md`                       |
+| ¿Cuál es la paridad y el commit fijado de Sentinel/VarSense? | `Agente/documentacion/herramientas/matriz-paridad-sentinel-varsense-2026-08-01.md` |
 
 ## Regla de autoridad
 
@@ -47,6 +48,7 @@
 - Plan visual antiguo: referencia histórica del concepto aprobado.
 - Plan wandori.us original: superado; no es especificación activa.
 - Plan Sentinel/VarSense editor-agnóstico: trabajo histórico documentado en tareas completadas.
+- Matriz Sentinel/VarSense: actualizada con contrato de findings, comando combinado `all` y commits fijados.
 - Auditoría arquitectónica frontend v1: activa; plan de refactorización parcialmente ejecutado.
 - Auditoría arquitectónica frontend v2: activa; 3 críticos, 5 altos, 8 medios identificados.
 - Plan refactorización arquitectura: activo; runtime móvil 297A-12 implementado parcialmente con `mobile-shell.ts`/`mobile-stack.ts`; revisar gate de transición antes de avanzar.

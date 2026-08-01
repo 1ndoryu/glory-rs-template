@@ -38,3 +38,9 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 - Un selector incremental no debe inferir dependencias desde cualquier `--changed HEAD`: solo tests modificados pueden ejecutarse selectivamente; código, configuración, borrados, renombres y untracked requieren suite completa.
 - El contrato de suite completa debe permanecer explícito (`test`/`test:full`), mientras el modo local selectivo se ofrece como comando separado para no convertir un PASS parcial en una garantía global.
 - Limitar workers y captura de salida evita que varios agentes saturen CPU/memoria; el gate debe fallar rápido ante locks duplicados y dejar el detalle en artifacts, no en stdout/contexto.
+
+## 018A-5 — Commit condicional y migración de reglas
+
+- El quality gate no debe ordenar commit a ciegas: diagnósticos, bloques intermedios y trabajo compartido pueden documentarse sin commit; el recordatorio debe indicar commit/push solo cuando el bloque sea entregable.
+- Antes de mover una regla del proyecto al core, conservar el bridge durante una fase, añadir fixture y filtrar el duplicado en el adapter; así se puede comparar sin duplicar ruido al usuario.
+- Un comando combinado (`all`) es más seguro que dos procesos si comparte provider y snapshot; cambiar el contrato requiere mantener `scan` y `orphan-classes` para no romper consumidores existentes.

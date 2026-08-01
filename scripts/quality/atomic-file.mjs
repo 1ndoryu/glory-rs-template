@@ -29,5 +29,22 @@ export async function writeAtomic(target, content) {
   await cleanupStaleAtomicTemps(target);
   const temporary = `${target}.tmp.${process.pid}.${randomUUID()}`;
   await writeFile(temporary, content, 'utf8');
-  await rename(temporary, target);
+  /* Windows no permite reemplazar un archivo abierto con rename(). Dos
+   * agentes pueden cerrar la etapa a la vez, así que reintentamos de forma
+   * acotada y retiramos solo el target exacto antes de cada intento. */
+  for (let attempt = 0; attempt < 6; attempt++) {
+    try {
+      await rename(temporary, target);
+      return;
+    } catch (error) {
+      if (!['EPERM', 'EEXIST', 'EBUSY'].includes(error?.code) || attempt === 5) {
+        try { await unlink(temporary); } catch { /* limpieza best-effort */ }
+        throw error;
+      }
+      try { await unlink(target); } catch (unlinkError) {
+        if (unlinkError?.code !== 'ENOENT') throw unlinkError;
+      }
+      await new Promise(resolve => setTimeout(resolve, 5 * (attempt + 1)));
+    }
+  }
 }

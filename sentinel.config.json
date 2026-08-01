@@ -22,6 +22,27 @@
     "src/handlers",
     "frontend"
   ],
+  "portableBoundaries": {
+    "dom": [
+      "/frontend/src/utils/dom.ts",
+      "/frontend/src/platform/",
+      "/frontend/src/adapters/"
+    ],
+    "window": [
+      "/frontend/src/platform/",
+      "/frontend/src/adapters/",
+      "/frontend/src/navigation/"
+    ],
+    "services": [
+      "/frontend/src/services/",
+      "/frontend/src/api/",
+      "/frontend/src/adapters/"
+    ],
+    "loggerModules": [
+      "/frontend/src/services/logger",
+      "/frontend/src/utils/logger"
+    ]
+  },
   "rules": {
     "barras-decorativas": {
       "severidad": "warning"
@@ -49,6 +70,12 @@
     },
     "axum-ruta-sintaxis-rs": {
       "severidad": "error"
+    },
+    "unsafe-process-shell": {
+      "severidad": "error"
+    },
+    "default-export": {
+      "habilitada": false
     }
   }
 }
