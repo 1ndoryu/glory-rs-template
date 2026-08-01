@@ -1,6 +1,7 @@
 /* Tests para command-registry.ts [Auditoría v4 §6.1] */
 import { describe, it, expect, vi } from 'vitest';
 import {
+  adminOnly,
   CommandRegistry,
   type Command,
   type CommandContext,
@@ -226,6 +227,43 @@ describe('CommandRegistry', () => {
       }));
       expect(CommandRegistry.isAvailable('test:avail-custom', { capability: 'admin' })).toEqual({ state: 'enabled' });
       expect(CommandRegistry.isAvailable('test:avail-custom', { capability: 'public' })).toEqual({ state: 'disabled', reason: 'admin only' });
+    });
+  });
+
+  /* [297A-29 F2] Comando genérico admin-only: el shell no hace if/else por
+   * capacidad, el comando declara su disponibilidad y las superficies la proyectan. */
+  describe('adminOnly', () => {
+    it('envuelve un comando restringiéndolo a admin', async () => {
+      const execute = vi.fn<() => CommandResult>(() => ({ status: 'success' }));
+      const base = makeCmd({ id: 'test:admin-only-1', execute });
+      CommandRegistry.register(adminOnly(base));
+
+      /* Admin: disponible y ejecuta */
+      expect(CommandRegistry.isAvailable('test:admin-only-1', { capability: 'admin' })).toEqual({ state: 'enabled' });
+      await CommandRegistry.execute('test:admin-only-1', { capability: 'admin' });
+      expect(execute).toHaveBeenCalled();
+
+      /* No-admin: hidden y falla fail-closed */
+      expect(CommandRegistry.isAvailable('test:admin-only-1', { capability: 'authenticated' })).toEqual({ state: 'hidden' });
+      const denied = await CommandRegistry.execute('test:admin-only-1', { capability: 'authenticated' });
+      expect(denied.status).toBe('failure');
+    });
+
+    it('compone con el isAvailable existente del comando base', () => {
+      const base = makeCmd({
+        id: 'test:admin-only-comp-1',
+        isAvailable: (ctx) =>
+          ctx.targets?.length ? { state: 'enabled' } : { state: 'disabled', reason: 'no target' },
+      });
+      CommandRegistry.register(adminOnly(base));
+
+      /* Admin + target: enabled */
+      expect(CommandRegistry.isAvailable('test:admin-only-comp-1', {
+        capability: 'admin', targets: [{ id: 'x', kind: 'folder' }],
+      })).toEqual({ state: 'enabled' });
+
+      /* No-admin: hidden antes incluso de evaluar el base */
+      expect(CommandRegistry.isAvailable('test:admin-only-comp-1', { capability: 'public' })).toEqual({ state: 'hidden' });
     });
   });
 });

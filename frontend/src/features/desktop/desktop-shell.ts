@@ -48,12 +48,13 @@ export function createDesktopShell(
   });
 
   /* Ventana legacy para páginas no-app */
-  const contentWindow = createDesktopWindow({
+  const contentWindowHandle = createDesktopWindow({
     title: 'Documento',
     content,
     className: 'desktop-content-window',
     resizable: true,
   });
+  const contentWindow = contentWindowHandle.element;
   contentWindow.style.display = 'none';
 
   /* Icon grid reactivo */
@@ -116,12 +117,12 @@ export function createDesktopShell(
   });
   resizeObserver.observe(windowContainer);
 
-  const renderedWindows = new Map<string, { el: HTMLElement; cleanup: () => void }>();
+  const renderedWindows = new Map<string, { el: HTMLElement; cleanup: () => void; destroy: () => void }>();
 
   const stopWindows = windowStore.subscribe((windows) => {
     for (const win of windows) {
       if (!renderedWindows.has(win.instanceId)) {
-        const el = createDesktopWindow({
+        const windowHandle = createDesktopWindow({
           title: win.title,
           content: win.content,
           className: win.cssClass ?? `desktop-window--${win.appId}`,
@@ -137,6 +138,7 @@ export function createDesktopShell(
           onMinimize: () => { minimizeWindow(win.instanceId); },
           onMaximize: () => { toggleMaximizeWindow(win.instanceId); },
         });
+        const el = windowHandle.element;
 
         el.style.position = 'absolute';
         el.style.setProperty('--win-x', `${win.bounds.x}px`);
@@ -158,13 +160,14 @@ export function createDesktopShell(
 
         el.addEventListener('mousedown', () => { focusWindow(win.instanceId); });
         windowContainer.appendChild(el);
-        renderedWindows.set(win.instanceId, { el, cleanup });
+        renderedWindows.set(win.instanceId, { el, cleanup, destroy: windowHandle.destroy });
       }
     }
 
     for (const [id, entry] of renderedWindows) {
       if (!windows.find(w => w.instanceId === id)) {
         entry.cleanup();
+        entry.destroy();
         entry.el.remove();
         renderedWindows.delete(id);
       }
@@ -208,9 +211,11 @@ export function createDesktopShell(
     workspace.removeEventListener('contextmenu', onWorkspaceContextMenu);
     for (const entry of renderedWindows.values()) {
       entry.cleanup();
+      entry.destroy();
       entry.el.remove();
     }
     renderedWindows.clear();
+    contentWindowHandle.destroy();
     shell.remove();
   }
 

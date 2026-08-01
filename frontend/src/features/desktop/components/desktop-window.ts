@@ -34,8 +34,10 @@ function createWindowControl(
 }
 
 /* [297A-2] Receta visual única para todas las futuras aplicaciones.
- * Los controles son decorativos hasta que exista el gestor de ventanas. */
-export function createDesktopWindow(options: DesktopWindowOptions): HTMLElement {
+ * Los controles son decorativos hasta que exista el gestor de ventanas.
+ * [297A-29 F2] Devuelve { element, destroy } para cancelar la suscripción
+ * del toolbar (login/logout en vivo) cuando la ventana se cierra. */
+export function createDesktopWindow(options: DesktopWindowOptions): { element: HTMLElement; destroy: () => void } {
   const windowElement = createEl('section', { className: 'desktop-window', ariaLabel: `Ventana ${options.title}` });
 
   if (options.className) windowElement.classList.add(...options.className.split(' '));
@@ -72,9 +74,10 @@ export function createDesktopWindow(options: DesktopWindowOptions): HTMLElement 
     },
     ...(options.toolbar ?? []),
   ];
-  windowElement.appendChild(createAppToolbar(allGroups, {
+  const toolbar = createAppToolbar(allGroups, {
     onClose: options.onClose, onMinimize: options.onMinimize, onMaximize: options.onMaximize,
-  }));
+  });
+  windowElement.appendChild(toolbar.element);
 
   const body = createEl('div', { className: 'desktop-window__body' });
   if (options.layout !== 'full-bleed') {
@@ -83,7 +86,10 @@ export function createDesktopWindow(options: DesktopWindowOptions): HTMLElement 
   body.appendChild(options.content);
   windowElement.appendChild(body);
 
-  return windowElement;
+  return {
+    element: windowElement,
+    destroy: toolbar.destroy,
+  };
 }
 
 /* === App Toolbar === */
@@ -107,16 +113,22 @@ function resolveToolbarItem(
   };
 }
 
+type WindowCallbacks = { onClose?: () => void; onMinimize?: () => void; onMaximize?: () => void };
+
+/* [297A-29 F2] Toolbar reactivo a la capacidad.
+ * - La capacidad se lee EN VIVO (authStore.get()) al abrir cada menú, no al
+ *   crear el toolbar: login/logout con la ventana abierta se reflejan en la
+ *   próxima apertura sin reabrir la ventana.
+ * - Se suscribe a authStore para re-renderizar los grupos cuando cambia la
+ *   capacidad (login/logout en vivo).
+ * - Un grupo cuyos items son todos hidden (p.ej. acciones admin-only con
+ *   adminOnly()) se oculta completo: el shell no hace if/else por capacidad.
+ * - Devuelve { element, destroy } para cancelar la suscripción en teardown. */
 export function createAppToolbar(
   groups: AppToolbarGroup[],
-  callbacks?: { onClose?: () => void; onMinimize?: () => void; onMaximize?: () => void },
-): HTMLElement {
+  callbacks?: WindowCallbacks,
+): { element: HTMLElement; destroy: () => void } {
   const toolbar = createEl('div', { className: 'desktop-app-toolbar' });
-
-  const ctx: CommandContext = {
-    capability: authStore.get().capability,
-    presentationMode: 'desktop',
-  };
 
   const windowCallbackMap: Record<string, 'onClose' | 'onMinimize' | 'onMaximize'> = {
     'window:close': 'onClose',
@@ -124,7 +136,14 @@ export function createAppToolbar(
     'window:maximize': 'onMaximize',
   };
 
-  for (const group of groups) {
+  function currentContext(): CommandContext {
+    return {
+      capability: authStore.get().capability,
+      presentationMode: 'desktop',
+    };
+  }
+
+  function buildEntry(group: AppToolbarGroup): HTMLElement {
     const btn = createEl('button', { type: 'button', className: 'desktop-app-toolbar__item', textContent: group.label, ariaHaspopup: 'menu' });
 
     const entry = createEl('div', { className: 'desktop-app-toolbar__entry' }, btn);
@@ -133,6 +152,7 @@ export function createAppToolbar(
       e.stopPropagation();
       btn.setAttribute('aria-expanded', 'true');
 
+      const ctx = currentContext();
       const items: DropdownMenuItem[] = [];
       for (const ref of group.items) {
         if (ref === '---' || (typeof ref === 'object' && ref.id === '---')) {
@@ -181,8 +201,42 @@ export function createAppToolbar(
       });
     });
 
-    toolbar.appendChild(entry);
+    return entry;
   }
 
-  return toolbar;
+  /* Un grupo solo se muestra si al menos un item es visible para la
+   * capacidad actual (fail-closed: items con isAvailable hidden se omiten). */
+  function groupHasVisibleItem(group: AppToolbarGroup, ctx: CommandContext): boolean {
+    for (const ref of group.items) {
+      if (ref === '---' || (typeof ref === 'object' && ref.id === '---')) continue;
+      const resolved = resolveToolbarItem(ref);
+      if (!resolved) continue;
+      const cmd = CommandRegistry.get(resolved.id);
+      if (cmd?.isAvailable) {
+        const avail = cmd.isAvailable(ctx);
+        if (avail.state === 'hidden') continue;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  function render(): void {
+    toolbar.textContent = '';
+    const ctx = currentContext();
+    for (const group of groups) {
+      if (!groupHasVisibleItem(group, ctx)) continue;
+      toolbar.appendChild(buildEntry(group));
+    }
+  }
+
+  render();
+
+  /* Re-render en login/logout: la visibilidad de grupos admin-only cambia en vivo */
+  const unsubscribe = authStore.subscribe(() => render());
+
+  return {
+    element: toolbar,
+    destroy: unsubscribe,
+  };
 }

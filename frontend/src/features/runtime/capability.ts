@@ -28,3 +28,15 @@ export function hasCapability(
   const requiredLevel = capabilityLevel(required ?? 'public');
   return currentLevel >= 0 && requiredLevel >= 0 && currentLevel >= requiredLevel;
 }
+
+/** Disponibilidad admin-only genérica para comandos.
+ * [297A-29 F2] Evita if/else por capacidad en el shell: cualquier comando
+ * declara su disponibilidad con este helper y el toolbar solo lo proyecta.
+ * Fail-closed: capacidad no admin (o corrupta) => hidden. */
+export function adminOnlyAvailability(capability: unknown):
+  | { state: 'enabled' }
+  | { state: 'hidden' } {
+  return hasCapability(capability, 'admin')
+    ? { state: 'enabled' }
+    : { state: 'hidden' };
+}

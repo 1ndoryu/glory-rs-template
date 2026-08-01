@@ -8,7 +8,7 @@
  * [297A-9/10] Contrato transversal de interacción, comandos y medición. */
 
 import type { IconNode } from 'lucide';
-import type { Capability } from './capability';
+import { adminOnlyAvailability, type Capability } from './capability';
 
 /* === Tipos del contrato de comandos === */
 
@@ -71,6 +71,22 @@ export interface Command {
   readonly isAvailable?: (ctx: CommandContext) => CommandAvailability;
   /** Función a ejecutar. Devuelve CommandResult. */
   readonly execute: (ctx?: CommandContext) => CommandResult | Promise<CommandResult>;
+}
+
+/** Envuelve un comando para restringirlo a administradores.
+ * [297A-29 F2] Reutilizable para acciones de toolbar/shell visibles solo a
+ * admins. El shell no hace if/else por capacidad: el comando declara su
+ * disponibilidad y las superficies la proyectan. Fail-closed: capacidad
+ * no admin (o ausente) => hidden. */
+export function adminOnly<T extends Command>(command: T): T {
+  return {
+    ...command,
+    isAvailable: (ctx) => {
+      const admin = adminOnlyAvailability(ctx.capability);
+      if (admin.state !== 'enabled') return admin;
+      return command.isAvailable ? command.isAvailable(ctx) : { state: 'enabled' };
+    },
+  };
 }
 
 /* === Registry === */
