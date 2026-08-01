@@ -121,3 +121,7 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Una anotación utoipa puede compilar aunque apunte a una ruta pública; comparar el path anotado con `.route()` evita que el cliente generado omita el prefijo `/admin`.
 - Los campos `serde_json::Value` de DTOs expuestos necesitan `#[schema(value_type = Object)]`; de lo contrario Orval falla con referencias `JsonValue` inexistentes.
+
+## 018A-21 — Los enums anidados también son parte del contrato
+
+- Al añadir un request con un enum de actualización (`ProjectUrlUpdate`), incluir el enum en `components(schemas(...))`; compilar Rust no garantiza que Orval encuentre todas las referencias.

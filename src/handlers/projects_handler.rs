@@ -11,6 +11,18 @@ use crate::services::project_svc::ProjectService;
 use crate::AppState;
 
 /// Crear proyecto (admin)
+/* [018A-21] Este dominio mantiene sus rutas admin explícitas en OpenAPI para
+ * que el cliente generado no confunda el catálogo público con el editor. */
+#[utoipa::path(
+    post,
+    path = "/api/admin/projects",
+    request_body = CreateProjectRequest,
+    responses(
+        (status = 201, description = "Proyecto creado", body = Project),
+        (status = 401, description = "No autorizado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
 pub async fn create_project(
     State(state): State<AppState>,
     _auth: AdminUser,
@@ -21,12 +33,26 @@ pub async fn create_project(
 }
 
 /// Listar proyectos (publico — solo visibles)
+#[utoipa::path(
+    get,
+    path = "/api/projects",
+    responses((status = 200, description = "Proyectos visibles", body = [Project]))
+)]
 pub async fn list_projects(State(state): State<AppState>) -> Result<Json<Vec<Project>>, AppError> {
     let projects = ProjectService::list_visible(&state.pool).await?;
     Ok(Json(projects))
 }
 
 /// Listar todos los proyectos (admin)
+#[utoipa::path(
+    get,
+    path = "/api/admin/projects",
+    responses(
+        (status = 200, description = "Todos los proyectos", body = [Project]),
+        (status = 401, description = "No autorizado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
 pub async fn list_all_projects(
     State(state): State<AppState>,
     _auth: AdminUser,
@@ -36,6 +62,17 @@ pub async fn list_all_projects(
 }
 
 /// Obtener un proyecto por ID (admin)
+#[utoipa::path(
+    get,
+    path = "/api/admin/projects/{id}",
+    params(("id" = Uuid, Path, description = "ID del proyecto")),
+    responses(
+        (status = 200, description = "Proyecto encontrado", body = Project),
+        (status = 401, description = "No autorizado", body = ErrorResponse),
+        (status = 404, description = "No encontrado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
 pub async fn get_project(
     State(state): State<AppState>,
     _auth: AdminUser,
@@ -46,6 +83,18 @@ pub async fn get_project(
 }
 
 /// Actualizar proyecto (admin)
+#[utoipa::path(
+    put,
+    path = "/api/admin/projects/{id}",
+    params(("id" = Uuid, Path, description = "ID del proyecto")),
+    request_body = UpdateProjectRequest,
+    responses(
+        (status = 200, description = "Proyecto actualizado", body = Project),
+        (status = 401, description = "No autorizado", body = ErrorResponse),
+        (status = 404, description = "No encontrado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
 pub async fn update_project(
     State(state): State<AppState>,
     _auth: AdminUser,
@@ -57,6 +106,17 @@ pub async fn update_project(
 }
 
 /// Eliminar proyecto (admin)
+#[utoipa::path(
+    delete,
+    path = "/api/admin/projects/{id}",
+    params(("id" = Uuid, Path, description = "ID del proyecto")),
+    responses(
+        (status = 204, description = "Proyecto eliminado"),
+        (status = 401, description = "No autorizado", body = ErrorResponse),
+        (status = 404, description = "No encontrado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
 pub async fn delete_project(
     State(state): State<AppState>,
     _auth: AdminUser,
