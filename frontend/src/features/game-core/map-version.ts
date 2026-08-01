@@ -105,8 +105,27 @@ function hasOwn(record: UnknownRecord, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(record, key);
 }
 
+function rejectUnknownKeys(
+  record: UnknownRecord,
+  allowed: readonly string[],
+  path: string,
+  issues: MapValidationIssue[],
+): void {
+  const allowedKeys = new Set(allowed);
+  for (const key of Object.keys(record)) {
+    if (!allowedKeys.has(key)) {
+      issues.push({ path: `${path}.${key}`, message: 'campo no permitido' });
+    }
+  }
+}
+
 function readBounds(value: unknown, path: string, issues: MapValidationIssue[]): MapBounds | undefined {
-  if (!isRecord(value) || !finite(value.minX) || !finite(value.maxX) || !finite(value.minZ) || !finite(value.maxZ)) {
+  if (!isRecord(value)) {
+    issues.push({ path, message: 'requiere límites numéricos finitos' });
+    return undefined;
+  }
+  rejectUnknownKeys(value, ['minX', 'maxX', 'minZ', 'maxZ'], path, issues);
+  if (!finite(value.minX) || !finite(value.maxX) || !finite(value.minZ) || !finite(value.maxZ)) {
     issues.push({ path, message: 'requiere límites numéricos finitos' });
     return undefined;
   }
@@ -125,7 +144,12 @@ function readBounds(value: unknown, path: string, issues: MapValidationIssue[]):
 }
 
 function readPosition(value: unknown, path: string, issues: MapValidationIssue[]): Vector2 | undefined {
-  if (!isRecord(value) || !finite(value.x) || !finite(value.z)) {
+  if (!isRecord(value)) {
+    issues.push({ path, message: 'requiere coordenadas finitas' });
+    return undefined;
+  }
+  rejectUnknownKeys(value, ['x', 'z'], path, issues);
+  if (!finite(value.x) || !finite(value.z)) {
     issues.push({ path, message: 'requiere coordenadas finitas' });
     return undefined;
   }
@@ -143,6 +167,12 @@ function readShape(value: unknown, path: string, issues: MapValidationIssue[]): 
     issues.push({ path, message: 'proxy de colisión ausente o no permitido' });
     return undefined;
   }
+  const allowedKeys = value.kind === 'circle'
+    ? ['kind', 'radius']
+    : value.kind === 'aabb'
+      ? ['kind', 'halfWidth', 'halfDepth']
+      : ['kind'];
+  rejectUnknownKeys(value, allowedKeys, path, issues);
   if (value.kind === 'circle' && finite(value.radius)
     && value.radius > 0 && value.radius <= MAP_VERSION_LIMITS.maxColliderSize) {
     return { kind: 'circle', radius: value.radius };
@@ -169,6 +199,7 @@ function validateTerrain(value: unknown, issues: MapValidationIssue[]): TerrainD
     issues.push({ path: 'terrain', message: 'debe ser un objeto' });
     return undefined;
   }
+  rejectUnknownKeys(value, ['schemaVersion', 'bounds', 'cellSize', 'chunkSize', 'chunks'], 'terrain', issues);
   if (value.schemaVersion !== 1) issues.push({ path: 'terrain.schemaVersion', message: 'versión no soportada' });
   const bounds = readBounds(value.bounds, 'terrain.bounds', issues);
   const cellSize = value.cellSize;
@@ -190,7 +221,12 @@ function validateTerrain(value: unknown, issues: MapValidationIssue[]): TerrainD
   const chunkKeys = new Set<string>();
   value.chunks.slice(0, MAP_VERSION_LIMITS.maxChunks).forEach((raw, index) => {
     const path = `terrain.chunks[${index}]`;
-    if (!isRecord(raw) || !Number.isSafeInteger(raw.x) || !Number.isSafeInteger(raw.z)) {
+    if (!isRecord(raw)) {
+      issues.push({ path, message: 'coordenadas de chunk inválidas' });
+      return;
+    }
+    rejectUnknownKeys(raw, ['x', 'z', 'heights', 'surfaces'], path, issues);
+    if (!Number.isSafeInteger(raw.x) || !Number.isSafeInteger(raw.z)) {
       issues.push({ path, message: 'coordenadas de chunk inválidas' });
       return;
     }
@@ -241,6 +277,7 @@ function validateTerrain(value: unknown, issues: MapValidationIssue[]): TerrainD
 export function validateMapVersion(value: unknown): readonly MapValidationIssue[] {
   if (!isRecord(value)) return [{ path: 'mapVersion', message: 'debe ser un objeto' }];
   const issues: MapValidationIssue[] = [];
+  rejectUnknownKeys(value, ['schemaVersion', 'id', 'terrain', 'assetManifest', 'instances', 'spawnPoints'], 'mapVersion', issues);
   if (value.schemaVersion !== MAP_VERSION_SCHEMA) issues.push({ path: 'schemaVersion', message: 'versión no soportada' });
   if (!validId(value.id)) issues.push({ path: 'id', message: 'requiere un id válido' });
   const terrain = validateTerrain(value.terrain, issues);
@@ -252,7 +289,12 @@ export function validateMapVersion(value: unknown): readonly MapValidationIssue[
     if (assets.length > MAP_VERSION_LIMITS.maxAssets) issues.push({ path: 'assetManifest', message: 'supera la cuota de assets' });
     assets.slice(0, MAP_VERSION_LIMITS.maxAssets).forEach(([key, raw]) => {
       const path = `assetManifest[${key}]`;
-      if (!isRecord(raw) || !validId(key) || key !== raw.id || !validId(raw.id)
+      if (!isRecord(raw)) {
+        issues.push({ path, message: 'asset version inválida' });
+        return;
+      }
+      rejectUnknownKeys(raw, ['id', 'category', 'contentHash', 'collisionProxy'], path, issues);
+      if (!validId(key) || key !== raw.id || !validId(raw.id)
         || typeof raw.contentHash !== 'string'
         || !raw.contentHash.trim() || raw.contentHash.length > MAP_VERSION_LIMITS.maxContentHashLength
         || !['terrain', 'tree', 'rock', 'water', 'character', 'generic'].includes(raw.category as string)) {
@@ -271,7 +313,12 @@ export function validateMapVersion(value: unknown): readonly MapValidationIssue[
     const ids = new Set<string>();
     instances.slice(0, MAP_VERSION_LIMITS.maxInstances).forEach((raw, index) => {
       const path = `instances[${index}]`;
-      if (!isRecord(raw) || !validId(raw.id) || ids.has(raw.id as string)) {
+      if (!isRecord(raw)) {
+        issues.push({ path, message: 'id de instancia inválido o duplicado' });
+        return;
+      }
+      rejectUnknownKeys(raw, ['id', 'assetVersionId', 'position', 'rotationY', 'scale', 'terrainAnchor'], path, issues);
+      if (!validId(raw.id) || ids.has(raw.id as string)) {
         issues.push({ path, message: 'id de instancia inválido o duplicado' });
         return;
       }
@@ -327,6 +374,7 @@ export function validateMapVersion(value: unknown): readonly MapValidationIssue[
     const ids = new Set<string>();
     spawns.slice(0, MAP_VERSION_LIMITS.maxSpawnPoints).forEach((raw, index) => {
       const path = `spawnPoints[${index}]`;
+      if (isRecord(raw)) rejectUnknownKeys(raw, ['id', 'position', 'radius'], path, issues);
       const position = isRecord(raw) ? readPosition(raw.position, `${path}.position`, issues) : undefined;
       const id = isRecord(raw) ? raw.id : undefined;
       const radius = isRecord(raw) ? raw.radius : undefined;

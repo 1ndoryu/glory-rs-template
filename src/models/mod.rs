@@ -1,4 +1,5 @@
 pub mod article;
+pub mod game_map;
 pub mod media;
 mod note;
 pub mod notification;

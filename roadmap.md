@@ -63,6 +63,7 @@
 - [ ] Mantener el objetivo inicial en salas de 8 jugadores, snapshots a baja frecuencia, interés por proximidad y salas bajo demanda.
 - [ ] Validar teardown al cerrar, límites de mensajes/mapa/assets, permisos server-side, reconexión y rollback de versiones.
 - [x] **297A-26 — Contrato frontend de MapVersion y fixture offline:** `game-core/map-version.ts` valida terreno por chunks, manifiesto de assets, instancias, spawns, bounds, transforms, referencias e IDs reservados; `game-playable` consume el adaptador `MapVersion → WorldMap`. Gate PASS: Sentinel/VarSense, type-check, 41 tests, build, diff-check y navegador `/forest-playable`. Backend, persistencia, endpoint, realtime, identidad, editor y mediciones GPU/memoria siguen pendientes.
+- [ ] **297A-27 — Contrato MapVersion compartido frontend/backend:** Rust añade `models::game_map::MapVersion` con JSON camelCase, `deny_unknown_fields`, proxy opcional, validación fail-closed de cuotas/bounds/chunks/referencias/transform/spawns y parseo acotado por bytes; frontend rechaza campos desconocidos en los mismos niveles. Evidencia previa al gate: `cargo fmt --check`, `cargo check`, 9 tests Rust, type-check, 23 tests frontend, build y diff-check PASS. No incluye endpoint, persistencia, publicación, realtime, identidad, editor ni límite de profundidad HTTP.
 
 **Gate/salida:** el plan GAME-01 queda aprobado y cada fase tiene su propio ID, gate `task:check`, auditoría SOLID/rendimiento/escalabilidad/seguridad/observabilidad, pruebas de navegador y evidencia de carga antes de iniciar la siguiente.
 

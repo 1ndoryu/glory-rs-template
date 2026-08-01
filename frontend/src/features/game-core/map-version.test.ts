@@ -83,6 +83,43 @@ describe('GAME-01 MapVersion', () => {
     expect(issues).not.toContainEqual(expect.objectContaining({ path: `terrain.chunks[${MAP_VERSION_LIMITS.maxChunks}]` }));
   });
 
+  it('rejects unknown fields at each nested contract boundary', () => {
+    const cases = [
+      { ...validMap, unexpected: true },
+      { ...validMap, terrain: { ...validMap.terrain, metadata: true } },
+      {
+        ...validMap,
+        assetManifest: {
+          'tree-v1': { ...asset, metadata: true },
+        },
+      },
+      {
+        ...validMap,
+        instances: [{ ...validMap.instances[0], metadata: true }],
+      },
+      {
+        ...validMap,
+        terrain: {
+          ...validMap.terrain,
+          chunks: [{ ...validMap.terrain.chunks[0], metadata: true }],
+        },
+      },
+      {
+        ...validMap,
+        assetManifest: {
+          'tree-v1': {
+            ...asset,
+            collisionProxy: { kind: 'circle' as const, radius: 0.5, metadata: true },
+          },
+        },
+      },
+    ];
+
+    for (const candidate of cases) {
+      expect(validateMapVersion(candidate)).not.toEqual([]);
+    }
+  });
+
   it('rejects instances and spawns outside the published bounds', () => {
     expect(validateMapVersion({
       ...validMap,

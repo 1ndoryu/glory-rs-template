@@ -341,16 +341,23 @@ repetidas de memoria/GPU y validación multi-viewport antes de cerrar la fase co
 - [ ] Cargar solo chunks/assets visibles con cache limitada e instancing para props repetidos.
 - [ ] Crear endpoint/servicio de mapa publicado y fixture de versión persistido.
 - [x] Probar documento inválido, exceso de chunks, referencias de asset inexistentes, IDs reservados, transforms, spawns y bounds malformados.
+- [x] Validar en Rust el mismo JSON `MapVersion` con `serde` camelCase, `deny_unknown_fields`, proxy opcional, límites de bytes previos a la deserialización y 9 tests negativos/deterministas.
+- [x] Alinear el frontend con rechazo de campos desconocidos en raíz, terreno, chunks, assets, colliders, instancias y spawns.
 
-**Evidencia parcial:** `frontend/src/features/game-core/map-version.ts` y
-`map-version.test.ts`; el fixture `game-playable` consume
-`FIXTURE_MAP_VERSION → mapVersionToWorldMap → game-core`. Type-check, 41 tests,
-build, diff-check y navegador `/forest-playable` pasan. No implica endpoint,
-persistencia, publicación server-side, chunks visibles ni editor.
+**Evidencia parcial:** `frontend/src/features/game-core/map-version.ts`,
+`map-version.test.ts`, `src/models/game_map.rs` y `src/models/mod.rs`; el fixture
+`game-playable` consume `FIXTURE_MAP_VERSION → mapVersionToWorldMap → game-core`.
+Frontend: type-check, 23 tests del bloque y build PASS. Backend: `cargo fmt --check`,
+`cargo check` y 9 tests `models::game_map` PASS. `git diff --check` PASS. El parser
+Rust ofrece `MapVersion::from_bounded_json`/`from_json`; el boundary HTTP futuro aún
+debe aplicar límite de profundidad y tamaño del body antes de invocarlo. No implica
+endpoint, persistencia, publicación server-side, chunks visibles, realtime ni editor.
 
-**Gate:** contrato frontend puro cerrado; la fase completa queda pendiente hasta
-validar el mismo documento en backend, cargar chunks/instancias de forma acotada
-y crear el servicio de mapa publicado.
+**Evidencia de gate:** `297A-27` queda reservado para el cierre de este bloque.
+
+**Gate:** contrato frontend/backend alineado y fail-closed; la fase completa queda
+pendiente hasta cargar chunks/instancias de forma acotada y crear el servicio de
+mapa publicado.
 
 **Auditoría de cierre — Fase 4:**
 - [ ] **SOLID/OCP:** parser, validación, navegación, serialización y renderer consumen el contrato versionado sin acoplamiento circular.
