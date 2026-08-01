@@ -5,6 +5,17 @@ use crate::models::project::Project;
 
 pub struct ProjectRepository;
 
+/** Parámetros tipados para una actualización parcial de proyecto. */
+pub struct ProjectUpdateParams<'a> {
+    pub id: Uuid,
+    pub title: Option<&'a str>,
+    pub description: Option<&'a str>,
+    pub url: Option<&'a str>,
+    pub clear_url: bool,
+    pub sort_order: Option<i32>,
+    pub is_visible: Option<bool>,
+}
+
 impl ProjectRepository {
     /// [297A-10] Crear proyecto dentro de una transacción.
     pub async fn create(
@@ -49,29 +60,25 @@ impl ProjectRepository {
 
     pub async fn update(
         pool: &PgPool,
-        id: Uuid,
-        title: Option<&str>,
-        description: Option<&str>,
-        url: Option<&str>,
-        sort_order: Option<i32>,
-        is_visible: Option<bool>,
+        params: ProjectUpdateParams<'_>,
     ) -> Result<Option<Project>, sqlx::Error> {
         sqlx::query_as::<_, Project>(
             "UPDATE projects SET \
                 title = COALESCE($1, title), \
                 description = COALESCE($2, description), \
-                url = COALESCE($3, url), \
-                sort_order = COALESCE($4, sort_order), \
-                is_visible = COALESCE($5, is_visible) \
-             WHERE id = $6 \
+                url = CASE WHEN $4 THEN NULL WHEN $3 IS NOT NULL THEN $3 ELSE url END, \
+                sort_order = COALESCE($5, sort_order), \
+                is_visible = COALESCE($6, is_visible) \
+             WHERE id = $7 \
              RETURNING id, title, description, url, sort_order, is_visible, created_at",
         )
-        .bind(title)
-        .bind(description)
-        .bind(url)
-        .bind(sort_order)
-        .bind(is_visible)
-        .bind(id)
+        .bind(params.title)
+        .bind(params.description)
+        .bind(params.url)
+        .bind(params.clear_url)
+        .bind(params.sort_order)
+        .bind(params.is_visible)
+        .bind(params.id)
         .fetch_optional(pool)
         .await
     }

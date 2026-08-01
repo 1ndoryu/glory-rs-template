@@ -3,7 +3,7 @@
  * [Auditoría v4 §4.1] — Rompe acoplamiento a api.get/post en pages/projects.ts y admin-projects.ts. */
 
 import { api } from '../api/client';
-import type { Project, CreateProjectRequest } from '../api/types';
+import type { Project, CreateProjectRequest, UpdateProjectRequest } from '../api/types';
 
 export const ProjectService = {
   /** Listar proyectos públicos (visibles). */
@@ -27,7 +27,7 @@ export const ProjectService = {
   },
 
   /** Actualizar un proyecto (admin). */
-  async update(id: string, data: Partial<CreateProjectRequest>): Promise<Project> {
+  async update(id: string, data: UpdateProjectRequest): Promise<Project> {
     return api.put<Project>(`/admin/projects/${id}`, data);
   },
 

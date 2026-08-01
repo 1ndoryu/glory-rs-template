@@ -2,8 +2,9 @@
 
 > **Tarea propuesta:** 297A-22
 > **Fecha:** 2026-07-31
-> **Estado:** ⏸ PENDIENTE DE REVISIÓN — no implementar hasta aprobación explícita del usuario
-> **Siguiente paso:** revisar las decisiones abiertas (sección 8) y aprobar la opción de modelo (sección 5)
+> **Estado:** 🟡 implementación técnica completada; validación visual/E2E pendiente
+> **Decisión aplicada:** Opción 1 — `mobilePosition {col,row}`, grid compacto de 2/3 columnas, `mobileOrder` solo como fallback legacy y comandos accesibles limitados a presentación móvil
+> **Siguiente paso:** ejecutar validación visual/E2E en 320/360/390/768+; no confundir el gate automatizado con evidencia de interacción real
 
 ## 1. Objetivo y límites
 
@@ -12,8 +13,7 @@
 escritorio y móvil.
 
 - El escritorio ya tiene drag + snap-grid (`position {col,row}`) desde 297A-20.
-- El móvil no tiene drag: solo long press → menú → `workspace:move-up/down`
-  (swap de `mobileOrder`, un paso a la vez).
+- El móvil implementa long press → modo edición → drag por celdas; soltar sin mover abre menú contextual. Los comandos move prev/next son solo alternativa accesible y escriben `mobilePosition`.
 
 **Objetivo:** que el launcher móvil reordene por arrastre sobre un grid de celdas
 (como el escritorio), y eliminar/quitar del flujo el reorden por swap de índices.
@@ -26,27 +26,24 @@ escritorio y móvil.
 
 ## 2. Hallazgos de investigación (estado actual, 2026-07-31)
 
-### Modelo de datos (dos sistemas independientes)
+### Modelo de datos (diagnóstico histórico; contrato vigente al final del plan)
 - `position?: GridPosition {col,row}` — snap-grid desktop/tablet (≥769px).
   `types.ts:47-51`.
-- `mobileOrder?: number` — índice plano por padre; usado por launcher móvil,
-  grid desktop ≤768px y `getChildren`. `types.ts:60`.
-- `fieldOverrides` permite override de `position | label | parentId | mobileOrder`.
+- `mobileOrder?: number` — índice plano legacy por padre; solo fallback para nodos sin `mobilePosition`. No es política de orden para Finder ni `getChildren`.
+- `mobilePosition?: GridPosition` — posición persistente canónica del launcher móvil en 3 columnas; el viewport de 2 columnas solo proyecta ese orden sin mutar el overlay.
+- `fieldOverrides` permite override de `position | mobilePosition | label | parentId | mobileOrder`.
 
-### Launcher móvil (`mobile-shell.ts`)
-- Ordena solo por `mobileOrder` (línea ~216) y renderiza en grid CSS fijo de 3
-  columnas (`mobile-prototype.css:79-84`; 2 columnas ≤480px).
-- **No usa `position`**; sin huecos posibles, flujo por orden del DOM.
-- Único gesto: `bindLongPress` (500ms, umbral 10px) en `mobile-gestures.ts`
-  → abre el mismo menú contextual `context: 'icon'` con presentación móvil.
+### Launcher móvil (`mobile-shell.ts`) — diagnóstico inicial
+- Estado inicial auditado: ordenaba solo por `mobileOrder` y no tenía posición móvil persistente.
+- Contrato vigente: `sortMobileNodes()` usa `mobilePosition` y deriva `mobileOrder` solo para datos legacy; CSS usa 3 columnas y 2 hasta 480px.
+- `bindLongPressDrag` distingue tap, menú al soltar sin mover y drag después del umbral; el menú contextual sigue siendo el componente compartido.
 
-### Comandos de reorden
+### Comandos de reorden — diagnóstico inicial y contrato vigente
 - `workspace:move-up` (order 44) / `workspace:move-down` (order 45),
   `contexts: ['icon']`, en `workspace-reorder-commands.ts`.
-- `reorderTarget(ctx, direction)`: swap de índices adyacentes → `reorderWorkspaceNodes`
-  → escribe `mobileOrder` en `fieldOverrides`. **No toca `position`**.
-- En el escritorio (≥769px) el icono tiene posición libre: el swap de `mobileOrder`
-  no produce ningún movimiento visible → comandos confusos (diagnóstico confirmado).
+- Diagnóstico inicial: `reorderTarget` hacía swap de índices y escribía `mobileOrder`.
+- Contrato vigente: los comandos accesibles calculan la celda anterior/siguiente y escriben `mobilePosition`; solo están disponibles con `presentationMode: 'mobile'`.
+- En escritorio el drag conserva `position`; no se usa un swap móvil para cambiar la presentación desktop.
 
 ### Escritorio (≥769px)
 - Drag con Pointer Events en `icon-drag.ts`: si `onPlaceCell` y width ≥769 → modo
@@ -88,10 +85,10 @@ escritorio y móvil.
   para nodos sin `mobilePosition` y para compat con datos existentes.
 - Alternativa a evaluar: derivar `mobileOrder` del orden de `mobilePosition`.
 
-### 4.3 ¿Qué pasa con `getChildren` y el orden de render?
-- `getChildren` ordena por `mobileOrder` hoy. Con `mobilePosition`, el orden de
-  render debe respetar primero `mobilePosition` y luego `mobileOrder` (fallback).
-- En escritorio, los nodos sin `position` siguen fluyendo por ese orden derivado.
+### 4.3 ¿Qué pasa con `getChildren` y el orden de render? (resuelto)
+- `getChildren` devuelve hijos sin política de presentación; Finder conserva el orden de contenido del workspace.
+- Solo el launcher llama explícitamente a `sortMobileNodes`, resolviendo `mobilePosition` y luego `mobileOrder` como fallback.
+- En escritorio, los nodos sin `position` siguen el flujo del grid sin recibir preferencias móviles.
 
 ### 4.4 ¿Cómo convive el long press con el drag táctil?
 - Hoy: long press 500ms → menú; mover >10px cancela.
@@ -126,27 +123,14 @@ con grid" en móvil, con paridad de comportamiento.
 
 ## 6. Fases propuestas (solo al aprobar el plan)
 
-- [ ] **Fase 0 — Revisión y aprobación.** Resolver secciones 4 y 5 con el usuario;
-      fijar opción de modelo, huecos sí/no, destino de move-up/down.
-- [ ] **Fase 1 — Modelo de datos.** Añadir `mobilePosition` a tipos/fieldOverrides;
-      deprecar `mobileOrder` a fallback; actualizar `merge.ts`, `overlay-mutations.ts`,
-      `getChildren` y `default-release.ts` (migrar/derivar datos existentes).
-- [ ] **Fase 2 — Launcher snap-grid.** Convertir `.movilLauncher__grid` a grid con
-      celdas; reutilizar geometría de `icon-grid.ts` parametrizada por columnas fijas;
-      render con `mobilePosition` (fallback `mobileOrder`).
-- [ ] **Fase 3 — Drag táctil en launcher.** Extender `mobile-gestures.ts`:
-      long press → modo edición; movimiento >umbral → drag; soltar en celda →
-      `planPlacement` (apretado o libre según decisión) → persistir `mobilePosition`.
-- [ ] **Fase 4 — Escritorio.** Quitar del menú contextual el swap sin efecto visible;
-      el drag desktop conserva `position`. Evaluar si el fallback `onReorder` del
-      grid ≤768px sigue siendo necesario.
-- [ ] **Fase 5 — Alternativa accesible.** Reemplazar `workspace:move-up/down` por
-      comandos sobre celdas (o lista alternativa), cumpliendo 297A-12 §9.
-- [ ] **Fase 6 — Migración y limpieza.** Datos sin `mobilePosition` → derivar de
-      `mobileOrder`; eliminar código muerto del swap si procede.
-- [ ] **Fase 7 — Tests y validación visual.** Unitarios (geometría móvil, merge,
-      gesto) + E2E visual 320/360/390, drag táctil, huecos, accesibilidad, teclado,
-      reload/sync y móvil↔tablet.
+- [x] **Fase 0 — Revisión y decisión.** Opción 1, grid compacto, `mobileOrder` fallback y comandos accesibles móviles.
+- [x] **Fase 1 — Modelo de datos.** `mobilePosition` en tipos, merge, overlay, release default y validación Rust.
+- [x] **Fase 2 — Launcher snap-grid.** Columnas 3/2, orden explícito por `mobilePosition` y navegación fuera del grid editable.
+- [x] **Fase 3 — Drag táctil.** Long press, umbral, ghost, drop por celda, compactación y batch de overlay.
+- [x] **Fase 4 — Separación de superficies.** Finder no hereda orden móvil; desktop conserva `position`.
+- [x] **Fase 5 — Alternativa accesible.** Move prev/next opera sobre celdas y solo está disponible en presentación móvil.
+- [x] **Fase 6 — Compatibilidad.** `mobileOrder` queda como fallback de lectura; no se elimina mientras existan overlays legacy.
+- [ ] **Fase 7 — Validación visual/E2E.** 320/360/390/768+, drag táctil real, foco, teclado, reload/sync y móvil↔tablet.
 
 ## 7. Gate y criterio de salida
 
@@ -154,16 +138,23 @@ con grid" en móvil, con paridad de comportamiento.
 asignado) + tests de la fase antes de avanzar.
 
 **Criterio final (Definition of Done):**
-- [ ] El launcher móvil reordena por arrastre sobre celdas y persiste en overlay
-      (sobrevive reload/sync sin contaminar el layout desktop).
-- [ ] "Mover arriba/abajo" no es el mecanismo de reorden (eliminado o reemplazado
-      por alternativa accesible que opera sobre celdas).
-- [ ] Desktop conserva posición libre (297A-20) sin regresión.
-- [ ] Requisito 297A-12 §9 cumplido: existe alternativa no gestual.
-- [ ] Validado en 320/360/390/768+ con drag táctil, foco, teclado y zoom 200%.
-- [ ] Manual de arquitectura/identidad/roadmap/Sentinel actualizados.
+- [x] El launcher móvil reordena por arrastre sobre celdas y persiste en overlay; la suite cubre el plan geométrico y el merge sin contaminar desktop.
+- [x] "Mover arriba/abajo" dejó de ser swap de índices y opera sobre `mobilePosition` como alternativa móvil accesible.
+- [x] Desktop conserva posición libre (297A-20) sin cambiar su contrato.
+- [x] Requisito 297A-12 §9 cumplido en código: existe alternativa no gestual.
+- [ ] Validación visual/E2E en 320/360/390/768+ con drag táctil, foco, teclado y zoom 200%.
+- [x] Plan, roadmap, contrato móvil y trazabilidad actualizados; Sentinel queda a cargo de detectar regresiones de contrato.
 
-## 8. Preguntas abiertas para la revisión (respuestas del usuario)
+## 8. Decisiones adoptadas en la revisión técnica
+
+1. Móvil usa grid compacto sin huecos; persiste una geometría canónica de 3 columnas y proyecta a 2 columnas sin reescribir el overlay; desktop conserva `position` independiente.
+2. `mobilePosition` es la posición persistente móvil; `mobileOrder` se conserva como fallback de lectura para datos antiguos.
+3. El drag móvil requiere long press; soltar sin movimiento abre menú contextual y mover después del umbral inicia drag.
+4. El botón de navegación está fuera del grid editable.
+5. `workspace:move-up/down` se conserva únicamente como alternativa accesible en presentación móvil y escribe `mobilePosition`, no `mobileOrder`.
+6. El overlay remoto acepta/valida `mobilePosition`; no se cambia la API ni se añade migración de BD.
+
+## 9. Preguntas abiertas históricas (resueltas; solo trazabilidad)
 
 1. ¿Móvil con grid apretado (sin huecos, como pantalla de inicio) o con huecos
    (como el escritorio)? → Recomendado: apretado.
@@ -178,7 +169,7 @@ asignado) + tests de la fase antes de avanzar.
 
 ## 9. Enlaces
 
-- Roadmap: `roadmap.md` (297A-22 pendiente de revisión).
+- Roadmap: `roadmap.md` (297A-22 implementación técnica completada; validación visual/E2E pendiente).
 - Plan móvil base: `Agente/planes/plan-experiencia-movil-launcher-2026-07-29.md`
   (requisito accesibilidad §9, invariantes §2).
 - Iconos libres escritorio: `Agente/planes/completados/plan-iconos-libres-desktop-2026-07-31.md`.

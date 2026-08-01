@@ -66,7 +66,7 @@ Reducir la deuda SOLID detectada antes de que crezcan los dominios de 297A-14 (e
 
 ### Fase 5 — Cierre
 - [x] Actualizar la guía `guia-agregar-app-2026-07-31.md`: capability única, deep links allowlisted, parámetros internos y contrato anti-drift quedan documentados.
-- [x] Ejecutar `npm run task:check -- 297A-23` y registrar evidencia S1–S5 en el plan/completados. *(gate fresco y self-check PASS; 266 tests frontend PASS en la validación final)*
+- [x] Ejecutar `npm run task:check -- 297A-23` y registrar evidencia S1–S5 en el plan/completados. *(gate fresco y self-check PASS; 267 tests frontend PASS en la validación final)*
 - [x] Archivar en `Agente/completados/tareas-2026-07-31.md` y actualizar roadmap. El commit queda a cargo del flujo Git explícito del repositorio.
 
 **Gate F5:** PASS técnico y documental; guía sincronizada; sin cambios de comportamiento observables. La validación visual desktop/móvil permanece como evidencia controlada del bloque 297A-24, no como deuda SOLID del runtime.
@@ -91,9 +91,9 @@ Reducir la deuda SOLID detectada antes de que crezcan los dominios de 297A-14 (e
 - El contrato real cruza `DEFAULT_RELEASE` + `ADMIN_NODES` contra `AppRegistry`; detecta `unregistered-app` y `missing-refId`.
 - Folders y shortcuts quedan fuera; apps registradas sin icono no generan falsos positivos.
 - TypeScript PASS; Vitest **261/261 tests en 31 archivos PASS** en el cierre F4 histórico.
-- Validación final del contrato `publicLocator`: TypeScript PASS; Vitest **266/266 tests en 32 archivos PASS**; `task:check -- 297A-23 --fresh`: PASS; `self-check -- -TareaId 297A-23`: PASS.
+- Validación final del contrato `publicLocator`: TypeScript PASS; Vitest **267/267 tests en 32 archivos PASS**; `task:check -- 297A-23 --fresh`: PASS; `self-check -- -TareaId 297A-23`: PASS.
 - Sentinel: 0 errores; VarSense: 0 errores; Rust `fmt`/`check` PASS; 8 tests unitarios de `workspace_overlay` PASS.
-- `cargo test --lib` queda pendiente de integración por la base local sin la tabla `auth_sessions`; no es un fallo de compilación ni del validador del workspace.
+- `npm test` ejecuta `cargo test` con `run-with-db`, migraciones/contexto por rama y confirmó **17/17 tests PASS**. Ejecutar `cargo test` directo sin `DATABASE_URL` y sin migraciones no es el flujo soportado. El split de modelos Rust del overlay quedó aplicado y validado con `cargo check`.
 - Revisión arquitectónica: sin bloqueantes; Rust valida forma/seguridad y el frontend valida catálogo/deep-link allowlisted sin duplicar `AppRegistry`.
 
 

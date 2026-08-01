@@ -52,6 +52,7 @@ export async function publishWorkspace(): Promise<{ version: number } | null> {
       resourceKind: node.resourceKind,
       publicLocator: node.publicLocator,
       position: node.position,
+      mobilePosition: node.mobilePosition,
       mobileOrder: node.mobileOrder,
       requires: node.requires,
     };
@@ -86,6 +87,6 @@ export async function rollbackWorkspace(targetVersion: number): Promise<boolean>
 }
 
 /* Re-export submodules for backward compatibility */
-export { moveNodePosition, moveNodeToParent, addOverlayNode, tombstoneNode, restoreNode, resetOverlay, reorderDesktopNodes, reorderWorkspaceNodes, createFolder, getTombstonedNodes, getChildren } from './overlay-mutations';
+export { moveNodePosition, moveNodesPosition, moveMobileNodesPosition, moveNodeToParent, addOverlayNode, tombstoneNode, restoreNode, resetOverlay, reorderDesktopNodes, reorderWorkspaceNodes, createFolder, getTombstonedNodes, getChildren } from './overlay-mutations';
 export { getClipboard, setClipboard, clearClipboard, pasteFromClipboard } from './clipboard';
 export type { ClipboardMode, ClipboardEntry } from './clipboard';

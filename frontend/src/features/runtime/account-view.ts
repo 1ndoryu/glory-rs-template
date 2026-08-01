@@ -11,6 +11,7 @@ import { createInput } from '../../components/ui/input';
 import { showToast } from '../../components/ui/toast';
 import { safeClick, safeRun } from '../../utils/safe-async';
 import { createEl } from '../../utils/dom';
+import { createPreferencesPanel } from './preferences-panel';
 import type { MountedView, RenderContext } from '../../core/lifecycle';
 
 function icon(iconNode: IconNode): HTMLElement {
@@ -139,19 +140,41 @@ interface AccountMount {
   readonly destroy: () => void;
 }
 
+interface PreferencesPanel {
+  readonly element: HTMLElement;
+  readonly destroy: () => void;
+}
+
 function mount(ctx: RenderContext): AccountMount {
   const container = createEl('section', {
     className: 'account-app',
     ariaLabel: 'Cuenta',
   });
   let stopped = false;
-  const stop = authStore.subscribe((state) => {
-    if (!stopped) renderView(container, state);
-  });
+  let panel: PreferencesPanel | null = null;
+
+  const render = (state: AuthState): void => {
+    if (stopped) return;
+    panel?.destroy();
+    panel = null;
+    renderView(container, state);
+    /* [297A-26] Las preferencias (tema + resolución de conflicto) viven dentro
+     * de la ventana Cuenta como panel embebido, no como modal global del
+     * sistema. El panel siempre muestra la preferencia; si el conflicto sigue
+     * pendiente al reabrir la ventana, reaparece. */
+    if (state.isAuthenticated) {
+      panel = createPreferencesPanel();
+      container.append(panel.element);
+    }
+  };
+
+  const stop = authStore.subscribe(render);
   const cleanup = (): void => {
     if (stopped) return;
     stopped = true;
     stop();
+    panel?.destroy();
+    panel = null;
   };
   ctx.signal.addEventListener('abort', cleanup, { once: true });
   return { element: container, destroy: cleanup };

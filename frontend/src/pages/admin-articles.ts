@@ -1,175 +1,118 @@
 /* wandori.us — Admin Articles
- * Lista y editor de artículos para el panel de administración.
- * [Auditoría v4 §1.2] Migrado a createEl(). */
+ * Listado editorial legacy; el editor vive en la app lazy `article-editor`.
+ * [297A-14] El Admin no contiene ventanas ni el editor Tiptap. */
 
 import { safeRun, safeClick } from '../utils/safe-async';
 import { tryCatch } from '../utils/result';
 import { ArticleService } from '../services';
-import { showToast } from '../components/ui/toast';
-import { createModal } from '../components/ui/modal';
 import { showConfirm } from '../components/ui/confirm';
-import { createInput } from '../components/ui/input';
-import { createTextarea } from '../components/ui/textarea';
-import { pickAndUpload } from '../utils/upload';
 import { clearArticleCache } from '../components/layout/sidebar';
 import { createEl } from '../utils/dom';
+import { subscribeArticleEditorSaved } from '../features/runtime/article-editor-events';
+import { showToast } from '../components/ui/toast';
 import type { Article } from '../api/types';
 
+const articleListCleanups = new WeakMap<HTMLElement, () => void>();
+const articleListGenerations = new WeakMap<HTMLElement, number>();
+
+/** Liberar la suscripción de una lista antes de desmontar su app contenedora. */
+export function disposeArticleList(container: HTMLElement): void {
+  const cleanup = articleListCleanups.get(container);
+  cleanup?.();
+  articleListCleanups.delete(container);
+  articleListGenerations.delete(container);
+}
+
+function ensureArticleListSubscription(container: HTMLElement): void {
+  if (articleListCleanups.has(container)) return;
+  const cleanup = subscribeArticleEditorSaved(() => {
+    clearArticleCache();
+    if (!container.isConnected) {
+      disposeArticleList(container);
+      return;
+    }
+    void renderArticleList(container);
+  });
+  articleListCleanups.set(container, cleanup);
+}
+
+/** Liberar todas las listas pertenecientes a una página Admin. */
+export function disposeAdminArticleLists(page: HTMLElement): void {
+  page.querySelectorAll<HTMLElement>('.admin-lista').forEach(disposeArticleList);
+}
+
+/** Abrir el programa editorial compartido, para crear o editar un artículo. */
+export function openEditor(article?: Article): void {
+  void import('../features/runtime/route-app-adapter')
+    .then(({ openAppWindow }) => {
+      const params = article ? { articleId: article.id } : undefined;
+      return openAppWindow('article-editor', params);
+    })
+    .catch(() => {
+      showToast('no se pudo abrir el editor');
+    });
+}
+
 function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+  const date = new Date(iso);
+  return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
 }
 
 export async function renderArticleList(container: HTMLElement): Promise<void> {
+  ensureArticleListSubscription(container);
+  const generation = (articleListGenerations.get(container) ?? 0) + 1;
+  articleListGenerations.set(container, generation);
   container.textContent = '';
   container.appendChild(createEl('p', { className: 'cargando', textContent: 'cargando...' }));
 
   const listResult = await tryCatch(ArticleService.listByStatus('all'));
+  if (articleListGenerations.get(container) !== generation) return;
   if (!listResult.ok) {
     container.textContent = '';
     container.appendChild(createEl('p', { className: 'vacio', textContent: 'error al cargar' }));
     return;
   }
 
-  const data = listResult.value;
   container.textContent = '';
+  for (const article of listResult.value.items) {
+    const title = createEl('span', {
+      textContent: article.title
+        + (article.status === 'draft' ? ' (borrador)' : '')
+        + (article.is_pinned ? ' · fijado' : ''),
+    });
+    const date = createEl('small', {
+      className: 'ml-sm',
+      textContent: ` — ${formatDate(article.created_at)}`,
+    });
+    const info = createEl('div', {}, title, date);
 
-    for (const article of data.items) {
-      const titulo = createEl('span', { textContent: article.title + (article.status === 'draft' ? ' (borrador)' : '') + (article.is_pinned ? ' · fijado' : '') });
-      const fecha = createEl('small', { className: 'ml-sm', textContent: ` — ${formatDate(article.created_at)}` });
-      const info = createEl('div', {}, titulo, fecha);
+    const editButton = createEl('button', {
+      type: 'button',
+      className: 'boton boton-pequeno',
+      textContent: 'editar',
+    });
+    editButton.addEventListener('click', () => openEditor(article));
 
-      const btnEditar = createEl('button', { className: 'boton boton-pequeno', textContent: 'editar' });
-      btnEditar.addEventListener('click', () => openEditor(article));
+    const deleteButton = createEl('button', {
+      type: 'button',
+      className: 'boton boton-pequeno',
+      textContent: 'eliminar',
+    });
+    deleteButton.addEventListener('click', safeClick(async () => {
+      const confirmed = await showConfirm(`eliminar "${article.title}"?`);
+      if (!confirmed) return;
+      const result = await safeRun(ArticleService.delete(article.id), 'error al eliminar');
+      if (!result.ok) return;
+      showToast('articulo eliminado');
+      clearArticleCache();
+      await renderArticleList(container);
+    }));
 
-      const btnEliminar = createEl('button', { className: 'boton boton-pequeno', textContent: 'eliminar' });
-      btnEliminar.addEventListener('click', safeClick(async () => {
-        const ok = await showConfirm(`eliminar "${article.title}"?`);
-        if (ok) {
-          const delResult = await safeRun(ArticleService.delete(article.id), 'error al eliminar');
-          if (delResult.ok) {
-            showToast('articulo eliminado');
-            clearArticleCache();
-            renderArticleList(container);
-          }
-        }
-      }));
-
-      const acciones = createEl('div', { className: 'admin-acciones' }, btnEditar, btnEliminar);
-      container.appendChild(createEl('div', { className: 'admin-item' }, info, acciones));
-    }
-
-    if (data.items.length === 0) {
-      container.appendChild(createEl('p', { className: 'vacio', textContent: 'no hay articulos' }));
-    }
-
-}
-
-export async function openEditor(article?: Article): Promise<void> {
-  const { createSelect } = await import('../components/ui/select');
-
-  const container = createEl('div', { className: 'flex-columna gap-lg' });
-  container.style.minHeight = '400px';
-
-  let title = article?.title || '';
-  let excerpt = article?.excerpt || '';
-  let status = article?.status || 'draft';
-  let isPinned = article?.is_pinned || false;
-
-  const titleInput = createInput({ label: 'titulo', placeholder: 'titulo del articulo', value: title, onInput: v => { title = v; } });
-  const excerptInput = createTextarea({ label: 'extracto', placeholder: 'resumen breve del articulo', value: excerpt, rows: 3, onInput: v => { excerpt = v; } });
-  const statusSelect = createSelect({ label: 'estado', options: [{ value: 'draft', label: 'borrador' }, { value: 'published', label: 'publicado' }], value: status, onChange: v => { status = v as 'draft' | 'published'; } });
-
-  const pinBtn = createEl('button', { className: 'boton', textContent: isPinned ? 'fijado ✓' : 'fijar articulo' });
-  pinBtn.addEventListener('click', () => {
-    isPinned = !isPinned;
-    pinBtn.textContent = isPinned ? 'fijado ✓' : 'fijar articulo';
-  });
-
-  const editorContainer = createEl('div', { className: 'border-bottom' });
-  editorContainer.style.minHeight = '300px';
-  editorContainer.style.padding = 'var(--espacio-md)';
-
-  const { Editor } = await import('@tiptap/core');
-  const StarterKit = (await import('@tiptap/starter-kit')).default;
-  const Image = (await import('@tiptap/extension-image')).default;
-  const editor = new Editor({
-    element: editorContainer,
-    extensions: [StarterKit, Image.configure({ inline: false })],
-    content: article?.content || { type: 'doc', content: [{ type: 'paragraph' }] },
-  });
-
-  const toolbar = createEl('div', { className: 'flex-wrap gap-sm mb-sm border-bottom' });
-  const toolbarButtons: Array<{ label: string; action: () => void }> = [
-    { label: 'negrita', action: () => { editor.chain().focus().toggleBold().run(); } },
-    { label: 'italica', action: () => { editor.chain().focus().toggleItalic().run(); } },
-    { label: 'codigo', action: () => { editor.chain().focus().toggleCode().run(); } },
-    { label: 'h2', action: () => { editor.chain().focus().toggleHeading({ level: 2 }).run(); } },
-    { label: 'h3', action: () => { editor.chain().focus().toggleHeading({ level: 3 }).run(); } },
-    { label: 'lista', action: () => { editor.chain().focus().toggleBulletList().run(); } },
-    { label: 'lista ordenada', action: () => { editor.chain().focus().toggleOrderedList().run(); } },
-    { label: 'cita', action: () => { editor.chain().focus().toggleBlockquote().run(); } },
-    { label: 'linea', action: () => { editor.chain().focus().setHorizontalRule().run(); } },
-    { label: 'imagen', action: () => { void safeRun(pickAndUpload('image/*', article?.id), 'error al subir imagen').then(r => { if (r.ok && r.value) editor.chain().focus().setImage({ src: r.value.url }).run(); }); } },
-    { label: 'audio', action: () => { void safeRun(pickAndUpload('audio/*', article?.id), 'error al subir audio').then(r => { if (r.ok && r.value) editor.chain().focus().insertContent(`<audio controls src="${r.value.url}"></audio>`).run(); }); } },
-    { label: 'video', action: () => { void safeRun(pickAndUpload('video/*', article?.id), 'error al subir video').then(r => { if (r.ok && r.value) editor.chain().focus().insertContent(`<video controls src="${r.value.url}" style="width:100%"></video>`).run(); }); } },
-  ];
-
-  for (const btn of toolbarButtons) {
-    const el = createEl('button', { className: 'boton boton-pequeno', textContent: btn.label });
-    el.addEventListener('click', btn.action);
-    toolbar.appendChild(el);
+    const actions = createEl('div', { className: 'admin-acciones' }, editButton, deleteButton);
+    container.appendChild(createEl('div', { className: 'admin-item' }, info, actions));
   }
 
-  let coverImage = article?.cover_image || '';
-  const coverContainer = createEl('div', { className: 'campo' });
-  const coverLabel = createEl('label', { className: 'campo-etiqueta', textContent: 'imagen de portada' });
-  const coverPreview = createEl('img', { className: 'config-imagen-preview' });
-  if (!coverImage) coverPreview.classList.add('oculto');
-  if (coverImage) coverPreview.src = coverImage;
-
-  const coverQuitar = createEl('button', { className: 'boton', textContent: 'quitar' });
-
-  const coverBtn = createEl('button', { className: 'boton', textContent: coverImage ? 'cambiar portada' : 'subir portada' });
-  coverBtn.addEventListener('click', safeClick(async () => {
-    const result = await safeRun(pickAndUpload('image/*'), 'error al subir portada');
-    if (result.ok && result.value) {
-      coverImage = result.value.url;
-      coverPreview.src = result.value.url;
-      coverPreview.classList.remove('oculto');
-      coverBtn.textContent = 'cambiar portada';
-      coverQuitar.classList.remove('oculto');
-    }
-  }));
-  if (!coverImage) coverQuitar.classList.add('oculto');
-  coverQuitar.addEventListener('click', () => {
-    coverImage = '';
-    coverPreview.classList.add('oculto');
-    coverPreview.src = '';
-    coverBtn.textContent = 'subir portada';
-    coverQuitar.classList.add('oculto');
-  });
-
-  const coverBtns = createEl('div', { className: 'flex-fila gap-md' }, coverBtn, coverQuitar);
-  coverContainer.append(coverLabel, coverPreview, coverBtns);
-
-  const btnGuardar = createEl('button', { className: 'boton boton-grande', textContent: article ? 'guardar' : 'crear' });
-  btnGuardar.addEventListener('click', safeClick(async () => {
-    if (!title.trim()) { showToast('el titulo es obligatorio'); return; }
-    const payload = { title, excerpt, content: editor.getJSON(), cover_image: coverImage || undefined, status, is_pinned: isPinned };
-    const fn = article
-      ? ArticleService.update(article.id, payload)
-      : ArticleService.create(payload);
-    const result = await safeRun(fn, 'error al guardar');
-    if (result.ok) {
-      showToast(article ? 'articulo actualizado' : 'articulo creado');
-      clearArticleCache();
-      modal.close();
-      const lista = document.getElementById('admin-articulos');
-      if (lista) renderArticleList(lista);
-    }
-  }));
-
-  container.append(titleInput, excerptInput, coverContainer, toolbar, editorContainer, statusSelect, pinBtn, btnGuardar);
-  const modal = createModal({ titulo: article ? 'editar articulo' : 'nuevo articulo', contenido: container, ancho: '720px', onClose: () => editor.destroy() });
+  if (listResult.value.items.length === 0) {
+    container.appendChild(createEl('p', { className: 'vacio', textContent: 'no hay articulos' }));
+  }
 }

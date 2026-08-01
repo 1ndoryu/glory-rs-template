@@ -113,6 +113,14 @@ export interface CreateProjectRequest {
   sort_order?: number;
 }
 
+export interface UpdateProjectRequest {
+  title?: string;
+  description?: string;
+  url?: string | null;
+  sort_order?: number;
+  is_visible?: boolean;
+}
+
 /* === Settings === */
 export interface SiteSettings {
   [key: string]: string;

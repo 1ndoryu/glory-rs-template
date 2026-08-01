@@ -1,26 +1,16 @@
 /* wandori.us — Mobile Shell
  * Presentación móvil del mismo runtime del OS: launcher + vista full-screen.
- * Las apps entregan el mismo MountedView que desktop; este módulo solo aporta
- * navegación y chrome móvil. [297A-12 §2–4] */
+ * Las apps entregan el mismo MountedView que desktop; este módulo coordina
+ * navegación, stack y lifecycle. [297A-12 §2–4] */
 
-import { Circle, FileUser, createElement, type IconNode } from 'lucide';
 import { createEl } from '../../utils/dom';
-import { createThemeToggleButton, type ThemeToggleButton } from '../../components/ui/theme-toggle-button';
 import { getCurrentPathname } from '../../utils/viewport';
 import { getCanonicalAppPath, type AppOpenHistory } from '../runtime/deep-links';
-import { openContextMenu } from '../desktop/components/desktop-context-menu';
-import { bindLongPress } from './mobile-gestures';
-import { authStore } from '../../store';
-import { createMobileAccountControl, type MobileAccountControl } from './mobile-account-control';
+import { AppRegistry } from '../runtime/app-registry';
 import { createAppHeader, createNavigation } from './mobile-chrome';
 import { isInternalPushHistoryEntry, navigate, replacePath } from '../../router';
 import type { MountedView } from '../../core/lifecycle';
-import { AppRegistry } from '../runtime/app-registry';
-import { resolveResourceType, type ResourceKind } from '../runtime/resource-type-registry';
 import { workspaceStore } from '../runtime/workspace/workspace-store';
-import type { ResolvedNode } from '../runtime/workspace/types';
-import { resolvePublicResourceTarget } from '../runtime/workspace/public-resource-locator';
-import { showToast } from '../../components/ui/toast';
 import {
   clearMobileStack,
   getTopMobileApp,
@@ -30,6 +20,7 @@ import {
   popMobileApp,
   type MobileStackEntry,
 } from './mobile-stack';
+import { createMobileLauncher, type MobileLauncher } from './mobile-launcher';
 
 export interface MobileShell {
   readonly element: HTMLElement;
@@ -40,66 +31,6 @@ export interface MobileShell {
   readonly openProfile: () => Promise<void>;
   readonly goHome: () => void;
   readonly goBack: () => void;
-}
-
-function resolveNodeIcon(node: ResolvedNode): IconNode {
-  if (node.id === 'profile' || node.refId === 'shell-profile') return FileUser;
-  if (node.type === 'app' && node.refId) return AppRegistry.get(node.refId)?.icon ?? Circle;
-  if (node.type === 'folder') return AppRegistry.get('finder')?.icon ?? Circle;
-  if (node.type === 'resource' && node.resourceKind) {
-    return AppRegistry.get(resolveResourceType(node.resourceKind as ResourceKind)?.appId ?? '')?.icon ?? Circle;
-  }
-  return Circle;
-}
-
-function resolveNodeAction(
-  node: ResolvedNode,
-  openApp: (appId: string, params?: Readonly<Record<string, string>>) => Promise<void>,
-  openProfile: () => Promise<void>,
-): (() => void) | undefined {
-  if (node.id === 'profile' || node.refId === 'shell-profile') {
-    return () => {
-      void openProfile().catch(() => {
-        /* El shell puede desmontarse durante el click; no reabrir vistas. */
-      });
-    };
-  }
-  if (node.type === 'folder') return () => { void openApp('finder', { folderId: node.id }); };
-  if (node.type === 'resource' && node.resourceKind) {
-    const publicTarget = resolvePublicResourceTarget(node);
-    if (publicTarget) return () => { void openApp(publicTarget.appId, publicTarget.params); };
-    return () => {
-      showToast('Este recurso todavía no tiene una referencia pública disponible');
-    };
-  }
-  if (node.refId && AppRegistry.get(node.refId)) return () => { void openApp(node.refId!); };
-  return undefined;
-}
-
-function createIconButton(
-  node: ResolvedNode,
-  openApp: (appId: string, params?: Readonly<Record<string, string>>) => Promise<void>,
-  openProfile: () => Promise<void>,
-): HTMLButtonElement | null {
-  const action = resolveNodeAction(node, openApp, openProfile);
-  if (!action) return null;
-
-  const button = createEl('button', {
-    type: 'button',
-    className: 'movilLauncher__app',
-    ariaLabel: `Abrir ${node.label}`,
-    role: 'listitem',
-  });
-  const pictogram = createEl('span', { className: 'movilLauncher__pictograma', ariaHidden: 'true' });
-  const icon = createElement(resolveNodeIcon(node));
-  icon.classList.add('movilLauncher__icono');
-  pictogram.appendChild(icon);
-  button.append(
-    pictogram,
-    createEl('span', { className: 'movilLauncher__etiqueta', textContent: node.label }),
-  );
-  button.addEventListener('click', action);
-  return button;
 }
 
 export function createMobileShell(
@@ -113,13 +44,10 @@ export function createMobileShell(
     ariaHidden: 'true',
   });
   let currentView: HTMLElement | null = null;
+  let launcher: MobileLauncher | null = null;
   let legacyContentVisible = false;
   let destroyed = false;
   const pendingControllers = new Set<AbortController>();
-  const launcherGestureCleanups: Array<() => void> = [];
-  /* [297A-18] Botón de tema del launcher; se destruye al re-renderizar launcher. */
-  let launcherThemeToggle: ThemeToggleButton | null = null;
-  let launcherAccountControl: MobileAccountControl | null = null;
 
   const openApp = async (
     appId: string,
@@ -142,77 +70,19 @@ export function createMobileShell(
     }
   };
 
-  const resolveTargetKind = (node: ResolvedNode): 'app' | 'folder' | 'resource' | 'shortcut' => {
-    if (node.type === 'app') return 'app';
-    if (node.type === 'folder') return 'folder';
-    if (node.type === 'resource') return 'resource';
-    return 'shortcut';
-  };
-
-  const openLauncherMenu = (node: ResolvedNode, event: PointerEvent): void => {
-    openContextMenu({
-      context: 'icon',
-      targets: [{ id: node.refId ?? node.id, kind: resolveTargetKind(node) }],
-      capability: authStore.get().capability,
-      presentationMode: 'mobile',
-      className: 'desktop-context-menu--mobile',
-      x: event.clientX,
-      y: event.clientY,
-    });
-  };
-
-  const clearLauncherGestures = (): void => {
-    for (const cleanup of launcherGestureCleanups.splice(0)) cleanup();
-  };
-
   const clearLauncherResources = (): void => {
-    clearLauncherGestures();
-    launcherThemeToggle?.destroy();
-    launcherThemeToggle = null;
-    launcherAccountControl?.destroy();
-    launcherAccountControl = null;
+    launcher?.destroy();
+    launcher = null;
   };
 
   const renderLauncher = (): HTMLElement => {
     clearLauncherResources();
-    const launcher = createEl('div', { className: 'movilLauncher' });
-    const themeToggle = createThemeToggleButton('movilLauncher__tema');
-    launcherThemeToggle = themeToggle;
-    launcherAccountControl = createMobileAccountControl(() => { void openApp('account'); });
-    const header = createEl('header', { className: 'movilLauncher__cabecera' },
-      createEl('span', { className: 'movilMarca', ariaHidden: 'true' }),
-      createEl('p', { className: 'movilLauncher__fecha', textContent: 'inicio' }),
-      createEl('span', { className: 'movilLauncher__acciones' }, launcherAccountControl.element, themeToggle.element),
-    );
-    const grid = createEl('div', {
-      className: 'movilLauncher__grid',
-      role: 'list',
-      ariaLabel: 'Aplicaciones del launcher',
+    launcher = createMobileLauncher({
+      openApp: (appId, params) => openApp(appId, params),
+      openProfile,
+      onToggleExternalNav,
     });
-    const nodes = Object.values(workspaceStore.get().nodes)
-      .filter((node) => node.parentId === 'desktop')
-      .sort((a, b) => (a.mobileOrder ?? 0) - (b.mobileOrder ?? 0));
-    for (const node of nodes) {
-      const button = createIconButton(node, openApp, openProfile);
-      if (!button) continue;
-      launcherGestureCleanups.push(bindLongPress(button, {
-        onLongPress: (event) => openLauncherMenu(node, event),
-      }).destroy);
-      grid.appendChild(button);
-    }
-    const navButton = createEl('button', {
-      type: 'button',
-      className: 'movilLauncher__app',
-      ariaLabel: 'Mostrar navegación',
-      role: 'listitem',
-    },
-      createEl('span', { className: 'movilLauncher__pictograma', ariaHidden: 'true' }, createElement(Circle)),
-      createEl('span', { className: 'movilLauncher__etiqueta', textContent: 'Navegación' }),
-    );
-    navButton.addEventListener('click', onToggleExternalNav);
-    grid.appendChild(navButton);
-    launcher.append(header, grid);
-    return launcher;
+    return launcher.element;
   };
 
   const renderCurrent = (entry: MobileStackEntry | undefined): void => {
@@ -255,7 +125,6 @@ export function createMobileShell(
     if (destroyed) return;
     const entry = getTopMobileApp();
     if (!entry) return;
-
     const app = AppRegistry.get(entry.appId);
     const canonicalPath = app ? getCanonicalAppPath(app, entry.params) : null;
     const ownsCurrentHistoryEntry = Boolean(
@@ -263,12 +132,6 @@ export function createMobileShell(
       && canonicalPath === getCurrentPathname()
       && isInternalPushHistoryEntry(),
     );
-
-    /* Una entrada marcada por el OS y representada por la URL actual puede
-     * resolverse con history.back(): retiramos primero la vista y dejamos que
-     * popstate reconcilie la ruta. Una vista local o un deep link externo no
-     * consume historial ajeno: se desapila y se restaura la ruta de la vista
-     * inferior, o la raíz si ya no queda ninguna. */
     if (ownsCurrentHistoryEntry) {
       popMobileApp({ preserveHistoryUrl: true });
       history.back();
@@ -303,7 +166,6 @@ export function createMobileShell(
     clearLauncherResources();
     for (const controller of pendingControllers) controller.abort();
     pendingControllers.clear();
-    /* MobileShell owns the stack cleanup; callers only destroy the shell. */
     clearMobileStack();
     currentView?.remove();
     currentView = null;

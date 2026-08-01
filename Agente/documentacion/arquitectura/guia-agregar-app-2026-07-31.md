@@ -88,7 +88,9 @@ AppRegistry.register({
 });
 ```
 
-- **Eager vs lazy:** apps pequeñas y siempre presentes → `register`; apps grandes o bajo demanda → `registerLazy({ ..., load: () => import('...').then(m => ({ render: ... })) })` (patrón Admin/Settings). No inflar el bundle inicial.
+- **Eager vs lazy:** apps pequeñas y ligeras → `register`; apps grandes o bajo demanda → `registerLazy({ ..., load: () => import('...').then(m => ({ render: ... })) })`. Apps editoriales complejas, WASM, WebGL, media avanzada o con dependencias pesadas deben ser lazy. No importar una dependencia pesada estáticamente desde `app-registration.ts`.
+- **Preload:** no existe un `preload` global todavía; la carga por defecto ocurre al abrir. No añadir listeners de hover/idle por app. Solo introducir una política de precarga mediante ADR y medición de Network.
+- **Heavy/GPU:** no existe aún un flag `heavy` global. Una app WebGL futura debe liberar loop, workers, timers, object URLs, audio y GPU en `destroy()`/abort; la exclusividad de recursos se decide con el primer caso real.
 - **Parámetros de instancia:** `ctx.params`; dedup por `_paramKey` lo hace `route-app-adapter` automáticamente con `stableParamsKey`. Los parámetros internos del workspace (`folderId`, `resourceId`) no son URLs públicas y nunca deben convertirse implícitamente en slug.
 - **Recursos públicos:** un nodo `resource` puede declarar `publicLocator: { appId, params }`; el resolver central valida que la app exista, sea pública y acepte esos parámetros mediante su `deepLink`. `refId` sigue siendo interno. Sin locator válido, la UI informa que el recurso no está disponible públicamente y no abre una ventana vacía.
 
@@ -171,12 +173,14 @@ Capacidades: `getAvailable(currentCapability)` y `route-app-adapter` consumen `h
 - **S3** — `AppDefinition` expone solo lo que el shell necesita; la app no conoce chrome.
 - **S4** — La app depende de `MountedView`/`RenderContext` y de servicios (p. ej. `workspaceStore`), nunca del DOM del shell ni de SQL.
 - **S5** — Límites: `*-preview.ts` ≤ 300 líneas; sin N+1, sin listeners sin teardown, sin `unwrap` sobre input externo. Segundo caso real: la app funciona en desktop y móvil con el mismo código.
+- **S6 — Carga:** una app pesada usa `registerLazy`, aporta medición de bundle y no descarga su chunk antes de abrirse salvo precarga aprobada. `destroy()` debe liberar recursos externos.
 
-Definition of Done: evidencia S1–S5 en el plan, prueba positiva + negativa + regresión, teardown verificado, `task:check` PASS, documentación/roadmap sincronizados.
+Definition of Done: evidencia S1–S6 en el plan, prueba positiva + negativa + regresión, teardown verificado, carga lazy medida cuando corresponda, `task:check` PASS y documentación/roadmap sincronizados.
 
 ## 5. Gotchas conocidos
 
 - `registerLazy` **no** usa `render` — usa `load`; no mezclar ambos.
+- El presupuesto actual de referencia está en `Agente/documentacion/arquitectura/adr-carga-apps-pesadas-2026-07-31.md`: bundle principal ~46 KB gzip y Tiptap ~87 KB gzip separado. Repetir la medición antes/después de agregar una dependencia pesada.
 - Clases CSS sin regla = hallazgo de VarSense: verificar que toda clase nueva tenga su regla (contraejemplo real: `.desktop-about` en `app-registration.ts` sin CSS; el contenido real usa `.about-contenido` en `pages.css`).
 - Apps sin `deepLink` no hacen `pushPath` (`getCanonicalAppPath` → `null`): no intentar URL canónica en apps locales.
 - `dispatchEvent({ type: 'app_opened' })` dentro de `render` y `app_closed` en `destroy` — patrón consistente del OS (analítica).

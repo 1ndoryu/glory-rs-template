@@ -9,9 +9,15 @@ import { showToast } from '../components/ui/toast';
 import { createTextarea } from '../components/ui/textarea';
 import { createFontPanel } from '../features/settings/font-panel';
 import { safeClick, safeRun, safeEffect } from '../utils/safe-async';
-import { renderArticleList, openEditor } from './admin-articles';
-import { renderProjectList } from './admin-projects';
+import { renderArticleList, openEditor, disposeAdminArticleLists } from './admin-articles';
+import { renderProjectList, disposeAdminProjectLists } from './admin-projects';
 import { createEl } from '../utils/dom';
+
+/** Cleanup de recursos editoriales antes de desmontar la página Admin. */
+export function disposeAdminPage(page: HTMLElement): void {
+  disposeAdminArticleLists(page);
+  disposeAdminProjectLists(page);
+}
 
 export async function renderAdmin(): Promise<HTMLElement> {
   showProfile.set(false);
@@ -40,6 +46,7 @@ export async function renderAdmin(): Promise<HTMLElement> {
     tabs.querySelectorAll('.boton').forEach(b => {
       (b as HTMLElement).style.fontWeight = b.textContent === name ? 'var(--peso-medio)' : 'var(--peso-normal)';
     });
+    disposeAdminPage(page);
     contentArea.innerHTML = '';
     contentArea.id = `admin-${name}`;
 

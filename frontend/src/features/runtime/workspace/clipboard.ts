@@ -74,6 +74,9 @@ export function pasteFromClipboard(targetParentId: NodeId | 'desktop'): NodeId[]
         refId: original.refId,
         resourceKind: original.resourceKind,
         publicLocator: original.publicLocator,
+        position: original.position,
+        mobilePosition: original.mobilePosition,
+        mobileOrder: original.mobileOrder,
         requires: original.requires,
       });
       pastedIds.push(newId);

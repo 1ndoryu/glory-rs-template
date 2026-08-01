@@ -1,7 +1,8 @@
 /* wandori.us — Overlay Mutations
  * Funciones que mutan el overlay del workspace. */
 
-import type { NodeId, WorkspaceNode, ResolvedNode } from './types';
+import type { GridPosition, NodeId, WorkspaceNode, ResolvedNode } from './types';
+
 import { overlayStore, workspaceStore, releaseStore, EMPTY_OVERLAY } from './stores';
 
 export function moveNodePosition(nodeId: NodeId, position: { col: number; row: number }): void {
@@ -24,6 +25,22 @@ export function moveNodesPosition(
     const fieldOverrides = { ...prev.fieldOverrides };
     for (const move of moves) {
       fieldOverrides[move.nodeId] = { ...fieldOverrides[move.nodeId], position: move.position };
+    }
+    return { ...prev, fieldOverrides };
+  });
+}
+
+export function moveMobileNodesPosition(
+  moves: ReadonlyArray<{ nodeId: NodeId; mobilePosition: GridPosition }>,
+): void {
+  if (moves.length === 0) return;
+  overlayStore.update((prev) => {
+    const fieldOverrides = { ...prev.fieldOverrides };
+    for (const move of moves) {
+      fieldOverrides[move.nodeId] = {
+        ...fieldOverrides[move.nodeId],
+        mobilePosition: move.mobilePosition,
+      };
     }
     return { ...prev, fieldOverrides };
   });
@@ -74,8 +91,9 @@ export function resetOverlay(): void {
   overlayStore.set(EMPTY_OVERLAY);
 }
 
-/** Persistir el orden de una colección en la proyección móvil.
- * No modifica position, por lo que el layout desktop permanece intacto. */
+/** Compatibilidad para datos legacy. El launcher nuevo escribe mobilePosition;
+ * esta función solo se conserva para importar overlays antiguos y no participa en
+ * la política de orden de Finder ni en la geometría desktop. */
 export function reorderWorkspaceNodes(orderedIds: readonly NodeId[]): void {
   overlayStore.update((prev) => {
     const overrides = { ...prev.fieldOverrides };
@@ -110,6 +128,10 @@ export function createFolder(parentId: NodeId | 'desktop', label: string): NodeI
     parentId,
     type: 'folder',
     label: uniqueLabel,
+    mobilePosition: {
+      col: siblings.length % 3,
+      row: Math.floor(siblings.length / 3),
+    },
     mobileOrder: siblings.length,
     requires: 'public',
   });
@@ -124,9 +146,10 @@ export function getTombstonedNodes(): WorkspaceNode[] {
     .filter((n): n is WorkspaceNode => n !== undefined);
 }
 
+/** Devuelve hijos sin imponer una política de presentación.
+ * Finder y otras superficies de contenido no deben heredar el orden del launcher;
+ * la superficie móvil usa `sortMobileNodes` explícitamente cuando lo necesita. */
 export function getChildren(parentId: NodeId | 'desktop'): ResolvedNode[] {
   const ws = workspaceStore.get();
-  return Object.values(ws.nodes)
-    .filter((n) => n.parentId === parentId)
-    .sort((a, b) => (a.mobileOrder ?? 0) - (b.mobileOrder ?? 0));
+  return Object.values(ws.nodes).filter((n) => n.parentId === parentId);
 }

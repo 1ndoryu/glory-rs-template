@@ -50,6 +50,8 @@ export interface AriaAttrs {
   ariaHaspopup?: string;
   'aria-expanded'?: string;
   ariaExpanded?: string;
+  'aria-pressed'?: string;
+  ariaPressed?: string;
   'aria-hidden'?: string;
   ariaHidden?: string;
   'aria-modal'?: string;
@@ -113,6 +115,7 @@ export function createEl<K extends keyof HTMLElementTagNameMap>(
     setAttr(el, 'aria-label', attrs['aria-label'] ?? attrs.ariaLabel);
     setAttr(el, 'aria-haspopup', attrs['aria-haspopup'] ?? attrs.ariaHaspopup);
     setAttr(el, 'aria-expanded', attrs['aria-expanded'] ?? attrs.ariaExpanded);
+    setAttr(el, 'aria-pressed', attrs['aria-pressed'] ?? attrs.ariaPressed);
     setAttr(el, 'aria-hidden', attrs['aria-hidden'] ?? attrs.ariaHidden);
     setAttr(el, 'aria-modal', attrs['aria-modal'] ?? attrs.ariaModal);
     setAttr(el, 'aria-labelledby', attrs['aria-labelledby'] ?? attrs.ariaLabelledby);

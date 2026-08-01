@@ -366,10 +366,10 @@ Producto → orden idempotente → proveedor → webhook verificado → entitlem
 
 - Rutas públicas deben entregar título, canonical, Open Graph y Schema.org sin depender de abrir manualmente una app.
 - Sitemap solo incluye recursos públicos/activos.
-- Aplicaciones pesadas se cargan dinámicamente cuando exista beneficio medido.
+- Aplicaciones pesadas se cargan dinámicamente cuando exista beneficio medido. La política vigente es `registerLazy` para apps grandes, WASM, WebGL, media avanzada o dependencias pesadas; no existe todavía `preload`/`heavy` global. `MountedView.destroy()` y `AbortSignal` deben liberar workers, timers, object URLs, audio y GPU. La decisión detallada y el presupuesto vigente están en `Agente/documentacion/arquitectura/adr-carga-apps-pesadas-2026-07-31.md`.
 - Bootstrap combina sesión/capacidades, feature flags, release y overlay en un roundtrip razonable.
 - Navegación completa por teclado, foco recuperable, zoom 200% y ventanas reencuadradas.
-- Breakpoints mínimos: 320, 768 y 1024. Móvil usa launcher + apps full-screen y `mobileOrder`; tablet/desktop usan ventanas y bounds.
+- Breakpoints mínimos: 320, 768 y 1024. Móvil usa launcher + apps full-screen y `mobilePosition` (3/2 columnas); `mobileOrder` solo es fallback legacy. Tablet/desktop usan ventanas, `position` y bounds.
 
 ## 16. Pruebas y quality gates
 

@@ -127,7 +127,8 @@
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' stroke='%23000' stroke-width='1' fill='none'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0 center;
-  padding-right: 20px;
+  /* [297A-26] Reserva para la flecha SVG (--espacio-md + --espacio-xs). */
+  padding-right: calc(var(--espacio-md) + var(--espacio-xs));
 }
 
 /* === MODAL === */
@@ -234,6 +235,44 @@
 
 .preferences-conflict__action {
   text-decoration: underline;
+}
+
+/* [297A-26] Panel de preferencias embebido en la ventana Cuenta (reemplaza el
+ * modal global). Separador superior consistente con modales/paneles del
+ * sistema. El selector de tema usa la misma receta de botones del OS. */
+.preferences-panel {
+  border-top: var(--borde);
+  padding-top: var(--espacio-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-md);
+}
+
+.preferences-panel__selector {
+  display: flex;
+  align-items: baseline;
+  gap: var(--espacio-md);
+}
+
+.preferences-panel__etiqueta {
+  font-family: var(--fuente-menu);
+  font-size: var(--tamano-texto);
+  font-weight: 600;
+  min-width: 4ch;
+}
+
+.preferences-panel__temas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espacio-md);
+}
+
+.preferences-panel__tema {
+  text-decoration: underline;
+}
+
+.preferences-panel__tema[aria-pressed='true'] {
+  font-weight: var(--peso-medio);
 }
 
 /* === RESOLUCIÓN DE OVERLAY DEL WORKSPACE === */

@@ -23,7 +23,7 @@ En teléfono, wandori.us se percibe como un móvil minimalista con el mismo leng
 - [x] MobileAppStack es una proyección del mismo estado/comandos, no otro store de negocio.
 - [x] CommandRegistry resuelve acciones; clic derecho desktop se adapta a long press/menú móvil.
 - [x] RouteAppAdapter conserva deep links y params; Back del stack está implementado.
-- [x] Workspace overlay usa los mismos nodos; solo cambia `mobileOrder` y presentación.
+- [x] Workspace overlay usa los mismos nodos; `mobilePosition` representa la geometría canónica móvil de 3 columnas y se proyecta a 2 columnas; `mobileOrder` solo sirve como fallback legacy.
 - [x] Seguridad, estados, papelera, pagos y analytics no dependen del viewport.
 
 ## 3. Contrato de presentación
@@ -78,9 +78,10 @@ módulo no implementa persistencia, pagos, drag, long press ni el stack definiti
 - [x] Desmontar el interceptor de rutas, el shell móvil y los listeners asociados con cleanup idempotente.
 - [x] Preservar estados transitorios de formularios/scroll durante la transición mediante snapshot efímero en memoria, opt-in `data-transient="true"` y `data-transient-scroll`; excluye secretos, archivos, campos ocultos y metadata sensible. Legacy outlet y Perfil shell usan claves/rutas separadas; snapshots se limpian en cancelación, error y teardown.
 
-**Implementación:** `frontend/src/features/mobile/mobile-shell.ts` y
-`frontend/src/features/mobile/mobile-stack.ts`. El adapter de rutas conserva
-params y deriva la misma app al stack móvil; no existen componentes `MobileFoo`.
+**Implementación:** `frontend/src/features/mobile/mobile-shell.ts`,
+`frontend/src/features/mobile/mobile-launcher.ts` y `frontend/src/features/mobile/mobile-stack.ts`.
+El shell coordina rutas/stack/lifecycle; `MobileLauncher` renderiza el launcher y sus gestos.
+El adapter de rutas conserva params y deriva la misma app al stack móvil; no existen componentes `MobileFoo`.
 
 **Gate parcial:** Perfil/Finder/Reader se montan en el shell full-screen con `MountedView`,
 Back/Home destruyen o desapilan vistas y tablet conserva el shell desktop. El interceptor de rutas,
@@ -93,9 +94,9 @@ la validación visual real y la prueba E2E de resize/orientación sin perder est
 
 ## 6. Bloque 3 — Launcher, carpetas y organización
 
-- [x] Grid ordenable con `mobileOrder` mediante los comandos compartidos `workspace:move-up/down`.
+- [x] Grid compacto reordenable por drag con `mobilePosition`; `mobileOrder` queda como fallback de datos antiguos y los comandos `workspace:move-up/down` son alternativa accesible móvil.
 - [x] Carpetas abren vista full-screen y permiten navegación jerárquica.
-- [x] Reorder con alternativa accesible por comandos; no depende del gesto táctil.
+- [x] Reorder con alternativa accesible por comandos que opera sobre celdas; no depende del gesto táctil.
 - [x] Long press abre el CommandRegistry móvil mediante el mismo menú contextual.
 - [x] Crear carpeta, copiar, cortar, pegar y mover usan comandos existentes.
 - [ ] Papelera muestra solo capas autorizadas.
@@ -167,7 +168,7 @@ la validación visual real y la prueba E2E de resize/orientación sin perder est
 
 ## 12. Criterio final de cierre
 
-**Estado del gate actual:** El runtime móvil y el snapshot transitorio opt-in pasan type-check, **203 tests en 19 suites**, `task:check -- 297A-12 --fresh` y `self-check`. Sentinel queda en 0 errores/75 warnings heredados; VarSense en 0 errores/2 avisos informativos; custom en 0 errores/4 avisos. La transición dinámica por URL/params, el long press, el menú compartido, el reorder accesible, la autorización por capability y la preservación segura de formularios/scroll están implementados. La validación visual real y las pruebas E2E de cambio de modo siguen abiertas, por eso el criterio final no se marca todavía.
+**Estado del gate actual:** El runtime móvil, `MobileLauncher` y el snapshot transitorio opt-in pasan type-check, **278 tests en 34 suites**, `task:check -- 297A-22 --fresh` y `self-check`. La transición dinámica por URL/params, el long press, el menú compartido, el reorder accesible, la autorización por capability y la preservación segura de formularios/scroll están implementados. La inspección de navegador confirmó tablet `768×1024` con escritorio, taskbar y sin overflow horizontal; la sesión móvil táctil no produjo evidencia automatizada estable, por lo que la validación visual/E2E móvil, safe areas, foco, teclado y apps críticas siguen abiertas.
 
 - [ ] Teléfono usa launcher y apps full-screen sin barras/ventanas desktop.
 - [ ] Tablet conserva comportamiento desktop.

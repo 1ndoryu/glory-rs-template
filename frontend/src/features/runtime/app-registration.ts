@@ -208,14 +208,61 @@ AppRegistry.registerLazy({
     render: (ctx: RenderContext): MountedView => {
       dispatchEvent({ type: 'app_opened', appId: 'admin' });
       const container = createEl('div');
-      void m.renderAdmin().then(el => {
-        if (!ctx.signal.aborted) container.appendChild(el);
-      });
+      let adminPage: HTMLElement | null = null;
+      let disposed = false;
+
+      void m.renderAdmin()
+        .then(el => {
+          if (disposed || ctx.signal.aborted) {
+            m.disposeAdminPage(el);
+            return;
+          }
+          adminPage = el;
+          container.appendChild(el);
+        })
+        .catch(() => {
+          if (!disposed && !ctx.signal.aborted) {
+            container.textContent = 'Error al cargar Admin.';
+          }
+        });
+
       return {
         element: container,
-        destroy: () => { dispatchEvent({ type: 'app_closed', appId: 'admin' }); },
+        destroy: () => {
+          disposed = true;
+          if (adminPage) m.disposeAdminPage(adminPage);
+          dispatchEvent({ type: 'app_closed', appId: 'admin' });
+        },
       };
     },
+  })),
+});
+
+/* === Article Editor — programa editorial admin === */
+AppRegistry.registerLazy({
+  id: 'article-editor',
+  title: 'Editor de artículos',
+  icon: FileText,
+  iconType: 'document',
+  singleton: false,
+  requires: 'admin',
+  layout: 'padded',
+  load: () => import('../desktop/apps/article-editor/article-editor').then(m => ({
+    render: (ctx: RenderContext): MountedView => m.renderArticleEditor(ctx),
+  })),
+});
+
+/* === Project Editor — programa editorial admin === */
+AppRegistry.registerLazy({
+  id: 'project-editor',
+  title: 'Editor de proyectos',
+  icon: FolderCode,
+  iconType: 'folder',
+  singleton: false,
+  requires: 'admin',
+  layout: 'padded',
+  load: () => import('../desktop/apps/project-editor/project-editor').then(m => ({
+    render: (ctx: RenderContext): MountedView => m.renderProjectEditor(ctx),
   })),
 });
 

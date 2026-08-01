@@ -106,6 +106,18 @@ describe('mergeWorkspace', () => {
 
   /* [297A-20] La posición de un nodo creado por el usuario (addedItem) también
    * debe resolverse desde fieldOverrides, como en nodos del release. */
+  it('debe aplicar fieldOverrides de posición móvil sin alterar la desktop', () => {
+    const overlay: WorkspaceOverlay = {
+      ...emptyOverlay,
+      fieldOverrides: {
+        folder1: { mobilePosition: { col: 1, row: 2 } },
+      },
+    };
+    const result = mergeWorkspace(simpleRelease, overlay, 'public');
+    expect(result.nodes.folder1.mobilePosition).toEqual({ col: 1, row: 2 });
+    expect(result.nodes.folder1.position).toEqual({ col: 0, row: 0 });
+  });
+
   it('debe aplicar fieldOverrides de posición a nodos addedItems', () => {
     const newFolder: WorkspaceNode = {
       id: 'new-folder',

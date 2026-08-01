@@ -134,9 +134,9 @@ npm run check
 cargo run                    # Iniciar servidor
 cargo check                  # Verificar compilación
 cargo clippy                 # Linter (nivel paranoia)
-cargo test                   # Tests
+npm test                    # cargo test con BD/contexto por rama
 cargo fmt                    # Formatear código
-npm run check:back           # cargo check + clippy
+npm run check:back           # cargo check + clippy con BD/contexto por rama
 
 # Frontend
 npm run dev:front            # Dev server con HMR
@@ -158,4 +158,4 @@ El proyecto tiene configurado clippy en modo estricto (`[lints.clippy]` en Cargo
 - `clippy::all` → **deny** (error en cualquier warning estándar)
 - `clippy::pedantic` → **warn** (warnings extra para código idiomático)
 
-Antes de cada commit: `cargo fmt --check && cargo clippy && cargo test`
+Antes de cada commit: `cargo fmt --check && npm run check:back && npm test` (los wrappers derivan BD/contexto por rama)

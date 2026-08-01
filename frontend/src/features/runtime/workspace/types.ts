@@ -44,9 +44,11 @@ export interface WorkspaceNode {
   readonly resourceKind?: WorkspaceResourceKind;
   /** Locator público; nunca contiene el UUID interno del recurso. */
   readonly publicLocator?: PublicResourceLocator;
-  /** Posición en grid del desktop. */
+  /** Posición persistente en el grid desktop/tablet. */
   position?: GridPosition;
-  /** Orden en vista móvil. */
+  /** Posición persistente en el grid compacto del launcher móvil. */
+  mobilePosition?: GridPosition;
+  /** Orden móvil legacy; solo fallback para nodos sin mobilePosition. */
   mobileOrder?: number;
   /** Capacidad requerida para ver este nodo. */
   readonly requires?: Capability;
@@ -67,7 +69,7 @@ export interface WorkspaceOverlay {
   /** Nodos nuevos añadidos por el usuario (carpetas, atajos). */
   readonly addedItems: Record<NodeId, WorkspaceNode>;
   /** Overrides de campos sobre nodos del release (posiciones, label, parentId). */
-  readonly fieldOverrides: Record<NodeId, Partial<Pick<WorkspaceNode, 'position' | 'label' | 'parentId' | 'mobileOrder'>>>;
+  readonly fieldOverrides: Record<NodeId, Partial<Pick<WorkspaceNode, 'position' | 'mobilePosition' | 'label' | 'parentId' | 'mobileOrder'>>>;
   /** IDs eliminados por el usuario (tombstones). */
   readonly tombstones: NodeId[];
 }

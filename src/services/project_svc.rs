@@ -2,11 +2,13 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::errors::AppError;
-use crate::models::project::{CreateProjectRequest, Project, UpdateProjectRequest};
+use crate::models::project::{
+    CreateProjectRequest, Project, ProjectUrlUpdate, UpdateProjectRequest,
+};
 use crate::models::resource::{
     CreateResourceParams, EditorialState, ResourceKind, VisibilityState,
 };
-use crate::repositories::project_repo::ProjectRepository;
+use crate::repositories::project_repo::{ProjectRepository, ProjectUpdateParams};
 use crate::repositories::resource_repo::ResourceRepository;
 
 pub struct ProjectService;
@@ -60,14 +62,23 @@ impl ProjectService {
         id: Uuid,
         req: UpdateProjectRequest,
     ) -> Result<Project, AppError> {
+        let (url, clear_url) = match &req.url {
+            ProjectUrlUpdate::Unchanged => (None, false),
+            ProjectUrlUpdate::Clear => (None, true),
+            ProjectUrlUpdate::Set(value) => (Some(value.as_str()), false),
+        };
+
         ProjectRepository::update(
             pool,
-            id,
-            req.title.as_deref(),
-            req.description.as_deref(),
-            req.url.as_deref(),
-            req.sort_order,
-            req.is_visible,
+            ProjectUpdateParams {
+                id,
+                title: req.title.as_deref(),
+                description: req.description.as_deref(),
+                url,
+                clear_url,
+                sort_order: req.sort_order,
+                is_visible: req.is_visible,
+            },
         )
         .await?
         .ok_or_else(|| AppError::NotFound("Proyecto no encontrado".into()))

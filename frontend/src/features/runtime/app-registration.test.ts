@@ -19,6 +19,24 @@ describe('Account app registration', () => {
     expect(account?.deepLink?.parse({ redirect: '/admin' })).toBeNull();
   });
 
+  it('registers article editor as an internal admin app', () => {
+    const editor = AppRegistry.get('article-editor');
+    expect(editor).toBeDefined();
+    expect(editor?.requires).toBe('admin');
+    expect(editor?.singleton).toBe(false);
+    expect(editor?.deepLink).toBeUndefined();
+    expect(editor?.routePatterns).toBeUndefined();
+  });
+
+  it('registers project editor as an internal admin app', () => {
+    const editor = AppRegistry.get('project-editor');
+    expect(editor).toBeDefined();
+    expect(editor?.requires).toBe('admin');
+    expect(editor?.singleton).toBe(false);
+    expect(editor?.deepLink).toBeUndefined();
+    expect(editor?.routePatterns).toBeUndefined();
+  });
+
   it('does not reinterpret an internal resourceId as a public Reader slug', async () => {
     const reader = AppRegistry.get('reader');
     expect(reader).toBeDefined();

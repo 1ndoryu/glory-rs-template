@@ -294,7 +294,7 @@ Cerrar desde taskbar no cambia el foco accidentalmente. Cuando no caben tareas s
 - Launcher de aplicaciones/carpetas inspirado en la organización de un teléfono.
 - No se muestran ventanas, titlebar, barra superior desktop ni taskbar.
 - Abrir una app ocupa toda el área disponible; la app conserva su contenido compartido.
-- Persistir `mobileOrder` y navegación recuperable, no coordenadas desktop.
+- Persistir `mobilePosition` para la geometría del launcher y navegación recuperable; `mobileOrder` solo se acepta como fallback legacy, nunca como posición desktop.
 - Back/Home/long press tienen contratos y alternativas accesibles aprobadas en el prototipo móvil.
 - Safe areas y teclado virtual no ocultan acciones.
 

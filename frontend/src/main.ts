@@ -36,7 +36,6 @@ import { loadSavedFonts } from './features/settings/font-panel';
 import { initTracking, trackPageView } from './features/analytics/tracker';
 import { initThemeStore } from './features/runtime/theme-store';
 import { initPreferencesSync } from './features/runtime/preferences-sync';
-import { initPreferencesConflictUI } from './features/runtime/preferences-conflict-ui';
 import { authStore, showProfile, showSidebar, siteConfig } from './store';
 import { AuthService } from './services';
 import { fetchWorkspaceRelease } from './features/runtime/workspace/workspace-store';
@@ -89,7 +88,6 @@ async function initApp(): Promise<void> {
    * (el anti-flash de index.html ya puso data-tema en la primera pintura). */
   initThemeStore();
   const stopPreferencesSync = initPreferencesSync();
-  const stopPreferencesConflictUI = initPreferencesConflictUI();
   const stopOverlaySync = initOverlaySync();
   const stopOverlayConflictUI = initOverlayConflictUI();
   const app = document.getElementById('app');
@@ -331,7 +329,6 @@ async function initApp(): Promise<void> {
     cleanedUp = true;
     mediaQuery.removeEventListener('change', onPresentationChange);
     stopTracking();
-    stopPreferencesConflictUI();
     stopPreferencesSync();
     stopOverlaySync();
     stopOverlayConflictUI();

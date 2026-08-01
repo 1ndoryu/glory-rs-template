@@ -15,7 +15,7 @@ import type {
  * Merge release + overlay → resolved workspace.
  * 1. Clone release nodes
  * 2. Remove tombstones (and orphan children)
- * 3. Apply field overrides (position, label, parentId, mobileOrder)
+ * 3. Apply field overrides (position, mobilePosition, label, parentId, mobileOrder)
  * 4. Add overlay items
  * 5. Filter by auth capability
  */
@@ -59,10 +59,9 @@ export function mergeWorkspace(
     result[id] = { ...node, origin: 'overlay' };
   }
 
-  /* [297A-20] Aplicar fieldOverrides DESPUÉS de añadir los items del overlay:
-   * así la posición/etiqueta de nodos creados por el usuario (addedItems)
-   * también se resuelve (antes los addedItems sobrescribían el override y
-   * mover una carpeta propia no persistía). */
+  /* Aplicar fieldOverrides DESPUÉS de añadir los items del overlay:
+   * así las posiciones desktop/móvil y etiqueta de nodos creados por el usuario
+   * también se resuelven en una sola pasada. */
   for (const [id, overrides] of Object.entries(overlay.fieldOverrides)) {
     const existing = result[id];
     if (existing && !collidedOverlayIds.has(id)) Object.assign(existing, overrides);
@@ -85,7 +84,7 @@ export function rebaseOverlay(
   const validTombstones = currentOverlay.tombstones.filter((id) => releaseIds.has(id));
 
   const addedIds = new Set(Object.keys(currentOverlay.addedItems));
-  const validOverrides: Record<NodeId, Partial<Pick<WorkspaceNode, 'position' | 'label' | 'parentId' | 'mobileOrder'>>> = {};
+  const validOverrides: Record<NodeId, Partial<Pick<WorkspaceNode, 'position' | 'mobilePosition' | 'label' | 'parentId' | 'mobileOrder'>>> = {};
   for (const [id, overrides] of Object.entries(currentOverlay.fieldOverrides)) {
     /* Los nodos publicados se rebajan contra el release; los creados por el
      * usuario permanecen válidos aunque no formen parte del release. */

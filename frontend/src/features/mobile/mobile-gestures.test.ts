@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { bindLongPress } from './mobile-gestures';
+import { bindLongPress, bindLongPressDrag } from './mobile-gestures';
 
 function pointerEvent(
   type: string,
@@ -70,6 +70,64 @@ describe('bindLongPress', () => {
 
     expect(click).toHaveBeenCalledTimes(1);
     binding.destroy();
+  });
+
+  it('distingue long press con menú de transición a drag', () => {
+    const element = document.createElement('button');
+    const onLongPress = vi.fn();
+    const onLongPressEnd = vi.fn();
+    const onDragStart = vi.fn();
+    const onDragMove = vi.fn();
+    const onDragEnd = vi.fn();
+    const binding = bindLongPressDrag(element, {
+      onLongPress,
+      onLongPressEnd,
+      onDragStart,
+      onDragMove,
+      onDragEnd,
+    });
+
+    element.dispatchEvent(pointerEvent('pointerdown', 6, 10, 10));
+    vi.advanceTimersByTime(500);
+    expect(onLongPress).toHaveBeenCalledTimes(1);
+    element.dispatchEvent(pointerEvent('pointerup', 6, 10, 10));
+    expect(onLongPressEnd).toHaveBeenCalledTimes(1);
+    expect(onDragStart).not.toHaveBeenCalled();
+
+    element.dispatchEvent(pointerEvent('pointerdown', 7, 10, 10));
+    vi.advanceTimersByTime(500);
+    element.dispatchEvent(pointerEvent('pointermove', 7, 25, 10));
+    element.dispatchEvent(pointerEvent('pointermove', 7, 30, 12));
+    element.dispatchEvent(pointerEvent('pointerup', 7, 30, 12));
+    expect(onDragStart).toHaveBeenCalledTimes(1);
+    expect(onDragMove).toHaveBeenCalledTimes(2);
+    expect(onDragEnd).toHaveBeenCalledTimes(1);
+    expect(onLongPressEnd).toHaveBeenCalledTimes(1);
+
+    binding.destroy();
+  });
+
+  it('limpia el drag pendiente y no emite callbacks después de destroy', () => {
+    const element = document.createElement('button');
+    const callbacks = {
+      onLongPress: vi.fn(),
+      onLongPressEnd: vi.fn(),
+      onDragStart: vi.fn(),
+      onDragMove: vi.fn(),
+      onDragEnd: vi.fn(),
+    };
+    const binding = bindLongPressDrag(element, callbacks);
+
+    element.dispatchEvent(pointerEvent('pointerdown', 8, 10, 10));
+    vi.advanceTimersByTime(500);
+    element.dispatchEvent(pointerEvent('pointermove', 8, 30, 10));
+    binding.destroy();
+    element.dispatchEvent(pointerEvent('pointermove', 8, 40, 10));
+    element.dispatchEvent(pointerEvent('pointerup', 8, 40, 10));
+
+    expect(callbacks.onDragStart).toHaveBeenCalledTimes(1);
+    expect(callbacks.onDragEnd).not.toHaveBeenCalled();
+    expect(callbacks.onDragMove).toHaveBeenCalledTimes(1);
   });
 
   it('cancela el timer y listeners al destruirse', () => {

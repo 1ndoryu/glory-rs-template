@@ -120,6 +120,28 @@
     padding: var(--espacio-2xl) var(--espacio-md);
   }
 
+  @media (max-width: 480px) {
+    .movilLauncher__grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  .movilLauncher__grid--editando {
+    touch-action: none;
+  }
+
+  .movilLauncher__navegacion {
+    display: grid;
+    width: calc(100% - (2 * var(--espacio-md)));
+    min-height: var(--areaControlSistemaMovil);
+    margin: 0 var(--espacio-md) var(--espacio-lg);
+    place-items: center;
+    border: var(--sistema-borde);
+    background: var(--sistema-fondo);
+    color: var(--sistema-texto);
+    font-family: var(--fuente-sistema);
+  }
+
   .movilLauncher__app,
   .movilCarpeta__archivo {
     display: flex;
@@ -132,6 +154,21 @@
     color: var(--sistema-texto);
     font-family: var(--fuente-sistema);
     font-size: var(--sistema-menu-contexto-texto-tamano);
+  }
+
+  .movilLauncher__app--editando {
+    outline: var(--sistema-borde);
+    outline-offset: var(--espacio-xs);
+  }
+
+  .movilLauncher__app--arrastrando {
+    opacity: 0.35;
+  }
+
+  .movilLauncher__app--ghost {
+    opacity: 0.8;
+    background: var(--sistema-fondo);
+    border: var(--sistema-borde);
   }
 
   .movilLauncher__app:focus-visible,
