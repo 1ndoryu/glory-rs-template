@@ -84,7 +84,7 @@ export interface WorkspaceIconGrid {
  * createDesktopIcon y su CSS, pero nadie la cableaba al selectionStore
  * (la selección solo vivía en el store, sin estado visible). */
 function applyIconSelection(el: HTMLElement, nodeId: string): void {
-  const selected = isSelected(nodeId);
+  const selected = isSelected(nodeId, 'desktop');
   el.classList.toggle('desktop-icon--selected', selected);
   el.setAttribute('aria-selected', String(selected));
 }
@@ -135,7 +135,7 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
         const iconEl = createDesktopIcon({
           label: node.label,
           type: resolveNodeIconType(node),
-          selected: isSelected(node.id),
+          selected: isSelected(node.id, 'desktop'),
           lucideIcon: resolveNodeIcon(node),
           onActivate,
         });
@@ -146,7 +146,7 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
         iconEl.addEventListener('mousedown', (e) => {
           if (e.button === 0 && e.detail === 1) {
             const nid = iconEl.getAttribute('data-node-id');
-            if (nid) selectSingle(nid);
+            if (nid) selectSingle(nid, 'desktop');
           }
         });
 
@@ -157,7 +157,7 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
           const ws = workspaceStore.get();
           const currentNode = ws.nodes[nid];
           if (!currentNode) return;
-          selectSingle(nid);
+          selectSingle(nid, 'desktop');
           openContextMenu({
             context: 'icon',
             targets: [{ id: currentNode.refId ?? nid, kind: currentNode.type === 'app' ? 'app' : 'shortcut' }],

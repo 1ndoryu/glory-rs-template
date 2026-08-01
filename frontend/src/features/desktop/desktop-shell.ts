@@ -128,7 +128,7 @@ export function createDesktopShell(
   const onWorkspaceContextMenu = (e: MouseEvent): void => {
     if (e.target !== workspace && e.target !== iconGrid.element) return;
     e.preventDefault();
-    selectBackground();
+    selectBackground('desktop');
     openContextMenu({
       context: 'desktop',
       capability: authStore.get().capability,

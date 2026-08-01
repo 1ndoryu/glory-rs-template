@@ -121,7 +121,7 @@ export function createFinderPreview(options: FinderOptions): HTMLElement {
     const target = e.target as HTMLElement;
     if (target !== grid) return;
     e.preventDefault();
-    selectBackground();
+    selectBackground('finder');
     openContextMenu({
       context: 'finder',
       targets: [{ id: currentFolderId, kind: 'folder' }],
@@ -228,7 +228,7 @@ function createFinderItem(
 
   /* [018A-88] Estado de selección visible: la clase --selected reutiliza los
    * tokens de selección del OS (--sistema-inverso-*) igual que el escritorio. */
-  const selected = isSelected(node.id);
+  const selected = isSelected(node.id, 'finder');
   item.classList.toggle('desktop-finder__item--selected', selected);
   item.setAttribute('aria-selected', String(selected));
 
@@ -253,14 +253,14 @@ function createFinderItem(
 
   item.addEventListener('mousedown', ((e: MouseEvent) => {
     if (e.button === 0 && e.detail === 1) {
-      selectSingle(node.id);
+      selectSingle(node.id, 'finder');
     }
   }) as EventListener);
 
   item.addEventListener('contextmenu', ((e: MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    selectSingle(node.id);
+    selectSingle(node.id, 'finder');
 
     const context = isFolder ? 'folder' : 'icon';
     const kind = isFolder ? 'folder' as const : (node.type === 'resource' ? 'shortcut' as const : 'app' as const);
