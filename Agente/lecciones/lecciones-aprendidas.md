@@ -238,3 +238,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Cuando un módulo deja de contener la responsabilidad que dio origen a su nombre, conservarlo como alias perpetúa una arquitectura equivocada y hace que futuras apps vuelvan a depender del boundary antiguo.
 - Renombrar el adaptador manteniendo la app y su contrato permite limpiar la deuda sin borrar la compatibilidad funcional ni reintroducir lógica en el shell.
+
+## 018A-45 — Un token huérfano se elimina solo con doble evidencia
+
+- VarSense identifica candidatos, pero la eliminación segura exige una búsqueda global que confirme que el nombre no aparece como consumidor ni en contratos dinámicos.
+- Mantener los tokens que sí tienen consumidores, aunque parezcan legacy, evita que una limpieza visual rompa preferencias de perfil, tema o geometría del OS.

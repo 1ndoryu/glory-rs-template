@@ -395,6 +395,7 @@ Plan canónico: `Agente/planes/plan-programas-editoriales-2026-07-31.md`.
 - [x] **018A-42 —** Desacoplar la entrega de commerce del webhook: `--process-commerce-outbox` reclama lotes con `SKIP LOCKED`, reintenta con backoff y rota el hash del grant sin persistir tokens en claro.
 - [x] **018A-43 —** Cerrar el alcance mínimo de Sentinel/VarSense; el gate reproducible desbloquea el roadmap principal y el backlog avanzado queda diferido explícitamente.
 - [x] **018A-44 —** Retirar el alias `font-panel.ts` ya sin lógica de fuentes; la app Configuración conserva su registro y delega desde `settings-panel.ts`, sin cambiar su comportamiento.
+- [x] **018A-45 —** Retirar siete tokens CSS sin consumidores confirmados por VarSense (`--radio`, aliases de sidebar, z-index legacy y transición); se conserva `--contenido-max` y el chrome activo.
 
 ## Revisión SOLID y escalabilidad por fase
 
