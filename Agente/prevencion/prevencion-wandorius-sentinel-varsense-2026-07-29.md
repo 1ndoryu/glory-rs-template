@@ -21,7 +21,7 @@
 - [x] Detectar token/JWT de sesión persistido en Web Storage. *(297A-8: migrado a sesiones opacas en cookie `HttpOnly`; JWT eliminado del frontend)*
 - [x] Detectar credenciales o auto-registro en frontend. *(297A-7: auto-login eliminado; registro apagado por feature flag)*
 - [x] Detectar endpoint público sin predicados obligatorios de visibilidad/lifecycle. *(297A-7: artículos públicos solo status='published'; productos solo is_active)*
-- [x] Detectar DTO público con `download_path`, `storage_key`, URL firmada o IDs internos de pago. *(297A-28/29: DTO públicos/admin separados y storage keys fuera del contrato)*
+- [x] Detectar DTO público con `download_path`, `storage_key`, URL firmada o IDs internos de pago. *(297A-28/29/46: DTOs de media y productos separados; storage keys, rutas e IDs de proveedor quedan fuera del contrato)*
 - [x] Detectar directorio de entregables servido estáticamente. *(297A-28: serving estático de `/uploads` retirado; el finding queda como prevención futura)*
 - [x] Detectar checkout que acepte precio/moneda/ruta/éxito desde cliente. *(297A-7: checkout valida is_active, requiere Stripe configurado)*
 - [x] Detectar webhook sin firma, evento único, validación de importe/moneda y transacción. *(297A-15/42: firma, idempotencia, transacción y outbox con reintento; proveedor real/E2E quedan diferidos)*

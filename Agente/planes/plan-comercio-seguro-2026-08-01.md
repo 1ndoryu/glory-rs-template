@@ -31,6 +31,7 @@ Gate: tests de firma/evento duplicado/grant y descarga con archivo válido, expi
 
 - [x] Registrar `Tienda`, `Pedidos` y `Descargas` en AppRegistry con las mismas rutas en desktop/tablet/móvil.
 - [x] Añadir catálogo público SQL que solo devuelve productos `active + public + is_active`.
+- [x] Separar la respuesta pública/admin del modelo interno del producto; `download_path` e IDs Stripe solo viven en services/repositories/webhook.
 - [x] Mostrar checkout dentro de la app Tienda: validación de email, clave de idempotencia delegada al servicio y redirección solo a la URL de Stripe devuelta por backend.
 - [x] Dejar estados vacíos explícitos para Pedidos/Descargas hasta que exista endpoint de historial por cuenta y grants consultables.
 - [x] Añadir los programas al release público existente con migración no destructiva y posiciones publicables.

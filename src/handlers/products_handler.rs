@@ -10,7 +10,8 @@ use validator::Validate;
 use crate::errors::AppError;
 use crate::middleware::AdminUser;
 use crate::models::product::{
-    CheckoutRequest, CreateProductRequest, Order, Product, UpdateProductRequest,
+    CheckoutRequest, CreateProductRequest, Order, Product, ProductAdminResponse,
+    ProductPublicResponse, UpdateProductRequest,
 };
 use crate::services::product_svc::ProductService;
 use crate::AppState;
@@ -30,7 +31,7 @@ pub struct CheckoutResponse {
     path = "/api/admin/products",
     request_body = CreateProductRequest,
     responses(
-        (status = 201, description = "Producto creado", body = Product),
+        (status = 201, description = "Producto creado", body = ProductAdminResponse),
         (status = 401, description = "No autorizado", body = ErrorResponse),
         (status = 422, description = "Error de validación", body = ErrorResponse)
     ),
@@ -40,12 +41,15 @@ pub async fn create_product(
     State(state): State<AppState>,
     _auth: AdminUser,
     Json(req): Json<CreateProductRequest>,
-) -> Result<(StatusCode, Json<Product>), AppError> {
+) -> Result<(StatusCode, Json<ProductAdminResponse>), AppError> {
     req.validate()
         .map_err(|e| AppError::Validation(e.to_string()))?;
 
     let product = ProductService::create(&state.pool, req).await?;
-    Ok((StatusCode::CREATED, Json(product)))
+    Ok((
+        StatusCode::CREATED,
+        Json(ProductAdminResponse::from(&product)),
+    ))
 }
 
 /// Obtener producto por ID (admin)
@@ -54,7 +58,7 @@ pub async fn create_product(
     path = "/api/admin/products/{id}",
     params(("id" = Uuid, Path, description = "ID del producto")),
     responses(
-        (status = 200, description = "Producto encontrado", body = Product),
+        (status = 200, description = "Producto encontrado", body = ProductAdminResponse),
         (status = 401, description = "No autorizado", body = ErrorResponse),
         (status = 404, description = "No encontrado", body = ErrorResponse)
     ),
@@ -64,9 +68,9 @@ pub async fn get_product(
     State(state): State<AppState>,
     _auth: AdminUser,
     Path(id): Path<Uuid>,
-) -> Result<Json<Product>, AppError> {
+) -> Result<Json<ProductAdminResponse>, AppError> {
     let product = ProductService::get(&state.pool, id).await?;
-    Ok(Json(product))
+    Ok(Json(ProductAdminResponse::from(&product)))
 }
 
 /// Listar todos los productos (admin)
@@ -74,7 +78,7 @@ pub async fn get_product(
     get,
     path = "/api/admin/products",
     responses(
-        (status = 200, description = "Todos los productos", body = [Product]),
+        (status = 200, description = "Todos los productos", body = [ProductAdminResponse]),
         (status = 401, description = "No autorizado", body = ErrorResponse)
     ),
     security(("session_cookie" = []))
@@ -82,9 +86,11 @@ pub async fn get_product(
 pub async fn list_all_products(
     State(state): State<AppState>,
     _auth: AdminUser,
-) -> Result<Json<Vec<Product>>, AppError> {
+) -> Result<Json<Vec<ProductAdminResponse>>, AppError> {
     let products = ProductService::list_all(&state.pool).await?;
-    Ok(Json(products))
+    Ok(Json(
+        products.iter().map(ProductAdminResponse::from).collect(),
+    ))
 }
 
 /// Listar productos de un articulo (publico — solo activos)
@@ -92,26 +98,31 @@ pub async fn list_all_products(
     get,
     path = "/api/articles/{article_id}/products",
     params(("article_id" = Uuid, Path, description = "ID del artículo")),
-    responses((status = 200, description = "Productos del artículo", body = [Product]))
+    responses((status = 200, description = "Productos del artículo", body = [ProductPublicResponse]))
 )]
 pub async fn list_products_by_article(
     State(state): State<AppState>,
     Path(article_id): Path<Uuid>,
-) -> Result<Json<Vec<Product>>, AppError> {
+) -> Result<Json<Vec<ProductPublicResponse>>, AppError> {
     let products = ProductService::list_by_article(&state.pool, article_id).await?;
-    Ok(Json(products))
+    Ok(Json(
+        products.iter().map(ProductPublicResponse::from).collect(),
+    ))
 }
 
 /// Catálogo público de la Tienda.
 #[utoipa::path(
     get,
     path = "/api/products",
-    responses((status = 200, description = "Catálogo público", body = [Product]))
+    responses((status = 200, description = "Catálogo público", body = [ProductPublicResponse]))
 )]
 pub async fn list_public_products(
     State(state): State<AppState>,
-) -> Result<Json<Vec<Product>>, AppError> {
-    Ok(Json(ProductService::list_public(&state.pool).await?))
+) -> Result<Json<Vec<ProductPublicResponse>>, AppError> {
+    let products = ProductService::list_public(&state.pool).await?;
+    Ok(Json(
+        products.iter().map(ProductPublicResponse::from).collect(),
+    ))
 }
 
 /// Actualizar producto (admin) — sincroniza envelope en transacción
@@ -121,7 +132,7 @@ pub async fn list_public_products(
     params(("id" = Uuid, Path, description = "ID del producto")),
     request_body = UpdateProductRequest,
     responses(
-        (status = 200, description = "Producto actualizado", body = Product),
+        (status = 200, description = "Producto actualizado", body = ProductAdminResponse),
         (status = 401, description = "No autorizado", body = ErrorResponse),
         (status = 404, description = "No encontrado", body = ErrorResponse)
     ),
@@ -132,12 +143,12 @@ pub async fn update_product(
     _auth: AdminUser,
     Path(id): Path<Uuid>,
     Json(req): Json<UpdateProductRequest>,
-) -> Result<Json<Product>, AppError> {
+) -> Result<Json<ProductAdminResponse>, AppError> {
     req.validate()
         .map_err(|e| AppError::Validation(e.to_string()))?;
 
     let product = ProductService::update(&state.pool, id, req).await?;
-    Ok(Json(product))
+    Ok(Json(ProductAdminResponse::from(&product)))
 }
 
 /// Eliminar producto (admin) — soft delete del envelope

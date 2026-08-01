@@ -243,3 +243,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - VarSense identifica candidatos, pero la eliminación segura exige una búsqueda global que confirme que el nombre no aparece como consumidor ni en contratos dinámicos.
 - Mantener los tokens que sí tienen consumidores, aunque parezcan legacy, evita que una limpieza visual rompa preferencias de perfil, tema o geometría del OS.
+
+## 018A-46 — El modelo SQL no es un DTO público
+
+- Aunque el frontend omita campos, serializar directamente el modelo interno deja el contrato vulnerable a futuras rutas o consumidores que sí los acepten.
+- Un DTO por boundary permite que el modelo conserve datos necesarios para checkout/webhook sin filtrar rutas de storage ni identificadores de proveedores a catálogo o artículos.
