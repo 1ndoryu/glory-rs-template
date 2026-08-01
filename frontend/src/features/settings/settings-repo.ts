@@ -30,7 +30,7 @@ export async function loadProfileSettings(): Promise<void> {
   };
 
   try {
-    const settings = await SettingsService.getAll();
+    const settings = await SettingsService.getPublic();
     if (settings && Object.keys(settings).length > 0) {
       config = {
         profileWidth: settings.profile_width !== undefined ? Number(settings.profile_width) : config.profileWidth,

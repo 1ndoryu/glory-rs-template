@@ -34,6 +34,7 @@
 - [ ] Detectar recurso creado sin defaults `draft`, `private`, `active`.
 - [ ] Detectar un único `status` mezclando editorial, visibilidad, lifecycle o comercio.
 - [ ] Detectar preferencia personal escrita en settings globales.
+- [x] El endpoint público de settings usa allowlist y no devuelve claves de auth/admin. *(018A-47: `SettingsRepository::get_public` + `SettingsService.getPublic`)*
 - [ ] Detectar publicación de workspace sin revisión, transacción y auditoría.
 - [ ] Detectar persistencia desktop sin `schemaVersion` y validación.
 - [ ] Detectar purga sin capacidad, retención, auditoría o capa explícita.

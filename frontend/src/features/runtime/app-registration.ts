@@ -185,7 +185,7 @@ AppRegistry.register({
     void (async () => {
       try {
         if (ctx.signal.aborted) return;
-        const settings = await SettingsService.getAll();
+        const settings = await SettingsService.getPublic();
         if (ctx.signal.aborted) return;
         const content = settings.about_content || '';
         if (content) {

@@ -12,8 +12,8 @@ use crate::repositories::settings_repo::SettingsRepository;
 pub struct SettingsService;
 
 impl SettingsService {
-    pub async fn get_all(pool: &PgPool) -> Result<HashMap<String, String>, AppError> {
-        Ok(SettingsRepository::get_all(pool).await?)
+    pub async fn get_public(pool: &PgPool) -> Result<HashMap<String, String>, AppError> {
+        Ok(SettingsRepository::get_public(pool).await?)
     }
 
     pub async fn update_batch(

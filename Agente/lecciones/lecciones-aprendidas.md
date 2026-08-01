@@ -248,3 +248,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Aunque el frontend omita campos, serializar directamente el modelo interno deja el contrato vulnerable a futuras rutas o consumidores que sí los acepten.
 - Un DTO por boundary permite que el modelo conserve datos necesarios para checkout/webhook sin filtrar rutas de storage ni identificadores de proveedores a catálogo o artículos.
+
+## 018A-47 — Un endpoint público de settings también necesita contrato
+
+- Devolver un mapa completo de configuración convierte cada clave futura en una exposición pública accidental; la allowlist debe vivir en el repository y crecer solo mediante revisión explícita.
+- Nombrar el cliente como `getPublic` mantiene la frontera visible también en el frontend y evita que una futura pantalla confunda configuración pública con secretos o flags administrativos.

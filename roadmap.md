@@ -397,6 +397,7 @@ Plan canónico: `Agente/planes/plan-programas-editoriales-2026-07-31.md`.
 - [x] **018A-44 —** Retirar el alias `font-panel.ts` ya sin lógica de fuentes; la app Configuración conserva su registro y delega desde `settings-panel.ts`, sin cambiar su comportamiento.
 - [x] **018A-45 —** Retirar siete tokens CSS sin consumidores confirmados por VarSense (`--radio`, aliases de sidebar, z-index legacy y transición); se conserva `--contenido-max` y el chrome activo.
 - [x] **018A-46 —** Separar los contratos públicos/admin de productos del modelo interno; catálogo y artículos ya no serializan `download_path` ni IDs de Stripe, mientras checkout/webhook conservan el modelo privado.
+- [x] **018A-47 —** Restringir `GET /api/settings` a una allowlist de presentación pública y renombrar el cliente frontend a `getPublic`; claves de auth/admin dejan de exponerse por defecto.
 
 ## Revisión SOLID y escalabilidad por fase
 

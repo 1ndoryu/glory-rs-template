@@ -15,7 +15,7 @@ use crate::models::settings::{
 use crate::services::settings_svc::{AnalyticsService, SettingsService};
 use crate::AppState;
 
-/// Obtener todos los settings (publico para temas/fonts)
+/// Obtener solo settings de presentación pública.
 #[utoipa::path(
     get,
     path = "/api/settings",
@@ -24,7 +24,7 @@ use crate::AppState;
 pub async fn get_settings(
     State(state): State<AppState>,
 ) -> Result<Json<HashMap<String, String>>, AppError> {
-    let settings = SettingsService::get_all(&state.pool).await?;
+    let settings = SettingsService::get_public(&state.pool).await?;
     Ok(Json(settings))
 }
 

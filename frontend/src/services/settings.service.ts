@@ -7,8 +7,8 @@ import { unwrapGeneratedResponse } from '../api/client';
 import { getSettings, updateSettings } from '../api/generated/settings-handler/settings-handler';
 
 export const SettingsService = {
-  /** Obtener todas las configuraciones. */
-  async getAll(): Promise<Record<string, string>> {
+  /** Obtener únicamente la configuración pública de presentación. */
+  async getPublic(): Promise<Record<string, string>> {
     const response = await getSettings();
     return unwrapGeneratedResponse<Record<string, string>>(response, [200]);
   },
@@ -24,7 +24,7 @@ export const SettingsService = {
 
   /** Obtener el contenido de About. */
   async getAboutContent(): Promise<string> {
-    const s = await SettingsService.getAll();
+    const s = await SettingsService.getPublic();
     return s.about_content || '';
   },
 

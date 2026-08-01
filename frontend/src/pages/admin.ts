@@ -139,7 +139,7 @@ function renderSitioTab(): { element: HTMLElement; createSaveAction: () => HTMLE
   container.appendChild(aboutArea);
 
   safeEffect(async () => {
-    const s = await SettingsService.getAll();
+        const s = await SettingsService.getPublic();
     aboutContent = s.about_content || '';
     const textarea = aboutArea.querySelector('textarea');
     if (textarea) textarea.value = aboutContent;
