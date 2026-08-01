@@ -3,6 +3,7 @@
 pub mod articles;
 pub mod auth;
 pub mod download_handler;
+pub mod game_map_handler;
 mod health;
 pub mod media_handler;
 mod notes;
@@ -54,6 +55,7 @@ impl utoipa::Modify for SecurityAddon {
 #[openapi(
     paths(
         health::health_check,
+        game_map_handler::get_active_map,
         auth::register,
         auth::login,
         auth::verify_email,
@@ -175,6 +177,7 @@ impl utoipa::Modify for SecurityAddon {
         crate::models::workspace::WorkspaceRelease,
         crate::models::workspace::WorkspaceReleasePublic,
         crate::models::workspace::PublishReleaseRequest,
+        crate::models::game_map::GameMapVersionPublic,
         crate::handlers::workspace_handler::ReleaseListResponse,
         crate::models::media::MediaAdminResponse,
         crate::models::media::MediaPublicResponse,
@@ -262,6 +265,7 @@ fn api_routes() -> Router<AppState> {
      * los atributos `utoipa::path` sí conservan `{id}` (formato OpenAPI). */
     Router::new()
         .merge(health::routes())
+        .merge(game_map_handler::routes())
         .merge(auth::routes())
         .merge(notes::routes())
         .merge(articles::routes())

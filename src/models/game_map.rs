@@ -1,5 +1,9 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::Value as JsonValue;
+use sha2::Digest;
 use std::collections::{BTreeMap, HashSet};
+use utoipa::ToSchema;
 
 pub const MAP_VERSION_SCHEMA: u8 = 1;
 pub const MAP_VERSION_CHUNK_SIZE: u32 = 16;
@@ -20,6 +24,23 @@ pub const MAP_VERSION_MAX_COLLIDER_SIZE: f64 = 256.0;
 pub const MAP_VERSION_MAX_SPAWN_RADIUS: f64 = 8.0;
 /// Límite por defecto para un documento antes de materializarlo con `serde_json`.
 pub const MAP_VERSION_MAX_JSON_BYTES: usize = 4 * 1024 * 1024;
+
+/// Bytes JSON deterministas usados como representación canónica del snapshot.
+/// `serde_json` ordena las claves del objeto con la configuración actual del
+/// proyecto; publicación y lectura deben usar siempre esta misma función.
+#[must_use]
+pub fn document_json_bytes(document: &JsonValue) -> Option<Vec<u8>> {
+    serde_json::to_vec(document).ok()
+}
+
+/// Hash estable del documento JSON que se almacena en `document`.
+/// La publicación futura debe calcularlo sobre la misma representación JSON
+/// que se persiste; el service lo vuelve a comprobar antes de servir.
+#[must_use]
+pub fn document_content_hash(document: &JsonValue) -> Option<String> {
+    let bytes = document_json_bytes(document)?;
+    Some(hex::encode(sha2::Sha256::digest(bytes)))
+}
 
 const RESERVED_IDS: [&str; 6] = [
     "__proto__",
@@ -150,6 +171,23 @@ pub struct MapVersion {
     pub asset_manifest: BTreeMap<String, GameAssetVersion>,
     pub instances: Vec<AssetInstance>,
     pub spawn_points: Vec<SpawnPoint>,
+}
+
+/// Envelope público del snapshot activo. No incluye `published_by`, UUID interno
+/// ni flags administrativos; el documento ya fue validado por el service.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct GameMapVersionPublic {
+    #[serde(rename = "mapId")]
+    pub map_id: String,
+    pub version: i32,
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: i32,
+    #[serde(rename = "contentHash")]
+    pub content_hash: String,
+    #[serde(rename = "publishedAt")]
+    pub published_at: DateTime<Utc>,
+    #[schema(value_type = Object)]
+    pub document: JsonValue,
 }
 
 impl MapVersion {
@@ -486,6 +524,34 @@ mod tests {
                 radius: 0.5,
             }],
         }
+    }
+
+    #[test]
+    fn public_envelope_excludes_internal_publication_fields() {
+        let envelope = GameMapVersionPublic {
+            map_id: "map-v1".to_string(),
+            version: 1,
+            schema_version: 1,
+            content_hash: "hash".to_string(),
+            published_at: chrono::DateTime::parse_from_rfc3339("2026-08-01T00:00:00Z")
+                .expect("fecha")
+                .with_timezone(&Utc),
+            document: serde_json::json!({ "id": "map-v1" }),
+        };
+        let json = serde_json::to_value(envelope).expect("serializa envelope");
+        assert!(json.get("publishedBy").is_none());
+        assert!(json.get("id").is_none());
+        assert!(json.get("isActive").is_none());
+        assert_eq!(json["mapId"], "map-v1");
+    }
+
+    #[test]
+    fn hashes_the_stored_json_document_deterministically() {
+        let document = serde_json::json!({ "id": "map-v1", "schemaVersion": 1 });
+        assert_eq!(
+            document_content_hash(&document),
+            Some("23fb4b973fd5e37023d9ede955e4f534b3cf854534f982078c9c5d432f087dbb".to_string())
+        );
     }
 
     #[test]

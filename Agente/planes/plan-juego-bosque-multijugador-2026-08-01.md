@@ -339,25 +339,31 @@ repetidas de memoria/GPU y validación multi-viewport antes de cerrar la fase co
 - [x] Adaptar `MapVersion` a `WorldMap` mediante proxies estáticos allowlisted; el núcleo sigue siendo X/Z y no inventa todavía altura de gameplay.
 - [ ] Generar terreno por chunks desde alturas/superficies 2D e implementar spatial index/proxies simples en el renderer real.
 - [ ] Cargar solo chunks/assets visibles con cache limitada e instancing para props repetidos.
-- [ ] Crear endpoint/servicio de mapa publicado y fixture de versión persistido.
+- [x] Crear el endpoint/servicio de lectura de mapa publicado y la migración de snapshots persistidos.
+- [ ] Crear el flujo admin de publicación y un fixture de versión persistido mediante ese flujo autorizado.
 - [x] Probar documento inválido, exceso de chunks, referencias de asset inexistentes, IDs reservados, transforms, spawns y bounds malformados.
-- [x] Validar en Rust el mismo JSON `MapVersion` con `serde` camelCase, `deny_unknown_fields`, proxy opcional, límites de bytes previos a la deserialización y 9 tests negativos/deterministas.
+- [x] Validar en Rust el mismo JSON `MapVersion` con `serde` camelCase, `deny_unknown_fields`, proxy opcional, límites de bytes previos a la deserialización y 11 tests deterministas.
 - [x] Alinear el frontend con rechazo de campos desconocidos en raíz, terreno, chunks, assets, colliders, instancias y spawns.
+- [x] Proteger snapshots publicados con límite SQL de JSONB, hash SHA-256 verificado al servir, índice de una versión activa y trigger de inmutabilidad.
 
 **Evidencia parcial:** `frontend/src/features/game-core/map-version.ts`,
-`map-version.test.ts`, `src/models/game_map.rs` y `src/models/mod.rs`; el fixture
-`game-playable` consume `FIXTURE_MAP_VERSION → mapVersionToWorldMap → game-core`.
-Frontend: type-check, 23 tests del bloque y build PASS. Backend: `cargo fmt --check`,
-`cargo check` y 9 tests `models::game_map` PASS. `git diff --check` PASS. El parser
-Rust ofrece `MapVersion::from_bounded_json`/`from_json`; el boundary HTTP futuro aún
-debe aplicar límite de profundidad y tamaño del body antes de invocarlo. No implica
-endpoint, persistencia, publicación server-side, chunks visibles, realtime ni editor.
+`map-version.test.ts`, `src/models/game_map.rs`, `src/repositories/game_map_repo.rs`,
+`src/services/game_map_svc.rs`, `src/handlers/game_map_handler.rs` y la migración
+`20260801140000_game_map_versions`. El endpoint público es
+`GET /api/game/maps/:map_id`; solo consulta `is_active`, valida el documento y no
+expone UUID interno, `published_by` ni `is_active`. `contentHash` se calcula con
+`document_json_bytes` sobre el `JsonValue` normalizado que se persiste, y el service
+lo verifica antes de responder. Frontend: type-check, 23 tests del bloque y build
+PASS. Backend: `cargo fmt --check`, `cargo check` y 11 tests `models::game_map` PASS.
+Quality gate `297A-28` PASS. Aún no hay snapshot inicial: hasta implementar la
+publicación admin el endpoint responderá 404 para mapas no publicados. El boundary
+HTTP futuro aún debe aplicar límite de profundidad y body antes de un flujo de
+escritura; las pruebas de migración/endpoint real se cerrarán junto con esa
+publicación autorizada. No implica chunks visibles, realtime ni editor.
 
-**Evidencia de gate:** `297A-27` queda reservado para el cierre de este bloque.
-
-**Gate:** contrato frontend/backend alineado y fail-closed; la fase completa queda
-pendiente hasta cargar chunks/instancias de forma acotada y crear el servicio de
-mapa publicado.
+**Gate:** lectura pública persistida y fail-closed preparada; la fase completa queda
+pendiente hasta implementar publicación admin validada, cargar chunks/instancias de
+forma acotada y crear el fixture persistido sin saltarse capacidades server-side.
 
 **Auditoría de cierre — Fase 4:**
 - [ ] **SOLID/OCP:** parser, validación, navegación, serialización y renderer consumen el contrato versionado sin acoplamiento circular.
