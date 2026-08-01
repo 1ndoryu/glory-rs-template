@@ -1,6 +1,7 @@
 /* wandori.us — Stripe Webhook Handler
  * Verifica la firma HMAC-SHA256 de Stripe y procesa eventos de pago.
- * Evento principal: checkout.session.completed → marca orden como pagada, envia email de descarga. */
+ * Evento principal: checkout.session.completed → marca orden como pagada y
+ * encola la entrega; el correo se procesa fuera del request. */
 
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
@@ -17,7 +18,6 @@ use crate::repositories::commerce_repo::{
 };
 use crate::repositories::product_repo::{OrderRepository, ProductRepository};
 use crate::services::commerce::generate_download_token;
-use crate::services::email::EmailService;
 use crate::AppState;
 
 type HmacSha256 = Hmac<Sha256>;
@@ -100,7 +100,7 @@ async fn handle_completed(state: &AppState, session: &serde_json::Value) -> Resu
         return Ok(());
     }
 
-    let (version_id, file_path) = if let Some((id, path)) =
+    let (version_id, _file_path) = if let Some((id, path)) =
         ProductVersionRepository::latest_for_product(&state.pool, product.id).await?
     {
         (Some(id), path)
@@ -112,10 +112,7 @@ async fn handle_completed(state: &AppState, session: &serde_json::Value) -> Resu
         };
         (None, path)
     };
-    let Some(token) = create_download_grant(state, &order, version_id).await? else {
-        return Ok(());
-    };
-    send_download_email(state, &order, &product.name, &token, session, &file_path).await?;
+    let _created = create_download_grant(state, &order, version_id).await?;
     Ok(())
 }
 
@@ -123,7 +120,7 @@ async fn create_download_grant(
     state: &AppState,
     order: &Order,
     product_version_id: Option<uuid::Uuid>,
-) -> Result<Option<String>, AppError> {
+) -> Result<bool, AppError> {
     let token = generate_download_token();
     let expires_at = chrono::Utc::now() + chrono::Duration::days(30);
     let created = EntitlementRepository::create_active(
@@ -137,7 +134,7 @@ async fn create_download_grant(
     )
     .await?;
     if !created {
-        return Ok(None);
+        return Ok(false);
     }
     CommerceOutboxRepository::enqueue(
         &state.pool,
@@ -147,43 +144,7 @@ async fn create_download_grant(
         &serde_json::json!({ "order_id": order.id, "product_version_id": product_version_id }),
     )
     .await?;
-    Ok(Some(token.raw))
-}
-
-async fn send_download_email(
-    state: &AppState,
-    order: &Order,
-    product_name: &str,
-    token: &str,
-    session: &serde_json::Value,
-    _download_path: &str,
-) -> Result<(), AppError> {
-    if let Some(api_key) = &state.resend_api_key {
-        let customer_email = session["customer_email"]
-            .as_str()
-            .or_else(|| session["customer_details"]["email"].as_str())
-            .unwrap_or(&order.customer_email);
-        let download_url = format!("{}/api/downloads/{token}", state.site_url);
-        EmailService::send_download_link(
-            api_key,
-            &state.email_from,
-            customer_email,
-            product_name,
-            &download_url,
-        )
-        .await?;
-        OrderRepository::mark_delivered(&state.pool, order.id).await?;
-        tracing::info!(
-            "Orden {} pagada y descarga enviada a {customer_email}",
-            order.id
-        );
-    } else {
-        tracing::warn!(
-            "Resend no configurado; grant creado para orden {} sin email",
-            order.id
-        );
-    }
-    Ok(())
+    Ok(true)
 }
 
 async fn handle_expired(state: &AppState, session: &serde_json::Value) -> Result<(), AppError> {

@@ -238,8 +238,8 @@ Plan: `Agente/planes/plan-notificaciones-2026-08-01.md`.
 - [x] Tienda como programa/carpeta visual, checkout dentro del OS y programas Pedidos/Descargas con estados vacíos seguros; catálogo público SQL filtra privados. *(worker, historial server-side y proveedor real quedan diferidos)*
 - [x] Product versions inmutables y endpoint de descarga privado con path traversal fail-closed.
 - [x] Orden idempotente por cliente + clave y webhook firmado con registro de eventos repetibles.
-- [x] Entitlements, grants opacos temporales y outbox deduplicado.
-- [x] Compra invitada soportada por checkout público; quedan reembolso/chargeback, worker outbox y pruebas E2E con Stripe/Resend.
+- [x] Entitlements, grants opacos temporales y outbox deduplicado; worker acotado con backoff y rotación de grant implementado (018A-42).
+- [x] Compra invitada soportada por checkout público; quedan reembolso/chargeback, scheduler/proveedor real y pruebas E2E con Stripe/Resend.
 
 **Salida:** cliente no concede acceso; comprador recibe la versión adquirida.
 
@@ -392,6 +392,7 @@ Plan canónico: `Agente/planes/plan-programas-editoriales-2026-07-31.md`.
 - [x] **018A-37 —** El selector frontend incremental y la escritura atómica Windows quedan cubiertos por fixtures del orquestador; la suite completa sigue reservada para `test:full`/CI.
 - [x] **018A-38 —** Separar el contrato Article en subinterfaces composables; type-check y Sentinel confirman que las vistas conservan el mismo boundary.
 - [x] **018A-41 —** Separar el registro de apps públicas y administrativas; `app-registration.ts` queda bajo 300 líneas y los registros/capacidades permanecen sin cambios.
+- [x] **018A-42 —** Desacoplar la entrega de commerce del webhook: `--process-commerce-outbox` reclama lotes con `SKIP LOCKED`, reintenta con backoff y rota el hash del grant sin persistir tokens en claro.
 
 ## Revisión SOLID y escalabilidad por fase
 

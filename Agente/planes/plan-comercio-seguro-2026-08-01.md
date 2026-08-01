@@ -1,6 +1,6 @@
 # Plan de comercio seguro — 2026-08-01
 
-Estado: backend y primera superficie OS completados; quedan worker, proveedor real, reembolsos y E2E.
+Estado: backend y primera superficie OS completados; worker local de outbox implementado; quedan proveedor real, reembolsos y E2E.
 
 ## Alcance
 
@@ -39,7 +39,7 @@ Gate: type-check, suite Rust/frontend y quality gate pasan; ningún producto pri
 
 ## Fase 4 — Pendiente con intervención humana
 
-- [ ] Worker/outbox que, si el correo falla, emita un grant nuevo de forma explícita, reintente correo y marque `commerce_outbox.processed_at` con backoff observable.
+- [x] Worker/outbox ejecutable una vez (`--process-commerce-outbox`): claim con `SKIP LOCKED`, backoff 30s–32m, rotación explícita del hash del grant y `processed_at` solo tras correo + orden entregada. *(018A-42; el scheduler/cron de producción queda fuera de alcance)*
 - [ ] Integrar Resend/Stripe en entorno de staging con secretos reales y webhook firmado.
 - [ ] Historial server-side de Pedidos/Descargas por cuenta y panel de estado de entrega.
 - [ ] Reembolso, chargeback, revocación manual y política de retención de grants.

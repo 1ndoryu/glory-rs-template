@@ -135,9 +135,41 @@ impl EntitlementRepository {
         .await?;
         Ok(())
     }
+
+    /// Rota el secreto de un grant existente sin guardar nunca el token en
+    /// claro. La restricción única por orden conserva una sola concesión
+    /// activa y hace idempotente el reintento de entrega.
+    pub async fn refresh_token_for_order(
+        pool: &PgPool,
+        order_id: Uuid,
+        token_hash: &str,
+        expires_at: DateTime<Utc>,
+    ) -> Result<bool, sqlx::Error> {
+        let updated = sqlx::query(
+            "UPDATE entitlements\
+             SET token_hash = $2, expires_at = $3, status = 'active', revoked_at = NULL\
+             WHERE order_id = $1",
+        )
+        .bind(order_id)
+        .bind(token_hash)
+        .bind(expires_at)
+        .execute(pool)
+        .await?
+        .rows_affected();
+        Ok(updated > 0)
+    }
 }
 
 pub struct CommerceOutboxRepository;
+
+#[derive(Debug, sqlx::FromRow)]
+pub struct CommerceOutboxEvent {
+    pub id: Uuid,
+    pub event_type: String,
+    pub aggregate_id: Uuid,
+    pub payload: Value,
+    pub attempts: i32,
+}
 
 impl CommerceOutboxRepository {
     pub async fn enqueue(
@@ -155,6 +187,58 @@ impl CommerceOutboxRepository {
         .bind(aggregate_id)
         .bind(dedupe_key)
         .bind(payload)
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Reclama un lote de eventos sin que dos workers procesen la misma fila.
+    /// El aplazamiento inmediato cubre la caída del proceso entre claim y
+    /// resultado; `reschedule` aplica el backoff específico del intento.
+    pub async fn claim_pending(
+        pool: &PgPool,
+        limit: i64,
+    ) -> Result<Vec<CommerceOutboxEvent>, sqlx::Error> {
+        sqlx::query_as::<_, CommerceOutboxEvent>(
+            "WITH claimed AS (\
+                 SELECT id FROM commerce_outbox\
+                 WHERE processed_at IS NULL AND available_at <= NOW()\
+                 ORDER BY available_at, id\
+                 FOR UPDATE SKIP LOCKED\
+                 LIMIT $1\
+             )\
+             UPDATE commerce_outbox AS item\
+             SET attempts = item.attempts + 1,\
+                 available_at = NOW() + INTERVAL '5 minutes'\
+             FROM claimed\
+             WHERE item.id = claimed.id\
+             RETURNING item.id, item.event_type, item.aggregate_id, item.payload, item.attempts",
+        )
+        .bind(limit.clamp(1, 100))
+        .fetch_all(pool)
+        .await
+    }
+
+    pub async fn mark_processed(pool: &PgPool, id: Uuid) -> Result<(), sqlx::Error> {
+        sqlx::query("UPDATE commerce_outbox SET processed_at = NOW() WHERE id = $1")
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn reschedule(
+        pool: &PgPool,
+        id: Uuid,
+        delay_seconds: i64,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "UPDATE commerce_outbox\
+             SET available_at = NOW() + ($2 * INTERVAL '1 second')\
+             WHERE id = $1 AND processed_at IS NULL",
+        )
+        .bind(id)
+        .bind(delay_seconds.max(1))
         .execute(pool)
         .await?;
         Ok(())

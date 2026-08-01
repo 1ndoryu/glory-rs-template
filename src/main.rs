@@ -13,7 +13,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
      * base de datos. Así Orval/CI no necesita arrancar un servidor ni dejar
      * procesos Bun/Node o conexiones PostgreSQL vivas solo para codegen. */
     let mut args = std::env::args().skip(1);
-    if args.next().as_deref() == Some("--emit-openapi") {
+    let command = args.next();
+    if command.as_deref() == Some("--emit-openapi") {
         let output = args.next().unwrap_or_else(|| "openapi.json".to_string());
         let document = serde_json::to_string_pretty(&handlers::ApiDoc::openapi())?;
         std::fs::write(PathBuf::from(&output), document)?;
@@ -38,6 +39,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     sqlx::migrate!().run(&pool).await?;
+
+    if command.as_deref() == Some("--process-commerce-outbox") {
+        let summary = glory_backend::services::commerce_outbox::process_default_batch(
+            &pool,
+            config.resend_api_key.as_deref(),
+            &config.email_from,
+            &std::env::var("SITE_URL").unwrap_or_else(|_| "https://wandori.us".to_string()),
+        )
+        .await?;
+        println!(
+            "Commerce outbox: claimed={}, processed={}, retried={}",
+            summary.claimed, summary.processed, summary.retried
+        );
+        return Ok(());
+    }
 
     /* [297A-8] Limpiar sesiones expiradas al arrancar */
     let cleaned = glory_backend::services::SessionService::cleanup_expired(&pool)

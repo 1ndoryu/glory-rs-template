@@ -223,3 +223,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Un catálogo de apps puede dividirse por capacidad/dominio mediante módulos de registro con efectos laterales; el entrypoint debe importar cada módulo una sola vez y conservar AppRegistry como única fuente.
 - La división estructural es preferible a una suppression de límite: mantiene rutas, lazy loading y teardown intactos, pero evita que nuevas apps vuelvan a inflar el coordinador.
+
+## 018A-42 — El webhook no debe ser el worker de entrega
+
+- Un webhook debe confirmar rápido la autoridad del pago y encolar un evento; una llamada externa lenta o fallida dentro del request puede dejar el evento marcado sin una entrega recuperable.
+- La rotación del grant debe actualizar solo el hash persistido y devolver el token raw únicamente al adaptador de correo; así el reintento genera un enlace nuevo sin convertir la cola en un almacén de credenciales.
