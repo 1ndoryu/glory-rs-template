@@ -30,10 +30,14 @@ CREATE TABLE notification_reads (
 
 -- Make the current public release visible immediately after migration. The
 -- partial unique index makes this safe if a deployment is retried.
+-- [018A-62] Fix 42P10: ON CONFLICT contra un indice parcial exige repetir su
+-- predicado (WHERE release_version IS NOT NULL); sin el, Postgres no infiere
+-- el "arbiter index" y aborta. Migracion nunca aplicable en ningun entorno,
+-- por eso se edita en sitio en lugar de crear migracion nueva.
 INSERT INTO notifications (kind, title, body, release_version, status, created_by, published_at)
 SELECT 'workspace_release', 'Novedades del escritorio',
        'El escritorio público está disponible en la versión ' || version || '.',
        version, 'published', published_by, published_at
 FROM workspace_releases
 WHERE version = (SELECT MAX(version) FROM workspace_releases)
-ON CONFLICT (release_version) DO NOTHING;
+ON CONFLICT (release_version) WHERE release_version IS NOT NULL DO NOTHING;
