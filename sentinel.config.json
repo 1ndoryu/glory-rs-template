@@ -46,6 +46,9 @@
     },
     "css-especificacion-diseno-local": {
       "severidad": "information"
+    },
+    "axum-ruta-sintaxis-rs": {
+      "severidad": "error"
     }
   }
 }
