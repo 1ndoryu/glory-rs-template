@@ -36,9 +36,10 @@ AppRegistry.register({
   layout: 'full-bleed',
   /* [018A-88] El menú Archivo expone la misma creación que el menú
    * contextual del Finder. Los comandos adminOnly se ocultan solos para
-   * usuarios public (isAvailable), sin if/else aquí. */
+   * usuarios public (isAvailable), sin if/else aquí.
+   * [018A-90] finder:new-folder se consolidó en workspace:create-folder. */
   toolbar: [
-    { label: 'Archivo', items: ['finder:new-folder', 'article:new', 'projects:new', 'product:new', 'media:upload'] },
+    { label: 'Archivo', items: ['workspace:create-folder', 'article:new', 'projects:new', 'product:new', 'media:upload'] },
   ],
   render: (ctx: RenderContext): MountedView => {
     dispatchEvent({ type: 'app_opened', appId: 'finder' });

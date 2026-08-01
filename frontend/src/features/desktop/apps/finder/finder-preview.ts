@@ -125,6 +125,16 @@ export function createFinderPreview(options: FinderOptions): HTMLElement {
 
   finder.append(pathEl, grid);
 
+  /* [018A-90] Navegación programática desde comandos globales (workspace:open):
+   * el comando no puede invocar navigateTo (closure), así que dispara un
+   * evento sobre el content de la ventana del Finder enfocada; el preview lo
+   * traduce a navigateTo y onNavigate sincroniza título y params en el
+   * windowStore (taskbar + reapertura de la carpeta de origen). */
+  finder.addEventListener('finder:navigate', ((e: Event) => {
+    const folderId = (e as CustomEvent<{ folderId?: string }>).detail?.folderId;
+    if (folderId) navigateTo(folderId);
+  }) as EventListener);
+
   function render(): void {
     const ws = workspaceStore.get();
 

@@ -50,6 +50,12 @@ export function mergeWorkspace(
 
   const collidedOverlayIds = new Set<NodeId>();
   for (const [id, node] of Object.entries(overlay.addedItems)) {
+    /* [018A-90] Un tombstone también elimina addedItems: antes el merge solo
+     * tumbaba nodos del release y tombstoneNode borraba los addedItems a mano
+     * (irrecuperables). Ahora tombstoneSubtree conserva los addedItems para
+     * poder restaurarlos con la raíz, así que el tombstone debe prevalecer
+     * también aquí. */
+    if (tombstoneSet.has(id)) continue;
     /* IDs del release pertenecen al namespace publicado. Un overlay remoto
      * inválido no puede reemplazar silenciosamente una app/recurso publicado;
      * el item colisionado se ignora y el release conserva precedencia. */

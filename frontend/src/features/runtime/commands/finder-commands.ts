@@ -20,7 +20,9 @@ CommandRegistry.register(adminOnly({
   label: 'Nuevo artículo',
   icon: FileText,
   order: 54,
-  contexts: ['finder', 'folder'],
+  /* [018A-90] La creación vive en el fondo del Finder ('finder'); el menú
+   * sobre una carpeta ('folder') queda reservado a acciones sobre la carpeta. */
+  contexts: ['finder'],
   undoPolicy: 'none',
   analyticsEvent: 'article.new',
   /* [018A-88] openAppWindow('article-editor') sin params abre el editor en
@@ -40,7 +42,9 @@ CommandRegistry.register(adminOnly({
   label: 'Nuevo producto',
   icon: Store,
   order: 56,
-  contexts: ['finder', 'folder'],
+  /* [018A-90] La creación vive en el fondo del Finder ('finder'); el menú
+   * sobre una carpeta ('folder') queda reservado a acciones sobre la carpeta. */
+  contexts: ['finder'],
   undoPolicy: 'none',
   analyticsEvent: 'product.new',
   isAvailable: () => ({ state: 'enabled' }),
@@ -64,7 +68,9 @@ CommandRegistry.register(adminOnly({
   label: 'Subir archivo',
   icon: Upload,
   order: 57,
-  contexts: ['finder', 'folder'],
+  /* [018A-90] La creación vive en el fondo del Finder ('finder'); el menú
+   * sobre una carpeta ('folder') queda reservado a acciones sobre la carpeta. */
+  contexts: ['finder'],
   undoPolicy: 'none',
   analyticsEvent: 'media.upload',
   isAvailable: () => ({ state: 'enabled' }),

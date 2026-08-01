@@ -1,7 +1,18 @@
 /* wandori.us — Keyboard Handler
  * Handler global de atajos de teclado del OS. [Plan §2.1] */
 
-import { CommandRegistry } from '../command-registry';
+import { CommandRegistry, type CommandContext } from '../command-registry';
+import { windowStore } from '../window-manager';
+
+/* [018A-90] Ctrl+V pega dentro de la carpeta abierta del Finder enfocado
+ * (antes CommandRegistry.execute se llamaba sin ctx y pegaba siempre en el
+ * escritorio). Sin ventana del Finder enfocada, el destino es el escritorio. */
+function buildPasteContext(): CommandContext | undefined {
+  const focused = windowStore.get().find((w) => w.focused && w.appId === 'finder');
+  const folderId = focused?.params?.folderId;
+  if (!folderId) return undefined;
+  return { targets: [{ id: folderId, kind: 'folder' }] };
+}
 
 export function initKeyboardShortcuts(): () => void {
   const onKeyDown = (e: KeyboardEvent): void => {
@@ -18,7 +29,8 @@ export function initKeyboardShortcuts(): () => void {
     for (const cmd of commands) {
       if (matchesShortcut(e, cmd.shortcut!)) {
         e.preventDefault();
-        void CommandRegistry.execute(cmd.id);
+        const ctx = cmd.id === 'workspace:paste' ? buildPasteContext() : undefined;
+        void CommandRegistry.execute(cmd.id, ctx);
         return;
       }
     }

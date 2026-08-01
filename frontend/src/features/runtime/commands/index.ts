@@ -6,6 +6,7 @@ import './window-commands';
 import './geometry-commands';
 import './app-commands';
 import './workspace-commands';
+import './workspace-node-commands';
 import './workspace-reorder-commands';
 import './toolbar-commands';
 import './finder-commands';

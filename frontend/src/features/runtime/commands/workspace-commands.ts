@@ -1,9 +1,12 @@
 /* wandori.us — Workspace Commands
- * Comandos de workspace: trash, restore, reset, publish, clipboard, create-folder. */
+ * Comandos de workspace: trash, restore, reset, publish, clipboard, create-folder.
+ * [018A-90] Los comandos de gestión de nodos (abrir/renombrar/eliminar) viven
+ * en workspace-node-commands.ts para mantener este archivo bajo el límite de
+ * líneas; este módulo conserva el helper resolveWorkspaceNodeId compartido. */
 
+import { Folder } from 'lucide';
 import { CommandRegistry, type CommandContext, type CommandResult } from '../command-registry';
 import {
-  tombstoneNode,
   restoreNode,
   resetOverlay,
   overlayStore,
@@ -18,10 +21,12 @@ import {
 } from '../workspace/workspace-store';
 import { getDiffSummary } from '../workspace/diff';
 import { showConfirm } from '../../../components/ui/confirm';
+import { showPrompt } from '../../../components/ui/prompt';
 import { showToast } from '../../../components/ui/toast';
 import { getSelectedIds } from '../selection-store';
 
-function resolveWorkspaceNodeId(targetId: string): string | undefined {
+/* [018A-90] Exportado para que workspace-node-commands.ts lo reutilice. */
+export function resolveWorkspaceNodeId(targetId: string): string | undefined {
   const ws = workspaceStore.get();
   const node = Object.values(ws.nodes).find(
     (n) => n.id === targetId || n.refId === targetId,
@@ -30,30 +35,6 @@ function resolveWorkspaceNodeId(targetId: string): string | undefined {
 }
 
 /* === Trash / Restore / Reset === */
-
-CommandRegistry.register({
-  id: 'workspace:trash',
-  label: 'Eliminar',
-  order: 30,
-  contexts: ['icon'],
-  undoPolicy: 'none',
-  analyticsEvent: 'workspace.trash',
-  isAvailable: (ctx) => {
-    const targetId = ctx.targets?.[0]?.id;
-    if (!targetId) return { state: 'hidden', reason: 'no target' };
-    const nodeId = resolveWorkspaceNodeId(targetId);
-    if (!nodeId) return { state: 'hidden', reason: 'node not found in workspace' };
-    return { state: 'enabled' };
-  },
-  execute: (ctx?: CommandContext): CommandResult => {
-    const targetId = ctx?.targets?.[0]?.id;
-    if (!targetId) return { status: 'failure', reason: 'no target' };
-    const nodeId = resolveWorkspaceNodeId(targetId);
-    if (!nodeId) return { status: 'failure', reason: 'node not found' };
-    tombstoneNode(nodeId);
-    return { status: 'success' };
-  },
-});
 
 CommandRegistry.register({
   id: 'workspace:restore',
@@ -135,8 +116,10 @@ CommandRegistry.register({
     return { state: 'enabled' };
   },
   execute: async (): Promise<CommandResult> => {
-    const versionStr = window.prompt('Número de versión a restaurar:');
-    if (!versionStr) return { status: 'cancelled' };
+    /* [018A-90] showPrompt en vez de window.prompt: el navegador integrado no
+     * soporta prompt() y el diálogo propio mantiene la estética B&W del OS. */
+    const versionStr = await showPrompt('Número de versión a restaurar:');
+    if (versionStr === null) return { status: 'cancelled' };
     const version = Number(versionStr);
     if (isNaN(version) || version < 1) return { status: 'failure', reason: 'version inválida' };
 
@@ -155,7 +138,8 @@ CommandRegistry.register({
   label: 'Copiar',
   shortcut: 'ctrl+c',
   order: 40,
-  contexts: ['icon'],
+  /* [018A-90] Copiar/cortar disponibles también para carpetas dentro del Finder. */
+  contexts: ['icon', 'folder'],
   undoPolicy: 'none',
   analyticsEvent: 'workspace.copy',
   isAvailable: (ctx) => {
@@ -179,7 +163,8 @@ CommandRegistry.register({
   label: 'Cortar',
   shortcut: 'ctrl+x',
   order: 41,
-  contexts: ['icon'],
+  /* [018A-90] Copiar/cortar disponibles también para carpetas dentro del Finder. */
+  contexts: ['icon', 'folder'],
   undoPolicy: 'none',
   analyticsEvent: 'workspace.cut',
   isAvailable: (ctx) => {
@@ -252,8 +237,13 @@ CommandRegistry.register({
 CommandRegistry.register({
   id: 'workspace:create-folder',
   label: 'Nueva carpeta',
+  icon: Folder,
   order: 43,
-  contexts: ['desktop', 'icon'],
+  /* [018A-90] Único comando de creación de carpetas: consolida el duplicado
+   * finder:new-folder (retirado). Cubre escritorio, iconos, fondo de carpeta
+   * del Finder y el toolbar del Finder. El menú sobre una carpeta ('folder')
+   * ya NO ofrece creación: solo acciones sobre la carpeta. */
+  contexts: ['desktop', 'icon', 'finder', 'toolbar'],
   undoPolicy: 'none',
   analyticsEvent: 'workspace.create_folder',
   isAvailable: () => ({ state: 'enabled' }),

@@ -1,7 +1,7 @@
 /* wandori.us — Overlay Mutations
  * Funciones que mutan el overlay del workspace. */
 
-import type { GridPosition, NodeId, WorkspaceNode, ResolvedNode } from './types';
+import type { GridPosition, NodeId, WorkspaceNode, ResolvedNode, ResolvedWorkspace } from './types';
 
 import { overlayStore, workspaceStore, releaseStore, EMPTY_OVERLAY } from './stores';
 
@@ -63,6 +63,21 @@ export function addOverlayNode(node: WorkspaceNode): void {
   }));
 }
 
+/* [018A-90] Renombrar un nodo vía fieldOverrides.label (el overlay ya lo
+ * soporta en types.ts, pero no había mutación ni comando que lo usara).
+ * No escribe overrides redundantes: si el label no cambia, no toca el overlay. */
+export function renameNode(nodeId: NodeId, label: string): void {
+  const trimmed = label.trim();
+  if (!trimmed) return;
+  overlayStore.update((prev) => ({
+    ...prev,
+    fieldOverrides: {
+      ...prev.fieldOverrides,
+      [nodeId]: { ...prev.fieldOverrides[nodeId], label: trimmed },
+    },
+  }));
+}
+
 export function tombstoneNode(nodeId: NodeId): void {
   overlayStore.update((prev) => ({
     ...prev,
@@ -80,11 +95,70 @@ export function tombstoneNode(nodeId: NodeId): void {
   }));
 }
 
+/* [018A-90] Borrado seguro en cascada: tumba el nodo y TODO su subárbol.
+ * A diferencia de tombstoneNode, conserva addedItems y fieldOverrides de los
+ * descendientes: el merge los ignora mientras el id esté en tombstones (ver
+ * la guarda en merge.ts [018A-90]) y restoreNode los recupera al quitar el
+ * tombstone de la raíz. Sin esto, borrar una carpeta destruía los hijos
+ * creados por el usuario de forma irreversible desde la UI. */
+export function tombstoneSubtree(nodeId: NodeId): void {
+  overlayStore.update((prev) => {
+    const ws = workspaceStore.get();
+    const ids = collectSubtreeIds(ws, nodeId);
+    const tombstones = Array.from(new Set([...prev.tombstones, ...ids]));
+    return { ...prev, tombstones };
+  });
+}
+
+/* [018A-90] BFS sobre el árbol resuelto: recoge el nodo y todos sus
+ * descendientes (hijos, nietos...) ANTES de tumbar, para no perder ramas. */
+function collectSubtreeIds(ws: ResolvedWorkspace, nodeId: NodeId): NodeId[] {
+  const out: NodeId[] = [nodeId];
+  let frontier: NodeId[] = [nodeId];
+  while (frontier.length > 0) {
+    const next: NodeId[] = [];
+    for (const [id, node] of Object.entries(ws.nodes)) {
+      if (node.parentId && frontier.includes(node.parentId) && !out.includes(id)) {
+        out.push(id);
+        next.push(id);
+      }
+    }
+    frontier = next;
+  }
+  return out;
+}
+
+/* [018A-90] Restaurar un nodo también restaura su subárbol (hijos y
+ * descendientes tumbados con él). Busca tanto en el release como en los
+ * addedItems para que las carpetas creadas por el usuario se recuperen
+ * con su contenido. Quitar tombstones de una rama es idempotente. */
 export function restoreNode(nodeId: NodeId): void {
-  overlayStore.update((prev) => ({
-    ...prev,
-    tombstones: prev.tombstones.filter((id) => id !== nodeId),
-  }));
+  overlayStore.update((prev) => {
+    const release = releaseStore.get();
+    const keep = new Set(collectRestoreSubtree(nodeId, release.nodes, prev.addedItems));
+    return { ...prev, tombstones: prev.tombstones.filter((id) => !keep.has(id)) };
+  });
+}
+
+function collectRestoreSubtree(
+  nodeId: NodeId,
+  releaseNodes: Record<NodeId, WorkspaceNode>,
+  addedItems: Record<NodeId, WorkspaceNode>,
+): NodeId[] {
+  const all = { ...releaseNodes, ...addedItems };
+  const out: NodeId[] = [nodeId];
+  let frontier: NodeId[] = [nodeId];
+  while (frontier.length > 0) {
+    const next: NodeId[] = [];
+    for (const [id, node] of Object.entries(all)) {
+      if (node.parentId && frontier.includes(node.parentId) && !out.includes(id)) {
+        out.push(id);
+        next.push(id);
+      }
+    }
+    frontier = next;
+  }
+  return out;
 }
 
 export function resetOverlay(): void {
@@ -138,12 +212,21 @@ export function createFolder(parentId: NodeId | 'desktop', label: string): NodeI
   return id;
 }
 
+/* [018A-90] La papelera lista solo RAÍCES tumbadas: si el padre también está
+ * tumbado, el nodo se restaura con la raíz y no se ofrece por separado.
+ * Incluye addedItems tumbados (carpetas/atajos creados por el usuario), que
+ * antes quedaban fuera de la papelera y eran irrecuperables desde la UI. */
 export function getTombstonedNodes(): WorkspaceNode[] {
   const release = releaseStore.get();
   const overlay = overlayStore.get();
+  const all = { ...release.nodes, ...overlay.addedItems };
+  const tombstoneSet = new Set(overlay.tombstones);
   return overlay.tombstones
-    .map((id) => release.nodes[id])
-    .filter((n): n is WorkspaceNode => n !== undefined);
+    .map((id) => all[id])
+    .filter((n): n is WorkspaceNode => {
+      if (!n) return false;
+      return !(n.parentId !== 'desktop' && n.parentId !== null && tombstoneSet.has(n.parentId));
+    });
 }
 
 /** Devuelve hijos sin imponer una política de presentación.

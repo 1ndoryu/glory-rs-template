@@ -1,7 +1,7 @@
 /* wandori.us — Toolbar Commands
  * Comandos referenciados por app toolbars (Papelera, Finder, Projects). */
 
-import { adminOnly, CommandRegistry, type CommandContext, type CommandResult } from '../command-registry';
+import { adminOnly, CommandRegistry, type CommandResult } from '../command-registry';
 import { Folder, Trash2, FolderCode } from 'lucide';
 
 CommandRegistry.register({
@@ -42,40 +42,18 @@ CommandRegistry.register({
   },
 });
 
-/* [018A-88] finder:new-folder ahora responde al contexto del menú contextual
- * del Finder: si llega un target que es carpeta (fondo de carpeta o carpeta
- * del grid), crea DENTRO de esa carpeta. Sin target (toolbar de la ventana)
- * conserva el fallback histórico: crear en el escritorio. */
-CommandRegistry.register({
-  id: 'finder:new-folder',
-  label: 'Nueva carpeta',
-  icon: Folder,
-  order: 52,
-  contexts: ['toolbar', 'finder', 'folder'],
-  undoPolicy: 'none',
-  analyticsEvent: 'finder.new_folder',
-  isAvailable: () => ({ state: 'enabled' }),
-  execute: async (ctx?: CommandContext): Promise<CommandResult> => {
-    const { createFolder } = await import('../workspace/workspace-store');
-    const targetId = ctx?.targets?.[0]?.id;
-    let parentId: string = 'desktop';
-    if (targetId) {
-      const ws = (await import('../workspace/workspace-store')).workspaceStore.get();
-      const node = Object.values(ws.nodes).find((n) => n.id === targetId || n.refId === targetId);
-      if (node?.type === 'folder') parentId = node.id;
-    }
-    createFolder(parentId, 'Nueva carpeta');
-    return { status: 'success' };
-  },
-});
+/* [018A-90] finder:new-folder RETIRADO: era un duplicado de
+ * workspace:create-folder, que ahora cubre toolbar + finder + icon + desktop.
+ * El menú Archivo del Finder referencia workspace:create-folder. */
 
 CommandRegistry.register(adminOnly({
   id: 'projects:new',
   label: 'Nuevo proyecto',
   icon: FolderCode,
   order: 53,
-  /* [018A-88] Disponible también desde el menú contextual del Finder. */
-  contexts: ['toolbar', 'finder', 'folder'],
+  /* [018A-90] Disponible desde el fondo del Finder; el menú sobre una carpeta
+   * ('folder') queda reservado a acciones sobre la carpeta. */
+  contexts: ['toolbar', 'finder'],
   undoPolicy: 'none',
   analyticsEvent: 'projects.new',
   /* [018A-26] La creación vive en el programa interno, no en la ruta legacy
