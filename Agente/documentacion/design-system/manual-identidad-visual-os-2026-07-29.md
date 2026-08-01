@@ -301,12 +301,13 @@ Cerrar desde taskbar no cambia el foco accidentalmente. Cuando no caben tareas s
 - Los botones de solo icono de toolbars (`.boton-icono`, ej. el editor de artículos) NO llevan borde; su separación se resuelve en el contenedor de la toolbar (`gap-md`). Esta separación es la única distinción de la toolbar respecto de los botones de acción enmarcados.
 - Ningún botón usa radio, sombra ni color de fondo; el borde es siempre `--borde` (1px sólido).
 
-### Toolbar de contenido
+### App toolbar de la ventana y controles de vista
 
-- [018A-68] La toolbar de contenido (controles dentro del body de una app, por debajo del app toolbar declarativo que es chrome de la ventana) usa la receta compartida `.barra-herramientas` (flex, gap-md, borde inferior) de `components.css`.
-- Los filtros y modos de vista dentro de esa barra usan `.control-segmentado` (componente `createSegmentedControl`): grupo de opciones pequeñas con borde 1px y el estado activo invertido (fondo negro, texto claro), patrón Mac clásico. Cada opción es un `button` con `aria-pressed`; el grupo lleva `role=group` + `aria-label`.
-- PROHIBIDO dentro de una toolbar de contenido: campos de formulario (`.campo`/`.campo-select` con etiqueta y subrayado) y botones con borde de superficie (`.boton`). Un filtro de pocas opciones se resuelve como control segmentado, no como select; un modo de vista (p. ej. biblioteca/papelera) es un segmentado de dos opciones, no un botón que cambia su etiqueta.
-- Las acciones de la toolbar de contenido usan `.boton-icono` (solo icono) o `.boton-con-icono` (icono+texto), nunca `.boton` con borde.
+- [018A-71] Los controles de vista/filtro de una app son un grupo de menú en el **app toolbar real de la ventana** (`desktop-app-toolbar`, chrome declarativo del shell), igual que "Ventana": la app declara su grupo en `AppDefinition.toolbar` (p. ej. "Ver") y los items son comandos del `CommandRegistry` con `contexts: ['toolbar']`.
+- El item activo muestra **Check** (checkmark): el comando declara `isActive(ctx)` y `createAppToolbar` proyecta el icono `Check` sobre el activo — patrón de menú de OS. Los demás items muestran su icono de categoría. El checkmark se evalúa en cada apertura, por lo que refleja el estado al momento de abrir.
+- Un menú con varias secciones (p. ej. filtro de tipo y vista biblioteca/papelera) usa un **separador** entre secciones (`'---'` en `AppToolbarGroup.items`; se renderiza como `.desktop-context-menu__separator`).
+- PROHIBIDO: botones falsos de toolbar dentro del body de la app (clases `desktop-app-toolbar__*` o `.boton` con borde de superficie simulando toolbar), campos de formulario (`.campo`/`.campo-select`) y controles segmentados visibles en el contenido. El body solo contiene contenido; el chrome (toolbar y acciones) lo provee el shell.
+- Las acciones directas dentro del body usan `.boton-icono` (solo icono) o `.boton-con-icono` (icono+texto), nunca `.boton` con borde. La acción primaria de creación (p. ej. subir archivo) vive en la franja inferior fija (`desktop-window__actions`), fuera del scroll.
 
 ## 14. Papelera y estados de archivo
 

@@ -69,6 +69,10 @@ export interface Command {
   readonly analyticsEvent?: string;
   /** Función que determina disponibilidad dado un contexto. */
   readonly isAvailable?: (ctx: CommandContext) => CommandAvailability;
+  /** [018A-71] Si el comando representa un estado seleccionable (filtros,
+   * vistas, toggles), devuelve true cuando está activo: las superficies
+   * muestran un checkmark, patrón de menú de OS. Opcional. */
+  readonly isActive?: (ctx: CommandContext) => boolean;
   /** Función a ejecutar. Devuelve CommandResult. */
   readonly execute: (ctx?: CommandContext) => CommandResult | Promise<CommandResult>;
 }

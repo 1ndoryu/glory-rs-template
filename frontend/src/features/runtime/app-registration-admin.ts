@@ -153,6 +153,23 @@ AppRegistry.registerLazy({
   singleton: true,
   requires: 'admin',
   layout: 'padded',
+  /* [018A-71] Grupo "Ver" en el app toolbar REAL de la ventana: filtro de
+   * tipo y vista biblioteca/papelera separados con un separador, checkmark
+   * del activo vía isActive de los comandos media:*. */
+  toolbar: [
+    {
+      label: 'Ver',
+      items: [
+        'media:filter-all',
+        'media:filter-image',
+        'media:filter-audio',
+        'media:filter-video',
+        '---',
+        'media:view-library',
+        'media:view-trash',
+      ],
+    },
+  ],
   load: () => import('../desktop/apps/media-library/media-library').then(m => ({
     render: (ctx: RenderContext): MountedView => {
       dispatchEvent({ type: 'app_opened', appId: 'media-library' });

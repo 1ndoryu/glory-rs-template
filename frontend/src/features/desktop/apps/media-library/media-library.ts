@@ -7,8 +7,8 @@
 import { createElement, RotateCcw, Trash2, Link, Upload, Image as ImageIcon, FileText } from 'lucide';
 import { createEl } from '../../../../utils/dom';
 import { createVacio } from '../../../../components/ui/empty-state';
-import { createSegmentedControl } from '../../../../components/ui/segmented-control';
 import { MediaService } from '../../../../services';
+import { setMediaViewHandler, type MediaFilter } from '../../../runtime/commands/media-commands';
 import { tryCatch } from '../../../../utils/result';
 import { safeClick, safeRun } from '../../../../utils/safe-async';
 import { showToast } from '../../../../components/ui/toast';
@@ -21,8 +21,6 @@ import {
   isAllowedUpload,
 } from './media-library-utils';
 import type { MediaAdmin } from '../../../../api/types';
-
-type MediaFilter = 'all' | 'image' | 'audio' | 'video';
 
 interface MediaLibraryOptions {
   readonly signal: AbortSignal;
@@ -150,32 +148,16 @@ export function createMediaLibraryPreview(options: MediaLibraryOptions): MediaLi
 
   const isActive = (): boolean => !disposed && !options.signal.aborted;
 
-  /* [018A-68] Toolbar de contenido con receta del sistema: el filtro de tipo
-   * y la vista biblioteca/papelera son controles segmentados (activo
-   * invertido), no campos de formulario ni botones con borde. La barra usa
-   * .barra-herramientas; el estado activo lo gestiona el componente. */
-  const filterControl = createSegmentedControl({
-    ariaLabel: 'Filtrar por tipo',
-    options: [
-      { value: 'all', label: 'todos' },
-      { value: 'image', label: 'imágenes' },
-      { value: 'audio', label: 'audio' },
-      { value: 'video', label: 'video' },
-    ],
-    value: 'all',
-    onChange: (value) => { filter = value as MediaFilter; void render(); },
-  });
-  const viewControl = createSegmentedControl({
-    ariaLabel: 'Vista de la biblioteca',
-    options: [
-      { value: 'library', label: 'biblioteca' },
-      { value: 'trash', label: 'papelera' },
-    ],
-    value: 'library',
-    onChange: (value) => {
-      trashView = value === 'trash';
-      void render();
-    },
+  /* [018A-71] Los controles de vista viven en el app toolbar REAL de la
+   * ventana (grupo "Ver", chrome declarativo): la app declara el grupo en
+   * app-registration-admin con comandos media:* que actúan sobre este
+   * puente. La vista solo expone estado y acciones; el checkmark del item
+   * activo lo calcula createAppToolbar vía isActive (patrón OS). Fail-closed:
+   * sin puente registrado, los comandos devuelven failure. */
+  setMediaViewHandler({
+    state: () => ({ filter, trashView }),
+    setFilter: (f: MediaFilter) => { filter = f; void render(); },
+    setTrashView: (v: boolean) => { trashView = v; void render(); },
   });
   /* [018A-67] Icono primero y texto en span, con la receta boton-con-icono:
    * flex centrado + gap + SVG dimensionado desde token. Antes era .boton a
@@ -217,14 +199,12 @@ export function createMediaLibraryPreview(options: MediaLibraryOptions): MediaLi
   }));
   uploadBtn.addEventListener('click', () => fileInput.click());
 
-  /* [018A-1 F3] La toolbar conserva solo controles de vista (filtro y toggle
-   * papelera/biblioteca); la acción primaria de creación (subir archivo)
-   * vive en la franja inferior fija, fuera del scroll de la lista.
-   * [018A-68] Contenedor con la receta compartida .barra-herramientas. */
-  const toolbar = createEl('div', { className: 'barra-herramientas' },
-    filterControl, viewControl);
+  /* [018A-1 F3] La acción primaria de creación (subir archivo) vive en la
+   * franja inferior fija, fuera del scroll de la lista. El control de vista
+   * vive en el app toolbar de la ventana (grupo "Ver" declarativo), no en
+   * el body. */
   const list = createEl('div', { className: 'media-library__grid' });
-  container.append(toolbar, list);
+  container.append(list);
   actionsBar.append(uploadBtn, fileInput);
   actionsBar.hidden = false;
 
@@ -261,6 +241,8 @@ export function createMediaLibraryPreview(options: MediaLibraryOptions): MediaLi
   const destroy = (): void => {
     if (disposed) return;
     disposed = true;
+    /* [018A-71] Limpiar el puente: la vista ya no puede recibir comandos. */
+    setMediaViewHandler(null);
     for (const url of pendingObjectUrls) URL.revokeObjectURL(url);
     pendingObjectUrls.clear();
   };

@@ -23,8 +23,10 @@
   gap: var(--espacio-sm);
   width: 100%;
   padding: var(--espacio-xs) var(--espacio-sm);
+  /* [018A-71] Sin bordes entre items: la separación la aporta el separador
+   * (o el agrupamiento del menú); los bordes por item chocaban con el
+   * separador y recargaban el menú. */
   border: none;
-  border-bottom: var(--sistema-borde);
   border-radius: 0;
   background: transparent;
   color: var(--sistema-texto);
@@ -33,10 +35,6 @@
   text-align: left;
   cursor: pointer;
   line-height: var(--linea-altura);
-}
-
-.desktop-context-menu__item:last-child {
-  border-bottom: none;
 }
 
 .desktop-context-menu__item:hover {
@@ -87,4 +85,14 @@
 
 .desktop-context-menu__item:hover .desktop-context-menu__shortcut {
   color: var(--sistema-inverso-texto);
+}
+
+/* [018A-70] Separador del menú contextual: lo renderiza dropdown-menu.ts
+ * (createDropdownItem) pero no tenía regla visual; misma receta que el
+ * separador del app toolbar (.desktop-app-toolbar__separator). */
+.desktop-context-menu__separator {
+  height: 1px;
+  margin: var(--espacio-xs) 0;
+  background: var(--sistema-texto);
+  opacity: 0.15;
 }

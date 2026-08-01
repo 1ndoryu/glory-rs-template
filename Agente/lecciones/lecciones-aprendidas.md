@@ -349,3 +349,16 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 - El DOM de una barra no debe guardarse en `localStorage`; la sesión conserva
   solo estado de presentación y la app debe reinstanciar sus acciones al
   restaurarse.
+
+## 018A-71 — Los controles de vista son menús del app toolbar, no clones en el body
+
+- Un control de vista (filtro/modo) de una app debe vivir en el app toolbar real de la ventana (`desktop-app-toolbar`, chrome del shell), declarado en `AppDefinition.toolbar`, nunca como un botón falso estilizado dentro del contenido. Los toolbars falsos en el body duplican el chrome y rompen el modelo ventana/contenido.
+- El checkmark de menú de OS se proyecta con `isActive?: (ctx) => boolean` en el contrato de comandos + icono `Check` en `createAppToolbar`, evaluado en CADA apertura del menú (estado fresco), no al abrir la ventana.
+- Los separadores del menú contextual se ven mejor sin bordes entre items: la división la hace solo `.desktop-context-menu__separator`; los items sin borde (hover por inversión) respetan el lenguaje 1-bit.
+
+## 018A-72 — CSS: un token compuesto con `var()` se resuelve donde se DECLARA, no donde se usa
+
+- `--borde: 1px solid var(--color-borde)` declarado en `:root` resuelve su `var(--color-borde)` interno en `:root` (siempre negro), aunque un scope descendiente (modo oscuro de ventanas) redefina `--color-borde` a blanco. Sobreescribir solo el token interno NO invierte al compuesto.
+- El patrón que sí funciona: redefinir el token COMPUESTO (`--borde`) en el scope de tema que ya redefine el token interno, de modo que se compute blanco allí y se herede a todos los descendientes legacy. Es el mismo mecanismo por el que `--sistema-borde` invertía: su `--sistema-texto` se sobreescribe en el propio `:root`.
+- Un data URI SVG no puede usar `currentColor`; la flecha de un select necesita un token propio (`--color-select-flecha`) con versión clara/oscura.
+- Antes de dar por buena la "auto-inversión" de un token compuesto, verificar empíricamente en el navegador el computed value dentro del scope de tema (getComputedStyle sobre el elemento real), no razonar sobre la intención del comentario.

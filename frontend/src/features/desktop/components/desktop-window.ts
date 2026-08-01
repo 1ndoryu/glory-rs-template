@@ -1,4 +1,4 @@
-import { createElement, Maximize2, Minus, X, type IconNode } from 'lucide';
+import { Check, createElement, Maximize2, Minus, X, type IconNode } from 'lucide';
 import { createEl } from '../../../utils/dom';
 import type { AppToolbarGroup, ToolbarItemRef } from '../../runtime/app-registry';
 import { CommandRegistry, type CommandContext } from '../../runtime/command-registry';
@@ -180,13 +180,19 @@ export function createAppToolbar(
           if (availability.state === 'hidden') continue;
         }
 
+        /* [018A-71] Item activo con checkmark: el comando declara isActive
+         * (filtros/vistas/toggles) y la superficie lo proyecta como Check,
+         * patrón de menú de OS. Se evalúa en cada apertura, por lo que
+         * refleja el estado al momento de abrir. */
+        const active = cmd?.isActive?.(ctx) ?? false;
+
         const callbackKey = windowCallbackMap[resolved.id];
         const isWindowCmd = !!callbackKey;
         const callbackDisabled = isWindowCmd && !callbacks?.[callbackKey];
         const disabled = availability.state !== 'enabled' || callbackDisabled;
 
         items.push({
-          icon: resolved.icon,
+          icon: active ? Check : resolved.icon,
           label: resolved.label,
           shortcut: resolved.shortcut,
           disabled,

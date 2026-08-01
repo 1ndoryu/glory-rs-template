@@ -1,7 +1,7 @@
 /* [297A-14 F4] Biblioteca de media — grid de assets con tokens del sistema.
  * Chrome monocromo; el contenido multimedia conserva su color.
- * [018A-68] La toolbar de contenido usa la receta compartida
- * .barra-herramientas de components.css (ya no tiene regla local). */
+ * [018A-71] Sin toolbar de contenido: el control de vista vive en el app
+ * toolbar real de la ventana (grupo "Ver" de app-registration-admin). */
 
 .media-library {
   display: flex;

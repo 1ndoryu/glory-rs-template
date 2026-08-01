@@ -47,6 +47,17 @@
 
 ## Pendientes ordenados
 
+### 018A-73 — Refactor de deuda CSS en `components.css`
+
+**Depende de:** revisión visual de páginas públicas (los componentes son legacy compartidos).
+
+- [ ] Dividir `components.css` (excede 600 líneas) en archivos por dominio/receta.
+- [ ] Mover el bloque de botón fuera de `components.css` a su receta (Button.css) y migrar consumidores a `<Button variante="...">`.
+- [ ] `.notificaciones__item`/`.notificacionesAdmin__item`: quitar especificaciones visuales locales (border/padding) y consumir recetas compartidas.
+- [ ] Reemplazar el selector `.comercio__producto h3` por `className="modalTitulo"` (o token equivalente).
+
+**Salida:** `components.css` sin lints bloqueantes de Sentinel; recetas consumidas, no duplicadas.
+
 ### 018A-69 — Restauración de ventanas conserva la barra de acciones
 
 **Depende de:** 317A-5 (persistencia de sesión) y 018A-1 (slot `MountedView.actions`).
