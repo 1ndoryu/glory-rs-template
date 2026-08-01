@@ -1,7 +1,10 @@
 /* wandori.us — Componentes UI
  * Todos los componentes son minimalistas B&W.
- * Botones = texto subrayado. Inputs = 1px border. Modales = overlay + panel.
+ * Botones: texto subrayado por defecto (páginas públicas); dentro de
+ * superficies del OS (ventanas, apps móviles, modales y confirms) llevan
+ * borde 1px para aspecto OS. Inputs = 1px border. Modales = overlay + panel.
  * PROHIBIDO: sombras, colores, bordes redondeados, hover effects.
+ * [317A-4] Borde 1px en botones dentro de superficies OS.
  * [Auditoría v3 §2.4] @layer components — specificity management. */
 
 @layer components {
@@ -51,23 +54,78 @@
   font-size: var(--tamano-grande);
 }
 
+/* [317A-4] Botones dentro de superficies del OS (ventanas desktop, apps
+ * móviles, modales y confirms) ganan borde 1px para aspecto OS. Fuera de esas
+ * superficies (páginas públicas como checkout/gallery) .boton sigue siendo
+ * texto subrayado sin borde. Los botones de solo icono (.boton-icono) de
+ * toolbars NO heredan este borde (clase distinta, sin superficie). */
+.desktop-window .boton,
+.movilApp .boton,
+.modal-contenido .boton,
+.confirm-contenido .boton {
+  display: inline-block;
+  padding: var(--espacio-xs) var(--espacio-sm);
+  border: var(--borde);
+  line-height: normal;
+}
+
+/* [317A-4] Los tabs (barra-tabs) son navegación, no botones de acción: aunque
+ * usen la clase .boton, nunca llevan el borde de botón OS. */
+.barra-tabs .boton {
+  display: inline;
+  padding: 0;
+  border: none;
+  line-height: inherit;
+}
+
+/* === BOTON ICONO — Receta compartida para botones de solo icono ===
+ * Para toolbars de apps (article-editor, futuros editores). Lucide 1px,
+ * tamaño desde token; el nombre accesible lo pone el consumidor (aria-label). */
+.boton-icono {
+  display: grid;
+  place-items: center;
+  width: var(--sistema-boton-icono-tamano);
+  height: var(--sistema-boton-icono-tamano);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-texto);
+}
+
+.boton-icono svg {
+  width: var(--sistema-boton-icono-svg-tamano);
+  height: var(--sistema-boton-icono-svg-tamano);
+  stroke-width: var(--sistema-icono-trazo);
+}
+
+.boton-icono:focus-visible {
+  outline: 1px solid var(--color-texto);
+  outline-offset: 2px;
+}
+
 /* === BARRA DE PESTAÑAS — Componente universal (Admin y futuras apps) ===
- * Autocontenida: posee su propio gap/margin/border para que el consumidor no
- * dependa de utilidades externas (regla 9.1: receta compartida en el sistema). */
+ * Autocontenida: posee su propio gap para que el consumidor no dependa de
+ * utilidades externas (regla 9.1: receta compartida en el sistema).
+ * [317A-4] Regla aprobada: variante vertical alineada a la izquierda, sin
+ * borde; el estado activo tiene opacidad plena y peso medio; los inactivos
+ * bajan de opacidad. La separación con el contenido la decide el layout del
+ * consumidor (en Admin: gap del padre en 2 columnas). */
 .barra-tabs {
   display: flex;
-  gap: var(--espacio-lg);
-  margin-bottom: var(--espacio-lg);
-  padding-bottom: var(--espacio-sm);
-  border-bottom: var(--borde);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--espacio-sm);
 }
 
 .barra-tabs__tab {
   font-weight: var(--peso-normal);
+  opacity: 0.45;
 }
 
 .barra-tabs__tab--activa {
   font-weight: var(--peso-medio);
+  opacity: 1;
 }
 
 /* === INPUT === */
@@ -82,6 +140,14 @@
   font-family: var(--fuente-menu);
   font-size: var(--tamano-texto);
   font-weight: 600;
+  /* [317A-4] Labels de formulario con primera letra en mayúscula. Se usa
+   * ::first-letter (no text-transform: capitalize) para que solo la primera
+   * letra de la frase suba ("Imagen de portada", nunca "Imagen De Portada"). */
+  display: inline-block;
+}
+
+.campo-etiqueta::first-letter {
+  text-transform: uppercase;
 }
 
 .campo-entrada {
@@ -278,6 +344,12 @@
   font-size: var(--tamano-texto);
   font-weight: 600;
   min-width: 4ch;
+  /* [317A-4] Misma regla de capitalización que .campo-etiqueta. */
+  display: inline-block;
+}
+
+.preferences-panel__etiqueta::first-letter {
+  text-transform: uppercase;
 }
 
 .preferences-panel__temas {

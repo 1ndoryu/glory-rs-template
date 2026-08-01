@@ -20,7 +20,9 @@ export function createToolbar(
   isActive: () => boolean,
 ): HTMLElement {
   const toolbar = createEl('div', {
-    className: 'article-editor__toolbar flex-fila flex-wrap gap-sm mb-sm border-bottom',
+    /* [317A-4] gap-md (16px) en vez de gap-sm (8px): los botones de solo icono
+     * de la toolbar no llevan borde y necesitan más aire entre sí. */
+    className: 'article-editor__toolbar flex-fila flex-wrap gap-md mb-sm border-bottom',
     ariaLabel: 'Herramientas de edición',
   });
   /* [317A-3] Botones con icono Lucide: label = nombre accesible (aria-label/title),

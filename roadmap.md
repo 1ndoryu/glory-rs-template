@@ -441,13 +441,14 @@ Cada fase termina con esta revisión antes de marcar su salida. La revisión deb
 2. Los botones dentro de una ventana del OS deben llevar borde 1px sin redondear (aspecto OS); fuera de ventanas (páginas públicas) siguen como texto subrayado.
 3. Los botones de solo icono de la toolbar del editor no llevan borde (están bien), solo necesitan más separación.
 4. *(Refinamiento posterior)* Los tabs de `.barra-tabs` NO deben llevar borde aunque usen `.boton` — son navegación, no botones de acción.
+5. *(Experimenta aprobada)* Barra de pestañas vertical alineada a la izquierda con layout de 2 columnas (tabs | contenido). El estado activo tiene opacidad plena y peso medio; los inactivos bajan a opacidad 0.45. Nueva regla visual registrada en el manual §13.
 
 - [x] Header de `components.css` actualizado: regla de botones según superficie (borde 1px dentro de `.desktop-window`, `.movilApp`, `.modal-contenido`, `.confirm-contenido`; texto subrayado fuera).
 - [x] Regla contextual de botones OS: `.desktop-window .boton, .movilApp .boton, .modal-contenido .boton, .confirm-contenido .boton { border: var(--borde); padding: var(--espacio-xs) var(--espacio-sm); }` + exclusión `.barra-tabs .boton` (tabs sin borde).
 - [x] Labels de formulario capitalizados: `.campo-etiqueta` y `.preferences-panel__etiqueta` con `::first-letter { text-transform: uppercase }` (NO `capitalize`, que subiría preposiciones).
 - [x] Toolbar del article-editor con más separación: `gap-sm` → `gap-md` en `article-editor-ui.ts`.
-- [x] Manual de identidad visual actualizado: regla de mayúscula inicial en labels (§6) y regla de botones según superficie (§13).
-- [ ] Validación: `tsc --noEmit` OK, gate `task:check -- 317A-4`.
-- [ ] Verificación en navegador: labels con mayúscula inicial, botones OS con borde 1px dentro de la ventana, tabs sin borde, toolbar más separada.
+- [x] Manual de identidad visual actualizado: regla de mayúscula inicial en labels (§6), regla de botones según superficie (§13) y nueva regla de barra de pestañas vertical 2 columnas (§13).
+- [x] Validación: `tsc --noEmit` OK, gate `task:check -- 317A-4` PASS (sentinel 0e/0w, varsense 0e/14w, frontend PASS).
+- [x] Verificación en navegador: labels con mayúscula inicial, botones OS con borde 1px dentro de la ventana (`.admin-contenido .boton` = 1px sólido, padding 4px/8px), tabs sin borde con opacidad activo 1 / inactivo 0.45, toolbar más separada, y layout 2 columnas (tabs izquierda x=87, contenido derecha x=197, misma fila, gap 24px) funcionando incluso en ventana estrecha 322px sin overflow.
 
-**Salida:** los formularios del OS capitalizan la primera letra de sus labels, los botones de acción dentro de superficies OS ganan borde 1px (los tabs y botones de icono no), y la toolbar del editor respira mejor; la identidad visual queda documentada en el manual.
+**Salida:** los formularios del OS capitalizan la primera letra de sus labels, los botones de acción dentro de superficies OS ganan borde 1px (los tabs y botones de icono no), la toolbar del editor respira mejor, y la barra de pestañas queda como navegación vertical izquierda en 2 columnas con estados de opacidad; la identidad visual queda documentada en el manual (§13).

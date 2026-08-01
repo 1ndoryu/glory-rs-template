@@ -109,6 +109,7 @@ El OS soporta dos temas, `claro` (por defecto) y `oscuro`, más la resolución i
 - Números del reloj, precios y métricas usan cifras tabulares cuando la fuente lo permita.
 - El menú contextual usa 2 px menos que el texto normal del sistema.
 - Mayúsculas solo para etiquetas breves deliberadas; no se fuerza todo el OS a uppercase.
+- [317A-4] Labels de formulario: primera letra en mayúscula (regla `::first-letter` de `.campo-etiqueta`). Nunca `text-transform: capitalize` completo, que subiría preposiciones ("Imagen De Portada"). El contenido del texto sigue en minúsculas en el código; la capitalización es presentacional.
 - El contenido editorial puede definir una receta de lectura en el futuro, pero no altera el chrome ni crea una fuente por app. Hasta aprobar esa receta, Reader usa JetBrains Mono.
 
 Jerarquía:
@@ -265,6 +266,20 @@ Cerrar desde taskbar no cambia el foco accidentalmente. Cuando no caben tareas s
 - Formularios consumen componentes UI compartidos.
 - No modal de página completa ni overlay que oscurezca el OS.
 - Tablas, vacíos, errores y confirmaciones reutilizan recetas, no clases locales equivalentes.
+
+### Barra de pestañas (tabs)
+
+- [317A-4] La barra de pestañas (`.barra-tabs`, componente universal `createTabs`) es navegación, no acción: aunque los tabs usen la clase `.boton`, NUNCA llevan el borde de botón OS (`border: none`, sin padding) dentro de las superficies.
+- Disposición aprobada: vertical, alineada a la izquierda, en layout de dos columnas junto al contenido (columna de tabs + columna de contenido). El consumidor decide la separación con el contenido (gap del padre, p. ej. `gap-lg` en `.admin-pagina`); la barra no aporta márgenes propios.
+- Estado activo: opacidad plena + peso medio (`.barra-tabs__tab--activa`). Inactivos: opacidad reducida (0.45) y peso normal.
+- Mismo patrón `role=tablist`/`role=tab`/`aria-selected` en cualquier futura app que use pestañas; no se crean barras locales.
+
+### Botones según superficie
+
+- [317A-4] Los botones de texto (`.boton`) dentro de superficies del OS —ventanas desktop (`.desktop-window`), apps móviles (`.movilApp`), modales (`.modal-contenido`) y confirmaciones (`.confirm-contenido`)— llevan borde 1px sin redondear y padding pequeño (`--espacio-xs`/`--espacio-sm`), aspecto OS.
+- Fuera de esas superficies (páginas públicas tipo checkout o galería exterior) `.boton` sigue siendo texto subrayado sin borde.
+- Los botones de solo icono de toolbars (`.boton-icono`, ej. el editor de artículos) NO llevan borde; su separación se resuelve en el contenedor de la toolbar (`gap-md`). Esta separación es la única distinción de la toolbar respecto de los botones de acción enmarcados.
+- Ningún botón usa radio, sombra ni color de fondo; el borde es siempre `--borde` (1px sólido).
 
 ## 14. Papelera y estados de archivo
 

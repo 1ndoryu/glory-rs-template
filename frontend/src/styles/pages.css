@@ -241,8 +241,11 @@
   width: 100%;
   flex: 1;
   min-height: 0;
+  /* [317A-4] 2 columnas: barra-tabs (izquierda) + contenido (derecha).
+   * El gap sustituye el margen que antes separaba en vertical. */
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  gap: var(--espacio-lg);
 }
 
 .admin-contenido {

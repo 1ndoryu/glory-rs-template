@@ -84,6 +84,9 @@
   /* [297A-18] Botón de tema del OS: 1px mayor que los controles de ventana. */
   --sistema-tema-boton-tamano: 19px;
   --sistema-tema-boton-icono-tamano: 13px;
+  /* [317A-3] Botón de solo icono (toolbars de apps): caja y SVG. */
+  --sistema-boton-icono-tamano: 20px;
+  --sistema-boton-icono-svg-tamano: 14px;
   --sistema-logo-tamano: 14px;
   --sistema-escritorio-alto-min: 560px;
   --sistema-escritorio-alto-mobile: 680px;
