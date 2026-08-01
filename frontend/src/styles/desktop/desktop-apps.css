@@ -28,17 +28,15 @@
   border-bottom: var(--sistema-borde);
 }
 
-/* [018A-78] Iconos del Finder compactos y coherentes con el escritorio.
- * La rejilla pasó de columnas 1fr (celdas de ~177px que dejaban el icono
- * flotando centrado y separado) a celdas fijas de --sistema-icono-celda
- * (88px, mismo tamaño que los iconos del escritorio) con el grupo centrado
- * y gap/padding de --espacio-md. El icono usa el tamaño de documento (48px)
- * y el trazo del sistema (1px, identidad del OS) en lugar del default 2px
- * de Lucide. Se retiró la regla muerta .desktop-finder__document-icon: su
- * propósito (tamaño de documento) ahora vive en .desktop-finder__icon. */
+/* [018A-78][018A-80] Iconos del Finder compactos y coherentes con el escritorio.
+ * 018A-78: celdas de --sistema-icono-celda (no 1fr), grupo centrado, trazo 1px
+ * y regla muerta .desktop-finder__document-icon retirada.
+ * 018A-80: columnas automáticas (auto-fill, como el escritorio) en vez de fijar
+ * 3, e icono un poco más pequeño (--sistema-finder-icono-tamano 40px). El
+ * override móvil de 2 columnas quedó redundante y se retiró. */
 .desktop-finder__grid {
   display: grid;
-  grid-template-columns: repeat(3, var(--sistema-icono-celda));
+  grid-template-columns: repeat(auto-fill, var(--sistema-icono-celda));
   justify-content: center;
   gap: var(--espacio-md);
   padding: var(--espacio-md);
@@ -62,8 +60,8 @@
 }
 
 .desktop-finder__icon {
-  width: var(--sistema-finder-documento-tamano);
-  height: var(--sistema-finder-documento-tamano);
+  width: var(--sistema-finder-icono-tamano);
+  height: var(--sistema-finder-icono-tamano);
   stroke-width: var(--sistema-icono-trazo);
 }
 
@@ -192,9 +190,5 @@
     left: var(--espacio-md);
     width: calc(100% - var(--espacio-xl));
     height: calc(100% - var(--espacio-xl));
-  }
-
-  .desktop-finder__grid {
-    grid-template-columns: repeat(2, var(--sistema-icono-celda));
   }
 }

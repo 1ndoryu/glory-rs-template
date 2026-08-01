@@ -75,6 +75,9 @@
   --sistema-finder-ancho: 620px;
   --sistema-finder-alto: 500px;
   --sistema-finder-documento-tamano: 48px;
+  /* [018A-80] Icono del grid del Finder: un poco más pequeño que el documento
+   * (40px) para una cuadrícula más densa y columnas automáticas. */
+  --sistema-finder-icono-tamano: 40px;
   --sistema-ventana-ancho-default: 640px;
   --sistema-ventana-alto-default: 480px;
   --sistema-drop-target-fondo: rgba(0, 0, 0, 0.05);
