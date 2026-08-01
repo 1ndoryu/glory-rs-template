@@ -5,6 +5,7 @@
 import { tryCatch } from '../../utils/result';
 import { AnalyticsService } from '../../services';
 import type { AnalyticsEvent } from '../../api/types';
+import { canTrackAnalytics } from './consent-store';
 
 const BATCH_SIZE = 10;
 const FLUSH_INTERVAL = 5000; /* 5 segundos */
@@ -15,6 +16,8 @@ let flushInFlight: Promise<void> | null = null;
 
 /* Registrar un evento */
 export function track(event: AnalyticsEvent): void {
+  if (!canTrackAnalytics()) return;
+
   eventQueue.push({
     ...event,
     event_id: crypto.randomUUID(),

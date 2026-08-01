@@ -14,7 +14,14 @@ export const AnalyticsService = {
     target_id?: string;
     metadata?: Record<string, unknown>;
   }>): Promise<void> {
-    await api.post('/api/analytics/events', { events });
+    await api.post('/api/analytics/events', { events }, {
+      headers: { 'X-Analytics-Consent': 'granted' },
+    });
+  },
+
+  /** Purga eventos antiguos según la política administrativa (30–730 días). */
+  async purge(maxAgeDays: number): Promise<{ deleted: number; cutoff: string }> {
+    return api.post('/api/admin/analytics/retention', { max_age_days: maxAgeDays });
   },
 
   /** Obtener estadísticas (admin). */

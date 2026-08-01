@@ -2,12 +2,16 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use validator::Validate;
 
 use crate::errors::AppError;
 use crate::middleware::AdminUser;
-use crate::models::settings::{AnalyticsStats, TrackEventsRequest, UpdateSettingsRequest};
+use crate::models::settings::{
+    AnalyticsRetentionRequest, AnalyticsRetentionResponse, AnalyticsStats, TrackEventsRequest,
+    UpdateSettingsRequest,
+};
 use crate::services::settings_svc::{AnalyticsService, SettingsService};
 use crate::AppState;
 
@@ -35,6 +39,16 @@ pub async fn track_events(
     headers: axum::http::HeaderMap,
     Json(req): Json<TrackEventsRequest>,
 ) -> Result<StatusCode, AppError> {
+    /* El servidor es la última frontera: sin consentimiento explícito no
+     * almacena nada aunque un cliente manipule su JavaScript. */
+    let consent_granted = headers
+        .get("x-analytics-consent")
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value == "granted");
+    if !consent_granted {
+        return Ok(StatusCode::NO_CONTENT);
+    }
+
     req.validate()
         .map_err(|error| AppError::Validation(error.to_string()))?;
     for event in &req.events {
@@ -46,27 +60,35 @@ pub async fn track_events(
         .get("x-forwarded-for")
         .or_else(|| headers.get("x-real-ip"))
         .and_then(|v| v.to_str().ok())
-        .map(|ip| {
-            use std::collections::hash_map::DefaultHasher;
-            use std::hash::{Hash, Hasher};
-            let mut hasher = DefaultHasher::new();
-            ip.hash(&mut hasher);
-            format!("{:x}", hasher.finish())
-        });
+        .map(|ip| hex::encode(Sha256::digest(ip.as_bytes())));
 
     let user_agent = headers
         .get("user-agent")
         .and_then(|v| v.to_str().ok())
-        .map(String::from);
+        .map(|value| hex::encode(Sha256::digest(value.as_bytes())));
 
     AnalyticsService::track_events(
         &state.pool,
         &req.events,
         ip_hash.as_deref(),
         user_agent.as_deref(),
+        consent_granted,
     )
     .await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Purga eventos más antiguos que la política elegida por el administrador.
+pub async fn purge_analytics(
+    State(state): State<AppState>,
+    _auth: AdminUser,
+    Json(req): Json<AnalyticsRetentionRequest>,
+) -> Result<Json<AnalyticsRetentionResponse>, AppError> {
+    req.validate()
+        .map_err(|error| AppError::Validation(error.to_string()))?;
+    let (deleted, cutoff) =
+        AnalyticsService::purge_older_than(&state.pool, req.max_age_days).await?;
+    Ok(Json(AnalyticsRetentionResponse { deleted, cutoff }))
 }
 
 /// Obtener estadisticas (admin)
@@ -85,5 +107,6 @@ pub fn routes() -> Router<AppState> {
         .route("/analytics/events", post(track_events))
         /* Admin */
         .route("/admin/settings", post(update_settings))
+        .route("/admin/analytics/retention", post(purge_analytics))
         .route("/admin/analytics/stats", get(get_analytics_stats))
 }

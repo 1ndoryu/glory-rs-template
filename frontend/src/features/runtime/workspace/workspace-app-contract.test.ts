@@ -22,6 +22,7 @@ describe('workspace/AppRegistry anti-drift contract', () => {
     expect(refs).toEqual([
       { nodeId: 'about', appId: 'about' },
       { nodeId: 'admin', appId: 'admin' },
+      { nodeId: 'analytics', appId: 'analytics' },
       { nodeId: 'mediaLibrary', appId: 'media-library' },
       { nodeId: 'projects', appId: 'projects' },
       { nodeId: 'settings', appId: 'settings' },

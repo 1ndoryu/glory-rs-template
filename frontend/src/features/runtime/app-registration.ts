@@ -3,7 +3,7 @@
  * Cada app define su id, título, icono, capacidades y render function.
  * Las apps solo devuelven contenido; el shell crea la ventana. */
 
-import { FileUser, Folder, Settings, FileText, FolderCode, Trash2, ShieldUser, UserRound, ShoppingBag, FolderOpen, Bell } from 'lucide';
+import { BarChart3, FileUser, Folder, Settings, FileText, FolderCode, Trash2, ShieldUser, UserRound, ShoppingBag, FolderOpen, Bell } from 'lucide';
 import { createEl } from '../../utils/dom';
 import { AppRegistry } from './app-registry';
 import { createPathDeepLink } from './deep-links';
@@ -153,6 +153,29 @@ AppRegistry.registerLazy({
       return {
         element: m.createFontPanel(),
         destroy: () => { dispatchEvent({ type: 'app_closed', appId: 'settings' }); },
+      };
+    },
+  })),
+});
+
+/* === Estadísticas === */
+AppRegistry.registerLazy({
+  id: 'analytics',
+  title: 'Estadísticas',
+  icon: BarChart3,
+  iconType: 'application',
+  singleton: true,
+  requires: 'admin',
+  routePatterns: ['/analytics'],
+  deepLink: createPathDeepLink('/analytics'),
+  layout: 'padded',
+  load: () => import('../analytics/analytics-panel').then(m => ({
+    render: (ctx: RenderContext): MountedView => {
+      dispatchEvent({ type: 'app_opened', appId: 'analytics' });
+      const view = m.createAnalyticsPanel(ctx.signal);
+      return {
+        element: view.element,
+        destroy: () => { view.destroy(); dispatchEvent({ type: 'app_closed', appId: 'analytics' }); },
       };
     },
   })),

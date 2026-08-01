@@ -74,3 +74,9 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 - Una novedad básica puede derivarse del `version` público del workspace sin crear una segunda entidad de publicación.
 - El estado leído local debe usar un ID estable y una lista acotada; la sincronización por cuenta se deja para cuando exista registro verificado y overlay remoto.
 - La campana solo despacha la apertura de la app; mantener fuente y presentación separadas evita duplicar lógica en desktop y móvil.
+
+## 018A-12 — Consentimiento debe existir en dos fronteras
+
+- Bloquear el tracker en el navegador no basta: el backend también debe rechazar lotes sin un header explícito de consentimiento.
+- IP y user-agent se anonimizan en el boundary antes del repository; una migración de privacidad no debe intentar restaurar datos que fueron eliminados.
+- Una purga parametrizada y acotada permite operar retención sin SQL manual ni intervalos interpolados.

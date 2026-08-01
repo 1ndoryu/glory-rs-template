@@ -39,6 +39,24 @@ pub struct TrackEventsRequest {
     pub events: Vec<TrackEvent>,
 }
 
+/// Solicitud administrativa de purga de analytics antiguos.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+pub struct AnalyticsRetentionRequest {
+    #[validate(range(
+        min = 30,
+        max = 730,
+        message = "La retención debe estar entre 30 y 730 días"
+    ))]
+    pub max_age_days: i32,
+}
+
+/// Resultado auditable de la purga de analytics.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct AnalyticsRetentionResponse {
+    pub deleted: u64,
+    pub cutoff: DateTime<Utc>,
+}
+
 /// Evento individual
 #[derive(Debug, Deserialize, Serialize, Validate, ToSchema)]
 pub struct TrackEvent {

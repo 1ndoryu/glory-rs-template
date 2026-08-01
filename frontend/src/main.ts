@@ -37,6 +37,7 @@ import { initResourceTypeRegistry } from './features/runtime/resource-type-regis
 import { setActorCategory } from './features/analytics/dispatcher';
 import { loadProfileSettings } from './features/settings/settings-repo';
 import { initTracking, trackPageView } from './features/analytics/tracker';
+import { createAnalyticsConsentBanner } from './features/analytics/consent-banner';
 import { initThemeStore } from './features/runtime/theme-store';
 import { initPreferencesSync } from './features/runtime/preferences-sync';
 import { authStore, showProfile, showSidebar, siteConfig } from './store';
@@ -182,6 +183,11 @@ async function initApp(): Promise<void> {
   mountPresentation(isMobile);
 
   app.appendChild(columnaDerecha);
+
+  /* [018A-12] El consentimiento es una superficie global, no una app. La
+   * decisión se toma antes de permitir que tracker.ts envíe métricas. */
+  const analyticsConsentBanner = createAnalyticsConsentBanner();
+  columnaDerecha.appendChild(analyticsConsentBanner.element);
 
   /* [Plan §9.1] Actualizar actor category al cambiar auth durante la sesión */
   authStore.subscribe((state) => {
@@ -367,6 +373,7 @@ async function initApp(): Promise<void> {
     stopMobileAdapter();
     clearTransientState();
     unmountPresentation();
+    analyticsConsentBanner.destroy();
   };
   (window as unknown as Record<string, unknown>).__wandoriusCleanup = cleanup;
 }

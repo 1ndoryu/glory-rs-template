@@ -27,6 +27,7 @@
 | ¿Por qué se cierran ventanas al abrir otra y cómo se resuelve? | `Agente/planes/plan-cierre-automatico-ventanas-2026-07-31.md`                |
 | ¿Cómo se implementan los programas editoriales por vertical? | `Agente/planes/plan-programas-editoriales-2026-07-31.md`                       |
 | ¿Cómo se protege el checkout, webhook y descarga digital? | `Agente/planes/plan-comercio-seguro-2026-08-01.md`                              |
+| ¿Cómo se consienten, anonimizan y depuran las métricas? | `Agente/planes/plan-analytics-privacidad-2026-08-01.md` |
 | ¿Cuál es la paridad y el commit fijado de Sentinel/VarSense? | `Agente/documentacion/herramientas/matriz-paridad-sentinel-varsense-2026-08-01.md` |
 
 ## Regla de autoridad

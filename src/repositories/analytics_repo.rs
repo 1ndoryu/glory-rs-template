@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use sqlx::{PgPool, Postgres, QueryBuilder};
 use uuid::Uuid;
 
@@ -6,6 +7,14 @@ use crate::models::settings::{AnalyticsStats, RecentEvent, TopArticle, TrackEven
 pub struct AnalyticsRepository;
 
 impl AnalyticsRepository {
+    pub async fn delete_before(pool: &PgPool, cutoff: DateTime<Utc>) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query("DELETE FROM analytics_events WHERE created_at < $1")
+            .bind(cutoff)
+            .execute(pool)
+            .await?;
+        Ok(result.rows_affected())
+    }
+
     pub async fn insert_events(
         pool: &PgPool,
         events: &[TrackEvent],
