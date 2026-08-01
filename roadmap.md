@@ -62,6 +62,7 @@
 - [x] **018A-19 —** Swagger/utoipa documenta la sesión opaca `session_id` como cookie y elimina referencias de Bearer/JWT del contrato; cobertura completa y retiro del cliente manual siguen diferidos.
 - [x] **018A-20 —** Paridad OpenAPI del dominio de artículos: rutas admin corregidas (`/api/admin/articles`) y clientes `articles/` regenerados; los dominios restantes siguen pendientes.
 - [x] **018A-21 —** Paridad OpenAPI del dominio de proyectos: catálogo público y CRUD admin anotados; cliente `projects/` regenerado. Productos, media y demás dominios siguen pendientes.
+- [x] **018A-22 —** Paridad OpenAPI del dominio de productos: catálogo, CRUD admin y checkout tipado; cliente `products/` regenerado. Media y demás dominios siguen pendientes.
 
 **Salida:** runtime compartido funciona sin chrome/listas/listeners duplicados. Orval se regenera localmente sin backend vivo; quedan cobertura total del contrato y retiro del cliente manual.
 

@@ -2,6 +2,8 @@ use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use serde::Serialize;
+use utoipa::ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 
@@ -13,7 +15,27 @@ use crate::models::product::{
 use crate::services::product_svc::ProductService;
 use crate::AppState;
 
+/* [018A-22] CheckoutResponse evita exponer el JSON dinámico de Stripe como
+ * contrato público; la autoridad de precio y entrega sigue server-side. */
+#[derive(Debug, Serialize, ToSchema)]
+pub struct CheckoutResponse {
+    pub checkout_url: String,
+    pub order_id: Uuid,
+    pub session_id: String,
+}
+
 /// Crear producto (admin) — nace inactivo/private por defecto
+#[utoipa::path(
+    post,
+    path = "/api/admin/products",
+    request_body = CreateProductRequest,
+    responses(
+        (status = 201, description = "Producto creado", body = Product),
+        (status = 401, description = "No autorizado", body = ErrorResponse),
+        (status = 422, description = "Error de validación", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
 pub async fn create_product(
     State(state): State<AppState>,
     _auth: AdminUser,
@@ -27,6 +49,17 @@ pub async fn create_product(
 }
 
 /// Obtener producto por ID (admin)
+#[utoipa::path(
+    get,
+    path = "/api/admin/products/{id}",
+    params(("id" = Uuid, Path, description = "ID del producto")),
+    responses(
+        (status = 200, description = "Producto encontrado", body = Product),
+        (status = 401, description = "No autorizado", body = ErrorResponse),
+        (status = 404, description = "No encontrado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
 pub async fn get_product(
     State(state): State<AppState>,
     _auth: AdminUser,
@@ -37,6 +70,15 @@ pub async fn get_product(
 }
 
 /// Listar todos los productos (admin)
+#[utoipa::path(
+    get,
+    path = "/api/admin/products",
+    responses(
+        (status = 200, description = "Todos los productos", body = [Product]),
+        (status = 401, description = "No autorizado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
 pub async fn list_all_products(
     State(state): State<AppState>,
     _auth: AdminUser,
@@ -46,6 +88,12 @@ pub async fn list_all_products(
 }
 
 /// Listar productos de un articulo (publico — solo activos)
+#[utoipa::path(
+    get,
+    path = "/api/articles/{article_id}/products",
+    params(("article_id" = Uuid, Path, description = "ID del artículo")),
+    responses((status = 200, description = "Productos del artículo", body = [Product]))
+)]
 pub async fn list_products_by_article(
     State(state): State<AppState>,
     Path(article_id): Path<Uuid>,
@@ -55,6 +103,11 @@ pub async fn list_products_by_article(
 }
 
 /// Catálogo público de la Tienda.
+#[utoipa::path(
+    get,
+    path = "/api/products",
+    responses((status = 200, description = "Catálogo público", body = [Product]))
+)]
 pub async fn list_public_products(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<Product>>, AppError> {
@@ -62,6 +115,18 @@ pub async fn list_public_products(
 }
 
 /// Actualizar producto (admin) — sincroniza envelope en transacción
+#[utoipa::path(
+    put,
+    path = "/api/admin/products/{id}",
+    params(("id" = Uuid, Path, description = "ID del producto")),
+    request_body = UpdateProductRequest,
+    responses(
+        (status = 200, description = "Producto actualizado", body = Product),
+        (status = 401, description = "No autorizado", body = ErrorResponse),
+        (status = 404, description = "No encontrado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
 pub async fn update_product(
     State(state): State<AppState>,
     _auth: AdminUser,
@@ -76,6 +141,17 @@ pub async fn update_product(
 }
 
 /// Eliminar producto (admin) — soft delete del envelope
+#[utoipa::path(
+    delete,
+    path = "/api/admin/products/{id}",
+    params(("id" = Uuid, Path, description = "ID del producto")),
+    responses(
+        (status = 204, description = "Producto eliminado"),
+        (status = 401, description = "No autorizado", body = ErrorResponse),
+        (status = 404, description = "No encontrado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
 pub async fn delete_product(
     State(state): State<AppState>,
     _auth: AdminUser,
@@ -91,7 +167,7 @@ async fn create_stripe_checkout(
     product: &Product,
     order: &Order,
     email: &str,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<CheckoutResponse>, AppError> {
     let success_url = format!(
         "{}/checkout/success?session_id={{CHECKOUT_SESSION_ID}}&order={}",
         state.site_url, order.id
@@ -169,22 +245,33 @@ async fn create_stripe_checkout(
         order.id
     );
 
-    Ok(Json(serde_json::json!({
-        "checkout_url": checkout_url,
-        "order_id": order.id,
-        "session_id": session_id,
-    })))
+    Ok(Json(CheckoutResponse {
+        checkout_url: checkout_url.to_string(),
+        order_id: order.id,
+        session_id: session_id.to_string(),
+    }))
 }
 
 /// Iniciar checkout de Stripe.
 /// [297A-7] Solo acepta productos activos. Modo demo deshabilitado.
 /// [297A-14] `get_public` exige envelope active + public e `is_active` en SQL.
+#[utoipa::path(
+    post,
+    path = "/api/products/{product_id}/checkout",
+    params(("product_id" = Uuid, Path, description = "ID del producto")),
+    request_body = CheckoutRequest,
+    responses(
+        (status = 200, description = "Checkout creado", body = CheckoutResponse),
+        (status = 404, description = "Producto no disponible", body = ErrorResponse),
+        (status = 422, description = "Error de validación", body = ErrorResponse)
+    )
+)]
 pub async fn checkout(
     State(state): State<AppState>,
     Path(product_id): Path<Uuid>,
     headers: HeaderMap,
     Json(req): Json<CheckoutRequest>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<CheckoutResponse>, AppError> {
     req.validate()
         .map_err(|error| AppError::Validation(error.to_string()))?;
     let product = ProductService::get_public(&state.pool, product_id).await?;

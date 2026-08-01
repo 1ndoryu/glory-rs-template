@@ -125,3 +125,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 ## 018A-21 — Los enums anidados también son parte del contrato
 
 - Al añadir un request con un enum de actualización (`ProjectUrlUpdate`), incluir el enum en `components(schemas(...))`; compilar Rust no garantiza que Orval encuentre todas las referencias.
+
+## 018A-22 — Las respuestas de terceros necesitan DTO propio
+
+- Checkout no debe publicar `serde_json::Value` como contrato: un DTO estable conserva la forma pública aunque Stripe agregue campos internos.
+- El precio, la disponibilidad y la entrega siguen siendo decisiones server-side; tipar la respuesta no autoriza al navegador a conceder acceso.
