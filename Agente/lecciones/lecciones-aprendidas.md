@@ -181,3 +181,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Generar funciones `fetch` no las hace seguras automáticamente: el mutator debe centralizar cookie, CSRF, base URL y envelope de errores antes de migrar un servicio.
 - Los clientes generados ignorados son reproducibles solo si CI ejecuta codegen antes del type-check; el workflow debe validar esa dependencia explícitamente.
+
+## 018A-33 — Adaptar contratos en el boundary, no en cada consumidor
+
+- Migrar servicios completos al cliente generado evita que editores conozcan rutas HTTP. Cuando el contrato usa un parche semántico (`ProjectUrlUpdate`), la conversión debe vivir en el servicio y conservar omitir/limpiar/reemplazar.
+- Los errores de catálogo no deben convertirse en `null` silenciosamente: si la API falla, el servicio propaga el resultado; `null` queda reservado para una respuesta exitosa sin elementos.
