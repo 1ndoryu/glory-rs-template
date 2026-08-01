@@ -90,6 +90,32 @@
     outline-offset: var(--espacio-xs);
   }
 
+  .movilLauncher__control {
+    display: grid;
+    width: var(--areaControlSistemaMovil);
+    height: var(--areaControlSistemaMovil);
+    place-items: center;
+    border: var(--sistema-borde);
+    background: var(--sistema-fondo);
+    color: var(--sistema-texto);
+  }
+
+  .movilLauncher__control svg {
+    width: var(--sistema-control-icono-tamano);
+    height: var(--sistema-control-icono-tamano);
+    stroke-width: var(--sistema-icono-trazo);
+  }
+
+  .movilLauncher__control[data-hay-novedades="true"] {
+    background: var(--sistema-texto);
+    color: var(--sistema-fondo);
+  }
+
+  .movilLauncher__control:focus-visible {
+    outline: var(--sistema-borde);
+    outline-offset: var(--espacio-xs);
+  }
+
   /* [297A-18] Botón de tema del launcher: área táctil mínima, tokens del sistema. */
   .movilLauncher__tema {
     display: grid;

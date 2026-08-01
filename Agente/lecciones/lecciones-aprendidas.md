@@ -68,3 +68,9 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 - Los enlaces de descarga se envían en claro solo una vez; la base conserva únicamente el hash y el endpoint vuelve a comprobar expiración y confinamiento de path.
 - Un batch de analytics necesita `event_id` antes de reintentar; de lo contrario una caída de red infla las métricas aunque el inserto sea multi-fila.
 - La auditoría de login debe hashear IP y omitir email/credenciales; registrarla después de validar la entrada evita convertir el log en una fuente de secretos.
+
+## 018A-11 — Notificaciones derivadas del release
+
+- Una novedad básica puede derivarse del `version` público del workspace sin crear una segunda entidad de publicación.
+- El estado leído local debe usar un ID estable y una lista acotada; la sincronización por cuenta se deja para cuando exista registro verificado y overlay remoto.
+- La campana solo despacha la apertura de la app; mantener fuente y presentación separadas evita duplicar lógica en desktop y móvil.

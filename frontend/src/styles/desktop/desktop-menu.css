@@ -86,6 +86,47 @@
   outline-offset: 2px;
 }
 
+/* [297A-21] Campana compartida: el contador es solo estado de presentación;
+ * la fuente de novedades vive en notifications-store. */
+.desktop-menu-bar__notificaciones {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--sistema-tema-boton-tamano);
+  height: var(--sistema-tema-boton-tamano);
+  cursor: pointer;
+}
+
+.desktop-menu-bar__notificaciones svg {
+  width: var(--sistema-tema-boton-icono-tamano);
+  height: var(--sistema-tema-boton-icono-tamano);
+  stroke-width: var(--sistema-icono-trazo);
+}
+
+.desktop-menu-bar__notificaciones:hover,
+.desktop-menu-bar__notificaciones[data-hay-novedades="true"] {
+  background: var(--sistema-texto);
+  color: var(--sistema-superficie);
+}
+
+.desktop-menu-bar__notificaciones:focus-visible {
+  outline: 1px solid var(--sistema-texto);
+  outline-offset: 2px;
+}
+
+.desktop-menu-bar__notificaciones-contador {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 10px;
+  padding: 0 2px;
+  background: var(--sistema-texto);
+  color: var(--sistema-superficie);
+  font-size: var(--sistema-menu-contexto-texto-tamano);
+  line-height: 1;
+  text-align: center;
+}
+
 /* [297A-18] Grupo derecho de la barra: hora + botón de tema. */
 .desktop-menu-bar__derecha {
   display: flex;

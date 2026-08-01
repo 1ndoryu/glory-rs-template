@@ -2,7 +2,7 @@
  * Render y gestos del launcher; no coordina rutas ni stack de apps.
  * MobileShell solo conserva la presentación full-screen y el lifecycle global. */
 
-import { Circle, FileUser, createElement, type IconNode } from 'lucide';
+import { Bell, Circle, FileUser, createElement, type IconNode } from 'lucide';
 import { createEl } from '../../utils/dom';
 import { createThemeToggleButton, type ThemeToggleButton } from '../../components/ui/theme-toggle-button';
 import { openContextMenu } from '../desktop/components/desktop-context-menu';
@@ -16,6 +16,7 @@ import { getMobileCellAt, getMobileGridMetrics, planMobilePlacement, sortMobileN
 import type { ResolvedNode } from '../runtime/workspace/types';
 import { resolvePublicResourceTarget } from '../runtime/workspace/public-resource-locator';
 import { showToast } from '../../components/ui/toast';
+import { loadNotifications, notificationsStore, unreadNotificationCount } from '../notifications/notifications-store';
 
 export interface MobileLauncherOptions {
   readonly openApp: (appId: string, params?: Readonly<Record<string, string>>) => Promise<void>;
@@ -113,12 +114,22 @@ export function createMobileLauncher(options: MobileLauncherOptions): MobileLaun
   const accountControl: MobileAccountControl = createMobileAccountControl(() => {
     void options.openApp('account');
   });
+  const notificationsButton = createEl('button', {
+    type: 'button', className: 'movilLauncher__control', ariaLabel: 'Abrir novedades',
+  }, createElement(Bell));
+  const stopNotifications = notificationsStore.subscribeSimple((state) => {
+    const count = unreadNotificationCount(state);
+    notificationsButton.setAttribute('aria-label', count > 0 ? `Novedades (${count} sin leer)` : 'Abrir novedades');
+    notificationsButton.toggleAttribute('data-hay-novedades', count > 0);
+  });
+  notificationsButton.addEventListener('click', () => { void options.openApp('notifications'); });
+  void loadNotifications();
   const gestureCleanups: Array<() => void> = [];
 
   const header = createEl('header', { className: 'movilLauncher__cabecera' },
     createEl('span', { className: 'movilMarca', ariaHidden: 'true' }),
     createEl('p', { className: 'movilLauncher__fecha', textContent: 'inicio' }),
-    createEl('span', { className: 'movilLauncher__acciones' }, accountControl.element, themeToggle.element),
+    createEl('span', { className: 'movilLauncher__acciones' }, accountControl.element, notificationsButton, themeToggle.element),
   );
   const grid = createEl('div', {
     className: 'movilLauncher__grid',
@@ -212,6 +223,7 @@ export function createMobileLauncher(options: MobileLauncherOptions): MobileLaun
     destroy: (): void => {
       for (const cleanup of gestureCleanups.splice(0)) cleanup();
       themeToggle.destroy();
+      stopNotifications();
       accountControl.destroy();
       launcher.remove();
     },

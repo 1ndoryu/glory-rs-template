@@ -28,7 +28,7 @@
 - Workspace overlay implementado: release + overlay + merge + clipboard + papelera + crear carpetas.
 - Split de archivos grandes completado: command-registration (725→6), workspace-store (430→4), desktop-shell (419→3), mobile-shell (antes >300; launcher extraído a `mobile-launcher.ts`).
 - Sesiones opacas en cookie operativas; JWT localStorage eliminado del frontend. `/admin` legacy y uploads públicos siguen como deuda controlada.
-- **Quality tool sprint:** 13 reglas custom (P0/P1/P2) + 7 Sentinel CLI + 4 VarSense = 24 reglas activas; la cobertura operativa estimada del quality tool es ~65% del inventario de patrones automatizables definido en el plan. VarSense reconoce contratos vanilla de clases con patch reproducible (`a93b8bf0…`, 43 tests del tool). Últimos gates 297A-13/15/16: PASS, Sentinel 0 errores, VarSense 0 errores, Rust 28 tests, frontend 382 tests en 49 suites. Auditoría v4 reporta por separado 57/78 hallazgos arquitectónicos potencialmente detectables (73%) y 19/23 correcciones del checklist base (83%); no son denominadores comparables. ISP refactor DomAttrs (33→6 sub-interfaces).
+- **Quality tool sprint:** 13 reglas custom (P0/P1/P2) + 7 Sentinel CLI + 4 VarSense = 24 reglas activas; la cobertura operativa estimada del quality tool es ~65% del inventario de patrones automatizables definido en el plan. VarSense reconoce contratos vanilla de clases con patch reproducible (`a93b8bf0…`, 43 tests del tool). Últimos gates 297A-13/15/16/21: PASS, Sentinel 0 errores, VarSense 0 errores, Rust 28 tests, frontend 385 tests en 50 suites. Auditoría v4 reporta por separado 57/78 hallazgos arquitectónicos potencialmente detectables (73%) y 19/23 correcciones del checklist base (83%); no son denominadores comparables. ISP refactor DomAttrs (33→6 sub-interfaces).
 - Ejecutar una tarea por vez y en este orden; no saltar dependencias.
 - El plan maestro contiene checklists/gates. El roadmap conserva solo pendientes.
 - El quality gate está operativo; toda tarea futura debe cerrarse con `npm run task:check -- {ID}`.
@@ -172,8 +172,10 @@
 
 **Depende de:** 297A-20, 297A-13 (entrega remota) y menú Admin de 297A-14. Idea nueva: campana junto al tema que avisa de contenido nuevo incluso a usuarios con estado personalizado (el overlay por diff ya les muestra lo nuevo; la campana solo añade el aviso). Plan propio al arrancar.
 
-- [ ] Definir qué genera una notificación (release nuevo, recursos agregados/actualizados), cuándo se marca leída y política anti-spam sin envío inmediato.
-- [ ] Campana en la barra superior (junto al tema) con contador, icono Lucide 1px, accesibilidad y estado local/remoto.
+Plan: `Agente/planes/plan-notificaciones-2026-08-01.md`.
+
+- [x] Definir qué genera una notificación (release público nuevo), cuándo se marca leída y política anti-spam local sin envío inmediato. *(release versionado como ID estable; estado leído acotado a 100 IDs)*
+- [x] Campana en la barra superior y launcher móvil junto al tema, con contador, icono Lucide 1px, accesibilidad y estado local.
 - [ ] Entrega de novedades por overlay (297A-13) y panel Admin para publicar/descartar novedades, integrado en el menú Admin por capacidades (297A-14).
 - [ ] Pruebas: usuario con overlay personalizado recibe aviso de novedades y las ve; casos negativos (sin spam, leídas, logout/login).
 

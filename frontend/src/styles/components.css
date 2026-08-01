@@ -104,6 +104,73 @@
   outline-offset: 2px;
 }
 
+/* [297A-21] Receta única para la app de novedades. Las apps solo consumen
+ * esta estructura; el chrome sigue siendo responsabilidad del shell. */
+.notificaciones {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-md);
+  height: 100%;
+}
+
+.notificaciones__titulo {
+  margin: 0;
+  font-size: var(--tamano-grande);
+  font-weight: var(--peso-medio);
+}
+
+.notificaciones__recargar {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: var(--espacio-xs);
+}
+
+.notificaciones__recargar svg,
+.notificaciones__icono svg {
+  width: var(--sistema-control-icono-tamano);
+  height: var(--sistema-control-icono-tamano);
+  stroke-width: var(--sistema-icono-trazo);
+}
+
+.notificaciones__lista {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--espacio-sm);
+}
+
+.notificaciones__item {
+  display: flex;
+  gap: var(--espacio-sm);
+  padding: var(--espacio-md);
+  border: var(--sistema-borde);
+  cursor: pointer;
+}
+
+.notificaciones__item--leida {
+  opacity: 0.55;
+}
+
+.notificaciones__item:focus-visible {
+  outline: var(--sistema-borde-doble);
+  outline-offset: var(--espacio-xs);
+}
+
+.notificaciones__itemTitulo,
+.notificaciones__itemTexto {
+  margin: 0;
+}
+
+.notificaciones__itemTitulo {
+  font-weight: var(--peso-medio);
+}
+
+.notificaciones__itemTexto {
+  margin-top: var(--espacio-xs);
+  font-size: var(--tamano-pequeno);
+}
+
 /* === BARRA DE PESTAÑAS — Componente universal (Admin y futuras apps) ===
  * Autocontenida: posee su propio gap para que el consumidor no dependa de
  * utilidades externas (regla 9.1: receta compartida en el sistema).
@@ -576,4 +643,3 @@
 }
 
 } /* @layer components */
-
