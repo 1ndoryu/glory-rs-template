@@ -441,6 +441,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [x] **018A-38 —** Resolver el warning ISP del DTO frontend `Article` con subinterfaces de identidad, contenido y publicación; conservar el alias público para no duplicar adaptadores ni romper consumidores.
 - [x] **018A-39 —** Materializar `resource:properties` y la app reutilizable `properties`; la matriz de paridad ahora cubre la apertura contextual y muestra solo metadatos locales seguros.
 - [x] **018A-40 —** Eliminar únicamente `gap-sm`, `mt-md` y `mb-lg` de `components.css` después de confirmar que no tienen consumidores; conservar clases construidas dinámicamente.
+- [x] **018A-41 —** Separar `app-registration-admin.ts` del catálogo público para mantener el límite de 300 líneas y conservar el registro único de capacidades, rutas y lifecycle.
 - [ ] Eliminar CSS/clases huérfanas con VarSense.
 
 **Criterio de salida:** una sola administración como app registrada, analytics útil/privado y cero rutas/chrome duplicados legacy; uploads y CSS/contratos obsoletos deben desaparecer después de su matriz de paridad.

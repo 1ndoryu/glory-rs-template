@@ -88,7 +88,7 @@ La auditoría profunda (§7, §8) identificó que el pipeline completo `backend 
 
 ## 4. Criterio de salida
 
-- Ningún archivo TS supera 300 líneas (excepto `font-panel.ts` en el límite).
+- Ningún archivo TS supera 300 líneas (excepto `font-panel.ts` en el límite); `app-registration.ts` fue dividido en catálogo público y `app-registration-admin.ts` (018A-41).
 - No hay imports circulares.
 - `npm run task:check` pasa.
 - Todas las funcionalidades del OS siguen operativas.

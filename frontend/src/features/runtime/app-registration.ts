@@ -3,7 +3,7 @@
  * Cada app define su id, título, icono, capacidades y render function.
  * Las apps solo devuelven contenido; el shell crea la ventana. */
 
-import { BarChart3, FileUser, Folder, Settings, FileText, FolderCode, Trash2, ShieldUser, UserRound, ShoppingBag, FolderOpen, Bell, Store, ClipboardList, Download, Info } from 'lucide';
+import { FileUser, Folder, FileText, FolderCode, Trash2, UserRound, Bell, Store, ClipboardList, Download, Info } from 'lucide';
 import { createEl } from '../../utils/dom';
 import { AppRegistry } from './app-registry';
 import { createPathDeepLink } from './deep-links';
@@ -18,6 +18,7 @@ import { mountAccountView } from './account-view';
 import { createNotificationsView } from '../notifications/notifications-view';
 import { createDownloadsView, createOrdersView, createStoreView } from '../commerce/store-view';
 import { createPropertiesPreview } from '../desktop/apps/properties/properties-preview';
+import './app-registration-admin';
 
 /* === Finder === */
 AppRegistry.register({
@@ -165,48 +166,6 @@ for (const commerceApp of [
   });
 }
 
-/* === Settings === */
-AppRegistry.registerLazy({
-  id: 'settings',
-  title: 'Configuración',
-  icon: Settings,
-  iconType: 'application',
-  singleton: true,
-  requires: 'admin',
-  load: () => import('../settings/font-panel').then(m => ({
-    render: (_ctx: RenderContext): MountedView => {
-      dispatchEvent({ type: 'app_opened', appId: 'settings' });
-      return {
-        element: m.createFontPanel(),
-        destroy: () => { dispatchEvent({ type: 'app_closed', appId: 'settings' }); },
-      };
-    },
-  })),
-});
-
-/* === Estadísticas === */
-AppRegistry.registerLazy({
-  id: 'analytics',
-  title: 'Estadísticas',
-  icon: BarChart3,
-  iconType: 'application',
-  singleton: true,
-  requires: 'admin',
-  routePatterns: ['/analytics'],
-  deepLink: createPathDeepLink('/analytics'),
-  layout: 'padded',
-  load: () => import('../analytics/analytics-panel').then(m => ({
-    render: (ctx: RenderContext): MountedView => {
-      dispatchEvent({ type: 'app_opened', appId: 'analytics' });
-      const view = m.createAnalyticsPanel(ctx.signal);
-      return {
-        element: view.element,
-        destroy: () => { view.destroy(); dispatchEvent({ type: 'app_closed', appId: 'analytics' }); },
-      };
-    },
-  })),
-});
-
 /* === About === */
 AppRegistry.register({
   id: 'about',
@@ -267,125 +226,6 @@ AppRegistry.register({
       destroy: () => { dispatchEvent({ type: 'app_closed', appId: 'trash' }); },
     };
   },
-});
-
-/* === Admin === */
-AppRegistry.registerLazy({
-  id: 'admin',
-  title: 'Admin',
-  icon: ShieldUser,
-  iconType: 'application',
-  singleton: true,
-  requires: 'admin',
-  /* [018A-26] Admin es una aplicación interna del OS: no conserva una ruta
-   * pública paralela. El shell la abre por AppRegistry y aplica la capacidad
-   * admin en la frontera de openAppWindow. */
-  load: () => import('../../pages/admin').then(m => ({
-    render: (ctx: RenderContext): MountedView => {
-      dispatchEvent({ type: 'app_opened', appId: 'admin' });
-      /* [317A-2] Contenedor con fill-height: los estados vacios centrados ocupan toda la ventana. */
-      const container = createEl('div', { className: 'app-contenedor' });
-      let adminPage: HTMLElement | null = null;
-      let disposed = false;
-
-      /* [018A-1] createAdminWindowView devuelve la página (async) y la
-       * franja de acciones (síncrona) que el shell coloca debajo del body. */
-      const { page, actions } = m.createAdminWindowView();
-      void page
-        .then(el => {
-          if (disposed || ctx.signal.aborted) {
-            m.disposeAdminPage(el);
-            return;
-          }
-          adminPage = el;
-          container.appendChild(el);
-        })
-        .catch(() => {
-          if (!disposed && !ctx.signal.aborted) {
-            container.textContent = 'Error al cargar Admin.';
-          }
-        });
-
-      return {
-        element: container,
-        actions,
-        destroy: () => {
-          disposed = true;
-          if (adminPage) m.disposeAdminPage(adminPage);
-          dispatchEvent({ type: 'app_closed', appId: 'admin' });
-        },
-      };
-    },
-  })),
-});
-
-/* === Article Editor — programa editorial admin === */
-AppRegistry.registerLazy({
-  id: 'article-editor',
-  title: 'Editor de artículos',
-  icon: FileText,
-  iconType: 'document',
-  singleton: false,
-  requires: 'admin',
-  layout: 'padded',
-  load: () => import('../desktop/apps/article-editor/article-editor').then(m => ({
-    render: (ctx: RenderContext): MountedView => m.renderArticleEditor(ctx),
-  })),
-});
-
-/* === Project Editor — programa editorial admin === */
-AppRegistry.registerLazy({
-  id: 'project-editor',
-  title: 'Editor de proyectos',
-  icon: FolderCode,
-  iconType: 'folder',
-  singleton: false,
-  requires: 'admin',
-  layout: 'padded',
-  load: () => import('../desktop/apps/project-editor/project-editor').then(m => ({
-    render: (ctx: RenderContext): MountedView => m.renderProjectEditor(ctx),
-  })),
-});
-
-/* === Product Editor — programa editorial admin === */
-AppRegistry.registerLazy({
-  id: 'product-editor',
-  title: 'Editor de productos',
-  icon: ShoppingBag,
-  iconType: 'application',
-  singleton: false,
-  requires: 'admin',
-  layout: 'padded',
-  load: () => import('../desktop/apps/product-editor/product-editor').then(m => ({
-    render: (ctx: RenderContext): MountedView => m.renderProductEditor(ctx),
-  })),
-});
-
-/* === Media Library — biblioteca de media admin === */
-AppRegistry.registerLazy({
-  id: 'media-library',
-  title: 'Biblioteca de media',
-  icon: FolderOpen,
-  iconType: 'folder',
-  singleton: true,
-  requires: 'admin',
-  layout: 'padded',
-  load: () => import('../desktop/apps/media-library/media-library').then(m => ({
-    render: (ctx: RenderContext): MountedView => {
-      dispatchEvent({ type: 'app_opened', appId: 'media-library' });
-      const view = m.createMediaLibraryPreview({ signal: ctx.signal });
-      /* [018A-1 F3] La franja de acciones (subir archivo) viaja en
-       * MountedView.actions; el shell la coloca igual en desktop y móvil. */
-      return {
-        element: view.element,
-        actions: view.actions,
-        destroy: () => {
-          view.destroy();
-          dispatchEvent({ type: 'app_closed', appId: 'media-library' });
-        },
-      };
-    },
-  })),
 });
 
 /* === Properties === */

@@ -218,3 +218,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Antes de borrar una utilidad CSS hay que buscarla en TypeScript, HTML y plantillas; nombres interpolados (`badge--${estado}`) no aparecen como literal completo y deben conservarse con evidencia.
 - La limpieza incremental de utilidades sin consumidores reduce la deuda sin convertir los falsos positivos de VarSense en cambios visuales riesgosos.
+
+## 018A-41 — Separar catálogos sin duplicar el registry
+
+- Un catálogo de apps puede dividirse por capacidad/dominio mediante módulos de registro con efectos laterales; el entrypoint debe importar cada módulo una sola vez y conservar AppRegistry como única fuente.
+- La división estructural es preferible a una suppression de límite: mantiene rutas, lazy loading y teardown intactos, pero evita que nuevas apps vuelvan a inflar el coordinador.

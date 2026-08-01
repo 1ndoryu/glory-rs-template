@@ -26,7 +26,7 @@
 
 - Concepto desktop aprobado; Finder es file browser real (lee workspaceStore); Reader sigue siendo preview.
 - Workspace overlay implementado: release + overlay + merge + clipboard + papelera + crear carpetas.
-- Split de archivos grandes completado: command-registration (725→6), workspace-store (430→4), desktop-shell (419→3), mobile-shell (antes >300; launcher extraído a `mobile-launcher.ts`).
+- Split de archivos grandes completado: command-registration (725→6), workspace-store (430→4), desktop-shell (419→3), mobile-shell (antes >300; launcher extraído a `mobile-launcher.ts`) y app-registration (276 + catálogo admin separado en `app-registration-admin.ts`).
 - Sesiones opacas en cookie operativas; JWT Bearer, `localStorage` y el secreto JWT fueron retirados del backend/frontend. La ruta legacy `/admin` fue retirada en 018A-26, el serving estático de uploads en 018A-28 y los DTOs de media se separaron en 018A-29; CSS/contratos legacy restantes siguen como deuda controlada.
 - **Quality tool sprint:** 13 reglas custom (P0/P1/P2) + 7 Sentinel CLI + 4 VarSense = 24 reglas activas; la cobertura operativa estimada del quality tool es ~65% del inventario de patrones automatizables definido en el plan. VarSense reconoce contratos vanilla de clases con patch reproducible (`a93b8bf0…`, 43 tests del tool). Últimos gates 297A-13/15/16/17/21: PASS, Sentinel 0 errores, VarSense 0 errores, Rust 30 tests, frontend 390 tests en 52 suites. Auditoría v4 reporta por separado 57/78 hallazgos arquitectónicos potencialmente detectables (73%) y 19/23 correcciones del checklist base (83%); no son denominadores comparables. ISP refactor DomAttrs (33→6 sub-interfaces). El contrato OpenAPI ya no ofrece Bearer/JWT: documenta la cookie `session_id` HttpOnly; la cobertura de endpoints y el retiro del cliente manual quedan diferidos.
 - Ejecutar una tarea por vez y en este orden; no saltar dependencias.
@@ -391,6 +391,7 @@ Plan canónico: `Agente/planes/plan-programas-editoriales-2026-07-31.md`.
 - [ ] Ejecutar Sentinel, VarSense, type-check, tests, E2E, presupuestos de rendimiento, observabilidad y runbook Coolify; deploy continúa fuera de alcance. El split estructural de modelos ya está cerrado: `workspace/` y `workspace_overlay/` agrupan DTOs, validación, locators y tests sin suppressions. Para backend se debe usar `npm test`/`npm run check:back`, que derivan la BD por rama y aplican el contexto correcto.
 - [x] **018A-37 —** El selector frontend incremental y la escritura atómica Windows quedan cubiertos por fixtures del orquestador; la suite completa sigue reservada para `test:full`/CI.
 - [x] **018A-38 —** Separar el contrato Article en subinterfaces composables; type-check y Sentinel confirman que las vistas conservan el mismo boundary.
+- [x] **018A-41 —** Separar el registro de apps públicas y administrativas; `app-registration.ts` queda bajo 300 líneas y los registros/capacidades permanecen sin cambios.
 
 ## Revisión SOLID y escalabilidad por fase
 
