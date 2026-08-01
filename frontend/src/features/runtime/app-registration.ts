@@ -212,7 +212,10 @@ AppRegistry.registerLazy({
       let adminPage: HTMLElement | null = null;
       let disposed = false;
 
-      void m.renderAdmin()
+      /* [018A-1] createAdminWindowView devuelve la página (async) y la
+       * franja de acciones (síncrona) que el shell coloca debajo del body. */
+      const { page, actions } = m.createAdminWindowView();
+      void page
         .then(el => {
           if (disposed || ctx.signal.aborted) {
             m.disposeAdminPage(el);
@@ -229,6 +232,7 @@ AppRegistry.registerLazy({
 
       return {
         element: container,
+        actions,
         destroy: () => {
           disposed = true;
           if (adminPage) m.disposeAdminPage(adminPage);

@@ -39,6 +39,9 @@ export interface WindowGeometry {
 /** Contenido de ventana — usado por desktop-shell. */
 export interface WindowContent {
   readonly content: HTMLElement;
+  /** [018A-1] Franja de acciones inferior de la ventana (debajo del body
+   * padded). La provee la app; opcional. */
+  readonly actions?: HTMLElement;
   readonly controller?: AbortController;
   readonly app?: AppDefinition;
   readonly icon?: IconNode;
@@ -91,6 +94,13 @@ export function generateWindowId(): string {
  * [Auditoría v4 §1.3] Movido de window-manager.ts para consolidar estado mutable. */
 export function generateNextZIndex(): number {
   return nextZIndex++;
+}
+
+/** Subir el piso de z-index por encima del máximo restaurado de sesión.
+ * [317A-5] Las ventanas restauradas conservan su zIndex; las aperturas nuevas
+ * deben quedar por encima, nunca colisionar con el techo restaurado. */
+export function ensureNextZIndexAbove(floor: number): void {
+  if (nextZIndex <= floor) nextZIndex = floor + 1;
 }
 
 /** Resetear contadores (solo para tests — prefijo _ indica API interna). */

@@ -9,8 +9,8 @@ import { createTextarea } from '../components/ui/textarea';
 import { createFontPanel } from '../features/settings/font-panel';
 import { safeClick, safeRun, safeEffect } from '../utils/safe-async';
 import { renderArticleList, openEditor, disposeAdminArticleLists } from './admin-articles';
-import { renderProjectList, disposeAdminProjectLists } from './admin-projects';
-import { renderProductList, disposeAdminProductLists } from './admin-products';
+import { renderProjectList, openProjectEditor, disposeAdminProjectLists } from './admin-projects';
+import { renderProductList, openProductEditor, disposeAdminProductLists } from './admin-products';
 import { createTabs } from '../components/ui/tabs';
 import { createVacio } from '../components/ui/empty-state';
 import { createEl } from '../utils/dom';
@@ -22,10 +22,25 @@ export function disposeAdminPage(page: HTMLElement): void {
   disposeAdminProductLists(page);
 }
 
-export async function renderAdmin(): Promise<HTMLElement> {
+/* [018A-1] Vista de Admin para el runtime de ventanas: devuelve la página
+ * (async) y la franja de acciones (síncrona) que el shell coloca debajo del
+ * body padded. El tab activo rellena la franja; los tabs sin alta la
+ * ocultan. Los botones de acción primaria van al final (derecha). */
+export function createAdminWindowView(): { page: Promise<HTMLElement>; actions: HTMLElement } {
   showProfile.set(false);
 
   const page = createEl('div', { className: 'admin-pagina' });
+
+  /* Franja de acciones de la ventana: hija directa de .desktop-window, debajo
+   * del body padded y fuera de su scroll. La rellena switchTab según el tab. */
+  const actionsBar = createEl('div', { className: 'desktop-window__actions' });
+  actionsBar.hidden = true;
+
+  function setWindowActions(buttons: HTMLElement[]): void {
+    actionsBar.textContent = '';
+    for (const button of buttons) actionsBar.appendChild(button);
+    actionsBar.hidden = buttons.length === 0;
+  }
 
   /* El header (h1 "admin" + botón "salir") duplicaba la barra de título de la
    * ventana y el logout de la app Cuenta ("cerrar sesión" en account-view.ts).
@@ -44,35 +59,46 @@ export async function renderAdmin(): Promise<HTMLElement> {
     contentArea.id = `admin-${name}`;
 
     switch (name) {
+      /* [018A-1] Las listas viven solas en el body; el botón de alta va a la
+       * franja inferior de la ventana (fuera del body padded), al final. */
       case 'articulos': {
-        const btnNuevo = createEl('button', { className: 'boton mb-md', textContent: '+ nuevo articulo' });
-        btnNuevo.addEventListener('click', () => openEditor());
-        contentArea.appendChild(btnNuevo);
         const lista = createEl('div', { className: 'admin-lista' });
         contentArea.appendChild(lista);
         renderArticleList(lista);
+        const btnNuevo = createEl('button', { className: 'boton', textContent: '+ nuevo articulo' });
+        btnNuevo.addEventListener('click', () => openEditor());
+        setWindowActions([btnNuevo]);
         break;
       }
       case 'proyectos': {
         const lista = createEl('div', { className: 'admin-lista' });
         contentArea.appendChild(lista);
         renderProjectList(lista);
+        const btnNuevo = createEl('button', { className: 'boton', textContent: '+ nuevo proyecto' });
+        btnNuevo.addEventListener('click', () => openProjectEditor());
+        setWindowActions([btnNuevo]);
         break;
       }
       case 'productos': {
         const lista = createEl('div', { className: 'admin-lista' });
         contentArea.appendChild(lista);
         renderProductList(lista);
+        const btnNuevo = createEl('button', { className: 'boton', textContent: '+ nuevo producto' });
+        btnNuevo.addEventListener('click', () => openProductEditor());
+        setWindowActions([btnNuevo]);
         break;
       }
       case 'fuentes':
         contentArea.appendChild(createFontPanel());
+        setWindowActions([]);
         break;
       case 'sitio':
         contentArea.appendChild(renderSitioTab());
+        setWindowActions([]);
         break;
       case 'estadisticas':
         renderEstadisticasTab(contentArea);
+        setWindowActions([]);
         break;
     }
   }
@@ -91,7 +117,13 @@ export async function renderAdmin(): Promise<HTMLElement> {
   });
 
   page.append(tabs.el, contentArea);
-  return page;
+  return { page: Promise.resolve(page), actions: actionsBar };
+}
+
+/* [legacy] Ruta /admin del router (sin ventana): solo el contenido. La franja
+ * de acciones pertenece al chrome de la ventana, no a la página en sí. */
+export async function renderAdmin(): Promise<HTMLElement> {
+  return createAdminWindowView().page;
 }
 
 function renderSitioTab(): HTMLElement {

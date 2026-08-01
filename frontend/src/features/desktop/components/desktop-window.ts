@@ -13,6 +13,9 @@ export interface DesktopWindowOptions {
   resizable?: boolean;
   layout?: 'padded' | 'full-bleed';
   toolbar?: AppToolbarGroup[];
+  /* [018A-1] Franja de acciones inferior de la ventana: hija directa de
+   * .desktop-window, debajo del body padded. La provee la app. */
+  actions?: HTMLElement;
   onClose?: () => void;
   onMinimize?: () => void;
   onMaximize?: () => void;
@@ -85,6 +88,12 @@ export function createDesktopWindow(options: DesktopWindowOptions): { element: H
   }
   body.appendChild(options.content);
   windowElement.appendChild(body);
+
+  /* [018A-1] Slot de acciones en el chrome: va después del body (fuera de
+   * su padding y scroll), como franja inferior de la ventana. */
+  if (options.actions) {
+    windowElement.appendChild(options.actions);
+  }
 
   return {
     element: windowElement,

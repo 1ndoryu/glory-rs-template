@@ -176,6 +176,8 @@ Todas las apps usan la misma receta `DesktopWindow`.
 │                                  │
 │          contenido app           │
 │                                  │
+├──────────────────────────────────┤
+│                       [acciones] │
 └──────────────────────────────────┘
 ```
 
@@ -195,6 +197,15 @@ Estados obligatorios:
 - Loading: contenido estable con texto/indicador monocromo.
 - Error: icono + mensaje + recuperación; nunca solo color.
 - Maximizada/móvil dominante: usa área útil entre barras.
+
+### Barra de acciones de la ventana (chrome inferior)
+
+- [018A-1] La franja de acciones (`.desktop-window__actions`) es parte del chrome de la ventana: hija directa de `.desktop-window`, debajo del body padded — fuera de su padding y de su scroll.
+- Lleva las acciones primarias del contexto activo de la app (p. ej. `+ nuevo artículo` en Admin). Los botones van **al final de la franja (derecha)** (`justify-content: flex-end`), con `gap-md` entre ellos.
+- El contenido de la ventana absorbe su propio scroll (`.admin-lista` con `overflow-y: auto`) para que la franja permanezca fija con listas largas.
+- Se oculta (`hidden`, sin espacio residual) cuando el contexto no tiene acciones.
+- La rellena la app según su estado (en Admin, el tab activo); el shell solo la coloca. El slot es opcional en `MountedView`/`WindowContent`; una app que no aporta acciones no cambia de comportamiento.
+- Solo aplica a la presentación desktop: el móvil no tiene ventanas y la ignora; las apps móviles resuelven sus acciones dentro de su propia superficie.
 
 ## 10. Barra superior
 

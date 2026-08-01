@@ -261,6 +261,10 @@
   gap: var(--espacio-md);
   flex: 1;
   min-height: 0;
+  /* [018A-1] scroll interno: la franja de acciones vive en el chrome de la
+   * ventana (debajo del body), así que la lista absorbe su propio scroll y
+   * la franja permanece fija con listas largas. */
+  overflow-y: auto;
 }
 
 .admin-item {

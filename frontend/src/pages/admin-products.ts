@@ -100,15 +100,9 @@ export async function renderProductList(container: HTMLElement): Promise<void> {
     container.appendChild(createEl('div', { className: 'admin-item' }, info, actions));
   }
 
-  const newButton = createEl('button', {
-    type: 'button',
-    className: 'boton mt-md',
-    textContent: '+ nuevo producto',
-  });
-  newButton.addEventListener('click', () => openProductEditor());
-  container.appendChild(newButton);
-
+  /* [018A-1] El botón "+ nuevo producto" vive en la barra de acciones
+   * inferior que orquesta admin.ts; la lista ya no lo crea. */
   if (listResult.value.length === 0) {
-    container.insertBefore(createVacio('no hay productos'), newButton);
+    container.appendChild(createVacio('no hay productos'));
   }
 }

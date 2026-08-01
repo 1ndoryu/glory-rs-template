@@ -452,3 +452,14 @@ Cada fase termina con esta revisión antes de marcar su salida. La revisión deb
 - [x] Verificación en navegador: labels con mayúscula inicial, botones OS con borde 1px dentro de la ventana (`.admin-contenido .boton` = 1px sólido, padding 4px/8px), tabs sin borde con opacidad activo 1 / inactivo 0.45, toolbar más separada, y layout 2 columnas (tabs izquierda x=87, contenido derecha x=197, misma fila, gap 24px) funcionando incluso en ventana estrecha 322px sin overflow.
 
 **Salida:** los formularios del OS capitalizan la primera letra de sus labels, los botones de acción dentro de superficies OS ganan borde 1px (los tabs y botones de icono no), la toolbar del editor respira mejor, y la barra de pestañas queda como navegación vertical izquierda en 2 columnas con estados de opacidad; la identidad visual queda documentada en el manual (§13).
+
+### 018A — Barra de acciones inferior de ventana (regla aprobada)
+
+**Regla:** las acciones primarias de una ventana viven en `.desktop-window__actions`, franja inferior del chrome (debajo del body padded, fuera de su padding y scroll), con los botones al final (derecha). Aprobada visualmente el 2026-08-01. Plan: `Agente/planes/plan-barra-acciones-ventanas-2026-08-01.md`.
+
+- [x] Slot `actions` en runtime chain + Admin (tabs con alta rellenan; sin alta ocultan). *(018A-1)*
+- [x] Manual identidad §9 y guía agregar-app actualizados. *(018A-2)*
+- [ ] Fase 1: alcance móvil del slot — Admin móvil no debe perder el botón de alta.
+- [ ] Fase 2: migrar editores (article/project/product) a la franja.
+- [ ] Fase 3: inventario de ventanas restantes (Configuración, Cuenta, Finder, Trash…).
+- [ ] Fase 4: prevención automatizable (Sentinel/VarSense).

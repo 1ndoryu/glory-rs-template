@@ -167,6 +167,8 @@ export function createDesktopShell(
         const windowHandle = createDesktopWindow({
           title: win.title,
           content: win.content,
+          /* [018A-1] Franja inferior opcional de la ventana. */
+          actions: win.actions,
           className: win.cssClass ?? `desktop-window--${win.appId}`,
           layout: win.layout,
           toolbar: win.toolbar,

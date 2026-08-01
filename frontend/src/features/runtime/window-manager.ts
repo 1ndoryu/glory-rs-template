@@ -50,6 +50,8 @@ export function openWindow(
     zIndex: generateNextZIndex(),
     focused: true,
     content: view.element,
+    /* [018A-1] La app puede aportar su franja de acciones. */
+    actions: view.actions,
     controller,
     app,
     layout: app.layout,

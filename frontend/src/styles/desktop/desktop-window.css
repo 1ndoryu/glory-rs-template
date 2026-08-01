@@ -81,6 +81,26 @@
   min-height: 0;
 }
 
+/* [018A-1] Franja de acciones de la ventana (regla visual aprobada): hija
+ * directa de .desktop-window, debajo del body padded — fuera de su padding
+ * y de su scroll. La app la rellena según su contexto activo y la oculta
+ * cuando no hay acciones. Los botones de acción primaria van al final de la
+ * franja (justify-content: flex-end), anclados a la derecha. */
+.desktop-window__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--espacio-md);
+  padding: var(--espacio-sm) var(--espacio-md);
+  border-top: var(--sistema-borde);
+  background: var(--sistema-superficie);
+}
+
+/* El slot existe pero sin acciones: oculto (tabs sin alta, otras apps). */
+.desktop-window__actions[hidden] {
+  display: none;
+}
+
 /* Scrollbar más gruesa para distinguir del borde de resize */
 .desktop-window__body::-webkit-scrollbar {
   width: 12px;
