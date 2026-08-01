@@ -301,6 +301,13 @@ Cerrar desde taskbar no cambia el foco accidentalmente. Cuando no caben tareas s
 - Los botones de solo icono de toolbars (`.boton-icono`, ej. el editor de artículos) NO llevan borde; su separación se resuelve en el contenedor de la toolbar (`gap-md`). Esta separación es la única distinción de la toolbar respecto de los botones de acción enmarcados.
 - Ningún botón usa radio, sombra ni color de fondo; el borde es siempre `--borde` (1px sólido).
 
+### Toolbar de contenido
+
+- [018A-68] La toolbar de contenido (controles dentro del body de una app, por debajo del app toolbar declarativo que es chrome de la ventana) usa la receta compartida `.barra-herramientas` (flex, gap-md, borde inferior) de `components.css`.
+- Los filtros y modos de vista dentro de esa barra usan `.control-segmentado` (componente `createSegmentedControl`): grupo de opciones pequeñas con borde 1px y el estado activo invertido (fondo negro, texto claro), patrón Mac clásico. Cada opción es un `button` con `aria-pressed`; el grupo lleva `role=group` + `aria-label`.
+- PROHIBIDO dentro de una toolbar de contenido: campos de formulario (`.campo`/`.campo-select` con etiqueta y subrayado) y botones con borde de superficie (`.boton`). Un filtro de pocas opciones se resuelve como control segmentado, no como select; un modo de vista (p. ej. biblioteca/papelera) es un segmentado de dos opciones, no un botón que cambia su etiqueta.
+- Las acciones de la toolbar de contenido usan `.boton-icono` (solo icono) o `.boton-con-icono` (icono+texto), nunca `.boton` con borde.
+
 ## 14. Papelera y estados de archivo
 
 - Papelera es una carpeta de sistema no eliminable.

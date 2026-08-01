@@ -132,6 +132,59 @@
   outline-offset: 2px;
 }
 
+/* === TOOLBAR DE CONTENIDO — Receta compartida (regla 018A-68) ===
+ * Contenedor de controles de vista/filtro dentro del body de una app
+ * (por debajo del app toolbar declarativo, que es chrome de la ventana).
+ * Las acciones usan .boton-icono/.boton-con-icono; los filtros y modos de
+ * vista usan .control-segmentado. PROHIBIDO .campo/.campo-select (formulario)
+ * ni .boton con borde de superficie dentro de esta barra. */
+.barra-herramientas {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--espacio-md);
+  padding-bottom: var(--espacio-md);
+  border-bottom: var(--sistema-borde);
+}
+
+/* === CONTROL SEGMENTADO — Receta compartida para filtros y modos de vista ===
+ * Grupo de opciones pequeñas con el activo invertido (Mac clásico). El
+ * contenedor aporta el borde; las opciones se separan con 1px. El nombre
+ * accesible del grupo lo aporta el consumidor (aria-label); cada opción es
+ * un botón con aria-pressed. Componente: components/ui/segmented-control.ts */
+.control-segmentado {
+  display: inline-flex;
+  border: var(--sistema-borde);
+}
+
+.control-segmentado__opcion {
+  padding: var(--espacio-xs) var(--espacio-sm);
+  border: none;
+  border-right: var(--sistema-borde);
+  border-radius: 0;
+  background: transparent;
+  color: var(--sistema-texto);
+  font-family: var(--fuente-sistema);
+  font-size: var(--sistema-texto-tamano);
+  line-height: inherit;
+  cursor: pointer;
+}
+
+.control-segmentado__opcion:last-child {
+  border-right: none;
+}
+
+.control-segmentado__opcion:hover,
+.control-segmentado__opcion--activa {
+  background: var(--sistema-texto);
+  color: var(--sistema-superficie);
+}
+
+.control-segmentado__opcion:focus-visible {
+  outline: 1px solid var(--sistema-texto);
+  outline-offset: 2px;
+}
+
 /* [297A-21] Receta única para la app de novedades. Las apps solo consumen
  * esta estructura; el chrome sigue siendo responsabilidad del shell. */
 .notificaciones {

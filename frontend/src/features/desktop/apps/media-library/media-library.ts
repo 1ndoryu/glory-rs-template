@@ -7,7 +7,7 @@
 import { createElement, RotateCcw, Trash2, Link, Upload, Image as ImageIcon, FileText } from 'lucide';
 import { createEl } from '../../../../utils/dom';
 import { createVacio } from '../../../../components/ui/empty-state';
-import { createSelect } from '../../../../components/ui/select';
+import { createSegmentedControl } from '../../../../components/ui/segmented-control';
 import { MediaService } from '../../../../services';
 import { tryCatch } from '../../../../utils/result';
 import { safeClick, safeRun } from '../../../../utils/safe-async';
@@ -150,9 +150,12 @@ export function createMediaLibraryPreview(options: MediaLibraryOptions): MediaLi
 
   const isActive = (): boolean => !disposed && !options.signal.aborted;
 
-  /* === Toolbar de la biblioteca === */
-  const filterSelect = createSelect({
-    label: 'tipo',
+  /* [018A-68] Toolbar de contenido con receta del sistema: el filtro de tipo
+   * y la vista biblioteca/papelera son controles segmentados (activo
+   * invertido), no campos de formulario ni botones con borde. La barra usa
+   * .barra-herramientas; el estado activo lo gestiona el componente. */
+  const filterControl = createSegmentedControl({
+    ariaLabel: 'Filtrar por tipo',
     options: [
       { value: 'all', label: 'todos' },
       { value: 'image', label: 'imágenes' },
@@ -162,14 +165,17 @@ export function createMediaLibraryPreview(options: MediaLibraryOptions): MediaLi
     value: 'all',
     onChange: (value) => { filter = value as MediaFilter; void render(); },
   });
-  const trashToggle = createEl('button', {
-    type: 'button', className: 'boton', ariaPressed: 'false', textContent: 'papelera',
-  });
-  trashToggle.addEventListener('click', () => {
-    trashView = !trashView;
-    trashToggle.setAttribute('aria-pressed', String(trashView));
-    trashToggle.textContent = trashView ? 'biblioteca' : 'papelera';
-    void render();
+  const viewControl = createSegmentedControl({
+    ariaLabel: 'Vista de la biblioteca',
+    options: [
+      { value: 'library', label: 'biblioteca' },
+      { value: 'trash', label: 'papelera' },
+    ],
+    value: 'library',
+    onChange: (value) => {
+      trashView = value === 'trash';
+      void render();
+    },
   });
   /* [018A-67] Icono primero y texto en span, con la receta boton-con-icono:
    * flex centrado + gap + SVG dimensionado desde token. Antes era .boton a
@@ -211,11 +217,12 @@ export function createMediaLibraryPreview(options: MediaLibraryOptions): MediaLi
   }));
   uploadBtn.addEventListener('click', () => fileInput.click());
 
-  /* [018A-1 F3] El toolbar conserva solo controles de vista (filtro y toggle
+  /* [018A-1 F3] La toolbar conserva solo controles de vista (filtro y toggle
    * papelera/biblioteca); la acción primaria de creación (subir archivo)
-   * vive en la franja inferior fija, fuera del scroll de la lista. */
-  const toolbar = createEl('div', { className: 'media-library__toolbar' },
-    filterSelect, trashToggle);
+   * vive en la franja inferior fija, fuera del scroll de la lista.
+   * [018A-68] Contenedor con la receta compartida .barra-herramientas. */
+  const toolbar = createEl('div', { className: 'barra-herramientas' },
+    filterControl, viewControl);
   const list = createEl('div', { className: 'media-library__grid' });
   container.append(toolbar, list);
   actionsBar.append(uploadBtn, fileInput);
