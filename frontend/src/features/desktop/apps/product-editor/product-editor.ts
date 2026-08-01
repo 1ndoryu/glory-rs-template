@@ -8,6 +8,7 @@ import { createInput } from '../../../../components/ui/input';
 import { createTextarea } from '../../../../components/ui/textarea';
 import { createSelect } from '../../../../components/ui/select';
 import { createEl } from '../../../../utils/dom';
+import { createVacio } from '../../../../components/ui/empty-state';
 import { safeClick, safeRun } from '../../../../utils/safe-async';
 import { showToast } from '../../../../components/ui/toast';
 import { tryCatch } from '../../../../utils/result';
@@ -135,10 +136,7 @@ export function renderProductEditor(ctx: RenderContext): MountedView {
     } catch {
       if (!isActive()) return;
       container.textContent = '';
-      container.appendChild(createEl('p', {
-        className: 'vacio',
-        textContent: 'error al cargar el editor de productos',
-      }));
+      container.appendChild(createVacio('error al cargar el editor de productos'));
     }
   };
 

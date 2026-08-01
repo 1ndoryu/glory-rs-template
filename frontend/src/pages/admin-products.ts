@@ -5,6 +5,7 @@
 import { safeRun, safeClick } from '../utils/safe-async';
 import { tryCatch } from '../utils/result';
 import { createEl } from '../utils/dom';
+import { createVacio } from '../components/ui/empty-state';
 import { ProductService } from '../services';
 import { showToast } from '../components/ui/toast';
 import { showConfirm } from '../components/ui/confirm';
@@ -64,7 +65,7 @@ export async function renderProductList(container: HTMLElement): Promise<void> {
   if (productListGenerations.get(container) !== generation) return;
   if (!listResult.ok) {
     container.textContent = '';
-    container.appendChild(createEl('p', { className: 'vacio', textContent: 'error al cargar productos' }));
+    container.appendChild(createVacio('error al cargar productos'));
     return;
   }
 
@@ -108,6 +109,6 @@ export async function renderProductList(container: HTMLElement): Promise<void> {
   container.appendChild(newButton);
 
   if (listResult.value.length === 0) {
-    container.insertBefore(createEl('p', { className: 'vacio', textContent: 'no hay productos' }), newButton);
+    container.insertBefore(createVacio('no hay productos'), newButton);
   }
 }

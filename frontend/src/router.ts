@@ -3,7 +3,7 @@
  * Soporta parámetros dinámicos (:slug), guards de autenticación
  * y AbortSignal para lifecycle de vistas. */
 
-import { createEl } from './utils/dom';
+import { createVacio } from './components/ui/empty-state';
 import type { RenderContext } from './core/lifecycle';
 export type { RenderContext };
 
@@ -108,7 +108,7 @@ export function pushPath(path: string): void {
 export function showRouteNotFound(): void {
   if (!outlet) return;
   outlet.innerHTML = '';
-  outlet.appendChild(createEl('div', { className: 'vacio', textContent: 'página no encontrada' }));
+  outlet.appendChild(createVacio('página no encontrada'));
 }
 
 export function getCurrentPath(): string {

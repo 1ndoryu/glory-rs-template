@@ -207,7 +207,8 @@ AppRegistry.registerLazy({
   load: () => import('../../pages/admin').then(m => ({
     render: (ctx: RenderContext): MountedView => {
       dispatchEvent({ type: 'app_opened', appId: 'admin' });
-      const container = createEl('div');
+      /* [317A-2] Contenedor con fill-height: los estados vacios centrados ocupan toda la ventana. */
+      const container = createEl('div', { className: 'app-contenedor' });
       let adminPage: HTMLElement | null = null;
       let disposed = false;
 
@@ -320,7 +321,8 @@ AppRegistry.registerLazy({
   load: () => import('../../pages/projects').then(m => ({
     render: (ctx: RenderContext): MountedView => {
       dispatchEvent({ type: 'app_opened', appId: 'projects' });
-      const container = createEl('div');
+      /* [317A-2] Contenedor con fill-height: los estados vacios centrados ocupan toda la ventana. */
+      const container = createEl('div', { className: 'app-contenedor' });
       void m.renderProjects().then(el => {
         if (!ctx.signal.aborted) container.appendChild(el);
       });

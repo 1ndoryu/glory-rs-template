@@ -12,6 +12,7 @@ import { renderArticleList, openEditor, disposeAdminArticleLists } from './admin
 import { renderProjectList, disposeAdminProjectLists } from './admin-projects';
 import { renderProductList, disposeAdminProductLists } from './admin-products';
 import { createTabs } from '../components/ui/tabs';
+import { createVacio } from '../components/ui/empty-state';
 import { createEl } from '../utils/dom';
 
 /** Cleanup de recursos editoriales antes de desmontar la página Admin. */
@@ -32,7 +33,10 @@ export async function renderAdmin(): Promise<HTMLElement> {
   /* Barra de pestañas universal (components/ui/tabs.ts). El estado activo lo
    * resuelve el componente (clase + aria-selected), sin inline styles ni
    * utilidades externas de padding/margin. [317A-1] */
-  const contentArea = createEl('div', { id: 'admin-articulos' });
+  /* [317A-2] admin-contenido cierra la cadena de fill-height de la ventana
+   * (app-contenedor -> admin-pagina -> admin-contenido) para que los estados
+   * vacios centrados llenen toda la altura. */
+  const contentArea = createEl('div', { id: 'admin-articulos', className: 'admin-contenido' });
 
   function switchTab(name: string): void {
     disposeAdminPage(page);
@@ -154,6 +158,7 @@ function renderEstadisticasTab(contentArea: HTMLElement): void {
       }
     }
   }).catch(() => {
-    statsContainer.innerHTML = '<p class="vacio">error al cargar estadisticas</p>';
+    /* [317A-2] Estado de error via componente universal (en vez de innerHTML). */
+    statsContainer.replaceChildren(createVacio('error al cargar estadisticas'));
   });
 }

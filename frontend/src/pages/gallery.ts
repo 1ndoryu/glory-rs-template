@@ -8,6 +8,7 @@ import { trackImageDownload } from '../features/analytics/tracker';
 import { updateMeta, setPageJsonLd } from '../features/seo/meta';
 import { showProfile } from '../store';
 import { createEl } from '../utils/dom';
+import { createVacio } from '../components/ui/empty-state';
 import { tryCatch } from '../utils/result';
 
 export async function renderGallery(): Promise<HTMLElement> {
@@ -15,9 +16,9 @@ export async function renderGallery(): Promise<HTMLElement> {
   updateMeta({ title: 'galeria', description: 'todas las imagenes de wandori.us' });
   setPageJsonLd('galeria', 'todas las imagenes de wandori.us');
 
-  const page = createEl('div');
-
   /* El h1 "galeria" duplicaba el título de la ventana ("Galería"). Eliminado. */
+  /* [317A-2] pagina-contenido llena el area de contenido para centrar los estados vacios. */
+  const page = createEl('div', { className: 'pagina-contenido' });
   const cargando = createEl('p', { className: 'cargando', textContent: 'cargando...' });
 
   page.appendChild(cargando);
@@ -52,7 +53,7 @@ export async function renderGallery(): Promise<HTMLElement> {
   page.innerHTML = '';
 
   if (media.length === 0) {
-    page.appendChild(createEl('p', { className: 'vacio', textContent: 'no hay imagenes todavia' }));
+    page.appendChild(createVacio('no hay imagenes todavia'));
     return page;
   }
 

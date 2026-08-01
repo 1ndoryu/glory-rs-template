@@ -5,6 +5,7 @@
 import { safeRun, safeClick } from '../utils/safe-async';
 import { tryCatch } from '../utils/result';
 import { createEl } from '../utils/dom';
+import { createVacio } from '../components/ui/empty-state';
 import { ProjectService } from '../services';
 import { showToast } from '../components/ui/toast';
 import { showConfirm } from '../components/ui/confirm';
@@ -59,7 +60,7 @@ export async function renderProjectList(container: HTMLElement): Promise<void> {
   if (projectListGenerations.get(container) !== generation) return;
   if (!listResult.ok) {
     container.textContent = '';
-    container.appendChild(createEl('p', { className: 'vacio', textContent: 'error al cargar proyectos' }));
+    container.appendChild(createVacio('error al cargar proyectos'));
     return;
   }
 
@@ -101,6 +102,6 @@ export async function renderProjectList(container: HTMLElement): Promise<void> {
   container.appendChild(newButton);
 
   if (listResult.value.length === 0) {
-    container.insertBefore(createEl('p', { className: 'vacio', textContent: 'no hay proyectos' }), newButton);
+    container.insertBefore(createVacio('no hay proyectos'), newButton);
   }
 }

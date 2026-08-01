@@ -6,6 +6,7 @@
 
 import { createElement, RotateCcw, Trash2, Link, Upload, Image as ImageIcon, FileText } from 'lucide';
 import { createEl } from '../../../../utils/dom';
+import { createVacio } from '../../../../components/ui/empty-state';
 import { createSelect } from '../../../../components/ui/select';
 import { MediaService } from '../../../../services';
 import { tryCatch } from '../../../../utils/result';
@@ -213,16 +214,15 @@ export function createMediaLibraryPreview(options: MediaLibraryOptions): MediaLi
     if (!isActive() || current !== generation) return;
     if (!result.ok) {
       list.textContent = '';
-      list.appendChild(createEl('p', { className: 'vacio', textContent: 'error al cargar la biblioteca' }));
+      list.appendChild(createVacio('error al cargar la biblioteca'));
       return;
     }
     list.textContent = '';
     const items = result.value.filter(item => filter === 'all' || item.file_type === filter);
     if (items.length === 0) {
-      list.appendChild(createEl('p', {
-        className: 'vacio',
-        textContent: trashView ? 'la papelera está vacía' : 'no hay archivos en la biblioteca',
-      }));
+      list.appendChild(createVacio(
+        trashView ? 'la papelera está vacía' : 'no hay archivos en la biblioteca',
+      ));
       return;
     }
     for (const item of items) {

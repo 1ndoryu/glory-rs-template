@@ -453,12 +453,27 @@
   margin-bottom: var(--espacio-sm);
 }
 
-/* === VACIO === */
+/* === VACIO (estado vacio universal, ver createVacio) === */
+/* El wrapper ocupa 100% ancho+alto y centra su texto; el <p> interno lleva
+ * el estilo. grid-column: 1/-1 permite llenar el ancho dentro de grids
+ * (p.ej. media-library). min-height da un minimo razonable cuando el padre
+ * no define altura (editores, modales). */
 .vacio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  width: 100%;
+  height: 100%;
+  flex: 1 1 auto;
+  min-height: var(--espacio-3xl);
+  grid-column: 1 / -1;
+}
+
+.vacio p {
   font-size: var(--tamano-texto);
   color: var(--color-texto-secundario);
   font-style: italic;
-  padding: var(--espacio-xl) 0;
 }
 
 /* === EDITOR DE ENLACES SOCIALES === */

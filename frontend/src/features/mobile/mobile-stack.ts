@@ -3,7 +3,7 @@
  * No contiene lógica de negocio ni componentes MobileFoo: solo instancia,
  * apila y destruye vistas compartidas. [297A-12 §2–4] */
 
-import { createEl } from '../../utils/dom';
+import { createVacio } from '../../components/ui/empty-state';
 import type { MountedView } from '../../core/lifecycle';
 import { AppRegistry } from '../runtime/app-registry';
 import { getCurrentPath, pushPath } from '../../router';
@@ -195,10 +195,7 @@ export function getTopMobileApp(): MobileStackEntry | undefined {
 /** Fallback visual para una app que no puede montarse en el shell móvil. */
 export function createMobileErrorView(title: string): MountedView {
   return {
-    element: createEl('p', {
-      className: 'vacio',
-      textContent: `No se pudo abrir ${title}.`,
-    }),
+    element: createVacio(`No se pudo abrir ${title}.`),
   };
 }
 

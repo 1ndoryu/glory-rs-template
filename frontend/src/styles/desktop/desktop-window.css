@@ -70,6 +70,17 @@
   padding: var(--espacio-md);
 }
 
+/* [317A-2] Contenedor de montaje de apps en ventanas: llena el body (que ya
+ * tiene altura definida) para que los estados vacios (.vacio height:100%)
+ * y los layouts flex internos ocupen toda la ventana. NO usar display:flex
+ * en .desktop-window__body: rompe el scroll de apps con contenido alto. */
+.app-contenedor {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 /* Scrollbar más gruesa para distinguir del borde de resize */
 .desktop-window__body::-webkit-scrollbar {
   width: 12px;

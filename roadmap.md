@@ -405,3 +405,17 @@ Cada fase termina con esta revisión antes de marcar su salida. La revisión deb
 - [x] Validación: `tsc --noEmit` OK, suite vitest 322/322 PASS, gate `task:check -- 317A-1`.
 
 **Salida:** cualquier app puede usar `createTabs({tabs, initial, onSwitch})` y obtener una barra de pestañas accesible y autocontenida; Admin migrado sin inline styles; CSS muerto retirado.
+
+### 317A-2 — Estado vacío universal (createVacio) centrado y capitalizado
+
+**Petición del usuario:** los estados vacíos deben estar centralizados en un componente universal (todos), con texto centrado que ocupe el 100% del ancho y la altura, y la primera letra en mayúscula.
+
+- [x] Crear `frontend/src/components/ui/empty-state.ts` (`createVacio`): wrapper `div.vacio` con `role="status"` + `<p>` interno con la primera letra capitalizada. *(317A-2)*
+- [x] CSS `.vacio` en `components.css`: flex centrado, `width/height: 100%`, `flex: 1`, `min-height` de respaldo y `grid-column: 1/-1` para grids; estilo de texto movido a `.vacio p`.
+- [x] Fill-height en ventanas: `.app-contenedor` (admin + projects) sin tocar `.desktop-window__body`; cadena `admin-pagina → admin-contenido → admin-lista` con flex; `.pagina-contenido` para galería/proyectos; `media-library__grid` con `flex:1`.
+- [x] Migrar los 16 sitios de `.vacio` a `createVacio`: admin-articles/products/projects (6), admin.ts stats, gallery, projects, router not-found, article/product/project-editor (3), media-library (2), mobile-stack.
+- [x] Test `empty-state.test.ts`: render, role=status, capitalización, texto ya capitalizado, string vacío. 4/4 PASS.
+- [x] Validación: `tsc --noEmit` OK, suite vitest 326/326 PASS.
+- [x] Gate `task:check -- 317A-2` PASS + verificación en navegador (Admin "No hay articulos" centrado a toda altura).
+
+**Salida:** cualquier estado vacío/error usa `createVacio(texto)` y queda centrado, llenando el contenedor, con mayúscula inicial y rol accesible; sin recetas `.vacio` duplicadas en cada archivo.

@@ -17,11 +17,15 @@
   border-bottom: var(--sistema-borde);
 }
 
+/* [317A-2] flex:1 + min-height:0 permite que el estado vacio (.vacio con
+ * grid-column 1/-1 y height:100%) llene el resto de la ventana. */
 .media-library__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: var(--espacio-lg);
   align-content: start;
+  flex: 1;
+  min-height: 0;
 }
 
 .media-library__item {

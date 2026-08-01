@@ -8,6 +8,7 @@ import { ArticleService } from '../services';
 import { showConfirm } from '../components/ui/confirm';
 import { clearArticleCache } from '../components/layout/sidebar';
 import { createEl } from '../utils/dom';
+import { createVacio } from '../components/ui/empty-state';
 import { subscribeArticleEditorSaved } from '../features/runtime/article-editor-events';
 import { showToast } from '../components/ui/toast';
 import type { Article } from '../api/types';
@@ -69,7 +70,7 @@ export async function renderArticleList(container: HTMLElement): Promise<void> {
   if (articleListGenerations.get(container) !== generation) return;
   if (!listResult.ok) {
     container.textContent = '';
-    container.appendChild(createEl('p', { className: 'vacio', textContent: 'error al cargar' }));
+    container.appendChild(createVacio('error al cargar'));
     return;
   }
 
@@ -113,6 +114,6 @@ export async function renderArticleList(container: HTMLElement): Promise<void> {
   }
 
   if (listResult.value.items.length === 0) {
-    container.appendChild(createEl('p', { className: 'vacio', textContent: 'no hay articulos' }));
+    container.appendChild(createVacio('no hay articulos'));
   }
 }

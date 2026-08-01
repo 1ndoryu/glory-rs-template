@@ -8,6 +8,7 @@ import { ArticleService } from '../../../../services';
 import { createInput } from '../../../../components/ui/input';
 import { createTextarea } from '../../../../components/ui/textarea';
 import { createEl } from '../../../../utils/dom';
+import { createVacio } from '../../../../components/ui/empty-state';
 import { pickAndUpload } from '../../../../utils/upload';
 import { safeClick, safeRun } from '../../../../utils/safe-async';
 import { showToast } from '../../../../components/ui/toast';
@@ -285,10 +286,7 @@ export function renderArticleEditor(ctx: RenderContext): MountedView {
       if (!isActive()) return;
       destroyEditor();
       container.textContent = '';
-      container.appendChild(createEl('p', {
-        className: 'vacio',
-        textContent: 'error al cargar el editor',
-      }));
+      container.appendChild(createVacio('error al cargar el editor'));
     }
   };
 

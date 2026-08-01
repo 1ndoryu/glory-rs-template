@@ -6,6 +6,7 @@ import { ProjectService } from '../services';
 import { updateMeta, setPageJsonLd } from '../features/seo/meta';
 import { showProfile } from '../store';
 import { createEl, createExternalLink } from '../utils/dom';
+import { createVacio } from '../components/ui/empty-state';
 import { tryCatch } from '../utils/result';
 
 export async function renderProjects(): Promise<HTMLElement> {
@@ -13,7 +14,8 @@ export async function renderProjects(): Promise<HTMLElement> {
   updateMeta({ title: 'proyectos', description: 'proyectos y trabajo de wandorius' });
   setPageJsonLd('proyectos', 'proyectos y trabajo de wandorius');
 
-  const page = createEl('div');
+  /* [317A-2] pagina-contenido llena el area de contenido para centrar los estados vacios. */
+  const page = createEl('div', { className: 'pagina-contenido' });
 
   /* El h1 "proyectos" duplicaba el título de la ventana ("Proyectos"). Eliminado. */
   const cargando = createEl('p', { className: 'cargando', textContent: 'cargando...' });
@@ -53,7 +55,7 @@ export async function renderProjects(): Promise<HTMLElement> {
   const visibles = projects.filter(p => p.is_visible).sort((a, b) => a.sort_order - b.sort_order);
 
   if (visibles.length === 0) {
-    page.appendChild(createEl('p', { className: 'vacio', textContent: 'no hay proyectos todavia' }));
+    page.appendChild(createVacio('no hay proyectos todavia'));
     return page;
   }
 
