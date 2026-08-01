@@ -172,3 +172,7 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 ## 018A-30 — El roadmap también es un contrato
 
 - Cuando una implementación cambia un shape o el orden de fases, las referencias históricas activas deben actualizarse en la misma tarea; una línea obsoleta puede hacer que el siguiente agente reintroduzca un contrato retirado.
+
+## 018A-31 — Validar CSS dinámico antes de eliminarlo
+
+- Un selector reportado como huérfano puede construirse desde una cadena o plantilla en TypeScript; antes de borrarlo hay que buscar consumidores dinámicos y conservarlos si forman parte del runtime.

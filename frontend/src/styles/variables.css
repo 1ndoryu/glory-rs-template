@@ -191,8 +191,8 @@
 }
 
 /* [297A-18] Contenido de apps del OS: hereda contexto de tema oscuro.
- * Finder/Reader/Trash ya usan --sistema-*; Profile, Settings (font-panel,
- * arrow-select), About, Admin y Projects renderizan componentes compartidos
+ * Finder/Reader/Trash ya usan --sistema-*; Profile, Settings, About, Admin y
+ * Projects renderizan componentes compartidos
  * con las páginas legacy (que usan --color-*). Para que el dark mode sea
  * legible sin migrar cada componente (lo que rompería las páginas legacy),
  * se redefine el juego de tokens exteriores dentro del alcance del OS:

@@ -304,14 +304,6 @@
   gap: var(--espacio-lg);
 }
 
-.font-panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--espacio-lg);
-}
-
-
-
 /* === ESTADÍSTICAS === */
 .stats-grid {
   display: grid;
@@ -388,4 +380,3 @@
 }
 
 } /* @layer components */
-

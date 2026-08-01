@@ -431,6 +431,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [x] Eliminar JWT Bearer, `jsonwebtoken`, secreto/configuración y clientes/tipos de autenticación legacy; la sesión opaca HttpOnly queda como autoridad única. *(018A-18; uploads y CSS/contratos legacy siguen pendientes)*
 - [x] **018A-28 —** Eliminar serving estático de uploads y sustituirlo por previews autorizados.
 - [x] **018A-29 —** Retirar el contrato `file_path` de respuestas de media mediante DTOs públicos/admin/upload explícitos; la matriz de paridad CSS/cliente manual continúa pendiente.
+- [x] **018A-31 —** Retirar estilos huérfanos verificados por VarSense (`arrow-select`, `.font-panel`) sin tocar clases generadas dinámicamente.
 - [ ] Eliminar CSS/clases huérfanas con VarSense.
 
 **Criterio de salida:** una sola administración como app registrada, analytics útil/privado y cero rutas/chrome duplicados legacy; uploads y CSS/contratos obsoletos deben desaparecer después de su matriz de paridad.

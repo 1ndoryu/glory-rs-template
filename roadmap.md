@@ -70,6 +70,7 @@
 - [x] **018A-28 —** Retirado el serving estático público de `/uploads`; las respuestas de media exponen solo previews autorizados y existen rutas públicas/admin con validación de envelope, estado y confinamiento de path.
 - [x] **018A-29 —** Separados los DTOs públicos, administrativos y de subida de media: las respuestas exponen `url`/`admin_url` y `file_name`, nunca `file_path` ni storage keys; servicios frontend y OpenAPI consumen el contrato explícito.
 - [x] **018A-30 —** Alineadas las referencias activas del roadmap y planes: el shape de media usa DTOs con URLs explícitas y las validaciones visuales/E2E quedan diferidas sin reabrir bloques técnicos cerrados.
+- [x] **018A-31 —** Retirados estilos CSS huérfanos confirmados (`arrow-select` y `.font-panel`); se conservan clases dinámicas usadas por el runtime y sus avisos quedan documentados como falsos positivos de análisis estático.
 
 **Salida:** runtime compartido funciona sin chrome/listas/listeners duplicados. Orval se regenera localmente sin backend vivo; quedan cobertura total del contrato y retiro del cliente manual.
 
@@ -364,6 +365,7 @@ Plan canónico: `Agente/planes/plan-programas-editoriales-2026-07-31.md`.
 - [x] Completar paneles Overview/Content/OS/Commerce/Reliability y exportación; `analytics` es un programa admin independiente y conserva el panel legacy como compatibilidad.
 - [x] **018A-28 —** Retirar serving estático de `/uploads`: previews públicos solo para `active + public + clean`, previews admin para recursos activos, y paths confinados al storage configurado.
 - [x] **018A-29 —** Separar DTO público/admin/upload de media del modelo interno de storage; `url` y `admin_url` quedan como contratos explícitos para API, OpenAPI y frontend.
+- [x] **018A-31 —** Limpiar CSS huérfano confirmado con VarSense; las clases construidas dinámicamente no se eliminan por un falso positivo.
 - [ ] Completar la matriz de paridad y retirar contratos/CSS legacy restantes. *(JWT Bearer ya no forma parte del contrato)*
 
 ### 297A-17 — Hardening, identidad, accesibilidad y SEO
