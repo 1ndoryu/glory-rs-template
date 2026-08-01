@@ -204,3 +204,7 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Ejecutar únicamente los tests modificados deja sin cobertura los tests que importan un módulo fuente cambiado; un grafo local de imports ofrece selección rápida sin convertir cada cambio en suite completa.
 - En Windows, `rename`/`unlink` concurrentes pueden devolver `EPERM` aunque otro escritor esté progresando; el reemplazo atómico debe reintentar ambos pasos con límite y paths exactos.
+
+## 018A-38 — Componer contratos sin romper consumidores
+
+- Un DTO grande puede dividirse con `extends` manteniendo el mismo nombre exportado; así se mejora ISP y Sentinel sin introducir mapeos, cambios de serialización ni duplicación de tipos.

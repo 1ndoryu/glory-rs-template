@@ -16,19 +16,29 @@ export interface LoginRequest {
 }
 
 /* === Articles === */
-export interface Article {
+/* [018A-38] Separar identidad, contenido y estado mantiene ISP sin cambiar
+ * el nombre público `Article` que consumen las vistas/editor y servicios. */
+interface ArticleIdentity {
   id: string;
   title: string;
   slug: string;
-  content: Record<string, unknown>; /* TipTap JSON */
-  excerpt: string;
-  cover_image: string | null;
-  status: 'draft' | 'published';
-  is_pinned: boolean;
-  published_at: string | null;
   created_at: string;
   updated_at: string;
 }
+
+interface ArticleContent {
+  content: Record<string, unknown>; /* TipTap JSON */
+  excerpt: string;
+  cover_image: string | null;
+}
+
+interface ArticlePublication {
+  status: 'draft' | 'published';
+  is_pinned: boolean;
+  published_at: string | null;
+}
+
+export interface Article extends ArticleIdentity, ArticleContent, ArticlePublication {}
 
 export interface CreateArticleRequest {
   title: string;
