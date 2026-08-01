@@ -73,6 +73,10 @@ export function renderArticleEditor(ctx: RenderContext): MountedView {
       let status = article?.status || 'draft';
       let isPinned = article?.is_pinned || false;
       let currentArticleId = article?.id;
+      /* [297A-14 F5] Sincroniza la etiqueta del botón (crear/guardar) también
+       * cuando el autosave crea el artículo; la referencia se asigna tras
+       * crear el botón (los clicks ocurren después de la hidratación). */
+      let updateSaveLabel: () => void = () => {};
 
       /* El autosave se crea antes de los inputs; los closures de onInput solo
        * se ejecutan al escribir (después de que autosave ya existe). */
@@ -130,7 +134,10 @@ export function renderArticleEditor(ctx: RenderContext): MountedView {
        * (status/pin) solo cambia con el guardado manual explícito. */
       autosave = createArticleAutosave({
         getArticleId: () => currentArticleId,
-        setArticleId: (id) => { currentArticleId = id; },
+        setArticleId: (id) => {
+          currentArticleId = id;
+          updateSaveLabel();
+        },
         getPayload: (): ArticleDraftPayload => ({
           title,
           excerpt,
@@ -157,6 +164,9 @@ export function renderArticleEditor(ctx: RenderContext): MountedView {
         className: 'boton boton-grande',
         textContent: currentArticleId ? 'guardar' : 'crear',
       });
+      updateSaveLabel = () => {
+        saveButton.textContent = currentArticleId ? 'guardar' : 'crear';
+      };
       saveButton.addEventListener('click', safeClick(async () => {
         if (!isActive() || !title.trim() || !editor) {
           if (isActive() && !title.trim()) showToast('el titulo es obligatorio');
@@ -178,7 +188,7 @@ export function renderArticleEditor(ctx: RenderContext): MountedView {
         if (!isActive() || !result.ok) return;
         const operation = currentArticleId ? 'updated' : 'created';
         currentArticleId = result.value.id;
-        saveButton.textContent = 'guardar';
+        updateSaveLabel();
         publishArticleEditorSaved({
           articleId: currentArticleId,
           operation,
