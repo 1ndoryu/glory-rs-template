@@ -30,6 +30,7 @@
 | ¿Cómo se consienten, anonimizan y depuran las métricas? | `Agente/planes/plan-analytics-privacidad-2026-08-01.md` |
 | ¿Cómo funciona el registro verificado y recovery?       | `Agente/planes/plan-auth-verificado-2026-08-01.md` |
 | ¿Cuál es la paridad y el commit fijado de Sentinel/VarSense? | `Agente/documentacion/herramientas/matriz-paridad-sentinel-varsense-2026-08-01.md` |
+| ¿Cómo se ejecuta backup, health y rollback sin SSH? | `Agente/documentacion/herramientas/runbook-coolify-backup-rollback-2026-08-01.md` |
 
 ## Regla de autoridad
 

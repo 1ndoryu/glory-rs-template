@@ -395,7 +395,8 @@ Plan canónico: `Agente/planes/plan-programas-editoriales-2026-07-31.md`.
 - [ ] Verificar manual visual, teclado, foco, live regions, zoom 200%, reduced motion, alto contraste y multimedia accesible.
 - [x] **018A-51 —** CI ejecuta `type-check` y `test:full` frontend solo con `task:check --ci`; local mantiene type-check y selección incremental para no degradar el equipo.
 - [x] **018A-53 —** CI ejecuta el build y aplica budgets gzip configurables de 65 KB para entry JS, 16 KB para entry CSS y 120 KB para el chunk JS mayor.
-- [ ] Ejecutar E2E críticos, observabilidad y runbook Coolify; deploy continúa fuera de alcance. El split estructural de modelos ya está cerrado: `workspace/` y `workspace_overlay/` agrupan DTOs, validación, locators y tests sin suppressions. Para backend se debe usar `npm test`/`npm run check:back`, que derivan la BD por rama y aplican el contexto correcto.
+- [x] **018A-54 —** Documentar preflight, deploy, health, backup/restore y rollback mediante Coolify Manager; no se ejecuta producción ni se habilita SSH.
+- [ ] Ejecutar E2E críticos y observabilidad real; deploy continúa fuera de alcance. El split estructural de modelos ya está cerrado: `workspace/` y `workspace_overlay/` agrupan DTOs, validación, locators y tests sin suppressions. Para backend se debe usar `npm test`/`npm run check:back`, que derivan la BD por rama y aplican el contexto correcto.
 - [x] **018A-37 —** El selector frontend incremental y la escritura atómica Windows quedan cubiertos por fixtures del orquestador; la suite completa sigue reservada para `test:full`/CI.
 - [x] **018A-38 —** Separar el contrato Article en subinterfaces composables; type-check y Sentinel confirman que las vistas conservan el mismo boundary.
 - [x] **018A-41 —** Separar el registro de apps públicas y administrativas; `app-registration.ts` queda bajo 300 líneas y los registros/capacidades permanecen sin cambios.
@@ -433,7 +434,7 @@ Cada fase termina con esta revisión antes de marcar su salida. La revisión deb
 - [x] **297A-14 Editorial:** editores comparten primitives y capacidades; añadir un tipo de documento no amplía el monolito Admin ni copia ventanas. *(E2E visual sigue pendiente)*
 - [x] **297A-15 Comercio:** pago, webhook, entitlement y grants son servicios independientes; otro proveedor o versión no cambia la autoridad server-side. *(UI/worker/proveedor real siguen pendientes)*
 - [x] **297A-16 Analytics:** catálogo, dispatcher y agregados son extensibles; añadir un evento no expone datos ni obliga a reescribir paneles existentes. *(consentimiento/paneles siguen pendientes)*
-- [ ] **297A-17 Hardening:** las reglas se ejecutan igual en local/CI y el runbook cubre rollback; ninguna excepción de Sentinel/VarSense oculta deuda estructural.
+- [x] **018A-54 —** El runbook de Coolify cubre rollback sin SSH y deja explícitos los límites de evidencia; queda pendiente la prueba operativa en un entorno autorizado.
 - [ ] **297A-29 Configuración legacy + Perfil admin:** el toolbar expone acciones por capacidad sin `if/else` en el shell; la app Configuración se conserva y queda pendiente de escalar a otra cosa (p. ej. panel de ajustes del sistema); añadir una acción admin futura es un comando más, no un cambio de shell.
 
 ### 297A-29 — App Configuración conservada + Perfil configurable por admin (fuentes/tamaños estáticos)

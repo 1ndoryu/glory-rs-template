@@ -283,3 +283,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Los límites de rendimiento solo son verificables sobre el build final; medir fuentes o cargar `test:full` en cada ciclo local no protege al producto y degrada el equipo.
 - Separar CI de local permite exigir build + gzip en integración sin convertir cada tarea en un proceso pesado. El límite vive en configuración y el reporte indica exactamente el asset y bytes que exceden.
+
+## 018A-54 — Documentar recuperación antes de necesitarla
+
+- Un runbook útil debe definir señales de salida, límites y orden de rollback, pero no debe fingir que una operación de producción fue probada cuando solo se revisó el procedimiento.
+- Mantener Coolify Manager como único canal evita que una urgencia reintroduzca SSH y deja cualquier hueco como mejora explícita de la herramienta.

@@ -470,7 +470,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [ ] E2E visitante/usuario/admin/publicación/compra/reembolso/rollback.
 - [ ] Threat review de auth, workspace, upload, payment y analytics.
 - [x] Budgets de rendimiento del bundle automatizados en CI; logging, métricas y alertas reales quedan diferidos.
-- [ ] Runbook de backup/restore/rollback antes de planificar deploy.
+- [x] **018A-54 —** Runbook de backup/restore/rollback documentado con Coolify Manager; la ejecución real requiere autorización y entorno de producción.
 
 **Criterio de salida:** todos los gates pasan y el producto puede entrar en revisión de producción. Deploy sigue fuera de alcance.
 
