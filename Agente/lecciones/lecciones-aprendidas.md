@@ -298,3 +298,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Reutilizar un `HashMap` y limpiar todas sus entradas con la ventana del login hace que una llamada de login pueda borrar prematuramente el contador de recuperación.
 - Separar los buckets conserva ventanas independientes y deja claro qué parte es protección local del proceso frente a un futuro limitador distribuido.
+
+## 018A-60 — Auditar sin convertir la auditoría en un almacén de secretos
+
+- Los eventos de auth pueden registrar tipo, éxito, usuario e IP hasheada sin copiar email, contraseña, sesión ni token; el servicio de tokens sigue siendo la única frontera que maneja el secreto crudo.
+- Registrar también los fallos de consumo permite detectar replay/abuso, pero el fallo de la propia auditoría debe propagarse para no presentar una acción sensible como completada sin evidencia.

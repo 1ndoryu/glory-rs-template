@@ -178,7 +178,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 
 - [x] Verificación de email detrás de `registration_enabled=false`, con `email_verified_at` y token de 24 h.
 - [x] Recovery con token hashado corto de un solo uso y revocación de sesiones.
-- [x] Rate limit de login y auditoría hash de intentos; registro/reset usan bucket específico por IP (3/5 min) y el rate limit distribuido queda pendiente.
+- [x] Rate limit de login y auditoría hash de intentos; registro/reset usan bucket específico por IP (3/5 min) y las acciones sensibles quedan auditadas sin secretos. El rate limit distribuido queda pendiente.
 - [x] **018A-57 —** La app Cuenta ofrece formularios de registro y recuperación con feedback no enumerable; el feature flag server-side sigue apagado y los tokens/correo real quedan fuera de alcance.
 - [x] Pruebas unitarias de opacidad/determinismo y consumo atómico; E2E de fijación/expiración/replay queda pendiente.
 - [x] Registro permanece apagado hasta completar correo, UI, MFA y E2E.
@@ -341,7 +341,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [x] **Cuenta como app del escritorio:** registrar en AppRegistry como singleton público con estados invitado/autenticado/admin; registro/recuperación son modos internos y verificación/MFA quedan como estados futuros del backend. *(account-view.ts + AppRegistry)*
 - [x] **Estado de sesión visible:** control en barra superior y launcher móvil junto al tema; abre Cuenta y refleja Entrar/Cuenta/Cuenta · admin con etiqueta accesible. *(desktop-menu-bar.ts + mobile-shell.ts)*
 - [x] **Login dentro de la app:** deslogueado, Cuenta muestra login dentro de su ventana; `/login` es deep link canónico, el wrapper legacy reutiliza la misma vista y registro/recuperación se alternan dentro de ella. `/register` permanece cerrado hasta completar backend verificado.
-- [x] Recovery backend con token hashado/expirable, revocación de sesiones, rate limit de login y auditoría hash; UI de solicitud y rate limit específico están integrados, mientras token UI, rate limit distribuido y E2E quedan pendientes. Logout limpia clipboard/undo.
+- [x] Recovery backend con token hashado/expirable, revocación de sesiones, rate limit de login, auditoría hash y auditoría de registro/verificación/recuperación; UI de solicitud y rate limit específico están integrados, mientras token UI, rate limit distribuido y E2E quedan pendientes. Logout limpia clipboard/undo.
 
 **Criterio de salida:** configuración privada y organización del workspace tienen transporte autenticado, revisión optimista, fallback offline, validación y conflicto explícito sin overwrite silencioso. Cuenta base, formularios y backend verificado quedan implementados detrás de flag; 297A-13 permanece abierto por UI de tokens/correo real, MFA, auditoría específica y E2E multi-dispositivo/móvil.
 

@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Mutex;
 use std::time::Instant;
+use uuid::Uuid;
 use validator::Validate;
 
 use argon2::PasswordVerifier;
@@ -18,6 +19,7 @@ use crate::models::{
     ConfirmPasswordResetRequest, LoginRequest, PasswordResetRequest, RegisterRequest,
     RegistrationResponse, VerifyEmailRequest,
 };
+use crate::repositories::auth_audit_repo::AuthAuditRepository;
 use crate::repositories::UserRepository;
 use crate::services::session::Session;
 use crate::services::{AuthService, SessionService};
@@ -92,6 +94,17 @@ fn check_auth_action_rate_limit(
     )
 }
 
+async fn record_auth_audit(
+    state: &AppState,
+    user_id: Option<Uuid>,
+    event_type: &str,
+    ip: &str,
+    succeeded: bool,
+) -> Result<(), AppError> {
+    AuthAuditRepository::record(&state.pool, user_id, event_type, ip, succeeded).await?;
+    Ok(())
+}
+
 /// Registrar nuevo usuario
 /// [297A-7] Registro público deshabilitado por defecto.
 /// Solo se permite cuando `registration_enabled = 'true'` en `site_settings`.
@@ -111,11 +124,8 @@ pub async fn register(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Json(req): Json<RegisterRequest>,
 ) -> Result<(StatusCode, Json<RegistrationResponse>), AppError> {
-    check_auth_action_rate_limit(
-        &state.auth_action_rate_limit,
-        "register",
-        &addr.ip().to_string(),
-    )?;
+    let ip = addr.ip().to_string();
+    check_auth_action_rate_limit(&state.auth_action_rate_limit, "register", &ip)?;
     req.validate()
         .map_err(|e| AppError::Validation(e.to_string()))?;
 
@@ -128,13 +138,21 @@ pub async fn register(
         .is_some_and(|v| v == "true");
 
     if !registration_enabled {
+        record_auth_audit(&state, None, "register", &ip, false).await?;
         return Err(AppError::Forbidden(
             "El registro público está deshabilitado".into(),
         ));
     }
 
     let email = req.email.clone();
-    let (_user_id, token) = AuthService::register_verified(&state.pool, &req).await?;
+    let (user_id, token) = match AuthService::register_verified(&state.pool, &req).await {
+        Ok(result) => result,
+        Err(error) => {
+            record_auth_audit(&state, None, "register", &ip, false).await?;
+            return Err(error);
+        }
+    };
+    record_auth_audit(&state, Some(user_id), "register", &ip, true).await?;
     if let Some(api_key) = state.resend_api_key.as_deref() {
         let link = format!("{}/verify-email?token={token}", state.site_url);
         crate::services::email::EmailService::send_account_link(
@@ -165,11 +183,15 @@ pub async fn register(
 )]
 pub async fn verify_email(
     State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Json(req): Json<VerifyEmailRequest>,
 ) -> Result<Json<RegistrationResponse>, AppError> {
+    let ip = addr.ip().to_string();
     req.validate()
         .map_err(|e| AppError::Validation(e.to_string()))?;
-    AuthService::verify_email(&state.pool, &req.token).await?;
+    let result = AuthService::verify_email(&state.pool, &req.token).await;
+    record_auth_audit(&state, None, "verify_email", &ip, result.is_ok()).await?;
+    result?;
     Ok(Json(RegistrationResponse {
         message: "Cuenta verificada. Ya puedes iniciar sesión".into(),
     }))
@@ -186,14 +208,21 @@ pub async fn request_password_reset(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Json(req): Json<PasswordResetRequest>,
 ) -> Result<(StatusCode, Json<RegistrationResponse>), AppError> {
-    check_auth_action_rate_limit(
-        &state.auth_action_rate_limit,
-        "password-reset",
-        &addr.ip().to_string(),
-    )?;
+    let ip = addr.ip().to_string();
+    check_auth_action_rate_limit(&state.auth_action_rate_limit, "password-reset", &ip)?;
     req.validate()
         .map_err(|e| AppError::Validation(e.to_string()))?;
-    if let Some(token) = AuthService::issue_password_reset(&state.pool, &req.email).await? {
+    let token = match AuthService::issue_password_reset(&state.pool, &req.email).await {
+        Ok(token) => {
+            record_auth_audit(&state, None, "password_reset_request", &ip, true).await?;
+            token
+        }
+        Err(error) => {
+            record_auth_audit(&state, None, "password_reset_request", &ip, false).await?;
+            return Err(error);
+        }
+    };
+    if let Some(token) = token {
         if let Some(api_key) = state.resend_api_key.as_deref() {
             let link = format!("{}/reset-password?token={token}", state.site_url);
             crate::services::email::EmailService::send_account_link(
@@ -226,14 +255,13 @@ pub async fn reset_password(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Json(req): Json<ConfirmPasswordResetRequest>,
 ) -> Result<StatusCode, AppError> {
-    check_auth_action_rate_limit(
-        &state.auth_action_rate_limit,
-        "password-reset-confirm",
-        &addr.ip().to_string(),
-    )?;
+    let ip = addr.ip().to_string();
+    check_auth_action_rate_limit(&state.auth_action_rate_limit, "password-reset-confirm", &ip)?;
     req.validate()
         .map_err(|e| AppError::Validation(e.to_string()))?;
-    AuthService::reset_password(&state.pool, &req.token, &req.password).await?;
+    let result = AuthService::reset_password(&state.pool, &req.token, &req.password).await;
+    record_auth_audit(&state, None, "password_reset_confirm", &ip, result.is_ok()).await?;
+    result?;
     Ok(StatusCode::NO_CONTENT)
 }
 
