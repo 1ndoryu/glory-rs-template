@@ -5,7 +5,27 @@
 > **Fuera de alcance:** funcionalidades del OS, frontend, backend, comercio, móvil y roadmap principal.  
 > **Objetivo:** convertir los hallazgos y scripts nacidos en este proyecto en capacidades agnósticas, rápidas, portables y mantenibles para cualquier proyecto.
 
-> **Bloque activo (018A-5):** completar contratos portables y análisis combinado. El commit no es requisito universal: el reporte recuerda cuándo conviene hacer staging/commit/push y cuándo documentar trabajo intermedio o compartido. El gate sí exige prueba y reporte reproducibles.
+> **Estado (018A-5):** mínimo operativo cerrado; el roadmap principal queda desbloqueado. El commit no es requisito universal: el reporte recuerda cuándo conviene hacer staging/commit/push y cuándo documentar trabajo intermedio o compartido. El gate sí exige prueba y reporte reproducibles.
+
+## Prioridad para desbloquear el roadmap principal
+
+Este es el único conjunto que debe ejecutarse antes de continuar con una tarea normal del producto:
+
+- [x] `npm run quality:test` pasa la suite del orquestador.
+- [x] `npm run task:check -- <task-id> --fresh` pasa Sentinel, VarSense, stack afectado y documentación.
+- [x] El gate diferencia error de herramienta, finding bloqueante, warning e información.
+- [x] El reporte conserva detalle en `.quality-reports/` y muestra el recordatorio condicional de commit.
+- [x] Sentinel y VarSense están fijados en `quality-tools.json` y no requieren instalación automática para trabajar localmente.
+
+Con este checklist cerrado, las mejoras restantes de este documento son backlog y no deben bloquear el siguiente bloque de `roadmap.md`. Solo vuelven a ser prioridad si aparece un fallo real del gate, una regresión de rendimiento o una tarea del producto que dependa de ellas.
+
+### Backlog diferido deliberadamente
+
+- Paridad formal CLI/LSP/VS Code con fixtures idénticas.
+- Invalidación avanzada de índices, benchmarks RSS/tiempo y paralelismo optimizado.
+- Reglas de seguridad y arquitectura de baja frecuencia (MFA, permisos client-only, webhooks, rollback optimista).
+- Perfiles de tema, referencias circulares y precisión avanzada de VarSense.
+- Publicación upstream, reinstalación `.vsix`, changelog, ADR y guía de migración.
 
 ## Cómo usar este roadmap
 
