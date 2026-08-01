@@ -17,16 +17,15 @@ export async function renderGallery(): Promise<HTMLElement> {
 
   const page = createEl('div');
 
-  const titulo = createEl('h1', { textContent: 'galeria' });
+  /* El h1 "galeria" duplicaba el título de la ventana ("Galería"). Eliminado. */
   const cargando = createEl('p', { className: 'cargando', textContent: 'cargando...' });
 
-  page.append(titulo, cargando);
+  page.appendChild(cargando);
 
   const mediaResult = await tryCatch(MediaService.list());
   if (!mediaResult.ok) {
     /* API no disponible — mostrar imagenes de ejemplo */
     page.innerHTML = '';
-    page.appendChild(titulo);
 
     const grid = createEl('div', { className: 'galeria-grid' });
     const demoImages = [
@@ -51,7 +50,6 @@ export async function renderGallery(): Promise<HTMLElement> {
 
   const media = mediaResult.value;
   page.innerHTML = '';
-  page.appendChild(titulo);
 
   if (media.length === 0) {
     page.appendChild(createEl('p', { className: 'vacio', textContent: 'no hay imagenes todavia' }));

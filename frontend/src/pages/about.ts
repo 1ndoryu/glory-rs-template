@@ -23,8 +23,8 @@ export async function renderAbout(): Promise<HTMLElement> {
   if (content) {
     appendSanitizedHtml(page, content);
   } else {
+    /* El h1 "about" duplicaba el título de la ventana ("About"). Eliminado. */
     page.append(
-      createEl('h1', { textContent: 'about' }),
       createText('soy wandorius. hago cosas con codigo y con palabras, aunque a veces no se cual de las dos es mas dificil.'),
       createText('me interesan los espacios entre las cosas: el silencio entre dos notas, el espacio en blanco entre dos lineas de codigo, el momento exacto en que una idea deja de ser tuya y empieza a ser de todos.'),
       createText('diseño web, software, musica, escritura. no me gusta definirme pero si tuviera que elegir una palabra seria: curioso.'),

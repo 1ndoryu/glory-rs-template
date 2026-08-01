@@ -2,9 +2,8 @@
  * Panel de administración. Orquesta tabs y delega a módulos.
  * [Auditoría v4 §1.2] Migrado a createEl(). */
 
-import { AuthService, SettingsService, AnalyticsService } from '../services';
-import { authStore, showProfile } from '../store';
-import { navigate } from '../router';
+import { SettingsService, AnalyticsService } from '../services';
+import { showProfile } from '../store';
 import { showToast } from '../components/ui/toast';
 import { createTextarea } from '../components/ui/textarea';
 import { createFontPanel } from '../features/settings/font-panel';
@@ -25,20 +24,10 @@ export async function renderAdmin(): Promise<HTMLElement> {
   showProfile.set(false);
 
   const page = createEl('div', { className: 'admin-pagina' });
-  const header = createEl('div', { className: 'admin-header' });
 
-  const titulo = createEl('h1', { textContent: 'admin' });
-  const btnLogout = createEl('button', { className: 'boton', textContent: 'salir' });
-  btnLogout.addEventListener('click', safeClick(async () => {
-    await AuthService.logout();
-    authStore.set({ isAuthenticated: false, userId: null, capability: 'public' });
-    showToast('sesion cerrada');
-    navigate('/');
-  }));
-
-  header.append(titulo, btnLogout);
-  page.appendChild(header);
-
+  /* El header (h1 "admin" + botón "salir") duplicaba la barra de título de la
+   * ventana y el logout de la app Cuenta ("cerrar sesión" en account-view.ts).
+   * Eliminado: la ventana ya se titula "Admin" y el logout vive en Cuenta. */
   const tabs = createEl('div', { className: 'flex-fila gap-lg mb-lg border-bottom' });
   const contentArea = createEl('div', { id: 'admin-articulos' });
 

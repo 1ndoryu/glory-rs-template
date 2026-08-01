@@ -238,13 +238,6 @@
   width: 100%;
 }
 
-.admin-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--espacio-xl);
-}
-
 .admin-lista {
   display: flex;
   flex-direction: column;

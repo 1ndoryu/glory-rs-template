@@ -14,16 +14,16 @@ export async function renderProjects(): Promise<HTMLElement> {
   setPageJsonLd('proyectos', 'proyectos y trabajo de wandorius');
 
   const page = createEl('div');
-  const titulo = createEl('h1', { textContent: 'proyectos' });
+
+  /* El h1 "proyectos" duplicaba el título de la ventana ("Proyectos"). Eliminado. */
   const cargando = createEl('p', { className: 'cargando', textContent: 'cargando...' });
 
-  page.append(titulo, cargando);
+  page.appendChild(cargando);
 
   const projectsResult = await tryCatch(ProjectService.list());
   if (!projectsResult.ok) {
     /* API no disponible — mostrar proyectos de ejemplo */
     page.innerHTML = '';
-    page.appendChild(titulo);
 
     const demoProjects = [
       { title: 'wandori.us', description: 'este sitio. blog/portfolio minimalista construido con rust y vanilla ts.', url: 'https://wandori.us' },
@@ -49,7 +49,6 @@ export async function renderProjects(): Promise<HTMLElement> {
 
   const projects = projectsResult.value;
   page.innerHTML = '';
-  page.appendChild(titulo);
 
   const visibles = projects.filter(p => p.is_visible).sort((a, b) => a.sort_order - b.sort_order);
 
