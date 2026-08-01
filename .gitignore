@@ -43,6 +43,8 @@ desktop.ini
 !/scripts/check-roadmap.mjs
 !/scripts/self-check.ps1
 !/scripts/prepare-ci-db.mjs
+!/scripts/codegen-local.mjs
+!/scripts/emit-openapi.ps1
 /backups/
 /clients/
 /frontend/public/legacy-assets/

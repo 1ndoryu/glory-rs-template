@@ -1,11 +1,25 @@
 use std::net::SocketAddr;
+use std::path::PathBuf;
 
 use glory_backend::config::AppConfig;
 use glory_backend::handlers;
+use utoipa::OpenApi;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenvy::dotenv().ok();
+
+    /* [018A-17] El contrato OpenAPI se puede exportar antes de conectar la
+     * base de datos. Así Orval/CI no necesita arrancar un servidor ni dejar
+     * procesos Bun/Node o conexiones PostgreSQL vivas solo para codegen. */
+    let mut args = std::env::args().skip(1);
+    if args.next().as_deref() == Some("--emit-openapi") {
+        let output = args.next().unwrap_or_else(|| "openapi.json".to_string());
+        let document = serde_json::to_string_pretty(&handlers::ApiDoc::openapi())?;
+        std::fs::write(PathBuf::from(&output), document)?;
+        println!("OpenAPI exportado en {output}");
+        return Ok(());
+    }
 
     tracing_subscriber::fmt()
         .with_env_filter(

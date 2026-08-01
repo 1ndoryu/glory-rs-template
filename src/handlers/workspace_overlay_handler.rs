@@ -5,13 +5,15 @@ use utoipa::ToSchema;
 
 use crate::errors::AppError;
 use crate::middleware::AuthUser;
-use crate::models::workspace_overlay::{UpdateWorkspaceOverlayRequest, WorkspaceOverlayResponse};
+use crate::models::workspace_overlay::{
+    UpdateWorkspaceOverlayRequest, WorkspaceOverlayDocument, WorkspaceOverlayResponse,
+};
 use crate::services::workspace_overlay_svc::WorkspaceOverlayService;
 use crate::AppState;
 
 #[derive(Debug, serde::Serialize, ToSchema)]
 pub struct WorkspaceOverlayApiResponse {
-    pub overlay: crate::models::workspace_overlay::WorkspaceOverlayDocument,
+    pub overlay: WorkspaceOverlayDocument,
     pub revision: i32,
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
@@ -31,7 +33,7 @@ impl From<WorkspaceOverlayResponse> for WorkspaceOverlayApiResponse {
     path = "/api/workspace/overlay",
     responses(
         (status = 200, description = "Overlay personal", body = WorkspaceOverlayApiResponse),
-        (status = 401, description = "No autorizado", body = crate::errors::ErrorResponse)
+        (status = 401, description = "No autorizado", body = ErrorResponse)
     )
 )]
 pub async fn get_overlay(
@@ -51,10 +53,10 @@ pub async fn get_overlay(
     request_body = UpdateWorkspaceOverlayRequest,
     responses(
         (status = 200, description = "Overlay actualizado", body = WorkspaceOverlayApiResponse),
-        (status = 401, description = "No autorizado", body = crate::errors::ErrorResponse),
-        (status = 403, description = "CSRF inválido", body = crate::errors::ErrorResponse),
-        (status = 409, description = "Revisión en conflicto", body = crate::errors::ErrorResponse),
-        (status = 422, description = "Overlay inválido", body = crate::errors::ErrorResponse)
+        (status = 401, description = "No autorizado", body = ErrorResponse),
+        (status = 403, description = "CSRF inválido", body = ErrorResponse),
+        (status = 409, description = "Revisión en conflicto", body = ErrorResponse),
+        (status = 422, description = "Overlay inválido", body = ErrorResponse)
     )
 )]
 pub async fn update_overlay(

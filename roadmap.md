@@ -58,7 +58,7 @@
 - [x] Drag y resize de ventanas por bordes con boundary clamping.
 - [x] Atajos de teclado (Escape, Meta+m, Ctrl+Shift+ArrowRight).
 - [x] contentWindow oculto en rutas manejadas por apps.
-- [ ] Orval Fetch tags-split (requiere backend corriendo con OpenAPI).
+- [x] **018A-17 —** Orval Fetch `tags-split`: `npm run codegen:local` exporta OpenAPI sin BD/servidor y regenera clientes por etiqueta; cobertura completa de endpoints y retiro del cliente manual siguen pendientes.
 
 **Salida:** runtime compartido funciona sin chrome/listas/listeners duplicados. Orval pendiente hasta tener backend operativo.
 
@@ -305,7 +305,7 @@ Este bloque amplía el alcance verificable sin duplicar los manuales canónicos.
 ### 297A-9 — Foundation del runtime
 
 - [x] Matriz de `AppRegistry`, `CommandRegistry` y `RouteAppAdapter` con capacidades, rutas, eventos y teardown.
-- [ ] Generar OpenAPI/Orval en modo `tags-split` cuando exista un backend ejecutándose; la configuración portable ya está preparada.
+- [x] Exportar OpenAPI sin levantar backend y generar Orval `tags-split` con configuración portable (`npm run codegen:local`); quedan cobertura total de endpoints y retiro del cliente manual.
 - [x] Tests de IDs, capacidades, disponibilidad por presentación e idempotencia; eventos críticos quedan server-side.
 - [ ] Prueba visual completa del shell en todos los viewports y zoom 200% (pendiente de servidor/navegador estable).
 

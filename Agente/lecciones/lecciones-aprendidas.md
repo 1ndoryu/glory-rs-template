@@ -99,3 +99,9 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 - El correo no se considera verificado por tener contraseña: `email_verified_at` y tokens opacos de un solo uso deben vivir en la base y consumirse atómicamente.
 - Recuperación responde igual exista o no el email; el token se persiste solo como hash, expira pronto y revocar sesiones después del cambio evita reutilización de una sesión robada.
 - Mantener `registration_enabled=false` permite desplegar contratos y migraciones sin abrir el alta pública antes de tener correo real, UI y pruebas E2E.
+
+## 018A-17 — OpenAPI regenerable sin servidor
+
+- Un comando de codegen no debe exigir una base de datos ni dejar un servidor vivo: `--emit-openapi` puede serializar `ApiDoc` antes del bootstrap de configuración/pool.
+- Los alias de `serde_json::Value` y tipos plenamente calificados en atributos utoipa producen referencias OpenAPI inválidas; los campos dinámicos deben declarar `value_type` y las respuestas usar nombres de esquema estables.
+- En Windows, invocar `npm.cmd` con `spawnSync` puede devolver `EINVAL`; ejecutar el binario Orval con `process.execPath` evita shell, quoting y advertencias de seguridad.

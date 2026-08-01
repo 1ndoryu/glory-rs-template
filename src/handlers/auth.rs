@@ -68,9 +68,9 @@ fn check_rate_limit(rate_limit: &LoginRateLimit, ip: &str) -> Result<(), AppErro
     request_body = RegisterRequest,
     responses(
         (status = 202, description = "Verificación requerida", body = RegistrationResponse),
-        (status = 403, description = "Registro deshabilitado", body = crate::errors::ErrorResponse),
-        (status = 409, description = "Email ya registrado", body = crate::errors::ErrorResponse),
-        (status = 422, description = "Error de validación", body = crate::errors::ErrorResponse)
+        (status = 403, description = "Registro deshabilitado", body = ErrorResponse),
+        (status = 409, description = "Email ya registrado", body = ErrorResponse),
+        (status = 422, description = "Error de validación", body = ErrorResponse)
     )
 )]
 pub async fn register(
@@ -122,7 +122,7 @@ pub async fn register(
     post,
     path = "/api/auth/verify-email",
     request_body = VerifyEmailRequest,
-    responses((status = 200, body = RegistrationResponse), (status = 400, body = crate::errors::ErrorResponse))
+    responses((status = 200, body = RegistrationResponse), (status = 400, body = ErrorResponse))
 )]
 pub async fn verify_email(
     State(state): State<AppState>,
@@ -174,7 +174,7 @@ pub async fn request_password_reset(
     post,
     path = "/api/auth/password-reset/confirm",
     request_body = ConfirmPasswordResetRequest,
-    responses((status = 204), (status = 400, body = crate::errors::ErrorResponse))
+    responses((status = 204), (status = 400, body = ErrorResponse))
 )]
 pub async fn reset_password(
     State(state): State<AppState>,
@@ -193,8 +193,8 @@ pub async fn reset_password(
     request_body = LoginRequest,
     responses(
         (status = 200, description = "Login exitoso"),
-        (status = 401, description = "Credenciales inválidas", body = crate::errors::ErrorResponse),
-        (status = 403, description = "Rate limit", body = crate::errors::ErrorResponse)
+        (status = 401, description = "Credenciales inválidas", body = ErrorResponse),
+        (status = 403, description = "Rate limit", body = ErrorResponse)
     )
 )]
 pub async fn login(

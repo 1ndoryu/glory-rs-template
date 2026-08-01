@@ -21,8 +21,8 @@ use crate::AppState;
     request_body = CreateArticleRequest,
     responses(
         (status = 201, description = "Articulo creado", body = Article),
-        (status = 401, description = "No autorizado", body = crate::errors::ErrorResponse),
-        (status = 422, description = "Error de validacion", body = crate::errors::ErrorResponse)
+        (status = 401, description = "No autorizado", body = ErrorResponse),
+        (status = 422, description = "Error de validacion", body = ErrorResponse)
     ),
     security(("bearer_auth" = []))
 )]
@@ -45,7 +45,7 @@ pub async fn create_article(
     params(("id" = Uuid, Path, description = "ID del articulo")),
     responses(
         (status = 200, description = "Articulo encontrado", body = Article),
-        (status = 404, description = "No encontrado", body = crate::errors::ErrorResponse)
+        (status = 404, description = "No encontrado", body = ErrorResponse)
     ),
     security(("bearer_auth" = []))
 )]
@@ -65,7 +65,7 @@ pub async fn get_article(
     params(("slug" = String, Path, description = "Slug del articulo")),
     responses(
         (status = 200, description = "Articulo encontrado", body = ArticlePublic),
-        (status = 404, description = "No encontrado", body = crate::errors::ErrorResponse)
+        (status = 404, description = "No encontrado", body = ErrorResponse)
     )
 )]
 pub async fn get_article_by_slug(
@@ -137,8 +137,8 @@ pub async fn list_articles_admin(
     request_body = UpdateArticleRequest,
     responses(
         (status = 200, description = "Articulo actualizado", body = Article),
-        (status = 404, description = "No encontrado", body = crate::errors::ErrorResponse),
-        (status = 401, description = "No autorizado", body = crate::errors::ErrorResponse)
+        (status = 404, description = "No encontrado", body = ErrorResponse),
+        (status = 401, description = "No autorizado", body = ErrorResponse)
     ),
     security(("bearer_auth" = []))
 )]
@@ -162,8 +162,8 @@ pub async fn update_article(
     params(("id" = Uuid, Path, description = "ID del articulo")),
     responses(
         (status = 204, description = "Articulo eliminado"),
-        (status = 404, description = "No encontrado", body = crate::errors::ErrorResponse),
-        (status = 401, description = "No autorizado", body = crate::errors::ErrorResponse)
+        (status = 404, description = "No encontrado", body = ErrorResponse),
+        (status = 401, description = "No autorizado", body = ErrorResponse)
     ),
     security(("bearer_auth" = []))
 )]
@@ -184,7 +184,7 @@ pub async fn delete_article(
     params(("alias" = String, Path, description = "Alias de sistema del articulo (e.g. 'about')")),
     responses(
         (status = 200, description = "Articulo encontrado", body = ArticlePublic),
-        (status = 404, description = "No encontrado", body = crate::errors::ErrorResponse)
+        (status = 404, description = "No encontrado", body = ErrorResponse)
     )
 )]
 pub async fn get_article_by_alias(
@@ -209,8 +209,8 @@ pub struct SetAliasRequest {
     request_body = SetAliasRequest,
     responses(
         (status = 200, description = "Alias asignado"),
-        (status = 404, description = "No encontrado", body = crate::errors::ErrorResponse),
-        (status = 401, description = "No autorizado", body = crate::errors::ErrorResponse)
+        (status = 404, description = "No encontrado", body = ErrorResponse),
+        (status = 401, description = "No autorizado", body = ErrorResponse)
     ),
     security(("bearer_auth" = []))
 )]

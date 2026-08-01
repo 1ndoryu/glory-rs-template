@@ -16,6 +16,7 @@
     "dev:back": "node scripts/run-with-db.mjs run",
     "dev:front": "npm --prefix frontend run dev",
     "codegen": "npm --prefix frontend run codegen",
+    "codegen:local": "node scripts/codegen-local.mjs",
     "test": "node scripts/run-with-db.mjs test",
     "roadmap": "node scripts/check-roadmap.mjs",
     "roadmap:watch": "node scripts/check-roadmap.mjs --watch"

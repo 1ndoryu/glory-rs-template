@@ -19,8 +19,10 @@ const OVERLAY_SCHEMA_VERSION: i32 = 1;
 pub struct WorkspaceOverlayDocument {
     pub version: i32,
     #[serde(rename = "addedItems")]
+    #[schema(value_type = Object)]
     pub added_items: JsonValue,
     #[serde(rename = "fieldOverrides")]
+    #[schema(value_type = Object)]
     pub field_overrides: JsonValue,
     pub tombstones: Vec<String>,
 }

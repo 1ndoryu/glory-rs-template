@@ -1,10 +1,13 @@
 import { defineConfig } from 'orval';
 
+const openApiTarget = process.env.OPENAPI_INPUT ?? 'http://localhost:3000/api-docs/openapi.json';
+
 export default defineConfig({
   glory: {
     input: {
-      /* Apuntar al backend corriendo localmente para obtener el schema OpenAPI */
-      target: 'http://localhost:3000/api-docs/openapi.json',
+      /* El servidor sigue siendo el origen por defecto; CI/codegen local puede
+       * usar el export estático para no arrancar BD ni dejar procesos vivos. */
+      target: openApiTarget,
     },
     output: {
       /* Vanilla TS usa el cliente fetch compartido; tags-split evita un

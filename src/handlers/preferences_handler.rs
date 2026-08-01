@@ -32,7 +32,7 @@ impl From<UserPreferences> for UserPreferencesResponse {
     path = "/api/me/preferences",
     responses(
         (status = 200, description = "Preferencias de la cuenta", body = UserPreferencesResponse),
-        (status = 401, description = "No autorizado", body = crate::errors::ErrorResponse)
+        (status = 401, description = "No autorizado", body = ErrorResponse)
     ),
     security(("bearer_auth" = []))
 )]
@@ -54,9 +54,9 @@ pub async fn get_preferences(
     request_body = UpdateUserPreferencesRequest,
     responses(
         (status = 200, description = "Preferencias actualizadas", body = UserPreferencesResponse),
-        (status = 401, description = "No autorizado", body = crate::errors::ErrorResponse),
-        (status = 409, description = "Revisión en conflicto", body = crate::errors::ErrorResponse),
-        (status = 422, description = "Preferencia inválida", body = crate::errors::ErrorResponse)
+        (status = 401, description = "No autorizado", body = ErrorResponse),
+        (status = 409, description = "Revisión en conflicto", body = ErrorResponse),
+        (status = 422, description = "Preferencia inválida", body = ErrorResponse)
     ),
     security(("bearer_auth" = []))
 )]

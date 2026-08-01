@@ -191,7 +191,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 
 ### 7.1 API y errores
 
-- [ ] Orval Fetch + `tags-split`. *(pendiente: requiere backend corriendo con OpenAPI)*
+- [x] Orval Fetch + `tags-split` con export estático sin BD/servidor (`npm run codegen:local`); quedan endpoints no anotados y retiro del cliente manual.
 - [ ] OpenAPI cubre endpoints consumidos. *(pendiente: backend ya tiene utoipa/Swagger UI)*
 - [ ] Retirar tipos/cliente manual duplicado cuando exista paridad. *(pendiente: tras Orval)*
 - [x] Contrato `Result` y toast/feedback visible. *(src/utils/result.ts)*

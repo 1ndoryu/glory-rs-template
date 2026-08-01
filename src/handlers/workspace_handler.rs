@@ -22,7 +22,7 @@ pub struct ReleaseListResponse {
     path = "/api/workspace/release",
     responses(
         (status = 200, description = "Release activo", body = WorkspaceReleasePublic),
-        (status = 404, description = "No hay releases", body = crate::errors::ErrorResponse)
+        (status = 404, description = "No hay releases", body = ErrorResponse)
     )
 )]
 pub async fn get_active_release(
@@ -39,7 +39,7 @@ pub async fn get_active_release(
     params(("version" = i32, Path, description = "Versión del release")),
     responses(
         (status = 200, description = "Release encontrado", body = WorkspaceReleasePublic),
-        (status = 404, description = "No encontrado", body = crate::errors::ErrorResponse)
+        (status = 404, description = "No encontrado", body = ErrorResponse)
     )
 )]
 pub async fn get_release_by_version(
@@ -75,8 +75,8 @@ pub async fn list_releases(
     request_body = PublishReleaseRequest,
     responses(
         (status = 201, description = "Release publicado", body = WorkspaceRelease),
-        (status = 401, description = "No autorizado", body = crate::errors::ErrorResponse),
-        (status = 403, description = "Prohibido", body = crate::errors::ErrorResponse)
+        (status = 401, description = "No autorizado", body = ErrorResponse),
+        (status = 403, description = "Prohibido", body = ErrorResponse)
     )
 )]
 pub async fn publish_release(
