@@ -251,6 +251,7 @@ Plan: `Agente/planes/plan-notificaciones-2026-08-01.md`.
 - [x] Batch acotado, inserción multi-fila y deduplicación por `event_id`; eventos críticos de pago permanecen server-side.
 - [x] Agregados y Estadísticas separados del dispatcher; app admin con paneles Overview/Content/OS/Commerce/Reliability y exportación JSON.
 - [x] **018A-26 —** Retirada la ruta frontend legacy `/admin`; Admin permanece como app interna registrada y “Nuevo proyecto” abre `project-editor` mediante `openAppWindow` con guardia admin.
+- [x] **018A-39 —** Estadísticas queda reflejada como app `analytics` y la acción declarada `properties` se ejecuta mediante `resource:properties`, que abre una ventana reutilizable de metadatos locales sin exponer IDs internos.
 - [ ] Completar paridad y eliminación de contratos/CSS legacy. *(JWT Bearer retirado en 018A-18; uploads ya usan previews autorizados en 018A-28; DTOs de media separados en 018A-29; la página Admin se conserva como programa interno)*
 
 **Salida:** una sola administración y métricas privadas/tipadas.
@@ -378,6 +379,7 @@ Plan canónico: `Agente/planes/plan-programas-editoriales-2026-07-31.md`.
 - [x] **018A-36 —** Retirar el cliente manual sin borrar la política común de sesión/CSRF/errores; verificar que no quedan consumidores de `api.get/post/...`.
 - [x] **018A-37 —** `test:changed` selecciona tests por grafo de imports en vez de ejecutar toda la suite ante cualquier cambio fuente; `writeAtomic` reintenta carreras Windows. `test:full` sigue siendo el modo explícito total.
 - [x] **018A-38 —** Dividir el contrato frontend `Article` en identidad, contenido y publicación para cumplir ISP sin cambiar el tipo público; el warning `large-interface-isp` queda resuelto.
+- [x] **018A-39 —** Completar la acción `properties` de la matriz de recursos y registrar la app `properties`; el menú contextual ya no declara una acción sin ejecutor.
 - [ ] Completar la matriz de paridad y retirar contratos/CSS legacy restantes. *(JWT Bearer ya no forma parte del contrato)*
 
 ### 297A-17 — Hardening, identidad, accesibilidad y SEO

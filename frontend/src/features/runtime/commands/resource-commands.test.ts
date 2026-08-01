@@ -1,5 +1,5 @@
 /* Tests de los comandos de recurso [297A-14 F5]:
- * resource:edit/publish/unpublish materializan las acciones declaradas en
+ * resource:edit/publish/unpublish/properties materializan las acciones declaradas en
  * resource-type-registry. Verifica:
  * - Registro y gating admin-only (fail-closed).
  * - Disponibilidad según kind y acción declarada.
@@ -46,10 +46,16 @@ describe('resource commands [297A-14 F5]', () => {
     vi.clearAllMocks();
   });
 
-  it('registra resource:edit/publish/unpublish', () => {
+  it('registra las acciones de recurso ejecutables', () => {
     expect(CommandRegistry.get('resource:edit')).toBeDefined();
     expect(CommandRegistry.get('resource:publish')).toBeDefined();
     expect(CommandRegistry.get('resource:unpublish')).toBeDefined();
+    expect(CommandRegistry.get('resource:properties')).toBeDefined();
+  });
+
+  it('properties queda disponible para visitantes sin elevar capacidades', () => {
+    const ctx = { capability: 'public' as const, targets: [{ id: 'art-1', kind: 'shortcut' as const }] };
+    expect(CommandRegistry.isAvailable('resource:properties', ctx).state).toBe('enabled');
   });
 
   it('oculta los comandos para capacidad no-admin (fail-closed)', () => {

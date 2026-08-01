@@ -3,7 +3,7 @@
  * Cada app define su id, título, icono, capacidades y render function.
  * Las apps solo devuelven contenido; el shell crea la ventana. */
 
-import { BarChart3, FileUser, Folder, Settings, FileText, FolderCode, Trash2, ShieldUser, UserRound, ShoppingBag, FolderOpen, Bell, Store, ClipboardList, Download } from 'lucide';
+import { BarChart3, FileUser, Folder, Settings, FileText, FolderCode, Trash2, ShieldUser, UserRound, ShoppingBag, FolderOpen, Bell, Store, ClipboardList, Download, Info } from 'lucide';
 import { createEl } from '../../utils/dom';
 import { AppRegistry } from './app-registry';
 import { createPathDeepLink } from './deep-links';
@@ -17,6 +17,7 @@ import { appendSanitizedHtml } from '../../utils/sanitize-html';
 import { mountAccountView } from './account-view';
 import { createNotificationsView } from '../notifications/notifications-view';
 import { createDownloadsView, createOrdersView, createStoreView } from '../commerce/store-view';
+import { createPropertiesPreview } from '../desktop/apps/properties/properties-preview';
 
 /* === Finder === */
 AppRegistry.register({
@@ -385,6 +386,24 @@ AppRegistry.registerLazy({
       };
     },
   })),
+});
+
+/* === Properties === */
+AppRegistry.register({
+  id: 'properties',
+  title: 'Propiedades',
+  icon: Info,
+  iconType: 'document',
+  singleton: false,
+  requires: 'public',
+  layout: 'padded',
+  render: (ctx: RenderContext): MountedView => {
+    dispatchEvent({ type: 'app_opened', appId: 'properties' });
+    return {
+      element: createPropertiesPreview(ctx.params?.nodeId),
+      destroy: () => { dispatchEvent({ type: 'app_closed', appId: 'properties' }); },
+    };
+  },
 });
 
 /* === Projects === */

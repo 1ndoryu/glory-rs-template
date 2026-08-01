@@ -439,6 +439,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [x] **018A-36 —** Retirar el objeto `api` manual y dejar `client.ts` como boundary de mutator/error para Orval; confirmar con búsqueda estática y pruebas de transporte que no se reintroduce una segunda puerta HTTP.
 - [x] **018A-37 —** Ajustar el rendimiento local de tests: selección por grafo de imports, suite completa explícita y retry acotado de `writeAtomic` en Windows; el type-check y el gate siguen siendo obligatorios aunque no exista test dependiente.
 - [x] **018A-38 —** Resolver el warning ISP del DTO frontend `Article` con subinterfaces de identidad, contenido y publicación; conservar el alias público para no duplicar adaptadores ni romper consumidores.
+- [x] **018A-39 —** Materializar `resource:properties` y la app reutilizable `properties`; la matriz de paridad ahora cubre la apertura contextual y muestra solo metadatos locales seguros.
 - [ ] Eliminar CSS/clases huérfanas con VarSense.
 
 **Criterio de salida:** una sola administración como app registrada, analytics útil/privado y cero rutas/chrome duplicados legacy; uploads y CSS/contratos obsoletos deben desaparecer después de su matriz de paridad.

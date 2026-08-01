@@ -208,3 +208,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 ## 018A-38 — Componer contratos sin romper consumidores
 
 - Un DTO grande puede dividirse con `extends` manteniendo el mismo nombre exportado; así se mejora ISP y Sentinel sin introducir mapeos, cambios de serialización ni duplicación de tipos.
+
+## 018A-39 — Toda acción declarada necesita un ejecutor
+
+- Una matriz de recursos puede aparentar paridad aunque solo enumere acciones: cada acción visible debe resolver target, declarar capacidad y abrir/ejecutar una única ruta del runtime.
+- Las propiedades pueden empezar como una lectura local segura; no se debe inventar un endpoint ni mostrar `refId` interno hasta que exista un contrato público y una decisión de privacidad.

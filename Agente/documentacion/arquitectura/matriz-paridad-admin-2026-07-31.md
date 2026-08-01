@@ -20,7 +20,7 @@
 | Biblioteca de media | (no existía en Admin legacy) | App `media-library` | ✅ Migrado F4 |
 | Fuentes/tamaños | `admin.ts` tab fuentes + `font-panel.ts` | Estáticos (297A-29) + app `settings` | ✅ Migrado F1/F29 |
 | About content | `admin.ts` tab sitio | App `about` + `article-editor` (alias) | ✅ Migrado F1 |
-| Estadísticas | `admin.ts` tab estadisticas | Pendiente 297A-16 (Analytics app) | ⏳ Pendiente |
+| Estadísticas | `admin.ts` tab estadisticas | App `analytics` | ✅ Migrado 297A-16 |
 | Login legacy | `pages/login.ts` + wrapper | App `account` (login en ventana) | ✅ Migrado 297A-13 |
 
 ## 2. Acciones por tipo de recurso (declaradas vs ejecutables)
@@ -39,7 +39,7 @@ que la ejecute con capacidades server-side.
 | trash | ✅ | ✅ | ✅ | ✅ | `workspace:trash` (papelera del workspace) |
 | restore | ✅ | ✅ | ✅ | ✅ | `workspace:restore` |
 | download | ⛔ | ⛔ | ✅ (F3 declarado) | ✅ | Finder (grant futuro 297A-15) |
-| properties | ✅ | ✅ | ✅ | ✅ | por implementar en F5 |
+| properties | ✅ | ✅ | ✅ | ✅ | `resource:properties` → App `properties` (018A-39) |
 
 ## 3. Estados editoriales por recurso
 
@@ -64,6 +64,7 @@ que la ejecute con capacidades server-side.
 
 - [x] Congelar esta matriz (este documento).
 - [x] Comandos `resource:edit/publish/unpublish` (materializan acciones declaradas).
+- [x] Comando `resource:properties` y programa reutilizable de metadatos locales (018A-39).
 - [x] Autosave de borrador en `article-editor` (create→update idempotente, teardown).
 - [ ] E2E visual desktop/tablet/móvil (apertura, foco, minimizar, cierre, error, transición).
 - [ ] Retirar superficies legacy SOLO tras paridad + rollback verificados (297A-16).

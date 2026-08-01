@@ -9,6 +9,7 @@
  * Contrato: el target trae refId (UUID interno); resolver kind vía el nodo
  * del workspace y despachar al servicio/editor correspondiente. */
 
+import { Info } from 'lucide';
 import { CommandRegistry, adminOnly, type CommandContext, type CommandResult } from '../command-registry';
 import { workspaceStore } from '../workspace/workspace-store';
 import type { WorkspaceResourceKind } from '../workspace/types';
@@ -74,6 +75,31 @@ CommandRegistry.register(adminOnly({
     return { status: 'success' };
   },
 }));
+
+/* === resource:properties — metadata local del recurso === */
+
+CommandRegistry.register({
+  id: 'resource:properties',
+  label: 'Propiedades',
+  icon: Info,
+  order: 24,
+  contexts: ['icon', 'folder'],
+  undoPolicy: 'none',
+  analyticsEvent: 'resource.properties',
+  isAvailable: (ctx: CommandContext) => {
+    const target = resolveResourceTarget(ctx.targets?.[0]?.id);
+    if (!target) return { state: 'hidden', reason: 'no resource target' };
+    if (!kindAllowsAction(target.kind, 'properties')) return { state: 'hidden', reason: 'kind sin properties' };
+    return { state: 'enabled' };
+  },
+  execute: async (ctx?: CommandContext): Promise<CommandResult> => {
+    const target = resolveResourceTarget(ctx?.targets?.[0]?.id);
+    if (!target) return { status: 'failure', reason: 'recurso no encontrado' };
+    const { openAppWindow } = await import('../route-app-adapter');
+    await openAppWindow('properties', { nodeId: target.nodeId });
+    return { status: 'success' };
+  },
+});
 
 /* === resource:publish — editorial público del tipo === */
 
