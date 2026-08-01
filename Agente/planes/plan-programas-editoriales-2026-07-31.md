@@ -1,7 +1,7 @@
 # Plan 297A-14 — Programas editoriales
 
 > **Fecha:** 2026-07-31
-> **Estado:** vertical de artículos/editor completado; proyectos, productos, media y E2E visual pendientes.
+> **Estado:** verticales de artículos y proyectos completados; productos, media, paridad y E2E visual pendientes.
 > **Epic:** 297A-4 — OS persistente, cuentas, programas y comercio.
 > **Depende de:** 297A-9, 297A-10 y 297A-11.
 > **Bloquea:** cierre completo de la administración editorial y 297A-15 Comercio.
@@ -38,10 +38,13 @@ Migrar la administración editorial desde el monolito Admin hacia programas reut
 
 ### Fase 2 — Editor de proyectos
 
-- [ ] Convertir el editor modal heredado en app lazy `project-editor` con el mismo contrato de loading/lifecycle.
-- [ ] Separar listado/orquestación de formulario y usar evento tipado de guardado.
-- [ ] Añadir pruebas de capacidad, cleanup, error, create→update y refresh sin respuestas obsoletas.
-- [ ] Validar envelope `resource` y estados editoriales antes de ampliar el formulario.
+- [x] Convertir el editor modal heredado en app lazy `project-editor` con el mismo contrato de loading/lifecycle.
+- [x] Separar listado/orquestación de formulario y usar evento tipado de guardado.
+- [x] Añadir regresiones de registro/capacidad, canal de eventos y refresh protegido contra respuestas obsoletas; la cobertura directa de UI/lifecycle del formulario queda como mejora de pruebas del siguiente corte.
+- [x] Validar el envelope `resource` y sincronizar título/visibilidad en creación/actualización transaccional; editorial permanece independiente y se modifica mediante publicación explícita.
+- [x] Mantener el lifecycle del envelope al eliminar: proyecto pasa a `trashed` sin dejar recurso huérfano.
+
+**Evidencia F2 — 2026-07-31:** `project-editor` admin-only sin deep link público; `GET /admin/projects/:id` protegido; create→update conserva ID; URL distingue omitida/null/valor; `projects` y `resources` mantienen título, visibilidad y lifecycle de forma transaccional, sin inferir editorial desde visibilidad; frontend typecheck, Vitest, build, backend, `task:check -- 297A-14 --fresh` y `self-check -- -TareaId 297A-14` PASS. Tests registrados: frontend 289/289 y backend 18/18. Sentinel 0 errores/14 warnings del alcance incremental; VarSense 0 errores/2 warnings; custom 0 errores/5 informativos.
 
 ### Fase 3 — Productos versionados
 

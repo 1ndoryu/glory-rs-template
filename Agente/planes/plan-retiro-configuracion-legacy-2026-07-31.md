@@ -1,0 +1,108 @@
+# Plan: retiro de la app Configuración legacy — fuentes/tamaños estáticos + Perfil configurable por admin
+
+> **Epic:** 297A-4 (OS persistente) · **Tarea:** 297A-29 (pendiente de roadmap)
+> **Fecha:** 2026-07-31 · **Estado:** plan aprobado por el usuario; pendiente de ejecución
+> **Próximo paso:** fase 1 (neutralizar fuentes/tamaños dinámicos) tras gate de planificación
+> **Archivo de completados:** `Agente/completados/tareas-2026-07-31.md`
+
+---
+
+## 1. Objetivo y límites
+
+**Objetivo:** eliminar la app "Configuración" del escritorio y el modelo configurable de fuentes/tamaños; el OS queda con **JetBrains Mono en todo y tamaños fijos** definidos en `variables.css`. La configuración de **Perfil** (foto, tamaños del avatar, borde, enlaces sociales, layout de redes) **no se elimina**: se mueve a la ventana Perfil y se abre con un **botón en el toolbar visible solo para admins**.
+
+**Límites explícitos:**
+- NO se implementa todavía el panel de control del usuario para cambiar fuentes. Se deja nota como trabajo futuro (fase 5) para cuando exista un panel de control de usuario con buena arquitectura.
+- NO se tocan: `about_content`, `show_entries_on_home`, `social_links`, `redes_layout`, `profile_image`, `registration_enabled` (siguen vivos en Admin/Perfil/backend).
+- NO se toca el backend de settings: `GET /api/settings` y `POST /api/admin/settings` se conservan (los consume Perfil para persistir foto/enlaces/borde).
+- NO se borra la columna de settings de BD; los tokens huérfanos de fuentes/tamaños quedan inertes (se documenta; limpieza opcional futura).
+- NO se tocan cambios ajenos en working tree (297A-14 editor de proyectos: backend projects + API client/types). Se commitearán por separado si el usuario lo autoriza.
+- Deploy sigue fuera de alcance.
+
+## 2. Contexto verificado (evidencia 2026-07-31)
+
+- La app `settings` se registra en `frontend/src/features/runtime/app-registration.ts:117-132` (`registerLazy`, `requires: 'admin'`, sin deep link). Se abre por menú (`desktop-menu-bar.ts:224-229`), icono admin del escritorio (`default-release.ts:39-43` `ADMIN_NODES.settings`) y tab `'fuentes'` de `pages/admin.ts:63`.
+- Componentes en `frontend/src/features/settings/`: `font-panel.ts` (3 tabs: Perfil/Fuentes/Tamaños), `font-helpers.ts` (selectores/sliders), `font-constants.ts` (23 Google Fonts), `settings-repo.ts` (persistencia debounced), `social-links.ts` (editor de enlaces).
+- **Perfil es una shell window** (`registerShellWindow`, `instanceId 'shell-profile'`, `desktop-shell.ts:40-54`), NO una app del registry. Comparte el mismo elemento en desktop y móvil (`main.ts:143`). Consume `profileImage`, `socialLinksStore`, `redesLayoutStore`.
+- **Toolbar con gating por capacidad YA EXISTE**: `createAppToolbar` (`desktop-window.ts:110-149`) construye `CommandContext { capability: authStore.get().capability }` y omite comandos cuyo `isAvailable(ctx)` devuelve `{state:'hidden'}`. Ningún comando usa todavía `ctx.capability`. **Hueco:** la capability se captura UNA vez al crear la ventana; no reacciona a login/logout en vivo.
+- **Bug borde confirmado:** `.desktop-profile-window .profile-foto { border: var(--sistema-borde) }` (`desktop-window.css:104-106`) sobreescribe `--profile-border` que el checkbox escribe; mayor especificidad que `layout.css:118`. El checkbox solo funcionaría en el layout legacy en desuso.
+- **Bug nav width:** slider actual 200–500 con default 320 (`font-panel.ts:137`); el usuario pide un máximo mayor. Al pasar a estático se fija un valor en `variables.css`.
+- El OS ya usa `--fuente-sistema` (JetBrains Mono) en todo el chrome; lo configurable solo afecta al **layout legacy** (sidebar/nav, profile, entradas). El `fontStore` (`store.ts:107-159`) sobreescribe tokens en runtime desde BD (`main.ts:107` llama `await loadSavedFonts()`).
+- `prerendered/` es código muerto de Nakomi Studio, no se relaciona.
+
+## 3. Dependencias
+
+- Fase 2 (toolbar reactivo) **antes** de fase 3 (botón admin en Perfil): el botón necesita el mecanismo de toolbar solo-admin.
+- Fase 3 (mover perfil) **antes** de fase 4 (eliminar app Configuración): no se borra hasta migrar.
+- Fase 1 (estático) puede ejecutarse primero o en paralelo con 3; no depende de 2/3.
+- La 297A-28 (ruta `POST /api/admin/settings` ya corregida en `settings.service.ts`) es prerequisito funcional: el guardado de Perfil depende de ella.
+
+## 4. Fases
+
+### Fase 1 — Fuentes/tamaños estáticos (JetBrains en todo)
+
+- [ ] Neutralizar `fontStore`: eliminar/neutralizar el suscriptor que inyecta variables dinámicas (`store.ts:107-159`) para `--nav-width`, `--profile-*`, `--menu-*`, `--tamano-*`, `--entrada-*`, `--redes-*`.
+- [ ] Dejar de llamar `loadSavedFonts()` en `main.ts:107` (o reducir a solo perfil: `profile_image`, `social_links`, `redes_layout`, `show_entries_on_home`).
+- [ ] Fijar tokens en `variables.css`: `--fuente-menu/-titulo/-texto` → JetBrains Mono (o migrar el layout legacy a `--fuente-sistema`); tamaños fijos (reutilizar bloque `--sistema-*`); `--nav-width` fijo a valor acordado (≥360px, ver bug nav width).
+- [ ] Migrar consumidores legacy de tokens configurables (`layout.css:11,43,118,222,240`, `base.css:9`, `reset.css:15`, `components.css`, `pages.css`) a los tokens estáticos.
+- [ ] Eliminar `font-constants.ts`, `font-helpers.ts` y el tab Fuentes/Tamaños de `font-panel.ts`.
+- [ ] Decidir destino de `settings-repo.ts`: conservar solo las funciones de perfil (`loadProfileSettings`, `saveProfileSettings`), quitar `saveSettings()` de fuentes/tamaños.
+- **Gate F1:** type-check, Vitest (ajustar tests que dependan de fontStore dinámico), `task:check`; visual: el OS y las páginas renderizan con JetBrains Mono y tamaños fijos sin regresión.
+
+### Fase 2 — Toolbar reactivo a capacidad + comando admin-only genérico
+
+- [ ] Cubrir el hueco de `createAppToolbar` (`desktop-window.ts`): suscribirse a `authStore` (subscribeSimple) y reconstruir el toolbar cuando cambia `capability` (login/logout en ventana abierta).
+- [ ] Crear comando genérico (p. ej. `profile:settings` o helper `adminOnlyCommand`) con `isAvailable: (ctx) => ctx.capability === 'admin' ? {state:'enabled'} : {state:'hidden'}`.
+- [ ] Test: toolbar de una ventana oculta/muestra el item admin-only según estado de `authStore` en vivo.
+- **Gate F2:** type-check, Vitest, `task:check`; visual: abrir ventana como invitado (sin item) y como admin (item visible) sin recargar.
+
+### Fase 3 — Perfil configurable desde la ventana Perfil (solo admin)
+
+- [ ] Extraer controles del tab Perfil de `font-panel.ts` a un nuevo `frontend/src/features/settings/profile-settings.ts` (foto, tamaños avatar 40–600, borde, enlaces sociales, layout redes).
+- [ ] Añadir toolbar a la shell window `shell-profile` (`registerShellWindow` ya acepta `toolbar`, `window-manager.ts:95-120`) con el comando admin-only de fase 2.
+- [ ] Montar `profile-settings` dentro de la ventana Perfil (panel/overlay dentro de la ventana, no modal global; reutilizar recetas compartidas).
+- [ ] **Fix borde:** ajustar `.desktop-profile-window .profile-foto` para que respete el token configurado (o eliminar el override fijo de `desktop-window.css:104-106`).
+- [ ] Conservar guardado: `profile_image`, `social_links`, `redes_layout`, tamaños avatar y borde vía `SettingsService.save` (`POST /api/admin/settings`).
+- **Gate F3:** type-check, Vitest (tests del nuevo panel + regresión del fix borde), `task:check`; visual: admin ve botón "Configurar" en toolbar de Perfil, abre el panel, cambia foto/borde/enlaces y persiste tras reload; invitado no ve el botón.
+
+### Fase 4 — Eliminar la app Configuración
+
+- [ ] Quitar registro `settings` de `app-registration.ts:117-132`.
+- [ ] Quitar `ADMIN_NODES.settings` de `default-release.ts:39-43`.
+- [ ] Quitar botón de menú `desktop-menu-bar.ts:224-229` y el tab `'fuentes'` de `pages/admin.ts:63`.
+- [ ] Eliminar `font-panel.ts` (si queda algo sin migrar) y CSS muerto (`.desktop-settings-window`, `desktop-window--settings`).
+- [ ] Verificar que no quedan referencias (grep `settings`/`createFontPanel`/`loadAllFonts`).
+- **Gate F4:** type-check, Vitest, `task:check`; visual: ya no existe icono/menú/tab de Configuración; nada roto en Perfil/Cuenta/Admin.
+
+### Fase 5 — (FUTURO, fuera de alcance) Panel de control del usuario para fuentes
+
+- [ ] NOTA: cuando exista un panel de control de usuario con buena arquitectura, re-introducir selector de fuente con persistencia de cuenta (reutilizando el transporte de preferencias/overlay de 297A-13). No implementar ahora.
+
+## 5. Gate/criterio de salida por fase
+
+- Cada fase cierra con: `npx tsc --noEmit` limpio (en `frontend/`), `npx vitest run` PASS, `npm run task:check -- 297A-29 --fresh` PASS, y validación visual real en navegador (al menos desktop 1440×900 y móvil 390×844; foco/teclado).
+- La tarea NO se archiva hasta que el síntoma reportado se verifique resuelto: sin icono/menú de Configuración, Perfil configurable solo-admin, borde funcional, nav fijo ≥360px, JetBrains en todo.
+- Ninguna casilla se marca por intención; solo con evidencia.
+
+## 6. Definition of Done
+
+- [ ] `Configuración` eliminada del AppRegistry, escritorio, menú y Admin sin referencias residuales.
+- [ ] Fuentes/tamaños 100% estáticos (JetBrains Mono + tokens fijos en `variables.css`); sin `fontStore` inyectando variables dinámicas.
+- [ ] Perfil configurable desde su toolbar con botón admin-only; foto/borde/tamaños/enlaces persisten en BD.
+- [ ] Toolbar de ventanas reacciona a cambio de capacidad en vivo (mecanismo genérico, no hardcodeado a Perfil).
+- [ ] Bug borde resuelto; nav width fijo ≥360px.
+- [ ] Roadmap actualizado, archivado en completados, commit `297A-29: ...` + push.
+
+## 7. Notas de arquitectura (decisiones)
+
+- El toolbar solo-admin se resuelve con el mecanismo existente de `Command.isAvailable` + `CommandContext.capability`, sin introducir `if (isAdmin)` en el shell (OCP: se extiende por comandos).
+- El panel de Perfil reutiliza recetas compartidas del sistema de diseño; no crea recetas visuales locales (regla 9.1).
+- La persistencia de perfil conserva `SettingsService.save` (ya corregido a `POST /api/admin/settings` en 297A-28) y `SettingsService.getAll` público para carga.
+- Los settings de fuentes/tamaños huérfanos en BD quedan inertes; no se migra ni borra (riesgo bajo, documentado).
+
+## 8. Enlaces
+
+- Guía de apps: `Agente/documentacion/arquitectura/guia-agregar-app-2026-07-31.md`
+- Manual de arquitectura: `Agente/documentacion/arquitectura/manual-arquitectura-wandorius-2026-07-29.md`
+- Identidad visual (JetBrains Mono): `Agente/documentacion/design-system/manual-identidad-visual-os-2026-07-29.md`
+- Plan maestro: `Agente/planes/plan-escritorio-persistente-cuentas-admin-apps-2026-07-29.md`

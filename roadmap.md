@@ -199,13 +199,13 @@
 **Depende de:** 297A-9/10/11. Plan: `Agente/planes/plan-programas-editoriales-2026-07-31.md`.
 
 - [x] Vertical de artículos/About: `article-editor` lazy, admin-only, lifecycle abortable, create→update, multimedia asociada al ID actual, evento tipado y listado Admin sin carreras.
-- [ ] Editor de proyectos.
+- [x] Editor de proyectos: app lazy admin-only, listado separado, lifecycle/eventos, GET por ID, create→update, URL tri-state y sincronización transaccional de título/visibilidad/lifecycle del resource envelope.
 - [ ] Editor de productos privado/inactivo por defecto.
 - [ ] Biblioteca de media.
 - [ ] Menú Admin por capacidades y paridad sin ampliar `admin.ts`.
 - [ ] E2E visual desktop/tablet/móvil del vertical editorial.
 
-**Salida parcial:** el editor de artículos vive como programa reutilizable; el epic editorial permanece abierto hasta completar proyectos, productos, media, paridad y E2E.
+**Salida parcial:** los editores de artículos y proyectos viven como programas reutilizables; el epic editorial permanece abierto hasta completar productos, media, paridad y E2E.
 
 ### 297A-15 — Comercio seguro
 
@@ -378,3 +378,16 @@ Cada fase termina con esta revisión antes de marcar su salida. La revisión deb
 - [ ] **297A-15 Comercio:** pago, webhook, entitlement y grants son servicios independientes; otro proveedor o versión no cambia la autoridad server-side.
 - [ ] **297A-16 Analytics:** catálogo, dispatcher y agregados son extensibles; añadir un evento no expone datos ni obliga a reescribir paneles existentes.
 - [ ] **297A-17 Hardening:** las reglas se ejecutan igual en local/CI y el runbook cubre rollback; ninguna excepción de Sentinel/VarSense oculta deuda estructural.
+- [ ] **297A-29 Retiro Configuración legacy:** el toolbar expone acciones por capacidad sin `if/else` en el shell; eliminar la app Configuración no toca Perfil/Cuenta/Admin; añadir una acción admin futura es un comando más, no un cambio de shell.
+
+### 297A-29 — Retiro de la app Configuración: fuentes/tamaños estáticos + Perfil configurable por admin
+
+**Depende de:** 297A-27 (overlay), 297A-28 (guardado settings), 297A-13 (capacidades) y 297A-19 (toolbar). Plan: `Agente/planes/plan-retiro-configuracion-legacy-2026-07-31.md`. Petición del usuario: borrar las configuraciones de fuentes y tamaños (todo estático con JetBrains Mono y valores fijos), eliminar la app Configuración y dejar la configuración de Perfil dentro de la ventana Perfil con un botón en el toolbar visible solo para admins.
+
+- [ ] Fase 1 — Fuentes/tamaños estáticos: neutralizar `fontStore` y `loadSavedFonts()`, fijar tokens en `variables.css` (JetBrains Mono en todo, `--nav-width` fijo ≥360px), migrar consumidores legacy, eliminar `font-constants.ts`/`font-helpers.ts`/tab Fuentes/Tamaños.
+- [ ] Fase 2 — Toolbar reactivo a capacidad: `createAppToolbar` se suscribe a `authStore` (login/logout en vivo) y se crea el comando genérico admin-only con `isAvailable` (sin `if/else` en el shell).
+- [ ] Fase 3 — Perfil configurable: extraer controles de perfil a `profile-settings.ts`, toolbar en `shell-profile` con botón admin-only, fix del borde (`.desktop-profile-window .profile-foto` respeta el token) y persistencia vía `POST /api/admin/settings`.
+- [ ] Fase 4 — Eliminar la app Configuración: quitar registro `settings`, nodo admin, botón de menú, tab `'fuentes'` de Admin y CSS muerto; sin referencias residuales.
+- [ ] Fase 5 — (futuro, no implementar) Panel de control del usuario para fuentes con buena arquitectura cuando exista el panel de control.
+
+**Salida:** sin icono/menú de Configuración; Perfil se configura desde su ventana con botón admin-only; fuentes/tamaños 100% estáticos; bug del borde y límite de nav resueltos; mecanismo genérico de toolbar por capacidad.
