@@ -6,6 +6,7 @@ const valid = {
   schemaVersion: 1, maxFindings: 3, maxReminders: 4, maxTerminalLines: 20,
   lockWaitMs: 0, maxConcurrentStages: 1,
   timeoutsMs: { sentinel: 1000 }, fullPatterns: ['frontend/'], profiles: { frontend: ['frontend/'] },
+  performanceBudgets: { entryJsGzipBytes: 1, entryCssGzipBytes: 1, largestChunkGzipBytes: 1 },
 };
 
 test('preflight rechaza claves desconocidas y límites inválidos', () => {

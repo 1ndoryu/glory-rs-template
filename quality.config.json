@@ -12,6 +12,11 @@
     "frontend": 120000,
     "frontendTest": 300000
   },
+  "performanceBudgets": {
+    "entryJsGzipBytes": 65000,
+    "entryCssGzipBytes": 16000,
+    "largestChunkGzipBytes": 120000
+  },
   "fullPatterns": [
     "Cargo.toml",
     "Cargo.lock",

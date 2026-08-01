@@ -52,7 +52,7 @@ async function verifyTool(name, toolConfig, manifest) {
 }
 
 export function validateQualityConfig(qualityConfig) {
-  const allowed = new Set(['schemaVersion', 'maxFindings', 'maxReminders', 'maxTerminalLines', 'lockWaitMs', 'maxConcurrentStages', 'timeoutsMs', 'fullPatterns', 'profiles']);
+  const allowed = new Set(['schemaVersion', 'maxFindings', 'maxReminders', 'maxTerminalLines', 'lockWaitMs', 'maxConcurrentStages', 'timeoutsMs', 'performanceBudgets', 'fullPatterns', 'profiles']);
   const unknown = Object.keys(qualityConfig).filter(key => !allowed.has(key));
   if (unknown.length > 0) throw new Error(`quality.config.json: claves desconocidas: ${unknown.join(', ')}`);
   for (const key of ['maxFindings', 'maxReminders', 'maxTerminalLines']) {
@@ -70,6 +70,9 @@ export function validateQualityConfig(qualityConfig) {
   if (!qualityConfig.profiles || typeof qualityConfig.profiles !== 'object') throw new Error('quality.config.json: profiles inválido');
   if (!qualityConfig.timeoutsMs || Object.values(qualityConfig.timeoutsMs).some(value => !Number.isInteger(value) || value < 1)) {
     throw new Error('quality.config.json: timeoutsMs inválido');
+  }
+  if (!qualityConfig.performanceBudgets || Object.values(qualityConfig.performanceBudgets).some(value => !Number.isInteger(value) || value < 1)) {
+    throw new Error('quality.config.json: performanceBudgets inválido');
   }
 }
 

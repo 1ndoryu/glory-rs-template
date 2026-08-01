@@ -452,6 +452,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [x] **018A-50 —** Cerrar paridad automatizable de contratos públicos/admin y aislar el backlog residual de CSS/fachadas manuales para una fase visual posterior.
 - [x] **018A-51 —** Hacer que el gate `--ci` ejecute `frontend/test:full` además de type-check, manteniendo en local el selector incremental para evitar consumo innecesario.
 - [x] **018A-52 —** Separar el fingerprint de caché por modo local/CI y cubrirlo con regresión para que el reporte nunca reclame cobertura no ejecutada.
+- [x] **018A-53 —** Construir el frontend en CI y aplicar budgets gzip configurables al entry JS, entry CSS y chunk JS mayor; mantener local ligero.
 - [ ] Eliminar CSS/clases huérfanas con VarSense tras revisión visual; diferido y no bloquea 297A-17.
 
 **Criterio de salida:** una sola administración como app registrada, analytics útil/privado y cero rutas/chrome duplicados legacy; uploads y CSS/contratos obsoletos deben desaparecer después de su matriz de paridad.
@@ -468,7 +469,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [ ] Sentinel/VarSense/self-check y CI bloqueantes.
 - [ ] E2E visitante/usuario/admin/publicación/compra/reembolso/rollback.
 - [ ] Threat review de auth, workspace, upload, payment y analytics.
-- [ ] Budgets de rendimiento, logging, métricas y alertas.
+- [x] Budgets de rendimiento del bundle automatizados en CI; logging, métricas y alertas reales quedan diferidos.
 - [ ] Runbook de backup/restore/rollback antes de planificar deploy.
 
 **Criterio de salida:** todos los gates pasan y el producto puede entrar en revisión de producción. Deploy sigue fuera de alcance.

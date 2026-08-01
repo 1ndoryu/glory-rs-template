@@ -278,3 +278,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Dos ejecuciones con los mismos archivos no tienen la misma evidencia si una ejecuta solo type-check y otra ejecuta la suite completa; el modo de validación forma parte del fingerprint.
 - Al cambiar el contrato del caché hay que incrementar su versión para invalidar resultados antiguos en vez de asumir que describen el nuevo gate.
+
+## 018A-53 — Un budget útil debe ejecutarse donde existe el artefacto
+
+- Los límites de rendimiento solo son verificables sobre el build final; medir fuentes o cargar `test:full` en cada ciclo local no protege al producto y degrada el equipo.
+- Separar CI de local permite exigir build + gzip en integración sin convertir cada tarea en un proceso pesado. El límite vive en configuración y el reporte indica exactamente el asset y bytes que exceden.

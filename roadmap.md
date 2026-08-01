@@ -265,8 +265,8 @@ Plan: `Agente/planes/plan-notificaciones-2026-08-01.md`.
 - [x] Estrategia SEO base: sitemap/robots dinámicos, metadata OG/Twitter, canonical y JSON-LD sin incluir drafts.
 - [ ] Manual visual en desktop/tablet/móvil.
 - [ ] Teclado, foco, zoom, reduced motion y multimedia accesible.
-- [ ] Quality gate/CI completos y E2E críticos.
-- [ ] Threat review, performance, observabilidad y runbook.
+- [x] Quality gate/CI automatizados: type-check local; suite frontend completa, build y budgets gzip en `task:check --ci`.
+- [ ] E2E críticos, threat review, observabilidad y runbook; se mantienen diferidos por requerir navegador, revisión humana o entorno de producción.
 
 **Salida:** preparado para revisión de producción; deploy continúa fuera de alcance.
 
@@ -385,6 +385,7 @@ Plan canónico: `Agente/planes/plan-programas-editoriales-2026-07-31.md`.
 - [x] **018A-50 —** Completar la matriz de paridad de contratos automatizables y documentar el backlog residual de CSS/fachadas manuales como deuda no bloqueante.
 - [x] **018A-51 —** El gate CI ejecuta la suite frontend completa; el trabajo local conserva alcance incremental y no inicia procesos innecesarios.
 - [x] **018A-52 —** La caché del quality gate separa huellas local/CI para impedir que un PASS de `test:full` se reutilice como cobertura local sin ejecutar la suite.
+- [x] **018A-53 —** CI construye el frontend y valida budgets gzip del entry JS, entry CSS y chunk JS mayor; local no ejecuta build para conservar el ciclo rápido.
 - [ ] Retirar CSS/clases huérfanas restantes con VarSense tras revisión visual; diferido.
 
 ### 297A-17 — Hardening, identidad, accesibilidad y SEO
@@ -393,7 +394,8 @@ Plan canónico: `Agente/planes/plan-programas-editoriales-2026-07-31.md`.
 - [x] Validar SEO base: HTML público, sitemap, robots, metadata y Open Graph sin exponer drafts ni rutas privadas; queda auditoría final.
 - [ ] Verificar manual visual, teclado, foco, live regions, zoom 200%, reduced motion, alto contraste y multimedia accesible.
 - [x] **018A-51 —** CI ejecuta `type-check` y `test:full` frontend solo con `task:check --ci`; local mantiene type-check y selección incremental para no degradar el equipo.
-- [ ] Ejecutar E2E críticos, presupuestos de rendimiento, observabilidad y runbook Coolify; deploy continúa fuera de alcance. El split estructural de modelos ya está cerrado: `workspace/` y `workspace_overlay/` agrupan DTOs, validación, locators y tests sin suppressions. Para backend se debe usar `npm test`/`npm run check:back`, que derivan la BD por rama y aplican el contexto correcto.
+- [x] **018A-53 —** CI ejecuta el build y aplica budgets gzip configurables de 65 KB para entry JS, 16 KB para entry CSS y 120 KB para el chunk JS mayor.
+- [ ] Ejecutar E2E críticos, observabilidad y runbook Coolify; deploy continúa fuera de alcance. El split estructural de modelos ya está cerrado: `workspace/` y `workspace_overlay/` agrupan DTOs, validación, locators y tests sin suppressions. Para backend se debe usar `npm test`/`npm run check:back`, que derivan la BD por rama y aplican el contexto correcto.
 - [x] **018A-37 —** El selector frontend incremental y la escritura atómica Windows quedan cubiertos por fixtures del orquestador; la suite completa sigue reservada para `test:full`/CI.
 - [x] **018A-38 —** Separar el contrato Article en subinterfaces composables; type-check y Sentinel confirman que las vistas conservan el mismo boundary.
 - [x] **018A-41 —** Separar el registro de apps públicas y administrativas; `app-registration.ts` queda bajo 300 líneas y los registros/capacidades permanecen sin cambios.
