@@ -39,8 +39,32 @@ let stopAuthSubscription: (() => void) | null = null;
 let sharedCleanup: (() => void) | null = null;
 let conflictPending = false;
 
+/* [297A-27] Comparación estructural insensible al orden de claves de objetos.
+ * El backend Rust serializa con BTreeMap (claves alfabéticas) mientras el
+ * frontend construye el overlay en orden de inserción JS; JSON.stringify
+ * estricto producía falsos conflictos con contenido idéntico. Los arrays
+ * (tombstones) sí comparan en orden porque el orden es significativo. */
+function equalValue(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  if (typeof left !== typeof right) return false;
+  if (left === null || right === null) return left === right;
+  if (typeof left !== 'object') return false;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+    return left.every((value, index) => equalValue(value, right[index]));
+  }
+  const leftKeys = Object.keys(left as Record<string, unknown>);
+  const rightKeys = Object.keys(right as Record<string, unknown>);
+  if (leftKeys.length !== rightKeys.length) return false;
+  for (const key of leftKeys) {
+    if (!Object.prototype.hasOwnProperty.call(right, key)) return false;
+    if (!equalValue((left as Record<string, unknown>)[key], (right as Record<string, unknown>)[key])) return false;
+  }
+  return true;
+}
+
 function equalOverlay(left: WorkspaceOverlay, right: WorkspaceOverlay): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
+  return equalValue(left, right);
 }
 
 function isEmptyOverlay(overlay: WorkspaceOverlay): boolean {

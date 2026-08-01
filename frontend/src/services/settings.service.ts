@@ -11,8 +11,11 @@ export const SettingsService = {
   },
 
   /** Guardar configuraciones parciales. */
+  /* [297A-28] El backend movió el guardado a POST /api/admin/settings en el
+   * refactor de seguridad 297A-7 (AdminUser + CSRF). GET /api/settings quedó
+   * público, pero el POST ya no existe en esa ruta → 405. */
   async save(settings: Record<string, string>): Promise<void> {
-    return api.post<void>('/api/settings', { settings });
+    return api.post<void>('/api/admin/settings', { settings });
   },
 
   /** Obtener el contenido de About. */
