@@ -136,7 +136,8 @@ export async function openAppWindow(
     const { workspaceStore } = await import('./workspace/workspace-store');
     const ws = workspaceStore.get();
     const folderNode = ws.nodes[params.folderId];
-    titleOverride = folderNode?.label ?? (params.folderId === 'desktop' ? 'Escritorio' : 'Galería');
+    /* [018A-87] Fallback genérico: ya no existe la carpeta "Galería". */
+    titleOverride = folderNode?.label ?? (params.folderId === 'desktop' ? 'Escritorio' : params.folderId);
   }
 
   const canonicalPath = getCanonicalAppPath(app, params);

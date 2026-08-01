@@ -5,6 +5,7 @@
 import { createEl } from '../utils/dom';
 import { MediaService } from '../services';
 import { tryCatch } from '../utils/result';
+import { publishMediaChanged, type MediaChangedFileType } from '../features/runtime/media-events';
 import type { MediaUpload } from '../api/types';
 
 export interface UploadResult {
@@ -18,6 +19,14 @@ export async function uploadFile(
   altText?: string,
 ): Promise<UploadResult> {
   const media = await MediaService.upload(file, { articleId, altText });
+  /* [018A-87] Toda subida de media (editor de artículos, portadas) también
+   * aterriza como nodo en su subcarpeta de Documentos vía media-gallery-sync. */
+  publishMediaChanged({
+    mediaId: media.id,
+    operation: 'uploaded',
+    fileType: media.file_type as MediaChangedFileType,
+    label: media.alt_text || media.file_name,
+  });
   return { url: media.url, media };
 }
 

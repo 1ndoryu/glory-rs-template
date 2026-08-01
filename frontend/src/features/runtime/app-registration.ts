@@ -19,12 +19,14 @@ import { mountAccountView } from './account-view';
 import { createNotificationsView } from '../notifications/notifications-view';
 import { createDownloadsView, createOrdersView, createStoreView } from '../commerce/store-view';
 import { createPropertiesPreview } from '../desktop/apps/properties/properties-preview';
+import { initMediaGallerySync } from './workspace/media-gallery-sync';
 import './app-registration-admin';
 
 /* === Finder === */
 AppRegistry.register({
   id: 'finder',
-  title: 'Galería',
+  /* [018A-87] La carpeta del workspace ahora es "Documentos", no "Galería". */
+  title: 'Documentos',
   icon: Folder,
   iconType: 'folder',
   singleton: false,
@@ -279,3 +281,10 @@ AppRegistry.registerLazy({
     },
   })),
 });
+
+/* [018A-87] Puente media → escritorio: al subir un archivo aterriza como nodo
+ * en su subcarpeta de "Documentos" (Imágenes/Audio/Vídeo/Documentos) y el admin
+ * lo propaga con "Publicar escritorio". Se inicializa aquí (no en main.ts,
+ * que tiene cambios ajenos en curso) porque este módulo se carga siempre con
+ * el shell y el registro es idempotente. */
+initMediaGallerySync();

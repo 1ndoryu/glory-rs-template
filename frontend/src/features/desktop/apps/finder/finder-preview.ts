@@ -23,6 +23,8 @@ import { resolvePublicResourceTarget } from '../../../runtime/workspace/public-r
 import { AppRegistry } from '../../../runtime/app-registry';
 import { resolveResourceIcon, resolveResourceIconType } from '../../../runtime/resource-type-registry';
 import { showToast } from '../../../../components/ui/toast';
+import { createModal } from '../../../../components/ui/modal';
+import { trackImageDownload } from '../../../analytics/tracker';
 
 export interface FinderOptions {
   folderId: string;
@@ -88,7 +90,8 @@ export function createFinderPreview(options: FinderOptions): HTMLElement {
 
     const ws = workspaceStore.get();
     const node = ws.nodes[folderId];
-    const label = node?.label ?? (folderId === 'desktop' ? 'Escritorio' : 'Galería');
+    /* [018A-87] Ya no hay carpeta "Galería" en el workspace: el fallback es genérico. */
+    const label = node?.label ?? (folderId === 'desktop' ? 'Escritorio' : folderId);
     options.onNavigate?.(folderId, label);
   }
 
@@ -210,6 +213,10 @@ function activateNode(
 ): void {
   if (node.type === 'folder') {
     navigateTo(node.id);
+  } else if (node.type === 'resource' && node.resourceKind === 'image' && node.refId) {
+    /* [018A-87] Las imágenes de Documentos se abren con visor local (preview
+     * pública + descargar), sin pasar por un deep link de app. */
+    openImagePreview(node.refId, node.label);
   } else if (node.type === 'resource' && node.resourceKind) {
     const publicTarget = resolvePublicResourceTarget(node);
     if (publicTarget) {
@@ -220,4 +227,26 @@ function activateNode(
   } else if (node.type === 'app' && node.refId) {
     options.onOpenApp(node.refId);
   }
+}
+
+/* [018A-87] Visor modal de imagen para los recursos de Documentos.
+ * Usa la preview pública (/api/media/{id}/preview) y permite descargar.
+ * Reutiliza createModal y trackImageDownload (mismo patrón que la página
+ * /gallery) para no duplicar recetas visuales. */
+function openImagePreview(mediaId: string, label: string): void {
+  const url = `/api/media/${mediaId}/preview`;
+
+  const fullImg = createEl('img', { src: url, alt: label });
+  fullImg.style.width = '100%';
+  fullImg.style.border = 'var(--borde)';
+
+  const btnDescargar = createEl('button', { className: 'boton', textContent: 'descargar' });
+  btnDescargar.addEventListener('click', () => {
+    trackImageDownload(url);
+    const a = createEl('a', { href: url, download: label || 'imagen' });
+    a.click();
+  });
+
+  const container = createEl('div', {}, fullImg, btnDescargar);
+  createModal({ titulo: label, contenido: container, ancho: '800px' });
 }

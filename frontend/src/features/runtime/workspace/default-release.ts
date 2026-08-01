@@ -10,9 +10,26 @@ import type { WorkspaceNode, WorkspaceTree } from './types';
 export const DEFAULT_RELEASE: WorkspaceTree = {
   version: 1,
   nodes: {
-    gallery: {
-      id: 'gallery', parentId: 'desktop', type: 'folder', label: 'Galería',
+    /* [018A-87] La carpeta "Galería" vacía se sustituye por "Documentos" con
+     * subcarpetas por tipo: las subidas de media aterrizan aquí vía
+     * media-gallery-sync (igual que Notas para artículos). Las subcarpetas
+     * viven dentro de la carpeta (no ocupan grid del escritorio ni el
+     * launcher móvil, que solo muestran el nivel raíz). */
+    documentos: {
+      id: 'documentos', parentId: 'desktop', type: 'folder', label: 'Documentos',
       position: { col: 0, row: 0 }, mobilePosition: { col: 0, row: 0 }, mobileOrder: 0, requires: 'public',
+    },
+    'documentos-imagenes': {
+      id: 'documentos-imagenes', parentId: 'documentos', type: 'folder', label: 'Imágenes', requires: 'public',
+    },
+    'documentos-audio': {
+      id: 'documentos-audio', parentId: 'documentos', type: 'folder', label: 'Audio', requires: 'public',
+    },
+    'documentos-video': {
+      id: 'documentos-video', parentId: 'documentos', type: 'folder', label: 'Vídeo', requires: 'public',
+    },
+    'documentos-documentos': {
+      id: 'documentos-documentos', parentId: 'documentos', type: 'folder', label: 'Documentos', requires: 'public',
     },
     projects: {
       id: 'projects', parentId: 'desktop', type: 'app', label: 'Proyectos', refId: 'projects',

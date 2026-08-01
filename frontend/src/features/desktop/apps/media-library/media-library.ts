@@ -9,6 +9,7 @@ import { createEl } from '../../../../utils/dom';
 import { createVacio } from '../../../../components/ui/empty-state';
 import { MediaService } from '../../../../services';
 import { setMediaViewHandler, type MediaFilter } from '../../../runtime/commands/media-commands';
+import { publishMediaChanged, type MediaChangedFileType } from '../../../runtime/media-events';
 import { tryCatch } from '../../../../utils/result';
 import { safeClick, safeRun } from '../../../../utils/safe-async';
 import { showToast } from '../../../../components/ui/toast';
@@ -109,6 +110,13 @@ function createItemCard(
     restoreBtn.addEventListener('click', safeClick(async () => {
       const result = await safeRun(MediaService.restore(item.id), 'error al restaurar');
       if (result.ok) {
+        /* [018A-87] Al restaurar, el icono vuelve a su subcarpeta de Documentos. */
+        publishMediaChanged({
+          mediaId: item.id,
+          operation: 'restored',
+          fileType: item.file_type as MediaChangedFileType,
+          label: item.alt_text || item.file_name,
+        });
         showToast('media restaurado');
         onAction();
       }
@@ -123,6 +131,13 @@ function createItemCard(
       if (!confirmed) return;
       const result = await safeRun(MediaService.delete(item.id), 'error al eliminar');
       if (result.ok) {
+        /* [018A-87] Al mover a la papelera, el icono se retira del escritorio. */
+        publishMediaChanged({
+          mediaId: item.id,
+          operation: 'deleted',
+          fileType: item.file_type as MediaChangedFileType,
+          label: item.alt_text || item.file_name,
+        });
         showToast('media movido a la papelera');
         onAction();
       }
@@ -194,6 +209,14 @@ export function createMediaLibraryPreview(options: MediaLibraryOptions): MediaLi
       pendingObjectUrls.delete(previewUrl);
     }
     if (!result.ok) return;
+    /* [018A-87] El archivo subido aterriza como nodo en su subcarpeta de
+     * Documentos (media-gallery-sync); el admin lo propaga con "Publicar". */
+    publishMediaChanged({
+      mediaId: result.value.id,
+      operation: 'uploaded',
+      fileType: result.value.file_type as MediaChangedFileType,
+      label: result.value.alt_text || result.value.file_name,
+    });
     showToast('archivo subido');
     await render();
   }));
