@@ -60,6 +60,7 @@
 - [x] contentWindow oculto en rutas manejadas por apps.
 - [x] **018A-17 —** Orval Fetch `tags-split`: `npm run codegen:local` exporta OpenAPI sin BD/servidor y regenera clientes por etiqueta; el esquema de seguridad usa `session_cookie`; cobertura completa de endpoints y retiro del cliente manual siguen pendientes.
 - [x] **018A-19 —** Swagger/utoipa documenta la sesión opaca `session_id` como cookie y elimina referencias de Bearer/JWT del contrato; cobertura completa y retiro del cliente manual siguen diferidos.
+- [x] **018A-20 —** Paridad OpenAPI del dominio de artículos: rutas admin corregidas (`/api/admin/articles`) y clientes `articles/` regenerados; los dominios restantes siguen pendientes.
 
 **Salida:** runtime compartido funciona sin chrome/listas/listeners duplicados. Orval se regenera localmente sin backend vivo; quedan cobertura total del contrato y retiro del cliente manual.
 

@@ -14,6 +14,9 @@ pub struct Article {
     pub id: Uuid,
     pub title: String,
     pub slug: String,
+    /* [018A-20] TipTap JSON se expone como objeto OpenAPI explícito para que
+     * Orval no cree una referencia huérfana `JsonValue`. */
+    #[schema(value_type = Object)]
     pub content: JsonValue,
     pub excerpt: String,
     pub cover_image: Option<String>,
@@ -36,6 +39,7 @@ pub struct CreateArticleRequest {
         message = "El titulo debe tener entre 1 y 500 caracteres"
     ))]
     pub title: String,
+    #[schema(value_type = Object)]
     pub content: JsonValue,
     #[serde(default)]
     pub excerpt: String,
@@ -55,6 +59,7 @@ fn default_status() -> String {
 pub struct UpdateArticleRequest {
     #[validate(length(min = 1, max = 500))]
     pub title: Option<String>,
+    #[schema(value_type = Object)]
     pub content: Option<JsonValue>,
     pub excerpt: Option<String>,
     pub cover_image: Option<String>,
@@ -87,6 +92,7 @@ pub struct ArticlePublic {
     pub id: Uuid,
     pub title: String,
     pub slug: String,
+    #[schema(value_type = Object)]
     pub content: JsonValue,
     pub excerpt: String,
     pub cover_image: Option<String>,

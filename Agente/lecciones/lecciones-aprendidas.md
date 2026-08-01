@@ -116,3 +116,8 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Retirar JWT del runtime no basta: Swagger/utoipa y los clientes generados pueden seguir publicando Bearer como si fuera válido.
 - La seguridad de sesión se documenta como `ApiKey::Cookie("session_id")`; CSRF queda explícito como header de mutación, sin inventar una segunda autoridad.
+
+## 018A-20 — Las rutas OpenAPI deben probarse contra el router real
+
+- Una anotación utoipa puede compilar aunque apunte a una ruta pública; comparar el path anotado con `.route()` evita que el cliente generado omita el prefijo `/admin`.
+- Los campos `serde_json::Value` de DTOs expuestos necesitan `#[schema(value_type = Object)]`; de lo contrario Orval falla con referencias `JsonValue` inexistentes.

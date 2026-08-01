@@ -17,7 +17,7 @@ use crate::AppState;
 /// Crear un articulo (admin)
 #[utoipa::path(
     post,
-    path = "/api/articles",
+    path = "/api/admin/articles",
     request_body = CreateArticleRequest,
     responses(
         (status = 201, description = "Articulo creado", body = Article),
@@ -41,7 +41,7 @@ pub async fn create_article(
 /// Obtener articulo por ID (admin — incluye borradores)
 #[utoipa::path(
     get,
-    path = "/api/articles/{id}",
+    path = "/api/admin/articles/{id}",
     params(("id" = Uuid, Path, description = "ID del articulo")),
     responses(
         (status = 200, description = "Articulo encontrado", body = Article),
@@ -132,7 +132,7 @@ pub async fn list_articles_admin(
 /// Actualizar articulo (admin)
 #[utoipa::path(
     put,
-    path = "/api/articles/{id}",
+    path = "/api/admin/articles/{id}",
     params(("id" = Uuid, Path, description = "ID del articulo")),
     request_body = UpdateArticleRequest,
     responses(
@@ -158,7 +158,7 @@ pub async fn update_article(
 /// Eliminar articulo (admin)
 #[utoipa::path(
     delete,
-    path = "/api/articles/{id}",
+    path = "/api/admin/articles/{id}",
     params(("id" = Uuid, Path, description = "ID del articulo")),
     responses(
         (status = 204, description = "Articulo eliminado"),
