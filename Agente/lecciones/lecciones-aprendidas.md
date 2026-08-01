@@ -39,6 +39,12 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 - El contrato de suite completa debe permanecer explícito (`test`/`test:full`), mientras el modo local selectivo se ofrece como comando separado para no convertir un PASS parcial en una garantía global.
 - Limitar workers y captura de salida evita que varios agentes saturen CPU/memoria; el gate debe fallar rápido ante locks duplicados y dejar el detalle en artifacts, no en stdout/contexto.
 
+## 018A-95 — Colisión de IDs entre agentes en paralelo
+
+- Con dos agentes activos en el mismo repositorio, un ID de tarea puede asignarse dos veces (el otro agente archivó su `018A-94` de GAME-01 mientras este bloque usaba el mismo número). Antes de cerrar, verificar en `Agente/completados/` que el ID no esté ya en uso; si colisiona, renumerar a la siguiente cifra libre (018A-95) y actualizar roadmap, gate y completados de forma consistente.
+- El archivo de completados es compartido: al commitearlo se arrastran también las entradas de documentación del otro agente (aceptable), pero NUNCA sus archivos de código (main.ts, workspace-store.ts, registros de apps, assets de juego, etc.) — el staging debe seguir siendo explícito por archivo.
+- El `selectionStore` global sin scope de superficie filtra selección entre superficies que muestran los mismos node-ids (Finder en raíz vs escritorio). La solución raíz es escalar por `source` en el contrato, no limpiar la selección al navegar (rompería copiar/cortar por teclado que usa la última selección como fallback).
+
 ## 018A-5 — Commit condicional y migración de reglas
 
 - El quality gate no debe ordenar commit a ciegas: diagnósticos, bloques intermedios y trabajo compartido pueden documentarse sin commit; el recordatorio debe indicar commit/push solo cuando el bloque sea entregable.
