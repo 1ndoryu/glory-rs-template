@@ -1,5 +1,6 @@
 /* wandori.us — Services barrel
- * [Auditoría v4] Service layer frontend. Abstrae api.get/post directo. */
+ * [Auditoría v4] Service layer frontend. Abstrae el transporte generado y
+ * conserva los efectos de dominio fuera del cliente HTTP. [018A-35] */
 
 export { ArticleService } from './article.service';
 export { AuthService } from './auth.service';

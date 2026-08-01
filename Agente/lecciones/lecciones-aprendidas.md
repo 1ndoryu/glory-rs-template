@@ -191,3 +191,7 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Un servicio de auth no es solo HTTP: la limpieza de clipboard/preferencias y la actualización de `authStore` deben permanecer fuera del mutator, después de validar el estado generado.
 - Los headers de consentimiento y de seguridad son parte del contrato del servicio; al migrar a Orval se pasan como `RequestInit` y no se duplican en el cliente generado.
+
+## 018A-35 — Los modelos ricos deben adaptarse en un único boundary
+
+- Cuando OpenAPI expresa árboles u overlays como mapas genéricos, la conversión debe quedar en funciones nombradas del servicio. Así el runtime conserva invariantes (`version`, `nodes`, tipos de nodo) y el cliente generado conserva el contrato HTTP sin duplicación.

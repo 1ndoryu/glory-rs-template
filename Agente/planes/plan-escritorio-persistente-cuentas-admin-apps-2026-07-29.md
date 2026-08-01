@@ -435,6 +435,7 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 - [x] **018A-32 —** Centralizar el transporte generado de Orval (cookie, CSRF, base URL y envelope) y migrar `MediaService`; los dominios restantes se migrarán por bloques y el cliente manual se retira solo al completar la matriz.
 - [x] **018A-33 —** Migrar `ArticleService`, `ProjectService` y `ProductService` al cliente generado, incluyendo checkout e idempotency header; adaptar `ProjectUrlUpdate` en el boundary y dejar auth/workspace/settings/analytics/notifications/preferences para bloques separados.
 - [x] **018A-34 —** Migrar `AuthService`, `PreferencesService`, `NotificationsService`, `SettingsService` y `AnalyticsService` al cliente generado; conservar stores, consentimiento y logout observable. `WorkspaceService` queda separado por sus tipos de overlay/release.
+- [x] **018A-35 —** Migrar `WorkspaceService` al cliente generado. Las funciones de conversión de release/overlay aíslan las aserciones de tipos y preservan el `404` público como `null`; no quedan consumidores de `api` en los servicios de dominio.
 - [ ] Eliminar CSS/clases huérfanas con VarSense.
 
 **Criterio de salida:** una sola administración como app registrada, analytics útil/privado y cero rutas/chrome duplicados legacy; uploads y CSS/contratos obsoletos deben desaparecer después de su matriz de paridad.
