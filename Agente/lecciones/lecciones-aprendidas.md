@@ -308,3 +308,10 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Si taskbar, móvil y titlebar mutan stores directamente, la misma acción puede quedar sin analítica, sin disponibilidad uniforme o con teardown distinto. El contrato debe vivir en `CommandRegistry` y las superficies solo proyectarlo.
 - El reencuadre por resize debe ser batch: una sola escritura al store evita N persistencias y mantiene el historial de rutas estable; los cambios ambientales usan `source='sync'`.
+
+## 018A-62/63/64 — ID de tarea y gate: dos lecciones de proceso
+
+- **El ID de tarea se asigna desde git log, no desde memoria.** Se usó `018A-14/15` creyéndolos siguientes cuando la secuencia real ya llegaba a `018A-61`; hubo que corregir comentarios en migración, servicio y handler. Antes de escribir un `[ID]`, comprobar el máximo usado: `git log --oneline | Select-String '018A-(\d+)' | % { [int]$Matches[1] } | Measure-Object -Maximum`.
+- **El quality gate exige el ID en `roadmap.md`, `Agente/planes/` o `Agente/completados/`** (`preflight.mjs`). Si la tarea aún no figura, `npm run task:check -- {ID}` falla con "no existe". Registrar la tarea en el roadmap (pendiente) → gate → archivar en completados → quitar del roadmap. El roadmap debe volver a quedar idéntico a HEAD si las tareas se cierran en el mismo bloque.
+- **`ON CONFLICT` contra índice parcial exige repetir el predicado `WHERE`** en el arbiter (42P10): `ON CONFLICT (col) WHERE col IS NOT NULL DO NOTHING`. Un índice UNIQUE parcial no matchea un `ON CONFLICT (col)` sin predicado.
+- **Desajuste utoipa ↔ cliente generado ↔ servicio manual** causa fallos silenciosos del frontend pese a HTTP correcto (login 204 mostrado como "credenciales incorrectas"). Alinear el contrato y aceptar el status real en `unwrapGeneratedResponse`; regenerar el cliente después.
