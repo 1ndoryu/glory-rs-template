@@ -125,12 +125,6 @@ export function createAdminWindowView(): { page: Promise<HTMLElement>; actions: 
   return { page: Promise.resolve(page), actions: actionsBar };
 }
 
-/* [legacy] Ruta /admin del router (sin ventana): solo el contenido. La franja
- * de acciones pertenece al chrome de la ventana, no a la página en sí. */
-export async function renderAdmin(): Promise<HTMLElement> {
-  return createAdminWindowView().page;
-}
-
 function renderSitioTab(): { element: HTMLElement; createSaveAction: () => HTMLElement } {
   const container = createEl('div', { className: 'flex-columna gap-lg' });
   container.appendChild(createEl('h3', { textContent: 'contenido del sitio' }));

@@ -1,7 +1,7 @@
 /* wandori.us — Toolbar Commands
  * Comandos referenciados por app toolbars (Papelera, Finder, Projects). */
 
-import { CommandRegistry, type CommandResult } from '../command-registry';
+import { adminOnly, CommandRegistry, type CommandResult } from '../command-registry';
 import { Folder, Trash2, FolderCode } from 'lucide';
 
 CommandRegistry.register({
@@ -58,7 +58,7 @@ CommandRegistry.register({
   },
 });
 
-CommandRegistry.register({
+CommandRegistry.register(adminOnly({
   id: 'projects:new',
   label: 'Nuevo proyecto',
   icon: FolderCode,
@@ -66,10 +66,12 @@ CommandRegistry.register({
   contexts: ['toolbar'],
   undoPolicy: 'none',
   analyticsEvent: 'projects.new',
+  /* [018A-26] La creación vive en el programa interno, no en la ruta legacy
+   * /admin. adminOnly mantiene el comando fuera de toolbars públicas. */
   isAvailable: () => ({ state: 'enabled' }),
   execute: async (): Promise<CommandResult> => {
-    const { navigate } = await import('../../../router');
-    navigate('/admin');
+    const { openAppWindow } = await import('../route-app-adapter');
+    await openAppWindow('project-editor');
     return { status: 'success' };
   },
-});
+}));

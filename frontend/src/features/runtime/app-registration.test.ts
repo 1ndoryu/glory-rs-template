@@ -37,6 +37,15 @@ describe('Account app registration', () => {
     expect(editor?.routePatterns).toBeUndefined();
   });
 
+  it('registers admin as an internal app without a legacy route', () => {
+    const admin = AppRegistry.get('admin');
+    expect(admin).toBeDefined();
+    expect(admin?.requires).toBe('admin');
+    expect(admin?.singleton).toBe(true);
+    expect(admin?.deepLink).toBeUndefined();
+    expect(admin?.routePatterns).toBeUndefined();
+  });
+
   it('registers product editor as an internal admin app', () => {
     const editor = AppRegistry.get('product-editor');
     expect(editor).toBeDefined();

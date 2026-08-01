@@ -427,12 +427,12 @@ No se salta un gate para construir UI sobre un contrato inseguro.
 ### 14.3 Retiro controlado
 
 - [ ] Matriz de paridad antigua→programa.
-- [ ] Eliminar ruta/página/icono/estilos Admin.
-- [x] Eliminar JWT Bearer, `jsonwebtoken`, secreto/configuración y clientes/tipos de autenticación legacy; la sesión opaca HttpOnly queda como autoridad única. *(018A-18; `/admin`, uploads y CSS legacy siguen pendientes)*
+- [x] **018A-26 —** Retirar la ruta legacy `/admin` y el wrapper de página sin ventana; conservar `Admin` como app interna singleton y abrir `project-editor` desde el comando administrativo registrado.
+- [x] Eliminar JWT Bearer, `jsonwebtoken`, secreto/configuración y clientes/tipos de autenticación legacy; la sesión opaca HttpOnly queda como autoridad única. *(018A-18; uploads y CSS/contratos legacy siguen pendientes)*
 - [ ] Eliminar uploads públicos y rutas/DTO obsoletos.
 - [ ] Eliminar CSS/clases huérfanas con VarSense.
 
-**Criterio de salida:** una sola administración, analytics útil/privado y cero dependencias del Admin legacy.
+**Criterio de salida:** una sola administración como app registrada, analytics útil/privado y cero rutas/chrome duplicados legacy; uploads y CSS/contratos obsoletos deben desaparecer después de su matriz de paridad.
 
 ## 15. 297A-17 — Hardening, identidad, accesibilidad y SEO
 

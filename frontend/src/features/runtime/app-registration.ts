@@ -276,7 +276,9 @@ AppRegistry.registerLazy({
   iconType: 'application',
   singleton: true,
   requires: 'admin',
-  routePatterns: ['/admin'],
+  /* [018A-26] Admin es una aplicación interna del OS: no conserva una ruta
+   * pública paralela. El shell la abre por AppRegistry y aplica la capacidad
+   * admin en la frontera de openAppWindow. */
   load: () => import('../../pages/admin').then(m => ({
     render: (ctx: RenderContext): MountedView => {
       dispatchEvent({ type: 'app_opened', appId: 'admin' });

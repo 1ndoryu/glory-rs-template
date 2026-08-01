@@ -145,3 +145,9 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - Media puede publicar filtros, estados y respuesta de upload aunque el cuerpo multipart permanezca en el adaptador manual; el tipo/extensión siempre los decide el backend.
 - Papelera y restore deben conservar operaciones separadas en OpenAPI para que una app futura no confunda soft delete con borrado permanente.
+
+## 018A-26 — Las apps internas no necesitan rutas legacy
+
+- Una app administrativa debe registrarse una sola vez en `AppRegistry`; conservar una ruta de página sin ventana crea un segundo punto de entrada y permite que el shell pierda capacidades, foco y analítica.
+- Los comandos de toolbar que crean contenido deben declarar `adminOnly` y abrir el editor por `openAppWindow`; navegar a `/admin` acopla una acción concreta a un panel monolítico.
+- Retirar la ruta no implica borrar el módulo que renderiza la app: el contenido puede seguir siendo reutilizable mientras la presentación y la autorización viven en el runtime.

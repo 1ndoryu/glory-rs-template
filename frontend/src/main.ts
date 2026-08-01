@@ -65,13 +65,7 @@ import { renderArticle } from './pages/article';
 import { renderAbout } from './pages/about';
 import { renderGallery } from './pages/gallery';
 import { renderProjects } from './pages/projects';
-import { renderAdmin } from './pages/admin';
 import { renderCheckoutSuccess, renderCheckoutCancel } from './pages/checkout';
-
-/* === Guard de autenticacion === */
-function requireAuth(): boolean {
-  return authStore.get().isAuthenticated;
-}
 
 /* === Registrar rutas === */
 addRoute({ path: '/', render: () => renderHome() });
@@ -82,7 +76,6 @@ addRoute({ path: '/projects', render: () => renderProjects() });
 /* `/login` es el deep link canónico de Cuenta; si el adapter aún no está
  * montado, el router conserva el mismo contenido como fallback. */
 addRoute({ path: '/login', render: (_params, ctx) => createAccountView(ctx) });
-addRoute({ path: '/admin', render: () => renderAdmin(), guard: requireAuth });
 addRoute({ path: '/checkout/success', render: () => renderCheckoutSuccess() });
 addRoute({ path: '/checkout/cancel', render: () => renderCheckoutCancel() });
 

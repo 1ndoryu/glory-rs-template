@@ -27,7 +27,7 @@
 - Concepto desktop aprobado; Finder es file browser real (lee workspaceStore); Reader sigue siendo preview.
 - Workspace overlay implementado: release + overlay + merge + clipboard + papelera + crear carpetas.
 - Split de archivos grandes completado: command-registration (725→6), workspace-store (430→4), desktop-shell (419→3), mobile-shell (antes >300; launcher extraído a `mobile-launcher.ts`).
-- Sesiones opacas en cookie operativas; JWT Bearer, `localStorage` y el secreto JWT fueron retirados del backend/frontend. `/admin` legacy y uploads públicos siguen como deuda controlada.
+- Sesiones opacas en cookie operativas; JWT Bearer, `localStorage` y el secreto JWT fueron retirados del backend/frontend. La ruta legacy `/admin` fue retirada en 018A-26; uploads públicos y CSS/contratos legacy siguen como deuda controlada.
 - **Quality tool sprint:** 13 reglas custom (P0/P1/P2) + 7 Sentinel CLI + 4 VarSense = 24 reglas activas; la cobertura operativa estimada del quality tool es ~65% del inventario de patrones automatizables definido en el plan. VarSense reconoce contratos vanilla de clases con patch reproducible (`a93b8bf0…`, 43 tests del tool). Últimos gates 297A-13/15/16/17/21: PASS, Sentinel 0 errores, VarSense 0 errores, Rust 30 tests, frontend 390 tests en 52 suites. Auditoría v4 reporta por separado 57/78 hallazgos arquitectónicos potencialmente detectables (73%) y 19/23 correcciones del checklist base (83%); no son denominadores comparables. ISP refactor DomAttrs (33→6 sub-interfaces). El contrato OpenAPI ya no ofrece Bearer/JWT: documenta la cookie `session_id` HttpOnly; la cobertura de endpoints y el retiro del cliente manual quedan diferidos.
 - Ejecutar una tarea por vez y en este orden; no saltar dependencias.
 - El plan maestro contiene checklists/gates. El roadmap conserva solo pendientes.
@@ -240,7 +240,8 @@ Plan: `Agente/planes/plan-notificaciones-2026-08-01.md`.
 - [x] Consentimiento/retención y eventos esenciales/opcionales: banner `unknown/granted/denied`, tracker bloqueado por defecto, header server-side, hashes SHA-256 y purga admin 30–730 días. *(plan `Agente/planes/plan-analytics-privacidad-2026-08-01.md`; revisión legal/E2E pendientes)*
 - [x] Batch acotado, inserción multi-fila y deduplicación por `event_id`; eventos críticos de pago permanecen server-side.
 - [x] Agregados y Estadísticas separados del dispatcher; app admin con paneles Overview/Content/OS/Commerce/Reliability y exportación JSON.
-- [ ] Paridad y eliminación de `/admin`, uploads y contratos/CSS legacy. *(JWT Bearer retirado en 018A-18)*
+- [x] **018A-26 —** Retirada la ruta frontend legacy `/admin`; Admin permanece como app interna registrada y “Nuevo proyecto” abre `project-editor` mediante `openAppWindow` con guardia admin.
+- [ ] Completar paridad y eliminación de uploads públicos y contratos/CSS legacy. *(JWT Bearer retirado en 018A-18; la página Admin se conserva como programa interno)*
 
 **Salida:** una sola administración y métricas privadas/tipadas.
 
