@@ -17,12 +17,12 @@ describe('Bosque playable WebGL lifecycle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.detectWebGL.mockReturnValue({ available: false, reason: 'WebGL bloqueado en el dispositivo' });
-    mocks.createGameInput.mockReturnValue({
+    mocks.createGameInput.mockImplementation(() => ({
       controls: document.createElement('div'),
       getDirection: () => ({ x: 0, z: 0 }),
       destroy: vi.fn(),
-    });
-    mocks.mountGamePlayableScene.mockReturnValue({
+    }));
+    mocks.mountGamePlayableScene.mockImplementation(() => ({
       canvas: document.createElement('canvas'),
       update: vi.fn(),
       resize: vi.fn(),
@@ -39,7 +39,7 @@ describe('Bosque playable WebGL lifecycle', () => {
         textures: 0,
       }),
       destroy: vi.fn(),
-    });
+    }));
     vi.stubGlobal('ResizeObserver', class {
       observe(): void {}
       disconnect(): void {}
@@ -58,6 +58,43 @@ describe('Bosque playable WebGL lifecycle', () => {
     expect(view.element.querySelector('.juegoFixture__estado')?.getAttribute('aria-live')).toBe('polite');
     expect(mocks.createGameInput).not.toHaveBeenCalled();
     expect(mocks.mountGamePlayableScene).not.toHaveBeenCalled();
+  });
+
+  it('repeatedly aborts before mounting without creating renderer resources', () => {
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const controller = new AbortController();
+      controller.abort();
+      const view = renderGamePlayable({ signal: controller.signal });
+      expect(view.element.querySelector('canvas')).toBeNull();
+      view.destroy?.();
+    }
+
+    expect(mocks.detectWebGL).not.toHaveBeenCalled();
+    expect(mocks.createGameInput).not.toHaveBeenCalled();
+    expect(mocks.mountGamePlayableScene).not.toHaveBeenCalled();
+    expect(globalThis.requestAnimationFrame).not.toHaveBeenCalled();
+  });
+
+  it('mounts and destroys the playable view repeatedly without retaining handles', () => {
+    mocks.detectWebGL.mockReturnValue({ available: true, kind: 'webgl2' });
+
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const view = renderGamePlayable({ signal: new AbortController().signal });
+      view.destroy?.();
+    }
+
+    expect(mocks.createGameInput).toHaveBeenCalledTimes(12);
+    expect(mocks.mountGamePlayableScene).toHaveBeenCalledTimes(12);
+    expect(mocks.createGameInput.mock.results.map(result => result.value.destroy))
+      .toHaveLength(12);
+    expect(mocks.mountGamePlayableScene.mock.results.map(result => result.value.destroy))
+      .toHaveLength(12);
+    for (const result of mocks.createGameInput.mock.results) {
+      expect(result.value.destroy).toHaveBeenCalledOnce();
+    }
+    for (const result of mocks.mountGamePlayableScene.mock.results) {
+      expect(result.value.destroy).toHaveBeenCalledOnce();
+    }
   });
 
   it('stops the frame loop and exposes an accessible error after context loss', () => {
@@ -81,6 +118,7 @@ describe('Bosque playable WebGL lifecycle', () => {
     expect(globalThis.requestAnimationFrame).toHaveBeenCalledTimes(1);
 
     view.destroy?.();
+    Object.defineProperty(document, 'hidden', { configurable: true, value: false });
     expect(mocks.createGameInput.mock.results[0]?.value.destroy).toHaveBeenCalledOnce();
     expect(mocks.mountGamePlayableScene.mock.results[0]?.value.destroy).toHaveBeenCalledOnce();
   });

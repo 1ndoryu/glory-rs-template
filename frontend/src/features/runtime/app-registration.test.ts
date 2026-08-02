@@ -29,7 +29,8 @@ describe('Account app registration', () => {
     expect(game3d?.deepLink?.stringify()).toBe('/forest-3d');
   });
 
-  it('registers the playable fixture separately from both visual previews', () => {
+  it('keeps the playable fixture lazy until its first instantiation', () => {
+    expect(AppRegistry.isLazy('game-playable')).toBe(true);
     const playable = AppRegistry.get('game-playable');
     expect(playable).toBeDefined();
     expect(playable?.singleton).toBe(true);

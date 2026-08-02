@@ -86,6 +86,11 @@ class AppRegistryClass {
     return this.apps.get(id);
   }
 
+  /** Diagnóstico de carga: no fuerza la resolución de una app lazy. */
+  isLazy(id: string): boolean {
+    return this.lazyApps.has(id);
+  }
+
   getAll(): readonly AppDefinition[] {
     return Array.from(this.apps.values());
   }
