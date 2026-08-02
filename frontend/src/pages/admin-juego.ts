@@ -15,6 +15,10 @@ import {
   isValidAdminLabel,
   type GameCharacterAdminEntry,
 } from '../services/game-character-admin.service';
+import {
+  GameAuditService,
+  type GameAuditEventEntry,
+} from '../services/game-audit.service';
 import { createEl } from '../utils/dom';
 import { createVacio } from '../components/ui/empty-state';
 import { createModal } from '../components/ui/modal';
@@ -27,6 +31,13 @@ const TONO_ETIQUETA: Record<string, string> = {
   ink: 'ink',
   middle: 'middle',
   paper: 'paper',
+};
+
+/* [297A-56] Etiquetas legibles de las acciones auditadas (el valor crudo de
+ * la API es character.created/character.updated). */
+const ACCION_ETIQUETA: Record<string, string> = {
+  'character.created': 'creado',
+  'character.updated': 'actualizado',
 };
 
 const gameCharacterListGenerations = new WeakMap<HTMLElement, number>();
@@ -61,6 +72,11 @@ export async function renderGameCharacterAdminList(container: HTMLElement): Prom
     return;
   }
 
+  /* [297A-56] La actividad se carga en paralelo con la lista pero nunca
+   * rompe el catálogo: si falla, solo la sección lo indica. */
+  const auditResult = await tryCatch(GameAuditService.listCharacterEvents({ limit: 10 }));
+  if (gameCharacterListGenerations.get(container) !== generation) return;
+
   const items = result.value;
   for (const item of items) {
     container.appendChild(renderAdminItem(item, container));
@@ -68,6 +84,39 @@ export async function renderGameCharacterAdminList(container: HTMLElement): Prom
   if (items.length === 0) {
     container.appendChild(createVacio('no hay personajes en el catálogo'));
   }
+  container.appendChild(renderActividad(auditResult));
+}
+
+function formatFechaHora(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  const hora = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()} ${hora}`;
+}
+
+/** Sección de actividad reciente del catálogo (últimos eventos auditados). */
+function renderActividad(result: { ok: true; value: GameAuditEventEntry[] } | { ok: false; error: string }): HTMLElement {
+  const seccion = createEl('section');
+  seccion.appendChild(createEl('h3', { className: 'mt-lg mb-md', textContent: 'actividad del catálogo' }));
+  if (!result.ok) {
+    seccion.appendChild(createVacio('no se pudo cargar la actividad'));
+    return seccion;
+  }
+  if (result.value.length === 0) {
+    seccion.appendChild(createVacio('sin actividad reciente'));
+    return seccion;
+  }
+  for (const event of result.value) {
+    const label = ACCION_ETIQUETA[event.action] ?? event.action;
+    const payload = event.payload;
+    const nombre = typeof payload?.displayName === 'string' ? payload.displayName : event.entityId;
+    const info = createEl('div', {},
+      createEl('span', { textContent: `${label} · ${nombre}` }),
+      createEl('small', { className: 'ml-sm', textContent: formatFechaHora(event.createdAt) }),
+    );
+    seccion.appendChild(createEl('div', { className: 'admin-item' }, info));
+  }
+  return seccion;
 }
 
 function renderAdminItem(entry: GameCharacterAdminEntry, container: HTMLElement): HTMLElement {

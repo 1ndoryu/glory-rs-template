@@ -556,6 +556,10 @@ realtime.
 
 **Límite 297A-55:** no hay panel UI de auditoría (el listado admin existe por API; la visualización llega junto a los paneles de mapa/assets), no hay auditoría de mapas/assets ni de expulsión (sus bloques la registrarán), la purga de retención queda para Fase 8 y el DTO no expone `actorId` (privacidad).
 
+**Evidencia 297A-56:** panel UI de auditoría en el tab "juego" del Admin: sección "actividad del catálogo" con los últimos 10 eventos (acción legible, personaje y fecha/hora), cargada en paralelo con el catálogo pero aislada — si falla, solo la sección lo indica y la lista sigue. `GameAuditService` valida estrictamente el contrato (acciones `character.created`/`character.updated`, kinds allowlisted, payload objeto) y envía `entityId`/`limit` como query params. 16 tests frontend dirigidos PASS (4 nuevos del servicio de auditoría); type-check y diff-check PASS.
+
+**Límite 297A-56:** la actividad no tiene paginación ni filtro por personaje en la UI (el servicio ya soporta `entityId`; la UI lo expone cuando el catálogo escale), no hay panel para mapa/assets/expulsión y la purga de retención queda para Fase 8.
+
 **Gate:** ningún invitado puede invocar admin ni reclamar el estado de otra identidad; el perfil no depende de datos enviados sin validar.
 
 **Auditoría de cierre — Fase 6:**
