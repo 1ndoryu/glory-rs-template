@@ -338,8 +338,8 @@ repetidas de memoria/GPU y validación multi-viewport antes de cerrar la fase co
 - [x] Implementar en frontend el contrato JSON-safe versionado de `TerrainDocument`, `GameAssetVersion`, instancias, spawns y `MapVersion`, con validador fail-closed y cuotas hard.
 - [x] Adaptar `MapVersion` a `WorldMap` mediante proxies estáticos allowlisted; el núcleo sigue siendo X/Z y no inventa todavía altura de gameplay.
 - [x] **297A-33 — Terreno visible por chunks y cache visual:** `buildTerrainMeshData` convierte cada `TerrainChunk` validado en posiciones/índices/superficies puras; `GamePlayableVisualCache` crea y retira `BufferGeometry` solo para chunks visibles y reutiliza geometría/materiales de props mediante `clone(true)` y prototipos. El teardown dispone el terreno y prototipos de forma idempotente.
-- [x] **297A-32 — Selección lógica visible y medición local:** `MapChunkCache` indexa instancias por chunk, calcula ventanas relativas a `bounds.minX/minZ`, aplica límites de chunks/instancias/assets, mantiene un LRU acotado y el fixture carga/retira props según el jugador; `FramePerformanceMonitor` conserva una ventana de muestras y expone p50/p95/max y frames sobre presupuesto.
-- [ ] Cargar solo chunks/assets visibles con cache limitada e instancing para props repetidos; el terreno visible y la reutilización por prototipos ya están preparados, pero aún falta `THREE.InstancedMesh`/batching real y un cache persistente de geometría entre evictions.
+- [x] **297A-34 — Batching InstancedMesh y métricas locales del renderer:** `GamePlayableVisualCache` agrupa por tipo los sólidos repetidos en `THREE.InstancedMesh` con máximo 128 instancias, mantiene contornos reutilizables y aplica posición/escala/rotación desde `AssetInstance`. `readRendererMetrics` normaliza `renderer.info` y `performance.memory` opcional; el controller publica `data-renderer-*`/`data-js-heap-*` sin analytics. 40 tests dirigidos PASS, incluyendo transformación de instancia y teardown idempotente.
+- [ ] Cargar solo chunks/assets visibles con cache limitada e instancing para props repetidos; el batching básico ya está implementado, pero falta culling real, batching avanzado/cache persistente y medición física de GPU/memoria.
 - [x] Crear el endpoint/servicio de lectura de mapa publicado y la migración de snapshots persistidos.
 - [x] Crear el flujo admin de publicación versionada: `AdminUser`, CSRF, revisión optimista, hash canónico, activación atómica y snapshots inmutables.
 - [x] Crear un fixture de versión persistido mediante el flujo autorizado y cubrir integración HTTP/DB real de autorización, CSRF, 413, revisión stale, concurrencia, activación única y trigger de inmutabilidad.
@@ -356,17 +356,21 @@ repetidas de memoria/GPU y validación multi-viewport antes de cerrar la fase co
 `GET /api/game/maps/:map_id`; solo consulta `is_active`, valida el documento y no
 expone UUID interno, `published_by` ni `is_active`. `contentHash` se calcula con
 `document_json_bytes` sobre el `JsonValue` normalizado que se persiste, y el service
-lo verifica antes de responder. Los bloques `297A-32` y `297A-33` añaden `map-streaming.ts`,
-`map-streaming-contracts.ts`, `performance-monitor.ts`, `terrain-mesh.ts` y el
-adaptador visual `game-playable-visual-cache.ts`: la selección y la malla son puras
-y testeables, el fixture actualiza `data-visible-chunks`, `data-visible-instances`
-y `data-frame-p95-ms`, y el renderer crea/retira geometría de terreno por chunk y
-libera recursos en el teardown. La ventana y el LRU tienen límites hard; no se carga
-el mapa completo para dibujar props. Los props reutilizan geometría/material mediante
-prototipos y `clone(true)`, no `THREE.InstancedMesh`. El cache visual reconstruye la
-geometría después de eviction; las superficies 3–15 sin material específico usan el
-material base. El monitor mide coste local de actualización/render, no memoria GPU
-ni latencia de red. El endpoint admin es `POST /api/admin/game/maps`,
+lo verifica antes de responder. Los bloques `297A-32`, `297A-33` y `297A-34` añaden `map-streaming.ts`,
+`map-streaming-contracts.ts`, `performance-monitor.ts`, `terrain-mesh.ts`,
+el adaptador visual `game-playable-visual-cache.ts` y el normalizador
+`game-renderer-metrics.ts`: la selección y la malla son puras y testeables, el
+fixture actualiza `data-visible-chunks`, `data-visible-instances`,
+`data-frame-p95-ms`, `data-renderer-draw-calls`, `data-renderer-triangles`,
+`data-renderer-geometries`, `data-renderer-textures` y heap JS cuando el navegador
+lo ofrece. El renderer crea/retira terreno por chunk, agrupa sólidos repetidos en
+`THREE.InstancedMesh` hasta 128 por tipo y libera recursos en el teardown. Los
+contornos conservan la gramática visual y reciben la transformación de
+`AssetInstance`. La ventana y el LRU tienen límites hard; `frustumCulled=false` es
+una decisión temporal del fixture para no perder instancias mientras se prepara un
+culling por batch. Las superficies 3–15 sin material específico usan el material
+base. Las métricas son locales y no representan memoria GPU física ni latencia de
+red. El endpoint admin es `POST /api/admin/game/maps`,
 protegido por `AdminUser`/CSRF, con `expectedVersion`, advisory lock por mapa,
 activación atómica y límite de body de 4 MiB antes de deserializar. El fixture
 `tests/game_map_publish.rs` ejercita el router de producción contra PostgreSQL real:
@@ -379,14 +383,16 @@ la BD de rama se hizo aplicando solo las migraciones faltantes, ya que
 --check`, `cargo check --tests` y la integración real PASS. Frontend `297A-32`:
 type-check PASS, 33 tests dirigidos PASS, build PASS y diff-check PASS. Frontend
 `297A-33`: type-check PASS, 36 tests dirigidos PASS, build PASS y diff-check PASS.
-No implica `THREE.InstancedMesh`, cache persistente entre evictions, medición real de
-GPU/memoria, realtime ni editor.
+Frontend `297A-34`: type-check PASS, 40 tests dirigidos PASS, build PASS y
+diff-check PASS. No implica culling avanzado, cache persistente entre evictions,
+medición física de GPU/memoria, realtime ni editor.
 
 **Gate:** lectura pública y publicación admin con fixture HTTP/DB real, autorización,
 concurrencia e invariantes de persistencia validadas; la selección lógica, medición
-local y terreno visible por chunks quedan evidenciados por `297A-32`/`297A-33`. La
-fase completa queda pendiente hasta implementar batching/instancing real, completar
-la medición de GPU/memoria y avanzar después a realtime.
+local, terreno visible por chunks y batching básico quedan evidenciados por
+`297A-32`/`297A-33`/`297A-34`. La fase completa queda pendiente hasta implementar
+culling/batching avanzado, completar la medición de GPU/memoria y avanzar después a
+realtime.
 
 **Auditoría de cierre — Fase 4:**
 - [ ] **SOLID/OCP:** parser, validación, navegación, serialización y renderer consumen el contrato versionado sin acoplamiento circular.

@@ -1,11 +1,13 @@
 /* GAME-01 — Cache visual acotado del fixture.
- * El loader lógico decide qué está visible; este adaptador solo materializa
- * chunks y props en Three.js, compartiendo geometría mediante prototipos.
+ * El loader lógico decide qué está visible; este adaptador materializa chunks
+ * visibles y agrupa sólidos repetidos con InstancedMesh. Los contornos siguen
+ * siendo clones de LineSegments para conservar la gramática visual del bosque.
  */
 
 import * as THREE from 'three';
 import {
   buildTerrainMeshData,
+  type AssetInstance,
   type MapVersion,
   type VisibleMapContent,
 } from '../../../game-core';
@@ -18,11 +20,28 @@ import {
 } from '../game-shared/forest-models';
 import type { FixtureProp } from './game-fixture-map';
 
+export const VISUAL_CACHE_LIMITS = {
+  maxInstancesPerKind: 128,
+} as const;
+
 export interface GamePlayableVisualCacheOptions {
   readonly scene: THREE.Scene;
   readonly materials: ForestMaterials;
   readonly map: MapVersion;
   readonly props: ReadonlyMap<string, FixtureProp>;
+}
+
+interface VisibleProp {
+  readonly prop: FixtureProp;
+  readonly instance: AssetInstance;
+}
+
+interface InstancedPropBatch {
+  readonly kind: FixtureProp['kind'];
+  readonly prototype: THREE.Group;
+  readonly meshes: readonly THREE.InstancedMesh[];
+  readonly localMatrices: readonly THREE.Matrix4[];
+  readonly helper: THREE.Object3D;
 }
 
 export function createGamePlayableVisualCache(options: GamePlayableVisualCacheOptions): GamePlayableVisualCache {
@@ -31,11 +50,15 @@ export function createGamePlayableVisualCache(options: GamePlayableVisualCacheOp
 
 export class GamePlayableVisualCache {
   private readonly terrainObjects = new Map<string, THREE.Mesh>();
-  private readonly propObjects = new Map<string, THREE.Group>();
-  private readonly prototypes = new Map<FixtureProp['kind'], THREE.Group>();
+  private readonly outlineObjects = new Map<string, THREE.Group>();
+  private readonly batches = new Map<FixtureProp['kind'], InstancedPropBatch>();
   private destroyed = false;
 
-  public constructor(private readonly options: GamePlayableVisualCacheOptions) {}
+  public constructor(private readonly options: GamePlayableVisualCacheOptions) {
+    for (const kind of ['conifer', 'broadleaf', 'rock', 'pond'] as const) {
+      this.batches.set(kind, this.createBatch(kind));
+    }
+  }
 
   public sync(content: VisibleMapContent): void {
     if (this.destroyed) return;
@@ -52,36 +75,37 @@ export class GamePlayableVisualCache {
       this.terrainObjects.delete(key);
     }
 
-    const activeProps = new Set<string>();
+    const instancesByKind = new Map<FixtureProp['kind'], VisibleProp[]>();
+    for (const kind of this.batches.keys()) instancesByKind.set(kind, []);
     for (const instance of content.instances) {
       const prop = this.options.props.get(instance.id);
       if (!prop) continue;
-      const object = this.propObjects.get(prop.id) ?? this.createProp(prop);
-      object.position.set(instance.position.x, prop.kind === 'pond' ? 0 : 0.15, instance.position.z);
-      this.configurePropTransform(object, prop);
-      activeProps.add(prop.id);
+      const props = instancesByKind.get(prop.kind);
+      if (props && props.length < VISUAL_CACHE_LIMITS.maxInstancesPerKind) {
+        props.push({ prop, instance });
+      }
     }
-    for (const [id, object] of this.propObjects) {
-      if (activeProps.has(id)) continue;
-      this.options.scene.remove(object);
-      this.propObjects.delete(id);
+
+    for (const [kind, batch] of this.batches) {
+      this.syncBatch(batch, instancesByKind.get(kind) ?? []);
     }
   }
 
   public destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
-    for (const object of this.propObjects.values()) this.options.scene.remove(object);
+    for (const outline of this.outlineObjects.values()) this.options.scene.remove(outline);
     for (const terrain of this.terrainObjects.values()) {
       this.options.scene.remove(terrain);
       terrain.geometry.dispose();
     }
-    for (const prototype of this.prototypes.values()) {
-      disposeObjectGeometries(prototype);
+    for (const batch of this.batches.values()) {
+      for (const mesh of batch.meshes) this.options.scene.remove(mesh);
+      disposeObjectGeometries(batch.prototype);
     }
     this.terrainObjects.clear();
-    this.propObjects.clear();
-    this.prototypes.clear();
+    this.outlineObjects.clear();
+    this.batches.clear();
   }
 
   private createTerrain(key: string, chunk: MapVersion['terrain']['chunks'][number]): THREE.Mesh {
@@ -107,39 +131,129 @@ export class GamePlayableVisualCache {
     return terrain;
   }
 
-  private createProp(prop: FixtureProp): THREE.Group {
-    const prototype = this.getPrototype(prop.kind);
-    const object = prototype.clone(true);
-    object.userData.instanceId = prop.id;
-    object.userData.assetVersionId = prop.assetVersionId;
-    this.options.scene.add(object);
-    this.propObjects.set(prop.id, object);
-    return object;
+  private createBatch(kind: FixtureProp['kind']): InstancedPropBatch {
+    const prototype = this.createPrototype(kind);
+    prototype.updateMatrixWorld(true);
+    const meshes: THREE.InstancedMesh[] = [];
+    const localMatrices: THREE.Matrix4[] = [];
+    prototype.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return;
+      if (Array.isArray(child.material)) return;
+      const mesh = new THREE.InstancedMesh(
+        child.geometry,
+        child.material,
+        VISUAL_CACHE_LIMITS.maxInstancesPerKind,
+      );
+      mesh.count = 0;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.frustumCulled = false;
+      this.options.scene.add(mesh);
+      meshes.push(mesh);
+      localMatrices.push(child.matrixWorld.clone());
+    });
+    return { kind, prototype, meshes, localMatrices, helper: new THREE.Object3D() };
   }
 
-  private getPrototype(kind: FixtureProp['kind']): THREE.Group {
-    const cached = this.prototypes.get(kind);
-    if (cached) return cached;
+  private syncBatch(batch: InstancedPropBatch, visibleProps: readonly VisibleProp[]): void {
+    const activeIds = new Set(visibleProps.map(({ prop }) => prop.id));
+    for (const [id, outline] of this.outlineObjects) {
+      const prop = this.options.props.get(id);
+      if (prop && prop.kind === batch.kind && !activeIds.has(id)) {
+        this.options.scene.remove(outline);
+        this.outlineObjects.delete(id);
+      }
+    }
+
+    for (const [index, { prop, instance }] of visibleProps.entries()) {
+      const helper = batch.helper;
+      helper.position.set(
+        instance.position.x,
+        prop.kind === 'pond' ? 0 : 0.15,
+        instance.position.z,
+      );
+      /* createRock() aporta una rotación base 0.8 al prototipo; la matriz de
+       * instancia añade el giro editorial y el delta artístico de escala. */
+      helper.rotation.set(
+        0,
+        instance.rotationY + (prop.kind === 'rock' ? (instance.scale - 1) * 0.8 : 0),
+        0,
+      );
+      const scale = instance.scale;
+      helper.scale.set(
+        prop.kind === 'pond' ? (prop.width ?? 1) * scale : scale,
+        prop.kind === 'pond' ? (prop.depth ?? 1) * scale : scale,
+        prop.kind === 'pond' ? 1 : scale,
+      );
+      helper.updateMatrix();
+      for (const [meshIndex, mesh] of batch.meshes.entries()) {
+        const matrix = helper.matrix.clone().multiply(batch.localMatrices[meshIndex]);
+        mesh.setMatrixAt(index, matrix);
+      }
+      const outline = this.outlineObjects.get(prop.id);
+      if (outline) {
+        applyOutlineTransform(outline, prop, instance);
+      } else {
+        this.createOutline(prop, instance, batch.prototype);
+      }
+    }
+    for (const mesh of batch.meshes) {
+      mesh.count = visibleProps.length;
+      mesh.instanceMatrix.needsUpdate = true;
+    }
+  }
+
+  private createOutline(
+    prop: FixtureProp,
+    instance: AssetInstance,
+    prototype: THREE.Group,
+  ): void {
+    const content = prototype.clone(true);
+    const meshes: THREE.Object3D[] = [];
+    content.traverse((child) => {
+      if (child instanceof THREE.Mesh) meshes.push(child);
+    });
+    meshes.forEach(mesh => mesh.removeFromParent());
+    const outline = new THREE.Group();
+    outline.add(content);
+    applyOutlineTransform(outline, prop, instance);
+    outline.userData.instanceId = prop.id;
+    outline.userData.assetVersionId = prop.assetVersionId;
+    this.options.scene.add(outline);
+    this.outlineObjects.set(prop.id, outline);
+  }
+
+  private createPrototype(kind: FixtureProp['kind']): THREE.Group {
     const { materials } = this.options;
-    const prototype = kind === 'conifer'
+    return kind === 'conifer'
       ? createConifer(materials)
       : kind === 'broadleaf'
         ? createBroadleaf(materials)
         : kind === 'rock'
           ? createRock(materials)
           : createPond(materials, 1, 1);
-    this.prototypes.set(kind, prototype);
-    return prototype;
   }
 
-  private configurePropTransform(object: THREE.Group, prop: FixtureProp): void {
-    if (prop.kind === 'pond') {
-      object.scale.set(prop.width ?? 1, prop.depth ?? 1, 1);
-      return;
-    }
-    object.scale.setScalar(prop.scale);
-    if (prop.kind === 'rock') object.rotation.y = prop.scale * 0.8;
-  }
+}
+
+function applyOutlineTransform(
+  outline: THREE.Group,
+  prop: FixtureProp,
+  instance: AssetInstance,
+): void {
+  outline.position.set(
+    instance.position.x,
+    prop.kind === 'pond' ? 0 : 0.15,
+    instance.position.z,
+  );
+  outline.rotation.y = instance.rotationY
+    + (prop.kind === 'rock' ? (instance.scale - 1) * 0.8 : 0);
+  const scale = instance.scale;
+  outline.scale.set(
+    prop.kind === 'pond' ? (prop.width ?? 1) * scale : scale,
+    prop.kind === 'pond' ? (prop.depth ?? 1) * scale : scale,
+    prop.kind === 'pond' ? 1 : scale,
+  );
 }
 
 function surfaceMaterialIndex(surface: number): number {
@@ -147,8 +261,11 @@ function surfaceMaterialIndex(surface: number): number {
 }
 
 function disposeObjectGeometries(object: THREE.Object3D): void {
+  const disposed = new Set<THREE.BufferGeometry>();
   object.traverse((child) => {
     if (child instanceof THREE.Mesh || child instanceof THREE.LineSegments) {
+      if (disposed.has(child.geometry)) return;
+      disposed.add(child.geometry);
       child.geometry.dispose();
     }
   });

@@ -97,10 +97,21 @@ export function renderGamePlayable(context: RenderContext): MountedView {
       frameMonitor.record(performance.now() - frameStart);
       frameCount += 1;
       const streaming = scene.streamingStats();
+      const rendererMetrics = scene.rendererMetrics();
       const performanceSnapshot = frameMonitor.snapshot();
       view.element.dataset.visibleChunks = String(streaming.visibleChunks);
       view.element.dataset.visibleInstances = String(streaming.visibleInstances);
       view.element.dataset.frameP95Ms = performanceSnapshot.p95Ms.toFixed(2);
+      view.element.dataset.rendererDrawCalls = String(rendererMetrics.drawCalls);
+      view.element.dataset.rendererTriangles = String(rendererMetrics.triangles);
+      view.element.dataset.rendererGeometries = String(rendererMetrics.geometries);
+      view.element.dataset.rendererTextures = String(rendererMetrics.textures);
+      if (rendererMetrics.jsHeapUsedBytes !== undefined) {
+        view.element.dataset.jsHeapUsedBytes = String(rendererMetrics.jsHeapUsedBytes);
+      }
+      if (rendererMetrics.jsHeapLimitBytes !== undefined) {
+        view.element.dataset.jsHeapLimitBytes = String(rendererMetrics.jsHeapLimitBytes);
+      }
       if (frameCount % 30 === 0) {
         setStatus(
           `offline · chunks ${streaming.visibleChunks} · props ${streaming.visibleInstances} · p95 ${performanceSnapshot.p95Ms.toFixed(1)}ms`,

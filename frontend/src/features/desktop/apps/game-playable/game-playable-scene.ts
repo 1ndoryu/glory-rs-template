@@ -14,6 +14,11 @@ import {
 import { createFigure, type ForestMaterials } from '../game-shared/forest-models';
 import { FIXTURE_PROPS } from './game-fixture-map';
 import { createGamePlayableVisualCache } from './game-playable-visual-cache';
+import {
+  readAvailableHeapMemory,
+  readRendererMetrics,
+  type GameRendererMetrics,
+} from './game-renderer-metrics';
 
 export interface GamePlayableStreamingStats {
   readonly cacheSize: number;
@@ -27,6 +32,7 @@ export interface GamePlayableSceneHandle {
   readonly resize: () => void;
   readonly render: () => void;
   readonly streamingStats: () => GamePlayableStreamingStats;
+  readonly rendererMetrics: () => GameRendererMetrics;
   readonly destroy: () => void;
 }
 
@@ -80,6 +86,7 @@ export function mountGamePlayableScene(
     visibleInstances: 0,
     visibleAssets: 0,
   };
+  let currentRendererMetrics: GameRendererMetrics = readRendererMetrics({});
 
   const streamProps = (center: { x: number; z: number }): void => {
     const visible = chunkCache.select({
@@ -169,7 +176,9 @@ export function mountGamePlayableScene(
   };
 
   const render = (): void => {
-    if (!destroyed) renderer.render(scene, camera);
+    if (destroyed) return;
+    renderer.render(scene, camera);
+    currentRendererMetrics = readRendererMetrics(renderer.info, readAvailableHeapMemory());
   };
 
   resize();
@@ -179,6 +188,7 @@ export function mountGamePlayableScene(
     resize,
     render,
     streamingStats: () => currentStreamingStats,
+    rendererMetrics: () => currentRendererMetrics,
     destroy: () => {
       if (destroyed) return;
       destroyed = true;
