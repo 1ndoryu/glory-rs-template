@@ -1,0 +1,53 @@
+use sqlx::{PgPool, Postgres, Transaction};
+
+use crate::errors::AppError;
+use crate::models::game_audit::{
+    GameAuditEventResponse, GAME_AUDIT_DEFAULT_LIMIT, GAME_AUDIT_MAX_LIST_LIMIT,
+};
+use crate::repositories::game_audit_repo::GameAuditRepository;
+
+pub struct GameAuditService;
+
+impl GameAuditService {
+    /// Registra un cambio del catálogo dentro de la transacción del cambio.
+    /// La acción es allowlisted: el caller solo puede pedir las constantes del
+    /// modelo, nunca un string arbitrario del cliente.
+    pub async fn record_character_change(
+        tx: &mut Transaction<'_, Postgres>,
+        actor_id: uuid::Uuid,
+        action: &str,
+        character_id: &str,
+        payload: &serde_json::Value,
+    ) -> Result<(), AppError> {
+        GameAuditRepository::insert(
+            tx,
+            Some(actor_id),
+            "admin",
+            action,
+            "character",
+            character_id,
+            payload,
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// Eventos de auditoría del catálogo para el panel admin; el límite nunca
+    /// excede el máximo definido aunque el cliente pida más.
+    pub async fn list_character_events(
+        pool: &PgPool,
+        entity_id: Option<&str>,
+        limit: Option<i64>,
+    ) -> Result<Vec<GameAuditEventResponse>, AppError> {
+        let limit = limit
+            .unwrap_or(GAME_AUDIT_DEFAULT_LIMIT)
+            .clamp(1, GAME_AUDIT_MAX_LIST_LIMIT);
+        Ok(
+            GameAuditRepository::list_by_entity(pool, "character", entity_id, limit)
+                .await?
+                .into_iter()
+                .map(Into::into)
+                .collect(),
+        )
+    }
+}

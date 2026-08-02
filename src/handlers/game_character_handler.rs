@@ -73,11 +73,11 @@ pub async fn list_admin_game_characters(
 )]
 pub async fn create_game_character(
     State(state): State<AppState>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Json(request): Json<CreateGameCharacterRequest>,
 ) -> Result<Json<GameCharacterAdminResponse>, AppError> {
     Ok(Json(
-        GameCharacterService::create(&state.pool, request)
+        GameCharacterService::create(&state.pool, admin.user_id, request)
             .await?
             .into(),
     ))
@@ -100,12 +100,12 @@ pub async fn create_game_character(
 )]
 pub async fn update_game_character(
     State(state): State<AppState>,
-    _admin: AdminUser,
+    admin: AdminUser,
     Path(id): Path<String>,
     Json(request): Json<UpdateGameCharacterRequest>,
 ) -> Result<Json<GameCharacterAdminResponse>, AppError> {
     Ok(Json(
-        GameCharacterService::update(&state.pool, &id, request)
+        GameCharacterService::update(&state.pool, admin.user_id, &id, request)
             .await?
             .into(),
     ))

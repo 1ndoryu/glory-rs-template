@@ -1,4 +1,5 @@
 pub mod article;
+pub mod game_audit;
 pub mod game_character;
 pub mod game_map;
 pub mod game_profile;

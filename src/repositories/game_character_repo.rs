@@ -1,4 +1,4 @@
-use sqlx::PgPool;
+use sqlx::{PgPool, Postgres, Transaction};
 
 use crate::models::game_character::GameCharacterDefinition;
 
@@ -44,8 +44,10 @@ impl GameCharacterRepository {
         .await
     }
 
+    /// [297A-55] Las mutaciones se ejecutan dentro de una transacción para que
+    /// el evento de auditoría se escriba (o se descarte) con el mismo cambio.
     pub async fn create(
-        pool: &PgPool,
+        tx: &mut Transaction<'_, Postgres>,
         id: &str,
         display_name: &str,
         body_tone: &str,
@@ -58,13 +60,13 @@ impl GameCharacterRepository {
         .bind(id)
         .bind(display_name)
         .bind(body_tone)
-        .fetch_one(pool)
+        .fetch_one(&mut **tx)
         .await
     }
 
     /// `None` significa que el id no existe en el catálogo.
     pub async fn update(
-        pool: &PgPool,
+        tx: &mut Transaction<'_, Postgres>,
         id: &str,
         display_name: &str,
         body_tone: &str,
@@ -80,7 +82,7 @@ impl GameCharacterRepository {
         .bind(display_name)
         .bind(body_tone)
         .bind(is_active)
-        .fetch_optional(pool)
+        .fetch_optional(&mut **tx)
         .await
     }
 }

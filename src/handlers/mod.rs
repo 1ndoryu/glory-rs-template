@@ -3,6 +3,7 @@
 pub mod articles;
 pub mod auth;
 pub mod download_handler;
+pub mod game_audit_handler;
 pub mod game_character_handler;
 pub mod game_map_handler;
 pub mod game_profile_handler;
@@ -62,6 +63,7 @@ impl utoipa::Modify for SecurityAddon {
         game_character_handler::list_game_characters,
         game_character_handler::create_game_character,
         game_character_handler::update_game_character,
+        game_audit_handler::list_game_audit_characters,
         game_map_handler::get_active_map,
         game_map_handler::publish_map,
         game_profile_handler::get_game_profile,
@@ -192,6 +194,7 @@ impl utoipa::Modify for SecurityAddon {
         crate::models::game_character::CreateGameCharacterRequest,
         crate::models::game_character::GameCharacterAdminResponse,
         crate::models::game_character::GameCharacterPublicResponse,
+        crate::models::game_audit::GameAuditEventResponse,
         crate::models::game_character::UpdateGameCharacterRequest,
         crate::models::game_map::GameMapVersionPublic,
         crate::models::game_map::PublishMapRequest,
@@ -296,6 +299,7 @@ fn api_routes() -> Router<AppState> {
     Router::new()
         .merge(health::routes())
         .merge(game_character_handler::routes())
+        .merge(game_audit_handler::routes())
         .merge(game_map_handler::routes())
         .merge(game_profile_handler::routes())
         .merge(game_ticket_handler::routes())

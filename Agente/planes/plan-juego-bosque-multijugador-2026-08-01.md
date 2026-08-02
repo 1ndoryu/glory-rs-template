@@ -552,6 +552,10 @@ realtime.
 
 **Límite 297A-54:** no hay editor de piezas por slots ni modelos visuales por tono en el render (el tono se persiste y se muestra como ayuda); el nombre se limita a 24 caracteres (contrato del perfil) y el id del personaje es inmutable; el build global sigue condicionado al error preexistente de `notifications-popover.ts`.
 
+**Evidencia 297A-55:** auditoría persistente de cambios sensibles del catálogo: `game_audit_events` registra `character.created`/`character.updated` (incluye desactivación) con actor (kind `admin`, id en BD), entidad y payload de estado visual, **dentro de la misma transacción** del cambio (nunca evento huérfano; el repo de personajes pasó a mutaciones transaccionales). `GET /api/admin/game/audit/characters` lista eventos acotados (1..=100, por defecto 50) con filtro `entityId`, solo `AdminUser` (401/403), sin exponer identidades ni datos privados; acciones allowlisted server-side. Retención prevista 90 días (purga en Fase 8). 15/15 tests HTTP PostgreSQL (3 nuevos de auditoría), fmt, check y clippy PASS.
+
+**Límite 297A-55:** no hay panel UI de auditoría (el listado admin existe por API; la visualización llega junto a los paneles de mapa/assets), no hay auditoría de mapas/assets ni de expulsión (sus bloques la registrarán), la purga de retención queda para Fase 8 y el DTO no expone `actorId` (privacidad).
+
 **Gate:** ningún invitado puede invocar admin ni reclamar el estado de otra identidad; el perfil no depende de datos enviados sin validar.
 
 **Auditoría de cierre — Fase 6:**
@@ -569,7 +573,7 @@ realtime.
 - [ ] Añadir command stack de selección/colocación/movimiento/duplicado/borrado y undo/redo.
 - [ ] Persistir borrador con revisión optimista y conflicto visible.
 - [ ] Añadir preview de borrador y publicación atómica.
-- [ ] Auditar cambios sensibles y garantizar que la sala activa conserva su versión.
+- [x] Auditoría persistente de cambios sensibles del catálogo (`297A-55`): `game_audit_events` registra crear/actualizar/desactivar con actor, acción y estado visual en la misma transacción; listado admin acotado sin identidades. La auditoría de mapa/assets y la garantía de versión de la sala activa llegan con sus bloques.
 
 **Gate:** un admin importa un GLB, crea terreno 2D, coloca instancias, guarda, previsualiza y publica; un usuario normal recibe rechazo server-side aunque fuerce el cliente.
 
