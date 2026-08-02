@@ -1,24 +1,26 @@
-//! GAME-01 — Upgrade WebSocket del transporte realtime.
+//! GAME-01 — Upgrade WebSocket y sesión realtime de una sala.
 //!
-//! El upgrade no usa query string, cookies de ticket ni el hub Glory: el primer
-//! mensaje debe ser `join` con un ticket opaco emitido por HTTP. Esta fase solo
-//! autentica el socket y rechaza el mapa aún no conectado; las salas y el actor
-//! server-authoritative pertenecen a Fase 5 posterior.
+//! El primer mensaje debe ser `join` con un ticket opaco emitido por HTTP. La
+//! identidad se resuelve server-side y la sesión delega el estado al actor.
 
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::State;
 use axum::response::Response;
 use axum::Router;
+use tokio::sync::mpsc;
 use tokio::time::timeout;
 
 use crate::errors::AppError;
 use crate::models::game_realtime::{
-    parse_client_message, serialize_server_message, GameRealtimeClientMessage,
-    GameRealtimeErrorCode, GameRealtimeErrorPayload, GameRealtimeServerMessage,
-    GAME_REALTIME_PROTOCOL_VERSION,
+    consume_rate_budget, parse_client_message, serialize_server_message, GameRealtimeClientMessage,
+    GameRealtimeErrorCode, GameRealtimeErrorPayload, GameRealtimeJoinPayload,
+    GameRealtimeServerMessage, GAME_REALTIME_PROTOCOL_VERSION,
 };
+use crate::services::game_map_svc::GameMapService;
+use crate::services::game_room::{JoinedRoom, RoomJoinError};
+use crate::services::game_room_map::GameRoomMap;
 use crate::services::game_ticket::GameTicketStore;
 use crate::AppState;
 
@@ -27,8 +29,7 @@ const GAME_WS_INVALID_MESSAGE: &str = "mensaje realtime inválido";
 const GAME_WS_UNAUTHORIZED: &str = "ticket realtime inválido";
 const GAME_WS_MAP_UNAVAILABLE: &str = "mapa realtime no disponible";
 
-/// Abre el transporte realtime; la autenticación se completa con el primer
-/// mensaje `join`, no con una identidad enviada en la petición HTTP.
+/// Abre el transporte realtime; el primer mensaje completa la autenticación.
 pub async fn upgrade_game_ws(
     State(state): State<AppState>,
     websocket: WebSocketUpgrade,
@@ -46,29 +47,28 @@ async fn handle_socket(
     state: AppState,
     _guard: crate::services::game_ws::GameWsConnectionGuard,
 ) {
-    let first_message = timeout(GAME_WS_HANDSHAKE_TIMEOUT, socket.recv()).await;
-    let Some(Ok(Message::Text(text))) = first_message.ok().flatten() else {
+    let Some(join_result) = receive_join(&mut socket).await else {
         close_socket(socket).await;
         return;
     };
-
-    let Ok(GameRealtimeClientMessage::Join { payload, .. }) = parse_client_message(text.as_bytes())
-    else {
-        send_fatal_error(
-            &mut socket,
-            GameRealtimeErrorCode::InvalidMessage,
-            GAME_WS_INVALID_MESSAGE,
-        )
-        .await;
-        return;
+    let payload = match join_result {
+        Ok(payload) => payload,
+        Err(code) => {
+            let message = if code == GameRealtimeErrorCode::InvalidMessage {
+                GAME_WS_INVALID_MESSAGE
+            } else {
+                "transporte realtime no configurado"
+            };
+            send_fatal_error(&mut socket, code, message).await;
+            return;
+        }
     };
-
-    match resolve_join_ticket(
+    let claims = match resolve_join_ticket(
         &state.game_ticket_store,
         state.game_ticket_secret.as_deref(),
         &payload.ticket,
     ) {
-        Ok(_) => {}
+        Ok(claims) => claims,
         Err(GameRealtimeErrorCode::ServerBusy) => {
             send_fatal_error(
                 &mut socket,
@@ -87,16 +87,162 @@ async fn handle_socket(
             .await;
             return;
         }
+    };
+
+    if ensure_room_map(&state).await.is_err() {
+        send_fatal_error(
+            &mut socket,
+            GameRealtimeErrorCode::MapUnavailable,
+            GAME_WS_MAP_UNAVAILABLE,
+        )
+        .await;
+        return;
     }
 
-    /* El subject se resuelve y consume server-side, pero no se proyecta aún:
-     * sin sala activa no existe player ID que asociar ni estado que serializar. */
-    send_fatal_error(
-        &mut socket,
-        GameRealtimeErrorCode::MapUnavailable,
-        GAME_WS_MAP_UNAVAILABLE,
-    )
-    .await;
+    let (output, messages) = mpsc::channel(32);
+    let room = state.game_ws_state.room_state();
+    let joined = match room.join(claims.subject, output).await {
+        Ok(joined) => joined,
+        Err(error) => {
+            let code = error.code();
+            let message = match error {
+                RoomJoinError::MapUnavailable => GAME_WS_MAP_UNAVAILABLE,
+                RoomJoinError::Full => "sala realtime llena",
+                RoomJoinError::DuplicateIdentity => GAME_WS_UNAUTHORIZED,
+                RoomJoinError::Busy => "sala realtime ocupada",
+            };
+            send_fatal_error(&mut socket, code, message).await;
+            return;
+        }
+    };
+    if !send_joined_messages(&mut socket, &joined).await {
+        joined.disconnect().await;
+        return;
+    }
+    run_joined_session(&mut socket, joined, messages).await;
+}
+
+async fn receive_join(
+    socket: &mut WebSocket,
+) -> Option<Result<GameRealtimeJoinPayload, GameRealtimeErrorCode>> {
+    let first_message = timeout(GAME_WS_HANDSHAKE_TIMEOUT, socket.recv()).await;
+    match first_message.ok().flatten() {
+        Some(Ok(Message::Text(text))) => {
+            let Ok(GameRealtimeClientMessage::Join { payload, .. }) =
+                parse_client_message(text.as_bytes())
+            else {
+                return Some(Err(GameRealtimeErrorCode::InvalidMessage));
+            };
+            Some(Ok(payload))
+        }
+        Some(Ok(Message::Binary(_) | Message::Ping(_) | Message::Pong(_))) => {
+            Some(Err(GameRealtimeErrorCode::InvalidMessage))
+        }
+        _ => None,
+    }
+}
+
+async fn send_joined_messages(socket: &mut WebSocket, joined: &JoinedRoom) -> bool {
+    let joined_message = GameRealtimeServerMessage::Joined {
+        v: GAME_REALTIME_PROTOCOL_VERSION,
+        payload: crate::models::game_realtime::GameRealtimeJoinedPayload {
+            player_id: joined.player_id.clone(),
+            map_version: joined.map_version.clone(),
+            tick: joined.tick,
+        },
+    };
+    if !send_server_message(socket, &joined_message).await {
+        return false;
+    }
+    let initial_message = GameRealtimeServerMessage::Snapshot {
+        v: GAME_REALTIME_PROTOCOL_VERSION,
+        payload: joined.initial_snapshot.clone(),
+    };
+    send_server_message(socket, &initial_message).await
+}
+
+async fn run_joined_session(
+    socket: &mut WebSocket,
+    joined: JoinedRoom,
+    mut messages: mpsc::Receiver<GameRealtimeServerMessage>,
+) {
+    let mut frame_history = Vec::new();
+    loop {
+        tokio::select! {
+            incoming = socket.recv() => {
+                let Some(result) = incoming else { break };
+                let Ok(frame) = result else { break };
+                if matches!(frame, Message::Close(_)) { break; }
+                let now = now_millis();
+                let Ok(history) = consume_rate_budget(&frame_history, now) else {
+                    send_fatal_error(socket, GameRealtimeErrorCode::RateLimited, "rate limit realtime excedido").await;
+                    break;
+                };
+                frame_history = history;
+                match frame {
+                    Message::Text(text) => {
+                        let Ok(message) = parse_client_message(text.as_bytes()) else {
+                            send_fatal_error(socket, GameRealtimeErrorCode::InvalidMessage, GAME_WS_INVALID_MESSAGE).await;
+                            break;
+                        };
+                        if joined.send(message).is_err() {
+                            send_fatal_error(socket, GameRealtimeErrorCode::ServerBusy, "sala realtime ocupada").await;
+                            break;
+                        }
+                    }
+                    Message::Ping(payload) => {
+                        if socket.send(Message::Pong(payload)).await.is_err() { break; }
+                    }
+                    Message::Binary(_) | Message::Pong(_) => {
+                        send_fatal_error(socket, GameRealtimeErrorCode::InvalidMessage, GAME_WS_INVALID_MESSAGE).await;
+                        break;
+                    }
+                    Message::Close(_) => break,
+                }
+            }
+            outgoing = messages.recv() => {
+                let Some(message) = outgoing else { break; };
+                if !send_server_message(socket, &message).await { break; }
+            }
+        }
+    }
+    joined.disconnect().await;
+}
+
+fn now_millis() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |duration| {
+            u64::try_from(duration.as_millis()).unwrap_or(u64::MAX)
+        })
+}
+
+async fn ensure_room_map(state: &AppState) -> Result<(), String> {
+    if state.game_ws_state.has_room_map().await {
+        return Ok(());
+    }
+    let Some(map_id) = std::env::var("GAME_MAP_ID")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+    else {
+        return Err("GAME_MAP_ID no configurado".to_string());
+    };
+    let public = GameMapService::get_active(&state.pool, &map_id)
+        .await
+        .map_err(|_| "mapa activo no encontrado".to_string())?;
+    let map = GameRoomMap::from_public(&public)?;
+    state.game_ws_state.set_room_map(Some(map)).await;
+    Ok(())
+}
+
+async fn send_server_message(socket: &mut WebSocket, message: &GameRealtimeServerMessage) -> bool {
+    let Ok(bytes) = serialize_server_message(message) else {
+        return false;
+    };
+    socket
+        .send(Message::Text(String::from_utf8_lossy(&bytes).into_owned()))
+        .await
+        .is_ok()
 }
 
 fn resolve_join_ticket(
@@ -126,8 +272,6 @@ async fn send_fatal_error(socket: &mut WebSocket, code: GameRealtimeErrorCode, m
             .send(Message::Text(String::from_utf8_lossy(&bytes).into_owned()))
             .await;
     }
-    /* `WebSocket::close` consume el socket; desde una referencia mutable se
-     * envía el frame Close para mantener el teardown explícito e idempotente. */
     let _ = socket.send(Message::Close(None)).await;
 }
 

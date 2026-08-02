@@ -2,7 +2,7 @@
 
 > **Fecha:** 2026-08-01
 > **ID:** GAME-01
-> **Estado:** dirección Three.js 3D aprobada; fixture offline, persistencia y publicación admin de mapas integrados; realtime, identidad y editor siguen pendientes.
+> **Estado:** dirección Three.js 3D aprobada; fixture offline, persistencia, publicación admin de mapas y la primera sala realtime server-authoritative están integrados; identidad invitada, reconexión persistente y editor siguen pendientes.
 > **Prioridad:** futura, después del bloque actualmente habilitado en `roadmap.md`.
 > **Dependencias globales:** runtime `AppRegistry`/`MountedView`, ciclo de vida y carga lazy, sesiones/capacidades, contratos de workspace y quality gate.
 > **Fuentes canónicas:** `roadmap.md`, `Agente/documentacion/arquitectura/adr-bosque-3d-assets-terreno-2d-2026-08-01.md`, `Agente/planes/plan-assets-terreno-bosque-3d-2026-08-01.md`, `Agente/planes/plan-glory-render-motor-juegos-2026-08-01.md`, `Agente/documentacion/arquitectura/adr-glory-render-repositorio-agnostico-2026-08-01.md`, `Agente/documentacion/arquitectura/adr-carga-apps-pesadas-2026-07-31.md`, `Agente/documentacion/producto/referencia-visual-bosque-2026-08-01.md`.
@@ -340,6 +340,19 @@ servidor sin depender de Three.js.
 - [x] Verificar por TCP el límite global: con capacidad 1, el segundo upgrade recibe HTTP 409 antes de abrir WebSocket.
 - [x] Mantener los tests independientes de PostgreSQL real y sin abrir actor de sala, movimiento ni snapshots.
 
+#### 297A-44 — Actor de sala server-authoritative
+
+- [x] Crear `GameRoomState` single-instance bajo demanda con actor Tokio de propietario único, cap estricto de 8 jugadores y TTL configurable de sala vacía.
+- [x] Materializar el mapa publicado como `GameRoomMap` inmutable, verificar metadata/hash, transformar colliders/spawns y construir un spatial index con presupuesto global de referencias.
+- [x] Conectar el ticket single-use al actor: `joined`, snapshot inicial, heartbeat, intents `move` server-authoritative, secuencias replay/jump, rate limit y snapshot filtrado por radio de interés.
+- [x] Aplicar backpressure bounded: `try_send` para comandos normales/snapshots, expulsión de conexiones lentas y `Disconnect` prioritario para evitar jugadores zombis.
+- [x] Manejar frames inválidos/oversized, Ping/Pong, cierre y teardown sin bloquear el loop; el mapa se carga desde `GAME_MAP_ID` o desde fixture inyectado solo en pruebas.
+- [x] Cubrir determinísticamente TTL/recreación, capacidad 8, identidad duplicada, movimiento/colisión y, por TCP, joined/snapshot/move/heartbeat/replay, map unavailable, replay de ticket, mensajes inválidos textuales/binarios, cierre, sala llena y capacidad HTTP 409.
+
+**Límite de 297A-44:** no se implementan identidad invitada, editor admin, matchmaking, dos salas, reconexión persistente, métricas operacionales ni publicación en vivo; el actor conserva la versión de mapa con la que inició.
+
+**Gate:** PASS verificado con `cargo fmt --check`, `cargo check --tests`, Clippy del alcance, tests dirigidos del actor/mapa/handler/contrato, 7 tests TCP, `git diff --check` y `GLORY_CARGO_TARGET_DIR=C:/tmp/glory-target/game_room npm run task:check -- 297A-44`. El gate reporta warnings preexistentes no bloqueantes fuera de este bloque.
+
 **Límite de estas entregas:** `297A-42`/`297A-43` establecen y prueban la frontera de transporte y autenticación WebSocket; no crean actor de sala, mapa activo para realtime, snapshots, presencia, autoridad de movimiento, reconexión ni identidad invitada. El `GameTicketStore`/`GameWsState` en memoria solo es válido para la primera instancia; antes de escalar se requiere un store/coordinador compartido. Estos contratos de ejecución permanecen en Fase 5/6.
 
 **Gate:** ADR realtime, ADR de identidad de invitado y contrato de mapa aprobados; el núcleo offline puede existir, pero no se habilita gameplay conectado hasta cerrar estos contratos.
@@ -448,9 +461,9 @@ realtime.
 ### Fase 5 — Realtime de una sala
 
 - [x] Integrar y probar la frontera inicial de upgrade/ticket WebSocket en el backend de wandori.us (`297A-42`/`297A-43`); el test TCP efímero cubre join, errores, replay, cierre y capacidad.
-- [ ] Crear actor de sala bajo demanda con TTL, cap de 8 y backpressure.
-- [ ] Implementar inputs server-authoritative, snapshots, interpolación y presencia.
-- [ ] Añadir reconexión, heartbeat, timeout y cierre al destruir la app.
+- [x] Crear actor de sala bajo demanda con TTL, cap de 8 y backpressure (`297A-44`).
+- [x] Implementar inputs server-authoritative, snapshots, interpolación y presencia (`297A-44`).
+- [x] Añadir heartbeat, timeout de handshake y cierre ordenado al destruir la sesión (`297A-44`); la reconexión persistente queda pendiente.
 - [ ] Medir CPU, memoria, mensajes, latencia y ancho de banda con 1, 4 y 8 clientes.
 
 **Gate:** ocho clientes pueden moverse en una sala sin aceptar posiciones falsificadas, sin fanout ilimitado y sin dejar salas vivas vacías.

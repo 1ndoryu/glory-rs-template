@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 use axum::serve;
 use futures_util::{SinkExt, StreamExt};
 use glory_backend::handlers::create_router_with_state;
+use glory_backend::services::game_room_map::{GameRoomMap, RoomBounds, RoomSpawn};
 use glory_backend::services::game_ticket::GameTicketStore;
 use glory_backend::services::game_ws::GameWsState;
 use glory_backend::AppState;
@@ -45,6 +46,26 @@ fn test_state_with_capacity(max_connections: usize) -> AppState {
     }
 }
 
+fn fixture_map() -> GameRoomMap {
+    GameRoomMap::from_parts(
+        "forest".to_string(),
+        1,
+        RoomBounds {
+            min_x: 0.0,
+            max_x: 32.0,
+            min_z: 0.0,
+            max_z: 32.0,
+        },
+        Vec::new(),
+        vec![RoomSpawn {
+            x: 2.0,
+            z: 2.0,
+            radius: 1.0,
+        }],
+    )
+    .expect("mapa fixture válido")
+}
+
 async fn spawn_server(state: AppState) -> (String, oneshot::Sender<()>, JoinHandle<()>) {
     let app = create_router_with_state(state);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
@@ -79,6 +100,53 @@ fn join_message(ticket: &str) -> Message {
         })
         .to_string(),
     )
+}
+
+async fn read_message_type<S>(
+    socket: &mut tokio_tungstenite::WebSocketStream<S>,
+    expected_type: &str,
+) -> Value
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+{
+    while let Some(message) = socket.next().await {
+        match message.expect("frame WebSocket válido") {
+            Message::Text(text) => {
+                let value = serde_json::from_str::<Value>(&text).expect("JSON realtime");
+                if value["type"] == expected_type {
+                    return value;
+                }
+            }
+            Message::Close(_) => break,
+            Message::Ping(_) | Message::Pong(_) | Message::Binary(_) | Message::Frame(_) => {}
+        }
+    }
+    panic!("el servidor debe enviar el tipo {expected_type}");
+}
+
+async fn read_snapshot_after<S>(
+    socket: &mut tokio_tungstenite::WebSocketStream<S>,
+    previous_sequence: u64,
+) -> Value
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+{
+    while let Some(message) = socket.next().await {
+        match message.expect("frame WebSocket válido") {
+            Message::Text(text) => {
+                let value = serde_json::from_str::<Value>(&text).expect("JSON realtime");
+                if value["type"] == "snapshot"
+                    && value["payload"]["snapshotSequence"].as_u64().unwrap_or(0)
+                        > previous_sequence
+                {
+                    return value;
+                }
+            }
+            Message::Close(_) => break,
+            Message::Ping(_) | Message::Pong(_) | Message::Binary(_) | Message::Frame(_) => {}
+        }
+    }
+    panic!("el servidor debe enviar un snapshot posterior a la secuencia {previous_sequence}");
 }
 
 async fn read_error<S>(socket: &mut tokio_tungstenite::WebSocketStream<S>) -> Value
@@ -183,6 +251,146 @@ async fn malformed_first_message_over_tcp_is_rejected() {
         Some(Ok(Message::Close(_))) | None
     ));
 
+    let _ = shutdown.send(());
+    server_handle.await.expect("server shutdown");
+}
+
+#[tokio::test]
+async fn binary_first_message_over_tcp_is_rejected() {
+    let (url, shutdown, server_handle) = spawn_server(test_state()).await;
+    let (mut socket, _) = connect_async(url).await.expect("upgrade WebSocket válido");
+
+    socket
+        .send(Message::Binary(vec![0, 1, 2, 3]))
+        .await
+        .expect("frame binario debe enviarse");
+    let error = read_error(&mut socket).await;
+    assert_eq!(error["payload"]["code"], "invalid_message");
+    assert_eq!(error["payload"]["fatal"], true);
+    assert!(matches!(
+        socket.next().await,
+        Some(Ok(Message::Close(_))) | None
+    ));
+
+    let _ = shutdown.send(());
+    server_handle.await.expect("server shutdown");
+}
+
+#[tokio::test]
+async fn ninth_tcp_player_is_rejected_with_room_full() {
+    let state = test_state_with_capacity(9);
+    state.game_ws_state.set_room_map(Some(fixture_map())).await;
+    let ticket_store = state.game_ticket_store.clone();
+    let (url, shutdown, server_handle) = spawn_server(state).await;
+    let mut sockets = Vec::new();
+
+    for _ in 0..8 {
+        let (mut socket, _) = connect_async(&url).await.expect("upgrade de jugador");
+        let ticket = ticket_store
+            .issue(Uuid::new_v4(), 30, TEST_SECRET)
+            .expect("ticket válido");
+        socket
+            .send(join_message(&ticket))
+            .await
+            .expect("join jugador");
+        let joined = read_message_type(&mut socket, "joined").await;
+        assert_eq!(joined["type"], "joined");
+        sockets.push(socket);
+    }
+
+    let (mut extra, _) = connect_async(url)
+        .await
+        .expect("upgrade del noveno jugador");
+    let extra_ticket = ticket_store
+        .issue(Uuid::new_v4(), 30, TEST_SECRET)
+        .expect("ticket válido");
+    extra
+        .send(join_message(&extra_ticket))
+        .await
+        .expect("join del noveno jugador");
+    let error = read_error(&mut extra).await;
+    assert_eq!(error["payload"]["code"], "room_full");
+    assert_eq!(error["payload"]["fatal"], true);
+    assert!(matches!(
+        extra.next().await,
+        Some(Ok(Message::Close(_))) | None
+    ));
+
+    drop(sockets);
+    let _ = shutdown.send(());
+    server_handle.await.expect("server shutdown");
+}
+
+#[tokio::test]
+async fn joined_tcp_room_moves_authoritatively_and_rejects_sequence_replay() {
+    let state = test_state();
+    state.game_ws_state.set_room_map(Some(fixture_map())).await;
+    let ticket = state
+        .game_ticket_store
+        .issue(Uuid::new_v4(), 30, TEST_SECRET)
+        .expect("ticket válido");
+    let (url, shutdown, server_handle) = spawn_server(state).await;
+    let (mut socket, _) = connect_async(url).await.expect("upgrade WebSocket válido");
+
+    socket.send(join_message(&ticket)).await.expect("join TCP");
+    let joined = read_message_type(&mut socket, "joined").await;
+    assert_eq!(joined["payload"]["mapVersion"], "forest@1");
+    let initial = read_message_type(&mut socket, "snapshot").await;
+    let initial_sequence = initial["payload"]["snapshotSequence"]
+        .as_u64()
+        .expect("secuencia inicial");
+    let initial_x = initial["payload"]["entities"][0]["position"]["x"]
+        .as_f64()
+        .expect("posición inicial");
+
+    socket
+        .send(Message::Text(
+            serde_json::json!({
+                "type": "move",
+                "v": 1,
+                "payload": { "sequence": 1, "direction": { "x": 1, "z": 0 } }
+            })
+            .to_string(),
+        ))
+        .await
+        .expect("move TCP");
+    socket
+        .send(Message::Text(
+            serde_json::json!({
+                "type": "heartbeat",
+                "v": 1,
+                "payload": { "lastSnapshotSequence": initial_sequence }
+            })
+            .to_string(),
+        ))
+        .await
+        .expect("heartbeat TCP");
+    let heartbeat_ack = read_message_type(&mut socket, "heartbeat_ack").await;
+    assert!(heartbeat_ack["payload"]["serverTick"].as_u64().is_some());
+    let moved = read_snapshot_after(&mut socket, initial_sequence).await;
+    let moved_x = moved["payload"]["entities"][0]["position"]["x"]
+        .as_f64()
+        .expect("posición autoritativa");
+    assert!(
+        moved_x > initial_x,
+        "el servidor debe aplicar la intención de movimiento"
+    );
+
+    socket
+        .send(Message::Text(
+            serde_json::json!({
+                "type": "move",
+                "v": 1,
+                "payload": { "sequence": 1, "direction": { "x": 1, "z": 0 } }
+            })
+            .to_string(),
+        ))
+        .await
+        .expect("replay TCP");
+    let replay = read_message_type(&mut socket, "error").await;
+    assert_eq!(replay["payload"]["code"], "sequence_replay");
+
+    drop(socket);
     let _ = shutdown.send(());
     server_handle.await.expect("server shutdown");
 }

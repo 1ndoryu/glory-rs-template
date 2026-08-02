@@ -1,11 +1,14 @@
 //! GAME-01 — Presupuesto de conexiones del transporte realtime.
 //!
-//! Este módulo solo limita handshakes/sockets activos en la primera instancia.
-//! No representa salas, jugadores ni fanout; esas responsabilidades pertenecen
-//! a la fase posterior del actor de sala.
+//! Este módulo limita handshakes/sockets activos y conserva el estado de la sala
+//! realtime en la primera instancia. El actor de sala posee jugadores, mapa y
+//! fanout; este wrapper expone sus límites al handler.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+
+use super::game_room::{GameRoomState, RoomJoinError};
+use super::game_room_map::GameRoomMap;
 
 pub const GAME_WS_DEFAULT_MAX_CONNECTIONS: usize = 64;
 
@@ -13,6 +16,7 @@ pub const GAME_WS_DEFAULT_MAX_CONNECTIONS: usize = 64;
 pub struct GameWsState {
     active_connections: Arc<AtomicUsize>,
     max_connections: usize,
+    room_state: GameRoomState,
 }
 
 impl Default for GameWsState {
@@ -27,6 +31,7 @@ impl GameWsState {
         Self {
             active_connections: Arc::new(AtomicUsize::new(0)),
             max_connections,
+            room_state: GameRoomState::empty(),
         }
     }
 
@@ -53,6 +58,26 @@ impl GameWsState {
     #[must_use]
     pub fn active_connections(&self) -> usize {
         self.active_connections.load(Ordering::Acquire)
+    }
+
+    #[must_use]
+    pub fn room_state(&self) -> GameRoomState {
+        self.room_state.clone()
+    }
+
+    pub async fn set_room_map(&self, map: Option<GameRoomMap>) {
+        self.room_state.set_map(map).await;
+    }
+
+    pub async fn has_room_map(&self) -> bool {
+        self.room_state.has_map().await
+    }
+
+    #[must_use]
+    pub fn room_join_error_code(
+        error: RoomJoinError,
+    ) -> crate::models::game_realtime::GameRealtimeErrorCode {
+        error.code()
     }
 }
 
