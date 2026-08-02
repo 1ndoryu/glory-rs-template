@@ -4,6 +4,8 @@
  * alineados a la rama/proyecto actual. */
 
 import { spawn } from 'node:child_process';
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 import { getBranchDbContext } from './branch-db.mjs';
 
 function cargoCommand() {
@@ -20,6 +22,32 @@ console.log('');
 const { dbUrl, cargoTargetDir } = getBranchDbContext();
 console.log('');
 
+const activityMarker = path.join(cargoTargetDir, `.glory-cargo-active-${process.pid}.json`);
+try {
+  mkdirSync(cargoTargetDir, { recursive: true });
+  writeFileSync(activityMarker, JSON.stringify({
+    pid: process.pid,
+    command: cargoArgs,
+    createdAt: new Date().toISOString(),
+  }, null, 2));
+} catch (error) {
+  console.error(`[run-with-db] No se pudo crear el marcador de actividad: ${error.message}`);
+  process.exit(1);
+}
+
+function cleanupMarker() {
+  if (!existsSync(activityMarker)) return;
+  try {
+    unlinkSync(activityMarker);
+  } catch (error) {
+    console.warn(`[run-with-db] No se pudo retirar el marcador: ${error.message}`);
+  }
+}
+
+process.once('SIGINT', cleanupMarker);
+process.once('SIGTERM', cleanupMarker);
+process.once('exit', cleanupMarker);
+
 const child = spawn(cargoCommand(), cargoArgs, {
   stdio: 'inherit',
   env: { ...process.env, DATABASE_URL: dbUrl, CARGO_TARGET_DIR: cargoTargetDir },
@@ -27,10 +55,12 @@ const child = spawn(cargoCommand(), cargoArgs, {
 });
 
 child.on('error', (err) => {
+  cleanupMarker();
   console.error('[run-with-db] Error:', err.message);
   process.exit(1);
 });
 child.on('exit', (code, signal) => {
+  cleanupMarker();
   if (signal || code === null) {
     console.error(`[run-with-db] Cargo terminó sin exit code (${signal ?? 'unknown signal'}).`);
     process.exit(2);
