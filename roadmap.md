@@ -25,6 +25,7 @@
 - Apps editoriales: `Agente/planes/plan-programas-editoriales-2026-07-31.md`
 - Interacción y medición: `Agente/planes/plan-contratos-interaccion-comandos-medicion-2026-07-29.md`
 - Guard de ejecuciones pesadas y targets Cargo: `Agente/planes/plan-heavy-run-guard-2026-08-02.md`
+- Guard global agnóstico por proyecto/rama: `Agente/planes/plan-global-quality-guard-agnostico-2026-08-02.md`
 
 ## Cómo leer este archivo
 
@@ -66,6 +67,18 @@
 - [x] Bloquear validaciones directas (`npx vitest`, `npm run test:*`, type-check/lint/build y Cargo de validación) desde PowerShell/CMD; todas recomiendan `npm run task:check -- <TareaId>`.
 
 **Gate/salida:** ningún agente puede iniciar accidentalmente un full o `cargo test` durante el cooldown desde los wrappers disponibles; el uso de `--allow-heavy` queda visible en reportes y la cuota de targets se mantiene sin borrar procesos activos.
+
+### 028A-6 — Guard global agnóstico por proyecto y rama (planificado)
+
+**Depende de:** 028A-5 y de aprobar `Agente/planes/plan-global-quality-guard-agnostico-2026-08-02.md`.
+
+- [ ] Extraer el runtime y los shims a una instalación estable fuera de cualquier repositorio o rama.
+- [ ] Definir y validar `.quality/guard-policy.json` como contrato declarativo por proyecto, con modos `enforce`, `observe` y `pass-through`.
+- [ ] Hacer que la resolución de política sea por workspace/rama en cada invocación y que un proyecto sin política pase sin bloqueo.
+- [ ] Migrar wandori.us al runtime global sin duplicar reglas ni dejar rutas hardcodeadas en perfiles.
+- [ ] Probar matriz multi-proyecto/multi-rama en PowerShell 5/7, CMD, CI, pipes y códigos de salida, con rollback.
+
+**Gate/salida:** cambiar de proyecto o rama no rompe el guard; cada proyecto puede declarar su propio gate y un proyecto sin política no queda bloqueado.
 
 ### 028A-5 — Novedades: popover de campana + admin "novedades" con borrado
 
