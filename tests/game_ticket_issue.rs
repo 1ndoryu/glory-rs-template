@@ -1,0 +1,205 @@
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+
+use axum::body::{to_bytes, Body};
+use axum::http::{Request, StatusCode};
+use serde_json::Value;
+use sqlx::postgres::PgPoolOptions;
+use tower::util::ServiceExt;
+use uuid::Uuid;
+
+use glory_backend::handlers::create_router_with_state;
+use glory_backend::services::SessionService;
+use glory_backend::AppState;
+
+const TEST_SECRET: &str = "game-ticket-http-test-secret";
+
+async fn test_state() -> AppState {
+    let database_url = std::env::var("DATABASE_URL")
+        .expect("DATABASE_URL es obligatorio para las pruebas HTTP de tickets");
+    let pool = PgPoolOptions::new()
+        .max_connections(8)
+        .connect(&database_url)
+        .await
+        .expect("la base de datos de pruebas debe estar disponible");
+
+    AppState {
+        pool,
+        upload_dir: "target/game-ticket-http-test-uploads".to_string(),
+        resend_api_key: None,
+        email_from: "test@example.invalid".to_string(),
+        stripe_secret_key: None,
+        stripe_webhook_secret: None,
+        game_ticket_secret: None,
+        game_ticket_store: glory_backend::services::game_ticket::GameTicketStore::default(),
+        site_url: "http://localhost:3000".to_string(),
+        login_rate_limit: Arc::new(Mutex::new(
+            HashMap::<String, (u8, std::time::Instant)>::new(),
+        )),
+        auth_action_rate_limit: Arc::new(Mutex::new(
+            HashMap::<String, (u8, std::time::Instant)>::new(),
+        )),
+    }
+}
+
+fn production_router(state: &AppState, secret: Option<&str>) -> axum::Router {
+    let mut router_state = state.clone();
+    router_state.game_ticket_secret = secret.map(str::to_string);
+    create_router_with_state(router_state)
+}
+
+async fn create_user(state: &AppState) -> Uuid {
+    let user_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO users (id, email, password_hash)
+         VALUES ($1, $2, 'test-only-password-hash')",
+    )
+    .bind(user_id)
+    .bind(format!("game-ticket-{user_id}@example.invalid"))
+    .execute(&state.pool)
+    .await
+    .expect("debe poder crear el usuario de prueba");
+    user_id
+}
+
+async fn session(state: &AppState, user_id: Uuid) -> (String, String) {
+    let result = SessionService::create(&state.pool, user_id, None, Some("game-ticket-test"))
+        .await
+        .expect("debe poder crear la sesión de prueba");
+    (result.raw_token, result.csrf_token)
+}
+
+async fn cleanup(state: &AppState, user_id: Uuid) {
+    sqlx::query("DELETE FROM auth_sessions WHERE user_id = $1")
+        .bind(user_id)
+        .execute(&state.pool)
+        .await
+        .expect("debe poder limpiar las sesiones de prueba");
+    sqlx::query("DELETE FROM users WHERE id = $1")
+        .bind(user_id)
+        .execute(&state.pool)
+        .await
+        .expect("debe poder limpiar el usuario de prueba");
+}
+
+fn ticket_request(
+    session_token: &str,
+    csrf_cookie: &str,
+    csrf_header: Option<&str>,
+) -> Request<Body> {
+    let mut builder = Request::builder()
+        .method("POST")
+        .uri("/api/game/ticket")
+        .header("origin", "http://localhost:5173")
+        .header(
+            "cookie",
+            format!("session_id={session_token}; csrf_token={csrf_cookie}"),
+        );
+    if let Some(csrf) = csrf_header {
+        builder = builder.header("x-csrf-token", csrf);
+    }
+    builder
+        .body(Body::empty())
+        .expect("request de ticket válida")
+}
+
+async fn json_body(response: axum::response::Response) -> Value {
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("cuerpo HTTP legible");
+    serde_json::from_slice(&body).expect("respuesta JSON válida")
+}
+
+#[tokio::test]
+async fn ticket_is_issued_from_session_subject_without_exposing_uuid() {
+    let state = test_state().await;
+    let user_id = create_user(&state).await;
+    let (session_token, csrf_token) = session(&state, user_id).await;
+
+    let response = production_router(&state, Some(TEST_SECRET))
+        .oneshot(ticket_request(
+            &session_token,
+            &csrf_token,
+            Some(&csrf_token),
+        ))
+        .await
+        .expect("router debe responder");
+    let status = response.status();
+    let body = json_body(response).await;
+    let ticket = body["ticket"]
+        .as_str()
+        .expect("respuesta debe contener ticket");
+
+    cleanup(&state, user_id).await;
+
+    let claims = state
+        .game_ticket_store
+        .consume(ticket, TEST_SECRET)
+        .expect("ticket emitido debe resolver el subject en el store compartido");
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(claims.subject, user_id);
+    assert!(ticket.starts_with("g1.game."));
+    assert!(!ticket.contains(&user_id.to_string()));
+    assert!(body.get("userId").is_none());
+    assert!(!body.to_string().contains(&user_id.to_string()));
+}
+
+#[tokio::test]
+async fn ticket_requires_session_and_valid_csrf() {
+    let state = test_state().await;
+    let without_session = production_router(&state, Some(TEST_SECRET))
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/game/ticket")
+                .body(Body::empty())
+                .expect("request sin sesión válida"),
+        )
+        .await
+        .expect("router debe responder");
+    assert_eq!(without_session.status(), StatusCode::UNAUTHORIZED);
+
+    let user_id = create_user(&state).await;
+    let (session_token, csrf_token) = session(&state, user_id).await;
+    let without_csrf = production_router(&state, Some(TEST_SECRET))
+        .oneshot(ticket_request(&session_token, &csrf_token, None))
+        .await
+        .expect("router debe responder");
+    let wrong_csrf = production_router(&state, Some(TEST_SECRET))
+        .oneshot(ticket_request(
+            &session_token,
+            &csrf_token,
+            Some("wrong-csrf"),
+        ))
+        .await
+        .expect("router debe responder");
+
+    cleanup(&state, user_id).await;
+
+    assert_eq!(without_csrf.status(), StatusCode::FORBIDDEN);
+    assert_eq!(wrong_csrf.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn ticket_fails_closed_when_secret_is_not_configured() {
+    let state = test_state().await;
+    let user_id = create_user(&state).await;
+    let (session_token, csrf_token) = session(&state, user_id).await;
+
+    let response = production_router(&state, None)
+        .oneshot(ticket_request(
+            &session_token,
+            &csrf_token,
+            Some(&csrf_token),
+        ))
+        .await
+        .expect("router debe responder");
+    let status = response.status();
+    let body = json_body(response).await;
+
+    cleanup(&state, user_id).await;
+
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(body["error"], "internal_error");
+    assert!(body.get("ticket").is_none());
+}

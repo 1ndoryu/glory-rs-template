@@ -107,6 +107,8 @@ mod tests {
             email_from: "test@example.invalid".to_string(),
             stripe_secret_key: None,
             stripe_webhook_secret: None,
+            game_ticket_secret: None,
+            game_ticket_store: crate::services::game_ticket::GameTicketStore::default(),
             site_url: "http://localhost:3000".to_string(),
             login_rate_limit: Arc::new(Mutex::new(
                 HashMap::<String, (u8, std::time::Instant)>::new(),
@@ -127,6 +129,7 @@ mod tests {
                 port: 3000,
                 stripe_secret_key: None,
                 stripe_webhook_secret: None,
+                game_ticket_secret: None,
                 upload_dir: "target/workspace-overlay-http-test-uploads".to_string(),
                 resend_api_key: None,
                 email_from: "test@example.invalid".to_string(),

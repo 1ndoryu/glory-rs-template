@@ -290,7 +290,7 @@ servidor sin depender de Three.js.
 - [ ] Decidir sala única vs matchmaking/instancias pequeñas.
 - [ ] Medir y aprobar presupuesto de chunk, GPU, memoria, mapa, assets, móvil y teardown para completar el ADR.
 - [ ] Definir identidad de invitado y cómo se vincula posteriormente a una cuenta.
-- [ ] Definir contrato de ticket compatible con UUID y separación Glory/wandori.us.
+- [x] Definir contrato de ticket compatible con UUID y separación Glory/wandori.us; el ticket opaco y el store server-side quedan implementados en 297A-40/41.
 - [ ] Fijar esquema de mensajes, tick, límites, desconexión y códigos de error.
 - [ ] Fijar licencia/dirección final de assets a partir de la referencia visual.
 - [ ] Redactar la ficha del vertical slice jugable: mapa pequeño, avatar con movimiento, segundo jugador simulado y criterio de “jugable”.
@@ -315,7 +315,15 @@ servidor sin depender de Three.js.
 - [x] Consumir cada nonce una sola vez con un replay store local acotado a 4096 entradas y poda de entradas expiradas.
 - [x] Cubrir manipulación, secreto incorrecto, propósito incorrecto, UUID inválido, expiración, replay, poda, token sobredimensionado y clocks inválidos.
 
-**Límite de esta entrega:** no implementa endpoint HTTP, upgrade WebSocket, integración con el hub Glory, emisión desde `AuthUser`, identidad invitada, actor de sala, autoridad de movimiento ni reconexión. El replay store local solo es válido para la primera instancia; antes de escalar se requiere un store compartido. Esos contratos de transporte y ejecución permanecen en Fase 5/6.
+#### 297A-41 — Emisión HTTP autenticada del ticket
+
+- [x] Añadir `GLORY_GAME_TICKET_SECRET` opcional a `AppConfig`/`AppState`, sin hardcodear secretos; la emisión falla cerrado con 500 si no está configurado.
+- [x] Exponer `POST /api/game/ticket` con `AuthUser` y CSRF; el subject procede de la sesión server-side y el cliente no puede elegirlo.
+- [x] Mantener el ticket opaco: el UUID queda en `GameTicketStore`, la respuesta solo contiene `{ ticket }` y el router de pruebas comparte el mismo estado.
+- [x] Registrar la ruta y el schema en OpenAPI y conservar `create_router` compatible mediante `create_router_with_state` para pruebas/adaptadores.
+- [x] Cubrir 401 sin sesión, 403 por CSRF ausente/incorrecto, 500 por secreto ausente y emisión positiva en 3 pruebas HTTP reales sobre PostgreSQL temporal migrado.
+
+**Límite de estas entregas:** no implementan upgrade WebSocket, integración con el hub Glory, identidad invitada, actor de sala, autoridad de movimiento ni reconexión. El `GameTicketStore` en memoria solo es válido para la primera instancia; antes de escalar se requiere un store compartido. Esos contratos de transporte y ejecución permanecen en Fase 5/6.
 
 **Gate:** ADR realtime, ADR de identidad de invitado y contrato de mapa aprobados; el núcleo offline puede existir, pero no se habilita gameplay conectado hasta cerrar estos contratos.
 

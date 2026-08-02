@@ -4,6 +4,7 @@ pub mod articles;
 pub mod auth;
 pub mod download_handler;
 pub mod game_map_handler;
+pub mod game_ticket_handler;
 mod health;
 pub mod media_handler;
 mod notes;
@@ -57,6 +58,7 @@ impl utoipa::Modify for SecurityAddon {
         health::health_check,
         game_map_handler::get_active_map,
         game_map_handler::publish_map,
+        game_ticket_handler::issue_game_ticket,
         auth::register,
         auth::login,
         auth::verify_email,
@@ -180,6 +182,7 @@ impl utoipa::Modify for SecurityAddon {
         crate::models::workspace::PublishReleaseRequest,
         crate::models::game_map::GameMapVersionPublic,
         crate::models::game_map::PublishMapRequest,
+        crate::handlers::game_ticket_handler::GameTicketResponse,
         crate::handlers::workspace_handler::ReleaseListResponse,
         crate::models::media::MediaAdminResponse,
         crate::models::media::MediaPublicResponse,
@@ -201,7 +204,7 @@ impl utoipa::Modify for SecurityAddon {
 #[allow(clippy::needless_for_each)]
 pub struct ApiDoc;
 
-/// Crea el router principal con CORS, tracing, Swagger UI y todas las rutas
+/// Crea el router principal con CORS, tracing, Swagger UI y todas las rutas.
 pub fn create_router(pool: sqlx::PgPool, config: crate::config::AppConfig) -> Router {
     let site_url = std::env::var("SITE_URL").unwrap_or_else(|_| "https://wandori.us".to_string());
 
@@ -212,6 +215,8 @@ pub fn create_router(pool: sqlx::PgPool, config: crate::config::AppConfig) -> Ro
         email_from: config.email_from,
         stripe_secret_key: config.stripe_secret_key,
         stripe_webhook_secret: config.stripe_webhook_secret,
+        game_ticket_secret: config.game_ticket_secret,
+        game_ticket_store: crate::services::game_ticket::GameTicketStore::default(),
         site_url,
         login_rate_limit: std::sync::Arc::new(std::sync::Mutex::new(
             std::collections::HashMap::new(),
@@ -220,7 +225,14 @@ pub fn create_router(pool: sqlx::PgPool, config: crate::config::AppConfig) -> Ro
             std::collections::HashMap::new(),
         )),
     };
+    create_router_with_state(state)
+}
 
+/// Crea el router usando un estado ya construido.
+///
+/// Esta frontera permite que pruebas y futuros adaptadores compartan el mismo
+/// store de tickets/replay que usan los handlers, sin duplicar estado oculto.
+pub fn create_router_with_state(state: AppState) -> Router {
     /* [297A-7] CORS con allowlist de orígenes */
     let allowed_origins: Vec<HeaderValue> = std::env::var("CORS_ORIGINS")
         .unwrap_or_else(|_| {
@@ -268,6 +280,7 @@ fn api_routes() -> Router<AppState> {
     Router::new()
         .merge(health::routes())
         .merge(game_map_handler::routes())
+        .merge(game_ticket_handler::routes())
         .merge(auth::routes())
         .merge(notes::routes())
         .merge(articles::routes())
