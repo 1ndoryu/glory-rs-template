@@ -26,6 +26,14 @@ function Convert-MojibakeToUtf8 {
     $legacy = [System.Text.Encoding]::GetEncoding(1252)
     return [System.Text.Encoding]::UTF8.GetString($legacy.GetBytes($Text))
 }
+
+function Normalize-ProfileText {
+    param([string]$Text)
+    # Algunos perfiles antiguos guardaron `` `n`` como texto literal, lo que
+    # convierte la siguiente asignación en un comando inválido al iniciar.
+    $literalNewLine = [string][char]96 + 'n'
+    return $Text.Replace($literalNewLine, [Environment]::NewLine)
+}
 if (-not $Uninstall) {
     $profileBlock = @"
 $markerStart
@@ -38,7 +46,7 @@ $markerEnd
             $profileDirectory = Split-Path -Parent $profilePath
             if (-not (Test-Path $profileDirectory)) { New-Item -ItemType Directory -Path $profileDirectory -Force | Out-Null }
             if (-not (Test-Path $profilePath)) { New-Item -ItemType File -Path $profilePath -Force | Out-Null }
-            $profileContent = Convert-MojibakeToUtf8 (Get-Content $profilePath -Raw)
+            $profileContent = Normalize-ProfileText (Convert-MojibakeToUtf8 (Get-Content $profilePath -Raw))
             $profileContent = [regex]::Replace($profileContent, $pattern, '')
             $profileContent = ($profileContent.TrimEnd() + "`r`n" + $profileBlock.Trim() + "`r`n")
             Set-Content -Path $profilePath -Value $profileContent -Encoding utf8NoBOM
@@ -63,7 +71,7 @@ $markerEnd
     if ($InstallProfile) {
         foreach ($profilePath in $profilePaths) {
             if (Test-Path $profilePath) {
-                $profileContent = Convert-MojibakeToUtf8 (Get-Content $profilePath -Raw)
+                $profileContent = Normalize-ProfileText (Convert-MojibakeToUtf8 (Get-Content $profilePath -Raw))
                 $profileContent = [regex]::Replace($profileContent, $pattern, '')
                 Set-Content -Path $profilePath -Value $profileContent -Encoding utf8NoBOM
             }
