@@ -36,6 +36,17 @@ test('bloquea scripts frontend de validación, incluso con --prefix', async () =
   assert.equal(decision.command, 'npm test:full');
 });
 
+test('bloquea el probe inerte para verificar que la shell cargó el guard', async () => {
+  const root = await fixtureRoot();
+  const decision = inspectDirectCommand({
+    executable: 'npm',
+    args: ['run', '__sentinel_guard_probe__'],
+    cwd: root,
+  });
+  assert.equal(decision.blocked, true);
+  assert.equal(decision.command, 'npm __sentinel_guard_probe__');
+});
+
 test('permite task:check, desarrollo y comandos de herramientas no relacionadas', async () => {
   const root = await fixtureRoot();
   assert.equal(inspectDirectCommand({ executable: 'npm', args: ['run', 'task:check', '--', '028A-5'], cwd: root }).blocked, false);

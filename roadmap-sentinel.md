@@ -338,6 +338,7 @@ El reporte `297A-49` tardó 533833 ms: Rust consumió 483037 ms (90,5 %) y expir
 - [ ] Mismos fixtures ejecutados por CLI, LSP y VS Code; diferencias solo en transporte/presentación.
 - [ ] Tests de config estricta: unknown keys, paths fuera del workspace, globs peligrosos, severity inválida y ruleId desconocido.
 - [ ] Tests de seguridad: secretos redacted, symlink/path traversal, shell injection, timeout, cancelación y procesos huérfanos.
+- [ ] Ejecutar `npm run __sentinel_guard_probe__`: el guard debe devolver `BLOQUEADO` sin invocar npm; si aparece "Missing script", la shell/launcher está sin interceptor y no se puede cerrar la cobertura global.
 - [ ] Tests de cache: hit válido, cambio de contenido, config, commit, parser, schema y plataforma.
 - [ ] Benchmarks small/medium/full con límite de memoria, tiempo, concurrencia y cantidad de findings.
 - [ ] Tests de reporte: máximo de hallazgos/reminders, detalle completo en artifact, salida determinista y exit code.

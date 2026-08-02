@@ -8,6 +8,9 @@ export const QUALITY_GUARD_EXIT_CODE = 78;
  * cannot bypass incremental scope, cooldowns or the compact quality report.
  * Gotcha: the root check is mandatory because these shims are global. */
 const BLOCKED_NPM_SCRIPTS = new Set([
+  /* [028A-12] Inert probe used to verify that a shell actually loads the
+   * global interceptor. It is intentionally not defined in package.json. */
+  '__sentinel_guard_probe__',
   'test',
   'test:changed',
   'test:full',
