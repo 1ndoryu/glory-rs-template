@@ -17,6 +17,7 @@ use std::sync::Arc;
 
 use crate::handlers::auth::{AuthActionRateLimit, LoginRateLimit};
 use crate::services::game_ticket::GameTicketStore;
+use crate::services::game_ws::GameWsState;
 
 /// Estado compartido de la aplicacion — accesible desde handlers y middleware
 #[derive(Clone)]
@@ -29,6 +30,7 @@ pub struct AppState {
     pub stripe_webhook_secret: Option<String>,
     pub game_ticket_secret: Option<String>,
     pub game_ticket_store: GameTicketStore,
+    pub game_ws_state: GameWsState,
     pub site_url: String,
     /// [297A-8] Rate limit para login por IP
     pub login_rate_limit: Arc<LoginRateLimit>,

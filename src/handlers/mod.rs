@@ -5,6 +5,7 @@ pub mod auth;
 pub mod download_handler;
 pub mod game_map_handler;
 pub mod game_ticket_handler;
+pub mod game_ws_handler;
 mod health;
 pub mod media_handler;
 mod notes;
@@ -217,6 +218,7 @@ pub fn create_router(pool: sqlx::PgPool, config: crate::config::AppConfig) -> Ro
         stripe_webhook_secret: config.stripe_webhook_secret,
         game_ticket_secret: config.game_ticket_secret,
         game_ticket_store: crate::services::game_ticket::GameTicketStore::default(),
+        game_ws_state: crate::services::game_ws::GameWsState::default(),
         site_url,
         login_rate_limit: std::sync::Arc::new(std::sync::Mutex::new(
             std::collections::HashMap::new(),
@@ -281,6 +283,7 @@ fn api_routes() -> Router<AppState> {
         .merge(health::routes())
         .merge(game_map_handler::routes())
         .merge(game_ticket_handler::routes())
+        .merge(game_ws_handler::routes())
         .merge(auth::routes())
         .merge(notes::routes())
         .merge(articles::routes())

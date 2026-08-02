@@ -32,6 +32,7 @@ async fn test_state() -> AppState {
         stripe_webhook_secret: None,
         game_ticket_secret: None,
         game_ticket_store: glory_backend::services::game_ticket::GameTicketStore::default(),
+        game_ws_state: glory_backend::services::game_ws::GameWsState::default(),
         site_url: "http://localhost:3000".to_string(),
         login_rate_limit: Arc::new(Mutex::new(
             HashMap::<String, (u8, std::time::Instant)>::new(),

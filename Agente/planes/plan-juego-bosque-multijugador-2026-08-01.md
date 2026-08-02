@@ -323,7 +323,16 @@ servidor sin depender de Three.js.
 - [x] Registrar la ruta y el schema en OpenAPI y conservar `create_router` compatible mediante `create_router_with_state` para pruebas/adaptadores.
 - [x] Cubrir 401 sin sesión, 403 por CSRF ausente/incorrecto, 500 por secreto ausente y emisión positiva en 3 pruebas HTTP reales sobre PostgreSQL temporal migrado.
 
-**Límite de estas entregas:** no implementan upgrade WebSocket, integración con el hub Glory, identidad invitada, actor de sala, autoridad de movimiento ni reconexión. El `GameTicketStore` en memoria solo es válido para la primera instancia; antes de escalar se requiere un store compartido. Esos contratos de transporte y ejecución permanecen en Fase 5/6.
+#### 297A-42 — Frontera de upgrade WebSocket del juego
+
+- [x] Activar `axum/ws` y registrar `GET /api/game/ws` en el router de producción, sin reutilizar el hub Glory `i32` como autoridad de salas UUID.
+- [x] Exigir `join` como primer mensaje WebSocket, usando el contrato realtime v1 y sin aceptar ticket por query string ni cookie.
+- [x] Aplicar timeout de handshake de 5 segundos, límite global inicial de 64 conexiones y guard RAII para liberar capacidad al cerrar.
+- [x] Resolver el ticket con `GameTicketStore` de forma single-use y fail-closed; cubrir secreto ausente, secreto incorrecto, replay y subject UUID solo en memoria.
+- [x] Enviar error allowlisted `map_unavailable` y cerrar después de autenticar mientras no exista mapa/sala; no aceptar todavía `move`, snapshots ni presencia.
+- [x] Cubrir capacidad/teardown, timeout, parseo del join y resolución/replay del ticket con tests dirigidos; la prueba de upgrade TCP real queda para el siguiente bloque.
+
+**Límite de estas entregas:** `297A-42` solo establece la frontera de transporte y autenticación WebSocket; no crea actor de sala, mapa activo para realtime, snapshots, presencia, autoridad de movimiento, reconexión ni identidad invitada. El `GameTicketStore`/`GameWsState` en memoria solo es válido para la primera instancia; antes de escalar se requiere un store/coordinador compartido. Estos contratos de ejecución permanecen en Fase 5/6.
 
 **Gate:** ADR realtime, ADR de identidad de invitado y contrato de mapa aprobados; el núcleo offline puede existir, pero no se habilita gameplay conectado hasta cerrar estos contratos.
 
@@ -430,7 +439,7 @@ realtime.
 
 ### Fase 5 — Realtime de una sala
 
-- [ ] Integrar upgrade/ticket WebSocket en el backend de wandori.us.
+- [x] Integrar la frontera inicial de upgrade/ticket WebSocket en el backend de wandori.us (`297A-42`); aún falta probar el upgrade TCP real contra un servidor levantado.
 - [ ] Crear actor de sala bajo demanda con TTL, cap de 8 y backpressure.
 - [ ] Implementar inputs server-authoritative, snapshots, interpolación y presencia.
 - [ ] Añadir reconexión, heartbeat, timeout y cierre al destruir la app.
