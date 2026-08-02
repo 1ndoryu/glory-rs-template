@@ -66,6 +66,50 @@ describe('GameProfileService', () => {
     expect(authStore.get().capability).toBe('public');
   });
 
+  it('updates the profile via PUT with the optimistic revision contract', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      displayName: 'Guardián',
+      characterId: 'forest-ranger',
+      revision: 1,
+      updatedAt: '2026-08-02T00:00:00Z',
+    }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(GameProfileService.update({
+      displayName: 'Guardián',
+      characterId: 'forest-ranger',
+      expectedRevision: 0,
+    })).resolves.toEqual(expect.objectContaining({ characterId: 'forest-ranger', revision: 1 }));
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/game/profile');
+    expect(init.method).toBe('PUT');
+    expect(init.credentials).toBe('include');
+    expect(JSON.parse(String(init.body))).toEqual({
+      displayName: 'Guardián',
+      characterId: 'forest-ranger',
+      expectedRevision: 0,
+    });
+  });
+
+  it('preserves the abort signal on profile updates', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      displayName: 'Guardián',
+      characterId: 'forest-scout',
+      revision: 1,
+      updatedAt: 'now',
+    }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const controller = new AbortController();
+
+    await GameProfileService.update(
+      { displayName: 'Guardián', characterId: 'forest-scout', expectedRevision: 0 },
+      { signal: controller.signal },
+    );
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.signal).toBe(controller.signal);
+  });
+
   it('validates profile shape before the game consumes it', () => {
     expect(isValidGameProfile({ displayName: 'Jugador', characterId: 'forest-scout', revision: 0, updatedAt: 'now' })).toBe(true);
     expect(isValidGameProfile({ displayName: 'Ju\u200Bgador', characterId: 'forest-scout', revision: 0, updatedAt: 'now' })).toBe(false);

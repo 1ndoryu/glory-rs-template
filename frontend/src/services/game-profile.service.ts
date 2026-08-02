@@ -38,11 +38,41 @@ function isValidGameProfile(value: unknown): value is GameProfile {
     && typeof profile.updatedAt === 'string';
 }
 
+export interface UpdateGameProfileInput {
+  displayName: string;
+  characterId: string;
+  /** Revisión que el cliente leyó antes de editar (conflicto → 409). */
+  expectedRevision: number;
+}
+
 export const GameProfileService = {
   async get(options?: { signal?: AbortSignal }): Promise<GameProfile> {
     const response = await generatedFetcher<GeneratedResponse<unknown>>(
       '/api/game/profile',
       { method: 'GET', signal: options?.signal },
+    );
+    const profile = unwrapGeneratedResponse<unknown>(response, [200]);
+    if (!isValidGameProfile(profile)) {
+      throw new Error('Respuesta de perfil de juego inválida');
+    }
+    return profile;
+  },
+
+  /* [297A-54] Guarda el personaje elegido y el nombre visible con revisión
+   * optimista; solo cuentas autenticadas (el backend devuelve 401 al invitado
+   * y la frontera CSRF la resuelve el transporte compartido). */
+  async update(
+    input: UpdateGameProfileInput,
+    options?: { signal?: AbortSignal },
+  ): Promise<GameProfile> {
+    const response = await generatedFetcher<GeneratedResponse<unknown>>(
+      '/api/game/profile',
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+        signal: options?.signal,
+      },
     );
     const profile = unwrapGeneratedResponse<unknown>(response, [200]);
     if (!isValidGameProfile(profile)) {

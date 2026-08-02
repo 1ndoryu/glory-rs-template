@@ -27,6 +27,7 @@ import {
   requestGameTicket,
   type GameRealtimeConnectionState,
 } from './game-realtime-client';
+import { openGameCharacterEditor } from './game-character-editor';
 import '../../../../styles/desktop/desktop-game-playable.css';
 
 function normalizeRealtimeDirection(direction: { x: number; z: number }): { x: number; z: number } {
@@ -46,6 +47,7 @@ interface GamePlayableElements {
   readonly element: HTMLElement;
   readonly sceneHost: HTMLElement;
   readonly status: HTMLElement;
+  readonly editorButton: HTMLElement;
 }
 
 export function createGamePlayableView(): GamePlayableElements {
@@ -58,16 +60,25 @@ export function createGamePlayableView(): GamePlayableElements {
     textContent: 'cargando fixture offline…',
   });
   status.setAttribute('aria-live', 'polite');
+  /* [297A-54] El botón "personaje" abre el editor del jugador; el runtime le
+   * añade el listener cuando ya tiene el catálogo cargado. */
+  const editorButton = createEl('button', {
+    type: 'button',
+    className: 'boton boton-pequeno',
+    textContent: 'personaje',
+  });
   const guide = createEl('header', { className: 'juegoFixture__guia' },
     createEl('div', {},
       createEl('h2', { className: 'juegoFixture__titulo', textContent: 'Bosque · prueba jugable' }),
       createEl('p', { className: 'juegoFixture__ayuda', textContent: 'mueve con WASD o las flechas · toca el pad en móvil' }),
     ),
+    createEl('div', { className: 'juegoFixture__acciones' }, editorButton),
   );
   return {
     element: createEl('section', { className: 'juegoFixture', ariaLabel: 'Bosque, fixture jugable offline' }, sceneHost, status, guide),
     sceneHost,
     status,
+    editorButton,
   };
 }
 
@@ -108,6 +119,9 @@ export function renderGamePlayable(context: RenderContext): MountedView {
     let profileSessionExpired = false;
     let character: GameCharacterDefinition | null = null;
     let characters: GameCharacterDefinition[] = [];
+    /* [297A-54] Revisión leída del perfil; el editor la usa como
+     * expectedRevision y la actualiza al guardar. */
+    let profileRevision = 0;
 
     try {
       try {
@@ -122,6 +136,7 @@ export function renderGamePlayable(context: RenderContext): MountedView {
         const profile = await GameProfileService.get({ signal: profileController.signal });
         if (version !== hydrationVersion) return;
         displayName = profile.displayName;
+        profileRevision = profile.revision;
         character = characters.find(option => option.id === profile.characterId) ?? null;
       } catch (error: unknown) {
         if (version !== hydrationVersion || context.signal.aborted || disposed) return;
@@ -159,6 +174,8 @@ export function renderGamePlayable(context: RenderContext): MountedView {
           profileLoadWarning,
           profileSessionExpired,
           character,
+          characters,
+          profileRevision,
         );
       } catch (error: unknown) {
         if (context.signal.aborted || disposed) return;
@@ -222,6 +239,8 @@ function mountGamePlayableRuntime(
   profileLoadWarning: boolean,
   profileSessionExpired: boolean,
   character: GameCharacterDefinition | null,
+  characters: GameCharacterDefinition[],
+  profileRevision: number,
 ): MountedView {
   const setStatus = (message: string, error = false): void => {
     view.status.textContent = message;
@@ -238,11 +257,43 @@ function mountGamePlayableRuntime(
     view.element.dataset.characterId = character.id;
     view.element.dataset.characterTone = character.bodyTone;
   }
+  /* [297A-54] Editor del jugador: abre el modal del OS con el catálogo activo
+   * y, al guardar, aplica el perfil persistido en vivo (dataset + estado) sin
+   * rehidratar la escena ni reconectar realtime. */
+  const onEditCharacter = (): void => {
+    openGameCharacterEditor({
+      characters,
+      initial: {
+        displayName,
+        characterId: character?.id ?? 'forest-scout',
+        revision: profileRevision,
+      },
+      isAuthenticated: authStore.get().isAuthenticated,
+      onSaved: (profile) => {
+        /* [297A-54] Si el runtime ya se destruyó (rehidratación por cambio de
+         * identidad mientras el modal estaba abierto), no tocar su estado. */
+        if (destroyed) return;
+        displayName = profile.displayName;
+        const nextCharacter = characters.find(option => option.id === profile.characterId) ?? character;
+        character = nextCharacter;
+        profileRevision = profile.revision;
+        view.element.dataset.playerName = displayName;
+        if (character) {
+          view.element.dataset.characterId = character.id;
+          view.element.dataset.characterTone = character.bodyTone;
+        }
+        setStatus(`${displayName} · perfil actualizado`, false);
+      },
+    });
+  };
   const capabilities = detectWebGL();
   if (!capabilities.available) {
     setStatus(`3D no disponible: ${capabilities.reason ?? 'WebGL rechazado'}`, true);
     return { element: view.element, destroy: () => {} };
   }
+  /* [297A-54] El listener del editor se registra tras el chequeo de WebGL para
+   * que el return temprano no deje listeners colgados (teardown por camino). */
+  view.editorButton.addEventListener('click', onEditCharacter);
   view.element.dataset.webglKind = capabilities.kind ?? 'unknown';
   const input: GameInputHandle = createGameInput();
   view.element.appendChild(input.controls);
@@ -369,6 +420,7 @@ function mountGamePlayableRuntime(
     if (destroyed) return;
     destroyed = true;
     stopFrameLoop();
+    view.editorButton.removeEventListener('click', onEditCharacter);
     context.signal.removeEventListener('abort', destroy);
     document.removeEventListener('visibilitychange', onVisibilityChange);
     scene?.canvas.removeEventListener('webglcontextlost', onContextLost);

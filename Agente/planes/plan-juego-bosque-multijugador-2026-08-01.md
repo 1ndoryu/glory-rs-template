@@ -2,7 +2,7 @@
 
 > **Fecha:** 2026-08-01
 > **ID:** GAME-01
-> **Estado:** dirección Three.js 3D aprobada; fixture offline, persistencia, publicación admin de mapas, sala realtime server-authoritative, identidad temporal invitada, perfil persistente de cuenta, catálogo base de personaje y gestión admin del catálogo (backend + panel UI) están integrados; el editor de mapa/assets, la reconexión persistente y la reclamación invitado→cuenta siguen pendientes.
+> **Estado:** dirección Three.js 3D aprobada; fixture offline, persistencia, publicación admin de mapas, sala realtime server-authoritative, identidad temporal invitada, perfil persistente de cuenta, catálogo base de personaje, gestión admin del catálogo (backend + panel UI) y editor de personaje del jugador están integrados; el editor de mapa/assets, la reconexión persistente y la reclamación invitado→cuenta siguen pendientes.
 > **Prioridad:** futura, después del bloque actualmente habilitado en `roadmap.md`.
 > **Dependencias globales:** runtime `AppRegistry`/`MountedView`, ciclo de vida y carga lazy, sesiones/capacidades, contratos de workspace y quality gate.
 > **Fuentes canónicas:** `roadmap.md`, `Agente/documentacion/arquitectura/adr-bosque-3d-assets-terreno-2d-2026-08-01.md`, `Agente/planes/plan-assets-terreno-bosque-3d-2026-08-01.md`, `Agente/planes/plan-glory-render-motor-juegos-2026-08-01.md`, `Agente/documentacion/arquitectura/adr-glory-render-repositorio-agnostico-2026-08-01.md`, `Agente/documentacion/arquitectura/adr-carga-apps-pesadas-2026-07-31.md`, `Agente/documentacion/producto/referencia-visual-bosque-2026-08-01.md`.
@@ -547,6 +547,10 @@ realtime.
 **Evidencia 297A-53:** panel admin del catálogo de personajes en la UI: tab "juego" en Admin con listado completo (activas e inactivas vía el nuevo `GET /api/admin/game/characters`, que nunca expone inactivas al público), alta con id/etiqueta/tono allowlisted, edición (renombrado, tono y estado) y desactivación/reactivación con confirmación. `GameCharacterAdminService` valida estrictamente el contrato admin (`isActive`/`createdAt`) y reutiliza el transporte compartido (cookie + CSRF). 8/8 tests HTTP PostgreSQL (6 admin) y 13 tests frontend dirigidos (6 nuevos del servicio admin) PASS; type-check y diff-check PASS.
 
 **Límite 297A-53:** no hay auditoría persistente de cambios sensibles (`game_audit_events` pendiente), borrado físico (solo desactivación por FK) ni editor de piezas por slots; el build global sigue condicionado al error TypeScript preexistente de `notifications-popover.ts` (archivo ajeno sin commitear).
+
+**Evidencia 297A-54:** editor de personaje del jugador dentro de la app Bosque: botón "personaje" en el header que abre el modal del OS con el catálogo activo (select) y el nombre visible (input, allowlist 1–24). `GameProfileService.update` persiste con revisión optimista (`expectedRevision`); tras guardar, el perfil se aplica en vivo (dataset + estado) sin rehidratar la escena. Invitados: el botón guardar queda deshabilitado con aviso (política 297A-51: sin perfil persistido) y la frontera 401 se reporta sin reclamar estado; 409 informa del conflicto sin cerrar el modal. 39 tests frontend dirigidos PASS (5 nuevos del editor + 2 del servicio + 1 de lifecycle).
+
+**Límite 297A-54:** no hay editor de piezas por slots ni modelos visuales por tono en el render (el tono se persiste y se muestra como ayuda); el nombre se limita a 24 caracteres (contrato del perfil) y el id del personaje es inmutable; el build global sigue condicionado al error preexistente de `notifications-popover.ts`.
 
 **Gate:** ningún invitado puede invocar admin ni reclamar el estado de otra identidad; el perfil no depende de datos enviados sin validar.
 

@@ -88,6 +88,26 @@ describe('Bosque playable WebGL lifecycle', () => {
     view.destroy?.();
   });
 
+  it('exposes the player editor button after a successful hydration', async () => {
+    mocks.detectWebGL.mockReturnValue({ available: true, kind: 'webgl2' });
+    mocks.getGameProfile.mockResolvedValue({
+      displayName: 'Guardián',
+      characterId: 'forest-scout',
+      revision: 3,
+      updatedAt: '2026-08-02T00:00:00Z',
+    });
+
+    const view = renderGamePlayable({ signal: new AbortController().signal });
+    await flushHydration();
+
+    const buttons = Array.from(view.element.querySelectorAll('button'));
+    expect(buttons.some(button => button.textContent === 'personaje')).toBe(true);
+    expect(view.element.dataset.playerName).toBe('Guardián');
+
+    view.destroy?.();
+    expect(mocks.mountGamePlayableScene.mock.results[0]?.value.destroy).toHaveBeenCalledOnce();
+  });
+
   it('keeps a revoked account out of guest realtime and preserves the warning state', async () => {
     authStore.set({ isAuthenticated: true, userId: 'account-1', capability: 'authenticated' }, 'sync');
     mocks.detectWebGL.mockReturnValue({ available: true, kind: 'webgl2' });
