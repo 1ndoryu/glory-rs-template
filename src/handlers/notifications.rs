@@ -1,6 +1,6 @@
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use axum::routing::{get, patch, post};
+use axum::routing::{delete, get, patch, post};
 use axum::{Json, Router};
 use uuid::Uuid;
 
@@ -120,6 +120,26 @@ pub async fn update_status_admin(
     Ok(Json(NotificationAdminResponse::from(&notification)))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/admin/notifications/{id}",
+    params(("id" = Uuid, Path, description = "ID de la novedad")),
+    responses(
+        (status = 204, description = "Novedad eliminada"),
+        (status = 401, description = "No autorizado", body = ErrorResponse),
+        (status = 404, description = "No encontrado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
+pub async fn delete_notification(
+    State(state): State<AppState>,
+    _admin: AdminUser,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, AppError> {
+    NotificationService::delete(&state.pool, id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/notifications", get(list_public))
@@ -130,4 +150,5 @@ pub fn routes() -> Router<AppState> {
             "/admin/notifications/:id/status",
             patch(update_status_admin),
         )
+        .route("/admin/notifications/:id", delete(delete_notification))
 }

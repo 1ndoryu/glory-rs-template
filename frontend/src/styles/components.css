@@ -128,90 +128,167 @@
   outline-offset: 2px;
 }
 
-/* [297A-21] Receta única para la app de novedades. Las apps solo consumen
- * esta estructura; el chrome sigue siendo responsabilidad del shell. */
-.notificaciones {
-  display: flex;
-  flex-direction: column;
-  gap: var(--espacio-md);
-  height: 100%;
+/* [028A-5] Popover de novedades (reemplaza la app notifications). Panel
+ * compacto anclado al botón que lo invoca (campana OS / control launcher);
+ * el posicionamiento (fixed + clamp) lo maneja notifications-popover.ts. */
+.notificacionesPopover {
+  position: fixed;
+  z-index: 9999;
+  background: var(--sistema-superficie);
+  border: var(--sistema-borde);
+  font-family: var(--fuente-sistema);
+  /* Misma escala tipográfica que dropdowns y menús contextuales del OS. */
+  font-size: var(--sistema-menu-contexto-texto-tamano);
+  color: var(--sistema-texto);
 }
 
-.notificaciones__titulo {
+.notificacionesPopover__cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espacio-sm);
+  padding: var(--espacio-sm);
+  border-bottom: var(--sistema-borde);
+}
+
+.notificacionesPopover__titulo {
   margin: 0;
-  font-size: var(--tamano-grande);
+  font-family: var(--fuente-sistema);
+  font-size: var(--tamano-texto);
   font-weight: var(--peso-medio);
 }
 
-.notificaciones__recargar {
+.notificacionesPopover__recargar {
   display: inline-flex;
   align-items: center;
-  align-self: flex-start;
   gap: var(--espacio-xs);
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--sistema-texto);
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
 }
 
-.notificaciones__recargar svg,
-.notificaciones__icono svg {
+.notificacionesPopover__recargar svg,
+.notificacionesPopover__icono svg {
   width: var(--sistema-control-icono-tamano);
   height: var(--sistema-control-icono-tamano);
   stroke-width: var(--sistema-icono-trazo);
 }
 
-.notificaciones__lista {
+.notificacionesPopover__lista {
   display: flex;
-  flex: 1;
   flex-direction: column;
-  gap: var(--espacio-sm);
+  /* [028A-5] Boceto aprobado: la lista no supera ~260px y hace scroll. */
+  max-height: 260px;
+  overflow-y: auto;
 }
 
-.notificaciones__item {
+.notificacionesPopover__item {
   display: flex;
   gap: var(--espacio-sm);
-  padding: var(--espacio-md);
-  border: var(--sistema-borde);
+  padding: var(--espacio-sm);
+  border-bottom: var(--sistema-borde);
   cursor: pointer;
 }
 
-.notificaciones__item--leida {
+.notificacionesPopover__item:last-child {
+  border-bottom: none;
+}
+
+.notificacionesPopover__item--leida {
   opacity: 0.55;
 }
 
-.notificaciones__item:focus-visible {
+.notificacionesPopover__item--noLeida .notificacionesPopover__itemTitulo::before {
+  /* Marcador del boceto: cuadrado negro precede al título no leído. */
+  content: '■';
+  margin-right: var(--espacio-xs);
+}
+
+.notificacionesPopover__item:focus-visible {
   outline: var(--sistema-borde-doble);
   outline-offset: var(--espacio-xs);
 }
 
-.notificaciones__itemTitulo,
-.notificaciones__itemTexto {
+.notificacionesPopover__icono {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+}
+
+.notificacionesPopover__contenido {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.notificacionesPopover__itemTitulo,
+.notificacionesPopover__itemTexto {
   margin: 0;
 }
 
-.notificaciones__itemTitulo {
+.notificacionesPopover__itemTitulo {
+  font-weight: var(--peso-medio);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notificacionesPopover__itemTexto {
+  margin-top: var(--espacio-xs);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.notificacionesPopover__itemFecha {
+  display: block;
+  margin-top: var(--espacio-xs);
+  font-size: var(--tamano-pequeno);
+  color: var(--sistema-texto-secundario);
+}
+
+.notificacionesPopover__pie {
+  border-top: var(--sistema-borde);
+  padding: var(--espacio-sm);
+  text-align: center;
+}
+
+.notificacionesPopover__pieBoton {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--sistema-texto);
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+/* [028A-5] Etiqueta de estado en listados del admin (recurso agnóstico:
+ * novedades, y reutilizable por otras listas). */
+.tag-estado {
+  display: inline-block;
+  padding: 0 var(--espacio-xs);
+  border: var(--sistema-borde);
+  font-size: var(--tamano-pequeno);
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.tag-estado--borrador {
+  opacity: 0.6;
+}
+
+.tag-estado--published {
   font-weight: var(--peso-medio);
 }
 
-.notificacionesAdmin {
-  display: flex;
-  flex-direction: column;
-  gap: var(--espacio-sm);
-  border-top: var(--borde);
-  padding-top: var(--espacio-md);
+.tag-estado--archivado {
+  opacity: 0.4;
 }
-
-.notificacionesAdmin__form,
-.notificacionesAdmin__item {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--espacio-sm);
-  align-items: center;
-}
-
-.notificacionesAdmin__form textarea { flex: 1 1 100%; min-height: 56px; }
-.notificacionesAdmin__form input { min-width: 120px; }
-.notificacionesAdmin__lista { display: grid; gap: var(--espacio-sm); overflow: auto; }
-.notificacionesAdmin__item { border: var(--borde); padding: var(--espacio-sm); justify-content: space-between; }
-.notificacionesAdmin__item p { flex: 1 1 100%; margin: 0; }
-.notificacionesAdmin__feedback { flex-basis: 100%; min-height: 1.25em; }
 
 /* === COMERCIO (apps Tienda/Pedidos/Descargas) === */
 .comercio {
@@ -261,9 +338,22 @@
   .comercio__lista { grid-template-columns: 1fr; }
 }
 
-.notificaciones__itemTexto {
-  margin-top: var(--espacio-xs);
+/* [028A-5] El admin de novedades reutiliza las recetas del admin (admin-item,
+ * admin-acciones) y el selector de estado nativo (campo-select). */
+
+/* [028A-5] Acciones y feedback dentro del cuerpo de un modal (patrón común
+ * del sistema: fila de botones + línea de estado). */
+.modal-acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--espacio-md);
+}
+
+.modal-feedback {
+  margin: 0;
+  min-height: 1.25em;
   font-size: var(--tamano-pequeno);
+  color: var(--sistema-texto-secundario);
 }
 
 /* [018A-12] Consentimiento opcional: superficie compacta, sin bloquear el

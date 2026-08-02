@@ -1,6 +1,7 @@
 import { unwrapGeneratedResponse } from '../api/client';
 import {
   createAdmin,
+  deleteNotification,
   listAdmin,
   listMine,
   listPublic,
@@ -65,5 +66,11 @@ export const NotificationsService = {
   async updateStatus(id: string, status: 'draft' | 'published' | 'archived'): Promise<ApiNotificationAdmin> {
     const response = await updateStatusAdmin(encodeURIComponent(id), { status });
     return unwrapGeneratedResponse<ApiNotificationAdmin>(response, [200]);
+  },
+
+  /** Elimina un aviso (incluidos los ya publicados); sus lecturas se borran en cascada. */
+  async deleteAdmin(id: string): Promise<void> {
+    const response = await deleteNotification(encodeURIComponent(id));
+    unwrapGeneratedResponse<void>(response, [204]);
   },
 };

@@ -3,7 +3,7 @@
  * Cada app define su id, título, icono, capacidades y render function.
  * Las apps solo devuelven contenido; el shell crea la ventana. */
 
-import { FileUser, Folder, FileText, FolderCode, Trash2, UserRound, Bell, Store, ClipboardList, Download, Info } from 'lucide';
+import { FileUser, Folder, FileText, FolderCode, Trash2, UserRound, Store, ClipboardList, Download, Info } from 'lucide';
 import { createEl } from '../../utils/dom';
 import { AppRegistry } from './app-registry';
 import { createPathDeepLink } from './deep-links';
@@ -16,7 +16,6 @@ import type { MountedView, RenderContext } from '../../core/lifecycle';
 import { SettingsService } from '../../services';
 import { appendSanitizedHtml } from '../../utils/sanitize-html';
 import { mountAccountView } from './account-view';
-import { createNotificationsView } from '../notifications/notifications-view';
 import { createDownloadsView, createOrdersView, createStoreView } from '../commerce/store-view';
 import { createPropertiesPreview } from '../desktop/apps/properties/properties-preview';
 import { initMediaGallerySync } from './workspace/media-gallery-sync';
@@ -122,30 +121,6 @@ AppRegistry.register({
       destroy: () => {
         view.destroy?.();
         dispatchEvent({ type: 'app_closed', appId: 'account' });
-      },
-    };
-  },
-});
-
-/* === Notifications === */
-AppRegistry.register({
-  id: 'notifications',
-  title: 'Novedades',
-  icon: Bell,
-  iconType: 'application',
-  singleton: true,
-  requires: 'public',
-  routePatterns: ['/notifications'],
-  deepLink: createPathDeepLink('/notifications'),
-  layout: 'padded',
-  render: (_ctx: RenderContext): MountedView => {
-    dispatchEvent({ type: 'app_opened', appId: 'notifications' });
-    const view = createNotificationsView();
-    return {
-      element: view.element,
-      destroy: () => {
-        view.destroy();
-        dispatchEvent({ type: 'app_closed', appId: 'notifications' });
       },
     };
   },

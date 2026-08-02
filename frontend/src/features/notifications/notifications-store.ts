@@ -110,6 +110,16 @@ export function markNotificationRead(id: string): void {
   }
 }
 
+/* [028A-5] Marca todas las no leídas reutilizando el flujo local-first de
+ * markNotificationRead. La API solo ofrece marcado individual; para listas
+ * pequeñas es aceptable, y el estado local garantiza la consistencia offline.
+ * Pendiente: un endpoint bulk backend (mark-read-all) evitaría N roundtrips
+ * cuando la lista crezca. */
+export function markAllNotificationsRead(): void {
+  const pendientes = notificationsStore.get().items.filter(item => !item.read).map(item => item.id);
+  for (const id of pendientes) markNotificationRead(id);
+}
+
 export function unreadNotificationCount(state: NotificationsState = notificationsStore.get()): number {
   return state.items.reduce((count, item) => count + (item.read ? 0 : 1), 0);
 }

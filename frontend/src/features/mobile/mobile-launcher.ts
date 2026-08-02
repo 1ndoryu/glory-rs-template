@@ -17,6 +17,7 @@ import type { ResolvedNode } from '../runtime/workspace/types';
 import { resolvePublicResourceTarget } from '../runtime/workspace/public-resource-locator';
 import { showToast } from '../../components/ui/toast';
 import { loadNotifications, notificationsStore, unreadNotificationCount } from '../notifications/notifications-store';
+import { createNotificationsPopover } from '../notifications/notifications-popover';
 
 export interface MobileLauncherOptions {
   readonly openApp: (appId: string, params?: Readonly<Record<string, string>>) => Promise<void>;
@@ -124,7 +125,9 @@ export function createMobileLauncher(options: MobileLauncherOptions): MobileLaun
     notificationsButton.setAttribute('aria-label', count > 0 ? `Novedades (${count} sin leer)` : 'Abrir novedades');
     notificationsButton.toggleAttribute('data-hay-novedades', count > 0);
   });
-  notificationsButton.addEventListener('click', () => { void options.openApp('notifications'); });
+  /* [028A-5] El launcher también abre el popover (no la ventana notifications). */
+  const notificationsPopover = createNotificationsPopover(notificationsButton);
+  notificationsButton.addEventListener('click', () => { notificationsPopover.toggle(); });
   void loadNotifications();
   const gestureCleanups: Array<() => void> = [];
 
@@ -226,6 +229,7 @@ export function createMobileLauncher(options: MobileLauncherOptions): MobileLaun
       for (const cleanup of gestureCleanups.splice(0)) cleanup();
       themeToggle.destroy();
       stopNotifications();
+      notificationsPopover.destroy();
       accountControl.destroy();
       launcher.remove();
     },

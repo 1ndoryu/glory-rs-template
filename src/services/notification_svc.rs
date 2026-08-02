@@ -101,4 +101,12 @@ impl NotificationService {
             .await?
             .ok_or_else(|| AppError::NotFound("Notificación no encontrada".into()))
     }
+
+    pub async fn delete(pool: &PgPool, id: Uuid) -> Result<(), AppError> {
+        if NotificationRepository::delete(pool, id).await? {
+            Ok(())
+        } else {
+            Err(AppError::NotFound("Notificación no encontrada".into()))
+        }
+    }
 }

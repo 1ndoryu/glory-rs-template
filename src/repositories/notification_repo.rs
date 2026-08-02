@@ -107,6 +107,15 @@ impl NotificationRepository {
         .await
     }
 
+    /// Elimina una notificacion (incluye sus lecturas via ON DELETE CASCADE).
+    pub async fn delete(pool: &PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query("DELETE FROM notifications WHERE id = $1")
+            .bind(id)
+            .execute(pool)
+            .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
     /// Inserts the release notice in the same transaction as the release.
     pub async fn create_release_notification(
         tx: &mut PgConnection,

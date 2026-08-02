@@ -14,6 +14,7 @@ import { authStore } from '../../../store';
 import { ArticleService } from '../../../services';
 import { createThemeToggleButton } from '../../../components/ui/theme-toggle-button';
 import { loadNotifications, notificationsStore, unreadNotificationCount } from '../../notifications/notifications-store';
+import { createNotificationsPopover } from '../../notifications/notifications-popover';
 
 interface MenuController {
   readonly close: () => void;
@@ -244,9 +245,11 @@ export function createDesktopMenuBar(): DesktopMenuBar {
     notificationsButton.toggleAttribute('data-hay-novedades', count > 0);
   });
   void loadNotifications();
+  /* [028A-5] La campana abre un popover anclado (novedades), no una ventana. */
+  const notificationsPopover = createNotificationsPopover(notificationsButton);
   notificationsButton.addEventListener('click', () => {
     controller.close();
-    void import('../../runtime/route-app-adapter').then(adapter => adapter.openAppWindow('notifications'));
+    notificationsPopover.toggle();
   });
   const accountButton = createEl('button', {
     type: 'button',
@@ -293,6 +296,7 @@ export function createDesktopMenuBar(): DesktopMenuBar {
       controller.close();
       stopAuth();
       stopNotifications();
+      notificationsPopover.destroy();
       themeToggle.destroy();
       element.remove();
     },
