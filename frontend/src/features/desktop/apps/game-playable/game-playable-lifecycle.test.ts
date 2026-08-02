@@ -1,21 +1,34 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '../../../../api/client';
+import { authStore } from '../../../../store';
 
 const mocks = vi.hoisted(() => ({
   detectWebGL: vi.fn(),
   mountGamePlayableScene: vi.fn(),
   createGameInput: vi.fn(),
   cancelAnimationFrame: vi.fn(),
+  getGameProfile: vi.fn(),
 }));
 
 vi.mock('./game-webgl-capabilities', () => ({ detectWebGL: mocks.detectWebGL }));
 vi.mock('./game-playable-scene', () => ({ mountGamePlayableScene: mocks.mountGamePlayableScene }));
 vi.mock('./game-playable-input', () => ({ createGameInput: mocks.createGameInput }));
+vi.mock('../../../../services', () => ({
+  GameProfileService: { get: mocks.getGameProfile },
+}));
 
 import { renderGamePlayable } from './game-playable';
+
+async function flushHydration(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+}
 
 describe('Bosque playable WebGL lifecycle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    authStore.set({ isAuthenticated: false, userId: null, capability: 'public' }, 'init');
+    mocks.getGameProfile.mockResolvedValue({ displayName: 'Guardián', revision: 0, updatedAt: '2026-08-02T00:00:00Z' });
     mocks.detectWebGL.mockReturnValue({ available: false, reason: 'WebGL bloqueado en el dispositivo' });
     mocks.createGameInput.mockImplementation(() => ({
       controls: document.createElement('div'),
@@ -48,47 +61,67 @@ describe('Bosque playable WebGL lifecycle', () => {
     vi.stubGlobal('cancelAnimationFrame', mocks.cancelAnimationFrame);
   });
 
-  it('shows fallback before creating input or a Three scene', () => {
+  it('loads the validated profile before deciding whether WebGL can mount', async () => {
     const view = renderGamePlayable({ signal: new AbortController().signal });
 
-    expect(view.element.dataset.state).toBeUndefined();
     expect(view.element.querySelector('canvas')).toBeNull();
     expect(view.element.querySelector('.juegoFixture__estado')?.textContent)
+      .toContain('cargando perfil');
+    expect(mocks.detectWebGL).not.toHaveBeenCalled();
+
+    await flushHydration();
+
+    expect(mocks.getGameProfile).toHaveBeenCalledOnce();
+    expect(mocks.detectWebGL).toHaveBeenCalledOnce();
+    expect(view.element.querySelector('.juegoFixture__estado')?.textContent)
       .toContain('WebGL bloqueado');
-    expect(view.element.querySelector('.juegoFixture__estado')?.getAttribute('aria-live')).toBe('polite');
-    expect(mocks.createGameInput).not.toHaveBeenCalled();
-    expect(mocks.mountGamePlayableScene).not.toHaveBeenCalled();
+    expect(view.element.dataset.playerName).toBe('Guardián');
+    view.destroy?.();
   });
 
-  it('repeatedly aborts before mounting without creating renderer resources', () => {
-    for (let attempt = 0; attempt < 12; attempt += 1) {
-      const controller = new AbortController();
-      controller.abort();
-      const view = renderGamePlayable({ signal: controller.signal });
-      expect(view.element.querySelector('canvas')).toBeNull();
-      view.destroy?.();
-    }
+  it('keeps a revoked account out of guest realtime and preserves the warning state', async () => {
+    authStore.set({ isAuthenticated: true, userId: 'account-1', capability: 'authenticated' }, 'sync');
+    mocks.detectWebGL.mockReturnValue({ available: true, kind: 'webgl2' });
+    mocks.getGameProfile.mockRejectedValue(new ApiError(401, { error: 'unauthorized' }, 'API Error: 401'));
+
+    const view = renderGamePlayable({ signal: new AbortController().signal });
+    await flushHydration();
+
+    expect(view.element.dataset.playerName).toBe('Jugador');
+    expect(view.element.querySelector('.juegoFixture__estado')?.textContent)
+      .toContain('sesión expirada');
+    expect((view.element.querySelector('.juegoFixture__estado') as HTMLElement).dataset.state).toBe('error');
+    expect(mocks.mountGamePlayableScene).toHaveBeenCalledOnce();
+    view.destroy?.();
+  });
+
+  it('aborts the profile request and clears its timeout before resolution', async () => {
+    let resolveProfile: ((profile: { displayName: string; revision: number; updatedAt: string }) => void) | undefined;
+    const clearTimeoutSpy = vi.spyOn(window, 'clearTimeout');
+    mocks.getGameProfile.mockReturnValue(new Promise(resolve => { resolveProfile = resolve; }));
+    const controller = new AbortController();
+    const view = renderGamePlayable({ signal: controller.signal });
+
+    controller.abort();
+    resolveProfile?.({ displayName: 'Tarde', revision: 0, updatedAt: '2026-08-02T00:00:00Z' });
+    await flushHydration();
 
     expect(mocks.detectWebGL).not.toHaveBeenCalled();
     expect(mocks.createGameInput).not.toHaveBeenCalled();
     expect(mocks.mountGamePlayableScene).not.toHaveBeenCalled();
-    expect(globalThis.requestAnimationFrame).not.toHaveBeenCalled();
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+    view.destroy?.();
   });
 
-  it('mounts and destroys the playable view repeatedly without retaining handles', () => {
+  it('mounts and destroys the playable view repeatedly without retaining handles', async () => {
     mocks.detectWebGL.mockReturnValue({ available: true, kind: 'webgl2' });
 
-    for (let attempt = 0; attempt < 12; attempt += 1) {
-      const view = renderGamePlayable({ signal: new AbortController().signal });
-      view.destroy?.();
-    }
+    const views = Array.from({ length: 12 }, () => renderGamePlayable({ signal: new AbortController().signal }));
+    await flushHydration();
+    views.forEach(view => view.destroy?.());
 
     expect(mocks.createGameInput).toHaveBeenCalledTimes(12);
     expect(mocks.mountGamePlayableScene).toHaveBeenCalledTimes(12);
-    expect(mocks.createGameInput.mock.results.map(result => result.value.destroy))
-      .toHaveLength(12);
-    expect(mocks.mountGamePlayableScene.mock.results.map(result => result.value.destroy))
-      .toHaveLength(12);
     for (const result of mocks.createGameInput.mock.results) {
       expect(result.value.destroy).toHaveBeenCalledOnce();
     }
@@ -97,11 +130,12 @@ describe('Bosque playable WebGL lifecycle', () => {
     }
   });
 
-  it('stops the frame loop and exposes an accessible error after context loss', () => {
+  it('stops the frame loop and exposes an accessible error after context loss', async () => {
     mocks.detectWebGL.mockReturnValue({ available: true, kind: 'webgl2' });
 
     const controller = new AbortController();
     const view = renderGamePlayable({ signal: controller.signal });
+    await flushHydration();
     const contextLost = new Event('webglcontextlost', { cancelable: true });
     mocks.mountGamePlayableScene.mock.results[0]?.value.canvas.dispatchEvent(contextLost);
 

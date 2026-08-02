@@ -5,6 +5,8 @@
 
 import type { MountedView, RenderContext } from '../../../../core/lifecycle';
 import { authStore } from '../../../../store';
+import { ApiError } from '../../../../api/client';
+import { GameProfileService } from '../../../../services';
 import { createEl } from '../../../../utils/dom';
 import {
   createWorldState,
@@ -62,8 +64,96 @@ export function createGamePlayableView(): GamePlayableElements {
   };
 }
 
+/* [297A-49] El perfil se resuelve antes de montar WebGL/realtime. La vista
+ * conserva un shell síncrono para que el runtime pueda cerrarla mientras la
+ * petición está pendiente, y el AbortSignal evita recursos huérfanos. */
 export function renderGamePlayable(context: RenderContext): MountedView {
   const view = createGamePlayableView();
+  let disposed = false;
+  let runtime: MountedView | null = null;
+  let profileController: AbortController | null = null;
+  let profileTimeout: number | null = null;
+  const accountSessionAtStart = authStore.get().isAuthenticated;
+
+  const setLoadingStatus = (message: string): void => {
+    view.status.textContent = message;
+    view.status.dataset.state = 'loading';
+    view.status.hidden = false;
+  };
+
+  const hydrate = async (): Promise<void> => {
+    if (context.signal.aborted || disposed) return;
+    setLoadingStatus('cargando perfil de juego…');
+    profileController = new AbortController();
+    const abortProfile = (): void => profileController?.abort();
+    profileTimeout = window.setTimeout(() => profileController?.abort(), 5_000);
+    context.signal.addEventListener('abort', abortProfile, { once: true });
+
+    let displayName = 'Jugador';
+    let profileLoadWarning = false;
+    let profileSessionExpired = false;
+    try {
+      const profile = await GameProfileService.get({ signal: profileController.signal });
+      displayName = profile.displayName;
+    } catch (error: unknown) {
+      if (context.signal.aborted || disposed) return;
+      /* 401 es el camino normal del invitado: no hay fila persistente y el
+       * realtime obtiene identidad temporal por separado. Otros fallos no
+       * bloquean el fallback offline, pero sí dejan diagnóstico accesible. */
+      if (error instanceof ApiError && error.status === 401 && accountSessionAtStart) {
+        profileLoadWarning = true;
+        profileSessionExpired = true;
+        setLoadingStatus('sesión expirada · modo local');
+      } else if (!(error instanceof ApiError && error.status === 401)) {
+        profileLoadWarning = true;
+        setLoadingStatus('perfil no disponible · modo local');
+      }
+    } finally {
+      if (profileTimeout !== null) window.clearTimeout(profileTimeout);
+      profileTimeout = null;
+      context.signal.removeEventListener('abort', abortProfile);
+      profileController = null;
+    }
+
+    if (context.signal.aborted || disposed) return;
+    try {
+      runtime = mountGamePlayableRuntime(
+        context,
+        view,
+        displayName,
+        profileLoadWarning,
+        profileSessionExpired,
+      );
+    } catch (error: unknown) {
+      if (context.signal.aborted || disposed) return;
+      setLoadingStatus('este dispositivo no pudo iniciar Bosque');
+      console.error('[Bosque fixture] No se pudo montar el runtime.', error);
+    }
+  };
+
+  void hydrate();
+
+  return {
+    element: view.element,
+    destroy: () => {
+      if (disposed) return;
+      disposed = true;
+      if (profileTimeout !== null) window.clearTimeout(profileTimeout);
+      profileTimeout = null;
+      profileController?.abort();
+      runtime?.destroy?.();
+      runtime = null;
+    },
+  };
+}
+
+function mountGamePlayableRuntime(
+  context: RenderContext,
+  view: GamePlayableElements,
+  displayName: string,
+  profileLoadWarning: boolean,
+  profileSessionExpired: boolean,
+): MountedView {
   const setStatus = (message: string, error = false): void => {
     view.status.textContent = message;
     view.status.dataset.state = error ? 'error' : 'ready';
@@ -74,6 +164,7 @@ export function renderGamePlayable(context: RenderContext): MountedView {
   if (context.signal.aborted) {
     return { element: view.element, destroy: () => {} };
   }
+  view.element.dataset.playerName = displayName;
   const capabilities = detectWebGL();
   if (!capabilities.available) {
     setStatus(`3D no disponible: ${capabilities.reason ?? 'WebGL rechazado'}`, true);
@@ -162,14 +253,14 @@ export function renderGamePlayable(context: RenderContext): MountedView {
       if (rendererMetrics.jsHeapLimitBytes !== undefined) {
         view.element.dataset.jsHeapLimitBytes = String(rendererMetrics.jsHeapLimitBytes);
       }
-      if (frameCount % 30 === 0 && realtimeState !== 'error') {
+      if (frameCount % 30 === 0 && realtimeState !== 'error' && !profileLoadWarning) {
         const mode = realtimeState === 'connected'
           ? `conectado${realtime?.getMapVersion() ? ` · ${realtime.getMapVersion()}` : ''}`
           : realtimeState === 'connecting'
             ? 'conectando… · fallback local'
             : 'offline · movimiento local';
         setStatus(
-          `${mode} · chunks ${streaming.visibleChunks} · props ${streaming.visibleInstances} · p95 ${performanceSnapshot.p95Ms.toFixed(1)}ms`,
+          `${displayName} · ${mode} · chunks ${streaming.visibleChunks} · props ${streaming.visibleInstances} · p95 ${performanceSnapshot.p95Ms.toFixed(1)}ms`,
           false,
         );
       }
@@ -229,12 +320,16 @@ export function renderGamePlayable(context: RenderContext): MountedView {
     resizeObserver.observe(view.sceneHost);
     scene.update(snapshotFromState(state));
     setStatus(
-      authStore.get().isAuthenticated
-        ? 'conectando… · fallback local mientras se autentica'
-        : 'conectando… · fallback local mientras se identifica el invitado',
-      false,
+      profileSessionExpired
+        ? `${displayName} · sesión expirada · modo local`
+        : profileLoadWarning
+          ? `${displayName} · perfil no disponible · modo local`
+          : authStore.get().isAuthenticated
+            ? `${displayName} · conectando… · fallback local mientras se autentica`
+            : `${displayName} · conectando… · fallback local mientras se identifica el invitado`,
+      profileLoadWarning,
     );
-    void realtime?.connect();
+    if (!profileSessionExpired) void realtime?.connect();
     startFrameLoop();
   } catch (error: unknown) {
     setStatus('este dispositivo no pudo iniciar el fixture 3d', true);

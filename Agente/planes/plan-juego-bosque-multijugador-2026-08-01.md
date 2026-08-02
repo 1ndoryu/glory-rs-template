@@ -519,14 +519,18 @@ realtime.
 
 - [x] Emitir identidad temporal para invitados con límites de abuso (`297A-47`).
 - [x] Asociar cuenta autenticada con perfil de juego persistente (`297A-48`): `GET/PUT /api/game/profile`, `AuthUser`, CSRF, nombre allowlisted y revisión optimista.
-- [ ] Cargar el perfil validado en el flujo previo al gameplay sin añadir consultas al loop de render.
+- [x] Cargar el perfil validado en el flujo previo al gameplay sin añadir consultas al loop de render (`297A-49`): hidratación abortable, timeout acotado, fallback invitado y montaje posterior de WebGL/realtime.
 - [ ] Crear personaje base y selección de opciones allowlisted.
 - [ ] Definir qué datos se conservan al pasar de invitado a cuenta.
 - [ ] Probar logout, sesión revocada, reconexión y cambio de usuario.
 
 **Evidencia 297A-48:** `user_game_profiles` persiste solo cuentas autenticadas; el GET devuelve un valor seguro sin crear fila, el PUT usa UPSERT transaccional con revisión, el DTO no serializa `user_id`, y el nombre rechaza controles y caracteres Unicode de formato invisibles. Integración HTTP real: 4/4 tests PASS en la BD aislada de rama; unitarios del modelo PASS.
 
-**Límite 297A-48:** no crea catálogo de personajes, no vincula invitados a cuentas y no carga todavía el perfil en `game-playable`; esas decisiones permanecen en los siguientes bloques.
+**Límite 297A-48:** no crea catálogo de personajes ni vincula invitados a cuentas; la carga en gameplay quedó en `297A-49` y las demás decisiones permanecen en los siguientes bloques.
+
+**Evidencia 297A-49:** `GameProfileService` consume `GET /api/game/profile` con cookie de sesión y valida estrictamente `displayName`, revisión y fecha; `game-playable` espera esa hidratación una sola vez antes de montar input, WebGL y realtime. El `AbortSignal` del `MountedView`, un timeout de 5 segundos y el teardown explícito cancelan la petición y su timer. Un 401 es el camino normal del invitado; errores de red/contrato conservan el modo local con estado accesible. Type-check y 16 tests frontend dirigidos PASS.
+
+**Límite 297A-49:** no guarda cambios desde gameplay, no crea catálogo/selector de personajes, no reclama identidades invitadas y no implementa reconexión persistente.
 
 **Gate:** ningún invitado puede invocar admin ni reclamar el estado de otra identidad; el perfil no depende de datos enviados sin validar.
 

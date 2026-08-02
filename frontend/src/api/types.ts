@@ -157,6 +157,13 @@ export interface UpdateProjectRequest {
   is_visible?: boolean;
 }
 
+/* === Game === */
+export interface GameProfile {
+  displayName: string;
+  revision: number;
+  updatedAt: string;
+}
+
 /* === Settings === */
 export interface SiteSettings {
   [key: string]: string;
