@@ -1,11 +1,12 @@
 use sqlx::PgPool;
+use uuid::Uuid;
 
 use crate::errors::AppError;
 use crate::models::game_map::{
-    document_content_hash, document_json_bytes, GameMapVersionPublic, MapVersion,
-    MAP_VERSION_MAX_JSON_BYTES,
+    canonicalize_document, document_content_hash, document_json_bytes, GameMapVersionPublic,
+    MapVersion, PublishMapRequest, MAP_VERSION_MAX_JSON_BYTES,
 };
-use crate::repositories::game_map_repo::GameMapRepository;
+use crate::repositories::game_map_repo::{GameMapRepository, GameMapVersionRow};
 
 pub struct GameMapService;
 
@@ -23,6 +24,58 @@ impl GameMapService {
             .await?
             .ok_or_else(|| AppError::NotFound("Mapa publicado no encontrado".into()))?;
 
+        Self::validate_stored_row(&row)?;
+        Ok(Self::to_public(row))
+    }
+
+    /// Publica un snapshot validado como nueva versión activa del mapa.
+    /// La autorización ya fue resuelta por el extractor `AdminUser` del handler.
+    pub async fn publish(
+        pool: &PgPool,
+        published_by: Uuid,
+        request: PublishMapRequest,
+    ) -> Result<GameMapVersionPublic, AppError> {
+        request
+            .validate_metadata()
+            .map_err(|message| AppError::Validation(message.into()))?;
+
+        let canonical_document = canonicalize_document(&request.document);
+        let document_bytes = document_json_bytes(&canonical_document)
+            .ok_or_else(|| AppError::Validation("El documento no es serializable".into()))?;
+        let document = MapVersion::from_bounded_json(&document_bytes, MAP_VERSION_MAX_JSON_BYTES)
+            .map_err(|message| {
+            AppError::Validation(format!("MapVersion inválido: {message}"))
+        })?;
+        let map_id = document.id.clone();
+
+        if let Some(requested_map_id) = &request.map_id {
+            if requested_map_id != &map_id {
+                return Err(AppError::Validation(
+                    "mapId debe coincidir con document.id".into(),
+                ));
+            }
+        }
+
+        let content_hash = document_content_hash(&canonical_document)
+            .ok_or_else(|| AppError::Validation("No se pudo calcular el hash del mapa".into()))?;
+        let row = GameMapRepository::publish(
+            pool,
+            &map_id,
+            request.expected_version,
+            i32::from(document.schema_version),
+            &content_hash,
+            &canonical_document,
+            published_by,
+        )
+        .await?
+        .ok_or_else(|| {
+            AppError::Conflict("La versión activa cambió; vuelve a leer el mapa".into())
+        })?;
+
+        Ok(Self::to_public(row))
+    }
+
+    fn validate_stored_row(row: &GameMapVersionRow) -> Result<(), AppError> {
         let document_size = usize::try_from(row.document_bytes).map_err(|_| {
             AppError::Internal("El tamaño del snapshot del mapa no es válido".into())
         })?;
@@ -33,10 +86,10 @@ impl GameMapService {
         }
         let document_bytes = document_json_bytes(&row.document)
             .ok_or_else(|| AppError::Internal("El snapshot del mapa no es serializable".into()))?;
-        let document: MapVersion =
-            MapVersion::from_bounded_json(&document_bytes, MAP_VERSION_MAX_JSON_BYTES).map_err(
-                |_| AppError::Internal("El snapshot publicado del mapa no es válido".into()),
-            )?;
+        let document = MapVersion::from_bounded_json(&document_bytes, MAP_VERSION_MAX_JSON_BYTES)
+            .map_err(|_| {
+            AppError::Internal("El snapshot publicado del mapa no es válido".into())
+        })?;
         let computed_hash = document_content_hash(&row.document)
             .ok_or_else(|| AppError::Internal("No se pudo verificar el hash del mapa".into()))?;
         if computed_hash != row.content_hash {
@@ -44,21 +97,22 @@ impl GameMapService {
                 "La integridad del snapshot del mapa no se pudo verificar".into(),
             ));
         }
-
-        let document_id = document.id.clone();
-        if document_id != row.map_id || i32::from(document.schema_version) != row.schema_version {
+        if document.id != row.map_id || i32::from(document.schema_version) != row.schema_version {
             return Err(AppError::Internal(
                 "La metadata del snapshot no coincide con su documento".into(),
             ));
         }
+        Ok(())
+    }
 
-        Ok(GameMapVersionPublic {
+    fn to_public(row: GameMapVersionRow) -> GameMapVersionPublic {
+        GameMapVersionPublic {
             map_id: row.map_id,
             version: row.version,
             schema_version: row.schema_version,
             content_hash: row.content_hash,
             published_at: row.published_at,
             document: row.document,
-        })
+        }
     }
 }

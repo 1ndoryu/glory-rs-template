@@ -2,7 +2,7 @@
 
 > **Fecha:** 2026-08-01
 > **ID:** GAME-01
-> **Estado:** dirección Three.js 3D aprobada; previews y fixture offline jugable integrados; núcleo lógico defensivo validado; realtime, persistencia, identidad y editor siguen bloqueados por dependencias/decisiones abiertas.
+> **Estado:** dirección Three.js 3D aprobada; fixture offline y contrato/persistencia de mapas integrados; publicación admin validada queda en cierre de gate; realtime, identidad y editor siguen pendientes.
 > **Prioridad:** futura, después del bloque actualmente habilitado en `roadmap.md`.
 > **Dependencias globales:** runtime `AppRegistry`/`MountedView`, ciclo de vida y carga lazy, sesiones/capacidades, contratos de workspace y quality gate.
 > **Fuentes canónicas:** `roadmap.md`, `Agente/documentacion/arquitectura/adr-bosque-3d-assets-terreno-2d-2026-08-01.md`, `Agente/planes/plan-assets-terreno-bosque-3d-2026-08-01.md`, `Agente/planes/plan-glory-render-motor-juegos-2026-08-01.md`, `Agente/documentacion/arquitectura/adr-glory-render-repositorio-agnostico-2026-08-01.md`, `Agente/documentacion/arquitectura/adr-carga-apps-pesadas-2026-07-31.md`, `Agente/documentacion/producto/referencia-visual-bosque-2026-08-01.md`.
@@ -340,7 +340,8 @@ repetidas de memoria/GPU y validación multi-viewport antes de cerrar la fase co
 - [ ] Generar terreno por chunks desde alturas/superficies 2D e implementar spatial index/proxies simples en el renderer real.
 - [ ] Cargar solo chunks/assets visibles con cache limitada e instancing para props repetidos.
 - [x] Crear el endpoint/servicio de lectura de mapa publicado y la migración de snapshots persistidos.
-- [ ] Crear el flujo admin de publicación y un fixture de versión persistido mediante ese flujo autorizado.
+- [x] Crear el flujo admin de publicación versionada: `AdminUser`, CSRF, revisión optimista, hash canónico, activación atómica y snapshots inmutables.
+- [ ] Crear un fixture de versión persistido mediante ese flujo autorizado y cubrir integración HTTP/DB/concurrencia con migraciones reales.
 - [x] Probar documento inválido, exceso de chunks, referencias de asset inexistentes, IDs reservados, transforms, spawns y bounds malformados.
 - [x] Validar en Rust el mismo JSON `MapVersion` con `serde` camelCase, `deny_unknown_fields`, proxy opcional, límites de bytes previos a la deserialización y 11 tests deterministas.
 - [x] Alinear el frontend con rechazo de campos desconocidos en raíz, terreno, chunks, assets, colliders, instancias y spawns.
@@ -353,17 +354,21 @@ repetidas de memoria/GPU y validación multi-viewport antes de cerrar la fase co
 `GET /api/game/maps/:map_id`; solo consulta `is_active`, valida el documento y no
 expone UUID interno, `published_by` ni `is_active`. `contentHash` se calcula con
 `document_json_bytes` sobre el `JsonValue` normalizado que se persiste, y el service
-lo verifica antes de responder. Frontend: type-check, 23 tests del bloque y build
-PASS. Backend: `cargo fmt --check`, `cargo check` y 11 tests `models::game_map` PASS.
-Quality gate `297A-28` PASS. Aún no hay snapshot inicial: hasta implementar la
-publicación admin el endpoint responderá 404 para mapas no publicados. El boundary
-HTTP futuro aún debe aplicar límite de profundidad y body antes de un flujo de
-escritura; las pruebas de migración/endpoint real se cerrarán junto con esa
-publicación autorizada. No implica chunks visibles, realtime ni editor.
+lo verifica antes de responder. El endpoint admin es `POST /api/admin/game/maps`,
+protegido por `AdminUser`/CSRF, con `expectedVersion`, advisory lock por mapa,
+activación atómica y límite de body de 4 MiB antes de deserializar. Frontend:
+type-check, 23 tests del bloque y build PASS. Backend: `cargo fmt --check`,
+`cargo check` y 11 tests `models::game_map` PASS. Quality gate `297A-28` PASS;
+la publicación admin queda bajo `297A-30`. Aún no hay snapshot inicial: hasta crear
+un fixture autorizado el endpoint público responderá 404 para mapas no publicados.
+Las pruebas HTTP/DB de auth, migración, concurrencia, límite 413 y activación única
+quedan ligadas al fixture/integración de publicación. No implica chunks visibles,
+realtime ni editor.
 
-**Gate:** lectura pública persistida y fail-closed preparada; la fase completa queda
-pendiente hasta implementar publicación admin validada, cargar chunks/instancias de
-forma acotada y crear el fixture persistido sin saltarse capacidades server-side.
+**Gate:** lectura pública y publicación admin validada/fail-closed preparadas;
+la fase completa queda pendiente hasta crear el fixture persistido, cerrar pruebas
+HTTP/DB/concurrentes con migraciones reales y cargar chunks/instancias de forma
+acotada, sin saltarse capacidades server-side.
 
 **Auditoría de cierre — Fase 4:**
 - [ ] **SOLID/OCP:** parser, validación, navegación, serialización y renderer consumen el contrato versionado sin acoplamiento circular.

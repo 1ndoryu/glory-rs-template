@@ -25,12 +25,34 @@ pub const MAP_VERSION_MAX_SPAWN_RADIUS: f64 = 8.0;
 /// Límite por defecto para un documento antes de materializarlo con `serde_json`.
 pub const MAP_VERSION_MAX_JSON_BYTES: usize = 4 * 1024 * 1024;
 
+/// Normaliza recursivamente un documento para que el orden de claves no dependa
+/// de cómo llegó el JSON del cliente ni de la representación de `jsonb`.
+#[must_use]
+pub fn canonicalize_document(document: &JsonValue) -> JsonValue {
+    match document {
+        JsonValue::Object(object) => {
+            let mut keys = object.keys().collect::<Vec<_>>();
+            keys.sort_unstable();
+            let mut canonical = serde_json::Map::new();
+            for key in keys {
+                if let Some(value) = object.get(key) {
+                    canonical.insert(key.clone(), canonicalize_document(value));
+                }
+            }
+            JsonValue::Object(canonical)
+        }
+        JsonValue::Array(values) => {
+            JsonValue::Array(values.iter().map(canonicalize_document).collect())
+        }
+        value => value.clone(),
+    }
+}
+
 /// Bytes JSON deterministas usados como representación canónica del snapshot.
-/// `serde_json` ordena las claves del objeto con la configuración actual del
-/// proyecto; publicación y lectura deben usar siempre esta misma función.
+/// Publicación y lectura deben usar siempre esta misma función.
 #[must_use]
 pub fn document_json_bytes(document: &JsonValue) -> Option<Vec<u8>> {
-    serde_json::to_vec(document).ok()
+    serde_json::to_vec(&canonicalize_document(document)).ok()
 }
 
 /// Hash estable del documento JSON que se almacena en `document`.
@@ -40,6 +62,26 @@ pub fn document_json_bytes(document: &JsonValue) -> Option<Vec<u8>> {
 pub fn document_content_hash(document: &JsonValue) -> Option<String> {
     let bytes = document_json_bytes(document)?;
     Some(hex::encode(sha2::Sha256::digest(bytes)))
+}
+
+/// Valida un snapshot que ya está asociado a metadata de persistencia.
+/// Se usa dentro de la transacción de publicación y al leer el mapa activo.
+pub fn validate_snapshot_document(
+    document: &JsonValue,
+    map_id: &str,
+    schema_version: i32,
+    content_hash: &str,
+) -> Result<MapVersion, String> {
+    let bytes = document_json_bytes(document)
+        .ok_or_else(|| "El documento no es serializable".to_string())?;
+    let map = MapVersion::from_bounded_json(&bytes, MAP_VERSION_MAX_JSON_BYTES)?;
+    if map.id != map_id || i32::from(map.schema_version) != schema_version {
+        return Err("La metadata del snapshot no coincide con su documento".to_string());
+    }
+    if document_content_hash(document).as_deref() != Some(content_hash) {
+        return Err("La integridad del snapshot del mapa no se pudo verificar".to_string());
+    }
+    Ok(map)
 }
 
 const RESERVED_IDS: [&str; 6] = [
@@ -171,6 +213,32 @@ pub struct MapVersion {
     pub asset_manifest: BTreeMap<String, GameAssetVersion>,
     pub instances: Vec<AssetInstance>,
     pub spawn_points: Vec<SpawnPoint>,
+}
+
+/// Request admin para publicar una versión inmutable del mapa.
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PublishMapRequest {
+    /// `0` para la primera publicación; después debe coincidir con la activa.
+    pub expected_version: i32,
+    /// Permite que el caller explicite el ID, pero siempre debe coincidir con `document.id`.
+    pub map_id: Option<String>,
+    #[schema(value_type = Object)]
+    pub document: JsonValue,
+}
+
+impl PublishMapRequest {
+    pub fn validate_metadata(&self) -> Result<(), &'static str> {
+        if self.expected_version < 0 {
+            return Err("expectedVersion no puede ser negativo");
+        }
+        if let Some(map_id) = &self.map_id {
+            if map_id.trim().is_empty() || map_id.chars().count() > MAP_VERSION_MAX_ID_LENGTH {
+                return Err("mapId no es válido");
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Envelope público del snapshot activo. No incluye `published_by`, UUID interno
@@ -546,10 +614,41 @@ mod tests {
     }
 
     #[test]
+    fn rejects_negative_publish_revisions() {
+        let request = PublishMapRequest {
+            expected_version: -1,
+            map_id: None,
+            document: serde_json::json!({}),
+        };
+        assert_eq!(
+            request.validate_metadata(),
+            Err("expectedVersion no puede ser negativo")
+        );
+    }
+
+    #[test]
+    fn canonicalizes_object_key_order_before_hashing() {
+        let mut first = serde_json::Map::new();
+        first.insert("z".to_string(), serde_json::json!(1));
+        first.insert("a".to_string(), serde_json::json!({ "y": 2, "b": 3 }));
+        let mut second = serde_json::Map::new();
+        second.insert("a".to_string(), serde_json::json!({ "b": 3, "y": 2 }));
+        second.insert("z".to_string(), serde_json::json!(1));
+        let first = JsonValue::Object(first);
+        let second = JsonValue::Object(second);
+        assert_eq!(document_json_bytes(&first), document_json_bytes(&second));
+        assert_eq!(
+            document_content_hash(&first),
+            document_content_hash(&second)
+        );
+    }
+
+    #[test]
     fn hashes_the_stored_json_document_deterministically() {
         let document = serde_json::json!({ "id": "map-v1", "schemaVersion": 1 });
+        let canonical = canonicalize_document(&document);
         assert_eq!(
-            document_content_hash(&document),
+            document_content_hash(&canonical),
             Some("23fb4b973fd5e37023d9ede955e4f534b3cf854534f982078c9c5d432f087dbb".to_string())
         );
     }

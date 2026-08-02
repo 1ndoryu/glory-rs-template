@@ -56,6 +56,7 @@ impl utoipa::Modify for SecurityAddon {
     paths(
         health::health_check,
         game_map_handler::get_active_map,
+        game_map_handler::publish_map,
         auth::register,
         auth::login,
         auth::verify_email,
@@ -178,6 +179,7 @@ impl utoipa::Modify for SecurityAddon {
         crate::models::workspace::WorkspaceReleasePublic,
         crate::models::workspace::PublishReleaseRequest,
         crate::models::game_map::GameMapVersionPublic,
+        crate::models::game_map::PublishMapRequest,
         crate::handlers::workspace_handler::ReleaseListResponse,
         crate::models::media::MediaAdminResponse,
         crate::models::media::MediaPublicResponse,
