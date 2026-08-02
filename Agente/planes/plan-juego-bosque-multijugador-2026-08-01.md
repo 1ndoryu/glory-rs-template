@@ -521,8 +521,8 @@ realtime.
 - [x] Asociar cuenta autenticada con perfil de juego persistente (`297A-48`): `GET/PUT /api/game/profile`, `AuthUser`, CSRF, nombre allowlisted y revisión optimista.
 - [x] Cargar el perfil validado en el flujo previo al gameplay sin añadir consultas al loop de render (`297A-49`): hidratación abortable, timeout acotado, fallback invitado y montaje posterior de WebGL/realtime.
 - [x] Crear personaje base y selección de opciones allowlisted (`297A-50`): catálogo activo público con DTO mínimo, selección persistente de cuenta y validación atómica server-side.
-- [ ] Definir qué datos se conservan al pasar de invitado a cuenta.
-- [ ] Probar logout, sesión revocada, reconexión y cambio de usuario.
+- [x] Definir qué datos se conservan al pasar de invitado a cuenta (`297A-51`): los invitados no poseen datos persistibles; la identidad temporal es efímera y nunca se fusiona con la cuenta. Al iniciar sesión, el perfil de la cuenta (nombre y personaje) aplica y el subject invitado expira por TTL en el store server-side.
+- [x] Probar logout, sesión revocada, reconexión y cambio de usuario (`297A-51`): el juego se rehidrata y reconecta cuando la identidad cambia en vivo (login, logout o cambio de cuenta), aborta cargas pendientes, destruye el runtime anterior y no filtra la identidad previa; una sesión revocada nunca degrada a invitado.
 
 **Evidencia 297A-48:** `user_game_profiles` persiste solo cuentas autenticadas; el GET devuelve un valor seguro sin crear fila, el PUT usa UPSERT transaccional con revisión, el DTO no serializa `user_id`, y el nombre rechaza controles y caracteres Unicode de formato invisibles. Integración HTTP real: 4/4 tests PASS en la BD aislada de rama; unitarios del modelo PASS.
 
@@ -535,6 +535,10 @@ realtime.
 **Evidencia 297A-50:** `game_character_definitions` contiene tres opciones base seed, activas y allowlisted; `GET /api/game/characters` expone solo `id`, etiqueta y tono visual. `user_game_profiles.character_id` tiene default/FK; el PUT exige selección explícita y valida la opción activa dentro de la misma transacción que el update condicionado por revisión, distinguiendo personaje inválido de conflicto de revisión. `game-playable` carga catálogo y perfil antes de montar WebGL/realtime, usa `forest-scout` solo para invitados y falla cerrado si no existe una opción activa. Backend 6/6 tests HTTP PostgreSQL y frontend 21/21 tests dirigidos PASS.
 
 **Límite 297A-50:** no existe editor admin del catálogo, desactivación desde UI, piezas combinables, inventario, compra ni reclamación de invitados; esos trabajos siguen en Fase 7/los bloques de identidad posteriores.
+
+**Evidencia 297A-51:** `game-playable` se suscribe a `authStore` y rehidrata el perfil/realtime cuando la identidad cambia en vivo (`account:<userId>` ↔ `guest`), con guardas de versión que invalidan hidrataciones obsoletas, aborto de la carga pendiente, teardown del runtime anterior y cleanup de la suscripción al cerrar. La decisión invitado→cuenta queda registrada: nada se transfiere (los invitados no tienen perfil persistido ni estado reclamable) y el perfil de la cuenta aplica al iniciar sesión. Type-check y 25 tests frontend dirigidos (10 de lifecycle) PASS; el build del bloque queda condicionado a un error TypeScript preexistente en `frontend/src/features/notifications/notifications-popover.ts`, archivo sin commitear de otro agente, fuera del alcance.
+
+**Límite 297A-51:** no implementa reconexión persistente del socket tras una caída de red, ni editor de perfil/personaje en UI; una sesión revocada a mitad de partida se muestra como error de realtime y el juego continúa en modo local hasta la siguiente hidratación.
 
 **Gate:** ningún invitado puede invocar admin ni reclamar el estado de otra identidad; el perfil no depende de datos enviados sin validar.
 

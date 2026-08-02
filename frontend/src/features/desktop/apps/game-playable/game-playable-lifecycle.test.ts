@@ -22,8 +22,9 @@ vi.mock('../../../../services', () => ({
 import { renderGamePlayable } from './game-playable';
 
 async function flushHydration(): Promise<void> {
-  await Promise.resolve();
-  await Promise.resolve();
+  /* [297A-51] La rehidratación encadena más continuaciones que la carga única;
+   * se vacía la cola de microtareas varias veces. */
+  for (let i = 0; i < 6; i += 1) await Promise.resolve();
 }
 
 describe('Bosque playable WebGL lifecycle', () => {
@@ -31,7 +32,11 @@ describe('Bosque playable WebGL lifecycle', () => {
     vi.clearAllMocks();
     authStore.set({ isAuthenticated: false, userId: null, capability: 'public' }, 'init');
     mocks.getGameProfile.mockResolvedValue({ displayName: 'Guardián', characterId: 'forest-scout', revision: 0, updatedAt: '2026-08-02T00:00:00Z' });
-    mocks.listGameCharacters.mockResolvedValue([{ id: 'forest-scout', displayName: 'Explorador', bodyTone: 'ink' }]);
+    mocks.listGameCharacters.mockResolvedValue([
+      { id: 'forest-scout', displayName: 'Explorador', bodyTone: 'ink' },
+      { id: 'forest-ranger', displayName: 'Guardabosques', bodyTone: 'middle' },
+      { id: 'forest-spirit', displayName: 'Espíritu', bodyTone: 'paper' },
+    ]);
     mocks.detectWebGL.mockReturnValue({ available: false, reason: 'WebGL bloqueado en el dispositivo' });
     mocks.createGameInput.mockImplementation(() => ({
       controls: document.createElement('div'),
@@ -97,6 +102,86 @@ describe('Bosque playable WebGL lifecycle', () => {
     expect((view.element.querySelector('.juegoFixture__estado') as HTMLElement).dataset.state).toBe('error');
     expect(mocks.mountGamePlayableScene).toHaveBeenCalledOnce();
     view.destroy?.();
+  });
+
+  it('re-hydrates and reconnects when a guest logs in while the game is open', async () => {
+    mocks.detectWebGL.mockReturnValue({ available: true, kind: 'webgl2' });
+    mocks.getGameProfile
+      .mockRejectedValueOnce(new ApiError(401, { error: 'unauthorized' }, 'API Error: 401'))
+      .mockResolvedValueOnce({ displayName: 'Guardiana', characterId: 'forest-ranger', revision: 0, updatedAt: '2026-08-02T00:00:00Z' });
+
+    const view = renderGamePlayable({ signal: new AbortController().signal });
+    await flushHydration();
+
+    expect(view.element.dataset.playerName).toBe('Jugador');
+    expect(view.element.dataset.characterId).toBe('forest-scout');
+    expect(mocks.mountGamePlayableScene).toHaveBeenCalledTimes(1);
+
+    authStore.set({ isAuthenticated: true, userId: 'account-9', capability: 'authenticated' }, 'user');
+    await flushHydration();
+
+    expect(mocks.getGameProfile).toHaveBeenCalledTimes(2);
+    expect(mocks.mountGamePlayableScene).toHaveBeenCalledTimes(2);
+    expect(mocks.mountGamePlayableScene.mock.results[0]?.value.destroy).toHaveBeenCalledOnce();
+    expect(view.element.dataset.playerName).toBe('Guardiana');
+    expect(view.element.dataset.characterId).toBe('forest-ranger');
+    view.destroy?.();
+  });
+
+  it('re-hydrates as guest on logout without leaking the previous account identity', async () => {
+    authStore.set({ isAuthenticated: true, userId: 'account-1', capability: 'authenticated' }, 'sync');
+    mocks.detectWebGL.mockReturnValue({ available: true, kind: 'webgl2' });
+    mocks.getGameProfile
+      .mockResolvedValueOnce({ displayName: 'Guardián', characterId: 'forest-scout', revision: 0, updatedAt: '2026-08-02T00:00:00Z' })
+      .mockRejectedValueOnce(new ApiError(401, { error: 'unauthorized' }, 'API Error: 401'));
+
+    const view = renderGamePlayable({ signal: new AbortController().signal });
+    await flushHydration();
+    expect(view.element.dataset.playerName).toBe('Guardián');
+
+    authStore.set({ isAuthenticated: false, userId: null, capability: 'public' }, 'user');
+    await flushHydration();
+
+    expect(mocks.getGameProfile).toHaveBeenCalledTimes(2);
+    expect(mocks.mountGamePlayableScene).toHaveBeenCalledTimes(2);
+    expect(mocks.mountGamePlayableScene.mock.results[0]?.value.destroy).toHaveBeenCalledOnce();
+    expect(view.element.dataset.playerName).toBe('Jugador');
+    expect(view.element.dataset.characterId).toBe('forest-scout');
+    view.destroy?.();
+  });
+
+  it('cancels an in-flight profile load when the session changes and mounts once', async () => {
+    mocks.detectWebGL.mockReturnValue({ available: true, kind: 'webgl2' });
+    let resolveProfile: ((profile: { displayName: string; characterId: string; revision: number; updatedAt: string }) => void) | undefined;
+    mocks.getGameProfile.mockImplementationOnce(() => new Promise(resolve => { resolveProfile = resolve; }));
+    mocks.getGameProfile.mockResolvedValue({ displayName: 'Guardiana', characterId: 'forest-ranger', revision: 0, updatedAt: '2026-08-02T00:00:00Z' });
+
+    const view = renderGamePlayable({ signal: new AbortController().signal });
+    authStore.set({ isAuthenticated: true, userId: 'account-5', capability: 'authenticated' }, 'user');
+    resolveProfile?.({ displayName: 'Tarde', characterId: 'forest-scout', revision: 0, updatedAt: '2026-08-02T00:00:00Z' });
+    await flushHydration();
+
+    expect(mocks.getGameProfile).toHaveBeenCalledTimes(2);
+    expect(mocks.mountGamePlayableScene).toHaveBeenCalledTimes(1);
+    expect(view.element.dataset.playerName).toBe('Guardiana');
+    expect(view.element.dataset.characterId).toBe('forest-ranger');
+    view.destroy?.();
+  });
+
+  it('does not re-hydrate after the view is destroyed', async () => {
+    mocks.detectWebGL.mockReturnValue({ available: true, kind: 'webgl2' });
+
+    const view = renderGamePlayable({ signal: new AbortController().signal });
+    await flushHydration();
+    expect(mocks.mountGamePlayableScene).toHaveBeenCalledTimes(1);
+
+    view.destroy?.();
+    authStore.set({ isAuthenticated: true, userId: 'account-7', capability: 'authenticated' }, 'user');
+    await flushHydration();
+
+    expect(mocks.getGameProfile).toHaveBeenCalledTimes(1);
+    expect(mocks.mountGamePlayableScene).toHaveBeenCalledTimes(1);
+    expect(mocks.mountGamePlayableScene.mock.results[0]?.value.destroy).toHaveBeenCalledOnce();
   });
 
   it('cleans hydration handles when the catalog has no valid character', async () => {

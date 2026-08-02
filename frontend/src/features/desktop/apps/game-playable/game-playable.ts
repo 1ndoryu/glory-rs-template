@@ -36,6 +36,12 @@ function normalizeRealtimeDirection(direction: { x: number; z: number }): { x: n
   return { x: direction.x / length, z: direction.z / length };
 }
 
+/* [297A-51] Clave de identidad de juego: solo cambia entre invitado y cuenta
+ * (o entre cuentas distintas); ignora transiciones de capacidad del OS. */
+function authIdentityKey(state: { isAuthenticated: boolean; userId: string | null }): string {
+  return state.isAuthenticated ? `account:${state.userId ?? ''}` : 'guest';
+}
+
 interface GamePlayableElements {
   readonly element: HTMLElement;
   readonly sceneHost: HTMLElement;
@@ -74,7 +80,11 @@ export function renderGamePlayable(context: RenderContext): MountedView {
   let runtime: MountedView | null = null;
   let profileController: AbortController | null = null;
   let profileTimeout: number | null = null;
-  const accountSessionAtStart = authStore.get().isAuthenticated;
+  let hydrationVersion = 0;
+  /* [297A-51] La identidad se relee en cada hidratación: si la sesión cambia
+   * mientras la app está abierta (login, logout o cambio de cuenta), el juego
+   * se rehidrata y reconecta con la identidad correcta. */
+  let accountSessionAtStart = authStore.get().isAuthenticated;
 
   const setLoadingStatus = (message: string): void => {
     view.status.textContent = message;
@@ -84,10 +94,13 @@ export function renderGamePlayable(context: RenderContext): MountedView {
 
   const hydrate = async (): Promise<void> => {
     if (context.signal.aborted || disposed) return;
+    const version = ++hydrationVersion;
+    accountSessionAtStart = authStore.get().isAuthenticated;
     setLoadingStatus('cargando perfil de juego…');
-    profileController = new AbortController();
-    const abortProfile = (): void => profileController?.abort();
-    profileTimeout = window.setTimeout(() => profileController?.abort(), 5_000);
+    const controller = new AbortController();
+    profileController = controller;
+    const abortProfile = (): void => controller.abort();
+    profileTimeout = window.setTimeout(() => controller.abort(), 5_000);
     context.signal.addEventListener('abort', abortProfile, { once: true });
 
     let displayName = 'Jugador';
@@ -100,17 +113,18 @@ export function renderGamePlayable(context: RenderContext): MountedView {
       try {
         characters = await GameCharacterService.list({ signal: profileController.signal });
       } catch (error: unknown) {
-        if (context.signal.aborted || disposed) return;
+        if (version !== hydrationVersion || context.signal.aborted || disposed) return;
         profileLoadWarning = true;
         setLoadingStatus('catálogo no disponible · cierra y vuelve a abrir Bosque');
       }
 
       try {
         const profile = await GameProfileService.get({ signal: profileController.signal });
+        if (version !== hydrationVersion) return;
         displayName = profile.displayName;
         character = characters.find(option => option.id === profile.characterId) ?? null;
       } catch (error: unknown) {
-        if (context.signal.aborted || disposed) return;
+        if (version !== hydrationVersion || context.signal.aborted || disposed) return;
         /* 401 es el camino normal del invitado: usa la opción base del catálogo.
          * Una cuenta revocada no puede degradarse a identidad invitada. */
         if (error instanceof ApiError && error.status === 401 && accountSessionAtStart) {
@@ -126,6 +140,7 @@ export function renderGamePlayable(context: RenderContext): MountedView {
         }
       }
 
+      if (version !== hydrationVersion) return;
       if (!character && !profileSessionExpired) {
         profileLoadWarning = true;
         setLoadingStatus('personaje no disponible · catálogo inválido');
@@ -135,7 +150,7 @@ export function renderGamePlayable(context: RenderContext): MountedView {
         return;
       }
 
-      if (context.signal.aborted || disposed) return;
+      if (version !== hydrationVersion || context.signal.aborted || disposed) return;
       try {
         runtime = mountGamePlayableRuntime(
           context,
@@ -154,9 +169,34 @@ export function renderGamePlayable(context: RenderContext): MountedView {
       if (profileTimeout !== null) window.clearTimeout(profileTimeout);
       profileTimeout = null;
       context.signal.removeEventListener('abort', abortProfile);
-      profileController = null;
+      if (profileController === controller) profileController = null;
     }
   };
+
+  /* [297A-51] Rehidratación ante cambio de identidad. Se aborta cualquier
+   * carga pendiente, se destruye el runtime anterior y se vuelve a hidratar
+   * con la sesión actual; la versión evita que una hidratación vieja
+   * sobrescriba el estado de la nueva. */
+  const rehydrate = (): void => {
+    if (disposed || context.signal.aborted) return;
+    hydrationVersion += 1;
+    profileController?.abort();
+    profileController = null;
+    if (profileTimeout !== null) window.clearTimeout(profileTimeout);
+    profileTimeout = null;
+    runtime?.destroy?.();
+    runtime = null;
+    void hydrate();
+  };
+
+  let lastAuthKey = authIdentityKey(authStore.get());
+  const stopAuth = authStore.subscribe((state, source) => {
+    if (source === 'init') return;
+    const key = authIdentityKey(state);
+    if (key === lastAuthKey) return;
+    lastAuthKey = key;
+    rehydrate();
+  });
 
   void hydrate();
 
@@ -165,6 +205,7 @@ export function renderGamePlayable(context: RenderContext): MountedView {
     destroy: () => {
       if (disposed) return;
       disposed = true;
+      stopAuth();
       if (profileTimeout !== null) window.clearTimeout(profileTimeout);
       profileTimeout = null;
       profileController?.abort();
