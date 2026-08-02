@@ -352,6 +352,18 @@ servidor sin depender de Three.js.
 
 **Gate técnico:** PASS verificado con type-check, 20 tests frontend dirigidos, build y `git diff --check`; la validación visual de `/forest-playable` queda pendiente porque la automatización de navegador no produjo una sesión/pestaña válida. No se abre socket para usuarios públicos.
 
+#### 297A-46 — Harness de medición realtime 1/4/8 clientes
+
+- [x] Añadir `tests/game_ws_benchmark.rs` como test manual ignorado (`--ignored --nocapture`) contra el router WebSocket real y un mapa fixture inyectado.
+- [x] Medir por escenario de 1, 4 y 8 clientes la latencia p50/p95 de `joined` y primer snapshot, snapshots recibidos, mensajes y bytes de payload cliente/servidor durante una ventana acotada.
+- [x] Mantener el benchmark fuera de la suite normal, con timeout, cierre de sockets y TTL de sala `0` solo para que cada escenario retire su actor antes del shutdown.
+- [x] Ejecutar `cargo check --test game_ws_benchmark` y `cargo test --test game_ws_benchmark -- --ignored --nocapture` en un entorno con espacio suficiente; registrar resultados reproducibles.
+- [x] Capturar CPU y memoria del proceso externamente; el harness sigue reportando payload JSON y no se presenta como medición de bytes físicos de transporte.
+
+**Estado de validación:** PASS reproducible con `CARGO_TARGET_DIR=C:/tmp/glory-target/game_ws_benchmark_check`: `cargo check --test game_ws_benchmark` y `cargo test --test game_ws_benchmark -- --ignored --nocapture`. Escenarios 1/4/8: 1 cliente `join p50/p95 0.63/0.63 ms`, primer snapshot `0.65/0.65 ms`, 21 snapshots, 23 mensajes servidor y 4.548 bytes de payload servidor; 4 clientes `1.04/1.09 ms`, `1.06/1.11 ms`, 84 snapshots, 92 mensajes y 48.876 bytes; 8 clientes `1.69/1.97 ms`, `1.71/1.98 ms`, 168 snapshots, 184 mensajes y 179.576 bytes. La ejecución duró 6.56 s, pasó 1/1 test y la monitorización externa observó pico de 56.34 MiB working set y 1.031 s de CPU acumulada. Los bytes son payload JSON del harness; el tráfico físico de red queda fuera de esta evidencia.
+
+**Límite de 297A-46:** no cambia el protocolo productivo, no añade métricas operacionales, no habilita reconexión ni invitados y no sustituye una prueba de carga distribuida.
+
 #### 297A-44 — Actor de sala server-authoritative
 
 - [x] Crear `GameRoomState` single-instance bajo demanda con actor Tokio de propietario único, cap estricto de 8 jugadores y TTL configurable de sala vacía.
@@ -477,7 +489,8 @@ realtime.
 - [x] Implementar inputs server-authoritative, snapshots, interpolación y presencia (`297A-44`).
 - [x] Añadir heartbeat, timeout de handshake y cierre ordenado al destruir la sesión (`297A-44`); la reconexión persistente queda pendiente.
 - [x] Conectar `game-playable` al transporte autenticado con fallback offline público (`297A-45`).
-- [ ] Medir CPU, memoria, mensajes, latencia y ancho de banda con 1, 4 y 8 clientes.
+- [x] Preparar y ejecutar el harness manual de mensajes, payload, latencia y snapshots para 1/4/8 clientes (`297A-46`); la ejecución local obtuvo evidencia externa de CPU/memoria.
+- [ ] Medir bytes físicos de transporte y comparar CPU/memoria/ancho de banda contra un presupuesto operativo en un entorno dedicado o distribuido; el benchmark local no pretende sustituir esa medición.
 
 **Gate:** ocho clientes pueden moverse en una sala sin aceptar posiciones falsificadas, sin fanout ilimitado y sin dejar salas vivas vacías.
 

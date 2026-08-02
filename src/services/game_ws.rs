@@ -11,6 +11,7 @@ use super::game_room::{GameRoomState, RoomJoinError};
 use super::game_room_map::GameRoomMap;
 
 pub const GAME_WS_DEFAULT_MAX_CONNECTIONS: usize = 64;
+const GAME_WS_DEFAULT_ROOM_TTL_SECS: u64 = 300;
 
 #[derive(Clone)]
 pub struct GameWsState {
@@ -28,10 +29,17 @@ impl Default for GameWsState {
 impl GameWsState {
     #[must_use]
     pub fn with_max_connections(max_connections: usize) -> Self {
+        Self::with_max_connections_and_room_ttl(max_connections, GAME_WS_DEFAULT_ROOM_TTL_SECS)
+    }
+
+    /// Crea el estado con un TTL de sala explícito. El constructor productivo
+    /// anterior conserva 300 segundos; los benchmarks pueden usar `0`.
+    #[must_use]
+    pub fn with_max_connections_and_room_ttl(max_connections: usize, room_ttl_secs: u64) -> Self {
         Self {
             active_connections: Arc::new(AtomicUsize::new(0)),
             max_connections,
-            room_state: GameRoomState::empty(),
+            room_state: GameRoomState::empty_with_ttl(room_ttl_secs),
         }
     }
 

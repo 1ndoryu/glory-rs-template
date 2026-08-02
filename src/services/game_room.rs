@@ -48,10 +48,15 @@ impl Default for GameRoomState {
 impl GameRoomState {
     #[must_use]
     pub fn empty() -> Self {
+        Self::empty_with_ttl(ROOM_EMPTY_TTL_SECS)
+    }
+
+    #[must_use]
+    pub fn empty_with_ttl(empty_ttl_secs: u64) -> Self {
         Self {
             map: Arc::new(RwLock::new(None)),
             room: Arc::new(tokio::sync::Mutex::new(None)),
-            empty_ttl_secs: ROOM_EMPTY_TTL_SECS,
+            empty_ttl_secs,
         }
     }
 
