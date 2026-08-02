@@ -26,6 +26,81 @@ function createMaterials(): {
 }
 
 describe('GamePlayableVisualCache', () => {
+  it('evicts old non-active terrain after the bounded visual cache is full', () => {
+    const scene = new THREE.Scene();
+    const materials = createMaterials();
+    const cache = createGamePlayableVisualCache({
+      scene,
+      materials,
+      map: FIXTURE_MAP_VERSION,
+      props: new Map(FIXTURE_PROPS.map(prop => [prop.id, prop])),
+    });
+    const sourceChunk = FIXTURE_MAP_VERSION.terrain.chunks[0];
+    const chunks = Array.from({ length: 13 }, (_, x) => ({ ...sourceChunk, x }));
+    const content = (chunk: typeof sourceChunk): VisibleMapContent => ({
+      chunkKeys: [`${chunk.x}:0`],
+      chunks: [chunk],
+      instances: [],
+      assets: [],
+      assetVersionIds: [],
+      evictedChunkKeys: [],
+      cacheSize: 1,
+    });
+
+    chunks.forEach(chunk => cache.sync(content(chunk)));
+
+    expect(scene.children.some(
+      child => child instanceof THREE.Mesh && child.userData.chunkKey === '0:0',
+    )).toBe(false);
+    expect(scene.children.some(
+      child => child instanceof THREE.Mesh && child.userData.chunkKey === '12:0',
+    )).toBe(true);
+
+    cache.destroy();
+    Object.values(materials).forEach(material => material.dispose());
+  });
+
+  it('reuses terrain geometry after a temporary visibility eviction', () => {
+    const scene = new THREE.Scene();
+    const materials = createMaterials();
+    const cache = createGamePlayableVisualCache({
+      scene,
+      materials,
+      map: FIXTURE_MAP_VERSION,
+      props: new Map(FIXTURE_PROPS.map(prop => [prop.id, prop])),
+    });
+    const chunk = FIXTURE_MAP_VERSION.terrain.chunks[0];
+    const content: VisibleMapContent = {
+      chunkKeys: ['0:0'],
+      chunks: [chunk],
+      instances: [],
+      assets: [],
+      assetVersionIds: [],
+      evictedChunkKeys: [],
+      cacheSize: 1,
+    };
+
+    cache.sync(content);
+    const terrain = scene.children.find(
+      child => child instanceof THREE.Mesh && child.userData.chunkKey === '0:0',
+    ) as THREE.Mesh;
+    expect(terrain).toBeDefined();
+    const geometry = terrain.geometry;
+
+    cache.sync({ ...content, chunkKeys: [], chunks: [] });
+    expect(terrain.parent).toBeNull();
+    cache.sync(content);
+
+    expect(scene.children.find(
+      child => child instanceof THREE.Mesh && child.userData.chunkKey === '0:0',
+    )).toBe(terrain);
+    expect(terrain.geometry).toBe(geometry);
+    expect(terrain.parent).toBe(scene);
+
+    cache.destroy();
+    Object.values(materials).forEach(material => material.dispose());
+  });
+
   it('uses AssetInstance transform instead of fixture display coordinates', () => {
     const scene = new THREE.Scene();
     const materials = createMaterials();
@@ -58,6 +133,8 @@ describe('GamePlayableVisualCache', () => {
       child => child instanceof THREE.InstancedMesh && child.count === 1,
     );
     expect(instanceMesh).toBeInstanceOf(THREE.InstancedMesh);
+    expect((instanceMesh as THREE.InstancedMesh).frustumCulled).toBe(true);
+    expect((instanceMesh as THREE.InstancedMesh).boundingSphere).not.toBeNull();
     const matrix = new THREE.Matrix4();
     (instanceMesh as THREE.InstancedMesh).getMatrixAt(0, matrix);
     const position = new THREE.Vector3();

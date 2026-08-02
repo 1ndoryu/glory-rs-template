@@ -339,7 +339,8 @@ repetidas de memoria/GPU y validación multi-viewport antes de cerrar la fase co
 - [x] Adaptar `MapVersion` a `WorldMap` mediante proxies estáticos allowlisted; el núcleo sigue siendo X/Z y no inventa todavía altura de gameplay.
 - [x] **297A-33 — Terreno visible por chunks y cache visual:** `buildTerrainMeshData` convierte cada `TerrainChunk` validado en posiciones/índices/superficies puras; `GamePlayableVisualCache` crea y retira `BufferGeometry` solo para chunks visibles y reutiliza geometría/materiales de props mediante `clone(true)` y prototipos. El teardown dispone el terreno y prototipos de forma idempotente.
 - [x] **297A-34 — Batching InstancedMesh y métricas locales del renderer:** `GamePlayableVisualCache` agrupa por tipo los sólidos repetidos en `THREE.InstancedMesh` con máximo 128 instancias, mantiene contornos reutilizables y aplica posición/escala/rotación desde `AssetInstance`. `readRendererMetrics` normaliza `renderer.info` y `performance.memory` opcional; el controller publica `data-renderer-*`/`data-js-heap-*` sin analytics. 40 tests dirigidos PASS, incluyendo transformación de instancia y teardown idempotente.
-- [ ] Cargar solo chunks/assets visibles con cache limitada e instancing para props repetidos; el batching básico ya está implementado, pero falta culling real, batching avanzado/cache persistente y medición física de GPU/memoria.
+- [x] **297A-35 — Cache visual persistente y culling por batch:** el cache conserva hasta 12 `TerrainChunk` materializados, los separa de la escena durante una eviction temporal y los reutiliza al volver; expulsa y dispone solo los chunks no activos cuando supera el límite. Los `InstancedMesh` activan frustum culling y recalculan `boundingSphere` tras sincronizar matrices. 42 tests dirigidos PASS, incluyendo eviction, reutilización y bounding sphere.
+- [ ] Cargar solo chunks/assets visibles con cache limitada e instancing para props repetidos; el cache/culling básico ya está implementado, pero faltan culling avanzado, batching por materiales y medición física de GPU/memoria.
 - [x] Crear el endpoint/servicio de lectura de mapa publicado y la migración de snapshots persistidos.
 - [x] Crear el flujo admin de publicación versionada: `AdminUser`, CSRF, revisión optimista, hash canónico, activación atómica y snapshots inmutables.
 - [x] Crear un fixture de versión persistido mediante el flujo autorizado y cubrir integración HTTP/DB real de autorización, CSRF, 413, revisión stale, concurrencia, activación única y trigger de inmutabilidad.
@@ -363,14 +364,12 @@ el adaptador visual `game-playable-visual-cache.ts` y el normalizador
 fixture actualiza `data-visible-chunks`, `data-visible-instances`,
 `data-frame-p95-ms`, `data-renderer-draw-calls`, `data-renderer-triangles`,
 `data-renderer-geometries`, `data-renderer-textures` y heap JS cuando el navegador
-lo ofrece. El renderer crea/retira terreno por chunk, agrupa sólidos repetidos en
-`THREE.InstancedMesh` hasta 128 por tipo y libera recursos en el teardown. Los
+lo ofrece. El renderer crea/retira terreno por chunk, agrupa sólidos repetidos en`THREE.InstancedMesh` hasta 128 por tipo y libera recursos en el teardown. Los
 contornos conservan la gramática visual y reciben la transformación de
-`AssetInstance`. La ventana y el LRU tienen límites hard; `frustumCulled=false` es
-una decisión temporal del fixture para no perder instancias mientras se prepara un
-culling por batch. Las superficies 3–15 sin material específico usan el material
-base. Las métricas son locales y no representan memoria GPU física ni latencia de
-red. El endpoint admin es `POST /api/admin/game/maps`,
+`AssetInstance`. La ventana y el LRU tienen límites hard; `297A-35` añade un LRU
+visual de 12 chunks y culling por `InstancedMesh.boundingSphere`. Las superficies
+3–15 sin material específico usan el material base. Las métricas son locales y no
+representan memoria GPU física ni latencia de red. El endpoint admin es `POST /api/admin/game/maps`,
 protegido por `AdminUser`/CSRF, con `expectedVersion`, advisory lock por mapa,
 activación atómica y límite de body de 4 MiB antes de deserializar. El fixture
 `tests/game_map_publish.rs` ejercita el router de producción contra PostgreSQL real:

@@ -22,6 +22,7 @@ import type { FixtureProp } from './game-fixture-map';
 
 export const VISUAL_CACHE_LIMITS = {
   maxInstancesPerKind: 128,
+  maxCachedTerrainChunks: 12,
 } as const;
 
 export interface GamePlayableVisualCacheOptions {
@@ -50,6 +51,7 @@ export function createGamePlayableVisualCache(options: GamePlayableVisualCacheOp
 
 export class GamePlayableVisualCache {
   private readonly terrainObjects = new Map<string, THREE.Mesh>();
+  private readonly terrainRecency: string[] = [];
   private readonly outlineObjects = new Map<string, THREE.Group>();
   private readonly batches = new Map<FixtureProp['kind'], InstancedPropBatch>();
   private destroyed = false;
@@ -66,14 +68,14 @@ export class GamePlayableVisualCache {
     for (const chunk of content.chunks) {
       const key = `${chunk.x}:${chunk.z}`;
       const terrain = this.terrainObjects.get(key) ?? this.createTerrain(key, chunk);
+      this.touchTerrain(key);
       if (!terrain.parent) this.options.scene.add(terrain);
     }
     for (const [key, terrain] of this.terrainObjects) {
       if (activeChunks.has(key)) continue;
       this.options.scene.remove(terrain);
-      terrain.geometry.dispose();
-      this.terrainObjects.delete(key);
     }
+    this.evictTerrain(activeChunks);
 
     const instancesByKind = new Map<FixtureProp['kind'], VisibleProp[]>();
     for (const kind of this.batches.keys()) instancesByKind.set(kind, []);
@@ -104,6 +106,7 @@ export class GamePlayableVisualCache {
       disposeObjectGeometries(batch.prototype);
     }
     this.terrainObjects.clear();
+    this.terrainRecency.length = 0;
     this.outlineObjects.clear();
     this.batches.clear();
   }
@@ -147,7 +150,7 @@ export class GamePlayableVisualCache {
       mesh.count = 0;
       mesh.castShadow = true;
       mesh.receiveShadow = true;
-      mesh.frustumCulled = false;
+      mesh.frustumCulled = true;
       this.options.scene.add(mesh);
       meshes.push(mesh);
       localMatrices.push(child.matrixWorld.clone());
@@ -200,6 +203,7 @@ export class GamePlayableVisualCache {
     for (const mesh of batch.meshes) {
       mesh.count = visibleProps.length;
       mesh.instanceMatrix.needsUpdate = true;
+      if (visibleProps.length > 0) mesh.computeBoundingSphere();
     }
   }
 
@@ -221,6 +225,25 @@ export class GamePlayableVisualCache {
     outline.userData.assetVersionId = prop.assetVersionId;
     this.options.scene.add(outline);
     this.outlineObjects.set(prop.id, outline);
+  }
+
+  private touchTerrain(key: string): void {
+    const index = this.terrainRecency.indexOf(key);
+    if (index >= 0) this.terrainRecency.splice(index, 1);
+    this.terrainRecency.push(key);
+  }
+
+  private evictTerrain(activeChunks: ReadonlySet<string>): void {
+    while (this.terrainObjects.size > VISUAL_CACHE_LIMITS.maxCachedTerrainChunks) {
+      const oldest = this.terrainRecency.find(key => !activeChunks.has(key));
+      if (oldest === undefined) return;
+      const index = this.terrainRecency.indexOf(oldest);
+      if (index >= 0) this.terrainRecency.splice(index, 1);
+      const terrain = this.terrainObjects.get(oldest);
+      if (!terrain) continue;
+      terrain.geometry.dispose();
+      this.terrainObjects.delete(oldest);
+    }
   }
 
   private createPrototype(kind: FixtureProp['kind']): THREE.Group {
