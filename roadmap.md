@@ -106,6 +106,16 @@
 
 **Gate/salida:** popover y tab "novedades" validados en navegador (crear, cambiar estado y borrar un aviso publicado); type-check, clippy y suite frontend verdes.
 
+### Plan de gobernanza del workspace (028A-10..14)
+
+**Fuente canónica:** `Agente/planes/plan-gobernanza-workspace-2026-08-02.md` (aprobado). Objetivo: dar al admin control real del escritorio desde la app Admin (release activo, validación, publicación) y garantizar coherencia para que nada borrado o en draft aparezca en la siguiente release.
+
+- [x] **028A-10 — Release v3 con árbol canónico:** la migración `20260802010000_028a10_release_v3` publica v3 con `documentos` + 4 subcarpetas, `projects`, `profile`, `about`, `settings`, `admin`, `trash` (Papelera), `store`, `orders` y `downloads`; excluye `snake` (nodo fantasma) y `game/game3d/gamePlayable` (prototipos GAME-01 ocultados). Gate PASS: `task:check -- 028A-10` (sentinel/varsense/rust/frontend/custom), `GET /api/workspace/release` = v3 con 14 nodos, navegador desktop + launcher móvil muestran Papelera/Tienda/Pedidos/Descargas y la app Papelera renderiza vacía.
+- [ ] **028A-11 — Guard de coherencia en `publish` (backend + tests):** validación estructural del árbol (ciclos, parents, tipos, límite 500, `requires`) + refs de recursos `active + ready + public` → 422 con lista de refs rotos; diff/summary persistido; tests de integración; regenerar Orval si cambia el contrato.
+- [ ] **028A-12 — Unificar el borrado de artículos (eliminar nodo fantasma):** soft delete (`trashed` + `deleted_at`), `GET /api/admin/articles/trashed` + `POST /api/admin/articles/{id}/restore`, sync del envelope `resources`, evento `ArticleEditorSavedEvent.operation='deleted'` y tombstone del nodo en `article-notas-sync.ts`.
+- [ ] **028A-13 — Backend de gobernanza:** `GET /api/admin/workspace/control`, `POST /api/admin/workspace/releases/{version}/validate` (dry-run), `POST /api/admin/workspace/releases/{version}/activate`, DTO ligero de `list_releases`; OpenAPI/Orval + tests de permisos (AdminUser/CSRF).
+- [ ] **028A-14 — Panel "Escritorio" en la app Admin:** estado actual, historial con diff, validar/publicar/activar y tombstones; resolver el nodo fantasma `snake`.
+
 ## Pendientes ordenados
 
 ### GAME-01 — Bosque multijugador 3D dentro del OS (planificado, bloqueado)
