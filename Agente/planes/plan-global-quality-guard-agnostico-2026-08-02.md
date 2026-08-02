@@ -1,7 +1,7 @@
 # Plan 028A-6 — Guard global de calidad agnóstico por proyecto y rama
 
-> **Fecha:** 2026-08-02  
-> **Estado:** propuesto; no implementar hasta revisar este diseño.  
+> **Fecha:** 2026-08-02
+> **Estado:** propuesto; no implementar hasta revisar este diseño.
 > **Motivación:** el guard actual depende de `scripts/quality` dentro de este repositorio. Al cambiar de rama o de proyecto no debe desaparecer, bloquear comandos legítimos ni ejecutar reglas de wandori.us fuera de su alcance.
 
 ## Decisión propuesta
