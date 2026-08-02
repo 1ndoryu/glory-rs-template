@@ -391,6 +391,19 @@
   gap: var(--espacio-md);
 }
 
+/* [028A-17] El banner es una superficie del OS (--sistema-*) que vive fuera
+ * de .desktop-window/.movilApp, así que el override del dark mode que
+ * redefine --color-* a blanco no le llega. Sus botones .boton forzaban
+ * --color-texto (negro en :root) y quedaban invisibles sobre la superficie
+ * oscura; consumen el token del sistema como el resto del banner. */
+.analyticsConsent .boton {
+  color: var(--sistema-texto);
+}
+
+.analyticsConsent .boton:disabled {
+  color: var(--sistema-texto-deshabilitado);
+}
+
 .analyticsPanel {
   display: flex;
   flex: 1;
