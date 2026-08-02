@@ -55,6 +55,8 @@ chrono = { version = "0.4", features = ["serde"] }
 
 [dev-dependencies]
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+tokio-tungstenite = "0.24"
+futures-util = "0.3"
 tokio-test = "0.4"
 
 [lints.clippy]

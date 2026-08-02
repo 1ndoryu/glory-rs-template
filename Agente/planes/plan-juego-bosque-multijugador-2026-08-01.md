@@ -332,7 +332,15 @@ servidor sin depender de Three.js.
 - [x] Enviar error allowlisted `map_unavailable` y cerrar después de autenticar mientras no exista mapa/sala; no aceptar todavía `move`, snapshots ni presencia.
 - [x] Cubrir capacidad/teardown, timeout, parseo del join y resolución/replay del ticket con tests dirigidos; la prueba de upgrade TCP real queda para el siguiente bloque.
 
-**Límite de estas entregas:** `297A-42` solo establece la frontera de transporte y autenticación WebSocket; no crea actor de sala, mapa activo para realtime, snapshots, presencia, autoridad de movimiento, reconexión ni identidad invitada. El `GameTicketStore`/`GameWsState` en memoria solo es válido para la primera instancia; antes de escalar se requiere un store/coordinador compartido. Estos contratos de ejecución permanecen en Fase 5/6.
+#### 297A-43 — Prueba TCP real del upgrade WebSocket
+
+- [x] Añadir `tokio-tungstenite` y `futures-util` solo como dependencias de desarrollo para probar el cliente contra Axum real.
+- [x] Levantar un servidor efímero en `127.0.0.1:0` con `create_router_with_state`, `PgPool::connect_lazy` y shutdown ordenado mediante `oneshot`/`JoinHandle`.
+- [x] Verificar por TCP el upgrade real, `join` válido con `map_unavailable`, cierre fatal, replay `unauthorized` y primer mensaje inválido `invalid_message`.
+- [x] Verificar por TCP el límite global: con capacidad 1, el segundo upgrade recibe HTTP 409 antes de abrir WebSocket.
+- [x] Mantener los tests independientes de PostgreSQL real y sin abrir actor de sala, movimiento ni snapshots.
+
+**Límite de estas entregas:** `297A-42`/`297A-43` establecen y prueban la frontera de transporte y autenticación WebSocket; no crean actor de sala, mapa activo para realtime, snapshots, presencia, autoridad de movimiento, reconexión ni identidad invitada. El `GameTicketStore`/`GameWsState` en memoria solo es válido para la primera instancia; antes de escalar se requiere un store/coordinador compartido. Estos contratos de ejecución permanecen en Fase 5/6.
 
 **Gate:** ADR realtime, ADR de identidad de invitado y contrato de mapa aprobados; el núcleo offline puede existir, pero no se habilita gameplay conectado hasta cerrar estos contratos.
 
@@ -439,7 +447,7 @@ realtime.
 
 ### Fase 5 — Realtime de una sala
 
-- [x] Integrar la frontera inicial de upgrade/ticket WebSocket en el backend de wandori.us (`297A-42`); aún falta probar el upgrade TCP real contra un servidor levantado.
+- [x] Integrar y probar la frontera inicial de upgrade/ticket WebSocket en el backend de wandori.us (`297A-42`/`297A-43`); el test TCP efímero cubre join, errores, replay, cierre y capacidad.
 - [ ] Crear actor de sala bajo demanda con TTL, cap de 8 y backpressure.
 - [ ] Implementar inputs server-authoritative, snapshots, interpolación y presencia.
 - [ ] Añadir reconexión, heartbeat, timeout y cierre al destruir la app.
