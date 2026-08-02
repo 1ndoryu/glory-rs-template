@@ -9,11 +9,12 @@ const PROFILE_REMINDERS = {
   rust: 'Rust: evita unwrap externo y confirma errores/logs accionables.',
 };
 
-export function selectReminders(scope, stages, limit = 4) {
+export function selectReminders(scope, stages, limit = 4, context = {}) {
   const reminders = [];
   const failed = stages.some(stage => stage.status === 'fail' || stage.status === 'error');
   const rustLight = stages.some(stage => stage.stage === 'rust' && stage.validationMode === 'local-light');
   if (failed) reminders.push('Corrige los primeros hallazgos y repite exactamente el mismo comando.');
+  if (context.heavyDeferred) reminders.push('Full bloqueado por cooldown de 3 horas; conserva el modo local-light y usa --allow-heavy solo con una necesidad manual justificada.');
   if (rustLight) reminders.push('Rust local-light: se ejecutaron fmt/check; ejecuta `npm run task:check -- <ID> --full` antes de cerrar una fase o publicar.');
   if (!failed) {
     /* El cierre es siempre visible aunque el alcance tenga varios perfiles y

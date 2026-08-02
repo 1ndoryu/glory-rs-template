@@ -6,11 +6,15 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { getBranchDbContext } from './branch-db.mjs';
+import { acquireHeavyRun, formatHeavyGuardMessage, isHeavyCargoCommand, isHeavyOverride } from './quality/heavy-run-guard.mjs';
 
 function cargoCommand() {
   return process.platform === 'win32' ? 'cargo.exe' : 'cargo';
 }
+
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const cargoArgs = process.argv.slice(2);
 if (cargoArgs.length === 0) {
@@ -19,7 +23,28 @@ if (cargoArgs.length === 0) {
 }
 
 console.log('');
-const { dbUrl, cargoTargetDir } = getBranchDbContext();
+let heavyLease = null;
+if (isHeavyCargoCommand(cargoArgs) && !process.env.GLORY_HEAVY_RUN_TOKEN) {
+  heavyLease = await acquireHeavyRun({
+    projectRoot,
+    mode: 'raw-cargo',
+    command: `run-with-db ${cargoArgs.join(' ')}`,
+    allowHeavy: isHeavyOverride(),
+  });
+  if (!heavyLease.allowed) {
+    console.error(`[run-with-db] BLOQUEADO: ${formatHeavyGuardMessage(heavyLease)}`);
+    process.exitCode = 75;
+    process.exit();
+  }
+}
+
+let dbContext;
+try { dbContext = getBranchDbContext(); }
+catch (error) {
+  if (heavyLease?.allowed) await heavyLease.release({ status: 'setup-error' });
+  throw error;
+}
+const { dbUrl, cargoTargetDir } = dbContext;
 console.log('');
 
 const activityMarker = path.join(cargoTargetDir, `.glory-cargo-active-${process.pid}.json`);
@@ -56,11 +81,13 @@ const child = spawn(cargoCommand(), cargoArgs, {
 
 child.on('error', (err) => {
   cleanupMarker();
+  if (heavyLease?.allowed) void heavyLease.release({ status: 'error' });
   console.error('[run-with-db] Error:', err.message);
   process.exit(1);
 });
-child.on('exit', (code, signal) => {
+child.on('exit', async (code, signal) => {
   cleanupMarker();
+  if (heavyLease?.allowed) await heavyLease.release({ status: signal ? 'signal' : code === 0 ? 'pass' : 'fail' });
   if (signal || code === null) {
     console.error(`[run-with-db] Cargo terminó sin exit code (${signal ?? 'unknown signal'}).`);
     process.exit(2);

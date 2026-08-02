@@ -17,6 +17,12 @@
     "entryCssGzipBytes": 16000,
     "largestChunkGzipBytes": 120000
   },
+  "heavyRun": {
+    "cooldownMinutes": 180,
+    "maxTargetGb": 15,
+    "maxTargetAgeDays": 7,
+    "maxConcurrent": 1
+  },
   "fullPatterns": [
     "Cargo.toml",
     "Cargo.lock",

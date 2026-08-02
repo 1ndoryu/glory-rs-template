@@ -52,7 +52,7 @@ async function verifyTool(name, toolConfig, manifest) {
 }
 
 export function validateQualityConfig(qualityConfig) {
-  const allowed = new Set(['schemaVersion', 'maxFindings', 'maxReminders', 'maxTerminalLines', 'lockWaitMs', 'maxConcurrentStages', 'timeoutsMs', 'performanceBudgets', 'fullPatterns', 'profiles']);
+  const allowed = new Set(['schemaVersion', 'maxFindings', 'maxReminders', 'maxTerminalLines', 'lockWaitMs', 'maxConcurrentStages', 'timeoutsMs', 'performanceBudgets', 'heavyRun', 'fullPatterns', 'profiles']);
   const unknown = Object.keys(qualityConfig).filter(key => !allowed.has(key));
   if (unknown.length > 0) throw new Error(`quality.config.json: claves desconocidas: ${unknown.join(', ')}`);
   for (const key of ['maxFindings', 'maxReminders', 'maxTerminalLines']) {
@@ -73,6 +73,18 @@ export function validateQualityConfig(qualityConfig) {
   }
   if (!qualityConfig.performanceBudgets || Object.values(qualityConfig.performanceBudgets).some(value => !Number.isInteger(value) || value < 1)) {
     throw new Error('quality.config.json: performanceBudgets inválido');
+  }
+  if (!qualityConfig.heavyRun || !Number.isFinite(qualityConfig.heavyRun.cooldownMinutes) || qualityConfig.heavyRun.cooldownMinutes < 0 || qualityConfig.heavyRun.cooldownMinutes > 24 * 60) {
+    throw new Error('quality.config.json: heavyRun.cooldownMinutes debe estar entre 0 y 1440');
+  }
+  if (!Number.isFinite(qualityConfig.heavyRun.maxTargetGb) || qualityConfig.heavyRun.maxTargetGb < 1 || qualityConfig.heavyRun.maxTargetGb > 100) {
+    throw new Error('quality.config.json: heavyRun.maxTargetGb debe estar entre 1 y 100');
+  }
+  if (!Number.isFinite(qualityConfig.heavyRun.maxTargetAgeDays) || qualityConfig.heavyRun.maxTargetAgeDays < 1 || qualityConfig.heavyRun.maxTargetAgeDays > 365) {
+    throw new Error('quality.config.json: heavyRun.maxTargetAgeDays debe estar entre 1 y 365');
+  }
+  if (!Number.isInteger(qualityConfig.heavyRun.maxConcurrent) || qualityConfig.heavyRun.maxConcurrent !== 1) {
+    throw new Error('quality.config.json: heavyRun.maxConcurrent debe ser 1 para proteger la máquina');
   }
 }
 
@@ -104,5 +116,7 @@ export async function preflight(args) {
     logsRoot,
     ci: args.ci,
     full: args.full,
+    allowHeavy: args.allowHeavy,
+    heavyDeferred: args.heavyDeferred,
   };
 }

@@ -1,6 +1,7 @@
 import { parseArgs } from './args.mjs';
 import { fingerprint, readCachedPass, writeCachedPass } from './cache.mjs';
-import { preflight } from './preflight.mjs';
+import { acquireHeavyRun, formatHeavyGuardMessage, inspectHeavyRun } from './heavy-run-guard.mjs';
+import { preflight, projectRoot } from './preflight.mjs';
 import { createReport, printCompact } from './reporter.mjs';
 import { selectReminders } from './reminders.mjs';
 import { cancelAll } from './runner.mjs';
@@ -59,6 +60,19 @@ async function main() {
   }
 
   try {
+    if (args.full && !args.ci) {
+      const heavyDecision = await inspectHeavyRun({
+        projectRoot,
+        mode: 'full',
+        allowHeavy: args.allowHeavy,
+      });
+      if (!heavyDecision.allowed) {
+        args.full = false;
+        args.heavyDeferred = heavyDecision;
+        process.stderr.write(`[quality] FULL diferido: ${formatHeavyGuardMessage(heavyDecision)}\n`);
+        process.stderr.write('[quality] Se ejecutará el modo local-light para no bloquear el equipo.\n');
+      }
+    }
     const context = await preflight(args);
     /* [018A-4] Un agente no debe acumular procesos esperando el mismo gate.
      * La espera larga queda disponible para consumidores de la librería, pero
@@ -67,17 +81,46 @@ async function main() {
       isCancelled: () => interrupted,
     });
     try {
-      const scope = await detectScope(context, args);
+      let scope = await detectScope(context, args);
+      let heavyLease = null;
+      const previousHeavyToken = process.env.GLORY_HEAVY_RUN_TOKEN;
+      if ((args.full || args.ci) && scope.full) {
+        heavyLease = await acquireHeavyRun({
+          projectRoot: context.projectRoot,
+          mode: args.ci ? 'ci' : 'full',
+          taskId: args.taskId,
+          command: `task:check ${args.taskId} ${args.ci ? '--ci' : '--full'}`,
+          allowHeavy: args.allowHeavy,
+        });
+        if (!heavyLease.allowed) {
+          args.full = false;
+          args.heavyDeferred = heavyLease;
+          context.full = false;
+          context.heavyDeferred = heavyLease;
+          scope = await detectScope(context, args);
+          process.stderr.write(`[quality] FULL diferido: ${formatHeavyGuardMessage(heavyLease)}\n`);
+          process.stderr.write('[quality] Se ejecutará el modo local-light para no bloquear el equipo.\n');
+        }
+      }
+      if (heavyLease?.allowed) process.env.GLORY_HEAVY_RUN_TOKEN = heavyLease.token;
       const definitions = stageDefinitions(context, scope, args.taskId);
-      const stages = await runBoundedStages(
-        definitions,
-        definition => executeStage(context, scope, definition, args),
-        { maxConcurrency: context.qualityConfig.maxConcurrentStages ?? 1, isCancelled: () => interrupted },
-      );
-      const reminders = selectReminders(scope, stages, context.qualityConfig.maxReminders);
-      const report = await createReport(context, args, scope, stages, reminders, startedAt);
-      printCompact(report, context);
-      process.exitCode = interrupted ? 130 : report.report.decision.exitCode;
+      let finalStatus = 'error';
+      try {
+        const stages = await runBoundedStages(
+          definitions,
+          definition => executeStage(context, scope, definition, args),
+          { maxConcurrency: context.qualityConfig.maxConcurrentStages ?? 1, isCancelled: () => interrupted },
+        );
+        const reminders = selectReminders(scope, stages, context.qualityConfig.maxReminders, context);
+        const report = await createReport(context, args, scope, stages, reminders, startedAt);
+        printCompact(report, context);
+        finalStatus = interrupted ? 'cancelled' : report.report.decision.label;
+        process.exitCode = interrupted ? 130 : report.report.decision.exitCode;
+      } finally {
+        if (previousHeavyToken === undefined) delete process.env.GLORY_HEAVY_RUN_TOKEN;
+        else process.env.GLORY_HEAVY_RUN_TOKEN = previousHeavyToken;
+        if (heavyLease?.allowed) await heavyLease.release({ status: finalStatus });
+      }
     } finally {
       await releaseTaskLock();
     }

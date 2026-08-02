@@ -86,7 +86,7 @@ Sin este anuncio, no se inicia ninguna tarea. Esta regla existe para que el agen
   - Despues de editar cualquier archivo Rust: `cargo check` sobre el workspace.
   - Despues de editar `.ts`/`.tsx`: ejecutar `npm run type-check`.
   - Despues de editar `.css`: validar variables/clases referenciadas.
-  - Antes de cada commit Rust: `cargo fmt --check` + `cargo clippy` + `cargo test`.
+  - Para Rust usa `npm run task:check -- <ID>` (modo local ligero: fmt/check). `cargo clippy`/`cargo test` completos solo en cierre de fase, CI o con `--full`; el guard aplica un cooldown de 3 horas y bloquea ejecuciones repetidas.
   - Antes de cada commit frontend: `npm run type-check` como minimo.
   - **Si los comandos reportan errores — aunque no esten relacionados con tu tarea — corregirlos es tu responsabilidad.** No se avanza ni se commitea con errores pendientes. Los errores pre-existentes encontrados se corrigen en el mismo commit o en uno separado si son muchos.
   - Despues de cambios en endpoints/schemas de Rust: regenerar cliente con `npm run codegen` y verificar que el frontend compila.
@@ -145,7 +145,7 @@ Tomar una tarea pendiente y completarla. Reglas:
 Despues de cada tarea, ejecutar los comandos de validacion correspondientes (ver seccion V). **Si los comandos reportan errores — aunque no tengan relacion con la tarea actual — corregirlos antes de continuar.** Los errores reportados por herramientas son tu responsabilidad. No se avanza con errores pendientes.
 
 Backend:
-- `cargo check` → `cargo clippy` → `cargo test`
+- `npm run task:check -- <ID>` → `npm run task:check -- <ID> --full` solo cuando el gate de fase/CI lo exige; `cargo test 2>&1` sigue siendo el mismo comando pesado y no evita el guard.
 - Si se modifico schema BD: verificar que migraciones estan al dia y `sqlx prepare` actualizado.
 
 Frontend:
@@ -154,7 +154,7 @@ Frontend:
 
 ### Paso 4 — Testear la tarea
 Antes de marcar como completada, verificar que la funcionalidad implementada o corregida funciona:
-- Backend: ejecutar `cargo test`. Para endpoints nuevos/modificados: hacer request manual (curl o herramienta equivalente) y verificar response body y status code.
+- Backend: ejecutar los tests afectados mediante el gate. Para endpoints nuevos/modificados: hacer request manual (herramienta equivalente) y verificar response body y status code; reservar la suite completa para el cierre de fase/CI.
 - Frontend: verificar que la UI renderiza correctamente y que los datos fluyen del backend al componente.
 - Si hay tests existentes, ejecutarlos. Si la tarea lo amerita y es viable, agregar un test.
 - Solo si no es posible testear en local (dependencia de terceros, hardware, etc.), omitir con justificacion en el comentario del commit.

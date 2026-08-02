@@ -216,9 +216,13 @@ El reporte `297A-49` tardó 533833 ms: Rust consumió 483037 ms (90,5 %) y expir
 - [x] Mantener `npm --prefix frontend run test` como selector seguro (`test:changed`) y conservar `test:full` como orden explícita.
 - [x] Separar fingerprints de caché para `local-light`, `full` y `ci`, y mostrar en el reporte qué cobertura se ejecutó.
 - [x] Emitir un recordatorio contextual con el comando `--full` cuando una tarea tocó Rust en modo ligero; no presentar ese resultado como cobertura completa.
+- [x] Aplicar cooldown configurable de 180 minutos a `--full`, `cargo test`, `cargo clippy` y `cargo bench`, con lock de una sola ejecución y override explícito auditado.
+- [x] Interceptar Cargo desde `run-with-db` y el shim global `cargo.cmd`; un full bloqueado degrada a `local-light` y conserva el motivo en JSON/Markdown.
+- [x] Limpiar `C:\tmp\glory-target` con cuota de 15 GB/retención de 7 días, validación de raíz y preservación de targets con proceso activo; la limpieza inicial liberó aproximadamente 29 GB.
+- [ ] Activar el interceptor dentro de los perfiles PowerShell solo después de backup y autorización explícita; el instalador por defecto no reescribe perfiles persistentes.
 - [ ] Medir en CI/nocturno los tiempos cold/warm de Rust y fijar un presupuesto operativo sin bloquear el feedback local; revisar el target estable compartido antes de cambiar `CARGO_TARGET_DIR`.
 
-**Gate SNT-05B:** el modo local no recompila clippy/tests por cada tarea y el informe deja una ruta reproducible para la suite completa. La suite completa sigue siendo obligatoria al cerrar una fase, cambiar infraestructura Rust, preparar publicación o ejecutar CI; no se ejecuta automáticamente en cada archivo.
+**Gate SNT-05B:** el modo local no recompila clippy/tests por cada tarea, ningún full se repite durante el cooldown y el informe deja una ruta reproducible para la suite completa. La suite completa sigue siendo obligatoria al cerrar una fase, cambiar infraestructura Rust, preparar publicación o ejecutar CI; no se ejecuta automáticamente en cada archivo.
 
 **Gate:** benchmark reproducible demuestra mejora; dos ejecuciones iguales producen el mismo JSON ordenado y no reutilizan PASS obsoleto.
 

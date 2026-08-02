@@ -15,6 +15,7 @@ function markdown(report) {
     `- Estado: **${report.decision.label}**`,
     `- Alcance: ${report.scope.full ? 'full' : 'incremental'} (${report.scope.files.length} archivos)`,
     `- Duración: ${report.durationMs}ms`,
+    ...(report.heavyGuard ? [`- Full diferido: **${report.heavyGuard.reason}** — ${report.heavyGuard.nextAllowedAt ?? report.heavyGuard.message ?? 'reintento bloqueado'}`] : []),
     '',
     '## Etapas',
     '',
@@ -33,12 +34,14 @@ export async function createReport(context, args, scope, stages, reminders, star
   const findings = stages.flatMap(stage => stage.findings).sort((a, b) =>
     (a.severity === 'error' ? 0 : 1) - (b.severity === 'error' ? 0 : 1)
   );
+  const deferred = context.heavyDeferred ?? null;
   const report = sanitize({
     schemaVersion: 1,
     taskId: args.taskId,
     generatedAt: new Date().toISOString(),
     durationMs: Date.now() - startedAt,
     mode: args.ci ? 'ci' : args.full ? 'full' : 'local-light',
+    heavyGuard: deferred,
     scope: { base: scope.base, full: scope.full, files: scope.files, profiles: [...scope.profiles] },
     tools: Object.fromEntries(Object.entries(context.tools).map(([name, tool]) => [name, {
       version: tool.version, commit: tool.commit, outputSchemaVersion: tool.outputSchemaVersion,
@@ -47,7 +50,9 @@ export async function createReport(context, args, scope, stages, reminders, star
     findings,
     reminders,
     decision,
-    nextCommand: decision.exitCode === 0 ? 'git status --short' : `npm run task:check -- ${args.taskId}`,
+    nextCommand: deferred
+      ? `npm run task:check -- ${args.taskId} --full --allow-heavy`
+      : decision.exitCode === 0 ? 'git status --short' : `npm run task:check -- ${args.taskId}`,
   });
   const jsonPath = path.join(context.reportRoot, 'latest.json');
   const markdownPath = path.join(context.reportRoot, 'latest.md');

@@ -55,6 +55,16 @@ Estos casos no se deben “ignorar” ni arreglar con una suppression global. Se
 
 ## Fases y checklist
 
+### Fase 0.75 — Protección contra ejecuciones pesadas repetidas (028A-3)
+
+- [x] Aplicar cooldown de 180 minutos y concurrencia máxima de una ejecución pesada por proyecto.
+- [x] Interceptar `cargo test 2>&1` como el mismo comando pesado; la redirección no evita el guard.
+- [x] Añadir cuota/retención para `C:\tmp\glory-target` y preservar targets con proceso activo.
+- [x] Degradar full bloqueado a `local-light` con razón, hora y override explícito en el reporte.
+- [ ] Revisar y activar el perfil PowerShell con backup y autorización explícita; el shim PATH queda activo sin reescribir perfiles.
+
+**Gate:** un agente que ignore el Markdown no puede iniciar repetidamente el full desde los wrappers disponibles; `--allow-heavy` es una excepción visible y manual.
+
 ### Fase 0.5 — Rendimiento del quality gate (028A-2)
 
 La ejecución `297A-49` demostró que el problema principal no era Sentinel/VarSense: Rust consumió 90,5 % del tiempo y expiró en `cargo test` sobre un target frío. Esta fase reduce el coste de feedback sin convertir los pasos omitidos en un PASS engañoso.

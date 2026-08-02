@@ -24,3 +24,14 @@ test('local-light recuerda ejecutar la suite completa antes de cerrar una fase',
   );
   assert.ok(reminders.some(item => item.includes('--full')));
 });
+
+test('full diferido deja visible el cooldown y el override manual', () => {
+  const reminders = selectReminders(
+    { profiles: new Set() },
+    [{ status: 'pass' }],
+    4,
+    { heavyDeferred: { reason: 'cooldown' } },
+  );
+  assert.ok(reminders.some(item => item.includes('cooldown')));
+  assert.ok(reminders.some(item => item.includes('--allow-heavy')));
+});

@@ -24,6 +24,7 @@
 - Deep links: `Agente/planes/plan-deep-links-ventanas-2026-07-31.md`
 - Apps editoriales: `Agente/planes/plan-programas-editoriales-2026-07-31.md`
 - Interacción y medición: `Agente/planes/plan-contratos-interaccion-comandos-medicion-2026-07-29.md`
+- Guard de ejecuciones pesadas y targets Cargo: `Agente/planes/plan-heavy-run-guard-2026-08-02.md`
 
 ## Cómo leer este archivo
 
@@ -51,6 +52,19 @@
 ## Siguiente bloque habilitado
 
 **018A-66 — Separar overlay personal de la sesión admin.** Validar en navegador login, logout y recarga con usuario admin: no debe aparecer el modal de conflicto ni el aviso `workspace actualizado`; con cuenta no-admin el conflicto solo aparece ante revisiones local/remota incompatibles. Después se continúa con hardening/E2E.
+
+### 028A-3 — Guard global de ejecuciones pesadas y limpieza de targets
+
+**Prioridad:** P0 antes de seguir acumulando validaciones Rust. El quality gate ya tiene cooldown y el shim CMD; queda revisar/autorizar la carga del interceptor en perfiles PowerShell sin sobrescribir configuración ajena.
+
+- [x] Limitar `--full`, `cargo test`, `cargo clippy` y `cargo bench` a una ejecución por proyecto cada 3 horas, con un único proceso pesado simultáneo.
+- [x] Degradar un full bloqueado a `local-light` y dejar la razón, hora de reintento y comando de excepción en el reporte.
+- [x] Interceptar `cargo` a través de `run-with-db` y del shim `cargo.cmd`; los comandos ligeros siguen pasando sin compilar tests.
+- [x] Mantener `C:\tmp\glory-target` bajo cuota de 15 GB y retención de 7 días, preservando targets con marcador de proceso activo.
+- [x] Validar el guard con tests unitarios, `quality:test` y limpieza en dry-run; limpiar los targets antiguos detectados (se liberaron aproximadamente 29 GB).
+- [ ] Revisar el perfil PowerShell 7/Windows PowerShell y ejecutar `quality:install-guard -InstallProfile` solo con autorización explícita; registrar backup y rollback del perfil.
+
+**Gate/salida:** ningún agente puede iniciar accidentalmente un full o `cargo test` durante el cooldown desde los wrappers disponibles; el uso de `--allow-heavy` queda visible en reportes y la cuota de targets se mantiene sin borrar procesos activos.
 
 ## Pendientes ordenados
 

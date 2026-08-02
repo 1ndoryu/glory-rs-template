@@ -9,7 +9,8 @@ test('parseArgs exige un task ID válido', () => {
 });
 
 test('parseArgs acepta flags internos conocidos', () => {
-  const args = parseArgs(['297A-6', '--fresh', '--base', 'HEAD~1']);
+  const args = parseArgs(['297A-6', '--fresh', '--allow-heavy', '--base', 'HEAD~1']);
   assert.equal(args.fresh, true);
+  assert.equal(args.allowHeavy, true);
   assert.equal(args.base, 'HEAD~1');
 });
