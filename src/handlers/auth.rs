@@ -79,7 +79,7 @@ fn check_login_rate_limit(rate_limit: &LoginRateLimit, ip: &str) -> Result<(), A
     )
 }
 
-fn check_auth_action_rate_limit(
+pub(crate) fn check_auth_action_rate_limit(
     rate_limit: &AuthActionRateLimit,
     action: &str,
     ip: &str,

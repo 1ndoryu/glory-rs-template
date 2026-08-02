@@ -2,7 +2,7 @@
 
 > **Fecha:** 2026-08-01
 > **ID:** GAME-01
-> **Estado:** dirección Three.js 3D aprobada; fixture offline, persistencia, publicación admin de mapas y la primera sala realtime server-authoritative están integrados; identidad invitada, reconexión persistente y editor siguen pendientes.
+> **Estado:** dirección Three.js 3D aprobada; fixture offline, persistencia, publicación admin de mapas, sala realtime server-authoritative e identidad temporal invitada están integrados; reconexión persistente, perfil de cuenta, personaje y editor siguen pendientes.
 > **Prioridad:** futura, después del bloque actualmente habilitado en `roadmap.md`.
 > **Dependencias globales:** runtime `AppRegistry`/`MountedView`, ciclo de vida y carga lazy, sesiones/capacidades, contratos de workspace y quality gate.
 > **Fuentes canónicas:** `roadmap.md`, `Agente/documentacion/arquitectura/adr-bosque-3d-assets-terreno-2d-2026-08-01.md`, `Agente/planes/plan-assets-terreno-bosque-3d-2026-08-01.md`, `Agente/planes/plan-glory-render-motor-juegos-2026-08-01.md`, `Agente/documentacion/arquitectura/adr-glory-render-repositorio-agnostico-2026-08-01.md`, `Agente/documentacion/arquitectura/adr-carga-apps-pesadas-2026-07-31.md`, `Agente/documentacion/producto/referencia-visual-bosque-2026-08-01.md`.
@@ -289,8 +289,8 @@ servidor sin depender de Three.js.
 - [ ] Registrar GAME-01 en roadmap/índice y confirmar dependencias cerradas.
 - [ ] Decidir sala única vs matchmaking/instancias pequeñas.
 - [ ] Medir y aprobar presupuesto de chunk, GPU, memoria, mapa, assets, móvil y teardown para completar el ADR.
-- [ ] Definir identidad de invitado y cómo se vincula posteriormente a una cuenta.
-- [x] Definir contrato de ticket compatible con UUID y separación Glory/wandori.us; el ticket opaco y el store server-side quedan implementados en 297A-40/41.
+- [x] Definir identidad temporal de invitado separada de cuenta: cookie opaca `guest_game`, HMAC, TTL de 2 horas, store server-side acotado y rate limit por IP; la vinculación posterior a cuenta queda pendiente.
+- [x] Definir contrato de ticket compatible con UUID y separación Glory/wandori.us; el ticket opaco y el store server-side quedan implementados en 297A-40/41 y 297A-47.
 - [ ] Fijar esquema de mensajes, tick, límites, desconexión y códigos de error.
 - [ ] Fijar licencia/dirección final de assets a partir de la referencia visual.
 - [ ] Redactar la ficha del vertical slice jugable: mapa pequeño, avatar con movimiento, segundo jugador simulado y criterio de “jugable”.
@@ -364,6 +364,22 @@ servidor sin depender de Three.js.
 
 **Límite de 297A-46:** no cambia el protocolo productivo, no añade métricas operacionales, no habilita reconexión ni invitados y no sustituye una prueba de carga distribuida.
 
+#### 297A-47 — Identidad temporal de invitados para el juego
+
+- [x] Crear identidad invitada solo en servidor con UUID interno y cookie opaca `guest_game`; el navegador nunca elige ni recibe el subject.
+- [x] Firmar la cookie con HMAC, propósito `guest`, TTL de 2 horas y límite de 4096 identidades temporales; podar entradas expiradas antes de aceptar nuevas.
+- [x] Hacer dual `POST /api/game/ticket`: cuenta autenticada con sesión/CSRF, o invitado sin sesión; una sesión presente pero inválida falla 401 y nunca degrada a invitado.
+- [x] Mantener la cookie `HttpOnly`, `SameSite=Strict` y `Secure` bajo HTTPS; reutilizar una cookie válida conserva el mismo subject server-side.
+- [x] Aplicar rate limit de emisión invitada por IP con respuesta 429 y sin confiar en headers de IP; añadir pruebas de cookie, reutilización, CSRF, rate limit y separación de UUID.
+- [x] Integrar el mismo cliente realtime en `game-playable` para cuentas e invitados; los permisos del OS continúan gobernados por `authStore` y el backend mantiene la separación de capacidades.
+- [x] Registrar el endpoint como autenticación opcional en OpenAPI y reexportar `OptionalAuthUser` sin alterar `AuthUser`/`AdminUser`.
+
+**Evidencia:** `src/services/game_ticket.rs`, `src/middleware/auth.rs`, `src/middleware/mod.rs`, `src/handlers/game_ticket_handler.rs`, `src/errors/mod.rs`, `tests/game_ticket_issue.rs` y `frontend/src/features/desktop/apps/game-playable/game-playable.ts`. Rust: `cargo fmt --check`, `cargo check --tests` y 9 tests unitarios PASS; integración HTTP completa PASS en la BD aislada de rama `glory_backend_wandorius`: 5/5 pruebas, incluyendo emisión autenticada, CSRF, secreto ausente, cookie/reutilización invitada y rate limit 429.
+
+**Límite de 297A-47:** no persiste perfiles, no vincula una identidad invitada a una cuenta, no implementa logout/reclamación, reconexión persistente, migración entre dispositivos ni editor admin. El store es single-instance y debe sustituirse por un adaptador compartido antes de escalar horizontalmente.
+
+**Gate:** autenticación opcional server-side, cookie/ticket opacos, 401/403/429/500 fail-closed, pruebas Rust/frontend y `task:check` PASS; no se habilita ninguna capacidad admin para invitados.
+
 #### 297A-44 — Actor de sala server-authoritative
 
 - [x] Crear `GameRoomState` single-instance bajo demanda con actor Tokio de propietario único, cap estricto de 8 jugadores y TTL configurable de sala vacía.
@@ -379,7 +395,7 @@ servidor sin depender de Three.js.
 
 **Límite de estas entregas:** `297A-42`/`297A-43` establecen y prueban la frontera de transporte y autenticación WebSocket; no crean actor de sala, mapa activo para realtime, snapshots, presencia, autoridad de movimiento, reconexión ni identidad invitada. El `GameTicketStore`/`GameWsState` en memoria solo es válido para la primera instancia; antes de escalar se requiere un store/coordinador compartido. Estos contratos de ejecución permanecen en Fase 5/6.
 
-**Gate:** ADR realtime, ADR de identidad de invitado y contrato de mapa aprobados; el núcleo offline puede existir, pero no se habilita gameplay conectado hasta cerrar estos contratos.
+**Gate:** ADR realtime, contrato de identidad temporal de invitado y contrato de mapa aprobados; el núcleo offline puede existir, pero no se habilita gameplay conectado hasta cerrar estos contratos.
 
 **Auditoría de cierre — Fase 2:**
 - [ ] **SOLID/OCP/DIP:** cada contrato puede extenderse por versión/adaptador; ninguna decisión futura exige `if` repartidos por renderer, shell y backend.
@@ -501,7 +517,7 @@ realtime.
 
 ### Fase 6 — Invitados, cuentas y personaje base
 
-- [ ] Emitir identidad temporal para invitados con límites de abuso.
+- [x] Emitir identidad temporal para invitados con límites de abuso (`297A-47`).
 - [ ] Asociar cuenta autenticada con perfil de juego persistente.
 - [ ] Crear personaje base y selección de opciones allowlisted.
 - [ ] Definir qué datos se conservan al pasar de invitado a cuenta.

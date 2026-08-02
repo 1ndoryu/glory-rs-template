@@ -2,9 +2,11 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use axum::body::{to_bytes, Body};
-use axum::http::{Request, StatusCode};
+use axum::extract::ConnectInfo;
+use axum::http::{header::SET_COOKIE, Request, StatusCode};
 use serde_json::Value;
 use sqlx::postgres::PgPoolOptions;
+use std::net::SocketAddr;
 use tower::util::ServiceExt;
 use uuid::Uuid;
 
@@ -99,9 +101,30 @@ fn ticket_request(
     if let Some(csrf) = csrf_header {
         builder = builder.header("x-csrf-token", csrf);
     }
-    builder
+    let mut request = builder
         .body(Body::empty())
-        .expect("request de ticket válida")
+        .expect("request de ticket válida");
+    request
+        .extensions_mut()
+        .insert(ConnectInfo(SocketAddr::from(([127, 0, 0, 1], 40_001))));
+    request
+}
+
+fn guest_ticket_request(cookie: Option<&str>) -> Request<Body> {
+    let mut builder = Request::builder()
+        .method("POST")
+        .uri("/api/game/ticket")
+        .header("origin", "http://localhost:5173");
+    if let Some(cookie) = cookie {
+        builder = builder.header("cookie", cookie);
+    }
+    let mut request = builder
+        .body(Body::empty())
+        .expect("request de invitado válida");
+    request
+        .extensions_mut()
+        .insert(ConnectInfo(SocketAddr::from(([127, 0, 0, 1], 40_002))));
+    request
 }
 
 async fn json_body(response: axum::response::Response) -> Value {
@@ -146,19 +169,63 @@ async fn ticket_is_issued_from_session_subject_without_exposing_uuid() {
 }
 
 #[tokio::test]
-async fn ticket_requires_session_and_valid_csrf() {
+async fn guest_ticket_sets_cookie_and_reuses_the_same_server_identity() {
     let state = test_state().await;
-    let without_session = production_router(&state, Some(TEST_SECRET))
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/game/ticket")
-                .body(Body::empty())
-                .expect("request sin sesión válida"),
-        )
+    let router = production_router(&state, Some(TEST_SECRET));
+
+    let first = router
+        .clone()
+        .oneshot(guest_ticket_request(None))
         .await
         .expect("router debe responder");
-    assert_eq!(without_session.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(first.status(), StatusCode::OK);
+    let set_cookie = first
+        .headers()
+        .get(SET_COOKIE)
+        .and_then(|value| value.to_str().ok())
+        .expect("la primera petición debe emitir cookie invitada")
+        .to_string();
+    assert!(set_cookie.starts_with("guest_game=g1.guest."));
+    assert!(set_cookie.contains("HttpOnly"));
+    let cookie = set_cookie
+        .split(';')
+        .next()
+        .expect("cookie invitada con nombre y valor")
+        .to_string();
+    let first_body = json_body(first).await;
+    let first_ticket = first_body["ticket"].as_str().expect("ticket invitado");
+    let first_subject = state
+        .game_ticket_store
+        .consume(first_ticket, TEST_SECRET)
+        .expect("primer ticket consumible")
+        .subject;
+
+    let second = router
+        .oneshot(guest_ticket_request(Some(&cookie)))
+        .await
+        .expect("router debe responder");
+    assert_eq!(second.status(), StatusCode::OK);
+    assert!(second.headers().get(SET_COOKIE).is_none());
+    let second_body = json_body(second).await;
+    let second_ticket = second_body["ticket"]
+        .as_str()
+        .expect("segundo ticket invitado");
+    let second_subject = state
+        .game_ticket_store
+        .consume(second_ticket, TEST_SECRET)
+        .expect("segundo ticket consumible")
+        .subject;
+    assert_eq!(first_subject, second_subject);
+}
+
+#[tokio::test]
+async fn ticket_requires_valid_csrf_for_authenticated_sessions_but_allows_guests() {
+    let state = test_state().await;
+    let guest = production_router(&state, Some(TEST_SECRET))
+        .oneshot(guest_ticket_request(None))
+        .await
+        .expect("router debe responder");
+    assert_eq!(guest.status(), StatusCode::OK);
 
     let user_id = create_user(&state).await;
     let (session_token, csrf_token) = session(&state, user_id).await;
@@ -179,6 +246,25 @@ async fn ticket_requires_session_and_valid_csrf() {
 
     assert_eq!(without_csrf.status(), StatusCode::FORBIDDEN);
     assert_eq!(wrong_csrf.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn guest_ticket_rate_limit_is_per_ip_and_returns_429() {
+    let state = test_state().await;
+    let router = production_router(&state, Some(TEST_SECRET));
+    for _ in 0..3 {
+        let response = router
+            .clone()
+            .oneshot(guest_ticket_request(None))
+            .await
+            .expect("router debe responder");
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+    let limited = router
+        .oneshot(guest_ticket_request(None))
+        .await
+        .expect("router debe responder");
+    assert_eq!(limited.status(), StatusCode::TOO_MANY_REQUESTS);
 }
 
 #[tokio::test]

@@ -1,11 +1,16 @@
-use axum::extract::State;
+use axum::extract::{ConnectInfo, State};
+use axum::http::{header::SET_COOKIE, HeaderMap};
 use axum::routing::post;
 use axum::{Json, Router};
+use std::net::SocketAddr;
 use utoipa::ToSchema;
 
 use crate::errors::AppError;
-use crate::middleware::AuthUser;
-use crate::services::game_ticket::GAME_TICKET_DEFAULT_TTL_SECS;
+use crate::handlers::auth::check_auth_action_rate_limit;
+use crate::middleware::OptionalAuthUser;
+use crate::services::game_ticket::{
+    GAME_GUEST_COOKIE_NAME, GAME_GUEST_COOKIE_TTL_SECS, GAME_TICKET_DEFAULT_TTL_SECS,
+};
 use crate::AppState;
 
 #[derive(Debug, serde::Serialize, ToSchema)]
@@ -16,32 +21,89 @@ pub struct GameTicketResponse {
 
 /// Emite un ticket corto para conectar el juego.
 ///
-/// La identidad procede exclusivamente de `AuthUser`; el cliente no puede
-/// elegir el subject. El endpoint no abre todavía WebSocket ni crea salas.
+/// La identidad procede de la sesión opaca o de una identidad invitada temporal
+/// creada server-side; el cliente no puede elegir el subject. El endpoint no
+/// abre todavía WebSocket ni crea salas.
 #[utoipa::path(
     post,
     path = "/api/game/ticket",
     responses(
-        (status = 200, description = "Ticket de juego emitido", body = GameTicketResponse),
-        (status = 401, description = "No autorizado", body = ErrorResponse),
+        (status = 200, description = "Ticket de juego emitido para cuenta o invitado", body = GameTicketResponse),
+        (status = 401, description = "Sesión inválida", body = ErrorResponse),
         (status = 403, description = "CSRF inválido", body = ErrorResponse),
+        (status = 429, description = "Límite de invitados", body = ErrorResponse),
         (status = 500, description = "Ticket no configurado", body = ErrorResponse)
     ),
-    security(("session_cookie" = []))
+    security(("session_cookie" = []), ())
 )]
 pub async fn issue_game_ticket(
     State(state): State<AppState>,
-    auth: AuthUser,
-) -> Result<Json<GameTicketResponse>, AppError> {
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    auth: OptionalAuthUser,
+    headers: HeaderMap,
+) -> Result<(HeaderMap, Json<GameTicketResponse>), AppError> {
     let secret = state
         .game_ticket_secret
         .as_deref()
         .ok_or_else(|| AppError::Internal("secreto de tickets de juego no configurado".into()))?;
-    let ticket =
-        state
-            .game_ticket_store
-            .issue(auth.user_id, GAME_TICKET_DEFAULT_TTL_SECS, secret)?;
-    Ok(Json(GameTicketResponse { ticket }))
+
+    if let Some(user_id) = auth.user_id {
+        let ticket =
+            state
+                .game_ticket_store
+                .issue(user_id, GAME_TICKET_DEFAULT_TTL_SECS, secret)?;
+        return Ok((HeaderMap::new(), Json(GameTicketResponse { ticket })));
+    }
+
+    let ip = addr.ip().to_string();
+    check_auth_action_rate_limit(&state.auth_action_rate_limit, "game-guest-ticket", &ip).map_err(
+        |error| match error {
+            AppError::Forbidden(message) => AppError::TooManyRequests(message),
+            other => other,
+        },
+    )?;
+    let existing_cookie = extract_cookie(&headers, GAME_GUEST_COOKIE_NAME);
+    let (subject, guest_cookie) = if let Some(cookie) = existing_cookie {
+        if let Some(subject) = state.game_ticket_store.resolve_guest(cookie, secret)? {
+            (subject, None)
+        } else {
+            let (subject, cookie) = state.game_ticket_store.issue_guest(secret)?;
+            (subject, Some(cookie))
+        }
+    } else {
+        let (subject, cookie) = state.game_ticket_store.issue_guest(secret)?;
+        (subject, Some(cookie))
+    };
+    let ticket = state
+        .game_ticket_store
+        .issue(subject, GAME_TICKET_DEFAULT_TTL_SECS, secret)?;
+    let mut response_headers = HeaderMap::new();
+    if let Some(guest_cookie) = guest_cookie {
+        let secure = if state.site_url.starts_with("https") {
+            "; Secure"
+        } else {
+            ""
+        };
+        let cookie = format!(
+            "{GAME_GUEST_COOKIE_NAME}={guest_cookie}; Path=/; HttpOnly; SameSite=Strict; Max-Age={GAME_GUEST_COOKIE_TTL_SECS}{secure}"
+        );
+        response_headers.append(
+            SET_COOKIE,
+            cookie.parse().map_err(|e| {
+                AppError::Internal(format!("Error construyendo cookie de invitado: {e}"))
+            })?,
+        );
+    }
+    Ok((response_headers, Json(GameTicketResponse { ticket })))
+}
+
+fn extract_cookie<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
+    let cookie_header = headers.get("cookie")?.to_str().ok()?;
+    cookie_header.split(';').map(str::trim).find_map(|pair| {
+        pair.strip_prefix(name)
+            .and_then(|value| value.strip_prefix('='))
+            .filter(|value| !value.is_empty())
+    })
 }
 
 pub fn routes() -> Router<AppState> {

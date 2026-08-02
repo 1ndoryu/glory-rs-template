@@ -19,6 +19,9 @@ pub enum AppError {
     #[error("Prohibido: {0}")]
     Forbidden(String),
 
+    #[error("Demasiadas solicitudes: {0}")]
+    TooManyRequests(String),
+
     #[error("Conflicto: {0}")]
     Conflict(String),
 
@@ -52,6 +55,11 @@ impl IntoResponse for AppError {
                 "Credenciales inválidas o ausentes".to_string(),
             ),
             Self::Forbidden(msg) => (StatusCode::FORBIDDEN, "forbidden", msg.clone()),
+            Self::TooManyRequests(msg) => (
+                StatusCode::TOO_MANY_REQUESTS,
+                "too_many_requests",
+                msg.clone(),
+            ),
             Self::Conflict(msg) => (StatusCode::CONFLICT, "conflict", msg.clone()),
             Self::Internal(msg) => {
                 tracing::error!("Error interno: {msg}");

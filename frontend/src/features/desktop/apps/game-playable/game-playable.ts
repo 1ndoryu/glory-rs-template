@@ -1,7 +1,7 @@
 /* GAME-01 — Vertical slice jugable con fallback offline.
  * Orquesta input, simulación, transporte realtime y renderer. El core sigue
- * puro; el socket solo se crea para una cuenta autenticada y siempre se libera
- * junto con la vista. Los usuarios públicos permanecen en el fixture offline. */
+ * puro; el socket se crea para cuentas e invitados temporales y siempre se
+ * libera junto con la vista. El backend distingue ambas identidades. */
 
 import type { MountedView, RenderContext } from '../../../../core/lifecycle';
 import { authStore } from '../../../../store';
@@ -95,17 +95,17 @@ export function renderGamePlayable(context: RenderContext): MountedView {
   const frameMonitor = new FramePerformanceMonitor({ maxSamples: 120 });
   let frameCount = 0;
   let realtimeState: GameRealtimeConnectionState = 'idle';
-  const realtime = authStore.get().isAuthenticated
-    ? createGameRealtimeClient({
-      ticketProvider: requestGameTicket,
-      socketFactory: (url) => new WebSocket(url),
-      socketUrl: defaultGameSocketUrl(),
-      onState: (next, message) => {
-        realtimeState = next;
-        if (next === 'error') setStatus(message ?? 'realtime no disponible', true);
-      },
-    })
-    : null;
+  /* La identidad de juego puede ser cuenta o invitado temporal. `authStore`
+   * sigue gobernando permisos del OS; no debe bloquear el loop realtime público. */
+  const realtime = createGameRealtimeClient({
+    ticketProvider: requestGameTicket,
+    socketFactory: (url) => new WebSocket(url),
+    socketUrl: defaultGameSocketUrl(),
+    onState: (next, message) => {
+      realtimeState = next;
+      if (next === 'error') setStatus(message ?? 'realtime no disponible', true);
+    },
+  });
 
   const stopFrameLoop = (): void => {
     if (frameHandle !== 0) cancelAnimationFrame(frameHandle);
@@ -229,7 +229,9 @@ export function renderGamePlayable(context: RenderContext): MountedView {
     resizeObserver.observe(view.sceneHost);
     scene.update(snapshotFromState(state));
     setStatus(
-      realtime ? 'conectando… · fallback local mientras se autentica' : 'offline · movimiento local · sin red',
+      authStore.get().isAuthenticated
+        ? 'conectando… · fallback local mientras se autentica'
+        : 'conectando… · fallback local mientras se identifica el invitado',
       false,
     );
     void realtime?.connect();

@@ -40,6 +40,32 @@ impl FromRequestParts<AppState> for AuthUser {
     }
 }
 
+/// Extractor opcional para endpoints que aceptan cuenta o identidad temporal.
+/// Nunca interpreta `guest_game` como una cuenta; solo resuelve `session_id`.
+pub struct OptionalAuthUser {
+    pub user_id: Option<Uuid>,
+}
+
+#[async_trait]
+impl FromRequestParts<AppState> for OptionalAuthUser {
+    type Rejection = AppError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let has_session = has_session_cookie(parts);
+        let user_id = resolve_optional_user_id(parts, state).await?;
+        if has_session && user_id.is_none() {
+            return Err(AppError::Unauthorized);
+        }
+        if is_mutation(&parts.method) && has_session {
+            verify_csrf(parts)?;
+        }
+        Ok(Self { user_id })
+    }
+}
+
 /// Extractor que valida sesión Y verifica que el usuario sea admin.
 pub struct AdminUser {
     pub user_id: Uuid,
@@ -76,21 +102,29 @@ impl FromRequestParts<AppState> for AdminUser {
 
 /// Resuelve el `user_id` únicamente desde la cookie de sesión opaca.
 async fn resolve_user_id(parts: &Parts, state: &AppState) -> Result<Uuid, AppError> {
-    if let Some(raw_token) = extract_cookie(parts, SESSION_COOKIE) {
-        if let Some(session) = SessionService::validate(&state.pool, raw_token)
-            .await
-            .map_err(|e| AppError::Internal(format!("Error validando sesión: {e}")))?
-        {
-            let active_user = UserRepository::find_by_id(&state.pool, session.user_id)
-                .await
-                .map_err(|e| AppError::Internal(format!("Error verificando usuario: {e}")))?;
-            if active_user.is_some() {
-                return Ok(session.user_id);
-            }
-        }
-    }
+    resolve_optional_user_id(parts, state)
+        .await?
+        .ok_or(AppError::Unauthorized)
+}
 
-    Err(AppError::Unauthorized)
+/// Resuelve una sesión válida sin interpretar cookies de juego como cuentas.
+pub(crate) async fn resolve_optional_user_id(
+    parts: &Parts,
+    state: &AppState,
+) -> Result<Option<Uuid>, AppError> {
+    let Some(raw_token) = extract_cookie(parts, SESSION_COOKIE) else {
+        return Ok(None);
+    };
+    let Some(session) = SessionService::validate(&state.pool, raw_token)
+        .await
+        .map_err(|e| AppError::Internal(format!("Error validando sesión: {e}")))?
+    else {
+        return Ok(None);
+    };
+    let active_user = UserRepository::find_by_id(&state.pool, session.user_id)
+        .await
+        .map_err(|e| AppError::Internal(format!("Error verificando usuario: {e}")))?;
+    Ok(active_user.map(|_| session.user_id))
 }
 
 /// Verifica el token CSRF: compara cookie `csrf_token` con header `X-CSRF-Token`

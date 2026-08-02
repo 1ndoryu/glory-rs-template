@@ -18,10 +18,13 @@ type HmacSha256 = Hmac<Sha256>;
 
 const PROTOCOL_VERSION: &str = "g1";
 const PURPOSE: &str = "game";
+const GUEST_PURPOSE: &str = "guest";
 pub const GAME_TICKET_DEFAULT_TTL_SECS: i64 = 30;
 pub const GAME_TICKET_MAX_TTL_SECS: i64 = 60;
 pub const GAME_TICKET_MAX_TOKEN_BYTES: usize = 512;
 pub const GAME_TICKET_MAX_PENDING_ENTRIES: usize = 4_096;
+pub const GAME_GUEST_COOKIE_NAME: &str = "guest_game";
+pub const GAME_GUEST_COOKIE_TTL_SECS: i64 = 2 * 60 * 60;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GameTicketClaims {
@@ -37,6 +40,12 @@ struct PendingTicket {
     expires_at: i64,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct GuestIdentity {
+    subject: Uuid,
+    expires_at: i64,
+}
+
 /// Almacén single-use local para el primer despliegue single-instance.
 ///
 /// Una futura topología multi-réplica deberá sustituir este adaptador por un
@@ -44,6 +53,7 @@ struct PendingTicket {
 #[derive(Clone, Default)]
 pub struct GameTicketStore {
     pending: Arc<Mutex<HashMap<Uuid, PendingTicket>>>,
+    guests: Arc<Mutex<HashMap<Uuid, GuestIdentity>>>,
 }
 
 impl GameTicketStore {
@@ -55,6 +65,16 @@ impl GameTicketStore {
     /// Verifica y consume el ticket de forma atómica para impedir replay.
     pub fn consume(&self, token: &str, secret: &str) -> Result<GameTicketClaims, AppError> {
         consume_at(self, token, secret, now_unix())
+    }
+
+    /// Resuelve una cookie de invitado sin convertirla en identidad de cuenta.
+    pub fn resolve_guest(&self, cookie: &str, secret: &str) -> Result<Option<Uuid>, AppError> {
+        resolve_guest_at(self, cookie, secret, now_unix())
+    }
+
+    /// Crea una identidad temporal y devuelve la cookie opaca que la representa.
+    pub fn issue_guest(&self, secret: &str) -> Result<(Uuid, String), AppError> {
+        issue_guest_at(self, secret, now_unix())
     }
 
     #[cfg(test)]
@@ -167,6 +187,95 @@ pub fn consume_at(
     })
 }
 
+pub fn issue_guest_at(
+    store: &GameTicketStore,
+    secret: &str,
+    now: i64,
+) -> Result<(Uuid, String), AppError> {
+    validate_secret(secret)?;
+    if now < 0 {
+        return Err(AppError::Internal("reloj de invitado inválido".into()));
+    }
+    let expires_at = now
+        .checked_add(GAME_GUEST_COOKIE_TTL_SECS)
+        .ok_or_else(|| AppError::Internal("expiración de invitado fuera de rango".into()))?;
+    let nonce = Uuid::new_v4();
+    let subject = Uuid::new_v4();
+    let mut guests = store
+        .guests
+        .lock()
+        .map_err(|_| AppError::Internal("almacén de invitados no disponible".into()))?;
+    guests.retain(|_, guest| guest.expires_at > now);
+    if guests.len() >= GAME_TICKET_MAX_PENDING_ENTRIES {
+        return Err(AppError::Internal("almacén de invitados lleno".into()));
+    }
+    guests.insert(
+        nonce,
+        GuestIdentity {
+            subject,
+            expires_at,
+        },
+    );
+    drop(guests);
+
+    let payload = format!("{PROTOCOL_VERSION}.{GUEST_PURPOSE}.{nonce}.{expires_at}");
+    let signature = sign(&payload, secret)?;
+    Ok((subject, format!("{payload}.{signature}")))
+}
+
+pub fn resolve_guest_at(
+    store: &GameTicketStore,
+    cookie: &str,
+    secret: &str,
+    now: i64,
+) -> Result<Option<Uuid>, AppError> {
+    validate_secret(secret)?;
+    if now < 0 || cookie.len() > GAME_TICKET_MAX_TOKEN_BYTES {
+        return Ok(None);
+    }
+    let parts: Vec<&str> = cookie.split('.').collect();
+    if parts.len() != 5
+        || parts[0] != PROTOCOL_VERSION
+        || parts[1] != GUEST_PURPOSE
+        || parts[2].is_empty()
+        || parts[3].is_empty()
+        || parts[4].is_empty()
+    {
+        return Ok(None);
+    }
+    let Ok(nonce) = parts[2].parse::<Uuid>() else {
+        return Ok(None);
+    };
+    let Ok(expires_at) = parts[3].parse::<i64>() else {
+        return Ok(None);
+    };
+    if expires_at <= now {
+        return Ok(None);
+    }
+    let payload = format!("{PROTOCOL_VERSION}.{GUEST_PURPOSE}.{nonce}.{expires_at}");
+    let Ok(signature) = hex::decode(parts[4]) else {
+        return Ok(None);
+    };
+    let mut mac = HmacSha256::new_from_slice(secret.as_bytes())
+        .map_err(|_| AppError::Internal("secreto HMAC inválido".into()))?;
+    mac.update(payload.as_bytes());
+    if mac.verify_slice(&signature).is_err() {
+        return Ok(None);
+    }
+    let mut guests = store
+        .guests
+        .lock()
+        .map_err(|_| AppError::Internal("almacén de invitados no disponible".into()))?;
+    guests.retain(|_, guest| guest.expires_at > now);
+    let Some(guest) = guests.get(&nonce) else {
+        return Ok(None);
+    };
+    if guest.expires_at != expires_at {
+        return Ok(None);
+    }
+    Ok(Some(guest.subject))
+}
+
 fn validate_secret(secret: &str) -> Result<(), AppError> {
     if secret.trim().is_empty() {
         return Err(AppError::Internal(
@@ -202,8 +311,8 @@ fn now_unix() -> i64 {
 #[cfg(test)]
 mod tests {
     use super::{
-        consume_at, issue_at, GameTicketStore, GAME_TICKET_DEFAULT_TTL_SECS,
-        GAME_TICKET_MAX_TTL_SECS,
+        consume_at, issue_at, issue_guest_at, resolve_guest_at, GameTicketStore,
+        GAME_GUEST_COOKIE_TTL_SECS, GAME_TICKET_DEFAULT_TTL_SECS, GAME_TICKET_MAX_TTL_SECS,
     };
     use uuid::Uuid;
 
@@ -287,5 +396,41 @@ mod tests {
         let store = GameTicketStore::default();
         assert!(issue_at(&store, Uuid::new_v4(), 30, " ", NOW).is_err());
         assert!(consume_at(&store, "malformed", " ", NOW).is_err());
+    }
+
+    #[test]
+    fn guest_cookie_is_opaque_temporary_and_server_resolved() {
+        let store = GameTicketStore::default();
+        let (subject, cookie) = issue_guest_at(&store, SECRET, NOW).expect("guest");
+        assert!(!cookie.contains(&subject.to_string()));
+        assert!(cookie.starts_with("g1.guest."));
+        assert_eq!(
+            resolve_guest_at(&store, &cookie, SECRET, NOW).ok(),
+            Some(Some(subject))
+        );
+        assert_eq!(
+            resolve_guest_at(&store, &cookie, SECRET, NOW + GAME_GUEST_COOKIE_TTL_SECS).ok(),
+            Some(None)
+        );
+    }
+
+    #[test]
+    fn guest_cookie_tampering_and_wrong_secret_fail_closed() {
+        let store = GameTicketStore::default();
+        let (_, cookie) = issue_guest_at(&store, SECRET, NOW).expect("guest");
+        let mut tampered = cookie.clone();
+        tampered.push('x');
+        assert_eq!(
+            resolve_guest_at(&store, &tampered, SECRET, NOW).ok(),
+            Some(None)
+        );
+        assert_eq!(
+            resolve_guest_at(&store, &cookie, "wrong-secret", NOW).ok(),
+            Some(None)
+        );
+        assert_eq!(
+            resolve_guest_at(&store, "g1.game.bad", SECRET, NOW).ok(),
+            Some(None)
+        );
     }
 }
