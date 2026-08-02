@@ -25,7 +25,7 @@
 - Apps editoriales: `Agente/planes/plan-programas-editoriales-2026-07-31.md`
 - Interacción y medición: `Agente/planes/plan-contratos-interaccion-comandos-medicion-2026-07-29.md`
 - Guard de ejecuciones pesadas y targets Cargo: `Agente/planes/plan-heavy-run-guard-2026-08-02.md`
-- Guard global agnóstico por proyecto/rama: `Agente/planes/plan-global-quality-guard-agnostico-2026-08-02.md`
+- Sentinel global agnóstico por proyecto/rama (incluye guard/orquestación; VarSense como analizador): `Agente/planes/plan-global-quality-guard-agnostico-2026-08-02.md`
 - Optimización Sentinel/VarSense: `Agente/planes/plan-optimizacion-sentinel-varsense-2026-08-02.md`
 
 ## Cómo leer este archivo

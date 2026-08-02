@@ -1,31 +1,47 @@
-# Plan 028A-6 — Guard global de calidad agnóstico por proyecto y rama
+# Plan 028A-6 — Sentinel como plano global de calidad agnóstico
 
 > **Fecha:** 2026-08-02
 > **Estado:** propuesto; no implementar hasta revisar este diseño.
 > **Motivación:** el guard actual depende de `scripts/quality` dentro de este repositorio. Al cambiar de rama o de proyecto no debe desaparecer, bloquear comandos legítimos ni ejecutar reglas de wandori.us fuera de su alcance.
 
-## Decisión propuesta
+## Decisión arquitectónica corregida
 
-Separar el guard en dos capas:
+No habrá un tercer producto llamado `GloryQuality`. **Sentinel será el único plano de control y orquestación de calidad**; VarSense seguirá siendo un analizador especializado que Sentinel ejecuta mediante un contrato de plugin.
 
-1. **Runtime global agnóstico**, instalado una sola vez fuera de cualquier repositorio.
-2. **Política declarativa por proyecto**, versionada junto al proyecto y resuelta en cada invocación.
+1. **Sentinel Core/CLI global:** runtime agnóstico instalado fuera de los repositorios. Resuelve la política, intercepta comandos, aplica cooldown/locks, calcula alcance incremental, orquesta etapas, administra cachés y genera el reporte.
+2. **Analizadores:** reglas nativas de Sentinel, VarSense para tokens/clases CSS y futuros analizadores. Cada analizador conserva su especialidad, pero no decide por separado el gate, el cooldown ni el reporte final.
+3. **Política local:** configuración declarativa versionada por proyecto y rama. Define qué comandos, analizadores y perfiles aplican; nunca contiene código ejecutable.
 
-El runtime nunca importa código del proyecto ni contiene reglas de wandori.us. Solo interpreta una política JSON segura, clasifica el comando y decide `allow`, `block` u `observe`.
+El nombre público será `sentinel` (`sentinel check`, `sentinel guard`, `sentinel doctor`, `sentinel status`). `task:check`, `quality-command-guard`, `global-cargo-guard` y los scripts actuales serán adaptadores de migración y después se retirarán. VarSense podrá seguir teniendo CLI/LSP propios para uso de editor, pero en el flujo de agentes su única autoridad de cierre será Sentinel.
+
+### Contrato de responsabilidades
+
+| Capacidad | Responsable único |
+|---|---|
+| Política por repositorio/rama | Sentinel Core |
+| Intercepción de `cargo`, `npm`, `npx`, `rustfmt`, etc. | Sentinel Guard |
+| Cooldown de 3 horas, locks y cuota de targets | Sentinel Scheduler |
+| Scope incremental y caché de etapas | Sentinel Orchestrator |
+| Reglas de variables/clases CSS | VarSense Analyzer, invocado por Sentinel |
+| Reglas generales de código | Sentinel Analyzers |
+| Reporte Markdown/JSON y exit code | Sentinel Reporter |
+| Configuración específica del proyecto | `sentinel.config.json` |
+
+Así se mantienen dos herramientas reales —Sentinel y VarSense—, no tres controles superpuestos.
 
 ### Ubicación estable global
 
-- Runtime versionado: `%LOCALAPPDATA%\GloryQuality\versions\<version>\`.
-- Alias activo: `%LOCALAPPDATA%\GloryQuality\current\`.
-- Shims `npm.cmd`, `npx.cmd`, `cargo.cmd` y ejecutable de diagnóstico: `%LOCALAPPDATA%\GloryQuality\bin\`.
-- Estado/cooldown compartido: `C:\tmp\glory-quality-guard\`, separado por raíz canónica del proyecto.
-- Los perfiles PowerShell solo harán dot-source de `%LOCALAPPDATA%\GloryQuality\current\profile.ps1`; nunca de una ruta dentro de este repositorio.
+- Runtime versionado: `%LOCALAPPDATA%\GlorySentinel\versions\<version>\`.
+- Alias activo: `%LOCALAPPDATA%\GlorySentinel\current\`.
+- Shims `npm.cmd`, `npx.cmd`, `cargo.cmd`, `rustfmt` y CLI: `%LOCALAPPDATA%\GlorySentinel\bin\`.
+- Estado/cooldown compartido: `C:\tmp\glory-sentinel\`, separado por raíz canónica del proyecto y `policyHash`.
+- Los perfiles PowerShell y Bash solo cargarán `%LOCALAPPDATA%\GlorySentinel\current\profile.ps1`/`profile.sh`; nunca una ruta dentro de este repositorio.
 
-El cambio de rama no altera el runtime global. Actualizar el runtime será una operación explícita (`quality:install-global` o `glory-quality update`) y tendrá backup/rollback.
+El cambio de rama no altera el runtime global. Actualizar el runtime será una operación explícita (`sentinel install` o `sentinel update`) y tendrá backup/rollback.
 
 ## Política declarativa por proyecto
 
-Cada proyecto que quiera enforcement añade `.quality/guard-policy.json` en su raíz. No se ejecuta nada desde este archivo: se parsea como JSON estricto, con claves allowlisted y límites acotados.
+Cada proyecto que quiera enforcement añade `sentinel.config.json` en su raíz. No se ejecuta nada desde este archivo: se parsea como JSON estricto, con claves allowlisted y límites acotados. `.quality/guard-policy.json` queda como alias de migración temporal, no como segundo contrato.
 
 Ejemplo para wandori.us:
 
@@ -34,13 +50,20 @@ Ejemplo para wandori.us:
   "schemaVersion": 1,
   "mode": "enforce",
   "gate": {
-    "command": ["npm", "run", "task:check", "--"],
+    "command": ["sentinel", "check", "--"],
     "taskIdRequired": true
   },
-  "directCommands": {
-    "npmScripts": ["test", "test:*", "type-check", "lint", "build"],
-    "npxTools": ["vitest", "tsc", "eslint", "prettier"],
-    "cargoSubcommands": ["check", "fmt", "test", "clippy", "bench"]
+  "guard": {
+    "directCommands": {
+      "npmScripts": ["test", "test:*", "type-check", "lint", "build"],
+      "npxTools": ["vitest", "tsc", "eslint", "prettier"],
+      "cargoSubcommands": ["check", "fmt", "test", "clippy", "bench"],
+      "tools": ["rustfmt"]
+    }
+  },
+  "analyzers": {
+    "sentinel": { "profile": "project-default" },
+    "varsense": { "enabled": true, "config": "varsense.config.json" }
   },
   "allow": ["dev", "preview", "codegen", "quality:*"]
 }
@@ -49,31 +72,32 @@ Ejemplo para wandori.us:
 ### Resolución de política
 
 - [ ] Buscar desde el directorio actual hacia arriba hasta la raíz del workspace.
-- [ ] Usar únicamente `.quality/guard-policy.json` como fuente canónica; no inferir reglas leyendo `AGENTS.md` ni scripts arbitrarios.
+- [ ] Usar únicamente `sentinel.config.json` como fuente canónica; no inferir reglas leyendo `AGENTS.md` ni scripts arbitrarios.
 - [ ] Canonicalizar la ruta antes de leerla y rechazar rutas fuera del workspace.
 - [ ] Calcular `policyHash` y asociarlo al estado; un cambio de rama o política nunca reutiliza una decisión cacheada de otra política.
 - [ ] Si no existe política: `pass-through` silencioso para permitir trabajar en cualquier proyecto.
-- [ ] Si existe una política inválida: no bloquear comandos desconocidos; mostrar una advertencia concisa y hacer fallar `glory-quality doctor`/CI para que el proyecto corrija su configuración.
+- [ ] Si existe una política inválida: no bloquear comandos desconocidos; mostrar una advertencia concisa y hacer fallar `sentinel doctor`/CI para que el proyecto corrija su configuración.
 - [ ] Si `mode` es `observe`: registrar el hallazgo y mostrar la recomendación, pero no impedir la ejecución.
 - [ ] Si `mode` es `enforce`: bloquear únicamente las clases declaradas y devolver código no cero.
+- [ ] VarSense no crea cooldown, lock ni reporte paralelo: Sentinel le entrega el manifiesto de archivos y recoge sus hallazgos con el contrato de analizador.
 
 ## Arquitectura por fases
 
 ### Fase 0 — ADR, contratos y compatibilidad
 
-- [ ] Crear ADR con la separación runtime global/política local y la matriz `enforce/observe/pass-through`.
-- [ ] Definir JSON Schema versionado de `guard-policy.json`, errores allowlisted y límites de tamaño/profundidad.
+- [ ] Crear ADR con Sentinel Core, el contrato de analizadores (incluido VarSense), la política local y la matriz `enforce/observe/pass-through`.
+- [ ] Definir JSON Schema versionado de `sentinel.config.json`, errores allowlisted y límites de tamaño/profundidad.
 - [ ] Definir contrato de salida estable: `decision`, `projectRoot`, `policyPath`, `policyHash`, `reason`, `recommendedCommand`, `exitCode`.
 - [ ] Definir compatibilidad Windows PowerShell 5/7, PowerShell Core, CMD, Bash/Git Bash (interactivo y `BASH_ENV`) y CI sin depender de variables específicas de VS Code.
 - [ ] Definir política de actualización, rollback y migración desde el guard actual.
 
 **Gate:** ADR aprobado, schema con fixtures válidos/ inválidos y contrato de salida revisado.
 
-### Fase 1 — Runtime global instalable y estable
+### Fase 1 — Sentinel Core global instalable y estable
 
-- [ ] Extraer el clasificador actual a un paquete/runtime agnóstico (`glory-quality-core`) sin imports de wandori.us.
-- [ ] Crear CLI global `glory-quality doctor|status|install|update|rollback`.
-- [ ] Instalar versiones en `%LOCALAPPDATA%\GloryQuality\versions` y cambiar `current` de forma atómica.
+- [ ] Extraer el clasificador, scheduler, scope, caché y reporter a Sentinel Core, sin imports de wandori.us ni de VarSense.
+- [ ] Crear CLI global `sentinel check|guard|doctor|status|install|update|rollback`.
+- [ ] Instalar versiones en `%LOCALAPPDATA%\GlorySentinel\versions` y cambiar `current` de forma atómica.
 - [ ] Generar shims con resolución del ejecutable real sin recursión; preservar argumentos, códigos de salida y redirecciones.
 - [ ] Dot-sourcear únicamente la ruta global estable en ambos perfiles; crear backup antes de cualquier modificación.
 - [ ] Mantener los wrappers del repositorio solo como adaptadores para desarrollo, no como dependencia del perfil global.
@@ -86,16 +110,18 @@ Ejemplo para wandori.us:
 - [ ] Diferenciar `no-policy`, `observe`, `enforce` y `invalid-policy` en el resultado y el reporte.
 - [ ] Invalidar decisiones/cooldowns por `projectRoot + policyHash + runtimeVersion`.
 - [ ] Mantener cooldown/locks solo para comandos declarados como pesados por la política; no compartirlos entre proyectos.
-- [ ] Añadir `glory-quality doctor` con diagnóstico de raíz, política, hash, modo, shims, PATH y comando recomendado.
+- [ ] Añadir `sentinel doctor` con diagnóstico de raíz, política, hash, modo, shims, PATH y comando recomendado.
 
 **Gate:** matriz con dos proyectos y dos ramas: el proyecto configurado bloquea lo declarado; el proyecto sin política pasa; cambiar de rama actualiza la decisión sin reiniciar el editor.
 
-### Fase 3 — Adaptador de wandori.us
+### Fase 3 — Adaptador de wandori.us y VarSense
 
-- [ ] Añadir `.quality/guard-policy.json` al proyecto con `npm run task:check -- <TareaId>` como gate.
-- [ ] Migrar `quality-command-guard.mjs`, `global-cargo-guard.ps1`, `npm.cmd`, `npx.cmd` y `cargo.cmd` al runtime global sin duplicar reglas.
-- [ ] Mantener `quality.config.json` para tiempos, alcance y cachés; la política de comandos solo declara el enrutamiento.
-- [ ] Actualizar `quality:install-guard` para instalar/copiar el runtime global y retirar rutas hardcodeadas del repositorio.
+- [ ] Añadir `sentinel.config.json` al proyecto con `sentinel check -- <TareaId>` como gate; conservar un alias temporal para `npm run task:check`.
+- [ ] Migrar `quality-command-guard.mjs`, `global-cargo-guard.ps1`, `npm.cmd`, `npx.cmd` y `cargo.cmd` al runtime global de Sentinel sin duplicar reglas.
+- [ ] Mantener `quality.config.json` solo para la transición de tiempos, alcance y cachés; la política de comandos y analizadores vive en Sentinel.
+- [ ] Integrar VarSense como adaptador de analizador (`files-from`, hallazgos tipados, caché e invalidación), sin un gate ni scheduler propio.
+- [ ] Actualizar `quality:install-guard` para instalar/copiar Sentinel y retirar rutas hardcodeadas del repositorio.
+- [ ] Ejecutar VarSense desde Sentinel y demostrar paridad de hallazgos con su CLI/LSP, sin permitir que VarSense cierre la tarea por separado.
 - [ ] Mantener compatibilidad temporal con el guard actual y emitir advertencia de migración, sin bloquear una rama antigua.
 
 **Gate:** wandori.us bloquea `npx vitest`, `npm run test:*`, type-check/lint/build y Cargo directo; `task:check`, `quality:*`, desarrollo y proyectos externos siguen funcionando.
@@ -115,7 +141,7 @@ Ejemplo para wandori.us:
 - [ ] Documentar rollback al runtime anterior y restaurar backups de perfiles.
 - [ ] Retirar el PATH que apunta a `scripts/quality` solo después de verificar el PATH global.
 - [ ] Eliminar shims duplicados del repositorio cuando dos versiones consecutivas hayan pasado la matriz.
-- [ ] Mantener un comando de desinstalación que quite solo entradas administradas por GloryQuality.
+- [ ] Mantener un comando de desinstalación que quite solo entradas administradas por Sentinel.
 - [ ] Marcar el guard actual como legacy y conservar un periodo de compatibilidad para ramas antiguas.
 
 **Gate:** rollback probado en una copia de perfil; ninguna rama activa pierde la capacidad de ejecutar su gate.
@@ -143,16 +169,16 @@ Cada fase debe adjuntar evidencia de:
 
 ## Definition of Done
 
-- [ ] El runtime global no depende de una rama ni de archivos del repositorio actual.
-- [ ] Un proyecto sin `.quality/guard-policy.json` puede ejecutar libremente sus comandos.
-- [ ] Un proyecto con política puede exigir su propio gate y sus propias clases de comandos.
+- [ ] El runtime global de Sentinel no depende de una rama ni de archivos del repositorio actual.
+- [ ] Un proyecto sin `sentinel.config.json` puede ejecutar libremente sus comandos.
+- [ ] Un proyecto con `sentinel.config.json` puede exigir su propio gate, comandos y conjunto de analizadores.
 - [ ] Cambiar de rama actualiza la política sin reiniciar VS Code ni reinstalar perfiles.
-- [ ] `doctor`, CI y los shims muestran decisiones coherentes en PowerShell 5/7, CMD y Bash/Git Bash.
+- [ ] `sentinel doctor`, CI y los shims muestran decisiones coherentes en PowerShell 5/7, CMD y Bash/Git Bash.
 - [ ] Tests de contrato, matriz multi-proyecto, type-check, Sentinel/VarSense y documentación pasan.
 - [ ] Existe rollback probado y no quedan rutas hardcodeadas a `C:\Users\...\glory-rust-template` en perfiles globales.
 
 ## Fuera de alcance de este plan
 
-- Definir qué comandos de calidad necesita cada proyecto; eso pertenece a su `guard-policy.json`.
+- Definir qué comandos y analizadores necesita cada proyecto; eso pertenece a su `sentinel.config.json`.
 - Ejecutar automáticamente el gate por el agente; el guard solo impide bypass y recomienda el comando canónico.
 - Cambiar reglas de Coolify, deploy o SSH; esas políticas siguen siendo globales y separadas.
