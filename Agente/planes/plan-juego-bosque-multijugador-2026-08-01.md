@@ -307,7 +307,15 @@ servidor sin depender de Three.js.
 - [x] Cubrir negativos: JSON/campos desconocidos, versión, dirección, replay/jump, entidades duplicadas, payload sobredimensionado, UTF-8 inválido y timestamps negativos.
 - [x] Validar sin abrir conexiones: frontend type-check, 26 tests dirigidos y build; Rust fmt/check y 8 tests del modelo.
 
-**Límite de esta entrega:** no implementa upgrade WebSocket, emisión/verificación de tickets, identidad invitada, actor de sala, autoridad de movimiento ni reconexión. Esos contratos de transporte y ejecución permanecen en Fase 5/6.
+#### 297A-40 — Ticket de juego firmado sin transporte
+
+- [x] Emitir tickets `g1.game` con subject UUID resuelto por servidor, propósito fijo, nonce aleatorio y firma HMAC.
+- [x] Acotar TTL a 30 segundos por defecto y 60 segundos máximo; rechazar reloj inválido, secreto vacío y expiración vencida.
+- [x] Rechazar tokens mayores de 512 bytes antes de dividir/decodificar y mantener errores de verificación sin revelar detalles sensibles.
+- [x] Consumir cada nonce una sola vez con un replay store local acotado a 4096 entradas y poda de entradas expiradas.
+- [x] Cubrir manipulación, secreto incorrecto, propósito incorrecto, UUID inválido, expiración, replay, poda, token sobredimensionado y clocks inválidos.
+
+**Límite de esta entrega:** no implementa endpoint HTTP, upgrade WebSocket, integración con el hub Glory, emisión desde `AuthUser`, identidad invitada, actor de sala, autoridad de movimiento ni reconexión. El replay store local solo es válido para la primera instancia; antes de escalar se requiere un store compartido. Esos contratos de transporte y ejecución permanecen en Fase 5/6.
 
 **Gate:** ADR realtime, ADR de identidad de invitado y contrato de mapa aprobados; el núcleo offline puede existir, pero no se habilita gameplay conectado hasta cerrar estos contratos.
 
