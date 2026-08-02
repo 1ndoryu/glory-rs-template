@@ -4,6 +4,7 @@ pub mod articles;
 pub mod auth;
 pub mod download_handler;
 pub mod game_map_handler;
+pub mod game_profile_handler;
 pub mod game_ticket_handler;
 pub mod game_ws_handler;
 mod health;
@@ -59,6 +60,8 @@ impl utoipa::Modify for SecurityAddon {
         health::health_check,
         game_map_handler::get_active_map,
         game_map_handler::publish_map,
+        game_profile_handler::get_game_profile,
+        game_profile_handler::update_game_profile,
         game_ticket_handler::issue_game_ticket,
         auth::register,
         auth::login,
@@ -183,6 +186,8 @@ impl utoipa::Modify for SecurityAddon {
         crate::models::workspace::PublishReleaseRequest,
         crate::models::game_map::GameMapVersionPublic,
         crate::models::game_map::PublishMapRequest,
+        crate::models::game_profile::GameProfile,
+        crate::models::game_profile::UpdateGameProfileRequest,
         crate::handlers::game_ticket_handler::GameTicketResponse,
         crate::handlers::workspace_handler::ReleaseListResponse,
         crate::models::media::MediaAdminResponse,
@@ -282,6 +287,7 @@ fn api_routes() -> Router<AppState> {
     Router::new()
         .merge(health::routes())
         .merge(game_map_handler::routes())
+        .merge(game_profile_handler::routes())
         .merge(game_ticket_handler::routes())
         .merge(game_ws_handler::routes())
         .merge(auth::routes())

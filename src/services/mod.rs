@@ -4,6 +4,7 @@ pub mod commerce;
 pub mod commerce_outbox;
 pub mod email;
 pub mod game_map_svc;
+pub mod game_profile;
 pub mod game_room;
 pub mod game_room_map;
 pub mod game_ticket;

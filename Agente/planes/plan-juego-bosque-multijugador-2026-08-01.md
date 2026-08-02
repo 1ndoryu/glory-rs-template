@@ -2,7 +2,7 @@
 
 > **Fecha:** 2026-08-01
 > **ID:** GAME-01
-> **Estado:** dirección Three.js 3D aprobada; fixture offline, persistencia, publicación admin de mapas, sala realtime server-authoritative e identidad temporal invitada están integrados; reconexión persistente, perfil de cuenta, personaje y editor siguen pendientes.
+> **Estado:** dirección Three.js 3D aprobada; fixture offline, persistencia, publicación admin de mapas, sala realtime server-authoritative, identidad temporal invitada y perfil persistente de cuenta están integrados; carga del perfil en gameplay, reconexión persistente, personaje y editor siguen pendientes.
 > **Prioridad:** futura, después del bloque actualmente habilitado en `roadmap.md`.
 > **Dependencias globales:** runtime `AppRegistry`/`MountedView`, ciclo de vida y carga lazy, sesiones/capacidades, contratos de workspace y quality gate.
 > **Fuentes canónicas:** `roadmap.md`, `Agente/documentacion/arquitectura/adr-bosque-3d-assets-terreno-2d-2026-08-01.md`, `Agente/planes/plan-assets-terreno-bosque-3d-2026-08-01.md`, `Agente/planes/plan-glory-render-motor-juegos-2026-08-01.md`, `Agente/documentacion/arquitectura/adr-glory-render-repositorio-agnostico-2026-08-01.md`, `Agente/documentacion/arquitectura/adr-carga-apps-pesadas-2026-07-31.md`, `Agente/documentacion/producto/referencia-visual-bosque-2026-08-01.md`.
@@ -518,10 +518,15 @@ realtime.
 ### Fase 6 — Invitados, cuentas y personaje base
 
 - [x] Emitir identidad temporal para invitados con límites de abuso (`297A-47`).
-- [ ] Asociar cuenta autenticada con perfil de juego persistente.
+- [x] Asociar cuenta autenticada con perfil de juego persistente (`297A-48`): `GET/PUT /api/game/profile`, `AuthUser`, CSRF, nombre allowlisted y revisión optimista.
+- [ ] Cargar el perfil validado en el flujo previo al gameplay sin añadir consultas al loop de render.
 - [ ] Crear personaje base y selección de opciones allowlisted.
 - [ ] Definir qué datos se conservan al pasar de invitado a cuenta.
 - [ ] Probar logout, sesión revocada, reconexión y cambio de usuario.
+
+**Evidencia 297A-48:** `user_game_profiles` persiste solo cuentas autenticadas; el GET devuelve un valor seguro sin crear fila, el PUT usa UPSERT transaccional con revisión, el DTO no serializa `user_id`, y el nombre rechaza controles y caracteres Unicode de formato invisibles. Integración HTTP real: 4/4 tests PASS en la BD aislada de rama; unitarios del modelo PASS.
+
+**Límite 297A-48:** no crea catálogo de personajes, no vincula invitados a cuentas y no carga todavía el perfil en `game-playable`; esas decisiones permanecen en los siguientes bloques.
 
 **Gate:** ningún invitado puede invocar admin ni reclamar el estado de otra identidad; el perfil no depende de datos enviados sin validar.
 
