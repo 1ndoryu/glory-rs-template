@@ -3,7 +3,9 @@
 > **Fecha:** 2026-08-02
 > **Estado:** propuesto; no implementar hasta revisar el alcance y los objetivos.
 > **Evidencia inicial:** los últimos reportes local-light tardan 16.6–35.1 s. VarSense consume 10.7–16.8 s y frontend 4.8–7.3 s. Sentinel va de 0.2 s incremental a 8–11 s cuando el alcance queda full. El full anterior llegó a 173.5 s, con Rust ocupando 114 s.
-> **Dependencias:** 028A-3/028A-5 (guard y gate único), `scripts/quality/cache.mjs`, `scope.mjs` y los repositorios versionados de Sentinel/VarSense.
+> **Dependencias:** 028A-3/028A-5 (guard y gate único), SNT-10/028A-6 (Sentinel como plano único), `scripts/quality/cache.mjs`, `scope.mjs` y los repositorios versionados de Sentinel/VarSense.
+
+> **Límite arquitectónico:** la optimización no crea otro scheduler. El scope, cooldown, caché compartida y reporte pertenecen a Sentinel; VarSense solo implementa el contrato incremental de analyzer. Durante la transición los adapters `scripts/quality` pueden conservar compatibilidad, pero no deben introducir una segunda caché o política.
 
 ## Objetivo
 
@@ -102,11 +104,11 @@ Medir en una máquina de referencia y publicar p50/p95; los objetivos iniciales 
 
 **Gate:** Sentinel incremental queda por debajo del presupuesto sin reducir reglas; full CI produce el mismo conjunto de findings que el modo previo.
 
-### Fase 4 — Reporte, caché y ejecución sostenible
+### Fase 4 — Reporte, caché y ejecución sostenible en Sentinel
 
 - [ ] Mostrar en el reporte si cada etapa fue `cache-hit`, incremental o full, cuántos archivos reutilizó y qué invalidó la caché.
 - [ ] Mantener el stdout compacto; el detalle de timing vive en `.quality-reports/<task>/metrics.json`.
-- [ ] Añadir diagnóstico `npm run quality:profile -- <TareaId>` que no ejecuta full: lee los últimos reportes y calcula p50/p95.
+- [ ] Añadir diagnóstico `sentinel profile <TareaId>` (alias temporal `npm run quality:profile`) que no ejecuta full: lee los últimos reportes y calcula p50/p95.
 - [ ] Aplicar TTL y cuota separadas para índices Sentinel/VarSense, sin mezclarlas con `C:\tmp\glory-target`.
 - [ ] Limpiar entradas huérfanas por `toolVersion/configHash` de forma acotada; nunca borrar una caché con lock activo.
 - [ ] Hacer que CI publique métricas históricas sin subir código fuente ni secretos.

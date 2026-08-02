@@ -1,13 +1,13 @@
 # Roadmap Sentinel / VarSense / Quality Gate — wandori.us
 
 > **Fecha:** 2026-08-01  
-> **Alcance:** exclusivamente Glory Sentinel, VarSense y el orquestador `scripts/quality`.  
+> **Alcance:** exclusivamente Glory Sentinel, VarSense y la migración del orquestador `scripts/quality` hacia Sentinel.
 > **Fuera de alcance:** funcionalidades del OS, frontend, backend, comercio, móvil y roadmap principal.  
-> **Objetivo:** convertir los hallazgos y scripts nacidos en este proyecto en capacidades agnósticas, rápidas, portables y mantenibles para cualquier proyecto.
+> **Objetivo:** convertir los hallazgos y scripts nacidos en este proyecto en capacidades agnósticas, rápidas, portables y mantenibles para cualquier proyecto, con Sentinel como único plano de control y VarSense como analizador especializado.
 
 > **Estado (018A-43):** mínimo operativo cerrado y verificado; el roadmap principal queda desbloqueado. El commit no es requisito universal: el reporte recuerda cuándo conviene hacer staging/commit/push y cuándo documentar trabajo intermedio o compartido. El gate sí exige prueba y reporte reproducibles.
 
-> **Decisión de alcance:** las fases SNT-02 a SNT-09 que siguen con casillas abiertas son backlog diferido. No se ejecutan como requisito de una tarea del producto mientras el gate mínimo pase, no haya regresión de rendimiento y no aparezca un finding bloqueante real. Las extensiones de reglas, paridad de adapters, benchmarks y publicación upstream quedan para una iteración específica de tooling.
+> **Decisión de alcance:** las fases SNT-02 a SNT-10 que siguen con casillas abiertas son backlog diferido. No se ejecutan como requisito de una tarea del producto mientras el gate mínimo pase, no haya regresión de rendimiento y no aparezca un finding bloqueante real. Las extensiones de reglas, paridad de adapters, benchmarks y publicación upstream quedan para una iteración específica de tooling.
 
 ## Prioridad para desbloquear el roadmap principal
 
@@ -28,13 +28,15 @@ Con este checklist cerrado, las mejoras restantes de este documento son backlog 
 - Reglas de seguridad y arquitectura de baja frecuencia (MFA, permisos client-only, webhooks, rollback optimista).
 - Perfiles de tema, referencias circulares y precisión avanzada de VarSense.
 - Publicación upstream, reinstalación `.vsix`, changelog, ADR y guía de migración.
+- Consolidación de Sentinel como plano único (`SNT-10`), incluida la migración reversible de configuración y la retirada del scheduler duplicado.
 
 ## Cómo usar este roadmap
 
 - Los IDs `SNT-*` son identificadores internos de este roadmap; al ejecutar una tarea se les asignará el task ID diario exigido por `AGENTS.md`.
 - Una casilla solo se marca con evidencia: fixture, prueba CLI/LSP/VS Code equivalente, reporte y quality gate.
 - El core de Sentinel/VarSense no recibe reglas, rutas, nombres de clases, idiomas ni decisiones de wandori.us.
-- El proyecto configura políticas mediante `sentinel.config.json`, `varsense.config.json`, `quality.config.json` y `quality-tools.json`.
+- **Estado actual:** el proyecto todavía separa `sentinel.config.json`, `varsense.config.json`, `quality.config.json` y `quality-tools.json`; son contratos de transición.
+- **Destino:** `sentinel.config.json` v2 contiene política, gate, guard, runtime y analyzers; `sentinel.lock.json` fija versiones/hashes. VarSense no crea gate, cooldown ni reporte de cierre propio.
 - Mientras exista una regla en scripts locales, el adaptador debe marcarla como puente temporal y registrar su paridad con el core.
 - Cada fase termina con revisión SOLID, rendimiento, falsos positivos, seguridad de paths/secretos y compatibilidad Windows/Linux/macOS.
 
@@ -280,6 +282,25 @@ El reporte `297A-49` tardó 533833 ms: Rust consumió 483037 ms (90,5 %) y expir
 
 **Gate:** rollback a la versión anterior funciona, ningún consumidor pierde diagnósticos críticos y el bridge local queda eliminado o con fecha explícita de retiro.
 
+### SNT-10 — Sentinel como plano único de control y migración del gate
+
+**Objetivo:** eliminar la separación conceptual entre un "quality gate" independiente y Sentinel. Sentinel debe ser el único dueño de política, guard, cooldown, scope, caché, ejecución de etapas y reporte; VarSense conserva su core/CLI/LSP, pero entra como analyzer versionado.
+
+**Plan canónico:** `Agente/planes/plan-global-quality-guard-agnostico-2026-08-02.md`.
+
+- [ ] Definir el contrato `analyze/check/guard/doctor/status` sin romper el CLI `sentinel analyze` actual.
+- [ ] Definir el contrato de analyzer: manifest de alcance, configuración efectiva, cancelación, timeout, salida normalizada, métricas y estados de error.
+- [ ] Diseñar `sentinel.config.json` v2 como envelope; mapear la configuración Sentinel v1 actual, `quality.config.json`, `varsense.config.json` y `quality-tools.json` mediante migración dry-run/backup/rollback.
+- [ ] Crear `sentinel.lock.json` con versión/commit/hash de Sentinel, VarSense y protocolo; no ejecutar plugins o binarios arbitrarios del repositorio.
+- [ ] Extraer scheduler, cooldown, locks, scope, caché y reporter desde `scripts/quality` al runtime de Sentinel; conservar `task:check` como alias temporal.
+- [ ] Integrar VarSense por adapter CLI JSON/JSONL con `files-from`; sus comandos editoriales CLI/LSP no pueden cerrar el gate ni crear un reporte paralelo.
+- [ ] Emitir leases efímeros para que `sentinel check` ejecute herramientas pesadas sin quedar bloqueado por sus propios shims; auditar PID, proyecto, comando, expiración y task ID.
+- [ ] Probar enforcement de shells normales y del launcher del agente; documentar explícitamente rutas absolutas y `--noprofile --norc` como límites no interceptables por scripts del repositorio.
+- [ ] Ejecutar doble vía en `observe`, comparar findings ordenados y activar `enforce` solo tras paridad y cinco tareas reales dentro del presupuesto.
+- [ ] Retirar gradualmente `quality-command-guard`, `global-cargo-guard`, wrappers y scripts duplicados cuando dos releases consecutivos permitan rollback.
+
+**Gate SNT-10:** `sentinel check` es la única autoridad de cierre; VarSense aparece como etapa/analyzer dentro del reporte combinado; ningún proyecto sin política queda bloqueado; la migración de configuración es reversible y la matriz multi-shell/multi-proyecto pasa.
+
 ## Nuevas reglas propuestas por prioridad
 
 ### Bloqueantes (P0)
@@ -338,6 +359,8 @@ El reporte `297A-49` tardó 533833 ms: Rust consumió 483037 ms (90,5 %) y expir
 ```text
 npm run quality:test
 npm run task:check -- <task-id-real>
+# Durante SNT-10, el equivalente canónico será:
+sentinel check <task-id-real>
 ```
 
 Para cambios en los repositorios upstream, además:
