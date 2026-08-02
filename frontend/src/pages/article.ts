@@ -119,7 +119,10 @@ async function openCheckoutModal(product: Product): Promise<void> {
   const desc = createEl('p', { textContent: product.description || product.name });
   let email = '';
   const emailInput = createInput({ label: 'email para recibir el archivo', type: 'email', placeholder: 'tu@email.com', onInput: (v) => { email = v; } });
-  const btnPagar = createEl('button', { className: 'boton boton-grande', textContent: 'proceder al pago' });
+  /* [028A-4] Sin boton-grande: el modal es superficie OS, receta .boton
+   * compacta (el chrome gobierna el tamaño, manual-001 §Botones según
+   * superficie). */
+  const btnPagar = createEl('button', { className: 'boton', textContent: 'proceder al pago' });
   btnPagar.addEventListener('click', safeClick(async () => {
     if (!email) { showToast('ingresa tu email'); return; }
     const result = await safeRun(ProductService.createCheckout(product.id, email), 'error al iniciar el pago');

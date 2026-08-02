@@ -49,10 +49,6 @@
   font-size: var(--tamano-pequeno);
 }
 
-.boton-grande {
-  font-size: var(--tamano-grande);
-}
-
 /* [317A-4] Botones dentro de superficies del OS (ventanas desktop, apps
  * móviles, modales y confirms) ganan borde 1px para aspecto OS. Fuera de esas
  * superficies (páginas públicas como checkout/gallery) .boton sigue siendo

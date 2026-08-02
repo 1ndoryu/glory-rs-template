@@ -92,9 +92,10 @@ function renderGuest(container: HTMLElement): void {
     feedback.hidden = true;
     const submit = createEl('button', {
       type: 'button',
-      // [018A-65] boton-con-icono: centra icono+texto en el botón de envío
-      // (entrar/registrar/recuperar), igual que en las acciones secundarias.
-      className: 'boton boton-con-icono boton-grande account-app__submit',
+      /* [028A-4] Sin boton-grande: dentro de la ventana el tamaño lo gobierna
+       * el chrome (receta .boton OS), no el contenido. El envío debe medir lo
+       * mismo que las acciones secundarias (crear cuenta/recuperar acceso). */
+      className: 'boton boton-con-icono account-app__submit',
       ariaLabel: copy.aria,
     }, icon(copy.icon), createEl('span', { textContent: copy.submit }));
 
