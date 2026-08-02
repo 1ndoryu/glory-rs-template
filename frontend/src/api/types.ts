@@ -160,8 +160,15 @@ export interface UpdateProjectRequest {
 /* === Game === */
 export interface GameProfile {
   displayName: string;
+  characterId: string;
   revision: number;
   updatedAt: string;
+}
+
+export interface GameCharacterDefinition {
+  id: string;
+  displayName: string;
+  bodyTone: 'ink' | 'middle' | 'paper';
 }
 
 /* === Settings === */

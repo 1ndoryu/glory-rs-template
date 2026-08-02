@@ -1,4 +1,5 @@
 pub mod article;
+pub mod game_character;
 pub mod game_map;
 pub mod game_profile;
 pub mod game_realtime;
@@ -14,6 +15,7 @@ pub mod user;
 pub mod workspace;
 pub mod workspace_overlay;
 
+pub use game_character::{GameCharacterDefinition, GameCharacterPublicResponse};
 pub use game_profile::{GameProfile, UpdateGameProfileRequest};
 pub use note::{CreateNoteRequest, Note, PaginatedNotes, PaginationParams, UpdateNoteRequest};
 pub use notification::{

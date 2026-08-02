@@ -8,12 +8,14 @@ const mocks = vi.hoisted(() => ({
   createGameInput: vi.fn(),
   cancelAnimationFrame: vi.fn(),
   getGameProfile: vi.fn(),
+  listGameCharacters: vi.fn(),
 }));
 
 vi.mock('./game-webgl-capabilities', () => ({ detectWebGL: mocks.detectWebGL }));
 vi.mock('./game-playable-scene', () => ({ mountGamePlayableScene: mocks.mountGamePlayableScene }));
 vi.mock('./game-playable-input', () => ({ createGameInput: mocks.createGameInput }));
 vi.mock('../../../../services', () => ({
+  GameCharacterService: { list: mocks.listGameCharacters },
   GameProfileService: { get: mocks.getGameProfile },
 }));
 
@@ -28,7 +30,8 @@ describe('Bosque playable WebGL lifecycle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     authStore.set({ isAuthenticated: false, userId: null, capability: 'public' }, 'init');
-    mocks.getGameProfile.mockResolvedValue({ displayName: 'Guardián', revision: 0, updatedAt: '2026-08-02T00:00:00Z' });
+    mocks.getGameProfile.mockResolvedValue({ displayName: 'Guardián', characterId: 'forest-scout', revision: 0, updatedAt: '2026-08-02T00:00:00Z' });
+    mocks.listGameCharacters.mockResolvedValue([{ id: 'forest-scout', displayName: 'Explorador', bodyTone: 'ink' }]);
     mocks.detectWebGL.mockReturnValue({ available: false, reason: 'WebGL bloqueado en el dispositivo' });
     mocks.createGameInput.mockImplementation(() => ({
       controls: document.createElement('div'),
@@ -76,6 +79,7 @@ describe('Bosque playable WebGL lifecycle', () => {
     expect(view.element.querySelector('.juegoFixture__estado')?.textContent)
       .toContain('WebGL bloqueado');
     expect(view.element.dataset.playerName).toBe('Guardián');
+    expect(view.element.dataset.characterId).toBe('forest-scout');
     view.destroy?.();
   });
 
@@ -95,15 +99,34 @@ describe('Bosque playable WebGL lifecycle', () => {
     view.destroy?.();
   });
 
+  it('cleans hydration handles when the catalog has no valid character', async () => {
+    const clearTimeoutSpy = vi.spyOn(window, 'clearTimeout');
+    const controller = new AbortController();
+    const removeAbortSpy = vi.spyOn(controller.signal, 'removeEventListener');
+    mocks.listGameCharacters.mockResolvedValue([]);
+
+    const view = renderGamePlayable({ signal: controller.signal });
+    await flushHydration();
+
+    expect(mocks.getGameProfile).toHaveBeenCalledOnce();
+    expect(mocks.detectWebGL).not.toHaveBeenCalled();
+    expect(mocks.mountGamePlayableScene).not.toHaveBeenCalled();
+    expect(view.element.querySelector('.juegoFixture__estado')?.textContent)
+      .toContain('personaje no disponible');
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+    expect(removeAbortSpy).toHaveBeenCalledOnce();
+    view.destroy?.();
+  });
+
   it('aborts the profile request and clears its timeout before resolution', async () => {
-    let resolveProfile: ((profile: { displayName: string; revision: number; updatedAt: string }) => void) | undefined;
+    let resolveProfile: ((profile: { displayName: string; characterId: string; revision: number; updatedAt: string }) => void) | undefined;
     const clearTimeoutSpy = vi.spyOn(window, 'clearTimeout');
     mocks.getGameProfile.mockReturnValue(new Promise(resolve => { resolveProfile = resolve; }));
     const controller = new AbortController();
     const view = renderGamePlayable({ signal: controller.signal });
 
     controller.abort();
-    resolveProfile?.({ displayName: 'Tarde', revision: 0, updatedAt: '2026-08-02T00:00:00Z' });
+    resolveProfile?.({ displayName: 'Tarde', characterId: 'forest-scout', revision: 0, updatedAt: '2026-08-02T00:00:00Z' });
     await flushHydration();
 
     expect(mocks.detectWebGL).not.toHaveBeenCalled();

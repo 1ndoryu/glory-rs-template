@@ -6,7 +6,8 @@
 import type { MountedView, RenderContext } from '../../../../core/lifecycle';
 import { authStore } from '../../../../store';
 import { ApiError } from '../../../../api/client';
-import { GameProfileService } from '../../../../services';
+import { GameCharacterService, GameProfileService } from '../../../../services';
+import type { GameCharacterDefinition } from '../../../../api/types';
 import { createEl } from '../../../../utils/dom';
 import {
   createWorldState,
@@ -92,42 +93,68 @@ export function renderGamePlayable(context: RenderContext): MountedView {
     let displayName = 'Jugador';
     let profileLoadWarning = false;
     let profileSessionExpired = false;
+    let character: GameCharacterDefinition | null = null;
+    let characters: GameCharacterDefinition[] = [];
+
     try {
-      const profile = await GameProfileService.get({ signal: profileController.signal });
-      displayName = profile.displayName;
-    } catch (error: unknown) {
+      try {
+        characters = await GameCharacterService.list({ signal: profileController.signal });
+      } catch (error: unknown) {
+        if (context.signal.aborted || disposed) return;
+        profileLoadWarning = true;
+        setLoadingStatus('catálogo no disponible · cierra y vuelve a abrir Bosque');
+      }
+
+      try {
+        const profile = await GameProfileService.get({ signal: profileController.signal });
+        displayName = profile.displayName;
+        character = characters.find(option => option.id === profile.characterId) ?? null;
+      } catch (error: unknown) {
+        if (context.signal.aborted || disposed) return;
+        /* 401 es el camino normal del invitado: usa la opción base del catálogo.
+         * Una cuenta revocada no puede degradarse a identidad invitada. */
+        if (error instanceof ApiError && error.status === 401 && accountSessionAtStart) {
+          profileLoadWarning = true;
+          profileSessionExpired = true;
+          character = characters.find(option => option.id === 'forest-scout') ?? null;
+          setLoadingStatus('sesión expirada · modo local');
+        } else if (error instanceof ApiError && error.status === 401) {
+          character = characters.find(option => option.id === 'forest-scout') ?? null;
+        } else {
+          profileLoadWarning = true;
+          setLoadingStatus('perfil no disponible · modo local');
+        }
+      }
+
+      if (!character && !profileSessionExpired) {
+        profileLoadWarning = true;
+        setLoadingStatus('personaje no disponible · catálogo inválido');
+      }
+      if (!character) {
+        /* No inventar una identidad visual si el catálogo no está disponible. */
+        return;
+      }
+
       if (context.signal.aborted || disposed) return;
-      /* 401 es el camino normal del invitado: no hay fila persistente y el
-       * realtime obtiene identidad temporal por separado. Otros fallos no
-       * bloquean el fallback offline, pero sí dejan diagnóstico accesible. */
-      if (error instanceof ApiError && error.status === 401 && accountSessionAtStart) {
-        profileLoadWarning = true;
-        profileSessionExpired = true;
-        setLoadingStatus('sesión expirada · modo local');
-      } else if (!(error instanceof ApiError && error.status === 401)) {
-        profileLoadWarning = true;
-        setLoadingStatus('perfil no disponible · modo local');
+      try {
+        runtime = mountGamePlayableRuntime(
+          context,
+          view,
+          displayName,
+          profileLoadWarning,
+          profileSessionExpired,
+          character,
+        );
+      } catch (error: unknown) {
+        if (context.signal.aborted || disposed) return;
+        setLoadingStatus('este dispositivo no pudo iniciar Bosque');
+        console.error('[Bosque fixture] No se pudo montar el runtime.', error);
       }
     } finally {
       if (profileTimeout !== null) window.clearTimeout(profileTimeout);
       profileTimeout = null;
       context.signal.removeEventListener('abort', abortProfile);
       profileController = null;
-    }
-
-    if (context.signal.aborted || disposed) return;
-    try {
-      runtime = mountGamePlayableRuntime(
-        context,
-        view,
-        displayName,
-        profileLoadWarning,
-        profileSessionExpired,
-      );
-    } catch (error: unknown) {
-      if (context.signal.aborted || disposed) return;
-      setLoadingStatus('este dispositivo no pudo iniciar Bosque');
-      console.error('[Bosque fixture] No se pudo montar el runtime.', error);
     }
   };
 
@@ -153,6 +180,7 @@ function mountGamePlayableRuntime(
   displayName: string,
   profileLoadWarning: boolean,
   profileSessionExpired: boolean,
+  character: GameCharacterDefinition | null,
 ): MountedView {
   const setStatus = (message: string, error = false): void => {
     view.status.textContent = message;
@@ -165,6 +193,10 @@ function mountGamePlayableRuntime(
     return { element: view.element, destroy: () => {} };
   }
   view.element.dataset.playerName = displayName;
+  if (character) {
+    view.element.dataset.characterId = character.id;
+    view.element.dataset.characterTone = character.bodyTone;
+  }
   const capabilities = detectWebGL();
   if (!capabilities.available) {
     setStatus(`3D no disponible: ${capabilities.reason ?? 'WebGL rechazado'}`, true);

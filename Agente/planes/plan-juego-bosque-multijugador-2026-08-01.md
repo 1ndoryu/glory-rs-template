@@ -2,7 +2,7 @@
 
 > **Fecha:** 2026-08-01
 > **ID:** GAME-01
-> **Estado:** dirección Three.js 3D aprobada; fixture offline, persistencia, publicación admin de mapas, sala realtime server-authoritative, identidad temporal invitada y perfil persistente de cuenta están integrados; carga del perfil en gameplay, reconexión persistente, personaje y editor siguen pendientes.
+> **Estado:** dirección Three.js 3D aprobada; fixture offline, persistencia, publicación admin de mapas, sala realtime server-authoritative, identidad temporal invitada, perfil persistente de cuenta y catálogo base de personaje están integrados; reconexión persistente, editor y reclamación invitado→cuenta siguen pendientes.
 > **Prioridad:** futura, después del bloque actualmente habilitado en `roadmap.md`.
 > **Dependencias globales:** runtime `AppRegistry`/`MountedView`, ciclo de vida y carga lazy, sesiones/capacidades, contratos de workspace y quality gate.
 > **Fuentes canónicas:** `roadmap.md`, `Agente/documentacion/arquitectura/adr-bosque-3d-assets-terreno-2d-2026-08-01.md`, `Agente/planes/plan-assets-terreno-bosque-3d-2026-08-01.md`, `Agente/planes/plan-glory-render-motor-juegos-2026-08-01.md`, `Agente/documentacion/arquitectura/adr-glory-render-repositorio-agnostico-2026-08-01.md`, `Agente/documentacion/arquitectura/adr-carga-apps-pesadas-2026-07-31.md`, `Agente/documentacion/producto/referencia-visual-bosque-2026-08-01.md`.
@@ -520,7 +520,7 @@ realtime.
 - [x] Emitir identidad temporal para invitados con límites de abuso (`297A-47`).
 - [x] Asociar cuenta autenticada con perfil de juego persistente (`297A-48`): `GET/PUT /api/game/profile`, `AuthUser`, CSRF, nombre allowlisted y revisión optimista.
 - [x] Cargar el perfil validado en el flujo previo al gameplay sin añadir consultas al loop de render (`297A-49`): hidratación abortable, timeout acotado, fallback invitado y montaje posterior de WebGL/realtime.
-- [ ] Crear personaje base y selección de opciones allowlisted.
+- [x] Crear personaje base y selección de opciones allowlisted (`297A-50`): catálogo activo público con DTO mínimo, selección persistente de cuenta y validación atómica server-side.
 - [ ] Definir qué datos se conservan al pasar de invitado a cuenta.
 - [ ] Probar logout, sesión revocada, reconexión y cambio de usuario.
 
@@ -531,6 +531,10 @@ realtime.
 **Evidencia 297A-49:** `GameProfileService` consume `GET /api/game/profile` con cookie de sesión y valida estrictamente `displayName`, revisión y fecha; `game-playable` espera esa hidratación una sola vez antes de montar input, WebGL y realtime. El `AbortSignal` del `MountedView`, un timeout de 5 segundos y el teardown explícito cancelan la petición y su timer. Un 401 es el camino normal del invitado; errores de red/contrato conservan el modo local con estado accesible. Type-check y 16 tests frontend dirigidos PASS.
 
 **Límite 297A-49:** no guarda cambios desde gameplay, no crea catálogo/selector de personajes, no reclama identidades invitadas y no implementa reconexión persistente.
+
+**Evidencia 297A-50:** `game_character_definitions` contiene tres opciones base seed, activas y allowlisted; `GET /api/game/characters` expone solo `id`, etiqueta y tono visual. `user_game_profiles.character_id` tiene default/FK; el PUT exige selección explícita y valida la opción activa dentro de la misma transacción que el update condicionado por revisión, distinguiendo personaje inválido de conflicto de revisión. `game-playable` carga catálogo y perfil antes de montar WebGL/realtime, usa `forest-scout` solo para invitados y falla cerrado si no existe una opción activa. Backend 6/6 tests HTTP PostgreSQL y frontend 21/21 tests dirigidos PASS.
+
+**Límite 297A-50:** no existe editor admin del catálogo, desactivación desde UI, piezas combinables, inventario, compra ni reclamación de invitados; esos trabajos siguen en Fase 7/los bloques de identidad posteriores.
 
 **Gate:** ningún invitado puede invocar admin ni reclamar el estado de otra identidad; el perfil no depende de datos enviados sin validar.
 

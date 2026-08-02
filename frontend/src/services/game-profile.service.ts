@@ -27,9 +27,11 @@ function isValidGameProfile(value: unknown): value is GameProfile {
   if (typeof value !== 'object' || value === null) return false;
   const profile = value as Record<string, unknown>;
   const keys = Object.keys(profile).sort();
-  if (keys.join(',') !== 'displayName,revision,updatedAt') return false;
+  if (keys.join(',') !== 'characterId,displayName,revision,updatedAt') return false;
   return typeof profile.displayName === 'string'
     && isValidDisplayName(profile.displayName)
+    && typeof profile.characterId === 'string'
+    && /^[a-z0-9-]{1,32}$/.test(profile.characterId)
     && typeof profile.revision === 'number'
     && Number.isInteger(profile.revision)
     && profile.revision >= 0

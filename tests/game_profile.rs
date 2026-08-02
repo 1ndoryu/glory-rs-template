@@ -105,6 +105,7 @@ fn update_request(
         .body(Body::from(
             json!({
                 "displayName": display_name,
+                "characterId": "forest-scout",
                 "expectedRevision": expected_revision,
             })
             .to_string(),
@@ -148,6 +149,7 @@ async fn profile_is_private_and_returns_a_safe_default_without_a_row() {
     cleanup(&state, user_id).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["displayName"], "Jugador");
+    assert_eq!(body["characterId"], "forest-scout");
     assert_eq!(body["revision"], 0);
     assert!(body.get("userId").is_none());
     assert_eq!(row_count.0, 0);
@@ -218,7 +220,7 @@ async fn profile_update_validates_allowlisted_name_and_unknown_fields() {
     let body = json!({
         "displayName": "Bosque",
         "expectedRevision": 0,
-        "characterId": "admin"
+        "fakeField": "admin"
     });
     let unknown_response = create_router_with_state(state.clone())
         .oneshot({
@@ -279,12 +281,13 @@ async fn concurrent_first_updates_have_one_winner_and_revision_increments() {
     } else {
         second_body
     };
-    let row: (String, i32) =
-        sqlx::query_as("SELECT display_name, revision FROM user_game_profiles WHERE user_id = $1")
-            .bind(user_id)
-            .fetch_one(&state.pool)
-            .await
-            .expect("la escritura ganadora debe crear el perfil");
+    let row: (String, String, i32) = sqlx::query_as(
+        "SELECT display_name, character_id, revision FROM user_game_profiles WHERE user_id = $1",
+    )
+    .bind(user_id)
+    .fetch_one(&state.pool)
+    .await
+    .expect("la escritura ganadora debe crear el perfil");
 
     cleanup(&state, user_id).await;
     assert_eq!(
@@ -303,5 +306,6 @@ async fn concurrent_first_updates_have_one_winner_and_revision_increments() {
     );
     assert!(success["displayName"] == "Claro" || success["displayName"] == "Oscuro");
     assert_eq!(success["revision"], 1);
-    assert_eq!(row.1, 1);
+    assert_eq!(row.1, "forest-scout");
+    assert_eq!(row.2, 1);
 }

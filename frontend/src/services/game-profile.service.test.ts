@@ -16,6 +16,7 @@ describe('GameProfileService', () => {
   it('loads a bounded camelCase profile and sends credentials', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       displayName: 'Guardián',
+      characterId: 'forest-scout',
       revision: 2,
       updatedAt: '2026-08-02T00:00:00Z',
     }), { status: 200 }));
@@ -23,6 +24,7 @@ describe('GameProfileService', () => {
 
     await expect(GameProfileService.get()).resolves.toEqual({
       displayName: 'Guardián',
+      characterId: 'forest-scout',
       revision: 2,
       updatedAt: '2026-08-02T00:00:00Z',
     });
@@ -36,6 +38,7 @@ describe('GameProfileService', () => {
   it('preserves abort signals and rejects malformed successful responses', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       displayName: 'x'.repeat(25),
+      characterId: 'forest-scout',
       revision: 0,
       updatedAt: 'now',
     }), { status: 200 }));
@@ -64,11 +67,12 @@ describe('GameProfileService', () => {
   });
 
   it('validates profile shape before the game consumes it', () => {
-    expect(isValidGameProfile({ displayName: 'Jugador', revision: 0, updatedAt: 'now' })).toBe(true);
-    expect(isValidGameProfile({ displayName: 'Ju\u200Bgador', revision: 0, updatedAt: 'now' })).toBe(false);
-    expect(isValidGameProfile({ displayName: ' Jugador', revision: 0, updatedAt: 'now' })).toBe(false);
-    expect(isValidGameProfile({ displayName: ' ', revision: 0, updatedAt: 'now' })).toBe(false);
-    expect(isValidGameProfile({ displayName: 'Jugador', revision: -1, updatedAt: 'now' })).toBe(false);
-    expect(isValidGameProfile({ displayName: 'Jugador', revision: 0, updatedAt: 7 })).toBe(false);
+    expect(isValidGameProfile({ displayName: 'Jugador', characterId: 'forest-scout', revision: 0, updatedAt: 'now' })).toBe(true);
+    expect(isValidGameProfile({ displayName: 'Ju\u200Bgador', characterId: 'forest-scout', revision: 0, updatedAt: 'now' })).toBe(false);
+    expect(isValidGameProfile({ displayName: ' Jugador', characterId: 'forest-scout', revision: 0, updatedAt: 'now' })).toBe(false);
+    expect(isValidGameProfile({ displayName: 'Jugador', characterId: 'Admin', revision: 0, updatedAt: 'now' })).toBe(false);
+    expect(isValidGameProfile({ displayName: ' ', characterId: 'forest-scout', revision: 0, updatedAt: 'now' })).toBe(false);
+    expect(isValidGameProfile({ displayName: 'Jugador', characterId: 'forest-scout', revision: -1, updatedAt: 'now' })).toBe(false);
+    expect(isValidGameProfile({ displayName: 'Jugador', characterId: 'forest-scout', revision: 0, updatedAt: 7 })).toBe(false);
   });
 });

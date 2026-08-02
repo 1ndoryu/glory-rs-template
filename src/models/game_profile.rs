@@ -4,6 +4,7 @@ use sqlx::FromRow;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+pub const GAME_PROFILE_DEFAULT_CHARACTER_ID: &str = "forest-scout";
 pub const GAME_PROFILE_DEFAULT_DISPLAY_NAME: &str = "Jugador";
 pub const GAME_PROFILE_MAX_DISPLAY_NAME_CHARS: usize = 24;
 
@@ -15,6 +16,7 @@ pub struct GameProfile {
     #[serde(skip_serializing)]
     pub user_id: Uuid,
     pub display_name: String,
+    pub character_id: String,
     pub revision: i32,
     pub updated_at: DateTime<Utc>,
 }
@@ -25,6 +27,8 @@ pub struct GameProfile {
 pub struct UpdateGameProfileRequest {
     /// Nombre visible del jugador; no es una identidad ni un permiso.
     pub display_name: String,
+    /// Opción visual publicada por el catálogo allowlisted.
+    pub character_id: String,
     /// Revisión que el cliente leyó antes de editar.
     pub expected_revision: i32,
 }
@@ -33,6 +37,10 @@ impl UpdateGameProfileRequest {
     pub fn validate(&self) -> Result<String, &'static str> {
         if self.expected_revision < 0 {
             return Err("Revisión no válida");
+        }
+        if !crate::models::game_character::GameCharacterDefinition::is_valid_id(&self.character_id)
+        {
+            return Err("Personaje no válido");
         }
         if self
             .display_name
@@ -70,6 +78,7 @@ mod tests {
     fn trims_and_accepts_a_bounded_display_name() {
         let request = UpdateGameProfileRequest {
             display_name: "  Guardián  ".to_string(),
+            character_id: "forest-scout".to_string(),
             expected_revision: 0,
         };
         assert_eq!(request.validate(), Ok("Guardián".to_string()));
@@ -80,22 +89,27 @@ mod tests {
         for request in [
             UpdateGameProfileRequest {
                 display_name: "Jugador".to_string(),
+                character_id: "forest-scout".to_string(),
                 expected_revision: -1,
             },
             UpdateGameProfileRequest {
                 display_name: " ".to_string(),
+                character_id: "forest-scout".to_string(),
                 expected_revision: 0,
             },
             UpdateGameProfileRequest {
                 display_name: "x".repeat(25),
+                character_id: "forest-scout".to_string(),
                 expected_revision: 0,
             },
             UpdateGameProfileRequest {
                 display_name: "Jugador\n".to_string(),
+                character_id: "forest-scout".to_string(),
                 expected_revision: 0,
             },
             UpdateGameProfileRequest {
                 display_name: "Ju\u{200B}gador".to_string(),
+                character_id: "forest-scout".to_string(),
                 expected_revision: 0,
             },
         ] {

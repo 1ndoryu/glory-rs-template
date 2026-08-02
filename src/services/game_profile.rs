@@ -3,9 +3,10 @@ use uuid::Uuid;
 
 use crate::errors::AppError;
 use crate::models::game_profile::{
-    GameProfile, UpdateGameProfileRequest, GAME_PROFILE_DEFAULT_DISPLAY_NAME,
+    GameProfile, UpdateGameProfileRequest, GAME_PROFILE_DEFAULT_CHARACTER_ID,
+    GAME_PROFILE_DEFAULT_DISPLAY_NAME,
 };
-use crate::repositories::game_profile_repo::GameProfileRepository;
+use crate::repositories::game_profile_repo::{GameProfileRepository, GameProfileUpdateResult};
 
 pub struct GameProfileService;
 
@@ -16,6 +17,7 @@ impl GameProfileService {
             .unwrap_or_else(|| GameProfile {
                 user_id,
                 display_name: GAME_PROFILE_DEFAULT_DISPLAY_NAME.to_string(),
+                character_id: GAME_PROFILE_DEFAULT_CHARACTER_ID.to_string(),
                 revision: 0,
                 updated_at: chrono::Utc::now(),
             }))
@@ -29,14 +31,28 @@ impl GameProfileService {
         let display_name = request
             .validate()
             .map_err(|message| AppError::Validation(message.into()))?;
-
-        GameProfileRepository::update_if_revision(
+        match GameProfileRepository::update_if_revision(
             pool,
             user_id,
             &display_name,
+            &request.character_id,
             request.expected_revision,
         )
         .await?
-        .ok_or_else(|| AppError::Conflict("El perfil cambió; vuelve a leerlo".into()))
+        {
+            GameProfileUpdateResult::Updated(profile) => Ok(profile),
+            GameProfileUpdateResult::CharacterUnavailable => {
+                Err(AppError::Validation("Personaje no disponible".into()))
+            }
+            GameProfileUpdateResult::RevisionConflict => Err(AppError::Conflict(
+                "El perfil cambió; vuelve a leerlo".into(),
+            )),
+        }
+    }
+
+    pub async fn list_characters(
+        pool: &PgPool,
+    ) -> Result<Vec<crate::models::game_character::GameCharacterDefinition>, AppError> {
+        Ok(GameProfileRepository::list_active_characters(pool).await?)
     }
 }
