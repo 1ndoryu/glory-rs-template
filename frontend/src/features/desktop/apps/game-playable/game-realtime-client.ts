@@ -15,8 +15,17 @@ import {
 const CLIENT_VERSION = 'game-01';
 const HEARTBEAT_MS = 1_000;
 const MOVE_SEQUENCE_START = 0;
+/* [297A-57] Reconexión persistente con backoff exponencial (1s → 2s → 4s …,
+ * tope 30s) y jitter para no sincronizar reintentos entre clientes. */
+const RECONNECT_BASE_DELAY_MS = 1_000;
+const RECONNECT_MAX_DELAY_MS = 30_000;
+const RECONNECT_JITTER_MS = 200;
+/* [297A-57] El servidor cierra con este código cuando la misma identidad
+ * abrió una conexión nueva (reemplazo): el cliente NO debe reintentar para
+ * evitar el ping-pong entre pestañas/dispositivos del mismo usuario. */
+const GAME_WS_REPLACED_CLOSE_CODE = 4001;
 
-export type GameRealtimeConnectionState = 'idle' | 'connecting' | 'connected' | 'error' | 'closed';
+export type GameRealtimeConnectionState = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error' | 'closed';
 
 export interface GameRealtimeTicketResponse {
   readonly ticket: string;
@@ -69,16 +78,55 @@ export function createGameRealtimeClient(
   let previousSnapshotAt = 0;
   let currentSnapshotAt = 0;
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let reconnectAttempt = 0;
+  /* [297A-57] Fallo deliberado (protocolo, servidor fatal o reemplazo de
+   * identidad): NO se reintenta. Los errores transitorios del transporte
+   * (evento `error` del socket) no lo marcan; el `close` que les sigue
+   * programa la reconexión. Sin esto, una caída de red real (error → close
+   * 1006 en navegadores) nunca volvería a conectar. */
+  let fatal = false;
 
   const notify = (next: GameRealtimeConnectionState, message?: string): void => {
     state = next;
     options.onState?.(next, message);
   };
 
+  const fail = (message: string, code: number, reason: string): void => {
+    fatal = true;
+    notify('error', message);
+    closeSocket(code, reason);
+  };
+
   const clearHeartbeat = (): void => {
     if (heartbeatTimer === null) return;
     clearInterval(heartbeatTimer);
     heartbeatTimer = null;
+  };
+
+  /* [297A-57] Cancela cualquier reintento pendiente y reinicia el backoff
+   * (se invoca al conectar con éxito y al destruir la vista). */
+  const clearReconnect = (): void => {
+    if (reconnectTimer !== null) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+    reconnectAttempt = 0;
+  };
+
+  const scheduleReconnect = (): void => {
+    if (destroyed) return;
+    reconnectAttempt += 1;
+    const exponential = Math.min(
+      RECONNECT_BASE_DELAY_MS * 2 ** (reconnectAttempt - 1),
+      RECONNECT_MAX_DELAY_MS,
+    );
+    const delay = exponential + Math.floor(Math.random() * RECONNECT_JITTER_MS);
+    notify('reconnecting');
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      void connect();
+    }, delay);
   };
 
   const closeSocket = (code = 1000, reason = 'cliente cerrado'): void => {
@@ -94,7 +142,7 @@ export function createGameRealtimeClient(
       socket.send(JSON.stringify(message));
       return true;
     } catch {
-      notify('error', 'no se pudo enviar el mensaje realtime');
+      options.onState?.(state, 'no se pudo enviar el mensaje realtime');
       return false;
     }
   };
@@ -115,28 +163,26 @@ export function createGameRealtimeClient(
   const handleMessage = (event: Event): void => {
     const data = (event as MessageEvent<unknown>).data;
     if (typeof data !== 'string') {
-      notify('error', 'mensaje realtime no textual');
-      closeSocket(1003, 'mensaje no textual');
+      fail('mensaje realtime no textual', 1003, 'mensaje no textual');
       return;
     }
     let parsed: unknown;
     try {
       parsed = JSON.parse(data) as unknown;
     } catch {
-      notify('error', 'JSON realtime inválido');
-      closeSocket(1007, 'JSON inválido');
+      fail('JSON realtime inválido', 1007, 'JSON inválido');
       return;
     }
     const result = validateGameRealtimeServerMessage(parsed);
     if (!result.ok) {
-      notify('error', result.error);
-      closeSocket(1007, 'mensaje inválido');
+      fail(result.error, 1007, 'mensaje inválido');
       return;
     }
     const message: GameRealtimeServerMessage = result.value;
     if (message.type === 'joined') {
       playerId = message.payload.playerId;
       mapVersion = message.payload.mapVersion;
+      clearReconnect();
       notify('connected');
       clearHeartbeat();
       heartbeatTimer = setInterval(() => {
@@ -155,8 +201,7 @@ export function createGameRealtimeClient(
     }
     if (message.type === 'error') {
       if (message.payload.fatal) {
-        notify('error', message.payload.message);
-        closeSocket(1008, message.payload.code);
+        fail(message.payload.message, 1008, message.payload.code);
       } else if (state === 'connected') {
         options.onState?.('connected', message.payload.message);
       }
@@ -176,29 +221,44 @@ export function createGameRealtimeClient(
       try {
         socket.send(JSON.stringify(join));
       } catch {
+        /* Transitorio: el cierre posterior (close → handleClose) reintenta y
+         * en el próximo open se obtiene un ticket nuevo. */
         notify('error', 'no se pudo enviar el join realtime');
         closeSocket(1011, 'join fallido');
       }
     }).catch((error: unknown) => {
+      /* Un ticket fallido puede ser temporal (red); el backoff reintenta y
+       * el próximo open pide un ticket nuevo. No se marca fatal. */
       notify('error', error instanceof Error ? error.message : 'no se pudo obtener ticket');
       closeSocket(1008, 'ticket inválido');
     });
-
-
   };
 
   const handleError = (): void => {
-    if (!destroyed) notify('error', 'conexión realtime no disponible');
+    /* Error transitorio del transporte: no marcar fatal. El evento `close`
+     * que le sigue en navegadores (1006) programa la reconexión. */
+    if (!destroyed) options.onState?.(state, 'conexión realtime no disponible');
   };
 
-  const handleClose = (): void => {
+  const handleClose = (event?: Event): void => {
     clearHeartbeat();
     socket = null;
-    if (!destroyed && state !== 'error') notify('closed');
+    if (destroyed || fatal) return;
+    /* [297A-57] 4001 = el servidor reemplazó esta identidad por una conexión
+     * nueva (otra pestaña/dispositivo del mismo usuario): no reintentar; la
+     * sesión terminó deliberadamente. */
+    if ((event as CloseEvent | undefined)?.code === GAME_WS_REPLACED_CLOSE_CODE) {
+      notify('closed', 'identidad reemplazada');
+      return;
+    }
+    /* [297A-57] Caída inesperada (red, servidor o timeout): se programa la
+     * reconexión con backoff; el render conserva el último snapshot y el
+     * consumidor vuelve a simulación local hasta volver a 'connected'. */
+    scheduleReconnect();
   };
 
   const connect = async (): Promise<void> => {
-    if (destroyed || state === 'connecting' || state === 'connected') return;
+    if (destroyed || fatal || state === 'connecting' || state === 'connected') return;
     notify('connecting');
     try {
       socket = options.socketFactory(options.socketUrl);
@@ -207,7 +267,9 @@ export function createGameRealtimeClient(
       socket.addEventListener('error', handleError);
       socket.addEventListener('close', handleClose);
     } catch (error: unknown) {
-      notify('error', error instanceof Error ? error.message : 'no se pudo abrir realtime');
+      /* Fallo al instanciar el socket: transitorio, se reintenta con backoff. */
+      options.onState?.(state, error instanceof Error ? error.message : 'no se pudo abrir realtime');
+      scheduleReconnect();
     }
   };
 
@@ -233,6 +295,7 @@ export function createGameRealtimeClient(
     destroy: (): void => {
       if (destroyed) return;
       destroyed = true;
+      clearReconnect();
       clearHeartbeat();
       if (socket) {
         socket.removeEventListener('open', handleOpen);

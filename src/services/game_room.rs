@@ -126,7 +126,6 @@ impl GameRoomState {
 pub enum RoomJoinError {
     MapUnavailable,
     Full,
-    DuplicateIdentity,
     Busy,
 }
 
@@ -136,7 +135,6 @@ impl RoomJoinError {
         match self {
             Self::MapUnavailable => GameRealtimeErrorCode::MapUnavailable,
             Self::Full => GameRealtimeErrorCode::RoomFull,
-            Self::DuplicateIdentity => GameRealtimeErrorCode::Unauthorized,
             Self::Busy => GameRealtimeErrorCode::ServerBusy,
         }
     }
@@ -314,11 +312,18 @@ fn join_player(
     output: mpsc::Sender<GameRealtimeServerMessage>,
     handle: RoomHandle,
 ) -> Result<JoinedRoom, RoomJoinError> {
-    if players.len() >= GAME_REALTIME_MAX_PLAYERS_PER_ROOM {
+    /* [297A-57] Reconexión persistente: el mismo subject reemplaza su conexión
+     * previa en vez de ser rechazado. Al eliminar el RoomPlayer viejo, su
+     * Sender se dropea y el handle_socket anterior se cierra solo (recv →
+     * None), sin duplicar jugadores ni esperar el timeout del servidor. */
+    let previous = players
+        .iter()
+        .find_map(|(id, player)| (player.subject == subject).then_some(id.clone()));
+    if players.len() >= GAME_REALTIME_MAX_PLAYERS_PER_ROOM && previous.is_none() {
         return Err(RoomJoinError::Full);
     }
-    if players.values().any(|player| player.subject == subject) {
-        return Err(RoomJoinError::DuplicateIdentity);
+    if let Some(previous_id) = previous {
+        players.remove(&previous_id);
     }
     let player_id = format!("p-{}", Uuid::new_v4().simple());
     let (x, z) = map.spawn_position(players.len());
@@ -604,23 +609,54 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn room_rejects_duplicate_identity_and_ninth_player() {
+    async fn reconnect_replaces_previous_identity_without_duplication() {
+        let state = GameRoomState::with_map(map());
+        let subject = Uuid::new_v4();
+        let (first_output, mut first_messages) = mpsc::channel(32);
+        let first = state.join(subject, first_output).await.expect("first");
+
+        /* [297A-57] La misma identidad reconecta: reemplaza la conexión previa
+         * (id nuevo, sin duplicar jugadores). */
+        let (second_output, mut second_messages) = mpsc::channel(32);
+        let second = state.join(subject, second_output).await.expect("reconnect");
+        assert_ne!(first.player_id, second.player_id);
+
+        /* La conexión vieja dejó de recibir: al reemplazar, su Sender se
+         * dropea y el canal se cierra (recv → Ok(None)). Se drena cualquier
+         * snapshot en vuelo del primer tick y se verifica el cierre, no un
+         * timeout (si el jugador viejo siguiera activo, llegaría un snapshot). */
+        while first_messages.try_recv().is_ok() {}
+        let outcome =
+            tokio::time::timeout(std::time::Duration::from_millis(300), first_messages.recv())
+                .await;
+        assert!(
+            matches!(outcome, Ok(None)),
+            "la conexión vieja siguió recibiendo: {outcome:?}"
+        );
+        let snapshot =
+            tokio::time::timeout(std::time::Duration::from_secs(1), second_messages.recv())
+                .await
+                .expect("snapshot")
+                .expect("snapshot");
+        assert!(matches!(
+            snapshot,
+            GameRealtimeServerMessage::Snapshot { .. }
+        ));
+        second.disconnect().await;
+    }
+
+    #[tokio::test]
+    async fn room_rejects_ninth_player_and_keeps_reconnect_slots() {
         let state = GameRoomState::with_map(map());
         let subject = Uuid::new_v4();
         let mut receivers = Vec::new();
-        let (output, messages) = mpsc::channel(32);
-        receivers.push(messages);
-        let _first = state.join(subject, output).await.expect("first");
-        let (duplicate_output, duplicate_messages) = mpsc::channel(32);
-        receivers.push(duplicate_messages);
-        assert!(matches!(
-            state.join(subject, duplicate_output).await,
-            Err(RoomJoinError::DuplicateIdentity)
-        ));
-        for _ in 1..GAME_REALTIME_MAX_PLAYERS_PER_ROOM {
+        /* [297A-57] El primer slot lo ocupa `subject` para poder probar su
+         * reconexión después; el resto usa identidades frescas. */
+        for index in 0..GAME_REALTIME_MAX_PLAYERS_PER_ROOM {
             let (output, messages) = mpsc::channel(32);
             receivers.push(messages);
-            state.join(Uuid::new_v4(), output).await.expect("capacity");
+            let id = if index == 0 { subject } else { Uuid::new_v4() };
+            state.join(id, output).await.expect("capacity");
         }
         let (extra_output, extra_messages) = mpsc::channel(32);
         receivers.push(extra_messages);
@@ -628,5 +664,8 @@ mod tests {
             state.join(Uuid::new_v4(), extra_output).await,
             Err(RoomJoinError::Full)
         ));
+        /* Una sala llena aún acepta la reconexión de un jugador presente. */
+        let (reconnect_output, _reconnect_messages) = mpsc::channel(32);
+        assert!(state.join(subject, reconnect_output).await.is_ok());
     }
 }

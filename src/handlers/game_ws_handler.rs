@@ -5,7 +5,7 @@
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
+use axum::extract::ws::{CloseFrame, Message, WebSocket, WebSocketUpgrade};
 use axum::extract::State;
 use axum::response::Response;
 use axum::Router;
@@ -28,6 +28,12 @@ const GAME_WS_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
 const GAME_WS_INVALID_MESSAGE: &str = "mensaje realtime inválido";
 const GAME_WS_UNAUTHORIZED: &str = "ticket realtime inválido";
 const GAME_WS_MAP_UNAVAILABLE: &str = "mapa realtime no disponible";
+/* [297A-57] Cierre por reemplazo de identidad: la misma cuenta abrió una
+ * conexión nueva; el Sender del RoomPlayer anterior se dropea y el socket
+ * viejo se cierra con este código para que el cliente NO reintente (evita el
+ * ping-pong entre pestañas/dispositivos del mismo usuario). */
+const GAME_WS_REPLACED_CLOSE_CODE: u16 = 4001;
+const GAME_WS_REPLACED_REASON: &str = "identidad reemplazada";
 
 /// Abre el transporte realtime; el primer mensaje completa la autenticación.
 pub async fn upgrade_game_ws(
@@ -108,7 +114,6 @@ async fn handle_socket(
             let message = match error {
                 RoomJoinError::MapUnavailable => GAME_WS_MAP_UNAVAILABLE,
                 RoomJoinError::Full => "sala realtime llena",
-                RoomJoinError::DuplicateIdentity => GAME_WS_UNAUTHORIZED,
                 RoomJoinError::Busy => "sala realtime ocupada",
             };
             send_fatal_error(&mut socket, code, message).await;
@@ -201,7 +206,18 @@ async fn run_joined_session(
                 }
             }
             outgoing = messages.recv() => {
-                let Some(message) = outgoing else { break; };
+                let Some(message) = outgoing else {
+                    /* [297A-57] El Sender se dropeó: la identidad fue reemplazada
+                     * por una conexión nueva (o la sala cerró). Cerrar con un
+                     * código distintivo para que el cliente no reintente. */
+                    let _ = socket
+                        .send(Message::Close(Some(CloseFrame {
+                            code: GAME_WS_REPLACED_CLOSE_CODE,
+                            reason: GAME_WS_REPLACED_REASON.to_string().into(),
+                        })))
+                        .await;
+                    break;
+                };
                 if !send_server_message(socket, &message).await { break; }
             }
         }

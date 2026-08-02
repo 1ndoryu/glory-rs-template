@@ -382,7 +382,9 @@ function mountGamePlayableRuntime(
           ? `conectado${realtime?.getMapVersion() ? ` · ${realtime.getMapVersion()}` : ''}`
           : realtimeState === 'connecting'
             ? 'conectando… · fallback local'
-            : 'offline · movimiento local';
+            : realtimeState === 'reconnecting'
+              ? 'reconectando… · fallback local'
+              : 'offline · movimiento local';
         setStatus(
           `${displayName} · ${mode} · chunks ${streaming.visibleChunks} · props ${streaming.visibleInstances} · p95 ${performanceSnapshot.p95Ms.toFixed(1)}ms`,
           false,

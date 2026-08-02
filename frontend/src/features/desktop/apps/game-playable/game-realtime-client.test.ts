@@ -29,7 +29,11 @@ class FakeSocket implements GameRealtimeSocket {
   }
 
   emit(type: string, data?: unknown): void {
-    const event = { data } as MessageEvent<unknown>;
+    /* [297A-57] El evento `close` transporta el código para distinguir el
+     * cierre por reemplazo de identidad (4001) de una caída de red (1006). */
+    const event = type === 'close'
+      ? ({ code: data } as CloseEvent)
+      : ({ data } as MessageEvent<unknown>);
     for (const listener of this.listeners.get(type) ?? []) listener(event);
   }
 }
@@ -201,5 +205,223 @@ describe('Bosque realtime client adapter', () => {
       .toBe('wss://example.test/api/game/ws');
     expect(defaultGameSocketUrl({ protocol: 'http:', host: 'localhost:5173' } as Location))
       .toBe('ws://localhost:5173/api/game/ws');
+  });
+
+  /* [297A-57] Reconexión persistente: backoff exponencial determinista
+   * (jitter 0 con Math.random espiado), re-join tras caída, sin reintento
+   * tras error fatal y cancelación al destruir. */
+  it('re-joins and returns to connected after an unexpected close', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const sockets: FakeSocket[] = [];
+    const states: string[] = [];
+    const client = createGameRealtimeClient({
+      ticketProvider: vi.fn().mockResolvedValue('ticket'),
+      socketFactory: () => {
+        const socket = new FakeSocket();
+        sockets.push(socket);
+        return socket;
+      },
+      socketUrl: 'ws://localhost/api/game/ws',
+      onState: state => states.push(state),
+    });
+
+    void client.connect();
+    sockets[0]!.emit('open');
+    await Promise.resolve();
+    sockets[0]!.emit('message', JSON.stringify({
+      v: 1,
+      type: 'joined',
+      payload: { playerId: 'p-local', mapVersion: 'forest@1', tick: 0 },
+    }));
+    expect(client.getState()).toBe('connected');
+
+    sockets[0]!.emit('close');
+    expect(client.getState()).toBe('reconnecting');
+    expect(states).toContain('reconnecting');
+
+    vi.advanceTimersByTime(1_000);
+    await Promise.resolve();
+    expect(sockets).toHaveLength(2);
+    sockets[1]!.emit('open');
+    await Promise.resolve();
+    expect(JSON.parse(sockets[1]!.sent[0] ?? '{}')).toMatchObject({
+      type: 'join',
+      payload: { ticket: 'ticket', clientVersion: 'game-01' },
+    });
+    sockets[1]!.emit('message', JSON.stringify({
+      v: 1,
+      type: 'joined',
+      payload: { playerId: 'p-local', mapVersion: 'forest@1', tick: 0 },
+    }));
+    expect(client.getState()).toBe('connected');
+    expect(client.getPlayerId()).toBe('p-local');
+    client.destroy();
+  });
+
+  it('grows the backoff exponentially and caps at 30s', () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const sockets: FakeSocket[] = [];
+    const client = createGameRealtimeClient({
+      ticketProvider: vi.fn().mockResolvedValue('ticket'),
+      socketFactory: () => {
+        const socket = new FakeSocket();
+        sockets.push(socket);
+        return socket;
+      },
+      socketUrl: 'ws://localhost/api/game/ws',
+    });
+
+    void client.connect();
+    sockets[0]!.emit('close');
+    expect(client.getState()).toBe('reconnecting');
+    vi.advanceTimersByTime(999);
+    expect(sockets).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    expect(sockets).toHaveLength(2);
+
+    sockets[1]!.emit('close');
+    vi.advanceTimersByTime(2_000);
+    expect(sockets).toHaveLength(3);
+
+    sockets[2]!.emit('close');
+    vi.advanceTimersByTime(4_000);
+    expect(sockets).toHaveLength(4);
+
+    sockets[3]!.emit('close');
+    vi.advanceTimersByTime(8_000);
+    expect(sockets).toHaveLength(5);
+
+    sockets[4]!.emit('close');
+    vi.advanceTimersByTime(16_000);
+    expect(sockets).toHaveLength(6);
+
+    sockets[5]!.emit('close');
+    vi.advanceTimersByTime(32_000);
+    expect(sockets).toHaveLength(7);
+    client.destroy();
+  });
+
+  it('does not reconnect after a fatal server error', () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const socket = new FakeSocket();
+    const states: string[] = [];
+    const client = createGameRealtimeClient({
+      ticketProvider: vi.fn().mockResolvedValue('ticket'),
+      socketFactory: () => socket,
+      socketUrl: 'ws://localhost/api/game/ws',
+      onState: state => states.push(state),
+    });
+
+    void client.connect();
+    socket.emit('message', JSON.stringify({
+      v: 1,
+      type: 'error',
+      payload: { code: 'room_full', message: 'sala llena', fatal: true },
+    }));
+    expect(client.getState()).toBe('error');
+
+    socket.emit('close');
+    vi.advanceTimersByTime(60_000);
+    expect(client.getState()).toBe('error');
+    expect(states).not.toContain('reconnecting');
+    client.destroy();
+  });
+
+  it('cancels a pending reconnect when destroyed', () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const sockets: FakeSocket[] = [];
+    const client = createGameRealtimeClient({
+      ticketProvider: vi.fn().mockResolvedValue('ticket'),
+      socketFactory: () => {
+        const socket = new FakeSocket();
+        sockets.push(socket);
+        return socket;
+      },
+      socketUrl: 'ws://localhost/api/game/ws',
+    });
+
+    void client.connect();
+    sockets[0]!.emit('close');
+    expect(client.getState()).toBe('reconnecting');
+    client.destroy();
+    vi.advanceTimersByTime(60_000);
+    expect(sockets).toHaveLength(1);
+    expect(client.getState()).toBe('closed');
+  });
+
+  /* [297A-57] En navegadores reales una caída de red dispara `error` y luego
+   * `close` (1006): el error del transporte no debe marcar fatal y el close
+   * posterior debe programar la reconexión. */
+  it('reconnects after a transport error event followed by close', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const sockets: FakeSocket[] = [];
+    const states: string[] = [];
+    const client = createGameRealtimeClient({
+      ticketProvider: vi.fn().mockResolvedValue('ticket'),
+      socketFactory: () => {
+        const socket = new FakeSocket();
+        sockets.push(socket);
+        return socket;
+      },
+      socketUrl: 'ws://localhost/api/game/ws',
+      onState: state => states.push(state),
+    });
+
+    void client.connect();
+    sockets[0]!.emit('error');
+    sockets[0]!.emit('close');
+    expect(client.getState()).toBe('reconnecting');
+
+    vi.advanceTimersByTime(1_000);
+    expect(sockets).toHaveLength(2);
+    sockets[1]!.emit('open');
+    await Promise.resolve();
+    sockets[1]!.emit('message', JSON.stringify({
+      v: 1,
+      type: 'joined',
+      payload: { playerId: 'p-local', mapVersion: 'forest@1', tick: 0 },
+    }));
+    expect(client.getState()).toBe('connected');
+    client.destroy();
+  });
+
+  /* [297A-57] 4001 = el servidor reemplazó esta identidad por una conexión
+   * nueva (otra pestaña/dispositivo): no reintentar para evitar el ping-pong. */
+  it('does not reconnect when the server replaces the identity (close 4001)', () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const sockets: FakeSocket[] = [];
+    const states: string[] = [];
+    const client = createGameRealtimeClient({
+      ticketProvider: vi.fn().mockResolvedValue('ticket'),
+      socketFactory: () => {
+        const socket = new FakeSocket();
+        sockets.push(socket);
+        return socket;
+      },
+      socketUrl: 'ws://localhost/api/game/ws',
+      onState: state => states.push(state),
+    });
+
+    void client.connect();
+    sockets[0]!.emit('open');
+    sockets[0]!.emit('message', JSON.stringify({
+      v: 1,
+      type: 'joined',
+      payload: { playerId: 'p-local', mapVersion: 'forest@1', tick: 0 },
+    }));
+    expect(client.getState()).toBe('connected');
+
+    sockets[0]!.emit('close', 4001);
+    expect(client.getState()).toBe('closed');
+    expect(states).not.toContain('reconnecting');
+    vi.advanceTimersByTime(60_000);
+    expect(sockets).toHaveLength(1);
+    client.destroy();
   });
 });
