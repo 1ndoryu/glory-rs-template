@@ -340,6 +340,18 @@ servidor sin depender de Three.js.
 - [x] Verificar por TCP el límite global: con capacidad 1, el segundo upgrade recibe HTTP 409 antes de abrir WebSocket.
 - [x] Mantener los tests independientes de PostgreSQL real y sin abrir actor de sala, movimiento ni snapshots.
 
+#### 297A-45 — Cliente realtime autenticado del Bosque
+
+- [x] Añadir adaptador `game-realtime-client.ts` separado de `game-core`, con ticket provider, WebSocket inyectable, estados de conexión y URL `ws/wss` derivada del host.
+- [x] Enviar `join`, `move` y heartbeat solo después de conexión/join; validar mensajes server-side en el boundary, ignorar snapshots atrasados e interpolar snapshots sucesivos.
+- [x] Integrar el adaptador en `game-playable` solo para cuentas autenticadas; mantener fallback offline para usuarios públicos y errores de transporte.
+- [x] Usar el `playerId` efímero server-side para distinguir el avatar local de entidades remotas; liberar socket, heartbeat, listeners, RAF y escena en `destroy()`.
+- [x] Cubrir handshake, ticket, joined, snapshots, interpolación, heartbeat, error fatal/no fatal, snapshot stale, URL segura y teardown con 20 tests frontend.
+
+**Límite de 297A-45:** no se implementan identidad invitada, reconexión persistente, dos salas, editor admin, publicación en vivo ni métricas operacionales.
+
+**Gate técnico:** PASS verificado con type-check, 20 tests frontend dirigidos, build y `git diff --check`; la validación visual de `/forest-playable` queda pendiente porque la automatización de navegador no produjo una sesión/pestaña válida. No se abre socket para usuarios públicos.
+
 #### 297A-44 — Actor de sala server-authoritative
 
 - [x] Crear `GameRoomState` single-instance bajo demanda con actor Tokio de propietario único, cap estricto de 8 jugadores y TTL configurable de sala vacía.
@@ -464,6 +476,7 @@ realtime.
 - [x] Crear actor de sala bajo demanda con TTL, cap de 8 y backpressure (`297A-44`).
 - [x] Implementar inputs server-authoritative, snapshots, interpolación y presencia (`297A-44`).
 - [x] Añadir heartbeat, timeout de handshake y cierre ordenado al destruir la sesión (`297A-44`); la reconexión persistente queda pendiente.
+- [x] Conectar `game-playable` al transporte autenticado con fallback offline público (`297A-45`).
 - [ ] Medir CPU, memoria, mensajes, latencia y ancho de banda con 1, 4 y 8 clientes.
 
 **Gate:** ocho clientes pueden moverse en una sala sin aceptar posiciones falsificadas, sin fanout ilimitado y sin dejar salas vivas vacías.

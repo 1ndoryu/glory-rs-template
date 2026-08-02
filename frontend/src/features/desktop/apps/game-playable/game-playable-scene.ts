@@ -29,7 +29,7 @@ export interface GamePlayableStreamingStats {
 
 export interface GamePlayableSceneHandle {
   readonly canvas: HTMLCanvasElement;
-  readonly update: (snapshot: WorldSnapshot) => void;
+  readonly update: (snapshot: WorldSnapshot, localEntityId?: string) => void;
   readonly resize: () => void;
   readonly render: () => void;
   readonly streamingStats: () => GamePlayableStreamingStats;
@@ -133,8 +133,8 @@ export function mountGamePlayableScene(
     camera.lookAt(cameraTarget.x, 0, cameraTarget.z);
   };
 
-  const createEntity = (id: string): THREE.Group => {
-    const remote = id !== 'local';
+  const createEntity = (id: string, localEntityId = 'local'): THREE.Group => {
+    const remote = id !== localEntityId;
     const figure = createFigure(materials, remote);
     figure.userData.entityId = id;
     scene.add(figure);
@@ -142,14 +142,14 @@ export function mountGamePlayableScene(
     return figure;
   };
 
-  const update = (snapshot: WorldSnapshot): void => {
+  const update = (snapshot: WorldSnapshot, localEntityId = 'local'): void => {
     if (destroyed) return;
     const activeIds = new Set<string>();
     for (const entity of snapshot.entities) {
-      const object = entities.get(entity.id) ?? createEntity(entity.id);
+      const object = entities.get(entity.id) ?? createEntity(entity.id, localEntityId);
       object.position.set(entity.position.x, 0.2, entity.position.z);
       activeIds.add(entity.id);
-      if (entity.id === 'local') currentPlayer = entity.position;
+      if (entity.id === localEntityId) currentPlayer = entity.position;
     }
     for (const [id, object] of entities) {
       if (activeIds.has(id)) continue;

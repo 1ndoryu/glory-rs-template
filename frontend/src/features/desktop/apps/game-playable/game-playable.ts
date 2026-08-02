@@ -1,9 +1,10 @@
-/* GAME-01 — Vertical slice jugable offline.
- * Orquesta input, simulación pura y renderer. No abre red, no persiste estado y
- * no crea chrome del OS. El fixture se reemplazará por contratos publicados en
- * fases posteriores, sin cambiar el lifecycle de la app. */
+/* GAME-01 — Vertical slice jugable con fallback offline.
+ * Orquesta input, simulación, transporte realtime y renderer. El core sigue
+ * puro; el socket solo se crea para una cuenta autenticada y siempre se libera
+ * junto con la vista. Los usuarios públicos permanecen en el fixture offline. */
 
 import type { MountedView, RenderContext } from '../../../../core/lifecycle';
+import { authStore } from '../../../../store';
 import { createEl } from '../../../../utils/dom';
 import {
   createWorldState,
@@ -17,7 +18,20 @@ import { detectWebGL } from './game-webgl-capabilities';
 import { FIXTURE_MAP, FIXTURE_MAP_VERSION } from './game-fixture-map';
 import { createGameInput, type GameInputHandle } from './game-playable-input';
 import { mountGamePlayableScene, type GamePlayableSceneHandle } from './game-playable-scene';
+import {
+  createGameRealtimeClient,
+  defaultGameSocketUrl,
+  requestGameTicket,
+  type GameRealtimeConnectionState,
+} from './game-realtime-client';
 import '../../../../styles/desktop/desktop-game-playable.css';
+
+function normalizeRealtimeDirection(direction: { x: number; z: number }): { x: number; z: number } {
+  if (!Number.isFinite(direction.x) || !Number.isFinite(direction.z)) return { x: 0, z: 0 };
+  const length = Math.hypot(direction.x, direction.z);
+  if (length <= 1) return direction;
+  return { x: direction.x / length, z: direction.z / length };
+}
 
 interface GamePlayableElements {
   readonly element: HTMLElement;
@@ -77,8 +91,21 @@ export function renderGamePlayable(context: RenderContext): MountedView {
   let visible = !document.hidden;
   let contextLost = false;
   let destroyed = false;
+  let lastNetworkMoveAt = 0;
   const frameMonitor = new FramePerformanceMonitor({ maxSamples: 120 });
   let frameCount = 0;
+  let realtimeState: GameRealtimeConnectionState = 'idle';
+  const realtime = authStore.get().isAuthenticated
+    ? createGameRealtimeClient({
+      ticketProvider: requestGameTicket,
+      socketFactory: (url) => new WebSocket(url),
+      socketUrl: defaultGameSocketUrl(),
+      onState: (next, message) => {
+        realtimeState = next;
+        if (next === 'error') setStatus(message ?? 'realtime no disponible', true);
+      },
+    })
+    : null;
 
   const stopFrameLoop = (): void => {
     if (frameHandle !== 0) cancelAnimationFrame(frameHandle);
@@ -94,13 +121,24 @@ export function renderGamePlayable(context: RenderContext): MountedView {
     lastTime = now;
     const direction = input.getDirection();
     try {
-      state = simulateTick(
-        state,
-        FIXTURE_MAP,
-        [{ playerId: 'local', direction, sequence: sequence++ }],
-        delta,
-      );
-      scene.update(snapshotFromState(state));
+      const networkSnapshot = realtime?.getState() === 'connected'
+        ? realtime.getRenderSnapshot(now)
+        : null;
+      if (networkSnapshot) {
+        if (now - lastNetworkMoveAt >= 66) {
+          realtime?.sendMove(normalizeRealtimeDirection(direction));
+          lastNetworkMoveAt = now;
+        }
+        scene.update(networkSnapshot, realtime?.getPlayerId() ?? undefined);
+      } else {
+        state = simulateTick(
+          state,
+          FIXTURE_MAP,
+          [{ playerId: 'local', direction, sequence: sequence++ }],
+          delta,
+        );
+        scene.update(snapshotFromState(state));
+      }
       scene.render();
       frameMonitor.record(performance.now() - frameStart);
       frameCount += 1;
@@ -124,9 +162,14 @@ export function renderGamePlayable(context: RenderContext): MountedView {
       if (rendererMetrics.jsHeapLimitBytes !== undefined) {
         view.element.dataset.jsHeapLimitBytes = String(rendererMetrics.jsHeapLimitBytes);
       }
-      if (frameCount % 30 === 0) {
+      if (frameCount % 30 === 0 && realtimeState !== 'error') {
+        const mode = realtimeState === 'connected'
+          ? `conectado${realtime?.getMapVersion() ? ` · ${realtime.getMapVersion()}` : ''}`
+          : realtimeState === 'connecting'
+            ? 'conectando… · fallback local'
+            : 'offline · movimiento local';
         setStatus(
-          `offline · chunks ${streaming.visibleChunks} · props ${streaming.visibleInstances} · p95 ${performanceSnapshot.p95Ms.toFixed(1)}ms`,
+          `${mode} · chunks ${streaming.visibleChunks} · props ${streaming.visibleInstances} · p95 ${performanceSnapshot.p95Ms.toFixed(1)}ms`,
           false,
         );
       }
@@ -167,6 +210,7 @@ export function renderGamePlayable(context: RenderContext): MountedView {
     scene?.canvas.removeEventListener('webglcontextlost', onContextLost);
     resizeObserver.disconnect();
     input.destroy();
+    realtime?.destroy();
     scene?.destroy();
     scene = null;
   };
@@ -184,7 +228,11 @@ export function renderGamePlayable(context: RenderContext): MountedView {
     attachContextLossListener();
     resizeObserver.observe(view.sceneHost);
     scene.update(snapshotFromState(state));
-    setStatus('offline · movimiento local · sin red', false);
+    setStatus(
+      realtime ? 'conectando… · fallback local mientras se autentica' : 'offline · movimiento local · sin red',
+      false,
+    );
+    void realtime?.connect();
     startFrameLoop();
   } catch (error: unknown) {
     setStatus('este dispositivo no pudo iniciar el fixture 3d', true);
