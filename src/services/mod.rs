@@ -3,6 +3,7 @@ mod auth;
 pub mod commerce;
 pub mod commerce_outbox;
 pub mod email;
+pub mod game_character_svc;
 pub mod game_map_svc;
 pub mod game_profile;
 pub mod game_room;

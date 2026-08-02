@@ -2,7 +2,7 @@
 
 > **Fecha:** 2026-08-01
 > **ID:** GAME-01
-> **Estado:** dirección Three.js 3D aprobada; fixture offline, persistencia, publicación admin de mapas, sala realtime server-authoritative, identidad temporal invitada, perfil persistente de cuenta y catálogo base de personaje están integrados; reconexión persistente, editor y reclamación invitado→cuenta siguen pendientes.
+> **Estado:** dirección Three.js 3D aprobada; fixture offline, persistencia, publicación admin de mapas, sala realtime server-authoritative, identidad temporal invitada, perfil persistente de cuenta, catálogo base de personaje y gestión admin del catálogo (backend) están integrados; el panel admin de UI, el editor de mapa/assets, la reconexión persistente y la reclamación invitado→cuenta siguen pendientes.
 > **Prioridad:** futura, después del bloque actualmente habilitado en `roadmap.md`.
 > **Dependencias globales:** runtime `AppRegistry`/`MountedView`, ciclo de vida y carga lazy, sesiones/capacidades, contratos de workspace y quality gate.
 > **Fuentes canónicas:** `roadmap.md`, `Agente/documentacion/arquitectura/adr-bosque-3d-assets-terreno-2d-2026-08-01.md`, `Agente/planes/plan-assets-terreno-bosque-3d-2026-08-01.md`, `Agente/planes/plan-glory-render-motor-juegos-2026-08-01.md`, `Agente/documentacion/arquitectura/adr-glory-render-repositorio-agnostico-2026-08-01.md`, `Agente/documentacion/arquitectura/adr-carga-apps-pesadas-2026-07-31.md`, `Agente/documentacion/producto/referencia-visual-bosque-2026-08-01.md`.
@@ -540,6 +540,10 @@ realtime.
 
 **Límite 297A-51:** no implementa reconexión persistente del socket tras una caída de red, ni editor de perfil/personaje en UI; una sesión revocada a mitad de partida se muestra como error de realtime y el juego continúa en modo local hasta la siguiente hidratación.
 
+**Evidencia 297A-52:** gestión admin del catálogo de personajes en el backend: `POST /api/admin/game/characters` (alta) y `PUT /api/admin/game/characters/:id` (renombrar, cambiar tono, desactivar), ambos con `AdminUser`/CSRF, validación allowlisted (`id`, etiqueta 1–48 sin controles, tono `ink|middle|paper`), 409 en id duplicado y 404 en id inexistente. El repositorio/servicio de personaje se separó de `game_profile` con un segundo consumidor real. Las opciones desactivadas desaparecen del catálogo público y no pueden seleccionarse de nuevo (422), aunque los perfiles existentes las conservan por FK. 10/10 tests HTTP PostgreSQL (2 catálogo + 4 admin + 4 perfil), `cargo fmt --check`, `cargo check --tests` y clippy PASS.
+
+**Límite 297A-52:** no existe panel admin de UI, auditoría persistente de cambios sensibles (`game_audit_events` sigue pendiente), borrado físico (solo desactivación por FK) ni editor de piezas por slots; la UI del catálogo se hará en un bloque posterior de Fase 7.
+
 **Gate:** ningún invitado puede invocar admin ni reclamar el estado de otra identidad; el perfil no depende de datos enviados sin validar.
 
 **Auditoría de cierre — Fase 6:**
@@ -549,6 +553,7 @@ realtime.
 
 ### Fase 7 — Assets 3D, editor 2D y publicación
 
+- [x] Gestión admin del catálogo de personajes en el backend (`297A-52`): alta, renombrado, tono y desactivación allowlisted con `AdminUser`/CSRF; las opciones desactivadas no reaparecen en el catálogo público ni pueden seleccionarse, y los perfiles existentes las conservan por FK.
 - [ ] Crear `Assets 3D` admin para importar/analizar/previsualizar/versionar GLB; no editar geometría.
 - [ ] Crear `Editor de mapa` admin 2D para altura, superficie, agua, caminos, spawn y colocación de instancias.
 - [ ] Reutilizar el renderer del juego para preview 3D; no crear un segundo motor dentro del editor.

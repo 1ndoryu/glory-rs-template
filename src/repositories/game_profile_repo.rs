@@ -1,7 +1,6 @@
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-use crate::models::game_character::GameCharacterDefinition;
 use crate::models::game_profile::GameProfile;
 
 pub struct GameProfileRepository;
@@ -83,18 +82,5 @@ impl GameProfileRepository {
 
         tx.commit().await?;
         Ok(result)
-    }
-
-    pub async fn list_active_characters(
-        pool: &PgPool,
-    ) -> Result<Vec<GameCharacterDefinition>, sqlx::Error> {
-        sqlx::query_as::<_, GameCharacterDefinition>(
-            "SELECT id, display_name, body_tone, is_active, created_at
-             FROM game_character_definitions
-             WHERE is_active = TRUE
-             ORDER BY id",
-        )
-        .fetch_all(pool)
-        .await
     }
 }

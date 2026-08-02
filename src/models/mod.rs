@@ -15,7 +15,10 @@ pub mod user;
 pub mod workspace;
 pub mod workspace_overlay;
 
-pub use game_character::{GameCharacterDefinition, GameCharacterPublicResponse};
+pub use game_character::{
+    CreateGameCharacterRequest, GameCharacterAdminResponse, GameCharacterDefinition,
+    GameCharacterPublicResponse, UpdateGameCharacterRequest,
+};
 pub use game_profile::{GameProfile, UpdateGameProfileRequest};
 pub use note::{CreateNoteRequest, Note, PaginatedNotes, PaginationParams, UpdateNoteRequest};
 pub use notification::{

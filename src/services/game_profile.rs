@@ -49,10 +49,4 @@ impl GameProfileService {
             )),
         }
     }
-
-    pub async fn list_characters(
-        pool: &PgPool,
-    ) -> Result<Vec<crate::models::game_character::GameCharacterDefinition>, AppError> {
-        Ok(GameProfileRepository::list_active_characters(pool).await?)
-    }
 }

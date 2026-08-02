@@ -3,6 +3,7 @@ pub mod article;
 pub mod auth_audit_repo;
 pub mod auth_token_repo;
 pub mod commerce_repo;
+pub mod game_character_repo;
 pub mod game_map_repo;
 pub mod game_profile_repo;
 pub mod media_repo;
