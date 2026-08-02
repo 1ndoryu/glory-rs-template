@@ -64,7 +64,7 @@ Ejemplo para wandori.us:
 - [ ] Crear ADR con la separación runtime global/política local y la matriz `enforce/observe/pass-through`.
 - [ ] Definir JSON Schema versionado de `guard-policy.json`, errores allowlisted y límites de tamaño/profundidad.
 - [ ] Definir contrato de salida estable: `decision`, `projectRoot`, `policyPath`, `policyHash`, `reason`, `recommendedCommand`, `exitCode`.
-- [ ] Definir compatibilidad Windows PowerShell 5/7, PowerShell Core, CMD y CI sin depender de variables específicas de VS Code.
+- [ ] Definir compatibilidad Windows PowerShell 5/7, PowerShell Core, CMD, Bash/Git Bash (interactivo y `BASH_ENV`) y CI sin depender de variables específicas de VS Code.
 - [ ] Definir política de actualización, rollback y migración desde el guard actual.
 
 **Gate:** ADR aprobado, schema con fixtures válidos/ inválidos y contrato de salida revisado.
@@ -103,7 +103,7 @@ Ejemplo para wandori.us:
 ### Fase 4 — Integración multi-proyecto y CI
 
 - [ ] Crear fixtures de un proyecto Node, Rust, Python y un proyecto sin política.
-- [ ] Probar `npm`, `npx`, `cargo`, comandos directos, `2>&1`, pipes y códigos de salida en PowerShell 5/7 y CMD.
+- [ ] Probar `npm`, `npx`, `cargo`, `rustfmt`, comandos directos, `2>&1`, pipes y códigos de salida en PowerShell 5/7, CMD y Bash/Git Bash.
 - [ ] Probar rutas anidadas, junctions/symlinks permitidos, repositorio movido y checkout de ramas con/sin política.
 - [ ] CI usará la política del proyecto y el runtime fijado; nunca dependerá del perfil del desarrollador.
 - [ ] Publicar reportes compactos sin secretos y con máximo tres hallazgos/máximo cuatro recordatorios.
@@ -147,7 +147,7 @@ Cada fase debe adjuntar evidencia de:
 - [ ] Un proyecto sin `.quality/guard-policy.json` puede ejecutar libremente sus comandos.
 - [ ] Un proyecto con política puede exigir su propio gate y sus propias clases de comandos.
 - [ ] Cambiar de rama actualiza la política sin reiniciar VS Code ni reinstalar perfiles.
-- [ ] `doctor`, CI y los shims muestran decisiones coherentes en PowerShell 5/7 y CMD.
+- [ ] `doctor`, CI y los shims muestran decisiones coherentes en PowerShell 5/7, CMD y Bash/Git Bash.
 - [ ] Tests de contrato, matriz multi-proyecto, type-check, Sentinel/VarSense y documentación pasan.
 - [ ] Existe rollback probado y no quedan rutas hardcodeadas a `C:\Users\...\glory-rust-template` en perfiles globales.
 

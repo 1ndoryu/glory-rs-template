@@ -51,6 +51,13 @@ test('bloquea validaciones Cargo directas para forzar el gate único', async () 
   assert.equal(decision.category, 'cargo');
 });
 
+test('bloquea rustfmt directo para evitar el bypass de cargo fmt', async () => {
+  const root = await fixtureRoot();
+  const decision = inspectDirectCommand({ executable: 'rustfmt.exe', args: ['src/lib.rs'], cwd: root });
+  assert.equal(decision.blocked, true);
+  assert.equal(decision.category, 'tool');
+});
+
 test('no bloquea comandos fuera de un proyecto Glory', async () => {
   const cwd = await mkdtemp(path.join(os.tmpdir(), 'unrelated-quality-command-'));
   assert.equal(inspectDirectCommand({ executable: 'npx', args: ['vitest', 'run'], cwd }).blocked, false);

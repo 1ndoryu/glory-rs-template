@@ -66,8 +66,9 @@
 - [x] Validar el guard con tests unitarios, `quality:test` y limpieza en dry-run; limpiar los targets antiguos detectados (se liberaron aproximadamente 29 GB).
 - [x] Revisar el perfil PowerShell 7/Windows PowerShell y ejecutar `quality:install-guard -InstallProfile` con autorización explícita; backups y rollback quedaron registrados.
 - [x] Bloquear validaciones directas (`npx vitest`, `npm run test:*`, type-check/lint/build y Cargo de validación) desde PowerShell/CMD; todas recomiendan `npm run task:check -- <TareaId>`.
+- [x] Cubrir Bash/Git Bash y shells no interactivos: instalar `global-quality-guard.sh` en `.bashrc`/`.bash_profile` y `BASH_ENV`, con resolución por workspace/rama; bloquear también `rustfmt` directo.
 
-**Gate/salida:** ningún agente puede iniciar accidentalmente un full o `cargo test` durante el cooldown desde los wrappers disponibles; el uso de `--allow-heavy` queda visible en reportes y la cuota de targets se mantiene sin borrar procesos activos.
+**Gate/salida:** ningún agente puede iniciar accidentalmente un full o `cargo test` durante el cooldown desde los wrappers PowerShell/CMD/Bash disponibles; el uso de `--allow-heavy` queda visible en reportes y la cuota de targets se mantiene sin borrar procesos activos. Invocaciones con ruta absoluta y shells iniciados con `--noprofile --norc` quedan fuera del alcance del interceptor y deben bloquearse en la capa de ejecución del agente, no mediante un script de proyecto.
 
 ### 028A-6 — Guard global agnóstico por proyecto y rama (planificado)
 

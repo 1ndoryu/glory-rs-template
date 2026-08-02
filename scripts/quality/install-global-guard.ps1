@@ -5,6 +5,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $guardScript = Join-Path $PSScriptRoot 'global-cargo-guard.ps1'
+$bashGuardScript = Join-Path $PSScriptRoot 'global-quality-guard.sh'
 $shimDirectory = $PSScriptRoot
 $currentProfile = [string]$PROFILE
 if ([string]::IsNullOrWhiteSpace($currentProfile)) {
@@ -16,9 +17,24 @@ $profilePaths = @(
     (Join-Path $profileParent 'PowerShell\Microsoft.PowerShell_profile.ps1'),
     (Join-Path $profileParent 'WindowsPowerShell\Microsoft.PowerShell_profile.ps1')
 ) | Where-Object { $_ } | Select-Object -Unique
+$bashProfilePaths = @(
+    (Join-Path $HOME '.bashrc'),
+    (Join-Path $HOME '.bash_profile')
+) | Select-Object -Unique
 
 $markerStart = '# >>> glory-quality-global-guard >>>'
 $markerEnd = '# <<< glory-quality-global-guard <<<'
+$bashMarkerStart = '# >>> glory-quality-global-bash-guard >>>'
+$bashMarkerEnd = '# <<< glory-quality-global-bash-guard <<<'
+
+function Convert-WindowsPathToBash {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    $normalized = $Path.Replace('\', '/')
+    if ($normalized -match '^([A-Za-z]):/(.*)$') {
+        return "/$($matches[1].ToLowerInvariant())/$($matches[2])"
+    }
+    return $normalized
+}
 
 function Convert-MojibakeToUtf8 {
     param([string]$Text)
@@ -50,6 +66,12 @@ $markerStart
 . '$guardScript'
 $markerEnd
 "@
+    $bashGuardPath = Convert-WindowsPathToBash -Path $bashGuardScript
+    $bashProfileBlock = @"
+$bashMarkerStart
+if [ -f '$bashGuardPath' ]; then . '$bashGuardPath'; fi
+$bashMarkerEnd
+"@
     $pattern = "(?s)" + [regex]::Escape($markerStart) + ".*?" + [regex]::Escape($markerEnd) + "\r?\n?"
     if ($InstallProfile) {
         foreach ($profilePath in $profilePaths) {
@@ -61,7 +83,17 @@ $markerEnd
             $profileContent = ($profileContent.TrimEnd() + "`r`n" + $profileBlock.Trim() + "`r`n")
             Set-Content -Path $profilePath -Value $profileContent -Encoding utf8NoBOM
         }
-        Write-Host "[glory-quality] Interceptor de perfil instalado en $($profilePaths -join ', ')" -ForegroundColor Green
+        foreach ($bashProfilePath in $bashProfilePaths) {
+            $bashDirectory = Split-Path -Parent $bashProfilePath
+            if (-not (Test-Path $bashDirectory)) { New-Item -ItemType Directory -Path $bashDirectory -Force | Out-Null }
+            if (-not (Test-Path $bashProfilePath)) { New-Item -ItemType File -Path $bashProfilePath -Force | Out-Null }
+            $bashContent = Normalize-ProfileText (Convert-MojibakeToUtf8 (Get-Content $bashProfilePath -Raw))
+            $bashPattern = "(?s)" + [regex]::Escape($bashMarkerStart) + ".*?" + [regex]::Escape($bashMarkerEnd) + "\r?\n?"
+            $bashContent = [regex]::Replace($bashContent, $bashPattern, '')
+            $bashContent = ($bashContent.TrimEnd() + "`n" + $bashProfileBlock.Trim() + "`n")
+            Set-Content -Path $bashProfilePath -Value $bashContent -Encoding utf8NoBOM
+        }
+        Write-Host "[glory-quality] Interceptor instalado en PowerShell ($($profilePaths -join ', ')) y Bash ($($bashProfilePaths -join ', '))" -ForegroundColor Green
     } else {
         Write-Host '[glory-quality] Shim PATH instalado; perfiles no modificados. Usa -InstallProfile solo tras revisar tu perfil.' -ForegroundColor Yellow
     }
@@ -93,6 +125,15 @@ $markerEnd
             }
         }
         Write-Host "[glory-quality] Interceptor retirado de los perfiles PowerShell" -ForegroundColor Yellow
+        foreach ($bashProfilePath in $bashProfilePaths) {
+            if (Test-Path $bashProfilePath) {
+                $bashContent = Normalize-ProfileText (Convert-MojibakeToUtf8 (Get-Content $bashProfilePath -Raw))
+                $bashPattern = "(?s)" + [regex]::Escape($bashMarkerStart) + ".*?" + [regex]::Escape($bashMarkerEnd) + "\r?\n?"
+                $bashContent = [regex]::Replace($bashContent, $bashPattern, '')
+                Set-Content -Path $bashProfilePath -Value $bashContent -Encoding utf8NoBOM
+            }
+        }
+        Write-Host "[glory-quality] Interceptor retirado de los perfiles Bash" -ForegroundColor Yellow
     }
     Write-Host '[glory-quality] Se retiró el shim PATH si era administrado por este instalador.' -ForegroundColor Yellow
 }

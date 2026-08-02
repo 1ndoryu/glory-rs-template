@@ -23,7 +23,9 @@ const BLOCKED_NPM_SCRIPTS = new Set([
   'build',
 ]);
 
-const BLOCKED_TOOLS = new Set(['vitest', 'tsc', 'eslint', 'prettier']);
+/* Direct rustfmt is the same validation path as cargo fmt and must not be
+ * able to bypass the task gate from a shell that does not expose cargo. */
+const BLOCKED_TOOLS = new Set(['vitest', 'tsc', 'eslint', 'prettier', 'rustfmt']);
 const BLOCKED_CARGO_COMMANDS = new Set(['check', 'clippy', 'test', 'bench', 'fmt']);
 
 function normalizeExecutable(value = '') {
