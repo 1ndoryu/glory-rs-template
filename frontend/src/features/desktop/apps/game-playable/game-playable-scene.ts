@@ -28,6 +28,7 @@ export interface GamePlayableStreamingStats {
 }
 
 export interface GamePlayableSceneHandle {
+  readonly canvas: HTMLCanvasElement;
   readonly update: (snapshot: WorldSnapshot) => void;
   readonly resize: () => void;
   readonly render: () => void;
@@ -184,6 +185,7 @@ export function mountGamePlayableScene(
   resize();
 
   return {
+    canvas: renderer.domElement,
     update,
     resize,
     render,

@@ -13,6 +13,7 @@ import {
   type WorldState,
 } from '../../../game-core';
 import { evaluateGamePerformanceBudget } from './game-performance-budget';
+import { detectWebGL } from './game-webgl-capabilities';
 import { FIXTURE_MAP, FIXTURE_MAP_VERSION } from './game-fixture-map';
 import { createGameInput, type GameInputHandle } from './game-playable-input';
 import { mountGamePlayableScene, type GamePlayableSceneHandle } from './game-playable-scene';
@@ -49,11 +50,22 @@ export function createGamePlayableView(): GamePlayableElements {
 
 export function renderGamePlayable(context: RenderContext): MountedView {
   const view = createGamePlayableView();
+  const setStatus = (message: string, error = false): void => {
+    view.status.textContent = message;
+    view.status.dataset.state = error ? 'error' : 'ready';
+    view.status.hidden = !error;
+  };
   /* La carga lazy puede resolver después de que WindowManager haya abortado la
    * vista. No montar listeners, observers ni WebGL si el scope ya terminó. */
   if (context.signal.aborted) {
     return { element: view.element, destroy: () => {} };
   }
+  const capabilities = detectWebGL();
+  if (!capabilities.available) {
+    setStatus(`3D no disponible: ${capabilities.reason ?? 'WebGL rechazado'}`, true);
+    return { element: view.element, destroy: () => {} };
+  }
+  view.element.dataset.webglKind = capabilities.kind ?? 'unknown';
   const input: GameInputHandle = createGameInput();
   view.element.appendChild(input.controls);
 
@@ -63,6 +75,7 @@ export function renderGamePlayable(context: RenderContext): MountedView {
   let frameHandle = 0;
   let lastTime = performance.now();
   let visible = !document.hidden;
+  let contextLost = false;
   let destroyed = false;
   const frameMonitor = new FramePerformanceMonitor({ maxSamples: 120 });
   let frameCount = 0;
@@ -72,15 +85,9 @@ export function renderGamePlayable(context: RenderContext): MountedView {
     frameHandle = 0;
   };
 
-  const setStatus = (message: string, error = false): void => {
-    view.status.textContent = message;
-    view.status.dataset.state = error ? 'error' : 'ready';
-    view.status.hidden = !error;
-  };
-
   const renderFrame = (now: number): void => {
     frameHandle = 0;
-    if (destroyed || !visible || !scene) return;
+    if (destroyed || contextLost || !visible || !scene) return;
 
     const frameStart = performance.now();
     const delta = Math.min(Math.max((now - lastTime) / 1000, 0), 0.1);
@@ -133,7 +140,7 @@ export function renderGamePlayable(context: RenderContext): MountedView {
   };
 
   const startFrameLoop = (): void => {
-    if (destroyed || !visible || frameHandle !== 0) return;
+    if (destroyed || contextLost || !visible || frameHandle !== 0) return;
     lastTime = performance.now();
     frameHandle = requestAnimationFrame(renderFrame);
   };
@@ -143,6 +150,12 @@ export function renderGamePlayable(context: RenderContext): MountedView {
     if (visible) startFrameLoop();
     else stopFrameLoop();
   };
+  const onContextLost = (event: Event): void => {
+    event.preventDefault();
+    contextLost = true;
+    stopFrameLoop();
+    setStatus('el navegador perdió el contexto 3D; cierra y vuelve a abrir Bosque', true);
+  };
   const onResize = (): void => scene?.resize();
 
   const destroy = (): void => {
@@ -151,6 +164,7 @@ export function renderGamePlayable(context: RenderContext): MountedView {
     stopFrameLoop();
     context.signal.removeEventListener('abort', destroy);
     document.removeEventListener('visibilitychange', onVisibilityChange);
+    scene?.canvas.removeEventListener('webglcontextlost', onContextLost);
     resizeObserver.disconnect();
     input.destroy();
     scene?.destroy();
@@ -159,10 +173,15 @@ export function renderGamePlayable(context: RenderContext): MountedView {
 
   context.signal.addEventListener('abort', destroy, { once: true });
   document.addEventListener('visibilitychange', onVisibilityChange);
+  /* El evento pertenece al canvas real de Three; no dependemos de bubbling. */
+  const attachContextLossListener = (): void => {
+    scene?.canvas.addEventListener('webglcontextlost', onContextLost, { once: true });
+  };
   const resizeObserver = new ResizeObserver(onResize);
 
   try {
     scene = mountGamePlayableScene(view.sceneHost, FIXTURE_MAP, FIXTURE_MAP_VERSION);
+    attachContextLossListener();
     resizeObserver.observe(view.sceneHost);
     scene.update(snapshotFromState(state));
     setStatus('offline · movimiento local · sin red', false);
