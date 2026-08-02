@@ -298,6 +298,17 @@ servidor sin depender de Three.js.
 - [ ] Decidir la restauración segura de sesión y fijar presupuestos de frame, memoria, mapa, mensajes, latencia y reconexión.
 - [ ] Registrar qué lógica es agnóstica y candidata a Glory y qué queda específica de wandori.us.
 
+#### 297A-39 — Contrato realtime v1 sin transporte
+
+- [x] Definir envelope versionado `v:1` para join, move, heartbeat, client ack, joined, snapshot, heartbeat ack y error.
+- [x] Mantener el ticket de join opaco y separar el `playerId` efímero de cualquier UUID de cuenta o subject interno.
+- [x] Validar límites antes de deserializar: 512 bytes cliente, 4 KiB servidor, strings acotados, 8 entidades, secuencias y rate budget.
+- [x] Alinear frontend/Rust en `deny_unknown_fields`, UTF-8 estricto, Unicode por puntos de código, controles C0/C1/DEL, vectores finitos, errores allowlisted y snapshots filtrados/deterministas.
+- [x] Cubrir negativos: JSON/campos desconocidos, versión, dirección, replay/jump, entidades duplicadas, payload sobredimensionado, UTF-8 inválido y timestamps negativos.
+- [x] Validar sin abrir conexiones: frontend type-check, 26 tests dirigidos y build; Rust fmt/check y 8 tests del modelo.
+
+**Límite de esta entrega:** no implementa upgrade WebSocket, emisión/verificación de tickets, identidad invitada, actor de sala, autoridad de movimiento ni reconexión. Esos contratos de transporte y ejecución permanecen en Fase 5/6.
+
 **Gate:** ADR realtime, ADR de identidad de invitado y contrato de mapa aprobados; el núcleo offline puede existir, pero no se habilita gameplay conectado hasta cerrar estos contratos.
 
 **Auditoría de cierre — Fase 2:**

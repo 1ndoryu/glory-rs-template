@@ -11,3 +11,4 @@ export * from './map-version';
 export * from './map-streaming';
 export * from './terrain-mesh';
 export * from './performance-monitor';
+export * from './game-realtime';
