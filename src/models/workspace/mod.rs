@@ -5,8 +5,14 @@ use sqlx::FromRow;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+mod release_validation;
+
+pub use release_validation::{validate_release_tree, ReleaseTreeIssue};
+
 /// Release inmutable del layout del escritorio.
 /// [297A-11 §9.2] Cada release es versionado e inmutable.
+/// [028A-11] `summary` guarda el diff auditable contra la release anterior
+/// (`diff_from`) o está vacío para la primera release.
 #[derive(Debug, Clone, FromRow, Serialize, ToSchema)]
 pub struct WorkspaceRelease {
     pub id: Uuid,
@@ -15,6 +21,9 @@ pub struct WorkspaceRelease {
     pub tree: JsonValue,
     pub published_at: DateTime<Utc>,
     pub published_by: Option<Uuid>,
+    #[schema(value_type = Object)]
+    pub summary: JsonValue,
+    pub diff_from: Option<i32>,
 }
 
 /// Request para publicar un nuevo release.

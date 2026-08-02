@@ -153,4 +153,29 @@ impl ResourceRepository {
         .await?;
         Ok(result.rows_affected() > 0)
     }
+
+    /// [028A-11] Devuelve los ids que NO son publicables: no existen o no están
+    /// `active + ready + public`. Usado por `WorkspaceService::publish` para
+    /// rechazar releases con refs de recursos rotos (422 con detalle).
+    pub async fn find_broken_public_refs(
+        pool: &PgPool,
+        ids: &[Uuid],
+    ) -> Result<Vec<Uuid>, sqlx::Error> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let public_ids: Vec<Uuid> = sqlx::query_scalar(
+            "SELECT id FROM resources \
+             WHERE id = ANY($1) \
+               AND lifecycle = 'active' AND editorial = 'ready' AND visibility = 'public'",
+        )
+        .bind(ids)
+        .fetch_all(pool)
+        .await?;
+        Ok(ids
+            .iter()
+            .filter(|id| !public_ids.contains(id))
+            .copied()
+            .collect())
+    }
 }

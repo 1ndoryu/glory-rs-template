@@ -45,6 +45,13 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 - El archivo de completados es compartido: al commitearlo se arrastran también las entradas de documentación del otro agente (aceptable), pero NUNCA sus archivos de código (main.ts, workspace-store.ts, registros de apps, assets de juego, etc.) — el staging debe seguir siendo explícito por archivo.
 - El `selectionStore` global sin scope de superficie filtra selección entre superficies que muestran los mismos node-ids (Finder en raíz vs escritorio). La solución raíz es escalar por `source` en el contrato, no limpiar la selección al navegar (rompería copiar/cortar por teclado que usa la última selección como fallback).
 
+## 028A-10 — La colisión de IDs también ocurre contra el roadmap pendiente
+
+- Un plan nuevo asignó `028A-8..12` mientras el roadmap ya tenía `028A-8` (optimización Sentinel/VarSense) pendiente y `028A-9` (guard Bash) completada: la colisión no estaba en `completados/` sino en los pendientes del roadmap.
+- Antes de numerar cualquier plan nuevo, `grep_search` en `roadmap.md` y `Agente/completados/` con el patrón del prefijo (`028A-\d+`) y verificar qué cifras están ocupadas; si el plan es reciente (mismo día) y sin commits, renumerar las fases del plan y renombrar/re-aplicar las migraciones ya creadas.
+- Tras renumerar una migración aplicada: `DELETE FROM workspace_releases WHERE version = N` + `DELETE FROM _sqlx_migrations WHERE version = <timestamp>` y re-aplicar con `cargo sqlx migrate run` (DATABASE_URL explícito a `glory_backend_wandorius`, `.env` stale).
+- `cargo fmt` sobre archivos del otro agente es seguro (rustfmt determinista) y deja su código formateado, pero esos archivos NO deben entrar en el commit propio: el staging por archivo los excluye y el otro agente los commitea con su tarea.
+
 ## 018A-5 — Commit condicional y migración de reglas
 
 - El quality gate no debe ordenar commit a ciegas: diagnósticos, bloques intermedios y trabajo compartido pueden documentarse sin commit; el recordatorio debe indicar commit/push solo cuando el bloque sea entregable.
@@ -388,3 +395,9 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 - Si `npm run dev` falla con `error: failed to remove file ...\debug\glory-backend.exe / Acceso denegado (os error 5)`, hay un `glory-backend.exe` anterior aún vivo que mantiene el binario abierto (Windows no permite sobrescribir un exe en ejecución). El dev launcher muere con código 101 y deja Vite huérfanos sirviendo el puerto anterior.
 - Diagnóstico: `Get-NetTCPConnection -State Listen` sobre `3000,5173,5174,5175` + `Get-CimInstance Win32_Process` con el command line completo para distinguir qué Vite pertenece al proyecto (ruta `frontend/node_modules/.../vite/bin/vite.js`) de los de otros workspaces (p. ej. `test1/freellmapi`). No matar procesos de otros proyectos.
 - Limpieza: `Stop-Process -Id <pids> -Force`, verificar puertos libres y relanzar `npm run dev`. La señal de readiness es el backend respondiendo en `127.0.0.1:3000` (401 en `/api/auth/me` sin sesión es señal de que responde) y Vite en `5174` (200). Los `ECONNREFUSED` del proxy Vite mientras el backend compila son normales.
+
+## 028A-11 — No saltarse el cooldown del guard y colisión de IDs con el agente paralelo
+
+- Cuando el guard bloquea una validación pesada por cooldown (180 min), el agente NO debe intentar `--allow-heavy`, `GLORY_QUALITY_ALLOW_HEAVY` ni variantes: el usuario lo desaprueba explícitamente (riesgo de que otro agente lo perciba como evasión del gate). La vía correcta es cerrar con gate local-light, registrar los tests como pendientes con su hora de reintento y ejecutarlos cuando el cooldown expire.
+- Los overrides del guard existen para emergencias reales y quedan visibles en reportes; usarlos para "no esperar" rompe el propósito del cooldown (limitar ejecuciones pesadas).
+- Colisión de IDs con agente paralelo: mientras el plan de gobernanza usaba `028A-10..14`, el otro agente commiteó `028A-10/11/12` para Sentinel (f26d649b, a3a93cc6, c3d91c7a). La colisión era contra commits ya hechos, no solo contra el roadmap. Verificar SIEMPRE `git log --oneline` + `Agente/completados/` + `roadmap.md` antes de numerar; si ya hay commits del otro agente con esos IDs, renumerar o aceptar con mensajes de commit descriptivos que desambigüen.
