@@ -11,8 +11,9 @@ import {
   type WorldMap,
   type WorldSnapshot,
 } from '../../../game-core';
-import { createBroadleaf, createConifer, createFigure, createPond, createRock, type ForestMaterials } from '../game-shared/forest-models';
-import { FIXTURE_PROPS, type FixtureProp } from './game-fixture-map';
+import { createFigure, type ForestMaterials } from '../game-shared/forest-models';
+import { FIXTURE_PROPS } from './game-fixture-map';
+import { createGamePlayableVisualCache } from './game-playable-visual-cache';
 
 export interface GamePlayableStreamingStats {
   readonly cacheSize: number;
@@ -58,17 +59,7 @@ export function mountGamePlayableScene(
     lines: new THREE.LineBasicMaterial({ color: 0x050505 }),
   };
 
-  const floor = new THREE.Mesh(
-    new THREE.BoxGeometry(map.bounds.maxX - map.bounds.minX, 0.5, map.bounds.maxZ - map.bounds.minZ),
-    materials.pale,
-  );
-  floor.position.set(
-    (map.bounds.minX + map.bounds.maxX) / 2,
-    -0.25,
-    (map.bounds.minZ + map.bounds.maxZ) / 2,
-  );
-  floor.receiveShadow = true;
-  scene.add(floor, new THREE.GridHelper(20, 20, 0x777777, 0xc8c8c2));
+  scene.add(new THREE.GridHelper(20, 20, 0x777777, 0xc8c8c2));
 
   scene.add(new THREE.HemisphereLight(0xffffff, 0x555555, 2.2));
   const sun = new THREE.DirectionalLight(0xffffff, 3.2);
@@ -77,29 +68,17 @@ export function mountGamePlayableScene(
   scene.add(sun);
 
   const chunkCache = new MapChunkCache(mapVersion);
-  const propById = new Map<string, FixtureProp>(FIXTURE_PROPS.map(prop => [prop.id, prop]));
-  const propObjects = new Map<string, THREE.Group>();
+  const visualCache = createGamePlayableVisualCache({
+    scene,
+    materials,
+    map: mapVersion,
+    props: new Map(FIXTURE_PROPS.map(prop => [prop.id, prop])),
+  });
   let currentStreamingStats: GamePlayableStreamingStats = {
     cacheSize: 0,
     visibleChunks: 0,
     visibleInstances: 0,
     visibleAssets: 0,
-  };
-
-  const createProp = (prop: FixtureProp): THREE.Group => {
-    const object = prop.kind === 'conifer'
-      ? createConifer(materials, prop.scale)
-      : prop.kind === 'broadleaf'
-        ? createBroadleaf(materials, prop.scale)
-        : prop.kind === 'rock'
-          ? createRock(materials, prop.scale)
-          : createPond(materials, prop.width ?? 1, prop.depth ?? 1);
-    object.userData.instanceId = prop.id;
-    object.userData.assetVersionId = prop.assetVersionId;
-    object.position.set(prop.x, prop.kind === 'pond' ? 0 : 0.15, prop.z);
-    scene.add(object);
-    propObjects.set(prop.id, object);
-    return object;
   };
 
   const streamProps = (center: { x: number; z: number }): void => {
@@ -109,20 +88,7 @@ export function mountGamePlayableScene(
       halfDepth: STREAM_HALF_DEPTH,
       marginCells: 0,
     });
-    const activeIds = new Set<string>();
-    for (const instance of visible.instances) {
-      const prop = propById.get(instance.id);
-      if (!prop) continue;
-      const object = propObjects.get(prop.id) ?? createProp(prop);
-      object.position.set(instance.position.x, prop.kind === 'pond' ? 0 : 0.15, instance.position.z);
-      activeIds.add(prop.id);
-    }
-    for (const [id, object] of propObjects) {
-      if (activeIds.has(id)) continue;
-      scene.remove(object);
-      disposeObjectGeometries(object);
-      propObjects.delete(id);
-    }
+    visualCache.sync(visible);
     currentStreamingStats = {
       cacheSize: visible.cacheSize,
       visibleChunks: visible.chunks.length,
@@ -216,12 +182,12 @@ export function mountGamePlayableScene(
     destroy: () => {
       if (destroyed) return;
       destroyed = true;
-      disposeScene(scene);
+      visualCache.destroy();
+      disposeScene(scene, materials);
       renderer.dispose();
       renderer.forceContextLoss();
       renderer.domElement.remove();
       entities.clear();
-      propObjects.clear();
     },
   };
 }
@@ -234,9 +200,9 @@ function disposeObjectGeometries(object: THREE.Object3D): void {
   });
 }
 
-function disposeScene(scene: THREE.Scene): void {
+function disposeScene(scene: THREE.Scene, sharedMaterials: ForestMaterials): void {
   const geometries = new Set<THREE.BufferGeometry>();
-  const materials = new Set<THREE.Material>();
+  const materials = new Set<THREE.Material>(Object.values(sharedMaterials));
   scene.traverse((object) => {
     if (object instanceof THREE.Mesh || object instanceof THREE.LineSegments) {
       geometries.add(object.geometry);
