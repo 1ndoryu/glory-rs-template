@@ -1,5 +1,5 @@
 use axum::extract::{Path, State};
-use axum::routing::{get, post, put};
+use axum::routing::{get, put};
 use axum::{Json, Router};
 
 use crate::errors::AppError;
@@ -25,6 +25,31 @@ pub async fn list_game_characters(
 ) -> Result<Json<Vec<GameCharacterPublicResponse>>, AppError> {
     Ok(Json(
         GameCharacterService::list_active(&state.pool)
+            .await?
+            .into_iter()
+            .map(Into::into)
+            .collect(),
+    ))
+}
+
+/// Listado completo del catálogo, incluidas las opciones desactivadas, para
+/// el panel admin (el público nunca ve inactivas).
+#[utoipa::path(
+    get,
+    path = "/api/admin/game/characters",
+    responses(
+        (status = 200, description = "Catálogo completo (activas e inactivas)", body = [GameCharacterAdminResponse]),
+        (status = 401, description = "No autorizado", body = ErrorResponse),
+        (status = 403, description = "Prohibido", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
+pub async fn list_admin_game_characters(
+    State(state): State<AppState>,
+    _admin: AdminUser,
+) -> Result<Json<Vec<GameCharacterAdminResponse>>, AppError> {
+    Ok(Json(
+        GameCharacterService::list_all(&state.pool)
             .await?
             .into_iter()
             .map(Into::into)
@@ -89,6 +114,9 @@ pub async fn update_game_character(
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/game/characters", get(list_game_characters))
-        .route("/admin/game/characters", post(create_game_character))
+        .route(
+            "/admin/game/characters",
+            get(list_admin_game_characters).post(create_game_character),
+        )
         .route("/admin/game/characters/:id", put(update_game_character))
 }

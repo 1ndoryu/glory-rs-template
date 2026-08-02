@@ -13,6 +13,11 @@ impl GameCharacterService {
         Ok(GameCharacterRepository::list_active(pool).await?)
     }
 
+    /// Listado completo para el panel admin (activas e inactivas).
+    pub async fn list_all(pool: &PgPool) -> Result<Vec<GameCharacterDefinition>, AppError> {
+        Ok(GameCharacterRepository::list_all(pool).await?)
+    }
+
     /// Alta de una nueva opción allowlisted. La autorización ya fue resuelta
     /// por el extractor `AdminUser` del handler; aquí solo se valida el input.
     pub async fn create(

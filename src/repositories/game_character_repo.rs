@@ -5,6 +5,19 @@ use crate::models::game_character::GameCharacterDefinition;
 pub struct GameCharacterRepository;
 
 impl GameCharacterRepository {
+    /// Todas las opciones del catálogo (activas e inactivas) para el panel
+    /// admin: permite ver y re-activar opciones desactivadas. Ordenadas por
+    /// estado (activas primero) y luego por id, determinista.
+    pub async fn list_all(pool: &PgPool) -> Result<Vec<GameCharacterDefinition>, sqlx::Error> {
+        sqlx::query_as::<_, GameCharacterDefinition>(
+            "SELECT id, display_name, body_tone, is_active, created_at
+             FROM game_character_definitions
+             ORDER BY is_active DESC, id",
+        )
+        .fetch_all(pool)
+        .await
+    }
+
     /// Opciones activas del catálogo, ordenadas por id para respuestas deterministas.
     pub async fn list_active(pool: &PgPool) -> Result<Vec<GameCharacterDefinition>, sqlx::Error> {
         sqlx::query_as::<_, GameCharacterDefinition>(

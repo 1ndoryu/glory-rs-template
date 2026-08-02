@@ -2,7 +2,7 @@
 
 > **Fecha:** 2026-08-01
 > **ID:** GAME-01
-> **Estado:** dirección Three.js 3D aprobada; fixture offline, persistencia, publicación admin de mapas, sala realtime server-authoritative, identidad temporal invitada, perfil persistente de cuenta, catálogo base de personaje y gestión admin del catálogo (backend) están integrados; el panel admin de UI, el editor de mapa/assets, la reconexión persistente y la reclamación invitado→cuenta siguen pendientes.
+> **Estado:** dirección Three.js 3D aprobada; fixture offline, persistencia, publicación admin de mapas, sala realtime server-authoritative, identidad temporal invitada, perfil persistente de cuenta, catálogo base de personaje y gestión admin del catálogo (backend + panel UI) están integrados; el editor de mapa/assets, la reconexión persistente y la reclamación invitado→cuenta siguen pendientes.
 > **Prioridad:** futura, después del bloque actualmente habilitado en `roadmap.md`.
 > **Dependencias globales:** runtime `AppRegistry`/`MountedView`, ciclo de vida y carga lazy, sesiones/capacidades, contratos de workspace y quality gate.
 > **Fuentes canónicas:** `roadmap.md`, `Agente/documentacion/arquitectura/adr-bosque-3d-assets-terreno-2d-2026-08-01.md`, `Agente/planes/plan-assets-terreno-bosque-3d-2026-08-01.md`, `Agente/planes/plan-glory-render-motor-juegos-2026-08-01.md`, `Agente/documentacion/arquitectura/adr-glory-render-repositorio-agnostico-2026-08-01.md`, `Agente/documentacion/arquitectura/adr-carga-apps-pesadas-2026-07-31.md`, `Agente/documentacion/producto/referencia-visual-bosque-2026-08-01.md`.
@@ -544,6 +544,10 @@ realtime.
 
 **Límite 297A-52:** no existe panel admin de UI, auditoría persistente de cambios sensibles (`game_audit_events` sigue pendiente), borrado físico (solo desactivación por FK) ni editor de piezas por slots; la UI del catálogo se hará en un bloque posterior de Fase 7.
 
+**Evidencia 297A-53:** panel admin del catálogo de personajes en la UI: tab "juego" en Admin con listado completo (activas e inactivas vía el nuevo `GET /api/admin/game/characters`, que nunca expone inactivas al público), alta con id/etiqueta/tono allowlisted, edición (renombrado, tono y estado) y desactivación/reactivación con confirmación. `GameCharacterAdminService` valida estrictamente el contrato admin (`isActive`/`createdAt`) y reutiliza el transporte compartido (cookie + CSRF). 8/8 tests HTTP PostgreSQL (6 admin) y 13 tests frontend dirigidos (6 nuevos del servicio admin) PASS; type-check y diff-check PASS.
+
+**Límite 297A-53:** no hay auditoría persistente de cambios sensibles (`game_audit_events` pendiente), borrado físico (solo desactivación por FK) ni editor de piezas por slots; el build global sigue condicionado al error TypeScript preexistente de `notifications-popover.ts` (archivo ajeno sin commitear).
+
 **Gate:** ningún invitado puede invocar admin ni reclamar el estado de otra identidad; el perfil no depende de datos enviados sin validar.
 
 **Auditoría de cierre — Fase 6:**
@@ -554,6 +558,7 @@ realtime.
 ### Fase 7 — Assets 3D, editor 2D y publicación
 
 - [x] Gestión admin del catálogo de personajes en el backend (`297A-52`): alta, renombrado, tono y desactivación allowlisted con `AdminUser`/CSRF; las opciones desactivadas no reaparecen en el catálogo público ni pueden seleccionarse, y los perfiles existentes las conservan por FK.
+- [x] Panel admin del catálogo de personajes (`297A-53`): tab "juego" en Admin con listado completo (activas e inactivas), alta, edición y desactivación/reactivación; `GameCharacterAdminService` con validación estricta del contrato admin.
 - [ ] Crear `Assets 3D` admin para importar/analizar/previsualizar/versionar GLB; no editar geometría.
 - [ ] Crear `Editor de mapa` admin 2D para altura, superficie, agua, caminos, spawn y colocación de instancias.
 - [ ] Reutilizar el renderer del juego para preview 3D; no crear un segundo motor dentro del editor.

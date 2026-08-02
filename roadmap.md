@@ -66,6 +66,18 @@
 
 **Gate/salida:** ningún agente puede iniciar accidentalmente un full o `cargo test` durante el cooldown desde los wrappers disponibles; el uso de `--allow-heavy` queda visible en reportes y la cuota de targets se mantiene sin borrar procesos activos.
 
+### 028A-5 — Novedades: popover de campana + admin "novedades" con borrado
+
+**Depende de:** 297A-21 (notificaciones) y las recetas de popover/modal del OS.
+
+- [x] La app `notifications` deja de ser una ventana: la campana (desktop y launcher móvil) abre un popover compacto de ~300px anclado, con lista de hasta ~40 avisos, scroll de ~260px, recargar, marcar todas y cierre por clic fuera/Escape.
+- [x] El admin de novedades vive en la app Admin como tab "novedades": listado de avisos, modal "+ nuevo aviso" y cambio de estado con `createSelect`.
+- [x] Borrado de avisos (incluidos los publicados) con confirmación; las lecturas se limpian en cascada (`ON DELETE CASCADE`).
+- [x] El tag de estado muestra etiqueta en español (borrador/publicado/archivado) en una línea (`white-space: nowrap`).
+- [x] Retiro del código legacy (`notifications-view.ts`, `notifications-admin.ts`) y de los estilos `.notificaciones`/`.notificacionesAdmin`.
+
+**Gate/salida:** popover y tab "novedades" validados en navegador (crear, cambiar estado y borrar un aviso publicado); type-check, clippy y suite frontend verdes.
+
 ## Pendientes ordenados
 
 ### GAME-01 — Bosque multijugador 3D dentro del OS (planificado, bloqueado)
@@ -98,7 +110,7 @@
 - [x] **297A-47 — Identidad temporal de invitados:** `POST /api/game/ticket` acepta cuenta autenticada con sesión/CSRF o invitado temporal server-side. La cookie `guest_game` es opaca, HMAC, `HttpOnly`, `SameSite=Strict`, TTL 2 h y store acotado a 4096 identidades; el rate limit por IP devuelve 429 y una sesión inválida nunca degrada a invitado. El cliente `game-playable` usa el mismo realtime para cuenta/invitado. Gate técnico: `cargo fmt --check`, `cargo check --tests`, 9 tests unitarios, type-check y 8 tests frontend PASS; 2 pruebas HTTP de invitado PASS. La integración de cuenta queda pendiente de ejecutar contra BD de pruebas migrada.
 - [x] **297A-48 — Perfil persistente de cuenta del juego:** `user_game_profiles` guarda únicamente el nombre visible allowlisted de cuentas autenticadas. `GET/PUT /api/game/profile` usa `AuthUser`, CSRF, JSON estricto, revisión optimista y UPSERT transaccional; invitados reciben 401 y el DTO no expone `user_id`. Gate técnico: `cargo fmt --check`, `cargo check --tests`, 4 tests HTTP PostgreSQL, 2 unitarios y `git diff --check` PASS; la integración dentro de `game-playable` y el catálogo de personajes quedan para el siguiente bloque.
 
-- [ ] GAME-01 restante: culling avanzado, medición física de GPU/memoria, snapshots/presencia avanzada, reconexión persistente, editor de personaje/catálogo y reclamación invitado→cuenta. `297A-49` carga el perfil antes de WebGL/realtime y `297A-50` añade catálogo base/selección allowlisted sin consultas en el loop de render. `297A-51` cierra Fase 6: decisión invitado→cuenta documentada (nada se transfiere; el perfil de la cuenta aplica) y rehidratación del juego ante login/logout/cambio de cuenta, con 25 tests frontend dirigidos. El build del bloque queda condicionado a un error TypeScript preexistente en `notifications-popover.ts` (archivo sin commitear de otro agente). `297A-52` añade la gestión admin del catálogo de personajes en el backend: `POST/PUT /api/admin/game/characters` con `AdminUser`/CSRF, validación allowlisted, 409/404 y desactivación que bloquea nuevas selecciones; 10/10 tests HTTP PostgreSQL PASS. El panel admin de UI queda pendiente.
+- [ ] GAME-01 restante: culling avanzado, medición física de GPU/memoria, snapshots/presencia avanzada, reconexión persistente, editor de personaje/catálogo y reclamación invitado→cuenta. `297A-49` carga el perfil antes de WebGL/realtime y `297A-50` añade catálogo base/selección allowlisted sin consultas en el loop de render. `297A-51` cierra Fase 6: decisión invitado→cuenta documentada (nada se transfiere; el perfil de la cuenta aplica) y rehidratación del juego ante login/logout/cambio de cuenta, con 25 tests frontend dirigidos. El build del bloque queda condicionado a un error TypeScript preexistente en `notifications-popover.ts` (archivo sin commitear de otro agente). `297A-52` añade la gestión admin del catálogo de personajes en el backend: `POST/PUT /api/admin/game/characters` con `AdminUser`/CSRF, validación allowlisted, 409/404 y desactivación que bloquea nuevas selecciones; 10/10 tests HTTP PostgreSQL PASS. `297A-53` añade el panel admin de UI (tab "juego"): listado completo activas/inactivas vía `GET /api/admin/game/characters`, alta, edición y desactivación/reactivación; 8/8 tests HTTP y 13 tests frontend dirigidos PASS.
 
 **Gate/salida:** el plan GAME-01 queda aprobado y cada fase tiene su propio ID, gate `task:check`, auditoría SOLID/rendimiento/escalabilidad/seguridad/observabilidad, pruebas de navegador y evidencia de carga antes de iniciar la siguiente.
 

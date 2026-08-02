@@ -425,3 +425,140 @@ async fn admin_update_renames_deactivates_and_blocks_profile_selection() {
     assert_eq!(selection.status(), StatusCode::UNPROCESSABLE_ENTITY);
     assert_eq!(missing.status(), StatusCode::NOT_FOUND);
 }
+
+#[tokio::test]
+async fn admin_list_requires_admin_role() {
+    let app = state().await;
+    let (admin_id, _admin_session, _admin_csrf) = create_user(&app, "admin").await;
+    let (user_id, user_session, _user_csrf) = create_user(&app, "user").await;
+
+    let without_session = create_router_with_state(app.clone())
+        .oneshot(
+            Request::builder()
+                .uri("/api/admin/game/characters")
+                .body(Body::empty())
+                .expect("request válida"),
+        )
+        .await
+        .expect("router responde");
+    let non_admin = create_router_with_state(app.clone())
+        .oneshot(
+            Request::builder()
+                .uri("/api/admin/game/characters")
+                .header("cookie", format!("session_id={user_session}"))
+                .body(Body::empty())
+                .expect("request válida"),
+        )
+        .await
+        .expect("router responde");
+
+    cleanup(&app, admin_id, None).await;
+    cleanup(&app, user_id, None).await;
+    assert_eq!(without_session.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(non_admin.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn admin_list_includes_deactivated_while_public_hides_them() {
+    let app = state().await;
+    let (admin_id, admin_session, admin_csrf) = create_user(&app, "admin").await;
+    let active_id = unique_character_id();
+    let retired_id = unique_character_id();
+
+    for (id, name) in [(&active_id, "Activo"), (&retired_id, "Retirado")] {
+        create_router_with_state(app.clone())
+            .oneshot(admin_create_request(
+                &admin_session,
+                Some(&admin_csrf),
+                Some(&admin_csrf),
+                json!({ "id": id, "displayName": name, "bodyTone": "ink" }),
+            ))
+            .await
+            .expect("creación responde");
+    }
+
+    create_router_with_state(app.clone())
+        .oneshot({
+            let request = Request::builder()
+                .method("PUT")
+                .uri(format!("/api/admin/game/characters/{retired_id}"))
+                .header("origin", "http://localhost:5173")
+                .header("content-type", "application/json")
+                .header(
+                    "cookie",
+                    format!("session_id={admin_session}; csrf_token={admin_csrf}"),
+                )
+                .header("x-csrf-token", &admin_csrf)
+                .body(Body::from(
+                    json!({
+                        "displayName": "Retirado",
+                        "bodyTone": "paper",
+                        "isActive": false
+                    })
+                    .to_string(),
+                ))
+                .expect("request válida");
+            request
+        })
+        .await
+        .expect("actualización responde");
+
+    let admin_list = create_router_with_state(app.clone())
+        .oneshot(
+            Request::builder()
+                .uri("/api/admin/game/characters")
+                .header("cookie", format!("session_id={admin_session}"))
+                .body(Body::empty())
+                .expect("request válida"),
+        )
+        .await
+        .expect("router responde");
+    let admin_list_status = admin_list.status();
+    let admin_body = json_body(admin_list).await;
+
+    let public_catalog = create_router_with_state(app.clone())
+        .oneshot(
+            Request::builder()
+                .uri("/api/game/characters")
+                .body(Body::empty())
+                .expect("request válida"),
+        )
+        .await
+        .expect("router responde");
+    let public_body = json_body(public_catalog).await;
+
+    sqlx::query("DELETE FROM game_character_definitions WHERE id = $1")
+        .bind(&active_id)
+        .execute(&app.pool)
+        .await
+        .expect("personaje activo limpiado");
+    sqlx::query("DELETE FROM game_character_definitions WHERE id = $1")
+        .bind(&retired_id)
+        .execute(&app.pool)
+        .await
+        .expect("personaje retirado limpiado");
+    cleanup(&app, admin_id, None).await;
+
+    assert_eq!(admin_list_status, StatusCode::OK);
+    let admin_items = admin_body.as_array().expect("lista admin válida");
+    let active_item = admin_items
+        .iter()
+        .find(|item| item["id"] == active_id)
+        .expect("opción activa listada");
+    let retired_item = admin_items
+        .iter()
+        .find(|item| item["id"] == retired_id)
+        .expect("opción desactivada listada");
+    assert_eq!(active_item["isActive"], true);
+    assert_eq!(retired_item["isActive"], false);
+    assert!(public_body
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|item| item["id"] == active_id));
+    assert!(!public_body
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|item| item["id"] == retired_id));
+}

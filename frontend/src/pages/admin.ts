@@ -11,6 +11,16 @@ import { safeClick, safeRun, safeEffect } from '../utils/safe-async';
 import { renderArticleList, openEditor, disposeAdminArticleLists } from './admin-articles';
 import { renderProjectList, openProjectEditor, disposeAdminProjectLists } from './admin-projects';
 import { renderProductList, openProductEditor, disposeAdminProductLists } from './admin-products';
+import {
+  renderNotificationsAdminList,
+  openNuevoAvisoModal,
+  disposeAdminNotificationsLists,
+} from './admin-notifications';
+import {
+  renderGameCharacterAdminList,
+  openNuevoPersonajeModal,
+  disposeAdminGameCharacterLists,
+} from './admin-juego';
 import { createTabs } from '../components/ui/tabs';
 import { createVacio } from '../components/ui/empty-state';
 import { createEl } from '../utils/dom';
@@ -20,6 +30,8 @@ export function disposeAdminPage(page: HTMLElement): void {
   disposeAdminArticleLists(page);
   disposeAdminProjectLists(page);
   disposeAdminProductLists(page);
+  disposeAdminNotificationsLists(page);
+  disposeAdminGameCharacterLists(page);
 }
 
 /* [018A-1] Vista de Admin para el runtime de ventanas: devuelve la página
@@ -88,6 +100,33 @@ export function createAdminWindowView(): { page: Promise<HTMLElement>; actions: 
         setWindowActions([btnNuevo]);
         break;
       }
+      case 'juego': {
+        /* [297A-53] Catálogo de personajes del Bosque: lista activas e
+         * inactivas; el alta vive en el modal (id + etiqueta + tono) y el
+         * botón de la franja lo abre. */
+        const lista = createEl('div', { className: 'admin-lista' });
+        contentArea.appendChild(lista);
+        void renderGameCharacterAdminList(lista);
+        const btnNuevo = createEl('button', { className: 'boton', textContent: '+ nuevo personaje' });
+        btnNuevo.addEventListener('click', () => openNuevoPersonajeModal(() => {
+          void renderGameCharacterAdminList(lista);
+        }));
+        setWindowActions([btnNuevo]);
+        break;
+      }
+      case 'novedades': {
+        /* [028A-5] El admin de novedades vive en esta página (no en la app
+         * notifications, eliminada); el alta usa un modal. */
+        const lista = createEl('div', { className: 'admin-lista' });
+        contentArea.appendChild(lista);
+        void renderNotificationsAdminList(lista);
+        const btnNuevo = createEl('button', { className: 'boton', textContent: '+ nuevo aviso' });
+        btnNuevo.addEventListener('click', () => openNuevoAvisoModal(() => {
+          void renderNotificationsAdminList(lista);
+        }));
+        setWindowActions([btnNuevo]);
+        break;
+      }
       case 'fuentes':
         contentArea.appendChild(createSettingsPanel());
         setWindowActions([]);
@@ -113,6 +152,8 @@ export function createAdminWindowView(): { page: Promise<HTMLElement>; actions: 
       { id: 'articulos', label: 'articulos' },
       { id: 'proyectos', label: 'proyectos' },
       { id: 'productos', label: 'productos' },
+      { id: 'juego', label: 'juego' },
+      { id: 'novedades', label: 'novedades' },
       { id: 'fuentes', label: 'fuentes' },
       { id: 'sitio', label: 'sitio' },
       { id: 'estadisticas', label: 'estadisticas' },
