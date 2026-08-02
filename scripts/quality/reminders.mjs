@@ -12,7 +12,9 @@ const PROFILE_REMINDERS = {
 export function selectReminders(scope, stages, limit = 4) {
   const reminders = [];
   const failed = stages.some(stage => stage.status === 'fail' || stage.status === 'error');
+  const rustLight = stages.some(stage => stage.stage === 'rust' && stage.validationMode === 'local-light');
   if (failed) reminders.push('Corrige los primeros hallazgos y repite exactamente el mismo comando.');
+  if (rustLight) reminders.push('Rust local-light: se ejecutaron fmt/check; ejecuta `npm run task:check -- <ID> --full` antes de cerrar una fase o publicar.');
   if (!failed) {
     /* El cierre es siempre visible aunque el alcance tenga varios perfiles y
      * maxReminders sea pequeño; evita que el agente olvide revisar el estado. */

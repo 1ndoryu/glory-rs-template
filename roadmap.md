@@ -62,23 +62,24 @@ Resolver los planes uno por uno, en este orden. Un agente no puede saltar a una 
 | Orden | Prioridad | ID/plan dueño | Dependencia inmediata | Salida mínima |
 | ---: | --- | --- | --- | --- |
 | 1 | P0 habilitado | `018A-66` — overlay admin | capacidades y 297A-13 | admin sin conflicto; cuenta personal conserva merge local/remoto |
-| 2 | P0 | `028A-1` — triage de alertas quality | reporte `297A-48` | cada warning tiene resolución, owner o excepción fechada; ningún P0 queda sin tarea |
-| 3 | P1 | `018A-73` — deuda CSS | revisión de recetas/tokens | CSS dividido por responsabilidad y sin deuda visual bloqueante |
-| 4 | P1 | `297A-17` — hardening, identidad, accesibilidad y SEO | 297A-6–16 + 018A-73 | casos negativos, teclado, SEO y observabilidad evidenciados |
-| 5 | P1 | `297A-9` — shell visual | runtime y recetas | shell validado en desktop/tablet/móvil, zoom y teclado |
-| 6 | P1 | `297A-12` — launcher móvil | 297A-9/11 | transición móvil↔tablet, touch y refresh sin lógica paralela |
-| 7 | P1 | `297A-19` — URLs/deep links/foco | 297A-9/11/12/13 | Back/Forward, refresh y URL compartible sin datos privados |
-| 8 | P1 | `297A-22` — reordenamiento grid | 297A-12 + overlay | drag, colisiones, persistencia y accesibilidad verificadas |
-| 9 | P1 | `297A-24` — cierre de ventanas + deuda SOLID runtime | 297A-19 | abrir una app nunca cierra otra; lifecycle visual/E2E y SRP cerrados |
-| 10 | P1 | `297A-13` — Cuenta, registro y overlay remoto | 297A-9/11/18 | concurrencia, recovery, tokens y capacidades sin filtraciones |
-| 11 | P1 | `297A-14` — programas editoriales | 297A-9/10/11 | artículos, proyectos, productos, media, papelera y autosave en tres presentaciones |
-| 12 | P1 | `297A-15` — comercio seguro | 297A-7/10/14 | proveedor, reembolsos, outbox, webhook, entitlement y descarga E2E |
-| 13 | P1 | `297A-16` — analytics y retiro legacy | 297A-9/11–15 | consentimiento, retención, purga y medición sin datos privados |
-| 14 | P2 | `297A-21` — notificaciones | 297A-13 + releases | deduplicación, dos dispositivos y capacidades verificadas |
-| 15 | P2 | `297A-29` — escalar Configuración | 297A-13/19/27/28 | nueva acción por registro/capacidad, sin eliminar compatibilidad |
-| 16 | P2 diferido | `297A-25` — apps pesadas | 297A-9/11/12 + primera app real | teardown, memoria/GPU y presupuesto medidos, no flags especulativos |
-| 17 | P2 futuro | `GAME-01` — Bosque 3D y assets/terreno | runtime, sesiones, quality y fila 16 | gameplay restante, editor 2D, publicación y mediciones físicas |
-| 18 | P2 futuro | `018A-96` — `glory-render` | GAME-01/Fase 8 + segundo juego | repositorio propio, CI y dos consumidores sin imports del OS |
+| 2 | P0 | `028A-2` — quality gate local ligero | reporte `297A-49` | Rust local solo fmt/check; clippy/tests solo `--full`/CI; suite frontend incremental |
+| 3 | P0 | `028A-1` — triage de alertas quality | reporte `297A-48` | cada warning tiene resolución, owner o excepción fechada; ningún P0 queda sin tarea |
+| 4 | P1 | `018A-73` — deuda CSS | revisión de recetas/tokens | CSS dividido por responsabilidad y sin deuda visual bloqueante |
+| 5 | P1 | `297A-17` — hardening, identidad, accesibilidad y SEO | 297A-6–16 + 018A-73 | casos negativos, teclado, SEO y observabilidad evidenciados |
+| 6 | P1 | `297A-9` — shell visual | runtime y recetas | shell validado en desktop/tablet/móvil, zoom y teclado |
+| 7 | P1 | `297A-12` — launcher móvil | 297A-9/11 | transición móvil↔tablet, touch y refresh sin lógica paralela |
+| 8 | P1 | `297A-19` — URLs/deep links/foco | 297A-9/11/12/13 | Back/Forward, refresh y URL compartible sin datos privados |
+| 9 | P1 | `297A-22` — reordenamiento grid | 297A-12 + overlay | drag, colisiones, persistencia y accesibilidad verificadas |
+| 10 | P1 | `297A-24` — cierre de ventanas + deuda SOLID runtime | 297A-19 | abrir una app nunca cierra otra; lifecycle visual/E2E y SRP cerrados |
+| 11 | P1 | `297A-13` — Cuenta, registro y overlay remoto | 297A-9/11/18 | concurrencia, recovery, tokens y capacidades sin filtraciones |
+| 12 | P1 | `297A-14` — programas editoriales | 297A-9/10/11 | artículos, proyectos, productos, media, papelera y autosave en tres presentaciones |
+| 13 | P1 | `297A-15` — comercio seguro | 297A-7/10/14 | proveedor, reembolsos, outbox, webhook, entitlement y descarga E2E |
+| 14 | P1 | `297A-16` — analytics y retiro legacy | 297A-9/11–15 | consentimiento, retención, purga y medición sin datos privados |
+| 15 | P2 | `297A-21` — notificaciones | 297A-13 + releases | deduplicación, dos dispositivos y capacidades verificadas |
+| 16 | P2 | `297A-29` — escalar Configuración | 297A-13/19/27/28 | nueva acción por registro/capacidad, sin eliminar compatibilidad |
+| 17 | P2 diferido | `297A-25` — apps pesadas | 297A-9/11/12 + primera app real | teardown, memoria/GPU y presupuesto medidos, no flags especulativos |
+| 18 | P2 futuro | `GAME-01` — Bosque 3D y assets/terreno | runtime, sesiones, quality y fila 16 | gameplay restante, editor 2D, publicación y mediciones físicas |
+| 19 | P2 futuro | `018A-96` — `glory-render` | GAME-01/Fase 8 + segundo juego | repositorio propio, CI y dos consumidores sin imports del OS |
 
 ### Reconciliación de planes para que no queden huérfanos
 

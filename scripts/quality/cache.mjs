@@ -18,9 +18,9 @@ export async function fingerprint(context, scope, stage) {
    * del runner aunque el conjunto de archivos permanezca igual. */
   hash.update(`quality-cache-v${CACHE_FORMAT_VERSION}\0`);
   hash.update(`${process.version}\0${process.platform}\0${process.arch}\0`);
-  /* [018A-52] CI ejecuta la suite frontend completa y local no; un PASS de
-   * un modo nunca puede reutilizarse para afirmar cobertura del otro. */
-  hash.update(`mode:${context.ci ? 'ci' : 'local'}\0`);
+  /* [018A-52] CI/full ejecutan validaciones ampliadas y local-light no; un
+   * PASS de un modo nunca puede reutilizarse para afirmar cobertura del otro. */
+  hash.update(`mode:${context.ci ? 'ci' : context.full ? 'full' : 'local-light'}\0`);
   hash.update(stage);
   hash.update(JSON.stringify(context.qualityConfig));
   hash.update(JSON.stringify(context.toolManifest));

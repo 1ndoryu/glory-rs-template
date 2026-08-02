@@ -55,6 +55,18 @@ Estos casos no se deben “ignorar” ni arreglar con una suppression global. Se
 
 ## Fases y checklist
 
+### Fase 0.5 — Rendimiento del quality gate (028A-2)
+
+La ejecución `297A-49` demostró que el problema principal no era Sentinel/VarSense: Rust consumió 90,5 % del tiempo y expiró en `cargo test` sobre un target frío. Esta fase reduce el coste de feedback sin convertir los pasos omitidos en un PASS engañoso.
+
+- [x] Evitar que un cambio de manifiesto frontend (`package.json`/lock) fuerce por sí solo el full Rust.
+- [x] Hacer que Rust local ejecute `fmt/check`; reservar clippy/tests para `--full` y `--ci`.
+- [x] Mantener `test:changed` como selector por defecto y `test:full` como suite explícita.
+- [x] Separar la caché por modo (`local-light`, `full`, `ci`) y recordar el comando completo en el reporte.
+- [ ] Establecer benchmark cold/warm en CI/nocturno y presupuesto operativo para no volver a bloquear la máquina.
+
+**Gate:** una tarea local no lanza la suite Rust completa salvo que se pida; el reporte identifica el modo y entrega el comando exacto para obtener cobertura completa. Antes de cerrar una fase o publicar debe pasar `npm run task:check -- <ID> --full` (o `--ci`).
+
 ### Fase 0 — Inventario y clasificación (este bloque)
 
 - [x] Capturar el reporte full `297A-48` y separar Sentinel, VarSense y custom.

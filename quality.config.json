@@ -20,11 +20,6 @@
   "fullPatterns": [
     "Cargo.toml",
     "Cargo.lock",
-    "package.json",
-    "package-lock.json",
-    "frontend/package.json",
-    "frontend/package-lock.json",
-    "frontend/tsconfig.json",
     "frontend/vite.config.ts",
     "frontend/vitest.config.ts",
     "sentinel.config.json",

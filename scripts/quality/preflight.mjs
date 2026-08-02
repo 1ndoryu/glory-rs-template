@@ -95,5 +95,14 @@ export async function preflight(args) {
   await mkdir(logsRoot, { recursive: true });
   /* [018A-51] El modo CI puede ampliar la validación frontend sin hacer que
    * cada agente ejecute la suite completa localmente. */
-  return { projectRoot, qualityConfig, toolManifest, tools, reportRoot, logsRoot, ci: args.ci };
+  return {
+    projectRoot,
+    qualityConfig,
+    toolManifest,
+    tools,
+    reportRoot,
+    logsRoot,
+    ci: args.ci,
+    full: args.full,
+  };
 }

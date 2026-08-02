@@ -41,8 +41,10 @@ test('cache separa el modo local del gate CI', async () => {
       toolManifest: { schemaVersion: 1, tools: {} },
     };
     const scope = { files: ['input.ts'], fingerprintFiles: ['input.ts'] };
-    const local = await fingerprint({ ...base, ci: false }, scope, 'frontend');
-    const ci = await fingerprint({ ...base, ci: true }, scope, 'frontend');
+    const local = await fingerprint({ ...base, ci: false, full: false }, scope, 'frontend');
+    const full = await fingerprint({ ...base, ci: false, full: true }, scope, 'frontend');
+    const ci = await fingerprint({ ...base, ci: true, full: false }, scope, 'frontend');
+    assert.notEqual(local, full);
     assert.notEqual(local, ci);
   } finally {
     await rm(projectRoot, { recursive: true, force: true });

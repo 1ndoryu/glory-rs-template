@@ -15,3 +15,12 @@ test('el cierre distingue commit opcional de trabajo entregable', () => {
   assert.match(reminders[0], /si el bloque es entregable/);
   assert.match(reminders[0], /no fuerces commit/);
 });
+
+test('local-light recuerda ejecutar la suite completa antes de cerrar una fase', () => {
+  const reminders = selectReminders(
+    { profiles: new Set(['rust']) },
+    [{ stage: 'rust', status: 'pass', validationMode: 'local-light' }],
+    4,
+  );
+  assert.ok(reminders.some(item => item.includes('--full')));
+});

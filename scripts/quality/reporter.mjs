@@ -38,7 +38,7 @@ export async function createReport(context, args, scope, stages, reminders, star
     taskId: args.taskId,
     generatedAt: new Date().toISOString(),
     durationMs: Date.now() - startedAt,
-    mode: args.ci ? 'ci' : 'local',
+    mode: args.ci ? 'ci' : args.full ? 'full' : 'local-light',
     scope: { base: scope.base, full: scope.full, files: scope.files, profiles: [...scope.profiles] },
     tools: Object.fromEntries(Object.entries(context.tools).map(([name, tool]) => [name, {
       version: tool.version, commit: tool.commit, outputSchemaVersion: tool.outputSchemaVersion,

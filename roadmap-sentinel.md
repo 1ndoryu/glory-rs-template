@@ -207,6 +207,19 @@ Una regla no ejecuta procesos, no escribe archivos, no imprime salida humana y n
 
 **Gate SNT-05A:** cerrado. La ejecución local ya no dispara automáticamente workers múltiples ni una suite completa por cada archivo fuente; el grafo de imports selecciona dependencias y `test:full` conserva la revisión total explícita. El benchmark comparativo de Sentinel/VarSense y el índice compartido quedan pendientes de SNT-03/SNT-05.
 
+#### SNT-05B — Quality gate local ligero (028A-2)
+
+El reporte `297A-49` tardó 533833 ms: Rust consumió 483037 ms (90,5 %) y expiró durante `cargo test` sobre un target frío. Sentinel (9881 ms), VarSense (13201 ms) y frontend (15874 ms) no fueron el cuello de botella. La política cambia el alcance por defecto sin eliminar la suite completa:
+
+- [x] Evitar que cambios de `package.json` o `package-lock.json` fuercen un full Rust; solo los archivos de infraestructura que cambian el contrato del gate mantienen esa invalidación.
+- [x] En Rust local ejecutar únicamente `cargo fmt --check` y `cargo check`; reservar `cargo clippy` y `cargo test` para `npm run task:check -- <ID> --full` o `--ci`.
+- [x] Mantener `npm --prefix frontend run test` como selector seguro (`test:changed`) y conservar `test:full` como orden explícita.
+- [x] Separar fingerprints de caché para `local-light`, `full` y `ci`, y mostrar en el reporte qué cobertura se ejecutó.
+- [x] Emitir un recordatorio contextual con el comando `--full` cuando una tarea tocó Rust en modo ligero; no presentar ese resultado como cobertura completa.
+- [ ] Medir en CI/nocturno los tiempos cold/warm de Rust y fijar un presupuesto operativo sin bloquear el feedback local; revisar el target estable compartido antes de cambiar `CARGO_TARGET_DIR`.
+
+**Gate SNT-05B:** el modo local no recompila clippy/tests por cada tarea y el informe deja una ruta reproducible para la suite completa. La suite completa sigue siendo obligatoria al cerrar una fase, cambiar infraestructura Rust, preparar publicación o ejecutar CI; no se ejecuta automáticamente en cada archivo.
+
 **Gate:** benchmark reproducible demuestra mejora; dos ejecuciones iguales producen el mismo JSON ordenado y no reutilizan PASS obsoleto.
 
 ### SNT-06 — Reglas de seguridad, contratos y arquitectura
