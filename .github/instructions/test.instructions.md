@@ -87,6 +87,7 @@ Sin este anuncio, no se inicia ninguna tarea. Esta regla existe para que el agen
   - Despues de editar `.ts`/`.tsx`: ejecutar `npm run type-check`.
   - Despues de editar `.css`: validar variables/clases referenciadas.
   - Para Rust usa `npm run task:check -- <ID>` (modo local ligero: fmt/check). `cargo clippy`/`cargo test` completos solo en cierre de fase, CI o con `--full`; el guard aplica un cooldown de 3 horas y bloquea ejecuciones repetidas.
+  - Para frontend no ejecutar `npx vitest`, `vitest`, `npm test`, `npm run test:*`, `npm run type-check`, `npm run lint` ni `npm run build` directamente dentro del workspace; el guard los bloquea y se usa `npm run task:check -- <ID>`.
   - Antes de cada commit frontend: `npm run type-check` como minimo.
   - **Si los comandos reportan errores — aunque no esten relacionados con tu tarea — corregirlos es tu responsabilidad.** No se avanza ni se commitea con errores pendientes. Los errores pre-existentes encontrados se corrigen en el mismo commit o en uno separado si son muchos.
   - Despues de cambios en endpoints/schemas de Rust: regenerar cliente con `npm run codegen` y verificar que el frontend compila.

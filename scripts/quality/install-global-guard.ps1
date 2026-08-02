@@ -34,6 +34,16 @@ function Normalize-ProfileText {
     $literalNewLine = [string][char]96 + 'n'
     return $Text.Replace($literalNewLine, [Environment]::NewLine)
 }
+
+function Resolve-RealCommandPath {
+    param([Parameter(Mandatory = $true)][string]$Name)
+    $shimPath = Join-Path $shimDirectory "$Name.cmd"
+    $command = Get-Command "$Name.cmd" -CommandType Application -ErrorAction Stop |
+        Where-Object { $_.Source -ne $shimPath } |
+        Select-Object -First 1
+    if (-not $command) { throw "No se encontró el ejecutable real de $Name" }
+    return $command.Source
+}
 if (-not $Uninstall) {
     $profileBlock = @"
 $markerStart
@@ -57,13 +67,19 @@ $markerEnd
     }
 
     $realCargo = (Get-Command cargo.exe -CommandType Application | Select-Object -First 1).Source
+    $realNpm = Resolve-RealCommandPath -Name 'npm'
+    $realNpx = Resolve-RealCommandPath -Name 'npx'
     [Environment]::SetEnvironmentVariable('GLORY_REAL_CARGO', $realCargo, 'User')
+    [Environment]::SetEnvironmentVariable('GLORY_REAL_NPM', $realNpm, 'User')
+    [Environment]::SetEnvironmentVariable('GLORY_REAL_NPX', $realNpx, 'User')
     $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
     $pathEntries = @($userPath -split ';' | Where-Object { $_ })
     if ($pathEntries -notcontains $shimDirectory) {
         [Environment]::SetEnvironmentVariable('Path', (($shimDirectory + ';') + ($pathEntries -join ';')), 'User')
     }
     $env:GLORY_REAL_CARGO = $realCargo
+    $env:GLORY_REAL_NPM = $realNpm
+    $env:GLORY_REAL_NPX = $realNpx
     if (($env:Path -split ';') -notcontains $shimDirectory) { $env:Path = "$shimDirectory;$env:Path" }
     Write-Host '[glory-quality] Cooldown global: 3 horas por proyecto; usa --allow-heavy solo manualmente.' -ForegroundColor Yellow
 } else {
