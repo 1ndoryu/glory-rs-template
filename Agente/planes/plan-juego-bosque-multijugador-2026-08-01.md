@@ -338,7 +338,8 @@ repetidas de memoria/GPU y validación multi-viewport antes de cerrar la fase co
 - [x] Implementar en frontend el contrato JSON-safe versionado de `TerrainDocument`, `GameAssetVersion`, instancias, spawns y `MapVersion`, con validador fail-closed y cuotas hard.
 - [x] Adaptar `MapVersion` a `WorldMap` mediante proxies estáticos allowlisted; el núcleo sigue siendo X/Z y no inventa todavía altura de gameplay.
 - [ ] Generar terreno por chunks desde alturas/superficies 2D e implementar spatial index/proxies simples en el renderer real.
-- [ ] Cargar solo chunks/assets visibles con cache limitada e instancing para props repetidos.
+- [x] **297A-32 — Selección lógica visible y medición local:** `MapChunkCache` indexa instancias por chunk, calcula ventanas relativas a `bounds.minX/minZ`, aplica límites de chunks/instancias/assets, mantiene un LRU acotado y el fixture carga/retira props según el jugador; `FramePerformanceMonitor` conserva una ventana de muestras y expone p50/p95/max y frames sobre presupuesto.
+- [ ] Cargar solo chunks/assets visibles con cache limitada e instancing para props repetidos; la selección lógica y el teardown de geometría están preparados, pero aún falta cache/instancing de geometría compartida.
 - [x] Crear el endpoint/servicio de lectura de mapa publicado y la migración de snapshots persistidos.
 - [x] Crear el flujo admin de publicación versionada: `AdminUser`, CSRF, revisión optimista, hash canónico, activación atómica y snapshots inmutables.
 - [x] Crear un fixture de versión persistido mediante el flujo autorizado y cubrir integración HTTP/DB real de autorización, CSRF, 413, revisión stale, concurrencia, activación única y trigger de inmutabilidad.
@@ -355,7 +356,13 @@ repetidas de memoria/GPU y validación multi-viewport antes de cerrar la fase co
 `GET /api/game/maps/:map_id`; solo consulta `is_active`, valida el documento y no
 expone UUID interno, `published_by` ni `is_active`. `contentHash` se calcula con
 `document_json_bytes` sobre el `JsonValue` normalizado que se persiste, y el service
-lo verifica antes de responder. El endpoint admin es `POST /api/admin/game/maps`,
+lo verifica antes de responder. El bloque `297A-32` añade `map-streaming.ts`,
+`map-streaming-contracts.ts` y `performance-monitor.ts`: la selección visible es
+pura y testeable, el fixture actualiza `data-visible-chunks`, `data-visible-instances`
+y `data-frame-p95-ms`, y el renderer libera las geometrías retiradas durante la
+eviction. La ventana y el LRU tienen límites hard; no se carga el mapa completo
+para dibujar props. El monitor mide coste local de actualización/render, no memoria
+GPU ni latencia de red. El endpoint admin es `POST /api/admin/game/maps`,
 protegido por `AdminUser`/CSRF, con `expectedVersion`, advisory lock por mapa,
 activación atómica y límite de body de 4 MiB antes de deserializar. El fixture
 `tests/game_map_publish.rs` ejercita el router de producción contra PostgreSQL real:
@@ -365,12 +372,15 @@ trigger UPDATE/DELETE. Los snapshots de prueba usan IDs únicos y se conservan p
 son inmutables; los autores se conservan por `ON DELETE RESTRICT`. La preparación de
 la BD de rama se hizo aplicando solo las migraciones faltantes, ya que
 `prepare-ci-db.mjs` no es idempotente sobre una BD existente. Backend: `cargo fmt
---check`, `cargo check --tests` y la integración real PASS. No implica chunks visibles,
-realtime ni editor.
+--check`, `cargo check --tests` y la integración real PASS. Frontend `297A-32`:
+type-check PASS, 33 tests dirigidos PASS, build PASS y diff-check PASS. No implica
+terreno renderizado por chunks, instancing real de assets, realtime ni editor.
 
 **Gate:** lectura pública y publicación admin con fixture HTTP/DB real, autorización,
-concurrencia e invariantes de persistencia validadas; la fase completa queda pendiente
-hasta cargar chunks/instancias de forma acotada, medir rendimiento y avanzar a realtime.
+concurrencia e invariantes de persistencia validadas; la selección lógica visible y
+la medición local quedan evidenciadas por `297A-32`. La fase completa queda pendiente
+hasta generar/renderizar terreno por chunks, añadir cache/instancing de geometría y
+completar la medición de GPU/memoria antes de avanzar a realtime.
 
 **Auditoría de cierre — Fase 4:**
 - [ ] **SOLID/OCP:** parser, validación, navegación, serialización y renderer consumen el contrato versionado sin acoplamiento circular.

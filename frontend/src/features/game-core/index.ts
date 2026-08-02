@@ -8,3 +8,5 @@ export * from './collision';
 export * from './simulation';
 export * from './interpolation';
 export * from './map-version';
+export * from './map-streaming';
+export * from './performance-monitor';

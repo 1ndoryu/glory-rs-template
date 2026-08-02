@@ -9,9 +9,10 @@ import {
   createWorldState,
   simulateTick,
   snapshotFromState,
+  FramePerformanceMonitor,
   type WorldState,
 } from '../../../game-core';
-import { FIXTURE_MAP } from './game-fixture-map';
+import { FIXTURE_MAP, FIXTURE_MAP_VERSION } from './game-fixture-map';
 import { createGameInput, type GameInputHandle } from './game-playable-input';
 import { mountGamePlayableScene, type GamePlayableSceneHandle } from './game-playable-scene';
 import '../../../../styles/desktop/desktop-game-playable.css';
@@ -62,6 +63,8 @@ export function renderGamePlayable(context: RenderContext): MountedView {
   let lastTime = performance.now();
   let visible = !document.hidden;
   let destroyed = false;
+  const frameMonitor = new FramePerformanceMonitor({ maxSamples: 120 });
+  let frameCount = 0;
 
   const stopFrameLoop = (): void => {
     if (frameHandle !== 0) cancelAnimationFrame(frameHandle);
@@ -78,6 +81,7 @@ export function renderGamePlayable(context: RenderContext): MountedView {
     frameHandle = 0;
     if (destroyed || !visible || !scene) return;
 
+    const frameStart = performance.now();
     const delta = Math.min(Math.max((now - lastTime) / 1000, 0), 0.1);
     lastTime = now;
     const direction = input.getDirection();
@@ -90,7 +94,19 @@ export function renderGamePlayable(context: RenderContext): MountedView {
       );
       scene.update(snapshotFromState(state));
       scene.render();
-      setStatus('offline · movimiento local · sin red', false);
+      frameMonitor.record(performance.now() - frameStart);
+      frameCount += 1;
+      const streaming = scene.streamingStats();
+      const performanceSnapshot = frameMonitor.snapshot();
+      view.element.dataset.visibleChunks = String(streaming.visibleChunks);
+      view.element.dataset.visibleInstances = String(streaming.visibleInstances);
+      view.element.dataset.frameP95Ms = performanceSnapshot.p95Ms.toFixed(2);
+      if (frameCount % 30 === 0) {
+        setStatus(
+          `offline · chunks ${streaming.visibleChunks} · props ${streaming.visibleInstances} · p95 ${performanceSnapshot.p95Ms.toFixed(1)}ms`,
+          false,
+        );
+      }
     } catch (error: unknown) {
       stopFrameLoop();
       setStatus('no se pudo ejecutar el fixture offline', true);
@@ -130,7 +146,7 @@ export function renderGamePlayable(context: RenderContext): MountedView {
   const resizeObserver = new ResizeObserver(onResize);
 
   try {
-    scene = mountGamePlayableScene(view.sceneHost, FIXTURE_MAP);
+    scene = mountGamePlayableScene(view.sceneHost, FIXTURE_MAP, FIXTURE_MAP_VERSION);
     resizeObserver.observe(view.sceneHost);
     scene.update(snapshotFromState(state));
     setStatus('offline · movimiento local · sin red', false);

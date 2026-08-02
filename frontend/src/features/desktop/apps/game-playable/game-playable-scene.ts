@@ -1,23 +1,44 @@
 /* GAME-01 — Renderer del fixture jugable.
  * Three.js vive detrás de este adaptador: recibe snapshots puros de game-core
- * y no decide movimiento, colisiones ni identidad. */
+ * y no decide movimiento, colisiones ni identidad. El contenido estático se
+ * limita a la ventana visible mediante el cache lógico de chunks.
+ */
 
 import * as THREE from 'three';
+import {
+  MapChunkCache,
+  type MapVersion,
+  type WorldMap,
+  type WorldSnapshot,
+} from '../../../game-core';
 import { createBroadleaf, createConifer, createFigure, createPond, createRock, type ForestMaterials } from '../game-shared/forest-models';
-import type { WorldMap, WorldSnapshot } from '../../../game-core';
-import { FIXTURE_PROPS } from './game-fixture-map';
+import { FIXTURE_PROPS, type FixtureProp } from './game-fixture-map';
+
+export interface GamePlayableStreamingStats {
+  readonly cacheSize: number;
+  readonly visibleChunks: number;
+  readonly visibleInstances: number;
+  readonly visibleAssets: number;
+}
 
 export interface GamePlayableSceneHandle {
   readonly update: (snapshot: WorldSnapshot) => void;
   readonly resize: () => void;
   readonly render: () => void;
+  readonly streamingStats: () => GamePlayableStreamingStats;
   readonly destroy: () => void;
 }
 
 const CAMERA_HEIGHT = 15;
 const CAMERA_DISTANCE = 13;
+const STREAM_HALF_WIDTH = 4;
+const STREAM_HALF_DEPTH = 4;
 
-export function mountGamePlayableScene(host: HTMLElement, map: WorldMap): GamePlayableSceneHandle {
+export function mountGamePlayableScene(
+  host: HTMLElement,
+  map: WorldMap,
+  mapVersion: MapVersion,
+): GamePlayableSceneHandle {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xeeeeea);
   scene.fog = new THREE.Fog(0xeeeeea, 22, 42);
@@ -49,7 +70,23 @@ export function mountGamePlayableScene(host: HTMLElement, map: WorldMap): GamePl
   floor.receiveShadow = true;
   scene.add(floor, new THREE.GridHelper(20, 20, 0x777777, 0xc8c8c2));
 
-  for (const prop of FIXTURE_PROPS) {
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x555555, 2.2));
+  const sun = new THREE.DirectionalLight(0xffffff, 3.2);
+  sun.position.set(-8, 18, 10);
+  sun.castShadow = true;
+  scene.add(sun);
+
+  const chunkCache = new MapChunkCache(mapVersion);
+  const propById = new Map<string, FixtureProp>(FIXTURE_PROPS.map(prop => [prop.id, prop]));
+  const propObjects = new Map<string, THREE.Group>();
+  let currentStreamingStats: GamePlayableStreamingStats = {
+    cacheSize: 0,
+    visibleChunks: 0,
+    visibleInstances: 0,
+    visibleAssets: 0,
+  };
+
+  const createProp = (prop: FixtureProp): THREE.Group => {
     const object = prop.kind === 'conifer'
       ? createConifer(materials, prop.scale)
       : prop.kind === 'broadleaf'
@@ -57,17 +94,42 @@ export function mountGamePlayableScene(host: HTMLElement, map: WorldMap): GamePl
         : prop.kind === 'rock'
           ? createRock(materials, prop.scale)
           : createPond(materials, prop.width ?? 1, prop.depth ?? 1);
-    object.position.x = prop.x;
-    object.position.z = prop.z;
-    object.position.y += prop.kind === 'pond' ? 0 : 0.15;
+    object.userData.instanceId = prop.id;
+    object.userData.assetVersionId = prop.assetVersionId;
+    object.position.set(prop.x, prop.kind === 'pond' ? 0 : 0.15, prop.z);
     scene.add(object);
-  }
+    propObjects.set(prop.id, object);
+    return object;
+  };
 
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x555555, 2.2));
-  const sun = new THREE.DirectionalLight(0xffffff, 3.2);
-  sun.position.set(-8, 18, 10);
-  sun.castShadow = true;
-  scene.add(sun);
+  const streamProps = (center: { x: number; z: number }): void => {
+    const visible = chunkCache.select({
+      center,
+      halfWidth: STREAM_HALF_WIDTH,
+      halfDepth: STREAM_HALF_DEPTH,
+      marginCells: 0,
+    });
+    const activeIds = new Set<string>();
+    for (const instance of visible.instances) {
+      const prop = propById.get(instance.id);
+      if (!prop) continue;
+      const object = propObjects.get(prop.id) ?? createProp(prop);
+      object.position.set(instance.position.x, prop.kind === 'pond' ? 0 : 0.15, instance.position.z);
+      activeIds.add(prop.id);
+    }
+    for (const [id, object] of propObjects) {
+      if (activeIds.has(id)) continue;
+      scene.remove(object);
+      disposeObjectGeometries(object);
+      propObjects.delete(id);
+    }
+    currentStreamingStats = {
+      cacheSize: visible.cacheSize,
+      visibleChunks: visible.chunks.length,
+      visibleInstances: visible.instances.length,
+      visibleAssets: visible.assets.length,
+    };
+  };
 
   const entities = new Map<string, THREE.Group>();
   let currentPlayer = { x: 0, z: -0.5 };
@@ -118,8 +180,10 @@ export function mountGamePlayableScene(host: HTMLElement, map: WorldMap): GamePl
     for (const [id, object] of entities) {
       if (activeIds.has(id)) continue;
       scene.remove(object);
+      disposeObjectGeometries(object);
       entities.delete(id);
     }
+    streamProps(currentPlayer);
     updateCamera();
   };
 
@@ -148,6 +212,7 @@ export function mountGamePlayableScene(host: HTMLElement, map: WorldMap): GamePl
     update,
     resize,
     render,
+    streamingStats: () => currentStreamingStats,
     destroy: () => {
       if (destroyed) return;
       destroyed = true;
@@ -156,8 +221,17 @@ export function mountGamePlayableScene(host: HTMLElement, map: WorldMap): GamePl
       renderer.forceContextLoss();
       renderer.domElement.remove();
       entities.clear();
+      propObjects.clear();
     },
   };
+}
+
+function disposeObjectGeometries(object: THREE.Object3D): void {
+  object.traverse((child) => {
+    if (child instanceof THREE.Mesh || child instanceof THREE.LineSegments) {
+      child.geometry.dispose();
+    }
+  });
 }
 
 function disposeScene(scene: THREE.Scene): void {
