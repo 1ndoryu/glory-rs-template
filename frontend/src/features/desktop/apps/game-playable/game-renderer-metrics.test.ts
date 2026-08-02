@@ -10,6 +10,8 @@ describe('readRendererMetrics', () => {
       usedJSHeapSize: 1024,
       jsHeapSizeLimit: 4096,
     })).toEqual({
+      rendererInfoAvailable: true,
+      rendererMemoryAvailable: true,
       drawCalls: 7,
       triangles: 120,
       lines: 4,
@@ -29,6 +31,8 @@ describe('readRendererMetrics', () => {
       usedJSHeapSize: -1,
       jsHeapSizeLimit: Number.NaN,
     })).toEqual({
+      rendererInfoAvailable: true,
+      rendererMemoryAvailable: true,
       drawCalls: 0,
       triangles: 0,
       lines: 0,
@@ -38,8 +42,30 @@ describe('readRendererMetrics', () => {
     });
   });
 
+  it('keeps render metrics available when Three omits optional memory info', () => {
+    expect(readRendererMetrics({
+      render: { calls: 2, triangles: 20 },
+    })).toMatchObject({
+      rendererInfoAvailable: true,
+      rendererMemoryAvailable: false,
+      drawCalls: 2,
+      triangles: 20,
+    });
+  });
+
+  it('does not treat memory-only info as render metrics', () => {
+    expect(readRendererMetrics({
+      memory: { geometries: 2, textures: 1 },
+    })).toMatchObject({
+      rendererInfoAvailable: false,
+      rendererMemoryAvailable: true,
+    });
+  });
+
   it('accepts an empty renderer info object', () => {
     expect(readRendererMetrics({})).toEqual({
+      rendererInfoAvailable: false,
+      rendererMemoryAvailable: false,
       drawCalls: 0,
       triangles: 0,
       lines: 0,

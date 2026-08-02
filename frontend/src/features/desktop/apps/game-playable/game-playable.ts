@@ -12,6 +12,7 @@ import {
   FramePerformanceMonitor,
   type WorldState,
 } from '../../../game-core';
+import { evaluateGamePerformanceBudget } from './game-performance-budget';
 import { FIXTURE_MAP, FIXTURE_MAP_VERSION } from './game-fixture-map';
 import { createGameInput, type GameInputHandle } from './game-playable-input';
 import { mountGamePlayableScene, type GamePlayableSceneHandle } from './game-playable-scene';
@@ -99,6 +100,7 @@ export function renderGamePlayable(context: RenderContext): MountedView {
       const streaming = scene.streamingStats();
       const rendererMetrics = scene.rendererMetrics();
       const performanceSnapshot = frameMonitor.snapshot();
+      const performanceBudget = evaluateGamePerformanceBudget(performanceSnapshot, rendererMetrics);
       view.element.dataset.visibleChunks = String(streaming.visibleChunks);
       view.element.dataset.visibleInstances = String(streaming.visibleInstances);
       view.element.dataset.frameP95Ms = performanceSnapshot.p95Ms.toFixed(2);
@@ -106,6 +108,9 @@ export function renderGamePlayable(context: RenderContext): MountedView {
       view.element.dataset.rendererTriangles = String(rendererMetrics.triangles);
       view.element.dataset.rendererGeometries = String(rendererMetrics.geometries);
       view.element.dataset.rendererTextures = String(rendererMetrics.textures);
+      view.element.dataset.rendererBudgetStatus = performanceBudget.status;
+      view.element.dataset.rendererBudgetFrameStatus = performanceBudget.frame.status;
+      view.element.dataset.rendererBudgetHeapStatus = performanceBudget.jsHeapUsedBytes.status;
       if (rendererMetrics.jsHeapUsedBytes !== undefined) {
         view.element.dataset.jsHeapUsedBytes = String(rendererMetrics.jsHeapUsedBytes);
       }

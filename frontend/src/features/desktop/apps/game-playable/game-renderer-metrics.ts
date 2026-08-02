@@ -22,6 +22,10 @@ export interface JSHeapMemoryLike {
 }
 
 export interface GameRendererMetrics {
+  /** True when renderer.info.render was available for this snapshot. */
+  readonly rendererInfoAvailable: boolean;
+  /** True when renderer.info.memory was available for this snapshot. */
+  readonly rendererMemoryAvailable: boolean;
   readonly drawCalls: number;
   readonly triangles: number;
   readonly lines: number;
@@ -39,6 +43,8 @@ export function readRendererMetrics(
   const render = info.render ?? {};
   const rendererMemory = info.memory ?? {};
   const metrics: GameRendererMetrics = {
+    rendererInfoAvailable: info.render !== undefined,
+    rendererMemoryAvailable: info.memory !== undefined,
     drawCalls: nonNegative(render.calls),
     triangles: nonNegative(render.triangles),
     lines: nonNegative(render.lines),
