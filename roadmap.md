@@ -52,15 +52,7 @@
 
 ## Siguiente bloque habilitado
 
-**028A-7 — El label de cuenta muestra solo el nombre de usuario.** Eliminar el prefijo redundante "Cuenta ·"/"cuenta ·" en la barra desktop y el launcher móvil: cuando hay sesión, mostrar el nombre derivado de la parte local del email (`userEmail` expuesto por `/auth/me`), con fallback por capacidad. Después se continúa con hardening/E2E.
-
-- [ ] Exponer `userEmail` en `AuthState` y poblarlo desde `AuthService.me()`.
-- [ ] Helper `authAccountName` que devuelve la parte local del email (o fallback admin/cuenta).
-- [ ] Desktop: `desktop-menu-bar` muestra solo el nombre (sin "Cuenta ·").
-- [ ] Móvil: `mobile-account-control` muestra solo el nombre (sin "cuenta ·").
-- [ ] Actualizar tests del menu bar; type-check y suite frontend verdes; validación en navegador.
-
-**Gate/salida:** label de sesión muestra solo el nombre de usuario en desktop y móvil (validado en navegador logueado como admin y como no-admin); `npm run task:check -- {ID}` y type-check PASS.
+**018A-66 — Separar overlay personal de la sesión admin.** Validar en navegador login, logout y recarga con usuario admin: no debe aparecer el modal de conflicto ni el aviso `workspace actualizado`; con cuenta no-admin el conflicto solo aparece ante revisiones local/remota incompatibles. Después se continúa con hardening/E2E.
 
 ### 028A-3 — Guard global de ejecuciones pesadas y limpieza de targets
 

@@ -15,7 +15,7 @@ beforeEach(() => {
       dispatchEvent: () => false,
     })) as typeof window.matchMedia;
   }
-  authStore.set({ isAuthenticated: false, userId: null, capability: 'public' }, 'sync');
+  authStore.set({ isAuthenticated: false, userId: null, userEmail: null, capability: 'public' }, 'sync');
 });
 
 describe('desktop menu bar account status', () => {
@@ -27,10 +27,12 @@ describe('desktop menu bar account status', () => {
     expect(button).not.toBeNull();
     expect(label?.textContent).toBe('Entrar');
 
-    authStore.set({ isAuthenticated: true, userId: 'user-1', capability: 'authenticated' }, 'sync');
-    expect(label?.textContent).toBe('Cuenta');
-    authStore.set({ isAuthenticated: true, userId: 'admin-1', capability: 'admin' }, 'sync');
-    expect(label?.textContent).toBe('Cuenta · admin');
+    /* [028A-7] El label muestra solo el nombre derivado del email, no
+     * "Cuenta · admin". Sin email, fallback por capacidad. */
+    authStore.set({ isAuthenticated: true, userId: 'user-1', userEmail: 'maria@example.com', capability: 'authenticated' }, 'sync');
+    expect(label?.textContent).toBe('maria');
+    authStore.set({ isAuthenticated: true, userId: 'admin-1', userEmail: 'admin@example.com', capability: 'admin' }, 'sync');
+    expect(label?.textContent).toBe('admin');
 
     bar.destroy();
     document.body.innerHTML = '';
@@ -42,7 +44,7 @@ describe('desktop menu bar account status', () => {
     const label = bar.element.querySelector('.desktop-menu-bar__account-label');
     bar.destroy();
 
-    authStore.set({ isAuthenticated: true, userId: 'user-1', capability: 'authenticated' }, 'sync');
+    authStore.set({ isAuthenticated: true, userId: 'user-1', userEmail: 'maria@example.com', capability: 'authenticated' }, 'sync');
     expect(label?.textContent).toBe('Entrar');
     document.body.innerHTML = '';
   });

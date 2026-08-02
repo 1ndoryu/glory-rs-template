@@ -28,6 +28,7 @@ export interface MeResult {
 
 interface MeResponse {
   id: string;
+  email: string;
   role?: 'user' | 'admin';
 }
 
@@ -83,7 +84,7 @@ export const AuthService = {
     }
     clearPreferencesSync();
     clearClipboard();
-    authStore.set({ isAuthenticated: false, userId: null, capability: 'public' });
+    authStore.set({ isAuthenticated: false, userId: null, userEmail: null, capability: 'public' });
   },
 
   /** Verificar sesión actual. */
@@ -92,7 +93,7 @@ export const AuthService = {
       const response = await me();
       const res = unwrapGeneratedResponse<MeResponse>(response, [200]);
       const capability = capabilityFromRole(res.role);
-      authStore.set({ isAuthenticated: true, userId: res.id, capability });
+      authStore.set({ isAuthenticated: true, userId: res.id, userEmail: res.email ?? null, capability });
       await syncPreferencesForUser(res.id);
       return { isAuthenticated: true, userId: res.id, capability };
     } catch {

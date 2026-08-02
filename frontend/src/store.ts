@@ -60,10 +60,14 @@ export function createStore<T>(initialValue: T): Store<T> {
 /* === Stores globales de la aplicación === */
 
 /* Estado de autenticación
- * [297A-8] Migrado de JWT localStorage a sesiones opacas en cookie HttpOnly. */
+ * [297A-8] Migrado de JWT localStorage a sesiones opacas en cookie HttpOnly.
+ * [028A-7] Se añade userEmail (opcional) para derivar el nombre de usuario
+ * visible en la barra/cuenta sin prefijos redundantes tipo "Cuenta ·". */
 export interface AuthState {
   isAuthenticated: boolean;
   userId: string | null;
+  /** Email del usuario autenticado; permite mostrar su nombre (parte antes de @). */
+  userEmail?: string | null;
   /** Capacidad confirmada por el backend; nunca se infiere desde la cookie. */
   capability: AuthCapability;
 }
@@ -71,8 +75,19 @@ export interface AuthState {
 export const authStore = createStore<AuthState>({
   isAuthenticated: false,
   userId: null,
+  userEmail: null,
   capability: 'public',
 });
+
+/* [028A-7] Nombre visible de la sesión: parte local del email (antes de @).
+ * Si no hay email (estado legacy o sesión parcial), fallback según capacidad. */
+export function authAccountName(state: AuthState): string {
+  if (state.userEmail) {
+    const local = state.userEmail.split('@')[0].trim();
+    if (local) return local;
+  }
+  return state.capability === 'admin' ? 'admin' : 'cuenta';
+}
 
 /* [297A-29 F1] Configuración de perfil y redes.
  * Las fuentes y tamaños son ahora estáticos (JetBrains Mono + tokens fijos

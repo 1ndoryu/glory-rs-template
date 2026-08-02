@@ -10,7 +10,7 @@ import { formatShortcut } from '../../../utils/format-shortcut';
 import { AppRegistry } from '../../runtime/app-registry';
 import type { Capability } from '../../runtime/capability';
 import { hasCapability } from '../../runtime/capability';
-import { authStore } from '../../../store';
+import { authStore, authAccountName } from '../../../store';
 import { ArticleService } from '../../../services';
 import { createThemeToggleButton } from '../../../components/ui/theme-toggle-button';
 import { loadNotifications, notificationsStore, unreadNotificationCount } from '../../notifications/notifications-store';
@@ -259,8 +259,10 @@ export function createDesktopMenuBar(): DesktopMenuBar {
   const accountLabel = accountButton.querySelector('.desktop-menu-bar__account-label');
   const stopAuth = authStore.subscribe((state) => {
     if (!accountLabel) return;
+    /* [028A-7] Solo el nombre del usuario (parte local del email), sin el
+     * prefijo redundante "Cuenta ·". Fallback admin/cuenta si no hay email. */
     accountLabel.textContent = state.isAuthenticated
-      ? (state.capability === 'admin' ? 'Cuenta · admin' : 'Cuenta')
+      ? authAccountName(state)
       : 'Entrar';
     accountButton.setAttribute('aria-label', state.isAuthenticated ? 'Abrir Cuenta' : 'Iniciar sesión');
   });

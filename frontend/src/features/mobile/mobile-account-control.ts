@@ -5,7 +5,7 @@
 
 import { UserRound, createElement } from 'lucide';
 import { createEl } from '../../utils/dom';
-import { authStore } from '../../store';
+import { authStore, authAccountName } from '../../store';
 
 export interface MobileAccountControl {
   readonly element: HTMLButtonElement;
@@ -22,8 +22,10 @@ export function createMobileAccountControl(onOpen: () => void): MobileAccountCon
   const label = button.querySelector('.movilLauncher__cuenta-label');
   const stop = authStore.subscribe((state) => {
     if (destroyed || !label) return;
+    /* [028A-7] Solo el nombre del usuario, sin el prefijo "cuenta ·".
+     * En móvil se mantiene el estilo en minúsculas. */
     label.textContent = state.isAuthenticated
-      ? (state.capability === 'admin' ? 'cuenta · admin' : 'cuenta')
+      ? authAccountName(state)
       : 'entrar';
     button.setAttribute('aria-label', state.isAuthenticated ? 'Abrir Cuenta' : 'Iniciar sesión');
   });
