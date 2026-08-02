@@ -24,6 +24,7 @@
 - Deep links: `Agente/planes/plan-deep-links-ventanas-2026-07-31.md`
 - Apps editoriales: `Agente/planes/plan-programas-editoriales-2026-07-31.md`
 - Interacción y medición: `Agente/planes/plan-contratos-interaccion-comandos-medicion-2026-07-29.md`
+- Triage de alertas de calidad: `Agente/planes/plan-triage-alertas-quality-2026-08-02.md`
 
 ## Cómo leer este archivo
 
@@ -32,6 +33,8 @@
 - El detalle de cada entrega terminada vive en `Agente/completados/` y en los planes archivados.
 - Una tarea solo se marca cuando tiene evidencia de código, pruebas, quality gate y, si es UI, navegador.
 - El cierre normal usa `npm run task:check -- {ID}` y `npm run self-check -- -TareaId {ID}`.
+- Solo el primer bloque habilitado puede ejecutarse. El resto permanece en la cola única de abajo aunque su plan tenga casillas abiertas.
+- Antes de empezar, reconciliar `roadmap.md` con `Agente/planes/`: un plan debe tener un ID dueño, dependencias, gate y un único siguiente paso; los planes completados/superados se archivan.
 
 ## Estado base implementado (resumen operativo)
 
@@ -51,6 +54,59 @@
 ## Siguiente bloque habilitado
 
 **018A-66 — Separar overlay personal de la sesión admin.** Validar en navegador login, logout y recarga con usuario admin: no debe aparecer el modal de conflicto ni el aviso `workspace actualizado`; con cuenta no-admin el conflicto solo aparece ante revisiones local/remota incompatibles. Después se continúa con hardening/E2E.
+
+## Cola única de planes pendientes (orden obligatorio)
+
+Resolver los planes uno por uno, en este orden. Un agente no puede saltar a una fila posterior porque “su” plan tenga casillas abiertas: primero debe cerrar la fila actual, mover completados a `Agente/planes/completados/` cuando corresponda y actualizar el siguiente bloque.
+
+| Orden | Prioridad | ID/plan dueño | Dependencia inmediata | Salida mínima |
+| ---: | --- | --- | --- | --- |
+| 1 | P0 habilitado | `018A-66` — overlay admin | capacidades y 297A-13 | admin sin conflicto; cuenta personal conserva merge local/remoto |
+| 2 | P0 | `028A-1` — triage de alertas quality | reporte `297A-48` | cada warning tiene resolución, owner o excepción fechada; ningún P0 queda sin tarea |
+| 3 | P1 | `018A-73` — deuda CSS | revisión de recetas/tokens | CSS dividido por responsabilidad y sin deuda visual bloqueante |
+| 4 | P1 | `297A-17` — hardening, identidad, accesibilidad y SEO | 297A-6–16 + 018A-73 | casos negativos, teclado, SEO y observabilidad evidenciados |
+| 5 | P1 | `297A-9` — shell visual | runtime y recetas | shell validado en desktop/tablet/móvil, zoom y teclado |
+| 6 | P1 | `297A-12` — launcher móvil | 297A-9/11 | transición móvil↔tablet, touch y refresh sin lógica paralela |
+| 7 | P1 | `297A-19` — URLs/deep links/foco | 297A-9/11/12/13 | Back/Forward, refresh y URL compartible sin datos privados |
+| 8 | P1 | `297A-22` — reordenamiento grid | 297A-12 + overlay | drag, colisiones, persistencia y accesibilidad verificadas |
+| 9 | P1 | `297A-24` — cierre de ventanas + deuda SOLID runtime | 297A-19 | abrir una app nunca cierra otra; lifecycle visual/E2E y SRP cerrados |
+| 10 | P1 | `297A-13` — Cuenta, registro y overlay remoto | 297A-9/11/18 | concurrencia, recovery, tokens y capacidades sin filtraciones |
+| 11 | P1 | `297A-14` — programas editoriales | 297A-9/10/11 | artículos, proyectos, productos, media, papelera y autosave en tres presentaciones |
+| 12 | P1 | `297A-15` — comercio seguro | 297A-7/10/14 | proveedor, reembolsos, outbox, webhook, entitlement y descarga E2E |
+| 13 | P1 | `297A-16` — analytics y retiro legacy | 297A-9/11–15 | consentimiento, retención, purga y medición sin datos privados |
+| 14 | P2 | `297A-21` — notificaciones | 297A-13 + releases | deduplicación, dos dispositivos y capacidades verificadas |
+| 15 | P2 | `297A-29` — escalar Configuración | 297A-13/19/27/28 | nueva acción por registro/capacidad, sin eliminar compatibilidad |
+| 16 | P2 diferido | `297A-25` — apps pesadas | 297A-9/11/12 + primera app real | teardown, memoria/GPU y presupuesto medidos, no flags especulativos |
+| 17 | P2 futuro | `GAME-01` — Bosque 3D y assets/terreno | runtime, sesiones, quality y fila 16 | gameplay restante, editor 2D, publicación y mediciones físicas |
+| 18 | P2 futuro | `018A-96` — `glory-render` | GAME-01/Fase 8 + segundo juego | repositorio propio, CI y dos consumidores sin imports del OS |
+
+### Reconciliación de planes para que no queden huérfanos
+
+- `plan-auth-verificado` pertenece a 297A-13/297A-17; `plan-comercio-seguro` a 297A-15; `plan-analytics-privacidad` a 297A-16.
+- `plan-experiencia-movil-launcher`, `plan-deep-links-ventanas`, `plan-reordenamiento-arrastre-grid`, `plan-cierre-automatico-ventanas`, `plan-deuda-solid-runtime` y `plan-barra-acciones-ventanas` se cierran dentro de las filas 6–9, no abren frentes paralelos.
+- `plan-programas-editoriales` y `plan-configuracion-legacy` son los dueños de las filas 11 y 15; `plan-carga-apps-pesadas` es el dueño de la fila 16.
+- `plan-assets-terreno-bosque-3d` y `plan-juego-bosque-multijugador` se resuelven juntos en GAME-01; `plan-glory-render-motor-juegos` espera la fila 18.
+- `plan-boceto-visual-bosque*`, `plan-refactorizacion-arquitectura` y `plan-componentizacion-ui` son históricos/diferidos: antes de ejecutar otra cosa se confirma su estado y se mueven a `Agente/planes/completados/` si ya no tienen checklist ejecutable.
+- Los planes sin fila propia no se ignoran: se enlazan a su fila dueña, conservan su checklist y se archivan solo con el gate de esa fila.
+
+### Recordatorio de organización antes de cada bloque
+
+- [ ] Leer el roadmap completo y abrir solo el primer plan habilitado.
+- [ ] Comprobar que el plan tiene estado, dependencias, owner, checklist, gate y criterio de salida.
+- [ ] Si una casilla ya está hecha, exigir evidencia y moverla a completados; no dejar checklists duplicadas en roadmap y plan.
+- [ ] Reubicar planes superseded/completados y actualizar enlaces antes de iniciar código.
+- [ ] Al cerrar, ejecutar quality gate, registrar warnings, revisar `git status`/commit condicional y releer este roadmap.
+
+## Política de warnings: nunca ignorar un PASS con deuda
+
+El último full report `297A-48` contiene 250 warnings de Sentinel, 77 de VarSense y 40 custom; Sentinel subió de 216 en `018A-92`. Es un baseline global (`scope: full`), no 455 regresiones nuevas: el delta contra los archivos cambiados fue 19 hallazgos. El reporte debe distinguir `new`, `recurrent` y `resolved` por archivo/regla. El plan canónico de clasificación es `Agente/planes/plan-triage-alertas-quality-2026-08-02.md`.
+
+- **Corregir ahora (P0):** suscripciones sin cleanup verificable, SQL productivo sin macros, SQL directo en handlers productivos y cualquier hallazgo de seguridad, pérdida de datos, carrera o error enmascarado. Helpers `#[cfg(test)]` se corrigen en Sentinel, no se migran como producción.
+- **Corregir antes del gate de fase (P1):** boundaries DOM/window sin adapter, `console` de producción, API fuera de service, barrels con lógica y archivos por encima de límites.
+- **Revisar y no borrar (P2):** tokens duplicados, clases huérfanas, selectores HTML, directorios abarrotados y hardcodes; resolver o documentar excepción acotada.
+- **Información:** `cssInlineScript` y recetas CSS locales se conservan como guía, no se presentan como warnings resueltos.
+- “Preexistente” no es una excusa: cada warning del archivo tocado se corrige o se registra con regla, archivo, tarea dueña, motivo, alcance y fecha de retirada.
+- La salida resumida debe mostrar cuántos hallazgos son nuevos/bloqueantes aunque limite stdout a tres ejemplos; el detalle completo y el baseline viven en `.quality-reports/`.
 
 ## Pendientes ordenados
 
@@ -73,7 +129,8 @@
 - [x] **297A-35 — Cache visual persistente y culling por batch:** el terreno visible se mantiene en un LRU visual de hasta 12 chunks, se retira de la escena sin destruirse durante evictions temporales y solo libera geometría al superar el límite; los `InstancedMesh` activan `frustumCulled` y actualizan `boundingSphere` tras cambiar matrices. 42 tests, type-check, build y diff-check PASS.
 - [x] **297A-36 — Presupuesto local medible del renderer:** `evaluateGamePerformanceBudget` evalúa p95 de frame, draw calls, triángulos, geometrías, texturas y heap JS opcional con estados `pass`/`fail`/`unknown`; exige 30 muestras para frame, no trata `renderer.info` ausente como cero y publica únicamente `data-renderer-budget-*` locales. 17 tests dirigidos, type-check, build y diff-check PASS. No representa memoria GPU física ni abre realtime.
 - [x] **297A-37 — Diagnóstico WebGL y pérdida de contexto:** `detectWebGL` prueba WebGL2/WebGL, libera el contexto temporal cuando existe `WEBGL_lose_context` y el fixture muestra fallback accesible antes de montar Three.js. El controller escucha `webglcontextlost` sobre el canvas real, detiene RAF y libera listeners/input/scene al cerrar. 23 tests dirigidos, type-check, build y diff-check PASS; no sustituye una medición física de GPU.
-- [x] **297A-38 — Lazy loading y lifecycle repetido del fixture:** `AppRegistry.isLazy('game-playable')` verifica que el registro no resuelve la app pesada antes de instanciarla. Las pruebas cubren 12 abortos antes del montaje y 12 ciclos reales de mount/destroy con handles independientes, sin acumular input, escena ni RAF. 36 tests dirigidos, type-check, build y diff-check PASS. La evidencia es de carga/lifecycle lógico, no de memoria GPU física.- [x] **297A-39 — Contrato realtime v1 sin transporte:** `game-realtime.ts` y `models/game_realtime.rs` alinean envelope versionado, join con ticket opaco, intents por secuencia, heartbeat/ack, snapshots filtrados, errores allowlisted, límites de bytes/frecuencia y validación fail-closed. Se cubren campos desconocidos, UTF-8 inválido, Unicode por puntos de código, controles C0/C1/DEL, secuencias replay/jump, timestamps negativos, entidades duplicadas y posiciones finitas. Frontend: type-check, 26 tests dirigidos y build PASS; Rust: fmt, check y 8 tests PASS; no incluye upgrade WebSocket, identidad invitada, salas ni autoridad de movimiento.
+- [x] **297A-38 — Lazy loading y lifecycle repetido del fixture:** `AppRegistry.isLazy('game-playable')` verifica que el registro no resuelve la app pesada antes de instanciarla. Las pruebas cubren 12 abortos antes del montaje y 12 ciclos reales de mount/destroy con handles independientes, sin acumular input, escena ni RAF. 36 tests dirigidos, type-check, build y diff-check PASS. La evidencia es de carga/lifecycle lógico, no de memoria GPU física.
+- [x] **297A-39 — Contrato realtime v1 sin transporte:** `game-realtime.ts` y `models/game_realtime.rs` alinean envelope versionado, join con ticket opaco, intents por secuencia, heartbeat/ack, snapshots filtrados, errores allowlisted, límites de bytes/frecuencia y validación fail-closed. Se cubren campos desconocidos, UTF-8 inválido, Unicode por puntos de código, controles C0/C1/DEL, secuencias replay/jump, timestamps negativos, entidades duplicadas y posiciones finitas. Frontend: type-check, 26 tests dirigidos y build PASS; Rust: fmt, check y 8 tests PASS; no incluye upgrade WebSocket, identidad invitada, salas ni autoridad de movimiento.
 - [x] **297A-40 — Ticket de juego firmado sin transporte:** `services/game_ticket.rs` emite y consume tickets `g1.game` ligados a UUID server-side, con HMAC, TTL por defecto de 30 s, máximo de 60 s, límite de 512 bytes, nonce y consumo single-use acotado a 4096 entradas. Tests cubren manipulación, secreto incorrecto, propósito, UUID, expiración, reloj inválido, replay, poda y token sobredimensionado. Rust: fmt/check y 7 tests del servicio PASS; no incluye endpoint HTTP, upgrade WebSocket, hub Glory, identidad invitada ni salas.
 - [x] **297A-41 — Emisión HTTP autenticada del ticket:** `POST /api/game/ticket` usa `AuthUser` y CSRF, resuelve el subject UUID server-side mediante `GameTicketStore`, responde solo `{ ticket }`, mantiene el UUID fuera del token y falla cerrado si falta `GLORY_GAME_TICKET_SECRET`. Incluye configuración, OpenAPI, router con estado compartible y 3 pruebas HTTP reales en PostgreSQL temporal migrado; fmt/check, tests unitarios, integración HTTP, export OpenAPI y diff-check PASS. No incluye upgrade WebSocket, hub Glory, identidad invitada, salas ni autoridad de movimiento.
 - [x] **297A-42 — Frontera de upgrade WebSocket del juego:** `/api/game/ws` acepta el upgrade sin ticket en query/cookie, exige `join` como primer mensaje, aplica límite global de conexiones, timeout de handshake de 5 s, validación del envelope realtime, consumo single-use del ticket opaco y cierre fail-closed. Una conexión autenticada aún recibe `map_unavailable` porque no existe actor/sala; no se reutiliza el hub Glory `i32`. Rust: fmt/check y tests dirigidos PASS; el handshake TCP real, actor de sala, snapshots y movimiento quedan pendientes.
@@ -84,7 +141,7 @@
 - [x] **297A-47 — Identidad temporal de invitados:** `POST /api/game/ticket` acepta cuenta autenticada con sesión/CSRF o invitado temporal server-side. La cookie `guest_game` es opaca, HMAC, `HttpOnly`, `SameSite=Strict`, TTL 2 h y store acotado a 4096 identidades; el rate limit por IP devuelve 429 y una sesión inválida nunca degrada a invitado. El cliente `game-playable` usa el mismo realtime para cuenta/invitado. Gate técnico: `cargo fmt --check`, `cargo check --tests`, 9 tests unitarios, type-check y 8 tests frontend PASS; 2 pruebas HTTP de invitado PASS. La integración de cuenta queda pendiente de ejecutar contra BD de pruebas migrada.
 - [x] **297A-48 — Perfil persistente de cuenta del juego:** `user_game_profiles` guarda únicamente el nombre visible allowlisted de cuentas autenticadas. `GET/PUT /api/game/profile` usa `AuthUser`, CSRF, JSON estricto, revisión optimista y UPSERT transaccional; invitados reciben 401 y el DTO no expone `user_id`. Gate técnico: `cargo fmt --check`, `cargo check --tests`, 4 tests HTTP PostgreSQL, 2 unitarios y `git diff --check` PASS; la integración dentro de `game-playable` y el catálogo de personajes quedan para el siguiente bloque.
 
-- [ ] GAME-01 restante: culling avanzado, medición física de GPU/memoria, snapshots/presencia avanzada, carga del perfil en gameplay, reconexión persistente, personaje de cuenta y editor.
+- [ ] GAME-01 restante: culling avanzado, medición física de GPU/memoria, snapshots/presencia avanzada, reconexión persistente, personaje de cuenta y editor. `297A-49` ya carga el perfil validado antes de WebGL/realtime, con abort/timeout y fallback invitado sin consultas en el loop de render.
 
 **Gate/salida:** el plan GAME-01 queda aprobado y cada fase tiene su propio ID, gate `task:check`, auditoría SOLID/rendimiento/escalabilidad/seguridad/observabilidad, pruebas de navegador y evidencia de carga antes de iniciar la siguiente.
 
