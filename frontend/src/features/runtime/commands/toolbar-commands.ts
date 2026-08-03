@@ -2,7 +2,7 @@
  * Comandos referenciados por app toolbars (Papelera, Finder, Projects). */
 
 import { adminOnly, CommandRegistry, type CommandResult } from '../command-registry';
-import { Folder, Trash2, FolderCode } from 'lucide';
+import { Folder, Trash2, FolderCode, Settings } from 'lucide';
 
 CommandRegistry.register({
   id: 'trash:restore-all',
@@ -62,6 +62,26 @@ CommandRegistry.register(adminOnly({
   execute: async (): Promise<CommandResult> => {
     const { openAppWindow } = await import('../route-app-adapter');
     await openAppWindow('project-editor');
+    return { status: 'success' };
+  },
+}));
+
+/* [297A-62] Configuración del juego: abre el panel modal del Bosque desde el
+ * toolbar real de la ventana. adminOnly lo oculta para no-admin (fail-closed)
+ * y el grupo del toolbar se re-renderiza en vivo con authStore; el panel se
+ * carga lazy en su propio chunk (no infla el chunk del juego). */
+CommandRegistry.register(adminOnly({
+  id: 'game:settings',
+  label: 'Configuración del Bosque',
+  icon: Settings,
+  order: 60,
+  contexts: ['toolbar'],
+  undoPolicy: 'none',
+  analyticsEvent: 'game.settings',
+  isAvailable: () => ({ state: 'enabled' }),
+  execute: async (): Promise<CommandResult> => {
+    const { openGameSettings } = await import('../../desktop/apps/game-playable/game-settings');
+    openGameSettings();
     return { status: 'success' };
   },
 }));

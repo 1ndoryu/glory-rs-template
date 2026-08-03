@@ -578,6 +578,10 @@ realtime.
 
 **Evidencia 297A-61:** panel UI del catálogo de assets en el tab "juego" del Admin: lista completa activas/inactivas vía `GameAssetAdminService.listAll` (`GET /api/admin/game/assets`), alta (id + etiqueta + categoría) y edición con estado (mismo patrón de modales que 297A-53), sección "actividad de assets" con los últimos 10 eventos (`GameAuditService.listAssetEvents`, `GET /api/admin/game/audit/assets`) cargada en paralelo y aislada (si falla, solo la sección lo indica), y pares acción-entidad `asset.created`/`asset.updated`↔`asset` en el validador compartido. La franja del tab lleva ambos botones de alta (personaje y asset). 9 tests frontend dirigidos PASS.
 
+**Evidencia 297A-62:** la configuración del juego vive DENTRO de la ventana del Bosque, no en el Admin: el toolbar real de la ventana (`AppToolbarGroup` del registro lazy de `game-playable`) expone el grupo "Configuración" con el comando `game:settings` envuelto en `adminOnly` — visible solo para cuentas admin y oculto en vivo para el resto (el toolbar re-renderiza con authStore). El comando abre un modal B&W del OS con las secciones organizadas "personajes" y "assets" (listas activas/inactivas, alta, edición y activar/desactivar reutilizando `GameCharacterAdminService`/`GameAssetAdminService`) más la actividad auditada aislada de ambos catálogos. La gestión se RETIRA del Admin: se elimina el tab "juego" de `admin.ts` y se borra `admin-juego.ts` (la lógica se mueve al módulo `game-settings.ts` del juego). Sin preview de modelos hasta Assets 3D. [Decisión de UX con el usuario: solo admin, catálogos, mover del Admin.]
+
+**Límite 297A-62:** el panel no previsualiza modelos (GLB llegan con Assets 3D); el editor de mapa y el runtime aún no consumen el catálogo; la auditoría de expulsión y la purga de retención quedan para Fase 8.
+
 **Gate:** ningún invitado puede invocar admin ni reclamar el estado de otra identidad; el perfil no depende de datos enviados sin validar.
 
 **Auditoría de cierre — Fase 6:**
@@ -599,6 +603,7 @@ realtime.
 - [x] Auditoría de la publicación de mapas (`297A-58`): `map.published` se registra en `game_audit_events` dentro de la misma transacción de la publicación (repo transaccional, patrón 297A-55); listado admin acotado por API. La auditoría de assets/expulsión y la garantía de versión de la sala activa llegan con sus bloques.
 - [x] Panel UI de auditoría de publicaciones de mapas (`297A-59`): sección "publicaciones de mapas" en el tab "juego" (últimas 10 publicaciones con versión y fecha, carga paralela aislada y pares acción-entidad estrictos en el validador).
 - [x] Catálogo de assets del juego (`297A-60`): tabla `game_assets` con seed base, CRUD admin allowlisted, catálogo público activo y auditoría transaccional de cambios con listado admin. Las versiones inmutables y el storage por hash llegan con `Assets 3D`.
+- [x] Configuración del juego dentro de la ventana (`297A-62`): la gestión de catálogos (personajes + assets) se mueve del Admin a un panel modal del OS abierto desde el toolbar real de la ventana del Bosque, visible solo para admin vía `adminOnly`; el tab "juego" del Admin desaparece.
 
 **Gate:** un admin importa un GLB, crea terreno 2D, coloca instancias, guarda, previsualiza y publica; un usuario normal recibe rechazo server-side aunque fuerce el cliente.
 

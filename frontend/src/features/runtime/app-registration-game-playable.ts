@@ -17,6 +17,13 @@ AppRegistry.registerLazy({
   requires: 'public',
   deepLink: createPathDeepLink('/forest-playable'),
   layout: 'full-bleed',
+  /* [297A-62] Configuración del juego dentro de la ventana: el toolbar real
+   * del shell proyecta el comando `game:settings`, que es adminOnly; para
+   * no-admin el grupo entero se oculta (fail-closed) y se re-renderiza en
+   * vivo con authStore. */
+  toolbar: [
+    { label: 'Configuración', items: ['game:settings'] },
+  ],
   load: () => import('../desktop/apps/game-playable/game-playable').then((module) => ({
     render: (context: RenderContext): MountedView => {
       dispatchEvent({ type: 'app_opened', appId: 'game-playable' });

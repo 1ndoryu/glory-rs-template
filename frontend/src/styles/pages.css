@@ -288,6 +288,15 @@
   border-bottom: var(--borde);
 }
 
+/* [297A-62] Encabezado de sección del panel de configuración del Bosque:
+ * título + botón de alta en la misma fila, separados con el espacio del OS. */
+.admin-seccion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espacio-md);
+}
+
 .admin-acciones {
   display: flex;
   gap: var(--espacio-md);
