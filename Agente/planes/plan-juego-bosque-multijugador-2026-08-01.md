@@ -572,6 +572,10 @@ realtime.
 
 **Límite 297A-59:** el panel es informativo (el editor de mapa y Assets 3D llegan en sus bloques de Fase 7); la auditoría de assets y de expulsión siguen pendientes; el DTO no expone `actorId` ni coordenadas, y la purga de retención queda para Fase 8.
 
+**Evidencia 297A-60:** catálogo de assets del juego (backend): tabla `game_assets` con seed (terreno, árbol, roca, agua), CRUD admin allowlisted (`POST/PUT /api/admin/game/assets` + listado admin), catálogo público `GET /api/game/assets` (solo activas, shape sin estado administrativo) y auditoría transaccional de cambios (`asset.created`/`asset.updated` en `game_audit_events`, mismo patrón que 297A-55) con listado admin `GET /api/admin/game/audit/assets`. La categoría usa el contrato del mapa (`terrain`/`tree`/`rock`/`water`/`character`/`generic`). Cierra el límite "no hay auditoría de assets" de 297A-58. 9/9 tests HTTP PostgreSQL PASS.
+
+**Límite 297A-60:** el catálogo no tiene versiones inmutables ni storage por hash (llegan con `Assets 3D`); el Editor de mapa y el runtime aún no consumen el catálogo; la auditoría de expulsión y la purga de retención quedan para Fase 8.
+
 **Gate:** ningún invitado puede invocar admin ni reclamar el estado de otra identidad; el perfil no depende de datos enviados sin validar.
 
 **Auditoría de cierre — Fase 6:**
@@ -592,6 +596,7 @@ realtime.
 - [x] Auditoría persistente de cambios sensibles del catálogo (`297A-55`): `game_audit_events` registra crear/actualizar/desactivar con actor, acción y estado visual en la misma transacción; listado admin acotado sin identidades. La auditoría de mapa/assets y la garantía de versión de la sala activa llegan con sus bloques.
 - [x] Auditoría de la publicación de mapas (`297A-58`): `map.published` se registra en `game_audit_events` dentro de la misma transacción de la publicación (repo transaccional, patrón 297A-55); listado admin acotado por API. La auditoría de assets/expulsión y la garantía de versión de la sala activa llegan con sus bloques.
 - [x] Panel UI de auditoría de publicaciones de mapas (`297A-59`): sección "publicaciones de mapas" en el tab "juego" (últimas 10 publicaciones con versión y fecha, carga paralela aislada y pares acción-entidad estrictos en el validador).
+- [x] Catálogo de assets del juego (`297A-60`): tabla `game_assets` con seed base, CRUD admin allowlisted, catálogo público activo y auditoría transaccional de cambios con listado admin. Las versiones inmutables y el storage por hash llegan con `Assets 3D`.
 
 **Gate:** un admin importa un GLB, crea terreno 2D, coloca instancias, guarda, previsualiza y publica; un usuario normal recibe rechazo server-side aunque fuerce el cliente.
 

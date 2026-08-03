@@ -52,6 +52,48 @@ impl GameAuditService {
         )
     }
 
+    /// [297A-60] Registra un cambio del catálogo de assets dentro de la
+    /// transacción del cambio (mismo patrón que el catálogo de personajes):
+    /// si el cambio falla, el evento se descarta con él.
+    pub async fn record_asset_change(
+        tx: &mut Transaction<'_, Postgres>,
+        actor_id: uuid::Uuid,
+        action: &str,
+        asset_id: &str,
+        payload: &serde_json::Value,
+    ) -> Result<(), AppError> {
+        GameAuditRepository::insert(
+            tx,
+            Some(actor_id),
+            "admin",
+            action,
+            "asset",
+            asset_id,
+            payload,
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// [297A-60] Eventos de auditoría del catálogo de assets para el panel
+    /// admin; mismo contrato acotado que el catálogo, con `entity_kind` `asset`.
+    pub async fn list_asset_events(
+        pool: &PgPool,
+        entity_id: Option<&str>,
+        limit: Option<i64>,
+    ) -> Result<Vec<GameAuditEventResponse>, AppError> {
+        let limit = limit
+            .unwrap_or(GAME_AUDIT_DEFAULT_LIMIT)
+            .clamp(1, GAME_AUDIT_MAX_LIST_LIMIT);
+        Ok(
+            GameAuditRepository::list_by_entity(pool, "asset", entity_id, limit)
+                .await?
+                .into_iter()
+                .map(Into::into)
+                .collect(),
+        )
+    }
+
     /// [297A-58] Registra una publicación de mapa dentro de la transacción de
     /// la publicación: si el publish falla, el evento se descarta con él.
     pub async fn record_map_publish(

@@ -11,6 +11,9 @@ pub const ACTION_CHARACTER_CREATED: &str = "character.created";
 pub const ACTION_CHARACTER_UPDATED: &str = "character.updated";
 /// [297A-58] Publicación de una nueva versión activa de un mapa del juego.
 pub const ACTION_MAP_PUBLISHED: &str = "map.published";
+/// [297A-60] Cambios allowlisted del catálogo de assets del juego.
+pub const ACTION_ASSET_CREATED: &str = "asset.created";
+pub const ACTION_ASSET_UPDATED: &str = "asset.updated";
 
 /// Evento persistido de auditoría. `actor_id` se conserva en BD para trazabilidad,
 /// pero no se expone en el listado admin (privacidad: solo el `actor_kind`).
