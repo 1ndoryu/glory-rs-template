@@ -31,11 +31,14 @@ Los repositorios upstream y una instalación global administrada no forman parte
 - `scripts/quality/policy-defaults.mjs`: catálogo único de comandos bloqueables para el guard de transición.
 - `scripts/quality/quality-command-guard.mjs`: consume política v2 válida; mantiene fallback legacy seguro.
 - `scripts/quality/tests/policy.test.mjs` y tests del guard: fixtures de rutas, claves desconocidas, modos y migración.
+- `scripts/quality/lock-generator.mjs`: generación/verificación local del lock sin instalación, comparación estructural ignorando `generatedAt`, backup `.bak` y escritura atómica.
+- `scripts/quality/sentinel-doctor.mjs --lock`: diagnóstico/generación explícita; `--check` no escribe y `--write` no modifica analyzers.
+- `scripts/quality/tests/lock-generator.test.mjs`: 6 fixtures de parseo, generación, no-escritura, mismatch, backup y symlink/tamper.
 
 ## Gates pendientes
 
 - Runtime global versionado instalado y verificable.
-- `sentinel.lock.json` con `identitySha256` para identidad y `artifactSha256` real para runtime instalado; el adaptador local mantiene `artifactSha256: null`.
-- `realpath`/canonicalización verifican que lockfile, install root y checkouts permanezcan dentro del workspace.
+- Runtime global versionado con `artifactSha256` real; el adaptador local mantiene `artifactSha256: null`.
+- `realpath`/canonicalización verifican que lockfile, install root, backup y checkouts permanezcan dentro del workspace; el generador local añade escritura atómica y backup probado.
 - Paridad CLI/LSP/VS Code y matriz PowerShell/CMD/Bash/CI.
 - Lease de procesos hijos, rollback de perfiles y segundo proyecto sin política.

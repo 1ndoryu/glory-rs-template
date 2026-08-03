@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { migrateLegacyConfig, loadPolicy } from './policy.mjs';
+import { checkLock, writeLock } from './lock-generator.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -17,23 +18,44 @@ export function resolveLegacyRoot(discovered) {
 }
 
 function parseArgs(argv) {
-  const options = { migrate: false, dryRun: false, json: false, cwd: process.cwd() };
+  const options = { migrate: false, dryRun: false, json: false, lock: false, write: false, cwd: process.cwd() };
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
     if (value === '--migrate') options.migrate = true;
     else if (value === '--dry-run') options.dryRun = true;
     else if (value === '--json') options.json = true;
+    else if (value === '--lock') options.lock = true;
+    else if (value === '--write') options.write = true;
     else if (value === '--cwd') {
       options.cwd = argv[index + 1];
       index += 1;
     } else if (value.startsWith('--')) throw new Error(`Opción desconocida: ${value}`);
   }
   if (options.migrate && !options.dryRun) throw new Error('La migración solo está disponible como --dry-run en esta fase');
+  if (options.write && !options.lock) throw new Error('--write requiere --lock');
   return options;
 }
 
 async function main(argv = process.argv.slice(2)) {
   const options = parseArgs(argv);
+  if (options.lock) {
+    const lockResult = options.write
+      ? await writeLock(path.resolve(options.cwd))
+      : await checkLock(path.resolve(options.cwd));
+    const lockOutput = {
+      schemaVersion: 1,
+      command: 'sentinel doctor --lock',
+      mode: options.write ? 'write' : 'check',
+      status: options.write ? 'written' : lockResult.ok ? 'pass' : 'error',
+      reason: options.write ? 'written' : lockResult.reason,
+      lockPath: lockResult.lockPath,
+      backupCreated: lockResult.backupCreated ?? false,
+    };
+    if (options.json) process.stdout.write(`${JSON.stringify(lockOutput, null, 2)}\\n`);
+    else process.stdout.write(`[sentinel doctor] lock ${lockOutput.status}: ${lockOutput.reason}\\n`);
+    if (!options.write && !lockResult.ok) process.exitCode = 1;
+    return lockResult;
+  }
   const discovered = await loadPolicy(options.cwd);
   const result = { schemaVersion: 1, command: 'sentinel doctor', ...discovered };
   if (options.migrate) {

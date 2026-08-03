@@ -115,8 +115,10 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 - [x] Incluir la identidad del lockfile en el fingerprint de caché para invalidar PASS ante cambios de hashes fijados.
 - [ ] Definir precedencia: defaults del runtime < configuración del proyecto < perfil explícito de CI; variables de entorno solo pueden seleccionar un perfil allowlisted, nunca cambiar severidades o saltarse enforcement.
 - [ ] Mantener lectura de los formatos anteriores durante dos versiones de runtime, con warning visible y fecha de retirada.
+- [x] Añadir generador local `quality:lock --check|--write` y `quality:doctor --lock`; `--check` es solo lectura, `--write` crea `.bak` y reemplaza atómicamente, sin instalar runtime ni mutar analyzers.
+- [x] Rechazar lock/checkouts y backups por symlink/junction fuera del workspace; preservar el fallo cerrado ante cambios reales en `.quality-tools`.
 
-**Gate:** una migración dry-run no modifica archivos; el lock local es estricto, reproducible y fail-closed ante divergencias. La generación aplicada sigue pendiente de comando/runtime global, backup y rollback.
+**Gate:** una migración dry-run no modifica archivos; el lock local es estricto, reproducible y fail-closed ante divergencias. La generación aplicada local queda verificada con backup y escritura atómica; la instalación/rollback del runtime global sigue pendiente.
 
 ### Resolución de política
 

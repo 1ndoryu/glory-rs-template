@@ -44,14 +44,17 @@ function validateInstallRoot(value) {
   if (value.replace(/\\/g, '/').split('/').includes('..')) fail('installRoot no puede salir del workspace');
 }
 
-async function assertInsideWorkspace(workspaceRoot, target, label) {
+export async function assertInsideWorkspace(workspaceRoot, target, label, { allowMissing = false } = {}) {
   let rootReal;
   let targetReal;
   try {
     rootReal = await realpath(workspaceRoot);
     targetReal = await realpath(target);
-  } catch {
-    fail(`${label}: ruta inexistente o no resoluble`);
+  } catch (error) {
+    if (!allowMissing || error?.code !== 'ENOENT') fail(`${label}: ruta inexistente o no resoluble`);
+    const parentReal = await realpath(path.dirname(target)).catch(() => null);
+    if (!parentReal) fail(`${label}: ruta inexistente o no resoluble`);
+    targetReal = path.join(parentReal, path.basename(target));
   }
   const relative = path.relative(rootReal, targetReal);
   if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
@@ -171,11 +174,15 @@ export async function gitArchiveSha256(toolRoot) {
   });
 }
 
-export async function verifyInstalledAnalyzers(workspaceRoot, manifest, lock) {
+export async function inspectInstalledAnalyzers(workspaceRoot, manifest) {
   const results = {};
+  validateInstallRoot(manifest.installRoot);
+  const installRoot = await assertInsideWorkspace(
+    workspaceRoot,
+    path.resolve(workspaceRoot, manifest.installRoot),
+    'quality-tools.installRoot',
+  );
   for (const [name, config] of Object.entries(manifest.tools)) {
-    validateInstallRoot(manifest.installRoot);
-    const installRoot = await assertInsideWorkspace(workspaceRoot, path.resolve(workspaceRoot, manifest.installRoot), 'quality-tools.installRoot');
     const toolRoot = await assertInsideWorkspace(workspaceRoot, path.join(installRoot, name), `quality-tools.${name}`);
     const cliPath = path.join(toolRoot, config.cli);
     try {
@@ -188,20 +195,38 @@ export async function verifyInstalledAnalyzers(workspaceRoot, manifest, lock) {
     const untrustedChanges = untrustedCheckoutChanges(status.stdout);
     if (untrustedChanges.length > 0) throw new Error(`${name}: checkout modificado; no se puede confiar en sentinel.lock.json (${untrustedChanges.join(', ')})`);
     const version = await runProcess(process.execPath, [cliPath, '--version'], { cwd: workspaceRoot, timeoutMs: 10_000 });
-    if (version.code !== 0 || version.stdout.trim() !== lock.analyzers[name].version) {
-      throw new Error(`${name}: versión instalada no coincide con sentinel.lock.json`);
-    }
+    if (version.code !== 0) throw new Error(`${name}: no se pudo leer la versión instalada`);
     const revision = await runProcess('git', ['-C', toolRoot, 'rev-parse', 'HEAD'], { cwd: workspaceRoot, timeoutMs: 10_000 });
-    if (revision.code !== 0 || revision.stdout.trim() !== lock.analyzers[name].commit) {
-      throw new Error(`${name}: commit instalado no coincide con sentinel.lock.json`);
-    }
+    if (revision.code !== 0) throw new Error(`${name}: no se pudo leer el commit instalado`);
     const sha256 = await gitArchiveSha256(toolRoot);
-    if (sha256 !== lock.analyzers[name].sha256) {
-      throw new Error(`${name}: SHA-256 del árbol instalado no coincide con sentinel.lock.json`);
-    }
-    results[name] = { version: version.stdout.trim(), commit: revision.stdout.trim(), sha256, cliPath };
+    results[name] = {
+      version: version.stdout.trim(),
+      protocolVersion: Number(config.outputSchemaVersion),
+      commit: revision.stdout.trim(),
+      sha256,
+      cliPath,
+    };
   }
   return results;
 }
 
-export { LOCK_FILE, LOCK_SCHEMA_VERSION };
+export async function verifyInstalledAnalyzers(workspaceRoot, manifest, lock) {
+  const inspected = await inspectInstalledAnalyzers(workspaceRoot, manifest);
+  const results = {};
+  for (const [name, installed] of Object.entries(inspected)) {
+    const expected = lock.analyzers[name];
+    if (!expected || installed.version !== expected.version) {
+      throw new Error(`${name}: versión instalada no coincide con sentinel.lock.json`);
+    }
+    if (installed.commit !== expected.commit) {
+      throw new Error(`${name}: commit instalado no coincide con sentinel.lock.json`);
+    }
+    if (installed.sha256 !== expected.sha256) {
+      throw new Error(`${name}: SHA-256 del árbol instalado no coincide con sentinel.lock.json`);
+    }
+    results[name] = installed;
+  }
+  return results;
+}
+
+export { LOCK_FILE, LOCK_SCHEMA_VERSION, validateInstallRoot };
