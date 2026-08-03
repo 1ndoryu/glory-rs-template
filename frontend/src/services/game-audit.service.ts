@@ -3,7 +3,9 @@
  * backend); el panel Admin lo muestra en el tab "juego". El contrato no
  * expone identidades: actor_kind, acción, entidad, payload visual y fecha.
  * [297A-59] El mismo DTO sirve para el catálogo (character.*) y para las
- * publicaciones de mapas (map.published), con pares acción-entidad estrictos. */
+ * publicaciones de mapas (map.published), con pares acción-entidad estrictos.
+ * [297A-61] El catálogo de assets (asset.created/asset.updated) usa el mismo
+ * contrato y el mismo helper con un tercer endpoint real. */
 
 import { generatedFetcher, unwrapGeneratedResponse, type GeneratedResponse } from '../api/client';
 
@@ -25,6 +27,8 @@ const ACTION_ENTITY_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['character.created', 'character'],
   ['character.updated', 'character'],
   ['map.published', 'map'],
+  ['asset.created', 'asset'],
+  ['asset.updated', 'asset'],
 ];
 
 export function isValidAuditEvent(value: unknown): value is GameAuditEventEntry {
@@ -54,7 +58,10 @@ export interface ListAuditEventsOptions {
 /* [297A-59] Segundo consumidor del mismo DTO: el helper comparte fetch,
  * query params y validación entre catálogo y mapas (dos casos reales). */
 async function listAuditEvents(
-  endpoint: '/api/admin/game/audit/characters' | '/api/admin/game/audit/maps',
+  endpoint:
+    | '/api/admin/game/audit/characters'
+    | '/api/admin/game/audit/maps'
+    | '/api/admin/game/audit/assets',
   options?: ListAuditEventsOptions,
 ): Promise<GameAuditEventEntry[]> {
   const params = new URLSearchParams();
@@ -78,5 +85,8 @@ export const GameAuditService = {
   },
   listMapEvents(options?: ListAuditEventsOptions): Promise<GameAuditEventEntry[]> {
     return listAuditEvents('/api/admin/game/audit/maps', options);
+  },
+  listAssetEvents(options?: ListAuditEventsOptions): Promise<GameAuditEventEntry[]> {
+    return listAuditEvents('/api/admin/game/audit/assets', options);
   },
 };

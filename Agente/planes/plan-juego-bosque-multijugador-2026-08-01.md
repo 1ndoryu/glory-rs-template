@@ -576,6 +576,8 @@ realtime.
 
 **Límite 297A-60:** el catálogo no tiene versiones inmutables ni storage por hash (llegan con `Assets 3D`); el Editor de mapa y el runtime aún no consumen el catálogo; la auditoría de expulsión y la purga de retención quedan para Fase 8.
 
+**Evidencia 297A-61:** panel UI del catálogo de assets en el tab "juego" del Admin: lista completa activas/inactivas vía `GameAssetAdminService.listAll` (`GET /api/admin/game/assets`), alta (id + etiqueta + categoría) y edición con estado (mismo patrón de modales que 297A-53), sección "actividad de assets" con los últimos 10 eventos (`GameAuditService.listAssetEvents`, `GET /api/admin/game/audit/assets`) cargada en paralelo y aislada (si falla, solo la sección lo indica), y pares acción-entidad `asset.created`/`asset.updated`↔`asset` en el validador compartido. La franja del tab lleva ambos botones de alta (personaje y asset). 9 tests frontend dirigidos PASS.
+
 **Gate:** ningún invitado puede invocar admin ni reclamar el estado de otra identidad; el perfil no depende de datos enviados sin validar.
 
 **Auditoría de cierre — Fase 6:**

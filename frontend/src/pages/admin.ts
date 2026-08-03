@@ -19,6 +19,8 @@ import {
 import {
   renderGameCharacterAdminList,
   openNuevoPersonajeModal,
+  renderGameAssetAdminList,
+  openNuevoAssetModal,
   disposeAdminGameCharacterLists,
 } from './admin-juego';
 import { createTabs } from '../components/ui/tabs';
@@ -103,15 +105,23 @@ export function createAdminWindowView(): { page: Promise<HTMLElement>; actions: 
       case 'juego': {
         /* [297A-53] Catálogo de personajes del Bosque: lista activas e
          * inactivas; el alta vive en el modal (id + etiqueta + tono) y el
-         * botón de la franja lo abre. */
+         * botón de la franja lo abre. [297A-61] El catálogo de assets tiene
+         * su propia lista y su botón de alta en la misma franja. */
         const lista = createEl('div', { className: 'admin-lista' });
         contentArea.appendChild(lista);
         void renderGameCharacterAdminList(lista);
+        const listaAssets = createEl('div', { className: 'admin-lista' });
+        contentArea.appendChild(listaAssets);
+        void renderGameAssetAdminList(listaAssets);
         const btnNuevo = createEl('button', { className: 'boton', textContent: '+ nuevo personaje' });
         btnNuevo.addEventListener('click', () => openNuevoPersonajeModal(() => {
           void renderGameCharacterAdminList(lista);
         }));
-        setWindowActions([btnNuevo]);
+        const btnNuevoAsset = createEl('button', { className: 'boton', textContent: '+ nuevo asset' });
+        btnNuevoAsset.addEventListener('click', () => openNuevoAssetModal(() => {
+          void renderGameAssetAdminList(listaAssets);
+        }));
+        setWindowActions([btnNuevo, btnNuevoAsset]);
         break;
       }
       case 'novedades': {

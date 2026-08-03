@@ -28,6 +28,20 @@ function mapAuditEvent(overrides: Record<string, unknown> = {}): Record<string, 
   };
 }
 
+/* [297A-61] Evento de catálogo de assets (payload con displayName/category). */
+function assetAuditEvent(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: 11,
+    actorKind: 'admin',
+    action: 'asset.created',
+    entityKind: 'asset',
+    entityId: 'oak',
+    payload: { displayName: 'Roble', category: 'tree', isActive: true },
+    createdAt: '2026-08-02T12:00:00Z',
+    ...overrides,
+  };
+}
+
 describe('GameAuditService', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -108,6 +122,38 @@ describe('GameAuditService', () => {
     const controller = new AbortController();
 
     await GameAuditService.listMapEvents({ signal: controller.signal });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.signal).toBe(controller.signal);
+  });
+
+  it('loads asset catalog events from the assets audit endpoint', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify([assetAuditEvent(), assetAuditEvent({ action: 'asset.updated', id: 12 })]), { status: 200 }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(GameAuditService.listAssetEvents({ entityId: 'oak', limit: 10 })).resolves.toEqual([
+      expect.objectContaining({ id: 11, action: 'asset.created', entityKind: 'asset' }),
+      expect.objectContaining({ id: 12, action: 'asset.updated' }),
+    ]);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/admin/game/audit/assets?entityId=oak&limit=10');
+    expect(init.method).toBe('GET');
+  });
+
+  it('keeps asset events in the shared validator and rejects mismatched pairs', () => {
+    expect(isValidAuditEvent(assetAuditEvent())).toBe(true);
+    expect(isValidAuditEvent(assetAuditEvent({ action: 'asset.deleted' }))).toBe(false);
+    expect(isValidAuditEvent(assetAuditEvent({ entityKind: 'character' }))).toBe(false);
+    expect(isValidAuditEvent(auditEvent({ action: 'asset.created' }))).toBe(false);
+  });
+
+  it('preserves the abort signal on asset events too', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const controller = new AbortController();
+
+    await GameAuditService.listAssetEvents({ signal: controller.signal });
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(init.signal).toBe(controller.signal);
   });
