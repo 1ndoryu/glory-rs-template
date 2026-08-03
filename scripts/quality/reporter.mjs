@@ -8,18 +8,25 @@ function finalDecision(stages) {
   return { exitCode: 0, label: 'PASS' };
 }
 
+/* [038A-1] Duración por etapa legible: ms por debajo de 1s, segundos con 1 decimal en adelante. */
+function formatDuration(ms) {
+  if (!Number.isFinite(ms) || ms < 0) return '—';
+  if (ms >= 1000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${Math.round(ms)}ms`;
+}
+
 function markdown(report) {
   const lines = [
     `# Quality report ${report.taskId}`,
     '',
     `- Estado: **${report.decision.label}**`,
     `- Alcance: ${report.scope.full ? 'full' : 'incremental'} (${report.scope.files.length} archivos)`,
-    `- Duración: ${report.durationMs}ms`,
+    `- Duración: ${report.durationMs}ms (${formatDuration(report.durationMs)})`,
     ...(report.heavyGuard ? [`- Full diferido: **${report.heavyGuard.reason}** — ${report.heavyGuard.nextAllowedAt ?? report.heavyGuard.message ?? 'reintento bloqueado'}`] : []),
     '',
     '## Etapas',
     '',
-    ...report.stages.map(stage => `- **${stage.stage}:** ${stage.status}${stage.cached ? ' (cache)' : ''} — ${stage.summary}`),
+    ...report.stages.map(stage => `- **${stage.stage}:** ${stage.status}${stage.cached ? ' (cache)' : ''} — ${formatDuration(stage.durationMs)} — ${stage.summary}`),
   ];
   if (report.findings.length > 0) {
     lines.push('', '## Hallazgos', '');
@@ -68,7 +75,7 @@ export function compactLines(reportResult, context) {
     `[quality] Scope: ${report.scope.full ? 'full' : 'incremental'} · ${report.scope.files.length} archivos`,
   ];
   for (const stage of report.stages) {
-    lines.push(`[quality] ${stage.stage.padEnd(9)} ${stage.status.toUpperCase()}${stage.cached ? ' (cached)' : ''} · ${stage.summary}`);
+    lines.push(`[quality] ${stage.stage.padEnd(9)} ${stage.status.toUpperCase()}${stage.cached ? ' (cached)' : ''} · ${formatDuration(stage.durationMs)} · ${stage.summary}`);
   }
   for (const finding of report.findings.slice(0, context.qualityConfig.maxFindings)) {
     const location = finding.file ? `${finding.file}${finding.line ? `:${finding.line}` : ''} · ` : '';
