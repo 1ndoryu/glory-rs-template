@@ -39,7 +39,7 @@ Los repositorios upstream y una instalación global administrada no forman parte
 - `scripts/quality/tests/lock-generator.test.mjs`: 6 fixtures de parseo, generación, no-escritura, mismatch, backup y symlink/tamper.
 - `scripts/quality/policy-decision.mjs`: contrato local único para `no-policy`, `legacy-v1`, `observe`, `enforce`, `pass-through` e `invalid-policy`; el campo es aditivo en identidad/reporte y no pretende sustituir el runtime global.
 - `scripts/quality/patches/sentinel-317a-3.patch` + `quality-tools.json`: patch local [317A-3] fijado por SHA-256; `sentinel.lock.json` conserva `patchSha256` y preflight rechaza patch raíz, diff aplicado o rutas adicionales manipuladas.
-- SNT-05C ya implementa `branch-key-v1`, namespaces por rama para reportes/cache/locks, retención TTL/cuota, los comandos explícitos `quality:reports:cleanup:dry`/`quality:reports:cleanup` y un lector legacy de solo lectura (`scripts/quality/report-reader.mjs`). El lector prioriza el namespace canónico, exige metadata exacta para aceptar legacy, marca sin metadata como ambiguo y falla cerrado ante traversal, symlinks o JSON canónico corrupto; la retirada tras dos versiones y la matriz de integración multi-branch/CI siguen pendientes.
+- SNT-05C ya implementa `branch-key-v1`, namespaces por rama para reportes/cache/locks, retención TTL/cuota, los comandos explícitos `quality:reports:cleanup:dry`/`quality:reports:cleanup`, un lector legacy de solo lectura (`scripts/quality/report-reader.mjs`) y una fixture local de aislamiento entre ramas/CI/detached (`scripts/quality/tests/branch-isolation.integration.test.mjs`). El lector prioriza el namespace canónico, exige metadata exacta para aceptar legacy, marca sin metadata como ambiguo y falla cerrado ante traversal, symlinks o JSON canónico corrupto. La retirada tras dos versiones, cambio de rama sin reinicio, runner CI reutilizado, poda integrada multi-proceso y la matriz multi-proceso/CI real del runtime global siguen pendientes.
 
 ## Gates pendientes
 
@@ -48,5 +48,5 @@ Los repositorios upstream y una instalación global administrada no forman parte
 - Upstream debe absorber [317A-3] para retirar el patch local; hasta entonces el patch declarado es la única divergencia permitida del checkout Sentinel.
 - `realpath`/canonicalización verifican que lockfile, install root, backup y checkouts permanezcan dentro del workspace; el generador local añade escritura atómica y backup probado.
 - Paridad CLI/LSP/VS Code y matriz PowerShell/CMD/Bash/CI.
-- Retirada del lector legacy tras dos versiones y matriz de integración multi-branch/CI; la partición por rama, lectura compatible de `latest`, retención TTL/cuota y poda segura de reportes de SNT-05C ya tienen implementación local y cobertura.
+- Retirada del lector legacy tras dos versiones y matriz multi-proceso/CI real del runtime global; la partición por rama, lectura compatible de `latest`, retención TTL/cuota, poda segura y fixture local de aislamiento de SNT-05C ya tienen implementación y cobertura.
 - Lease de procesos hijos, rollback de perfiles y segundo proyecto sin política.

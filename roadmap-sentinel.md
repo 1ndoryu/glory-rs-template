@@ -24,6 +24,7 @@ Con este checklist cerrado, las mejoras restantes de este documento son backlog 
 ### Backlog diferido deliberadamente
 
 - Paridad formal CLI/LSP/VS Code con fixtures idénticas.
+- Matriz multi-proceso/CI real del runtime global; la fixture local de aislamiento por rama/CI ya está implementada en `scripts/quality/tests/branch-isolation.integration.test.mjs`.
 - Invalidación avanzada de índices, benchmarks RSS/tiempo y paralelismo optimizado.
 - Reglas de seguridad y arquitectura de baja frecuencia (MFA, permisos client-only, webhooks, rollback optimista).
 - Perfiles de tema, referencias circulares y precisión avanzada de VarSense.
