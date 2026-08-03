@@ -88,6 +88,40 @@ test('la matriz aísla reporte, cache y lock entre dos ramas', async () => {
   }
 });
 
+test('cambiar de rama en el mismo proceso recalcula identidad y permite locks concurrentes', async () => {
+  const projectRoot = await mkdtemp(path.join(os.tmpdir(), 'quality-branch-switch-'));
+  try {
+    const main = await identityFor(projectRoot, 'main');
+    const feature = await identityFor(projectRoot, 'feature/maps');
+    const backToMain = await identityFor(projectRoot, 'main');
+    assert.equal(backToMain.branchKey, main.branchKey);
+    assert.notEqual(main.branchKey, feature.branchKey);
+    assert.notEqual(branchReportRoot(projectRoot, main), branchReportRoot(projectRoot, feature));
+
+    const mainContext = branchContext(projectRoot, main);
+    const featureContext = branchContext(projectRoot, feature);
+    const [releaseMain, releaseFeature] = await Promise.all([
+      acquireTaskLock(mainContext, TASK_ID, 100),
+      acquireTaskLock(featureContext, TASK_ID, 100),
+    ]);
+    await Promise.all([releaseMain(), releaseFeature()]);
+  } finally {
+    await rm(projectRoot, { recursive: true, force: true });
+  }
+});
+
+test('refs largas y peligrosas producen claves acotadas sin traversal', async () => {
+  const projectRoot = await mkdtemp(path.join(os.tmpdir(), 'quality-branch-safe-'));
+  try {
+    const identity = await identityFor(projectRoot, `../${'x'.repeat(508)}`);
+    assert.match(identity.branchKey, /^[A-Za-z0-9._-]+$/u);
+    assert.ok(identity.branchKey.length <= 96);
+    assert.equal(identity.branchKey, createBranchKey(identity.canonicalRef));
+  } finally {
+    await rm(projectRoot, { recursive: true, force: true });
+  }
+});
+
 test('CI y detached mantienen namespaces distintos aunque compartan commit', async () => {
   const projectRoot = await mkdtemp(path.join(os.tmpdir(), 'quality-branch-identities-'));
   try {

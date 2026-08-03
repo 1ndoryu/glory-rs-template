@@ -24,7 +24,7 @@ Con este checklist cerrado, las mejoras restantes de este documento son backlog 
 ### Backlog diferido deliberadamente
 
 - Paridad formal CLI/LSP/VS Code con fixtures idénticas.
-- Cambio de rama con procesos ya iniciados y matriz multi-proceso/CI real del runtime global; las fixtures locales de aislamiento por rama/identidad CI y retención best-effort ya están implementadas en `scripts/quality/tests/branch-isolation.integration.test.mjs` y `scripts/quality/tests/report-retention-stage.test.mjs`.
+- Concurrencia multi-proceso y matriz CI real del runtime global; la fixture local ya cubre cambio de rama dentro del mismo proceso, aislamiento de identidad CI, refs peligrosas, locks entre namespaces y retención best-effort (`scripts/quality/tests/branch-isolation.integration.test.mjs`, `scripts/quality/tests/report-retention-stage.test.mjs`).
 - Invalidación avanzada de índices, benchmarks RSS/tiempo y paralelismo optimizado.
 - Reglas de seguridad y arquitectura de baja frecuencia (MFA, permisos client-only, webhooks, rollback optimista).
 - Perfiles de tema, referencias circulares y precisión avanzada de VarSense.
@@ -241,7 +241,7 @@ El reporte `297A-49` tardó 533833 ms: Rust consumió 483037 ms (90,5 %) y expir
 - [ ] Mover caché y locks a `.quality-reports/branches/<branch-key>/cache/` y `locks/`; incluir `branch-key`/commit/ref en identidad y fingerprints.
 - [ ] Leer el layout antiguo durante la transición y ofrecer un alias/puntero controlado para consumidores de `.quality-reports/<task-id>/latest.*`, sin symlinks inseguros.
 - [ ] Configurar TTL y cuota máxima; implementar poda determinista con `--dry-run`, protección de la rama activa, locks activos, procesos/escrituras recientes y límites de workspace.
-- [ ] Añadir fixtures para dos ramas concurrentes, cambio de rama, detached HEAD, CI reutilizado, nombres peligrosos/largos, symlinks y fallo de poda.
+- [x] Añadir fixtures locales para dos ramas concurrentes en namespaces, cambio de rama dentro del proceso, detached HEAD, identidades CI, nombres peligrosos/largos, symlinks y fallo de poda; la concurrencia multi-proceso/CI real queda ligada al runtime global.
 
 **Gate SNT-05C:** dos ramas producen namespaces y `latest` independientes; un PASS/cache/lock no cruza ramas; la poda libera únicamente candidatos elegibles, respeta TTL/cuota y no borra una ejecución activa ni rutas fuera del workspace. El reporte conserva bytes/candidatos y resultado de poda sin secretos.
 
