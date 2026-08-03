@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readFile, realpath, rename, unlink, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import os from 'node:os';
@@ -66,14 +66,21 @@ async function readProjectConfig(projectRoot) {
 
 export async function findQualityRoot(startPath = process.cwd()) {
   let candidate = path.resolve(startPath);
+  try {
+    candidate = await realpath(candidate);
+  } catch (error) {
+    if (error?.code === 'ENOENT') return path.resolve(startPath);
+    throw error;
+  }
   while (candidate) {
     const config = path.join(candidate, 'quality.config.json');
     const guard = path.join(candidate, 'scripts', 'quality', 'heavy-run-guard.mjs');
     try {
-      await readFile(config, 'utf8');
-      await readFile(guard, 'utf8');
+      const configMetadata = await lstat(config);
+      const guardMetadata = await lstat(guard);
+      if (!configMetadata.isFile() || !guardMetadata.isFile()) throw new Error('quality markers are not regular files');
       return candidate;
-    } catch { /* Sube un nivel hasta la raíz del workspace. */ }
+    } catch { /* Symlink/junction o marcador ausente: sube al padre. */ }
     const parent = path.dirname(candidate);
     if (parent === candidate) break;
     candidate = parent;
