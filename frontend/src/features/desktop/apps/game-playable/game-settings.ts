@@ -1,10 +1,11 @@
-/* GAME-01 — Configuración del Bosque (panel dentro de la ventana del juego).
- * [297A-62] La gestión de catálogos (personajes + assets) se mueve del tab
- * "juego" del Admin a un modal B&W del OS abierto desde el toolbar real de la
- * ventana del Bosque (comando `game:settings`, adminOnly). Secciones
- * organizadas con encabezado propio y botón de alta junto a cada lista;
- * actividad auditada aislada por catálogo. Sin preview de modelos hasta
- * Assets 3D. Reutiliza los servicios admin existentes sin duplicar contratos. */
+/* GAME-01 — Configuración del Bosque (vista dentro de la ventana del juego).
+ * [297A-63] Reemplaza al modal 297A-62: el comando `game:settings` del
+ * toolbar dispara un evento sobre la ventana del juego y esta alterna su
+ * contenido — la escena se retira por un momento y aparece el panel de
+ * configuración con TABS (personajes / assets / actividad) para organizar
+ * la gestión de catálogos. El panel reutiliza los servicios admin existentes
+ * sin duplicar contratos; los modales de alta/edición siguen siendo diálogos
+ * puntuales del OS dentro de esta vista. Sin preview de modelos hasta 3D. */
 
 import { safeRun } from '../../../../utils/safe-async';
 import { tryCatch } from '../../../../utils/result';
@@ -30,6 +31,7 @@ import { createVacio } from '../../../../components/ui/empty-state';
 import { createModal } from '../../../../components/ui/modal';
 import { createInput } from '../../../../components/ui/input';
 import { createSelect } from '../../../../components/ui/select';
+import { createTabs } from '../../../../components/ui/tabs';
 import { showToast } from '../../../../components/ui/toast';
 import { showConfirm } from '../../../../components/ui/confirm';
 
@@ -39,7 +41,6 @@ const TONO_ETIQUETA: Record<string, string> = {
   paper: 'paper',
 };
 
-/* [297A-56] Etiquetas legibles de las acciones auditadas. */
 const ACCION_ETIQUETA: Record<string, string> = {
   'character.created': 'creado',
   'character.updated': 'actualizado',
@@ -92,7 +93,7 @@ function renderActividad(
 }
 
 /** Renderiza el listado de personajes (activas e inactivas) con guard de
- * generación: si el modal se cierra mientras carga, no toca el DOM. */
+ * generación: si la vista se desmonta mientras carga, no toca el DOM. */
 async function renderPersonajes(container: HTMLElement): Promise<void> {
   const generation = (gameCharacterListGenerations.get(container) ?? 0) + 1;
   gameCharacterListGenerations.set(container, generation);
@@ -235,7 +236,7 @@ function renderAssetItem(entry: GameAssetAdminEntry, container: HTMLElement): HT
   return createEl('div', { className: 'admin-item' }, info, actions);
 }
 
-/* === Alta y edición (mismos formularios que el Admin retirado) === */
+/* === Alta y edición (formularios puntuales del OS dentro de la vista) === */
 
 const CATEGORY_OPTIONS = GAME_ASSET_CATEGORIES.map((category) => ({ value: category, label: category }));
 const TONE_OPTIONS = [
@@ -512,12 +513,19 @@ export function openEditarAssetModal(entry: GameAssetAdminEntry, onSaved: () => 
   });
 }
 
-/** Panel de configuración del Bosque: modal del OS con las secciones de
- * catálogos organizadas (personajes y assets), abierto desde el toolbar de la
- * ventana del juego por el comando `game:settings` (solo admin). */
-export function openGameSettings(): void {
+export interface GameSettingsPanel {
+  element: HTMLElement;
+  destroy: () => void;
+}
+
+/* [297A-63] Vista de configuración: reemplaza al juego dentro de la ventana.
+ * Tabs para organizar (personajes / assets / actividad); la actividad global
+ * agrega también las publicaciones de mapas. Cada tab se monta bajo demanda
+ * para no cargar todos los catálogos al abrir. */
+export function createGameSettingsPanel(options: { onBack: () => void }): GameSettingsPanel {
   const personajesLista = createEl('div', { className: 'admin-lista' });
   const assetsLista = createEl('div', { className: 'admin-lista' });
+  const actividadContenido = createEl('div', { className: 'admin-lista' });
 
   const btnNuevoPersonaje = createEl('button', {
     type: 'button',
@@ -536,7 +544,6 @@ export function openGameSettings(): void {
     void renderAssets(assetsLista);
   }));
 
-  /* Sección personajes: encabezado + botón de alta junto a la lista. */
   const personajes = createEl('section', {},
     createEl('header', { className: 'admin-seccion' },
       createEl('h3', { className: 'mt-lg mb-sm', textContent: 'personajes' }),
@@ -544,8 +551,6 @@ export function openGameSettings(): void {
     ),
     personajesLista,
   );
-
-  /* Sección assets: encabezado + botón de alta junto a la lista. */
   const assets = createEl('section', {},
     createEl('header', { className: 'admin-seccion' },
       createEl('h3', { className: 'mt-lg mb-sm', textContent: 'assets' }),
@@ -554,26 +559,116 @@ export function openGameSettings(): void {
     assetsLista,
   );
 
-  /* Pie del modal: cierre explícito (closeOnBackdrop false evita cerrar por
-   * accidente mientras se edita un catálogo). */
-  const btnCerrar = createEl('button', { type: 'button', className: 'boton', textContent: 'cerrar' });
-  const pie = createEl('div', { className: 'modal-acciones' }, btnCerrar);
+  /* Actividad global: personajes + assets + publicaciones de mapas, cada una
+   * aislada (si una falla, las demás siguen). */
+  const actividad = createEl('section', {},
+    createEl('h3', { className: 'mt-lg mb-sm', textContent: 'actividad' }),
+    actividadContenido,
+  );
 
-  const modal = createModal({
-    titulo: 'configuración del Bosque',
-    contenido: [personajes, assets, pie],
-    ancho: '640px',
-    closeOnBackdrop: false,
-    onClose: () => {
-      /* [297A-62] Liberar los guards de generación para que ninguna carga
-       * pendiente toque el DOM tras cerrar. */
-      gameCharacterListGenerations.delete(personajesLista);
-      gameAssetListGenerations.delete(assetsLista);
+  const paneles = new Map<string, HTMLElement>([
+    ['personajes', personajes],
+    ['assets', assets],
+    ['actividad', actividad],
+  ]);
+  const activos = new Map<string, boolean>();
+
+  const tabs = createTabs({
+    tabs: [
+      { id: 'personajes', label: 'personajes' },
+      { id: 'assets', label: 'assets' },
+      { id: 'actividad', label: 'actividad' },
+    ],
+    initial: 'personajes',
+    onSwitch: (id) => {
+      for (const [tabId, panel] of paneles) {
+        panel.hidden = tabId !== id;
+      }
+      /* [297A-63] Carga bajo demanda: cada tab monta su contenido una sola vez. */
+      if (id === 'personajes' && !activos.get('personajes')) {
+        activos.set('personajes', true);
+        void renderPersonajes(personajesLista);
+      } else if (id === 'assets' && !activos.get('assets')) {
+        activos.set('assets', true);
+        void renderAssets(assetsLista);
+      } else if (id === 'actividad' && !activos.get('actividad')) {
+        activos.set('actividad', true);
+        void renderActividadGlobal(actividadContenido);
+      }
     },
   });
 
-  btnCerrar.addEventListener('click', () => modal.close());
+  const btnVolver = createEl('button', {
+    type: 'button',
+    className: 'boton',
+    textContent: 'volver al Bosque',
+  });
+  btnVolver.addEventListener('click', () => options.onBack());
 
+  const header = createEl('header', { className: 'admin-seccion juegoConfig__header' },
+    createEl('h2', { className: 'juegoConfig__titulo', textContent: 'configuración del Bosque' }),
+    btnVolver,
+  );
+
+  const element = createEl('div', { className: 'juegoConfig' },
+    header,
+    tabs.el,
+    ...paneles.values(),
+  );
+
+  /* Tab inicial visible desde el montaje. */
+  for (const [tabId, panel] of paneles) panel.hidden = tabId !== 'personajes';
   void renderPersonajes(personajesLista);
-  void renderAssets(assetsLista);
+  activos.set('personajes', true);
+
+  return {
+    element,
+    /* [297A-63] destroy() también retira el panel del DOM: la vista del juego
+     * oculta sus hijos originales y monta este panel como último hijo; al
+     * volver, el elemento debe desaparecer o quedaría superpuesto al Bosque
+     * rehidratado. El cleanup de generaciones evita que las cargas
+     * pendientes toquen un DOM ya desmontado. */
+    destroy: () => {
+      gameCharacterListGenerations.delete(personajesLista);
+      gameAssetListGenerations.delete(assetsLista);
+      element.remove();
+    },
+  };
+}
+
+/** Carga aislada de las tres actividades en el tab "actividad". */
+async function renderActividadGlobal(container: HTMLElement): Promise<void> {
+  container.textContent = '';
+  const [personajes, assets, mapas] = await Promise.all([
+    tryCatch(GameAuditService.listCharacterEvents({ limit: 10 })),
+    tryCatch(GameAuditService.listAssetEvents({ limit: 10 })),
+    tryCatch(GameAuditService.listMapEvents({ limit: 10 })),
+  ]);
+  container.appendChild(renderActividad(personajes, 'personajes'));
+  container.appendChild(renderActividad(assets, 'assets'));
+  container.appendChild(renderActividadMapas(mapas));
+}
+
+/** Sección de publicaciones de mapas recientes (últimos eventos auditados). */
+function renderActividadMapas(result: { ok: true; value: GameAuditEventEntry[] } | { ok: false; error: string }): HTMLElement {
+  const seccion = createEl('section');
+  seccion.appendChild(createEl('h4', { className: 'mt-md mb-sm', textContent: 'publicaciones de mapas' }));
+  if (!result.ok) {
+    seccion.appendChild(createVacio('no se pudo cargar la actividad de mapas'));
+    return seccion;
+  }
+  if (result.value.length === 0) {
+    seccion.appendChild(createVacio('sin publicaciones recientes'));
+    return seccion;
+  }
+  for (const event of result.value) {
+    const label = ACCION_ETIQUETA[event.action] ?? event.action;
+    const version = typeof event.payload?.schemaVersion === 'number' ? ` · v${event.payload.schemaVersion}` : '';
+    const info = createEl('div', {},
+      createEl('span', { textContent: `${label} · ${event.entityId}${version}` }),
+      createEl('small', { className: 'ml-sm', textContent: formatFechaHora(event.createdAt) }),
+    );
+    seccion.appendChild(createEl('div', { className: 'admin-item' }, info));
+  }
+  return seccion;
 }

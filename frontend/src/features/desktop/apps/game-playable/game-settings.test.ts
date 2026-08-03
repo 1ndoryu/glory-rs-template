@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { openGameSettings } from './game-settings';
+import { createGameSettingsPanel } from './game-settings';
 import { GameCharacterAdminService } from '../../../../services/game-character-admin.service';
 import { GameAssetAdminService } from '../../../../services/game-asset-admin.service';
 import { GameAuditService, isValidAuditEvent } from '../../../../services/game-audit.service';
@@ -39,7 +39,14 @@ function auditEvent(overrides: Record<string, unknown> = {}): Record<string, unk
   };
 }
 
-describe('openGameSettings (297A-62)', () => {
+function mountPanel(): { element: HTMLElement; destroy: () => void } {
+  const onBack = vi.fn();
+  const panel = createGameSettingsPanel({ onBack });
+  document.body.appendChild(panel.element);
+  return { element: panel.element, destroy: panel.destroy };
+}
+
+describe('createGameSettingsPanel (297A-63)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -50,7 +57,7 @@ describe('openGameSettings (297A-62)', () => {
     document.body.style.overflow = '';
   });
 
-  it('abre el modal de configuración con ambas secciones de catálogo', async () => {
+  it('monta un panel con tabs (no un modal) dentro del documento', async () => {
     vi.spyOn(GameCharacterAdminService, 'listAll').mockResolvedValue([
       characterEntry() as never,
     ]);
@@ -59,17 +66,46 @@ describe('openGameSettings (297A-62)', () => {
     ]);
     vi.spyOn(GameAuditService, 'listCharacterEvents').mockResolvedValue([] as never);
     vi.spyOn(GameAuditService, 'listAssetEvents').mockResolvedValue([] as never);
+    vi.spyOn(GameAuditService, 'listMapEvents').mockResolvedValue([] as never);
 
-    openGameSettings();
+    const { element, destroy } = mountPanel();
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    const dialog = document.querySelector<HTMLElement>('.modal-contenido');
-    expect(dialog).not.toBeNull();
-    expect(dialog?.textContent).toContain('personajes');
-    expect(dialog?.textContent).toContain('assets');
-    expect(dialog?.textContent).toContain('Explorador');
-    expect(dialog?.textContent).toContain('Roble');
-    expect(dialog?.textContent).toContain('cerrar');
+    /* No es un modal: no hay overlay y el panel es hijo directo del body. */
+    expect(document.querySelector('.modal-overlay')).toBeNull();
+    expect(element.classList.contains('juegoConfig')).toBe(true);
+    expect(element.textContent).toContain('configuración del Bosque');
+    /* Tabs del OS para organizar. */
+    expect(element.textContent).toContain('personajes');
+    expect(element.textContent).toContain('assets');
+    expect(element.textContent).toContain('actividad');
+    /* El tab inicial (personajes) monta su catálogo; assets queda oculto. */
+    expect(element.textContent).toContain('Explorador');
+    destroy();
+  });
+
+  it('cambia de tab y monta el catálogo correspondiente bajo demanda', async () => {
+    vi.spyOn(GameCharacterAdminService, 'listAll').mockResolvedValue([
+      characterEntry() as never,
+    ]);
+    vi.spyOn(GameAssetAdminService, 'listAll').mockResolvedValue([
+      assetEntry() as never,
+    ]);
+    vi.spyOn(GameAuditService, 'listCharacterEvents').mockResolvedValue([] as never);
+    vi.spyOn(GameAuditService, 'listAssetEvents').mockResolvedValue([] as never);
+    vi.spyOn(GameAuditService, 'listMapEvents').mockResolvedValue([] as never);
+
+    const { element, destroy } = mountPanel();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const assetsTab = Array.from(element.querySelectorAll<HTMLButtonElement>('button[role="tab"]'))
+      .find((button) => button.textContent === 'assets');
+    expect(assetsTab).toBeDefined();
+    assetsTab?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(element.textContent).toContain('Roble');
+    destroy();
   });
 
   it('muestra el estado vacío si un catálogo no tiene entradas', async () => {
@@ -77,14 +113,14 @@ describe('openGameSettings (297A-62)', () => {
     vi.spyOn(GameAssetAdminService, 'listAll').mockResolvedValue([] as never);
     vi.spyOn(GameAuditService, 'listCharacterEvents').mockResolvedValue([] as never);
     vi.spyOn(GameAuditService, 'listAssetEvents').mockResolvedValue([] as never);
+    vi.spyOn(GameAuditService, 'listMapEvents').mockResolvedValue([] as never);
 
-    openGameSettings();
+    const { element, destroy } = mountPanel();
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    const dialog = document.querySelector<HTMLElement>('.modal-contenido');
     /* [317A-2] createVacio capitaliza la primera letra del estado vacío. */
-    expect(dialog?.textContent).toContain('No hay personajes en el catálogo');
-    expect(dialog?.textContent).toContain('No hay assets en el catálogo');
+    expect(element.textContent).toContain('No hay personajes en el catálogo');
+    destroy();
   });
 
   it('mantiene los catálogos operativos si la auditoría falla (aislamiento)', async () => {
@@ -96,36 +132,52 @@ describe('openGameSettings (297A-62)', () => {
     ]);
     vi.spyOn(GameAuditService, 'listCharacterEvents').mockRejectedValue(new Error('audit down'));
     vi.spyOn(GameAuditService, 'listAssetEvents').mockRejectedValue(new Error('audit down'));
+    vi.spyOn(GameAuditService, 'listMapEvents').mockRejectedValue(new Error('audit down'));
 
-    openGameSettings();
+    const { element, destroy } = mountPanel();
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    const dialog = document.querySelector<HTMLElement>('.modal-contenido');
-    expect(dialog?.textContent).toContain('Explorador');
-    expect(dialog?.textContent).toContain('Roble');
-    expect(dialog?.textContent).toContain('No se pudo cargar la actividad');
+    expect(element.textContent).toContain('Explorador');
+    expect(element.textContent).toContain('No se pudo cargar la actividad');
+    destroy();
   });
 
-  it('permite cerrar el modal con el botón inferior', () => {
+  it('destruir el panel lo retira del DOM (no queda superpuesto al juego)', () => {
     vi.spyOn(GameCharacterAdminService, 'listAll').mockResolvedValue([] as never);
     vi.spyOn(GameAssetAdminService, 'listAll').mockResolvedValue([] as never);
     vi.spyOn(GameAuditService, 'listCharacterEvents').mockResolvedValue([] as never);
     vi.spyOn(GameAuditService, 'listAssetEvents').mockResolvedValue([] as never);
+    vi.spyOn(GameAuditService, 'listMapEvents').mockResolvedValue([] as never);
 
-    openGameSettings();
+    const { element, destroy } = mountPanel();
+    expect(document.body.contains(element)).toBe(true);
+    destroy();
+    expect(document.body.contains(element)).toBe(false);
+  });
 
-    const cerrar = Array.from(document.querySelectorAll<HTMLButtonElement>('button'))
-      .find((button) => button.textContent === 'cerrar');
-    expect(cerrar).toBeDefined();
-    cerrar?.click();
-    expect(document.querySelector('.modal-overlay')).toBeNull();
+  it('invoca onBack al pulsar volver al Bosque', () => {
+    vi.spyOn(GameCharacterAdminService, 'listAll').mockResolvedValue([] as never);
+    vi.spyOn(GameAssetAdminService, 'listAll').mockResolvedValue([] as never);
+    vi.spyOn(GameAuditService, 'listCharacterEvents').mockResolvedValue([] as never);
+    vi.spyOn(GameAuditService, 'listAssetEvents').mockResolvedValue([] as never);
+    vi.spyOn(GameAuditService, 'listMapEvents').mockResolvedValue([] as never);
+
+    const onBack = vi.fn();
+    const panel = createGameSettingsPanel({ onBack });
+    document.body.appendChild(panel.element);
+
+    const volver = Array.from(panel.element.querySelectorAll<HTMLButtonElement>('button'))
+      .find((button) => button.textContent === 'volver al Bosque');
+    expect(volver).toBeDefined();
+    volver?.click();
+    expect(onBack).toHaveBeenCalledTimes(1);
   });
 });
 
 describe('game-settings audit event rendering', () => {
-  it('isValidAuditEvent del servicio de auditoría acepta eventos de assets', () => {
-    /* [297A-61] Los pares acción-entidad asset.*↔asset ya están en el validador
-     * compartido; este test lo confirma de forma directa sin fetch. */
+  it('isValidAuditEvent acepta eventos de assets y de personajes', () => {
+    /* [297A-61] Los pares acción-entidad ya están en el validador compartido. */
     expect(isValidAuditEvent(auditEvent({ action: 'asset.created', entityKind: 'asset', id: 9 }))).toBe(true);
+    expect(isValidAuditEvent(auditEvent({ action: 'character.updated', id: 10 }))).toBe(true);
   });
 });

@@ -1,22 +1,19 @@
-/* Tests del comando admin-only 'game:settings' [297A-62].
+/* Tests del comando admin-only 'game:settings' [297A-63].
  * Importar el módulo registra el comando (side effect). Verifica:
  * - Oculto para no-admin (fail-closed).
  * - Visible/ejecutable para admin.
- * - Abre el panel de configuración del Bosque (módulo lazy mockeado). */
+ * - Dispara el evento game:settings sobre la ventana enfocada del Bosque
+ *   (la app alterna su contenido: juego ↔ configuración), sin modal. */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { CommandRegistry } from '../command-registry';
-
-const openGameSettings = vi.fn();
-vi.mock('../../desktop/apps/game-playable/game-settings', () => ({
-  openGameSettings,
-}));
+import { windowStore } from '../window-manager';
 
 import './toolbar-commands';
 
 describe('game:settings', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('está registrado en el registry', () => {
@@ -38,15 +35,40 @@ describe('game:settings', () => {
       .toBe('enabled');
   });
 
-  it('abre el panel de configuración del Bosque para admin', async () => {
+  it('dispara el evento game:settings sobre la ventana enfocada del Bosque', async () => {
+    const content = document.createElement('section');
+    const dispatchSpy = vi.spyOn(content, 'dispatchEvent');
+    vi.spyOn(windowStore, 'get').mockReturnValue([
+      {
+        instanceId: 'win-1',
+        appId: 'game-playable',
+        title: 'Bosque · prueba',
+        focused: true,
+        content,
+      } as never,
+    ]);
+
     const result = await CommandRegistry.execute('game:settings', { capability: 'admin' });
     expect(result).toEqual({ status: 'success' });
-    expect(openGameSettings).toHaveBeenCalledTimes(1);
+    const event = dispatchSpy.mock.calls[0]?.[0] as CustomEvent | undefined;
+    expect(event?.type).toBe('game:settings');
   });
 
-  it('no se ejecuta para no-admin aunque el panel esté disponible', async () => {
+  it('no se ejecuta para no-admin aunque la ventana esté enfocada', async () => {
+    const content = document.createElement('section');
+    const dispatchSpy = vi.spyOn(content, 'dispatchEvent');
+    vi.spyOn(windowStore, 'get').mockReturnValue([
+      {
+        instanceId: 'win-1',
+        appId: 'game-playable',
+        title: 'Bosque · prueba',
+        focused: true,
+        content,
+      } as never,
+    ]);
+
     const result = await CommandRegistry.execute('game:settings', { capability: 'public' });
     expect(result.status).toBe('failure');
-    expect(openGameSettings).not.toHaveBeenCalled();
+    expect(dispatchSpy).not.toHaveBeenCalled();
   });
 });

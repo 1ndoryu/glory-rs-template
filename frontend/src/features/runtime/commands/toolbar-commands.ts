@@ -66,10 +66,11 @@ CommandRegistry.register(adminOnly({
   },
 }));
 
-/* [297A-62] Configuración del juego: abre el panel modal del Bosque desde el
- * toolbar real de la ventana. adminOnly lo oculta para no-admin (fail-closed)
- * y el grupo del toolbar se re-renderiza en vivo con authStore; el panel se
- * carga lazy en su propio chunk (no infla el chunk del juego). */
+/* [297A-63] Configuración del juego DENTRO de la ventana: el comando dispara
+ * un evento sobre la ventana enfocada del Bosque y la app alterna su
+ * contenido (la escena se retira un momento y aparece el panel con tabs).
+ * adminOnly lo oculta para no-admin (fail-closed) y el grupo del toolbar se
+ * re-renderiza en vivo con authStore. Sin ventana del juego, la abre. */
 CommandRegistry.register(adminOnly({
   id: 'game:settings',
   label: 'Configuración del Bosque',
@@ -80,8 +81,14 @@ CommandRegistry.register(adminOnly({
   analyticsEvent: 'game.settings',
   isAvailable: () => ({ state: 'enabled' }),
   execute: async (): Promise<CommandResult> => {
-    const { openGameSettings } = await import('../../desktop/apps/game-playable/game-settings');
-    openGameSettings();
+    const { windowStore } = await import('../window-manager');
+    const focused = windowStore.get().find((w) => w.focused && w.appId === 'game-playable');
+    if (focused?.content) {
+      focused.content.dispatchEvent(new CustomEvent('game:settings'));
+      return { status: 'success' };
+    }
+    const { openAppWindow } = await import('../route-app-adapter');
+    await openAppWindow('game-playable');
     return { status: 'success' };
   },
 }));

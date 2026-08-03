@@ -9,6 +9,7 @@ use serde_json::json;
 use sqlx::postgres::PgPoolOptions;
 use uuid::Uuid;
 
+use glory_backend::repositories::workspace_repo::WorkspaceRepository;
 use glory_backend::services::workspace_svc::WorkspaceService;
 
 /// Serializa los tests que publican: cada uno calcula version = max+1, y dos
@@ -156,7 +157,10 @@ async fn publish_accepts_valid_tree_and_computes_summary() {
     let resource_id = ctx.create_resource("ready", "public").await;
     /* [297A-58] IDs únicos por ejecución: el summary compara contra la release
      * anterior REAL de la BD; con IDs fijos el test depende de la historia de
-     * publicaciones de la rama (fallaba en CI limpio y tras cada release). */
+     * publicaciones de la rama (fallaba en CI limpio y tras cada release).
+     * [028A-13] `publish` versiona contra la ÚLTIMA release (get_latest), no
+     * contra la activa: con la activación explícita la activa puede no ser la
+     * última publicada. La base del diff es la última, sea cual sea su estado. */
     let uniq = Uuid::new_v4().simple().to_string();
     let (folder_id, about_id, resource_node_id) = (
         format!("doc-{uniq}"),
@@ -165,9 +169,10 @@ async fn publish_accepts_valid_tree_and_computes_summary() {
     );
     let tree = tree_with_ids(Some(resource_id), &folder_id, &about_id, &resource_node_id);
 
-    let previous = WorkspaceService::get_active_release(&ctx.pool)
+    let previous = WorkspaceRepository::get_latest(&ctx.pool)
         .await
-        .expect("release activa previa (la migración siembra v1)");
+        .expect("release previa (la migración siembra v1)")
+        .expect("release previa existente");
     let prev_version = previous.version;
 
     let result = WorkspaceService::publish(&ctx.pool, tree.clone(), ctx.admin_id).await;

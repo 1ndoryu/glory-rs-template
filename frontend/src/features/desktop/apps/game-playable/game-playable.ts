@@ -28,6 +28,7 @@ import {
   type GameRealtimeConnectionState,
 } from './game-realtime-client';
 import { openGameCharacterEditor } from './game-character-editor';
+import { createGameSettingsPanel, type GameSettingsPanel } from './game-settings';
 import '../../../../styles/desktop/desktop-game-playable.css';
 
 function normalizeRealtimeDirection(direction: { x: number; z: number }): { x: number; z: number } {
@@ -96,6 +97,42 @@ export function renderGamePlayable(context: RenderContext): MountedView {
    * mientras la app está abierta (login, logout o cambio de cuenta), el juego
    * se rehidrata y reconecta con la identidad correcta. */
   let accountSessionAtStart = authStore.get().isAuthenticated;
+  /* [297A-63] Panel de configuración DENTRO de la ventana: la escena se
+   * retira un momento y el panel con tabs la reemplaza; al volver, la
+   * hidratación remonta el runtime. Se destruye el runtime real para liberar
+   * WebGL/input/realtime mientras se administra el catálogo. */
+  let settingsPanel: GameSettingsPanel | null = null;
+  let gameChildren: HTMLElement[] = [];
+
+  const closeSettingsPanel = (): void => {
+    settingsPanel?.destroy();
+    settingsPanel = null;
+    for (const child of gameChildren) child.hidden = false;
+    gameChildren = [];
+    /* Volver al Bosque: rehidratar remonta el runtime (perfil + WebGL). */
+    void hydrate();
+  };
+
+  const openSettingsPanel = (): void => {
+    if (disposed || context.signal.aborted || settingsPanel) return;
+    /* Retirar el juego: liberar el runtime y abortar cargas pendientes. */
+    runtime?.destroy?.();
+    runtime = null;
+    if (profileTimeout !== null) window.clearTimeout(profileTimeout);
+    profileTimeout = null;
+    profileController?.abort();
+    profileController = null;
+    gameChildren = Array.from(view.element.children) as HTMLElement[];
+    for (const child of gameChildren) child.hidden = true;
+    const panel = createGameSettingsPanel({ onBack: closeSettingsPanel });
+    settingsPanel = panel;
+    view.element.appendChild(panel.element);
+  };
+
+  /* [297A-63] El comando game:settings del toolbar dispara este evento sobre
+   * el content de la ventana enfocada (mismo patrón que finder:navigate). */
+  const onGameSettingsEvent = (): void => openSettingsPanel();
+  view.element.addEventListener('game:settings', onGameSettingsEvent);
 
   const setLoadingStatus = (message: string): void => {
     view.status.textContent = message;
@@ -222,6 +259,9 @@ export function renderGamePlayable(context: RenderContext): MountedView {
     destroy: () => {
       if (disposed) return;
       disposed = true;
+      view.element.removeEventListener('game:settings', onGameSettingsEvent);
+      settingsPanel?.destroy();
+      settingsPanel = null;
       stopAuth();
       if (profileTimeout !== null) window.clearTimeout(profileTimeout);
       profileTimeout = null;
