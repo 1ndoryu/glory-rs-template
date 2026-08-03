@@ -89,7 +89,8 @@ export function validateLock(lock, manifest) {
   validateText(lock.runtime.version, 'runtime.version');
   validateCommit(lock.runtime.commit, 'runtime.commit', true);
   validateSha(lock.runtime.identitySha256, 'runtime.identitySha256');
-  if (lock.runtime.artifactSha256 !== null && lock.runtime.artifactSha256 !== undefined) validateSha(lock.runtime.artifactSha256, 'runtime.artifactSha256');
+  if (!Object.hasOwn(lock.runtime, 'artifactSha256')) fail('runtime.artifactSha256 debe ser null o SHA-256');
+  if (lock.runtime.artifactSha256 !== null) validateSha(lock.runtime.artifactSha256, 'runtime.artifactSha256');
   if (RUNTIME_ARTIFACT_STATUSES.has(lock.runtime.status) && !lock.runtime.artifactSha256) fail('runtime instalado debe declarar artifactSha256');
   if (lock.runtime.status === 'not-installed' && lock.runtime.commit !== 'not-installed') {
     fail('runtime not-installed debe declarar commit not-installed');

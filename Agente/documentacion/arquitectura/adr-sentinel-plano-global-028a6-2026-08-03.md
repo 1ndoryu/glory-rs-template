@@ -44,7 +44,7 @@ Los repositorios upstream y una instalación global administrada no forman parte
 ## Gates pendientes
 
 - Runtime global versionado instalado y verificable.
-- Runtime global versionado con `artifactSha256` real; el adaptador local mantiene `artifactSha256: null`.
+- Runtime global versionado con `artifactSha256` real; el adaptador local mantiene `artifactSha256: null` explícito y el lockfile rechaza el campo ausente para forzar regeneración segura.
 - Upstream debe absorber [317A-3] para retirar el patch local; hasta entonces el patch declarado es la única divergencia permitida del checkout Sentinel.
 - `realpath`/canonicalización verifican que lockfile, install root, backup y checkouts permanezcan dentro del workspace; el generador local añade escritura atómica y backup probado.
 - Paridad CLI/LSP/VS Code y matriz PowerShell/CMD/Bash/CI.

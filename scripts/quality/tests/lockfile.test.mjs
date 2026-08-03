@@ -46,6 +46,11 @@ test('valida lockfile y hash de runtime', () => {
   assert.doesNotThrow(() => validateLock(lock, manifest));
   assert.doesNotThrow(() => assertRuntimeLockHash(lock.runtime));
   assert.throws(() => assertRuntimeLockHash({ ...lock.runtime, identitySha256: '0'.repeat(64) }), /runtime.identitySha256/);
+  const missingArtifact = { ...lock, runtime: { ...lock.runtime } };
+  delete missingArtifact.runtime.artifactSha256;
+  assert.throws(() => validateLock(missingArtifact, manifest), /artifactSha256 debe ser null/);
+  assert.throws(() => validateLock({ ...lock, runtime: { ...lock.runtime, artifactSha256: undefined } }, manifest), /artifactSha256: SHA-256 inválido/);
+  assert.throws(() => validateLock({ ...lock, runtime: { ...lock.runtime, status: 'installed', artifactSha256: null } }, manifest), /runtime instalado debe declarar artifactSha256/);
 });
 
 test('rechaza divergencia entre lockfile y quality-tools', () => {
