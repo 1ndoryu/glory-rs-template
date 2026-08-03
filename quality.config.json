@@ -23,6 +23,11 @@
     "maxTargetAgeDays": 7,
     "maxConcurrent": 1
   },
+  "reportRetention": {
+    "maxAgeDays": 7,
+    "maxWorkspaceMiB": 512,
+    "maxBranchMiB": 128
+  },
   "fullPatterns": [
     "Cargo.toml",
     "Cargo.lock",

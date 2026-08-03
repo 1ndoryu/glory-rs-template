@@ -222,10 +222,27 @@ El reporte `297A-49` tardó 533833 ms: Rust consumió 483037 ms (90,5 %) y expir
 - [x] Aplicar cooldown configurable de 180 minutos a `--full`, `cargo test`, `cargo clippy` y `cargo bench`, con lock de una sola ejecución y override explícito auditado.
 - [x] Interceptar Cargo desde `run-with-db` y el shim global `cargo.cmd`; un full bloqueado degrada a `local-light` y conserva el motivo en JSON/Markdown.
 - [x] Limpiar `C:\tmp\glory-target` con cuota de 15 GB/retención de 7 días, validación de raíz y preservación de targets con proceso activo; la limpieza inicial liberó aproximadamente 29 GB.
+- [x] Particionar `.quality-reports` por `projectRoot/branch-key/task-id`, incluyendo reportes Markdown/JSON, logs, caché y locks; implementar `branch-key-v1` con `canonicalRef` UTF-8, NFC, SHA-256 hexadecimal y encoding allowlisted para ramas normales, detached HEAD y refs CI sin permitir traversal (`scripts/quality/branch-identity.mjs`).
+- [x] Añadir retención específica de reportes (defaults: 7 días, 512 MiB por workspace y 128 MiB por rama), contando reportes/logs/tool reports/caché/locks; marcar `overQuota` sin borrar la rama activa, podar históricos/tareas/caché elegibles, respetar locks/temporales/escrituras recientes, eliminar locks huérfanos solo tras TTL + PID inactivo, y mantener poda/errores fuera del exit code (`report-retention.mjs`).
+- [x] Exponer `quality:reports:cleanup:dry` y `quality:reports:cleanup`; el modo destructivo requiere `--cleanup --yes`.
+- [ ] Migrar el layout histórico `.quality-reports/<task-id>/` mediante lectura solo cuando su metadata de rama coincida exactamente; sin metadata se considera ambiguo. El writer nunca actualizará un alias global y la compatibilidad se retirará tras dos versiones. Nunca crear symlinks inseguros ni mezclar `latest` entre ramas.
 - [ ] Activar el interceptor dentro de los perfiles PowerShell solo después de backup y autorización explícita; el instalador por defecto no reescribe perfiles persistentes.
 - [ ] Medir en CI/nocturno los tiempos cold/warm de Rust y fijar un presupuesto operativo sin bloquear el feedback local; revisar el target estable compartido antes de cambiar `CARGO_TARGET_DIR`.
 
 **Gate SNT-05B:** el modo local no recompila clippy/tests por cada tarea, ningún full se repite durante el cooldown y el informe deja una ruta reproducible para la suite completa. La suite completa sigue siendo obligatoria al cerrar una fase, cambiar infraestructura Rust, preparar publicación o ejecutar CI; no se ejecuta automáticamente en cada archivo.
+
+#### SNT-05C — Reportes por rama y retención acotada
+
+**Objetivo:** evitar que `.quality-reports` crezca indefinidamente y que resultados/cache/locks de una rama contaminen otra.
+
+- [ ] Resolver `branch-key` desde la rama Git, una ref CI allowlisted o `detached-<short-sha>`; guardar ref/SHA original en metadata y codificar la clave con límites estrictos.
+- [ ] Escribir en `.quality-reports/branches/<branch-key>/<task-id>/` los `latest.md/json`, logs y reportes de adapters.
+- [ ] Mover caché y locks a `.quality-reports/branches/<branch-key>/cache/` y `locks/`; incluir `branch-key`/commit/ref en identidad y fingerprints.
+- [ ] Leer el layout antiguo durante la transición y ofrecer un alias/puntero controlado para consumidores de `.quality-reports/<task-id>/latest.*`, sin symlinks inseguros.
+- [ ] Configurar TTL y cuota máxima; implementar poda determinista con `--dry-run`, protección de la rama activa, locks activos, procesos/escrituras recientes y límites de workspace.
+- [ ] Añadir fixtures para dos ramas concurrentes, cambio de rama, detached HEAD, CI reutilizado, nombres peligrosos/largos, symlinks y fallo de poda.
+
+**Gate SNT-05C:** dos ramas producen namespaces y `latest` independientes; un PASS/cache/lock no cruza ramas; la poda libera únicamente candidatos elegibles, respeta TTL/cuota y no borra una ejecución activa ni rutas fuera del workspace. El reporte conserva bytes/candidatos y resultado de poda sin secretos.
 
 **Gate:** benchmark reproducible demuestra mejora; dos ejecuciones iguales producen el mismo JSON ordenado y no reutilizan PASS obsoleto.
 

@@ -13,6 +13,8 @@
     "quality:lock": "node scripts/quality/lock-generator.mjs",
     "quality:cleanup": "node scripts/quality/target-maintenance.mjs --cleanup",
     "quality:cleanup:dry": "node scripts/quality/target-maintenance.mjs --dry-run",
+    "quality:reports:cleanup": "node scripts/quality/report-cleanup.mjs --cleanup --yes",
+    "quality:reports:cleanup:dry": "node scripts/quality/report-cleanup.mjs --dry-run",
     "quality:install-guard": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/quality/install-global-guard.ps1",
     "task:check": "node scripts/quality/task-check.mjs",
     "check:back": "node scripts/run-with-db.mjs check && node scripts/run-with-db.mjs clippy",

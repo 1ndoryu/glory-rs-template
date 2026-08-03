@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { runProcess } from './runner.mjs';
 import { loadPolicy, policyIdentity } from './policy.mjs';
 import { assertRuntimeLockHash, readLock, verifyInstalledAnalyzers } from './lockfile.mjs';
+import { branchReportRoot, resolveBranchIdentity } from './branch-identity.mjs';
+import { normalizeReportRetention } from './report-retention.mjs';
 
 export const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -54,7 +56,7 @@ async function verifyTool(root, name, toolConfig, manifest) {
 }
 
 export function validateQualityConfig(qualityConfig) {
-  const allowed = new Set(['schemaVersion', 'maxFindings', 'maxReminders', 'maxTerminalLines', 'lockWaitMs', 'maxConcurrentStages', 'timeoutsMs', 'performanceBudgets', 'heavyRun', 'fullPatterns', 'profiles']);
+  const allowed = new Set(['schemaVersion', 'maxFindings', 'maxReminders', 'maxTerminalLines', 'lockWaitMs', 'maxConcurrentStages', 'timeoutsMs', 'performanceBudgets', 'heavyRun', 'reportRetention', 'fullPatterns', 'profiles']);
   const unknown = Object.keys(qualityConfig).filter(key => !allowed.has(key));
   if (unknown.length > 0) throw new Error(`quality.config.json: claves desconocidas: ${unknown.join(', ')}`);
   for (const key of ['maxFindings', 'maxReminders', 'maxTerminalLines']) {
@@ -88,6 +90,7 @@ export function validateQualityConfig(qualityConfig) {
   if (!Number.isInteger(qualityConfig.heavyRun.maxConcurrent) || qualityConfig.heavyRun.maxConcurrent !== 1) {
     throw new Error('quality.config.json: heavyRun.maxConcurrent debe ser 1 para proteger la máquina');
   }
+  normalizeReportRetention(qualityConfig.reportRetention);
 }
 
 export async function preflight(args) {
@@ -112,9 +115,15 @@ export async function preflight(args) {
     tools[name] = { ...await verifyTool(workspaceRoot, name, config, toolManifest), ...installed[name] };
   }
 
-  const reportRoot = path.join(workspaceRoot, '.quality-reports', args.taskId);
+  const branch = await resolveBranchIdentity(workspaceRoot);
+  const branchRoot = branchReportRoot(workspaceRoot, branch);
+  const reportRoot = path.join(branchRoot, args.taskId);
   const logsRoot = path.join(reportRoot, 'logs');
+  const cacheRoot = path.join(branchRoot, 'cache');
+  const locksRoot = path.join(branchRoot, 'locks');
   await mkdir(logsRoot, { recursive: true });
+  await mkdir(cacheRoot, { recursive: true });
+  await mkdir(locksRoot, { recursive: true });
   /* [018A-51] El modo CI puede ampliar la validación frontend sin hacer que
    * cada agente ejecute la suite completa localmente. */
   return {
@@ -124,6 +133,9 @@ export async function preflight(args) {
     tools,
     reportRoot,
     logsRoot,
+    cacheRoot,
+    locksRoot,
+    branch,
     ci: args.ci,
     full: args.full,
     allowHeavy: args.allowHeavy,

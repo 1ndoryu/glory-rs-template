@@ -23,6 +23,8 @@ function markdown(report) {
     `- Alcance: ${report.scope.full ? 'full' : 'incremental'} (${report.scope.files.length} archivos)`,
     `- Duración: ${report.durationMs}ms (${formatDuration(report.durationMs)})`,
     `- Política: ${report.policy.policyHash} · ${report.policy.decision?.action ?? 'unknown'} · ${report.policy.reason}`,
+    ...(report.reportRetention?.status === 'error' ? [`- Retención: **error no bloqueante** — ${report.reportRetention.message}`] : []),
+    ...(report.reportRetention?.overQuota ? [`- Retención: **overQuota** — ${report.reportRetention.currentBranchBytes} bytes en la rama activa`] : []),
     ...(report.heavyGuard ? [`- Full diferido: **${report.heavyGuard.reason}** — ${report.heavyGuard.nextAllowedAt ?? report.heavyGuard.message ?? 'reintento bloqueado'}`] : []),
     '',
     '## Etapas',
@@ -50,6 +52,8 @@ export async function createReport(context, args, scope, stages, reminders, star
     durationMs: Date.now() - startedAt,
     mode: args.ci ? 'ci' : args.full ? 'full' : 'local-light',
     heavyGuard: deferred,
+    branch: context.branch ?? null,
+    reportRetention: context.reportRetention ?? null,
     policy: context.policyIdentity ?? {
       projectRoot: context.projectRoot,
       policyPath: null,

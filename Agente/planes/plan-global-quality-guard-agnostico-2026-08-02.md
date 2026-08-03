@@ -102,6 +102,20 @@ Ejemplo para wandori.us:
 }
 ```
 
+### Identidad de rama, partición de reportes y retención
+
+El gate no debe escribir todos los resultados en un único namespace creciente. La persistencia local se organizará por workspace y rama, con una identidad estable y segura:
+
+- **Reportes canónicos:** `.quality-reports/branches/<branch-key>/<task-id>/latest.{md,json}` y sus logs/tool reports debajo del mismo namespace.
+- **Caché y locks:** `.quality-reports/branches/<branch-key>/cache/` y `.quality-reports/branches/<branch-key>/locks/`; ningún PASS, lock o log de una rama se reutiliza silenciosamente en otra.
+- **Identidad normal:** `git symbolic-ref --short HEAD` para ramas locales.
+- **Detached HEAD/CI:** prioridad determinista: ref explícita entregada por el adapter, `GITHUB_HEAD_REF`/`GITHUB_REF_NAME`/`CI_COMMIT_REF_NAME` allowlisted, rama Git local y, finalmente, `detached-<full-sha>`. La ref y el SHA completo quedan en metadata; el nombre de directorio nunca contiene el SHA sin límite.
+- **`branch-key-v1`:** seleccionar una `canonicalRef` UTF-8 (la ref allowlisted elegida o `detached:<full-sha>`), normalizarla a Unicode NFC, preservar mayúsculas, rechazar NUL/control y refs que no cumplan el contrato allowlisted. El hash es SHA-256 de los bytes UTF-8 de esa `canonicalRef`, expresado en hexadecimal minúsculo; codificar cada byte UTF-8 fuera de `[A-Za-z0-9._-]` como `_HH`, limitar el prefijo a 64 caracteres y añadir `--<hash[0:16]>`. El resultado total no supera 96 caracteres y siempre queda dentro de `[A-Za-z0-9._-]`; versión, `canonicalRef`, algoritmo, encoding y hash forman parte de metadata/fingerprint.
+- **Compatibilidad de transición:** el `latest` histórico en `.quality-reports/<task-id>/` no será un puntero global escribible. Durante dos versiones solo se leerá si el JSON contiene metadata de rama (`branchKeyVersion`, `branchKey`, `canonicalRef` y `commit`) y coincide exactamente con la rama actual; un reporte antiguo sin metadata se considera ambiguo y no se reutiliza ni migra automáticamente. El writer canónico escribirá únicamente en `branches/<branch-key>/`. Después se retirará esa lectura.
+- **Retención:** `quality.config.json` declarará TTL y cuotas allowlisted. Defaults iniciales de bajo consumo: 7 días, 512 MiB por workspace y 128 MiB por `branch-key`; la cuota incluye todos los archivos regulares de reportes, logs, tool reports, caché y locks, pero no `C:\tmp\glory-target`. La rama activa nunca se borra para cumplir cuota: si excede 128 MiB, el reporte marca `overQuota`, informa bytes y candidatos bloqueados, y la poda puede actuar sobre históricos elegibles; al cambiar de rama, su namespace deja de estar protegido y se poda en la siguiente ejecución.
+- **Poda segura:** será explícita o ejecutable como etapa best-effort después del gate, tendrá `--dry-run`, informará bytes/candidatos eliminados y nunca cambiará el exit code ni el resultado del análisis. Un fallo de poda o una cuota excedida se registra como estado auditable y no bloquea el gate; se preservan `.tmp-*`/temporales de `writeAtomic`, locks activos, locks huérfanos hasta superar su TTL y comprobar que su PID no está activo, y archivos con escritura reciente. Los locks huérfanos elegibles cuentan para la cuota y pueden eliminarse solo después de ese criterio.
+- **CI/artifacts:** los artifacts se publicarán con `branch-key`, task ID y commit corto; no se mezclará `latest` de una rama con otra en runners reutilizados.
+
 ### Versionado y migración de configuración
 
 El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y boundaries del analizador. No se puede reutilizar ese nombre introduciendo `gate` y `guard` sin contrato de migración.
@@ -175,8 +189,14 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 - [ ] Emitir leases efímeros firmados para que los procesos hijos iniciados por `sentinel check` puedan usar herramientas pesadas sin que el propio shim los bloquee; el lease debe estar ligado a PID, proyecto, comando, expiración y task ID.
 - [ ] Definir la frontera de enforcement: shims cubren shells normales; el launcher del agente/CI debe invocar `sentinel guard` antes de ejecutar procesos. Rutas absolutas y shells `--noprofile --norc` se registran como bypass no interceptable por un script de proyecto, no se presentan como cobertura completa.
 - [x] Añadir al diagnóstico local la decisión estable (`action`, `mode`, `blocked`, `reason`) junto con raíz, hash y comando recomendado; diagnóstico de shims/PATH global queda pendiente del runtime externo.
+- [x] Resolver la identidad de rama de forma segura para rama normal, detached HEAD, CI y nombres con `/`, espacios, unicode o longitud excesiva; añadir fixture determinista de `branch-key` (`scripts/quality/branch-identity.mjs`).
+- [x] Particionar reportes, logs, caché y locks por `projectRoot + branch-key`; conservar el SHA/ref original en metadata y evitar colisiones entre ramas (`preflight.mjs`, `cache.mjs`, `lock.mjs`, `reporter.mjs`).
+- [ ] Definir la migración del layout actual `.quality-reports/<task-id>/` al namespace por rama, con lectura compatible del `latest` antiguo durante dos versiones y sin symlinks inseguros.
+- [x] Añadir retención configurable por TTL/cuota (defaults: 7 días, 512 MiB por workspace, 128 MiB por rama), contando reportes/logs/tool reports/caché/locks; marcar `overQuota` sin borrar la rama activa, podar históricos/tareas/caché elegibles con `--dry-run`, respetar locks/temporales/escrituras recientes y eliminar locks huérfanos solo tras TTL + PID inactivo; registrar bytes/candidatos antes y después sin alterar el exit code (`report-retention.mjs`).
+- [x] Exponer `quality:reports:cleanup:dry` y `quality:reports:cleanup`; el modo destructivo requiere `--cleanup --yes`.
+- [ ] Probar concurrencia entre dos ramas, cambio de rama sin reinicio, detached HEAD, runner CI reutilizado, traversal/symlink y fallo no bloqueante de la poda con fixtures de integración del gate.
 
-**Gate:** matriz con dos proyectos y dos ramas: el proyecto configurado bloquea lo declarado; el proyecto sin política pasa; cambiar de rama actualiza la decisión sin reiniciar el editor.
+**Gate:** matriz con dos proyectos y dos ramas: el proyecto configurado bloquea lo declarado; el proyecto sin política pasa; cambiar de rama actualiza la decisión sin reiniciar el editor. Los reportes, locks y cachés quedan aislados por rama; la poda dry-run y aplicada respetan TTL/cuota, no toca una ejecución activa y no puede borrar fuera del workspace.
 
 ### Fase 3 — Adaptador de wandori.us y VarSense *(pendiente después de Fase 1)*
 
@@ -223,6 +243,8 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 - Shims usan `shell: false`/argumentos separados cuando invocan Node; PowerShell y CMD deben preservar códigos de salida.
 - Cada analyzer tiene timeout, límite de bytes, cancelación y cleanup; un proceso huérfano queda marcado y no se reutiliza su salida.
 - La configuración se trata como input no confiable: JSON sin ejecución, rutas canonicalizadas, symlink/junction dentro del workspace y globs con límites.
+- Los nombres de rama nunca se usan como rutas sin codificación allowlisted; detached HEAD, refs CI y hashes tienen límites de longitud y colisión verificable.
+- La poda de `.quality-reports` solo opera dentro de la raíz canónica, no sigue enlaces, respeta locks/procesos activos y registra un resultado auditable sin incluir secretos.
 - Actualizaciones usan directorio temporal, hash/verificación y rename atómico; rollback conserva la versión anterior.
 
 ## Auditoría SOLID, rendimiento y escalabilidad por fase

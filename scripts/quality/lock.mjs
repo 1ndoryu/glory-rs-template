@@ -12,7 +12,7 @@ function sleep(ms) {
 }
 
 function lockPath(context, taskId) {
-  return path.join(context.projectRoot, '.quality-reports', 'locks', `${taskId}.lock`);
+  return path.join(context.locksRoot ?? path.join(context.projectRoot, '.quality-reports', 'locks'), `${taskId}.lock`);
 }
 
 async function readLock(lock) {

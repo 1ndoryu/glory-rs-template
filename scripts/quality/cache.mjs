@@ -33,7 +33,7 @@ export async function fingerprint(context, scope, stage) {
 }
 
 function cachePath(context, stage) {
-  return path.join(context.projectRoot, '.quality-reports', 'cache', `${stage}.json`);
+  return path.join(context.cacheRoot ?? path.join(context.projectRoot, '.quality-reports', 'cache'), `${stage}.json`);
 }
 
 export async function readCachedPass(context, stage, expectedFingerprint) {
