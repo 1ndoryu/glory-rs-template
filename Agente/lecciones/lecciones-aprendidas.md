@@ -39,6 +39,12 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 - El contrato de suite completa debe permanecer explícito (`test`/`test:full`), mientras el modo local selectivo se ofrece como comando separado para no convertir un PASS parcial en una garantía global.
 - Limitar workers y captura de salida evita que varios agentes saturen CPU/memoria; el gate debe fallar rápido ante locks duplicados y dejar el detalle en artifacts, no en stdout/contexto.
 
+## 038A-1 — Procesos huérfanos en Windows rompen dev y poda de targets
+
+- `child.kill()` de Node en Windows NO mata el árbol de procesos: cargo → glory-backend quedan huérfanos (nietos), bloqueando recompilaciones ("Acceso denegado os error 5" al reutilizar el .exe) y haciendo que `clean-cargo-target.ps1` detecte "build activo" y salte toda la limpieza.
+- Solución en `glory-rs/scripts/dev.mjs`: `killProcessTree` con `taskkill /PID <pid> /T /F` en `cleanup()` y al arrancar (`killStaleProjectProcesses`) antes del pre-cleanup, protegido por marcador vivo `.glory-cargo-active-*.json`.
+- Patrón reutilizable: si una herramienta se queda colgada o un servicio no libera recursos en Windows, sospechar procesos huérfanos y usar `taskkill /T` (árbol completo), no `Stop-Process`/`kill` que solo atacan al origen.
+
 ## 018A-95 — Colisión de IDs entre agentes en paralelo
 
 - Con dos agentes activos en el mismo repositorio, un ID de tarea puede asignarse dos veces (el otro agente archivó su `018A-94` de GAME-01 mientras este bloque usaba el mismo número). Antes de cerrar, verificar en `Agente/completados/` que el ID no esté ya en uso; si colisiona, renumerar a la siguiente cifra libre (018A-95) y actualizar roadmap, gate y completados de forma consistente.
