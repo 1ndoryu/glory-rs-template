@@ -11,7 +11,10 @@ use crate::repositories::workspace_repo::WorkspaceRepository;
 pub struct WorkspaceService;
 
 /// Recurso roto detectado al validar un release (para el 422 con detalle).
+/// [297A-58] camelCase: el contrato del detalle usa `refId` (los DTOs del API
+/// no exponen `snake_case`; sin `rename_all` el test y el frontend verían `null`).
 #[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 struct BrokenResourceRef {
     /// id del nodo en el árbol del release
     id: String,
@@ -75,14 +78,14 @@ impl WorkspaceService {
 
         /* Release anterior para el diff auditable */
         let previous = WorkspaceRepository::get_latest(pool).await?;
-        let next_version = previous.as_ref().map(|r| r.version).unwrap_or(0) + 1;
+        let next_version = previous.as_ref().map_or(0, |r| r.version) + 1;
         let summary = compute_release_summary(&tree, previous.as_ref());
         let diff_from = previous.as_ref().map(|r| r.version);
 
         let mut tx = pool.begin().await?;
 
         let release = WorkspaceRepository::create(
-            &mut *tx,
+            &mut tx,
             next_version,
             &tree,
             Some(published_by),
@@ -91,12 +94,8 @@ impl WorkspaceService {
         )
         .await?;
 
-        NotificationRepository::create_release_notification(
-            &mut *tx,
-            release.version,
-            published_by,
-        )
-        .await?;
+        NotificationRepository::create_release_notification(&mut tx, release.version, published_by)
+            .await?;
 
         tx.commit().await?;
         Ok(release)

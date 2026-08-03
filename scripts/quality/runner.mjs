@@ -6,6 +6,13 @@ const ENV_ALLOWLIST = [
   'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'PROGRAMFILES', 'PROGRAMFILES(X86)',
   'NUMBER_OF_PROCESSORS', 'CI', 'NO_COLOR', 'TERM', 'npm_execpath',
   'DATABASE_URL', 'CARGO_TARGET_DIR_BASE', 'GLORY_CARGO_TARGET_DIR',
+  /* [297A-58] El lease pesado adquirido por el gate (--full/--allow-heavy)
+   * debe llegar a run-with-db: sin el token, el subcomando clippy/test
+   * intenta adquirir su propio lease y el cooldown lo bloquea (75). El guard
+   * ya reconoce estas variables como override sancionado en isHeavyOverride.
+   * GLORY_QUALITY_GATE_TOKEN exime a las etapas internas del gate del guard
+   * de comandos directos (solo lo conoce el árbol de procesos del gate). */
+  'GLORY_HEAVY_RUN_TOKEN', 'GLORY_QUALITY_ALLOW_HEAVY', 'GLORY_QUALITY_GATE_TOKEN',
 ];
 const MAX_CAPTURE_BYTES = 64 * 1024;
 const activeChildren = new Set();

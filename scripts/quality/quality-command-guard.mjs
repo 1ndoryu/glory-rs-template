@@ -68,6 +68,12 @@ function npxTool(args = []) {
 }
 
 export function inspectDirectCommand({ executable, args = [], cwd = process.cwd(), projectRoot } = {}) {
+  /* [297A-58] Las etapas internas del gate (fmt/type-check/tests) son la vía
+   * sancionada de validación: el guard solo debe interceptar invocaciones
+   * directas del agente. El gate establece un token aleatorio por ejecución
+   * (GLORY_QUALITY_GATE_TOKEN) que se hereda únicamente por su árbol de
+   * procesos; fuera de él, el token no existe y el bloqueo sigue vigente. */
+  if (process.env.GLORY_QUALITY_GATE_TOKEN) return { blocked: false, root: null };
   const root = findQualityRoot(projectRoot ? path.resolve(projectRoot) : cwd);
   if (!root) return { blocked: false, root: null };
 

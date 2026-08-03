@@ -55,7 +55,7 @@ impl TestContext {
         let id = Uuid::new_v4();
         sqlx::query(
             "INSERT INTO resources (id, kind, title, editorial, visibility, lifecycle) \
-             VALUES ($1, 'article', $2, $3, $4, 'active')",
+             VALUES ($1, 'article', $2, $3::editorial_state, $4::visibility_state, 'active')",
         )
         .bind(id)
         .bind("Artículo de prueba")
@@ -99,11 +99,24 @@ impl TestContext {
 /// Árbol mínimo válido: un folder con un recurso público, una app raíz y un
 /// shortcut opcional. Sin publicLocator para no acoplar al contrato de overlay.
 fn valid_tree(resource_ref: Option<Uuid>) -> serde_json::Value {
+    tree_with_ids(resource_ref, "documentos", "about", "recurso")
+}
+
+/// Igual que `valid_tree` pero con IDs de nodo explícitos.
+/// [297A-58] Los tests que verifican el summary deben usar IDs únicos por
+/// ejecución: el diff se calcula contra la release anterior REAL de la BD
+/// (estado de rama), no contra una historia fija de versiones.
+fn tree_with_ids(
+    resource_ref: Option<Uuid>,
+    folder_id: &str,
+    about_id: &str,
+    resource_node_id: &str,
+) -> serde_json::Value {
     let mut nodes = serde_json::Map::new();
     nodes.insert(
-        "documentos".into(),
+        folder_id.into(),
         json!({
-            "id": "documentos",
+            "id": folder_id,
             "parentId": "desktop",
             "type": "folder",
             "label": "Documentos",
@@ -111,9 +124,9 @@ fn valid_tree(resource_ref: Option<Uuid>) -> serde_json::Value {
         }),
     );
     nodes.insert(
-        "about".into(),
+        about_id.into(),
         json!({
-            "id": "about",
+            "id": about_id,
             "parentId": "desktop",
             "type": "app",
             "label": "Acerca de",
@@ -122,10 +135,10 @@ fn valid_tree(resource_ref: Option<Uuid>) -> serde_json::Value {
     );
     if let Some(ref_id) = resource_ref {
         nodes.insert(
-            "recurso".into(),
+            resource_node_id.into(),
             json!({
-                "id": "recurso",
-                "parentId": "documentos",
+                "id": resource_node_id,
+                "parentId": folder_id,
                 "type": "resource",
                 "label": "Artículo público",
                 "refId": ref_id
@@ -141,34 +154,58 @@ async fn publish_accepts_valid_tree_and_computes_summary() {
     let mut ctx = TestContext::new().await;
 
     let resource_id = ctx.create_resource("ready", "public").await;
-    let tree = valid_tree(Some(resource_id));
+    /* [297A-58] IDs únicos por ejecución: el summary compara contra la release
+     * anterior REAL de la BD; con IDs fijos el test depende de la historia de
+     * publicaciones de la rama (fallaba en CI limpio y tras cada release). */
+    let uniq = Uuid::new_v4().simple().to_string();
+    let (folder_id, about_id, resource_node_id) = (
+        format!("doc-{uniq}"),
+        format!("about-{uniq}"),
+        format!("recurso-{uniq}"),
+    );
+    let tree = tree_with_ids(Some(resource_id), &folder_id, &about_id, &resource_node_id);
+
+    let previous = WorkspaceService::get_active_release(&ctx.pool)
+        .await
+        .expect("release activa previa (la migración siembra v1)");
+    let prev_version = previous.version;
 
     let result = WorkspaceService::publish(&ctx.pool, tree.clone(), ctx.admin_id).await;
     let release = result.expect("release válida publicada");
     ctx.releases_created.push(release.version);
 
-    /* diff contra la release v3 existente: nada de v3 está en nuestro árbol
-     * mínimo, así que todo aparece en removed y lo nuestro en added. */
-    assert!(release.version > 3, "version debe continuar tras v3");
-    assert_eq!(release.diff_from, Some(3));
+    assert_eq!(
+        release.version,
+        prev_version + 1,
+        "la versión continúa tras v{prev_version}"
+    );
+    assert_eq!(release.diff_from, Some(prev_version));
+
     let summary = release.summary.as_object().expect("summary objeto");
-    assert!(summary["added"]
-        .as_array()
-        .unwrap()
-        .contains(&json!("documentos")));
-    assert!(summary["added"]
-        .as_array()
-        .unwrap()
-        .contains(&json!("about")));
-    assert!(summary["added"]
-        .as_array()
-        .unwrap()
-        .contains(&json!("recurso")));
-    assert!(summary["removed"]
-        .as_array()
-        .unwrap()
-        .contains(&json!("documentos-imagenes")));
     assert_eq!(summary["nodeCount"], json!(3));
+    let added = summary["added"].as_array().expect("added lista");
+    for id in [&folder_id, &about_id, &resource_node_id] {
+        assert!(
+            added.contains(&json!(id)),
+            "added debe incluir {id}: {summary:?}"
+        );
+    }
+    /* Los nodos del release anterior ausentes del árbol nuevo salen en removed. */
+    let prev_nodes = previous
+        .tree
+        .get("nodes")
+        .and_then(serde_json::Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    let removed = summary["removed"].as_array().expect("removed lista");
+    for prev_id in prev_nodes.keys() {
+        if !tree["nodes"].get(prev_id).is_some() {
+            assert!(
+                removed.contains(&json!(prev_id)),
+                "removed debe incluir {prev_id}: {summary:?}"
+            );
+        }
+    }
 
     /* Contrato de lectura: activo = máximo, listado desc, get por versión. */
     let active = WorkspaceService::get_active_release(&ctx.pool)

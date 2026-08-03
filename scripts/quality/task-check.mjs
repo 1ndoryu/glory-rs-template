@@ -1,4 +1,5 @@
 import { parseArgs } from './args.mjs';
+import crypto from 'node:crypto';
 import { fingerprint, readCachedPass, writeCachedPass } from './cache.mjs';
 import { acquireHeavyRun, formatHeavyGuardMessage, inspectHeavyRun } from './heavy-run-guard.mjs';
 import { preflight, projectRoot } from './preflight.mjs';
@@ -58,6 +59,10 @@ async function main() {
     process.exitCode = 2;
     return;
   }
+  /* [297A-58] Marca el árbol de procesos del gate como validación sancionada:
+   * el guard de comandos directos la propaga a las etapas (fmt/type-check)
+   * y no las bloquea. Fuera del gate el token no existe. */
+  process.env.GLORY_QUALITY_GATE_TOKEN ||= crypto.randomUUID();
 
   try {
     if (args.full && !args.ci) {

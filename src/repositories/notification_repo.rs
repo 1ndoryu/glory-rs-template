@@ -128,7 +128,7 @@ impl NotificationRepository {
                     'El escritorio público está disponible en la versión ' || version || '.',
                     version, 'published', $2, published_at
              FROM workspace_releases WHERE version = $1
-             ON CONFLICT (release_version) DO NOTHING",
+             ON CONFLICT (release_version) WHERE release_version IS NOT NULL DO NOTHING",
         )
         .bind(version)
         .bind(created_by)
