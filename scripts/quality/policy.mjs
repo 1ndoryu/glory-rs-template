@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { access, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { BLOCKED_CARGO_COMMANDS, BLOCKED_NPM_SCRIPTS, BLOCKED_TOOLS, DEFAULT_GATE_COMMAND } from './policy-defaults.mjs';
@@ -136,6 +137,33 @@ export function migrateLegacyConfig({ sentinelConfig, qualityConfig, toolManifes
   };
 }
 
+function hashText(value) {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function policyReason(discovered) {
+  return discovered.status === 'policy'
+    ? 'política v2 válida'
+    : discovered.warning ?? discovered.error ?? discovered.status;
+}
+
+export function policyIdentity(discovered, runtimeVersion = null) {
+  return {
+    projectRoot: discovered.projectRoot,
+    policyPath: discovered.policyPath,
+    policyHash: discovered.policyHash ?? hashText(discovered.status),
+    runtimeVersion,
+    reason: policyReason(discovered),
+    recommendedCommand: discovered.status === 'legacy-v1'
+      ? 'npm run quality:doctor -- --migrate --dry-run'
+      : discovered.status === 'invalid-policy'
+        ? 'npm run quality:doctor -- --json'
+        : discovered.status === 'no-policy'
+          ? 'sentinel check <task-id>'
+          : 'npm run task:check -- <task-id>',
+  };
+}
+
 async function exists(filePath) {
   try { await access(filePath); return true; } catch { return false; }
 }
@@ -153,19 +181,23 @@ export async function discoverPolicy(startPath) {
 
 export async function loadPolicy(startPath) {
   const discovered = await discoverPolicy(startPath);
-  if (!discovered.policyPath) return { status: 'no-policy', ...discovered };
+  if (!discovered.policyPath) {
+    return { status: 'no-policy', ...discovered, policyHash: hashText('no-policy') };
+  }
+  const raw = await readFile(discovered.policyPath, 'utf8');
+  const policyHash = hashText(raw);
   let parsed;
-  try { parsed = JSON.parse(await readFile(discovered.policyPath, 'utf8')); }
+  try { parsed = JSON.parse(raw); }
   catch (error) {
-    return { status: 'invalid-policy', ...discovered, error: `JSON inválido: ${error.message}` };
+    return { status: 'invalid-policy', ...discovered, policyHash, error: `JSON inválido: ${error.message}` };
   }
   if (parsed.schemaVersion === undefined) {
-    return { status: 'legacy-v1', ...discovered, warning: 'sentinel.config.json usa el formato de analizador v1; no se activa como política v2' };
+    return { status: 'legacy-v1', ...discovered, policyHash, warning: 'sentinel.config.json usa el formato de analizador v1; no se activa como política v2' };
   }
   try {
     validatePolicy(parsed);
-    return { status: 'policy', ...discovered, policy: parsed };
+    return { status: 'policy', ...discovered, policyHash, policy: parsed };
   } catch (error) {
-    return { status: 'invalid-policy', ...discovered, error: error.message };
+    return { status: 'invalid-policy', ...discovered, policyHash, error: error.message };
   }
 }

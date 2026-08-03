@@ -77,7 +77,8 @@
 - [x] Definir y validar localmente la política v2 en `scripts/quality/policy.mjs`, sin reutilizar silenciosamente el `sentinel.config.json` v1 del analizador.
 - [x] Añadir `quality:doctor -- --migrate --dry-run`; produce migración en memoria, `writes: []` y no modifica perfiles/archivos.
 - [x] Hacer que el guard de transición aplique `enforce`/`observe`/`pass-through` para una política v2 válida y conserve fallback seguro para v1/legacy.
-- [x] Cubrir el contrato con 49 tests de quality y fixtures de claves desconocidas, paths inseguros, modos, wildcard y migración.
+- [x] Cubrir el contrato con 54 tests de quality y fixtures de claves desconocidas, paths inseguros, modos, wildcard, migración e identidad de caché/reporte.
+- [x] Añadir `policyHash`/identidad de política al reporte y fingerprint de caché; cambiar la política invalida PASS anteriores.
 - [ ] Extraer el runtime y los shims a una instalación estable fuera de cualquier repositorio o rama. *(bloqueado: runtime/repos upstream no presentes en este checkout)*
 - [ ] Migrar wandori.us al runtime global sin duplicar reglas ni dejar rutas hardcodeadas en perfiles. *(depende de la anterior)*
 - [ ] Probar matriz multi-proyecto/multi-rama en PowerShell 5/7, CMD, CI, pipes y códigos de salida, con rollback. *(depende de runtime global)*

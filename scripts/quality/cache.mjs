@@ -3,7 +3,7 @@ import { mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { writeAtomic } from './atomic-file.mjs';
 
-const CACHE_FORMAT_VERSION = 3;
+const CACHE_FORMAT_VERSION = 4;
 
 async function hashFile(hash, root, relativePath) {
   try {
@@ -24,6 +24,7 @@ export async function fingerprint(context, scope, stage) {
   hash.update(stage);
   hash.update(JSON.stringify(context.qualityConfig));
   hash.update(JSON.stringify(context.toolManifest));
+  hash.update(`policy:${context.policy?.policyHash ?? context.policyIdentity?.policyHash ?? 'unresolved'}\0`);
   for (const file of scope.fingerprintFiles ?? scope.files) {
     await hashFile(hash, context.projectRoot, file);
   }

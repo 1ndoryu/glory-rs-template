@@ -2,7 +2,7 @@ import { access, mkdir, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runProcess } from './runner.mjs';
-import { loadPolicy } from './policy.mjs';
+import { loadPolicy, policyIdentity } from './policy.mjs';
 
 export const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -124,5 +124,6 @@ export async function preflight(args) {
     allowHeavy: args.allowHeavy,
     heavyDeferred: args.heavyDeferred,
     policy,
+    policyIdentity: policyIdentity(policy, toolManifest.tools?.sentinel?.version ?? null),
   };
 }

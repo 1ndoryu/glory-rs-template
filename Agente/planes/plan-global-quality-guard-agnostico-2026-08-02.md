@@ -121,7 +121,8 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 - [ ] Buscar desde el directorio actual hacia arriba hasta la raíz del workspace.
 - [ ] Usar únicamente `sentinel.config.json` como fuente canónica; no inferir reglas leyendo `AGENTS.md` ni scripts arbitrarios.
 - [ ] Canonicalizar la ruta antes de leerla y rechazar rutas fuera del workspace.
-- [ ] Calcular `policyHash` y asociarlo al estado; un cambio de rama o política nunca reutiliza una decisión cacheada de otra política.
+- [x] Calcular `policyHash` desde la configuración descubierta y asociarlo al estado/reporte; el fingerprint de caché lo incluye para invalidar PASS cuando cambia la política. (`scripts/quality/policy.mjs`, `cache.mjs`, `reporter.mjs`)
+- [ ] Asociar también la identidad a un runtime global instalado y a leases firmados. *(pendiente del runtime global)*
 - [ ] Si no existe política: `pass-through` silencioso para permitir trabajar en cualquier proyecto.
 - [ ] Si existe una política inválida: no bloquear comandos desconocidos; mostrar una advertencia concisa y hacer fallar `sentinel doctor`/CI para que el proyecto corrija su configuración.
 - [ ] Si `mode` es `observe`: registrar el hallazgo y mostrar la recomendación, pero no impedir la ejecución.
@@ -135,12 +136,13 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 - [x] Crear ADR con Sentinel Core, el contrato de analizadores (incluido VarSense), la política local y la matriz `enforce/observe/pass-through`. (`adr-sentinel-plano-global-028a6-2026-08-03.md`)
 - [x] Implementar validación estricta local de la política v2 y descubrimiento por ancestros en `scripts/quality/policy.mjs`.
 - [x] Implementar `quality:doctor --migrate --dry-run`; no escribe archivos ni cambia perfiles.
-- [x] Añadir fixtures de política válida, claves desconocidas, rutas fuera del workspace, modos y migración v1→v2 (`scripts/quality/tests/policy.test.mjs` + guard).
+- [x] Añadir fixtures de política válida, claves desconocidas, rutas fuera del workspace, modos, migración v1→v2 e identidad/hash (`scripts/quality/tests/policy.test.mjs`, `policy-identity.test.mjs` + guard/cache).
 - [x] Centralizar los defaults de comandos bloqueables para que el guard de transición y la migración no mantengan catálogos divergentes.
 
 - [ ] Crear JSON Schema publicado con Sentinel Core (la fuente de runtime global no está presente en este checkout).
 - [x] Definir y validar localmente el contrato v2, errores allowlisted y límites de tamaño de strings/listas/rutas; publicar el JSON Schema queda ligado al runtime upstream.
-- [ ] Definir contrato de salida estable en Sentinel Core; el doctor local entrega `status`, `projectRoot`, `policyPath`, `error`, migración y no sustituye todavía el reporte del gate.
+- [x] Añadir al reporte local la identidad estable de política: `projectRoot`, `policyPath`, `policyHash`, `runtimeVersion`, `reason` y comando recomendado; se mantiene `schemaVersion: 1` por compatibilidad aditiva.
+- [ ] Definir contrato final de salida de Sentinel Core con decisión/exitCode y transporte CLI/LSP. *(pendiente del runtime global)*
 - [ ] Definir contrato de plugin, taxonomía `analyze/check/guard/doctor` y matriz de compatibilidad Sentinel↔VarSense.
 - [ ] Definir compatibilidad Windows PowerShell 5/7, PowerShell Core, CMD, Bash/Git Bash (interactivo y `BASH_ENV`) y CI sin depender de variables específicas de VS Code.
 - [ ] Definir política de actualización, rollback y migración desde el guard actual.
@@ -163,7 +165,8 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 
 - [ ] Implementar descubrimiento de raíz y política en cada comando, sin estado de proceso que sobreviva al cambio de rama.
 - [ ] Diferenciar `no-policy`, `observe`, `enforce` y `invalid-policy` en el resultado y el reporte.
-- [ ] Invalidar decisiones/cooldowns por `projectRoot + policyHash + runtimeVersion`.
+- [x] Invalidar la caché local por `policyHash` además de modo, herramientas, configuración y archivos.
+- [ ] Invalidar decisiones/cooldowns del runtime global por `projectRoot + policyHash + runtimeVersion`. *(pendiente del runtime global)*
 - [ ] Mantener cooldown/locks solo para comandos declarados como pesados por la política; no compartirlos entre proyectos.
 - [ ] Emitir leases efímeros firmados para que los procesos hijos iniciados por `sentinel check` puedan usar herramientas pesadas sin que el propio shim los bloquee; el lease debe estar ligado a PID, proyecto, comando, expiración y task ID.
 - [ ] Definir la frontera de enforcement: shims cubren shells normales; el launcher del agente/CI debe invocar `sentinel guard` antes de ejecutar procesos. Rutas absolutas y shells `--noprofile --norc` se registran como bypass no interceptable por un script de proyecto, no se presentan como cobertura completa.
@@ -182,7 +185,7 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 - [ ] Ejecutar primero en modo `observe` contra el gate actual y comparar reportes normalizados; activar `enforce` solo después de resolver diferencias, errores de herramienta y falsos positivos.
 - [ ] Mantener compatibilidad temporal con el guard actual y emitir advertencia de migración, sin bloquear una rama antigua.
 
-**Gate:** parcialmente verificado en transición: el guard local consume una política v2 válida en `enforce`/`observe` y conserva defaults legacy para v1; instalación global, shells externos y runtime Sentinel quedan pendientes.
+**Gate:** parcialmente verificado en transición: guard local, identidad de política, invalidación de caché y reportes pasan; instalación global, shells externos y runtime Sentinel quedan pendientes.
 
 ### Fase 4 — Integración multi-proyecto y CI *(pendiente de runtime global)*
 
