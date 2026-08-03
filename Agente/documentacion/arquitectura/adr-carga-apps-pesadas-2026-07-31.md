@@ -23,6 +23,17 @@ Build de producción ejecutado el 2026-07-31:
 
 El build no genera manifest porque `build.manifest` no está habilitado. Los nombres de hash no son contrato público. Los archivos de `dist/uploads` y `legacy-assets` son recursos estáticos/copias de contenido, no código inicial y no se cuentan en el presupuesto JS.
 
+Medición adicional — 2026-08-02 [297A-59] tras añadir el motor del Bosque (three.js):
+
+| Asset | Tamaño gzip reportado | Interpretación |
+|---|---:|---|
+| `index-*.js` | ~54.79 KB | bundle principal, estable frente a la nueva app |
+| `forest-models-*.js` | ~130.19 KB | chunk lazy del juego (three.js + primitivas forestales), solo se descarga al abrir el juego |
+| `tiptap-*.js` | ~89.96 KB | editor separado |
+| CSS principal | ~10.72 KB | estilos globales |
+
+El juego es la primera app 3D con `registerLazy`; su chunk (three.js) se convierte en el más grande. El presupuesto `largestChunkGzipBytes` se actualiza de 120 KB a 140 KB (130.19 KB medidos + margen para las primitivas que el editor de mapa añada); el entry principal y el CSS siguen dentro de su presupuesto. El chunk es lazy: no se descarga antes de abrir la app, así que el arranque no se penaliza.
+
 ## Decisión
 
 ### 1. Política de registro

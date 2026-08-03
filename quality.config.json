@@ -15,7 +15,7 @@
   "performanceBudgets": {
     "entryJsGzipBytes": 65000,
     "entryCssGzipBytes": 16000,
-    "largestChunkGzipBytes": 120000
+    "largestChunkGzipBytes": 140000
   },
   "heavyRun": {
     "cooldownMinutes": 180,
