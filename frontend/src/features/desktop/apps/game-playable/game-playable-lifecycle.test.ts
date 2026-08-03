@@ -9,15 +9,21 @@ const mocks = vi.hoisted(() => ({
   cancelAnimationFrame: vi.fn(),
   getGameProfile: vi.fn(),
   listGameCharacters: vi.fn(),
+  resolvePlayableMap: vi.fn(),
 }));
 
 vi.mock('./game-webgl-capabilities', () => ({ detectWebGL: mocks.detectWebGL }));
 vi.mock('./game-playable-scene', () => ({ mountGamePlayableScene: mocks.mountGamePlayableScene }));
 vi.mock('./game-playable-input', () => ({ createGameInput: mocks.createGameInput }));
+/* [297A-65] El resolver del mapa jugable se mockea: el runtime recibe una
+ * resolución determinista (publicada o fixture) sin red. */
+vi.mock('./game-map-source', () => ({ resolvePlayableMap: mocks.resolvePlayableMap }));
 vi.mock('../../../../services', () => ({
   GameCharacterService: { list: mocks.listGameCharacters },
   GameProfileService: { get: mocks.getGameProfile },
 }));
+
+import { FIXTURE_MAP, FIXTURE_MAP_VERSION } from './game-fixture-map';
 
 import { renderGamePlayable } from './game-playable';
 
@@ -61,6 +67,17 @@ describe('Bosque playable WebGL lifecycle', () => {
       }),
       destroy: vi.fn(),
     }));
+    /* [297A-65] Por defecto el mapa es el fixture offline (sin publicación). */
+    mocks.resolvePlayableMap.mockResolvedValue({
+      map: {
+        document: FIXTURE_MAP_VERSION,
+        world: FIXTURE_MAP,
+        label: 'fixture',
+        version: 0,
+        fromFixture: true,
+      },
+      warning: false,
+    });
     vi.stubGlobal('ResizeObserver', class {
       observe(): void {}
       disconnect(): void {}
@@ -283,5 +300,56 @@ describe('Bosque playable WebGL lifecycle', () => {
     Object.defineProperty(document, 'hidden', { configurable: true, value: false });
     expect(mocks.createGameInput.mock.results[0]?.value.destroy).toHaveBeenCalledOnce();
     expect(mocks.mountGamePlayableScene.mock.results[0]?.value.destroy).toHaveBeenCalledOnce();
+  });
+
+  it('mounts the runtime with the published map when a release exists', async () => {
+    mocks.detectWebGL.mockReturnValue({ available: true, kind: 'webgl2' });
+    /* [297A-65] Publicación activa v2: el runtime recibe su documento y su
+     * mundo, no el fixture; el estado expone la etiqueta de versión. */
+    const publishedDocument = { ...FIXTURE_MAP_VERSION, id: 'bosque', spawnPoints: [{ id: 'spawn-publicada', position: { x: 2, z: 3 }, radius: 0.4 }] };
+    mocks.resolvePlayableMap.mockResolvedValue({
+      map: {
+        document: publishedDocument,
+        world: FIXTURE_MAP,
+        label: 'v2',
+        version: 2,
+        fromFixture: false,
+      },
+      warning: false,
+    });
+
+    const view = renderGamePlayable({ signal: new AbortController().signal });
+    await flushHydration();
+
+    const [host, world, document] = mocks.mountGamePlayableScene.mock.calls[0];
+    expect(host).toBe(view.element.querySelector('.juegoFixture__escena'));
+    expect(world).toBe(FIXTURE_MAP);
+    expect(document).toBe(publishedDocument);
+    expect(view.element.querySelector('.juegoFixture__estado')?.textContent).toContain('v2');
+    view.destroy?.();
+  });
+
+  it('keeps playing on the fixture with a warning when the map cannot be resolved', async () => {
+    mocks.detectWebGL.mockReturnValue({ available: true, kind: 'webgl2' });
+    /* [297A-65] Fallo de red/5xx: fail-closed al fixture, la vista lo comunica
+     * como error de mapa sin bloquear el juego. */
+    mocks.resolvePlayableMap.mockResolvedValue({
+      map: {
+        document: FIXTURE_MAP_VERSION,
+        world: FIXTURE_MAP,
+        label: 'fixture',
+        version: 0,
+        fromFixture: true,
+      },
+      warning: true,
+    });
+
+    const view = renderGamePlayable({ signal: new AbortController().signal });
+    await flushHydration();
+
+    expect(mocks.mountGamePlayableScene).toHaveBeenCalledTimes(1);
+    expect(view.element.querySelector('.juegoFixture__estado')?.textContent).toContain('mapa no disponible');
+    expect((view.element.querySelector('.juegoFixture__estado') as HTMLElement | null)?.dataset.state).toBe('error');
+    view.destroy?.();
   });
 });

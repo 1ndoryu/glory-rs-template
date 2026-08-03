@@ -588,6 +588,10 @@ realtime.
 
 **Límite 297A-64:** el editor no previsualiza en 3D (reusar renderer llega con su bloque); sin pintado de altura/superficie por pincel (solo grid y colocación de instancias/spawns), sin borrador persistido server-side (el borrador es local y publicar es atómico), sin exportar/importar y sin editor de proxies de colisión (Assets 3D).
 
+**Evidencia 297A-65:** el runtime del Bosque consume el mapa publicado. `game-map-source.ts` (`resolvePlayableMap`) carga la publicación activa (`GET /api/game/maps/bosque` vía `GameMapAdminService.getActive`) y, fail-closed, cae al fixture offline cuando no hay publicación (404→null, sin aviso) o ante fallo de red/documento inválido (con `warning` visible). `game-playable` resuelve el mapa en `hydrate()` ANTES de montar WebGL/realtime y lo pasa al runtime: la escena se monta con el documento y el mundo publicado, la simulación local usa sus colliders y el spawn local toma el primer `spawnPoints` del mapa. Al volver al Bosque tras publicar desde el editor (297A-64), la rehidratación resuelve la versión nueva: el circuito editar→publicar→jugar queda cerrado. El estado muestra la etiqueta (`v<N>` o `fixture`) y el aviso de mapa no disponible. 7 tests frontend dirigidos PASS (4 del resolver + 3 de lifecycle: montaje con mapa publicado, fixture con warning y fixture por defecto); type-check y diff-check PASS.
+
+**Límite 297A-65:** las instancias del catálogo aún no tienen representación visual 3D (la visual cache ignora ids fuera del fixture hasta Assets 3D), la cámara de la escena parte del origen del fixture y converge al spawn publicado en el primer `update` (la entidad local se siembra en el spawn del documento y la cámara lo sigue al instante), el runtime sigue sin invitados/reconexión diferenciada por mapa y el editor no previsualiza; la auditoría de expulsión y la purga de retención quedan para Fase 8.
+
 **Gate:** ningún invitado puede invocar admin ni reclamar el estado de otra identidad; el perfil no depende de datos enviados sin validar.
 
 **Auditoría de cierre — Fase 6:**

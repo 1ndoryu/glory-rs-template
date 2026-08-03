@@ -18,7 +18,7 @@ import {
 } from '../../../game-core';
 import { evaluateGamePerformanceBudget } from './game-performance-budget';
 import { detectWebGL } from './game-webgl-capabilities';
-import { FIXTURE_MAP, FIXTURE_MAP_VERSION } from './game-fixture-map';
+import { resolvePlayableMap, type PlayableMapResolution } from './game-map-source';
 import { createGameInput, type GameInputHandle } from './game-playable-input';
 import { mountGamePlayableScene, type GamePlayableSceneHandle } from './game-playable-scene';
 import {
@@ -203,6 +203,12 @@ export function renderGamePlayable(context: RenderContext): MountedView {
       }
 
       if (version !== hydrationVersion || context.signal.aborted || disposed) return;
+      /* [297A-65] El mapa jugable se resuelve ANTES de montar WebGL/realtime:
+       * publicación activa si existe, fixture offline fail-closed si no. Al
+       * volver al Bosque tras publicar (297A-64), la rehidratación resuelve
+       * aquí la versión nueva y el circuito editar→publicar→jugar se cierra. */
+      const mapResolution = await resolvePlayableMap({ signal: profileController.signal });
+      if (version !== hydrationVersion || context.signal.aborted || disposed) return;
       try {
         runtime = mountGamePlayableRuntime(
           context,
@@ -213,6 +219,7 @@ export function renderGamePlayable(context: RenderContext): MountedView {
           character,
           characters,
           profileRevision,
+          mapResolution,
         );
       } catch (error: unknown) {
         if (context.signal.aborted || disposed) return;
@@ -281,6 +288,7 @@ function mountGamePlayableRuntime(
   character: GameCharacterDefinition | null,
   characters: GameCharacterDefinition[],
   profileRevision: number,
+  mapResolution: PlayableMapResolution,
 ): MountedView {
   const setStatus = (message: string, error = false): void => {
     view.status.textContent = message;
@@ -338,8 +346,14 @@ function mountGamePlayableRuntime(
   const input: GameInputHandle = createGameInput();
   view.element.appendChild(input.controls);
 
+  /* [297A-65] El spawn local usa el primer spawn del mapa resuelto (publicado
+   * o fixture), con respaldo determinista si el documento no lo tuviera. */
+  const spawn = mapResolution.map.document.spawnPoints[0];
+  const localSpawn = spawn
+    ? { position: { x: spawn.position.x, z: spawn.position.z }, radius: spawn.radius }
+    : { position: { x: 0, z: -0.5 }, radius: 0.38 };
   let scene: GamePlayableSceneHandle | null = null;
-  let state: WorldState = createWorldState([{ id: 'local', position: { x: 0, z: -0.5 }, radius: 0.38 }]);
+  let state: WorldState = createWorldState([{ id: 'local', ...localSpawn }]);
   let sequence = 0;
   let frameHandle = 0;
   let lastTime = performance.now();
@@ -388,7 +402,7 @@ function mountGamePlayableRuntime(
       } else {
         state = simulateTick(
           state,
-          FIXTURE_MAP,
+          mapResolution.map.world,
           [{ playerId: 'local', direction, sequence: sequence++ }],
           delta,
         );
@@ -482,7 +496,7 @@ function mountGamePlayableRuntime(
   const resizeObserver = new ResizeObserver(onResize);
 
   try {
-    scene = mountGamePlayableScene(view.sceneHost, FIXTURE_MAP, FIXTURE_MAP_VERSION);
+    scene = mountGamePlayableScene(view.sceneHost, mapResolution.map.world, mapResolution.map.document);
     attachContextLossListener();
     resizeObserver.observe(view.sceneHost);
     scene.update(snapshotFromState(state));
@@ -491,10 +505,12 @@ function mountGamePlayableRuntime(
         ? `${displayName} · sesión expirada · modo local`
         : profileLoadWarning
           ? `${displayName} · perfil no disponible · modo local`
-          : authStore.get().isAuthenticated
-            ? `${displayName} · conectando… · fallback local mientras se autentica`
-            : `${displayName} · conectando… · fallback local mientras se identifica el invitado`,
-      profileLoadWarning,
+          : mapResolution.warning
+            ? `${displayName} · mapa no disponible · modo local (${mapResolution.map.label})`
+            : authStore.get().isAuthenticated
+              ? `${displayName} · ${mapResolution.map.label} · conectando… · fallback local mientras se autentica`
+              : `${displayName} · ${mapResolution.map.label} · conectando… · fallback local mientras se identifica el invitado`,
+      profileLoadWarning || mapResolution.warning,
     );
     if (!profileSessionExpired) void realtime?.connect();
     startFrameLoop();
