@@ -275,7 +275,7 @@ El reporte `297A-49` tardó 533833 ms: Rust consumió 483037 ms (90,5 %) y expir
 **Objetivo:** retirar deuda local sin romper consumidores existentes.
 
 - [x] Crear matriz de paridad con ruleId, severidad, fixture, adapters, commits y pendientes.
-- [x] Fijar commits y schemas compatibles en `quality-tools.json`; la publicación remota queda separada de este workspace.
+- [x] Fijar commits, schemas y patch local compatible en `quality-tools.json`; [317A-3] queda hashado y la publicación/remoción upstream se mantiene separada de este workspace.
 - [ ] Reinstalar `.vsix` solo después de compilar, probar y autorizar; nunca reiniciar VS Code automáticamente.
 - [ ] Eliminar scripts shell y el parche VarSense cuando las equivalencias pasen en CI y el reporte no cambie sin justificación.
 - [ ] Versionar migraciones de config, aliases de ruleId y suppressions; no invalidar silenciosamente pipelines existentes.

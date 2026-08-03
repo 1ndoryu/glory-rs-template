@@ -35,11 +35,13 @@ Los repositorios upstream y una instalación global administrada no forman parte
 - `scripts/quality/sentinel-doctor.mjs --lock`: diagnóstico/generación explícita; `--check` no escribe y `--write` no modifica analyzers.
 - `scripts/quality/tests/lock-generator.test.mjs`: 6 fixtures de parseo, generación, no-escritura, mismatch, backup y symlink/tamper.
 - `scripts/quality/policy-decision.mjs`: contrato local único para `no-policy`, `legacy-v1`, `observe`, `enforce`, `pass-through` e `invalid-policy`; el campo es aditivo en identidad/reporte y no pretende sustituir el runtime global.
+- `scripts/quality/patches/sentinel-317a-3.patch` + `quality-tools.json`: patch local [317A-3] fijado por SHA-256; `sentinel.lock.json` conserva `patchSha256` y preflight rechaza patch raíz, diff aplicado o rutas adicionales manipuladas.
 
 ## Gates pendientes
 
 - Runtime global versionado instalado y verificable.
 - Runtime global versionado con `artifactSha256` real; el adaptador local mantiene `artifactSha256: null`.
+- Upstream debe absorber [317A-3] para retirar el patch local; hasta entonces el patch declarado es la única divergencia permitida del checkout Sentinel.
 - `realpath`/canonicalización verifican que lockfile, install root, backup y checkouts permanezcan dentro del workspace; el generador local añade escritura atómica y backup probado.
 - Paridad CLI/LSP/VS Code y matriz PowerShell/CMD/Bash/CI.
 - Lease de procesos hijos, rollback de perfiles y segundo proyecto sin política.

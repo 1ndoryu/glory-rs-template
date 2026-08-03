@@ -13,13 +13,15 @@
       "version": "0.4.0",
       "protocolVersion": 1,
       "commit": "107be9b61a7ed4676ee89b101ecff4112a039fb2",
-      "sha256": "cb7192084507a9cfe6d84b795d3979c5f687f582c66423b375d321ecd0301610"
+      "sha256": "cb7192084507a9cfe6d84b795d3979c5f687f582c66423b375d321ecd0301610",
+      "patchSha256": "77bfdac2a3d245ecc50d9d79bc0539f52fdc0c72426aa21c53202c48c0bb9ed7"
     },
     "varsense": {
       "version": "2.2.0",
       "protocolVersion": 1,
       "commit": "b1aa3f06ffbb96a55dd0156a99eae482f41311b8",
-      "sha256": "6ccd652a8a7bce8985469e47bddbeeaa35e08b7cb67ff400529417e525841ba7"
+      "sha256": "6ccd652a8a7bce8985469e47bddbeeaa35e08b7cb67ff400529417e525841ba7",
+      "patchSha256": null
     }
   }
 }

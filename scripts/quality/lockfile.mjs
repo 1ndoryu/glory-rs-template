@@ -64,12 +64,14 @@ export async function assertInsideWorkspace(workspaceRoot, target, label, { allo
 }
 
 export function untrustedCheckoutChanges(statusOutput) {
-  return statusOutput
-    .split(/\r?\n/)
+  const records = String(statusOutput).includes('\0')
+    ? String(statusOutput).split('\0')
+    : String(statusOutput).split(/\r?\n/);
+  return records
     .map(line => line.trimEnd())
     .filter(Boolean)
     .filter(line => {
-      const pathName = line.slice(3).replace(/\\\\/g, '/');
+      const pathName = line.slice(3).replace(/\\/g, '/');
       return pathName !== INSTALL_METADATA_PATH;
     });
 }
@@ -107,7 +109,7 @@ export function validateLock(lock, manifest) {
     const entry = lock.analyzers[name];
     const expected = manifestTools[name];
     if (!isRecord(entry)) fail(`analyzers.${name} debe ser un objeto`);
-    validateKeys(entry, new Set(['version', 'protocolVersion', 'commit', 'sha256']), `analyzers.${name}`);
+    validateKeys(entry, new Set(['version', 'protocolVersion', 'commit', 'sha256', 'patchSha256']), `analyzers.${name}`);
     validateText(entry.version, `analyzers.${name}.version`);
     if (entry.version !== expected.version) fail(`analyzers.${name}.version no coincide con quality-tools.json`);
     const protocolVersion = Number(expected.outputSchemaVersion);
@@ -117,6 +119,16 @@ export function validateLock(lock, manifest) {
     validateCommit(entry.commit, `analyzers.${name}.commit`);
     if (entry.commit !== expected.commit) fail(`analyzers.${name}.commit no coincide con quality-tools.json`);
     validateSha(entry.sha256, `analyzers.${name}.sha256`);
+    if (expected.patch !== undefined) {
+      if (!isRecord(expected.patch)) fail(`quality-tools.${name}.patch inválido`);
+      validateKeys(expected.patch, new Set(['path', 'sha256']), `quality-tools.${name}.patch`);
+      if (typeof expected.patch.path !== 'string' || path.isAbsolute(expected.patch.path) || expected.patch.path.replace(/\\/g, '/').split('/').includes('..')) {
+        fail(`quality-tools.${name}.patch.path inválido`);
+      }
+      validateSha(expected.patch.sha256, `quality-tools.${name}.patch.sha256`);
+    }
+    const expectedPatchSha = expected.patch?.sha256 ?? null;
+    if (entry.patchSha256 !== expectedPatchSha) fail(`analyzers.${name}.patchSha256 no coincide con quality-tools.json`);
   }
   return lock;
 }
@@ -174,6 +186,69 @@ export async function gitArchiveSha256(toolRoot) {
   });
 }
 
+async function gitStatusPorcelain(toolRoot) {
+  return new Promise((resolve, reject) => {
+    const child = spawn('git', ['-C', toolRoot, 'status', '--porcelain=v1', '-z', '--untracked-files=all'], {
+      cwd: toolRoot,
+      shell: false,
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const chunks = [];
+    let stderr = '';
+    const timeout = setTimeout(() => {
+      if (process.platform === 'win32' && child.pid) {
+        spawn('taskkill.exe', ['/pid', String(child.pid), '/t', '/f'], { shell: false, stdio: 'ignore', windowsHide: true });
+      } else child.kill('SIGTERM');
+      reject(new Error('git status excedió el timeout'));
+    }, 30_000);
+    child.stdout.on('data', chunk => chunks.push(Buffer.from(chunk)));
+    child.stderr.on('data', chunk => { stderr += chunk; });
+    child.on('error', error => { clearTimeout(timeout); reject(error); });
+    child.on('close', (code, signal) => {
+      clearTimeout(timeout);
+      if (signal || code !== 0) reject(new Error(`git status falló (${signal ?? code}): ${stderr.trim()}`));
+      else resolve({ text: Buffer.concat(chunks).toString('utf8') });
+    });
+  });
+}
+
+async function patchFileSha256(workspaceRoot, patchPath) {
+  if (typeof patchPath !== 'string' || path.isAbsolute(patchPath) || patchPath.replace(/\\/g, '/').split('/').includes('..')) {
+    throw new Error('quality-tools.patch.path debe ser una ruta relativa dentro del workspace');
+  }
+  const patchAbsolute = path.join(workspaceRoot, patchPath);
+  await assertInsideWorkspace(workspaceRoot, patchAbsolute, 'quality-tools.patch.path');
+  return createHash('sha256').update(await readFile(patchAbsolute)).digest('hex');
+}
+
+async function gitDiffSha256(toolRoot) {
+  return new Promise((resolve, reject) => {
+    const child = spawn('git', ['-C', toolRoot, 'diff', '--binary', '--no-ext-diff'], {
+      cwd: toolRoot,
+      shell: false,
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const hash = createHash('sha256');
+    let stderr = '';
+    const timeout = setTimeout(() => {
+      if (process.platform === 'win32' && child.pid) {
+        spawn('taskkill.exe', ['/pid', String(child.pid), '/t', '/f'], { shell: false, stdio: 'ignore', windowsHide: true });
+      } else child.kill('SIGTERM');
+      reject(new Error('git diff excedió el timeout'));
+    }, 30_000);
+    child.stdout.on('data', chunk => hash.update(chunk));
+    child.stderr.on('data', chunk => { stderr += chunk; });
+    child.on('error', error => { clearTimeout(timeout); reject(error); });
+    child.on('close', (code, signal) => {
+      clearTimeout(timeout);
+      if (signal || code !== 0) reject(new Error(`git diff falló (${signal ?? code}): ${stderr.trim()}`));
+      else resolve(hash.digest('hex'));
+    });
+  });
+}
+
 export async function inspectInstalledAnalyzers(workspaceRoot, manifest) {
   const results = {};
   validateInstallRoot(manifest.installRoot);
@@ -190,24 +265,65 @@ export async function inspectInstalledAnalyzers(workspaceRoot, manifest) {
     } catch {
       throw new Error(`Falta el CLI instalado de ${name}; ejecuta npm run quality:setup`);
     }
-    const status = await runProcess('git', ['-C', toolRoot, 'status', '--porcelain', '--untracked-files=all'], { cwd: workspaceRoot, timeoutMs: 10_000 });
-    if (status.code !== 0) throw new Error(`${name}: no se pudo inspeccionar el estado del checkout`);
-    const untrustedChanges = untrustedCheckoutChanges(status.stdout);
-    if (untrustedChanges.length > 0) throw new Error(`${name}: checkout modificado; no se puede confiar en sentinel.lock.json (${untrustedChanges.join(', ')})`);
+    const status = await gitStatusPorcelain(toolRoot);
+    const untrustedChanges = untrustedCheckoutChanges(status.text);
+    const patchSha256 = config.patch?.sha256 ?? null;
+    if (patchSha256 !== null) {
+      const declaredSha = await patchFileSha256(workspaceRoot, config.patch.path);
+      if (declaredSha !== patchSha256) throw new Error(`${name}: SHA-256 del patch declarado no coincide con quality-tools.json`);
+    }
+    let actualPatchSha = createHash('sha256').digest('hex');
+    if (untrustedChanges.length > 0) {
+      actualPatchSha = await gitDiffSha256(toolRoot);
+      const patchPaths = patchSha256 ? await declaredPatchPaths(workspaceRoot, config.patch.path) : new Set();
+      const changedPaths = checkoutPaths(status.text);
+      const onlyDeclaredPatch = patchSha256 !== null
+        && actualPatchSha === patchSha256
+        && [...changedPaths].every(file => patchPaths.has(file));
+      if (!onlyDeclaredPatch) throw new Error(`${name}: checkout modificado; no se puede confiar en sentinel.lock.json (${untrustedChanges.join(', ')})`);
+    }
+    if (patchSha256 === null && actualPatchSha !== createHash('sha256').digest('hex')) {
+      throw new Error(`${name}: checkout modificado sin patch declarado`);
+    }
     const version = await runProcess(process.execPath, [cliPath, '--version'], { cwd: workspaceRoot, timeoutMs: 10_000 });
     if (version.code !== 0) throw new Error(`${name}: no se pudo leer la versión instalada`);
     const revision = await runProcess('git', ['-C', toolRoot, 'rev-parse', 'HEAD'], { cwd: workspaceRoot, timeoutMs: 10_000 });
     if (revision.code !== 0) throw new Error(`${name}: no se pudo leer el commit instalado`);
     const sha256 = await gitArchiveSha256(toolRoot);
+    if (patchSha256 !== null && actualPatchSha !== patchSha256) {
+      throw new Error(`${name}: patch aplicado no coincide con quality-tools.json`);
+    }
     results[name] = {
       version: version.stdout.trim(),
       protocolVersion: Number(config.outputSchemaVersion),
       commit: revision.stdout.trim(),
       sha256,
+      patchSha256,
       cliPath,
     };
   }
   return results;
+}
+
+function checkoutPaths(statusOutput) {
+  return new Set(untrustedCheckoutChanges(statusOutput).map(line => line.slice(3).replace(/\\/g, '/')));
+}
+
+async function declaredPatchPaths(workspaceRoot, patchPath) {
+  if (typeof patchPath !== 'string' || path.isAbsolute(patchPath) || patchPath.replace(/\\/g, '/').split('/').includes('..')) {
+    throw new Error('quality-tools.patch.path debe ser una ruta relativa dentro del workspace');
+  }
+  const patch = await readFile(path.join(workspaceRoot, patchPath), 'utf8');
+  const paths = new Set();
+  for (const line of patch.split('\n')) {
+    const match = /^diff --git a\/(.+) b\/(.+)$/u.exec(line);
+    if (match) {
+      paths.add(match[1]);
+      paths.add(match[2]);
+    }
+  }
+  if (paths.size === 0) throw new Error('quality-tools.patch no contiene rutas diff válidas');
+  return paths;
 }
 
 export async function verifyInstalledAnalyzers(workspaceRoot, manifest, lock) {
@@ -223,6 +339,9 @@ export async function verifyInstalledAnalyzers(workspaceRoot, manifest, lock) {
     }
     if (installed.sha256 !== expected.sha256) {
       throw new Error(`${name}: SHA-256 del árbol instalado no coincide con sentinel.lock.json`);
+    }
+    if (installed.patchSha256 !== (expected.patchSha256 ?? null)) {
+      throw new Error(`${name}: SHA-256 del patch instalado no coincide con sentinel.lock.json`);
     }
     results[name] = installed;
   }

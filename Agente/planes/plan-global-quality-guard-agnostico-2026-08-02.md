@@ -111,7 +111,7 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 - [ ] Migrar `quality.config.json` (timeouts, perfiles, cooldown, presupuestos), `varsense.config.json` y `quality-tools.json` mediante un comando `sentinel doctor --migrate --dry-run` antes de escribir.
 - [x] Crear `sentinel.lock.json` para fijar runtime, protocolo, versión/commit/hash de Sentinel y VarSense; el runtime local queda explícitamente como `project-adapter`, sin simular instalación global.
 - [x] Usar un formato mínimo estable para el lock: `schemaVersion`, runtime `{status, version, commit, identitySha256, artifactSha256}`, analyzers `{version, protocolVersion, commit, sha256}` y fecha de generación; nunca guardar secretos. `identitySha256` no sustituye el hash de artefacto: en `project-adapter`, `artifactSha256` es `null`; un runtime global instalado exigirá hash real.
-- [x] Integrar preflight con validación de lock, versión/protocolo/commit, hash reproducible `git archive` y rechazo de checkouts modificados; solo se tolera `.quality-install.json` como metadata administrativa exacta.
+- [x] Integrar preflight con validación de lock, versión/protocolo/commit, hash reproducible `git archive`, patch declarado y rechazo de checkouts modificados; solo se tolera `.quality-install.json` como metadata administrativa exacta.
 - [x] Incluir la identidad del lockfile en el fingerprint de caché para invalidar PASS ante cambios de hashes fijados.
 - [ ] Definir precedencia: defaults del runtime < configuración del proyecto < perfil explícito de CI; variables de entorno solo pueden seleccionar un perfil allowlisted, nunca cambiar severidades o saltarse enforcement.
 - [ ] Mantener lectura de los formatos anteriores durante dos versiones de runtime, con warning visible y fecha de retirada.
@@ -249,7 +249,7 @@ La migración a Sentinel como plano único deja documentación desincronizada co
 - [ ] **`rules.md`** — reescribir con los IDs reales del `ruleRegistry` (actualmente lista IDs de la era IA que no coinciden) o eliminar.
 - [ ] **`CHANGELOG.md`** — añadir entrada 0.4.x con las portable rules y `portableBoundaries`; marcar la deprecación del motor IA de la entrada 0.1.0.
 - [ ] **Sincronizar `main` con el commit fijado** (`107be9b6`): portable rules (`src/analyzers/static/portableRules.ts`), `portableBoundaries` en `config.ts` y reglas `unsafe-process-shell`/`default-export` en el registry. Sin esto, `main` está detrás de lo que el gate consume y los README describen features que el repo dev no tiene.
-- [ ] **Parche local `[317A-3]`** (`.boton-icono`, `botonIcono`, variantes kebab en `reactComponentRules.ts` + `staticCssRules.ts` + test): decidir si es regla de sistema (mover al repo) o específica de proyecto (evaluar contra la regla de agnosticidad); hoy solo existe en la copia instalada sin commitear.
+- [x] **Parche local `[317A-3]`** declarado reproduciblemente en `scripts/quality/patches/sentinel-317a-3.patch` y `quality-tools.json` (`patchSha256=77bfdac2a3d245ecc50d9d79bc0539f52fdc0c72426aa21c53202c48c0bb9ed7`): `.boton-icono`, `botonIcono`, variantes kebab y fixture. Setup/lock verifican el archivo raíz, el diff aplicado y las rutas; sigue siendo patch local hasta upstream.
 
 ### Repositorio varsense (repo dev `main` + copia instalada `.quality-tools/varsense`)
 

@@ -61,6 +61,14 @@ function comparableLock(lock) {
   };
 }
 
+function stableSerialize(value) {
+  if (Array.isArray(value)) return `[${value.map(stableSerialize).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableSerialize(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
 export function buildLock(analyzers, generatedAt = new Date().toISOString()) {
   return {
     schemaVersion: LOCK_SCHEMA_VERSION,
@@ -71,6 +79,7 @@ export function buildLock(analyzers, generatedAt = new Date().toISOString()) {
       protocolVersion: value.protocolVersion,
       commit: value.commit,
       sha256: value.sha256,
+      patchSha256: value.patchSha256 ?? null,
     }])),
   };
 }
@@ -103,7 +112,7 @@ export async function checkLock(workspaceRoot, options = {}) {
     throw error;
   }
   validateLock(actual, manifest);
-  const ok = JSON.stringify(comparableLock(actual)) === JSON.stringify(comparableLock(expected));
+  const ok = stableSerialize(comparableLock(actual)) === stableSerialize(comparableLock(expected));
   return { ok, reason: ok ? 'match' : 'mismatch', lockPath, actual, expected, manifest };
 }
 

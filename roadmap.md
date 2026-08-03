@@ -79,7 +79,7 @@
 - [x] Hacer que el guard de transición aplique `enforce`/`observe`/`pass-through` para una política v2 válida y conserve fallback seguro para v1/legacy.
 - [x] Cubrir el contrato con 60 tests de quality y fixtures de claves desconocidas, paths inseguros, modos, wildcard, migración, lockfile, checkout modificado e identidad de caché/reporte.
 - [x] Añadir `policyHash`/identidad de política al reporte y fingerprint de caché; cambiar la política invalida PASS anteriores.
-- [x] Añadir `sentinel.lock.json` con runtime/analyzers fijados, versión/protocolo/commit/hash, validación preflight, `git archive` reproducible y rechazo de checkouts modificados; runtime global queda explícitamente `project-adapter`.
+- [x] Añadir `sentinel.lock.json` con runtime/analyzers fijados, versión/protocolo/commit/hash, patch local declarado, validación preflight, `git archive` reproducible y rechazo de checkouts modificados; runtime global queda explícitamente `project-adapter`.
 - [x] Añadir generador local del lock (`quality:lock --check|--write`, `quality:doctor --lock`) con modo solo lectura, backup `.bak`, escritura atómica y protección contra symlinks; no instala runtime ni modifica analyzers.
 - [ ] Extraer el runtime y los shims a una instalación estable fuera de cualquier repositorio o rama. *(bloqueado: runtime/repos upstream no presentes en este checkout)*
 - [ ] Migrar wandori.us al runtime global sin duplicar reglas ni dejar rutas hardcodeadas en perfiles. *(depende de la anterior)*

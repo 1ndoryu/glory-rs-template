@@ -8,7 +8,11 @@
       "version": "0.4.0",
       "outputSchemaVersion": "1",
       "buildScript": "compile",
-      "cli": "out/cli/index.js"
+      "cli": "out/cli/index.js",
+      "patch": {
+        "path": "scripts/quality/patches/sentinel-317a-3.patch",
+        "sha256": "77bfdac2a3d245ecc50d9d79bc0539f52fdc0c72426aa21c53202c48c0bb9ed7"
+      }
     },
     "varsense": {
       "repository": "https://github.com/1ndoryu/varsense.git",

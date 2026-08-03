@@ -6,7 +6,7 @@ import { SettingsService, AnalyticsService } from '../services';
 import { showProfile } from '../store';
 import { showToast } from '../components/ui/toast';
 import { createTextarea } from '../components/ui/textarea';
-import { createFontPanel } from '../features/settings/font-panel';
+import { createProfileSettingsPanel } from '../features/settings/profile-settings';
 import { safeClick, safeRun, safeEffect } from '../utils/safe-async';
 import { renderArticleList, openEditor, disposeAdminArticleLists } from './admin-articles';
 import { renderProjectList, openProjectEditor, disposeAdminProjectLists } from './admin-projects';
@@ -89,7 +89,7 @@ export function createAdminWindowView(): { page: Promise<HTMLElement>; actions: 
         break;
       }
       case 'fuentes':
-        contentArea.appendChild(createFontPanel());
+        contentArea.appendChild(createProfileSettingsPanel());
         setWindowActions([]);
         break;
       case 'sitio': {
@@ -145,7 +145,7 @@ function renderSitioTab(): { element: HTMLElement; createSaveAction: () => HTMLE
   container.appendChild(aboutArea);
 
   safeEffect(async () => {
-    const s = await SettingsService.getAll();
+    const s = await SettingsService.getPublic();
     aboutContent = s.about_content || '';
     const textarea = aboutArea.querySelector('textarea');
     if (textarea) textarea.value = aboutContent;

@@ -16,7 +16,7 @@ export async function renderAbout(): Promise<HTMLElement> {
 
   const page = createEl('div', { className: 'about-contenido' });
 
-  const settingsResult = await tryCatch(SettingsService.getAll());
+  const settingsResult = await tryCatch(SettingsService.getPublic());
   const settings = settingsResult.ok ? settingsResult.value : null;
   const content = settings?.about_content || '';
 
