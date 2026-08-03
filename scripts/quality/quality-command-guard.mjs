@@ -1,35 +1,17 @@
 import path from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { validatePolicy } from './policy.mjs';
+import { BLOCKED_CARGO_COMMANDS, BLOCKED_NPM_SCRIPTS, BLOCKED_TOOLS } from './policy-defaults.mjs';
 
 export const QUALITY_GUARD_EXIT_CODE = 78;
 
 /* [028A-5] Direct validation commands must enter the task gate so agents
  * cannot bypass incremental scope, cooldowns or the compact quality report.
  * Gotcha: the root check is mandatory because these shims are global. */
-const BLOCKED_NPM_SCRIPTS = new Set([
-  /* [028A-12] Inert probe used to verify that a shell actually loads the
-   * global interceptor. It is intentionally not defined in package.json. */
-  '__sentinel_guard_probe__',
-  'test',
-  'test:changed',
-  'test:full',
-  'test:file',
-  'test:watch',
-  'type-check',
-  'lint',
-  'check',
-  'check:back',
-  'check:front',
-  'fmt',
-  'fmt:check',
-  'build',
-]);
-
-/* Direct rustfmt is the same validation path as cargo fmt and must not be
- * able to bypass the task gate from a shell that does not expose cargo. */
-const BLOCKED_TOOLS = new Set(['vitest', 'tsc', 'eslint', 'prettier', 'rustfmt']);
-const BLOCKED_CARGO_COMMANDS = new Set(['check', 'clippy', 'test', 'bench', 'fmt']);
+const BLOCKED_NPM_SCRIPT_SET = new Set(BLOCKED_NPM_SCRIPTS);
+const BLOCKED_TOOL_SET = new Set(BLOCKED_TOOLS);
+const BLOCKED_CARGO_COMMAND_SET = new Set(BLOCKED_CARGO_COMMANDS);
 
 function normalizeExecutable(value = '') {
   return path.basename(String(value)).toLowerCase().replace(/\.(cmd|exe)$/u, '');
@@ -53,11 +35,44 @@ function findQualityRoot(startPath = process.cwd()) {
   return null;
 }
 
-function npmScript(args = []) {
+function readV2GuardPolicy(root) {
+  const policyPath = path.join(root, 'sentinel.config.json');
+  if (!existsSync(policyPath)) return { status: 'no-policy' };
+  let raw;
+  try { raw = JSON.parse(readFileSync(policyPath, 'utf8')); }
+  catch { return { status: 'invalid-policy' }; }
+  if (raw?.schemaVersion !== 2) return { status: 'legacy-v1' };
+  try { validatePolicy(raw); }
+  catch { return { status: 'invalid-policy' }; }
+  const directCommands = raw.guard.directCommands;
+  const mode = raw.mode;
+  if (!['enforce', 'observe', 'pass-through'].includes(mode) || !directCommands || typeof directCommands !== 'object') {
+    return { status: 'invalid-policy' };
+  }
+  const lists = ['npmScripts', 'npxTools', 'cargoSubcommands', 'tools'];
+  if (!lists.every(key => Array.isArray(directCommands[key]) && directCommands[key].every(value => typeof value === 'string'))) {
+    return { status: 'invalid-policy' };
+  }
+  return {
+    status: 'policy',
+    mode,
+    npmScripts: new Set(directCommands.npmScripts),
+    npxTools: new Set(directCommands.npxTools.map(normalizeExecutable)),
+    cargoSubcommands: new Set(directCommands.cargoSubcommands.map(value => value.toLowerCase())),
+    tools: new Set(directCommands.tools.map(normalizeExecutable)),
+  };
+}
+
+function matchesPolicyName(value, patterns) {
+  if (patterns.has(value)) return true;
+  return [...patterns].some(pattern => pattern.includes('*') && new RegExp(`^${pattern.split('*').map(part => part.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')).join('.*')}$`, 'u').test(value));
+}
+
+function npmScript(args = [], allowedScripts = BLOCKED_NPM_SCRIPT_SET) {
   const values = args.map(String);
   const runIndex = values.findIndex(value => value === 'run' || value === 'run-script');
   if (runIndex >= 0) return values[runIndex + 1] ?? null;
-  const direct = values.find(value => BLOCKED_NPM_SCRIPTS.has(value));
+  const direct = values.find(value => matchesPolicyName(value, allowedScripts));
   return direct ?? null;
 }
 
@@ -79,46 +94,56 @@ export function inspectDirectCommand({ executable, args = [], cwd = process.cwd(
 
   const command = normalizeExecutable(executable);
   const values = args.map(String);
+  const policy = readV2GuardPolicy(root);
+  const legacyFallback = policy.status === 'legacy-v1';
+  const npmScripts = policy.status === 'policy' || legacyFallback ? (policy.npmScripts ?? BLOCKED_NPM_SCRIPT_SET) : BLOCKED_NPM_SCRIPT_SET;
+  const npxTools = policy.status === 'policy' || legacyFallback ? (policy.npxTools ?? BLOCKED_TOOL_SET) : BLOCKED_TOOL_SET;
+  const cargoCommands = policy.status === 'policy' || legacyFallback ? (policy.cargoSubcommands ?? BLOCKED_CARGO_COMMAND_SET) : BLOCKED_CARGO_COMMAND_SET;
+  const tools = policy.status === 'policy' || legacyFallback ? (policy.tools ?? BLOCKED_TOOL_SET) : BLOCKED_TOOL_SET;
   let reason = null;
   let category = null;
 
   if (command === 'npm') {
-    const script = npmScript(values);
-    if (script && BLOCKED_NPM_SCRIPTS.has(script)) {
+    const script = npmScript(values, npmScripts);
+    if (script && matchesPolicyName(script, npmScripts)) {
       reason = `npm ${script}`;
       category = 'script';
     } else {
       const execIndex = values.findIndex(value => value === 'exec');
       const tool = execIndex >= 0 ? npxTool(values.slice(execIndex + 1)) : null;
-      if (tool && BLOCKED_TOOLS.has(tool)) {
+      if (tool && matchesPolicyName(tool, npxTools)) {
         reason = `npm exec ${tool}`;
         category = 'tool';
       }
     }
   } else if (command === 'npx' || command === 'npm exec') {
     const tool = npxTool(values);
-    if (tool && BLOCKED_TOOLS.has(tool)) {
+    if (tool && matchesPolicyName(tool, npxTools)) {
       reason = `${command} ${tool}`;
       category = 'tool';
     }
-  } else if (BLOCKED_TOOLS.has(command)) {
+  } else if (matchesPolicyName(command, tools)) {
     reason = command;
     category = 'tool';
   } else if (command === 'cargo') {
     const cargoCommand = firstNonOption(values)?.toLowerCase();
-    if (cargoCommand && BLOCKED_CARGO_COMMANDS.has(cargoCommand)) {
+    if (cargoCommand && matchesPolicyName(cargoCommand, cargoCommands)) {
       reason = `cargo ${cargoCommand}`;
       category = 'cargo';
     }
   }
 
-  if (!reason) return { blocked: false, root };
+  if (!reason || policy.status === 'no-policy' || policy.status === 'invalid-policy' || policy.mode === 'pass-through') {
+    return { blocked: false, root, policyStatus: policy.status };
+  }
+  if (policy.mode === 'observe') return { blocked: false, root, policyStatus: policy.status, observed: reason, category };
   return {
     blocked: true,
     category,
     command: reason,
     root,
     exitCode: QUALITY_GUARD_EXIT_CODE,
+    policyStatus: policy.status,
   };
 }
 

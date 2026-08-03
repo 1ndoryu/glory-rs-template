@@ -70,17 +70,19 @@
 
 **Gate/salida:** ningún agente puede iniciar accidentalmente un full o `cargo test` durante el cooldown desde los wrappers PowerShell/CMD/Bash disponibles; el uso de `--allow-heavy` queda visible en reportes y la cuota de targets se mantiene sin borrar procesos activos. Invocaciones con ruta absoluta y shells iniciados con `--noprofile --norc` quedan fuera del alcance del interceptor y deben bloquearse en la capa de ejecución del agente, no mediante un script de proyecto.
 
-### 028A-6 — Guard global agnóstico por proyecto y rama (planificado)
+### 028A-6 — Guard global agnóstico por proyecto y rama (migración incremental)
 
 **Depende de:** 028A-5 y de aprobar `Agente/planes/plan-global-quality-guard-agnostico-2026-08-02.md`.
 
-- [ ] Extraer el runtime y los shims a una instalación estable fuera de cualquier repositorio o rama.
-- [ ] Definir y validar `.quality/guard-policy.json` como contrato declarativo por proyecto, con modos `enforce`, `observe` y `pass-through`.
-- [ ] Hacer que la resolución de política sea por workspace/rama en cada invocación y que un proyecto sin política pase sin bloqueo.
-- [ ] Migrar wandori.us al runtime global sin duplicar reglas ni dejar rutas hardcodeadas en perfiles.
-- [ ] Probar matriz multi-proyecto/multi-rama en PowerShell 5/7, CMD, CI, pipes y códigos de salida, con rollback.
+- [x] Definir y validar localmente la política v2 en `scripts/quality/policy.mjs`, sin reutilizar silenciosamente el `sentinel.config.json` v1 del analizador.
+- [x] Añadir `quality:doctor -- --migrate --dry-run`; produce migración en memoria, `writes: []` y no modifica perfiles/archivos.
+- [x] Hacer que el guard de transición aplique `enforce`/`observe`/`pass-through` para una política v2 válida y conserve fallback seguro para v1/legacy.
+- [x] Cubrir el contrato con 49 tests de quality y fixtures de claves desconocidas, paths inseguros, modos, wildcard y migración.
+- [ ] Extraer el runtime y los shims a una instalación estable fuera de cualquier repositorio o rama. *(bloqueado: runtime/repos upstream no presentes en este checkout)*
+- [ ] Migrar wandori.us al runtime global sin duplicar reglas ni dejar rutas hardcodeadas en perfiles. *(depende de la anterior)*
+- [ ] Probar matriz multi-proyecto/multi-rama en PowerShell 5/7, CMD, CI, pipes y códigos de salida, con rollback. *(depende de runtime global)*
 
-**Gate/salida:** cambiar de proyecto o rama no rompe el guard; cada proyecto puede declarar su propio gate y un proyecto sin política no queda bloqueado.
+**Gate/salida del tramo local:** contrato v2, dry-run, guard y tests pasan; el gate global multi-proyecto/multi-shell no se declara cerrado hasta instalar el runtime fijado y ejecutar la matriz externa.
 
 ### 028A-8 — Optimización medible de Sentinel y VarSense (planificado)
 

@@ -22,6 +22,10 @@
 - Un cambio de schema, ruleId o severidad requiere actualizar esta matriz, fixtures de equivalencia y el fingerprint de caché antes de cambiar el manifest.
 - El empaquetado `.vsix` y la instalación en el editor se ejecutan solo después de compile, lint, smoke LSP y suite; nunca se reinicia VS Code automáticamente.
 
+## Nota de sincronización
+
+Los commits fijados en `quality-tools.json` son la fuente que consume este gate. Los repositorios de desarrollo upstream pueden estar detrás; este workspace no los sincroniza ni declara paridad de `main` sin un checkout verificable. La migración 028A-6 añade un contrato local de política v2 y mantiene el formato Sentinel v1 como configuración del analizador hasta que exista el runtime global.
+
 ## Pendientes explícitos
 
 - Benchmark small/medium/full con memoria RSS comparable en Windows/Linux CI.

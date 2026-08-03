@@ -1,7 +1,11 @@
 # Plan 028A-6 — Sentinel como plano global de calidad agnóstico
 
 > **Fecha:** 2026-08-02
-> **Estado:** propuesto; no implementar hasta revisar este diseño.
+> **Estado:** migración incremental en ejecución; el contrato local v2 y `doctor --migrate --dry-run` están implementados. La instalación global/upstream/multi-shell sigue bloqueada hasta disponer de los runtimes externos y sus fixtures.
+>
+> **ADR:** `Agente/documentacion/arquitectura/adr-sentinel-plano-global-028a6-2026-08-03.md`.
+>
+> **Regla de ejecución:** este plan es una iniciativa multi-release. No se ejecuta como un único cambio: cada fase debe cerrar su gate y no se marca una fase upstream/global con evidencia simulada.
 > **Motivación:** el guard actual depende de `scripts/quality` dentro de este repositorio. Al cambiar de rama o de proyecto no debe desaparecer, bloquear comandos legítimos ni ejecutar reglas de wandori.us fuera de su alcance.
 
 ## Decisión arquitectónica corregida
@@ -128,16 +132,22 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 
 ### Fase 0 — ADR, contratos y compatibilidad
 
-- [ ] Crear ADR con Sentinel Core, el contrato de analizadores (incluido VarSense), la política local y la matriz `enforce/observe/pass-through`.
-- [ ] Definir JSON Schema versionado de `sentinel.config.json`, errores allowlisted y límites de tamaño/profundidad.
-- [ ] Definir contrato de salida estable: `decision`, `projectRoot`, `policyPath`, `policyHash`, `reason`, `recommendedCommand`, `exitCode`.
+- [x] Crear ADR con Sentinel Core, el contrato de analizadores (incluido VarSense), la política local y la matriz `enforce/observe/pass-through`. (`adr-sentinel-plano-global-028a6-2026-08-03.md`)
+- [x] Implementar validación estricta local de la política v2 y descubrimiento por ancestros en `scripts/quality/policy.mjs`.
+- [x] Implementar `quality:doctor --migrate --dry-run`; no escribe archivos ni cambia perfiles.
+- [x] Añadir fixtures de política válida, claves desconocidas, rutas fuera del workspace, modos y migración v1→v2 (`scripts/quality/tests/policy.test.mjs` + guard).
+- [x] Centralizar los defaults de comandos bloqueables para que el guard de transición y la migración no mantengan catálogos divergentes.
+
+- [ ] Crear JSON Schema publicado con Sentinel Core (la fuente de runtime global no está presente en este checkout).
+- [x] Definir y validar localmente el contrato v2, errores allowlisted y límites de tamaño de strings/listas/rutas; publicar el JSON Schema queda ligado al runtime upstream.
+- [ ] Definir contrato de salida estable en Sentinel Core; el doctor local entrega `status`, `projectRoot`, `policyPath`, `error`, migración y no sustituye todavía el reporte del gate.
 - [ ] Definir contrato de plugin, taxonomía `analyze/check/guard/doctor` y matriz de compatibilidad Sentinel↔VarSense.
 - [ ] Definir compatibilidad Windows PowerShell 5/7, PowerShell Core, CMD, Bash/Git Bash (interactivo y `BASH_ENV`) y CI sin depender de variables específicas de VS Code.
 - [ ] Definir política de actualización, rollback y migración desde el guard actual.
 
-**Gate:** ADR aprobado, schema con fixtures válidos/ inválidos y contrato de salida revisado.
+**Gate:** ADR aprobado; fixtures y doctor local pasan. La fase 0 queda parcialmente cerrada: el schema/runtime global y la salida final permanecen pendientes upstream.
 
-### Fase 1 — Sentinel Core global instalable y estable
+### Fase 1 — Sentinel Core global instalable y estable *(bloqueada: runtime upstream ausente)*
 
 - [ ] Extraer el clasificador, scheduler, scope, caché y reporter a Sentinel Core, sin imports de wandori.us ni de VarSense.
 - [ ] Crear CLI global `sentinel check|guard|doctor|status|install|update|rollback`.
@@ -149,7 +159,7 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 
 **Gate:** una rama que elimina `scripts/quality` no rompe el perfil ni el CLI global; `doctor` identifica la versión activa y el ejecutable real.
 
-### Fase 2 — Resolución por workspace y rama
+### Fase 2 — Resolución por workspace y rama *(contrato local parcial; enforcement global bloqueado)*
 
 - [ ] Implementar descubrimiento de raíz y política en cada comando, sin estado de proceso que sobreviva al cambio de rama.
 - [ ] Diferenciar `no-policy`, `observe`, `enforce` y `invalid-policy` en el resultado y el reporte.
@@ -161,7 +171,7 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 
 **Gate:** matriz con dos proyectos y dos ramas: el proyecto configurado bloquea lo declarado; el proyecto sin política pasa; cambiar de rama actualiza la decisión sin reiniciar el editor.
 
-### Fase 3 — Adaptador de wandori.us y VarSense
+### Fase 3 — Adaptador de wandori.us y VarSense *(pendiente después de Fase 1)*
 
 - [ ] Añadir `sentinel.config.json` al proyecto con `sentinel check -- <TareaId>` como gate; conservar un alias temporal para `npm run task:check`.
 - [ ] Migrar `quality-command-guard.mjs`, `global-cargo-guard.ps1`, `npm.cmd`, `npx.cmd` y `cargo.cmd` al runtime global de Sentinel sin duplicar reglas.
@@ -172,9 +182,9 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 - [ ] Ejecutar primero en modo `observe` contra el gate actual y comparar reportes normalizados; activar `enforce` solo después de resolver diferencias, errores de herramienta y falsos positivos.
 - [ ] Mantener compatibilidad temporal con el guard actual y emitir advertencia de migración, sin bloquear una rama antigua.
 
-**Gate:** wandori.us bloquea `npx vitest`, `npm run test:*`, type-check/lint/build y Cargo directo; `task:check`, `quality:*`, desarrollo y proyectos externos siguen funcionando.
+**Gate:** parcialmente verificado en transición: el guard local consume una política v2 válida en `enforce`/`observe` y conserva defaults legacy para v1; instalación global, shells externos y runtime Sentinel quedan pendientes.
 
-### Fase 4 — Integración multi-proyecto y CI
+### Fase 4 — Integración multi-proyecto y CI *(pendiente de runtime global)*
 
 - [ ] Crear fixtures de un proyecto Node, Rust, Python y un proyecto sin política.
 - [ ] Probar `npm`, `npx`, `cargo`, `rustfmt`, comandos directos, `2>&1`, pipes y códigos de salida en PowerShell 5/7, CMD y Bash/Git Bash.
@@ -185,7 +195,7 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 
 **Gate:** 100% de fixtures con decisión esperada, sin bloqueo cruzado entre proyectos y sin proceso huérfano.
 
-### Fase 5 — Retirada segura del acoplamiento actual
+### Fase 5 — Retirada segura del acoplamiento actual *(pendiente de dos releases y rollback probado)*
 
 - [ ] Documentar rollback al runtime anterior y restaurar backups de perfiles.
 - [ ] Retirar el PATH que apunta a `scripts/quality` solo después de verificar el PATH global.
@@ -251,7 +261,10 @@ La migración a Sentinel como plano único deja documentación desincronizada co
 
 ## Definition of Done
 
-- [ ] El runtime global de Sentinel no depende de una rama ni de archivos del repositorio actual.
+- [x] El contrato local de política v2 no depende de una rama ni de archivos externos; el runtime global equivalente sigue bloqueado por ausencia del runtime upstream.
+- [x] `doctor --migrate --dry-run` es reversible y no escribe archivos.
+- [x] El guard de transición mantiene compatibilidad con v1 y aplica `enforce`/`observe` para v2 válida.
+- [ ] El runtime global de Sentinel no depende de una rama ni de archivos del repositorio actual. *(bloqueado por runtime upstream ausente)*
 - [ ] Un proyecto sin `sentinel.config.json` puede ejecutar libremente sus comandos.
 - [ ] Un proyecto con `sentinel.config.json` puede exigir su propio gate, comandos y conjunto de analizadores.
 - [ ] `sentinel analyze` conserva compatibilidad con el CLI/LSP/VS Code actual y `sentinel check` produce el reporte único del gate.

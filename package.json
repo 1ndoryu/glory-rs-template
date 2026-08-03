@@ -9,6 +9,7 @@
     "quality:setup": "node scripts/quality/setup.mjs",
     "quality:test": "node --test scripts/quality/tests/*.test.mjs",
     "quality:guard": "node scripts/quality/heavy-run-guard.mjs --status",
+    "quality:doctor": "node scripts/quality/sentinel-doctor.mjs",
     "quality:cleanup": "node scripts/quality/target-maintenance.mjs --cleanup",
     "quality:cleanup:dry": "node scripts/quality/target-maintenance.mjs --dry-run",
     "quality:install-guard": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/quality/install-global-guard.ps1",
