@@ -221,6 +221,34 @@ Cada fase debe adjuntar evidencia de:
 - **Observabilidad:** logs estructurados y reportes con `runtimeVersion`, `policyHash`, decisión, duración y motivo, sin datos sensibles.
 - **Dependencias:** el grafo permitido es `Sentinel Core → contratos/política/scheduler/reporter`; `adapters → contratos`; `VarSense adapter → contratos`. Core no importa VS Code, LSP, VarSense ni código del proyecto.
 
+## Documentación afectada e inventario de correcciones
+
+La migración a Sentinel como plano único deja documentación desincronizada con el estado real (era IA eliminada, CLI `analyze`, reglas portables, `varsense all`, gate). Inventario completo; cada ítem se resuelve dentro de la fase indicada y queda verificado contra el código fijado en `quality-tools.json`.
+
+### Repositorio glory-sentinel (repo dev `main` + copia instalada `.quality-tools/sentinel`)
+
+- [ ] **`README.md`** — reescribir: eliminar la era IA (análisis IA contextual, comando toggle IA, config `codeSentinel.aiAnalysis.*`, alias Gemini; todo eliminado en 0.4.0) y documentar CLI `analyze`/`--files-from`/`--format`/`--output`/`--config`, exit codes 0/1/2, JSON `schemaVersion: '1'`, validación estricta de `sentinel.config.json`, `portableBoundaries` y el catálogo completo de reglas del `ruleRegistry`. Posicionar Sentinel como plano de control de calidad agnóstico (VS Code + CLI + LSP).
+- [ ] **`help.txt`** — reemplazar el volcado del `--help` de Gemini CLI por el `--help` real de `sentinel analyze` (o eliminar; es residuo de la era IA).
+- [ ] **`rules.md`** — reescribir con los IDs reales del `ruleRegistry` (actualmente lista IDs de la era IA que no coinciden) o eliminar.
+- [ ] **`CHANGELOG.md`** — añadir entrada 0.4.x con las portable rules y `portableBoundaries`; marcar la deprecación del motor IA de la entrada 0.1.0.
+- [ ] **Sincronizar `main` con el commit fijado** (`107be9b6`): portable rules (`src/analyzers/static/portableRules.ts`), `portableBoundaries` en `config.ts` y reglas `unsafe-process-shell`/`default-export` en el registry. Sin esto, `main` está detrás de lo que el gate consume y los README describen features que el repo dev no tiene.
+- [ ] **Parche local `[317A-3]`** (`.boton-icono`, `botonIcono`, variantes kebab en `reactComponentRules.ts` + `staticCssRules.ts` + test): decidir si es regla de sistema (mover al repo) o específica de proyecto (evaluar contra la regla de agnosticidad); hoy solo existe en la copia instalada sin commitear.
+
+### Repositorio varsense (repo dev `main` + copia instalada `.quality-tools/varsense`)
+
+- [ ] **`README.md`** — reescribir: nombre actual VarSense (no "CSS Variables Validator"), CLI `scan`/`orphan-classes`/`all`, binario `varsense`/`varsense-lsp`, LSP stdio, integración Zed y `tokenDetection` (hallazgos `token-duplicate`/`token-unused`).
+- [ ] **`CHANGELOG.md`** — añadir `all` y `tokenDetection` a 2.2.0.
+- [ ] **Sincronizar `main` con el commit fijado** (`b1aa3f06`): subcomando `all` y `tokenDetection`. El gate invoca `varsense all` (`adapters/varsense.mjs`), que solo existe en la copia instalada; contra `main` el gate fallaría.
+
+### Proyecto wandori.us (glory-rust-template)
+
+- [ ] **`README.md` (raíz)** — documentar `npm run task:check`, el quality gate unificado, Sentinel y VarSense (hoy solo describe comandos `npm run check/check:back/check:front/codegen` del template base).
+- [ ] **`roadmap-sentinel.md`** — corregir contradicción: la sección "Hallazgos prioritarios" dice que `runVarsense` ejecuta `scan` y `orphan-classes` como procesos separados, pero el adaptador real invoca `varsense all`.
+- [ ] **`Agente/documentacion/herramientas/matriz-paridad-sentinel-varsense-2026-08-01.md`** — añadir nota aclaratoria: `all`/`tokenDetection`/portable rules existen en los commits fijados por `quality-tools.json`, pero los repos dev (`main`) están detrás; pendiente sincronizar.
+- [ ] **`Agente/documentacion/indice-documentacion-2026-07-29.md`** — enlazar este plan global y su inventario de correcciones.
+
+**Gate del inventario:** cada ítem cierra con evidencia (commit en el repo de la herramienta o en el proyecto) y el catálogo de reglas del README de Sentinel debe coincidir con `ruleRegistry.ts` de la copia instalada. Los repos dev sincronizados con las copias instaladas es prerequisito para que la documentación describa lo que el gate realmente consume.
+
 ## Definition of Done
 
 - [ ] El runtime global de Sentinel no depende de una rama ni de archivos del repositorio actual.

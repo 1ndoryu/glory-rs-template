@@ -128,6 +128,16 @@
 
 **Gate/salida:** el reporte Markdown muestra la duración de cada etapa y la salida compacta también; tests del orquestador verdes. Gate completo del repo pendiente de errores TS ajenos en `about.ts`/`admin.ts` (otro frente en curso).
 
+### 038A-4 — Inventario de documentación desactualizada + README de Sentinel alineado con v0.4.0
+
+**Depende de:** nada (solicitud directa del usuario). Origen: el plan 028A-6 no contemplaba qué documentación corrige la migración a plano global.
+
+- [x] Añadir al plan `028A-6` la sección "Documentación afectada e inventario de correcciones" con todos los MDs desactualizados (README/help.txt/rules.md/CHANGELOG de sentinel, README/CHANGELOG de varsense, sincronización de repos dev con commits fijados, README raíz, roadmap-sentinel, matriz-paridad, índice de documentación).
+- [x] Reescribir `code-sentinel/README.md` eliminando la era IA (análisis IA, toggle IA, config `aiAnalysis.*`, alias Gemini; todo eliminado en 0.4.0) y documentando el estado real: CLI `analyze` + `--files-from`, exit codes 0/1/2, JSON `schemaVersion: '1'`, validación estricta de `sentinel.config.json` (incl. `portableBoundaries`), catálogo completo de reglas del `ruleRegistry` y rol de plano global. Commit `95ac5b0` en `1ndoryu/glory-sentinel`.
+- [x] Sincronizar el README actualizado a la copia instalada `.quality-tools/sentinel/` (la que ejecuta el gate).
+
+**Gate/salida:** README de sentinel sin restos de IA y coherente con el código fijado; el resto del inventario queda planificado en 028A-6 para implementarse con cada fase.
+
 ### 028A-16 — Auditoría del uso de excepciones del guard (prevención cooldown)
 
 **Depende de:** coordinar con `Agente/planes/plan-heavy-run-guard-2026-08-02.md` (el otro agente posee `scripts/quality/`). Fuente: `Agente/prevencion/prevencion-cooldown-guard-2026-08-02.md`.
