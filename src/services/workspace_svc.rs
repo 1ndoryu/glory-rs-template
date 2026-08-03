@@ -2,7 +2,10 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::errors::AppError;
-use crate::models::workspace::{validate_release_tree, WorkspaceRelease, WorkspaceReleasePublic};
+use crate::models::workspace::{
+    validate_release_tree, BrokenResourceRef, ReleaseControlResponse, ReleaseListItem,
+    ReleaseTreeIssue, ReleaseValidationResponse, WorkspaceRelease, WorkspaceReleasePublic,
+};
 use crate::models::workspace_overlay::validate_public_locators_in_tree;
 use crate::repositories::notification_repo::NotificationRepository;
 use crate::repositories::resource_repo::ResourceRepository;
@@ -10,27 +13,17 @@ use crate::repositories::workspace_repo::WorkspaceRepository;
 
 pub struct WorkspaceService;
 
-/// Recurso roto detectado al validar un release (para el 422 con detalle).
-/// [297A-58] camelCase: el contrato del detalle usa `refId` (los DTOs del API
-/// no exponen `snake_case`; sin `rename_all` el test y el frontend verían `null`).
-#[derive(serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct BrokenResourceRef {
-    /// id del nodo en el árbol del release
-    id: String,
-    /// uuid del recurso referenciado que no es publicable
-    ref_id: Uuid,
-    /// label del nodo (para localizar visualmente)
-    label: String,
-}
-
 impl WorkspaceService {
     /// Obtener el release activo (público).
+    /// [028A-13] La activa es la marcada `is_active`; si por cualquier motivo
+    /// no hubiera ninguna (p. ej. migración a medias), cae al MAX(version).
     pub async fn get_active_release(pool: &PgPool) -> Result<WorkspaceReleasePublic, AppError> {
-        WorkspaceRepository::get_latest(pool)
+        let release = WorkspaceRepository::get_active(pool)
             .await?
+            .or(WorkspaceRepository::get_latest(pool).await?)
             .map(WorkspaceReleasePublic::from)
-            .ok_or_else(|| AppError::NotFound("No hay releases publicados".into()))
+            .ok_or_else(|| AppError::NotFound("No hay releases publicados".into()))?;
+        Ok(release)
     }
 
     /// Obtener un release por versión (público).
@@ -44,9 +37,113 @@ impl WorkspaceService {
             .ok_or_else(|| AppError::NotFound(format!("Release v{version} no encontrado")))
     }
 
-    /// Listar todos los releases (admin — incluye historial).
-    pub async fn list_releases(pool: &PgPool) -> Result<Vec<WorkspaceRelease>, AppError> {
-        Ok(WorkspaceRepository::list_releases(pool).await?)
+    /// Listar todos los releases en DTO ligero (admin — historial).
+    /// [028A-13] `ReleaseListItem` omite el `tree` completo: el panel solo
+    /// necesita versión, fechas, resumen y tamaño para renderizar el historial.
+    pub async fn list_releases(pool: &PgPool) -> Result<Vec<ReleaseListItem>, AppError> {
+        let releases = WorkspaceRepository::list_releases(pool).await?;
+        Ok(releases.into_iter().map(ReleaseListItem::from).collect())
+    }
+
+    /// Estado actual de la gobernanza del workspace (dashboard del Admin).
+    /// [028A-13] Expone la activa y la más reciente para que el panel avise
+    /// cuando la activa no es la última publicada (incidente v4).
+    pub async fn control(pool: &PgPool) -> Result<ReleaseControlResponse, AppError> {
+        let releases = WorkspaceRepository::list_releases(pool).await?;
+        let active = releases.iter().find(|r| r.is_active);
+        let latest = releases.first();
+        let node_count = |r: &WorkspaceRelease| {
+            r.tree
+                .get("nodes")
+                .and_then(serde_json::Value::as_object)
+                .map_or(0, serde_json::Map::len)
+        };
+        Ok(ReleaseControlResponse {
+            active_version: active.map(|r| r.version),
+            active_node_count: active.map(node_count),
+            active_published_at: active.map(|r| r.published_at),
+            active_published_by: active.and_then(|r| r.published_by),
+            latest_version: latest.map(|r| r.version),
+            total_releases: releases.len(),
+        })
+    }
+
+    /// Dry-run de validación de una release publicada (admin).
+    /// [028A-13] Reutiliza el mismo guard que `publish` (estructura, locators
+    /// públicos y refs de recursos) pero sin escribir nada. El panel lo usa
+    /// para mostrar qué pasaría antes de activar.
+    pub async fn validate_version(
+        pool: &PgPool,
+        version: i32,
+    ) -> Result<ReleaseValidationResponse, AppError> {
+        let release = WorkspaceRepository::get_by_version(pool, version)
+            .await?
+            .ok_or_else(|| AppError::NotFound(format!("Release v{version} no encontrado")))?;
+
+        let mut issues: Vec<ReleaseTreeIssue> = Vec::new();
+        if let Err(message) = validate_release_tree(&release.tree) {
+            issues.push(ReleaseTreeIssue {
+                node_id: String::new(),
+                message,
+            });
+        }
+        if let Err(message) = validate_public_locators_in_tree(&release.tree) {
+            issues.push(ReleaseTreeIssue {
+                node_id: String::new(),
+                message: message.to_string(),
+            });
+        }
+        let broken_refs = collect_broken_resource_refs(pool, &release.tree).await?;
+
+        Ok(ReleaseValidationResponse {
+            version,
+            valid: issues.is_empty() && broken_refs.is_empty(),
+            issues,
+            broken_refs,
+        })
+    }
+
+    /// Activar una release existente (admin).
+    /// [028A-13] Sin `force` se valida estructura + refs antes de activar (422
+    /// con detalle si hay problemas); con `?force=true` se activa igualmente.
+    pub async fn activate_version(
+        pool: &PgPool,
+        version: i32,
+        force: bool,
+    ) -> Result<WorkspaceRelease, AppError> {
+        let release = WorkspaceRepository::get_by_version(pool, version)
+            .await?
+            .ok_or_else(|| AppError::NotFound(format!("Release v{version} no encontrado")))?;
+
+        if !force {
+            let mut issues: Vec<ReleaseTreeIssue> = Vec::new();
+            if let Err(message) = validate_release_tree(&release.tree) {
+                issues.push(ReleaseTreeIssue {
+                    node_id: String::new(),
+                    message,
+                });
+            }
+            if let Err(message) = validate_public_locators_in_tree(&release.tree) {
+                issues.push(ReleaseTreeIssue {
+                    node_id: String::new(),
+                    message: message.to_string(),
+                });
+            }
+            let broken_refs = collect_broken_resource_refs(pool, &release.tree).await?;
+            if !issues.is_empty() || !broken_refs.is_empty() {
+                return Err(AppError::ValidationDetails {
+                    message:
+                        "La release tiene problemas; usa ?force=true para activarla igualmente"
+                            .into(),
+                    details: serde_json::json!({ "issues": issues, "brokenRefs": broken_refs }),
+                });
+            }
+        }
+
+        let mut tx = pool.begin().await?;
+        let activated = WorkspaceRepository::activate_version(&mut tx, version).await?;
+        tx.commit().await?;
+        Ok(activated)
     }
 
     /// Publicar un nuevo release (admin).
@@ -55,6 +152,8 @@ impl WorkspaceService {
     /// ciclos, parentId, límites), publicLocators y refs de recursos contra la
     /// BD (deben ser `active + ready + public`). El 422 devuelve la lista de
     /// refs rotos para que el panel admin las corrija antes de publicar.
+    /// [028A-13] La nueva release se auto-activa (mismo comportamiento que
+    /// antes, donde MAX(version) era la vigente); el panel permite revertir.
     pub async fn publish(
         pool: &PgPool,
         tree: serde_json::Value,
@@ -93,6 +192,9 @@ impl WorkspaceService {
             diff_from,
         )
         .await?;
+
+        /* [028A-13] La release publicada queda vigente de inmediato. */
+        WorkspaceRepository::activate_version(&mut tx, release.version).await?;
 
         NotificationRepository::create_release_notification(&mut tx, release.version, published_by)
             .await?;

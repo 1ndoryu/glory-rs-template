@@ -228,7 +228,10 @@ fn validate_id(id: &str) -> Result<(), String> {
 }
 
 /// Issue tipado de validación (para la API admin de dry-run de 028A-13).
+/// [028A-13-fix] `rename_all = "camelCase"` para exponer `nodeId` (contrato
+/// camelCase del API, igual que el resto de DTOs de gobernanza).
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ReleaseTreeIssue {
     pub node_id: String,
     pub message: String,
