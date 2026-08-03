@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -49,6 +49,37 @@ test('mapea la configuración legacy a una política v2 sin perder el analizador
 
 test('doctor no inventa una migración para un proyecto sin política', async () => {
   assert.throws(() => resolveLegacyRoot({ projectRoot: null }), /No se encontró una raíz/);
+});
+
+test('rechaza una política symlink para no cargar configuración fuera del workspace', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'sentinel-policy-link-'));
+  const outside = await mkdtemp(path.join(os.tmpdir(), 'sentinel-policy-outside-'));
+  try {
+    await writeFile(path.join(outside, 'sentinel.config.json'), JSON.stringify(validPolicy()), 'utf8');
+    await symlink(path.join(outside, 'sentinel.config.json'), path.join(root, 'sentinel.config.json'), 'file');
+    const loaded = await loadPolicy(root);
+    assert.equal(loaded.status, 'invalid-policy');
+    assert.match(loaded.error, /no puede ser symlink/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(outside, { recursive: true, force: true });
+  }
+});
+
+test('resuelve físicamente un startPath junction antes de buscar la política', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'sentinel-policy-junction-'));
+  const physical = await mkdtemp(path.join(os.tmpdir(), 'sentinel-policy-physical-'));
+  try {
+    await mkdir(path.join(root, 'nested'), { recursive: true });
+    await writeFile(path.join(root, 'sentinel.config.json'), JSON.stringify(validPolicy()), 'utf8');
+    const linked = path.join(physical, 'linked');
+    await symlink(root, linked, 'junction');
+    const discovered = await discoverPolicy(path.join(linked, 'nested'));
+    assert.equal(discovered.projectRoot, root);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(physical, { recursive: true, force: true });
+  }
 });
 
 test('descubre la política en un ancestro y diferencia no-policy de legacy-v1', async () => {

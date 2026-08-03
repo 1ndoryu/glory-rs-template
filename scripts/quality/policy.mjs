@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { access, readFile } from 'node:fs/promises';
+import { lstat, readFile, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { BLOCKED_CARGO_COMMANDS, BLOCKED_NPM_SCRIPTS, BLOCKED_TOOLS, DEFAULT_GATE_COMMAND } from './policy-defaults.mjs';
 import { policyDecision } from './policy-decision.mjs';
@@ -166,15 +166,23 @@ export function policyIdentity(discovered, runtimeVersion = null) {
   };
 }
 
-async function exists(filePath) {
-  try { await access(filePath); return true; } catch { return false; }
-}
-
 export async function discoverPolicy(startPath) {
   let candidate = path.resolve(startPath);
+  try {
+    candidate = await realpath(candidate);
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
   while (true) {
     const policyPath = path.join(candidate, POLICY_FILE);
-    if (await exists(policyPath)) return { projectRoot: candidate, policyPath };
+    const metadata = await lstat(policyPath).catch(error => {
+      if (error?.code === 'ENOENT') return null;
+      throw error;
+    });
+    if (metadata?.isSymbolicLink()) {
+      return { projectRoot: candidate, policyPath, symlink: true };
+    }
+    if (metadata?.isFile()) return { projectRoot: candidate, policyPath };
     const parent = path.dirname(candidate);
     if (parent === candidate) return { projectRoot: null, policyPath: null };
     candidate = parent;
@@ -185,6 +193,14 @@ export async function loadPolicy(startPath) {
   const discovered = await discoverPolicy(startPath);
   if (!discovered.policyPath) {
     return { status: 'no-policy', ...discovered, policyHash: hashText('no-policy') };
+  }
+  if (discovered.symlink) {
+    return {
+      status: 'invalid-policy',
+      ...discovered,
+      policyHash: hashText('symlink-policy'),
+      error: 'sentinel.config.json no puede ser symlink o junction',
+    };
   }
   const raw = await readFile(discovered.policyPath, 'utf8');
   const policyHash = hashText(raw);
