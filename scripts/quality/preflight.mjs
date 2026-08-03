@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runProcess } from './runner.mjs';
 import { loadPolicy, policyIdentity } from './policy.mjs';
+import { assertRuntimeLockHash, readLock, verifyInstalledAnalyzers } from './lockfile.mjs';
 
 export const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -102,9 +103,13 @@ export async function preflight(args) {
   const policy = discoveredPolicy;
   if (policy.status === 'invalid-policy') throw new Error(policy.error);
 
+  const lockFile = policy.policy?.runtime?.lockFile ?? 'sentinel.lock.json';
+  const { lock, lockPath } = await readLock(workspaceRoot, toolManifest, lockFile);
+  assertRuntimeLockHash(lock.runtime);
+  const installed = await verifyInstalledAnalyzers(workspaceRoot, toolManifest, lock);
   const tools = {};
   for (const [name, config] of Object.entries(toolManifest.tools)) {
-    tools[name] = await verifyTool(workspaceRoot, name, config, toolManifest);
+    tools[name] = { ...await verifyTool(workspaceRoot, name, config, toolManifest), ...installed[name] };
   }
 
   const reportRoot = path.join(workspaceRoot, '.quality-reports', args.taskId);
@@ -125,5 +130,7 @@ export async function preflight(args) {
     heavyDeferred: args.heavyDeferred,
     policy,
     policyIdentity: policyIdentity(policy, toolManifest.tools?.sentinel?.version ?? null),
+    lock,
+    lockPath,
   };
 }

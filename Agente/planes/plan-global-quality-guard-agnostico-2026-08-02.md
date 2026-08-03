@@ -109,12 +109,14 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 - [ ] Definir `sentinel.config.json` v2 como un envelope con secciones `policy`, `gate`, `guard`, `runtime`, `analyzers.sentinel` y `analyzers.varsense`.
 - [ ] Mapear automáticamente la configuración v1 actual a `analyzers.sentinel` sin cambiar severidades ni patrones; unknown keys deben fallar en `sentinel doctor`, no ignorarse.
 - [ ] Migrar `quality.config.json` (timeouts, perfiles, cooldown, presupuestos), `varsense.config.json` y `quality-tools.json` mediante un comando `sentinel doctor --migrate --dry-run` antes de escribir.
-- [ ] Crear `sentinel.lock.json` para fijar runtime, protocolo, versión/commit/hash de Sentinel y VarSense; la política no puede descargar ni ejecutar versiones arbitrarias.
-- [ ] Usar un formato mínimo estable para el lock: `schemaVersion`, runtime `{version, commit, sha256}`, analyzers `{version, protocolVersion, sha256}` y fecha de generación; nunca guardar secretos.
+- [x] Crear `sentinel.lock.json` para fijar runtime, protocolo, versión/commit/hash de Sentinel y VarSense; el runtime local queda explícitamente como `project-adapter`, sin simular instalación global.
+- [x] Usar un formato mínimo estable para el lock: `schemaVersion`, runtime `{status, version, commit, identitySha256, artifactSha256}`, analyzers `{version, protocolVersion, commit, sha256}` y fecha de generación; nunca guardar secretos. `identitySha256` no sustituye el hash de artefacto: en `project-adapter`, `artifactSha256` es `null`; un runtime global instalado exigirá hash real.
+- [x] Integrar preflight con validación de lock, versión/protocolo/commit, hash reproducible `git archive` y rechazo de checkouts modificados; solo se tolera `.quality-install.json` como metadata administrativa exacta.
+- [x] Incluir la identidad del lockfile en el fingerprint de caché para invalidar PASS ante cambios de hashes fijados.
 - [ ] Definir precedencia: defaults del runtime < configuración del proyecto < perfil explícito de CI; variables de entorno solo pueden seleccionar un perfil allowlisted, nunca cambiar severidades o saltarse enforcement.
 - [ ] Mantener lectura de los formatos anteriores durante dos versiones de runtime, con warning visible y fecha de retirada.
 
-**Gate:** una migración dry-run no modifica archivos; la migración aplicada es reversible, conserva un hash de la configuración efectiva y dos versiones consecutivas producen el mismo conjunto de findings.
+**Gate:** una migración dry-run no modifica archivos; el lock local es estricto, reproducible y fail-closed ante divergencias. La generación aplicada sigue pendiente de comando/runtime global, backup y rollback.
 
 ### Resolución de política
 

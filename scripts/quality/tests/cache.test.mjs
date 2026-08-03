@@ -14,6 +14,7 @@ test('cache de calidad distingue pass, cambios de archivo y formato', async () =
       qualityConfig: { schemaVersion: 1, lockWaitMs: 0 },
       toolManifest: { schemaVersion: 1, tools: {} },
       policy: { policyHash: 'policy-a' },
+      lock: { schemaVersion: 1, analyzers: { sentinel: { sha256: 'lock-a' } } },
     };
     const scope = { files: ['input.ts'], fingerprintFiles: ['input.ts'] };
     const first = await fingerprint(context, scope, 'frontend');
@@ -41,6 +42,7 @@ test('cache separa el modo local del gate CI', async () => {
       qualityConfig: { schemaVersion: 1, lockWaitMs: 0 },
       toolManifest: { schemaVersion: 1, tools: {} },
       policy: { policyHash: 'policy-a' },
+      lock: { schemaVersion: 1, analyzers: { sentinel: { sha256: 'lock-a' } } },
     };
     const scope = { files: ['input.ts'], fingerprintFiles: ['input.ts'] };
     const local = await fingerprint({ ...base, ci: false, full: false }, scope, 'frontend');
@@ -50,6 +52,8 @@ test('cache separa el modo local del gate CI', async () => {
     assert.notEqual(local, ci);
     const changedPolicy = await fingerprint({ ...base, policy: { policyHash: 'policy-b' } }, scope, 'frontend');
     assert.notEqual(local, changedPolicy);
+    const changedLock = await fingerprint({ ...base, lock: { schemaVersion: 1, analyzers: { sentinel: { sha256: 'lock-b' } } } }, scope, 'frontend');
+    assert.notEqual(local, changedLock);
   } finally {
     await rm(projectRoot, { recursive: true, force: true });
   }

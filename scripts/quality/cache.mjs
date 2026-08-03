@@ -25,6 +25,7 @@ export async function fingerprint(context, scope, stage) {
   hash.update(JSON.stringify(context.qualityConfig));
   hash.update(JSON.stringify(context.toolManifest));
   hash.update(`policy:${context.policy?.policyHash ?? context.policyIdentity?.policyHash ?? 'unresolved'}\0`);
+  hash.update(`lock:${JSON.stringify(context.lock ?? 'unresolved')}\0`);
   for (const file of scope.fingerprintFiles ?? scope.files) {
     await hashFile(hash, context.projectRoot, file);
   }

@@ -35,6 +35,7 @@ Los repositorios upstream y una instalación global administrada no forman parte
 ## Gates pendientes
 
 - Runtime global versionado instalado y verificable.
-- `sentinel.lock.json` con hashes de runtime/analyzers.
+- `sentinel.lock.json` con `identitySha256` para identidad y `artifactSha256` real para runtime instalado; el adaptador local mantiene `artifactSha256: null`.
+- `realpath`/canonicalización verifican que lockfile, install root y checkouts permanezcan dentro del workspace.
 - Paridad CLI/LSP/VS Code y matriz PowerShell/CMD/Bash/CI.
 - Lease de procesos hijos, rollback de perfiles y segundo proyecto sin política.

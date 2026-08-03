@@ -291,7 +291,8 @@ El reporte `297A-49` tardó 533833 ms: Rust consumió 483037 ms (90,5 %) y expir
 - [ ] Definir el contrato `analyze/check/guard/doctor/status` sin romper el CLI `sentinel analyze` actual.
 - [ ] Definir el contrato de analyzer: manifest de alcance, configuración efectiva, cancelación, timeout, salida normalizada, métricas y estados de error.
 - [ ] Diseñar `sentinel.config.json` v2 como envelope; mapear la configuración Sentinel v1 actual, `quality.config.json`, `varsense.config.json` y `quality-tools.json` mediante migración dry-run/backup/rollback.
-- [ ] Crear `sentinel.lock.json` con versión/commit/hash de Sentinel, VarSense y protocolo; no ejecutar plugins o binarios arbitrarios del repositorio.
+- [x] Crear `sentinel.lock.json` con versión/commit/hash de Sentinel, VarSense y protocolo; preflight verifica `git archive`, checkout limpio y realpath dentro del workspace; el runtime local declara `identitySha256` + `artifactSha256: null` hasta existir runtime global.
+- [ ] Exigir `artifactSha256` real para runtime global instalado y completar instalación/rollback sin ejecutar plugins o binarios arbitrarios del repositorio.
 - [ ] Extraer scheduler, cooldown, locks, scope, caché y reporter desde `scripts/quality` al runtime de Sentinel; conservar `task:check` como alias temporal.
 - [ ] Integrar VarSense por adapter CLI JSON/JSONL con `files-from`; sus comandos editoriales CLI/LSP no pueden cerrar el gate ni crear un reporte paralelo.
 - [ ] Emitir leases efímeros para que `sentinel check` ejecute herramientas pesadas sin quedar bloqueado por sus propios shims; auditar PID, proyecto, comando, expiración y task ID.
