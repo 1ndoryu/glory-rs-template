@@ -16,16 +16,16 @@ El nombre público será `sentinel` (`sentinel check`, `sentinel guard`, `sentin
 
 ### Contrato de responsabilidades
 
-| Capacidad | Responsable único |
-|---|---|
-| Política por repositorio/rama | Sentinel Core |
-| Intercepción de `cargo`, `npm`, `npx`, `rustfmt`, etc. | Sentinel Guard |
-| Cooldown de 3 horas, locks y cuota de targets | Sentinel Scheduler |
-| Scope incremental y caché de etapas | Sentinel Orchestrator |
-| Reglas de variables/clases CSS | VarSense Analyzer, invocado por Sentinel |
-| Reglas generales de código | Sentinel Analyzers |
-| Reporte Markdown/JSON y exit code | Sentinel Reporter |
-| Configuración específica del proyecto | `sentinel.config.json` |
+| Capacidad                                              | Responsable único                        |
+| ------------------------------------------------------ | ---------------------------------------- |
+| Política por repositorio/rama                          | Sentinel Core                            |
+| Intercepción de `cargo`, `npm`, `npx`, `rustfmt`, etc. | Sentinel Guard                           |
+| Cooldown de 3 horas, locks y cuota de targets          | Sentinel Scheduler                       |
+| Scope incremental y caché de etapas                    | Sentinel Orchestrator                    |
+| Reglas de variables/clases CSS                         | VarSense Analyzer, invocado por Sentinel |
+| Reglas generales de código                             | Sentinel Analyzers                       |
+| Reporte Markdown/JSON y exit code                      | Sentinel Reporter                        |
+| Configuración específica del proyecto                  | `sentinel.config.json`                   |
 
 Así se mantienen dos herramientas reales —Sentinel y VarSense—, no tres controles superpuestos.
 
@@ -38,13 +38,13 @@ Así se mantienen dos herramientas reales —Sentinel y VarSense—, no tres con
 
 ### Taxonomía pública de comandos
 
-| Comando | Responsabilidad | ¿Ejecuta analizadores? |
-|---|---|---|
-| `sentinel analyze` | Análisis de archivos/workspace y salida normalizada | Sí, uno o varios analyzers |
-| `sentinel check <task-id>` | Gate completo/incremental, etapas, caché, reporte y exit code | Sí, mediante el orquestador |
-| `sentinel guard <command>` | Interceptar una validación directa y recomendar el gate | No |
-| `sentinel doctor/status` | Diagnosticar política, versión, shims, locks y cachés | No |
-| `sentinel install/update/rollback` | Gestionar el runtime global versionado | No |
+| Comando                            | Responsabilidad                                               | ¿Ejecuta analizadores?      |
+| ---------------------------------- | ------------------------------------------------------------- | --------------------------- |
+| `sentinel analyze`                 | Análisis de archivos/workspace y salida normalizada           | Sí, uno o varios analyzers  |
+| `sentinel check <task-id>`         | Gate completo/incremental, etapas, caché, reporte y exit code | Sí, mediante el orquestador |
+| `sentinel guard <command>`         | Interceptar una validación directa y recomendar el gate       | No                          |
+| `sentinel doctor/status`           | Diagnosticar política, versión, shims, locks y cachés         | No                          |
+| `sentinel install/update/rollback` | Gestionar el runtime global versionado                        | No                          |
 
 El alias `npm run task:check -- <task-id>` solo delegará a `sentinel check` durante la migración. No se deben mezclar `analyze` y `check` en un único comando ambiguo.
 
@@ -76,25 +76,25 @@ Ejemplo para wandori.us:
 
 ```json
 {
-  "schemaVersion": 1,
-  "mode": "enforce",
-  "gate": {
-    "command": ["sentinel", "check", "--"],
-    "taskIdRequired": true
-  },
-  "guard": {
-    "directCommands": {
-      "npmScripts": ["test", "test:*", "type-check", "lint", "build"],
-      "npxTools": ["vitest", "tsc", "eslint", "prettier"],
-      "cargoSubcommands": ["check", "fmt", "test", "clippy", "bench"],
-      "tools": ["rustfmt"]
-    }
-  },
-  "analyzers": {
-    "sentinel": { "profile": "project-default" },
-    "varsense": { "enabled": true, "config": "varsense.config.json" }
-  },
-  "allow": ["dev", "preview", "codegen", "quality:*"]
+    "schemaVersion": 1,
+    "mode": "enforce",
+    "gate": {
+        "command": ["sentinel", "check", "--"],
+        "taskIdRequired": true
+    },
+    "guard": {
+        "directCommands": {
+            "npmScripts": ["test", "test:*", "type-check", "lint", "build"],
+            "npxTools": ["vitest", "tsc", "eslint", "prettier"],
+            "cargoSubcommands": ["check", "fmt", "test", "clippy", "bench"],
+            "tools": ["rustfmt"]
+        }
+    },
+    "analyzers": {
+        "sentinel": {"profile": "project-default"},
+        "varsense": {"enabled": true, "config": "varsense.config.json"}
+    },
+    "allow": ["dev", "preview", "codegen", "quality:*"]
 }
 ```
 

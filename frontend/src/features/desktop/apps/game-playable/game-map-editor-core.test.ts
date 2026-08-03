@@ -9,6 +9,10 @@ import {
   addSpawnPoint,
   moveSpawnPoint,
   deleteSpawnPoint,
+  paintSurface,
+  setActiveSurface,
+  terrainCellAt,
+  TERRAIN_SURFACE_VALUES,
   undo,
   redo,
   setTool,
@@ -66,6 +70,81 @@ describe('game-map-editor-core (297A-64)', () => {
     const before = state.document.instances.length;
     state = placeInstance(state, { x: 1, z: 2 });
     expect(state.document.instances).toHaveLength(before);
+  });
+
+  describe('pincel de superficie (297A-66)', () => {
+    it('pinta la celda bajo el cursor con la superficie activa y commitea', () => {
+      let state = makeState();
+      state = setTool(state, 'paint');
+      state = setActiveSurface(state, TERRAIN_SURFACE_VALUES.water);
+
+      /* El fixture (0,0) tiene 0 en casi todas las celdas (superficie suelo).
+       * Celda global (0,0) → chunk 0,0, índice 0. */
+      const before = state.document.terrain.chunks[0].surfaces[0];
+      state = paintSurface(state, { x: -9.5, z: -7.5 }, TERRAIN_SURFACE_VALUES.water);
+
+      expect(state.document.terrain.chunks[0].surfaces[0]).toBe(1);
+      expect(before).toBe(0);
+      expect(state.undoStack).toHaveLength(1);
+      expect(getValidationIssues(state)).toHaveLength(0);
+    });
+
+    it('no pinta fuera de los chunks existentes (fail-closed)', () => {
+      let state = makeState();
+      state = setTool(state, 'paint');
+      const before = state.document.terrain.chunks[0].surfaces[0];
+      /* Mundo muy lejano: fuera de bounds y de chunks. */
+      state = paintSurface(state, { x: 500, z: 500 }, TERRAIN_SURFACE_VALUES.water);
+      expect(state.document.terrain.chunks[0].surfaces[0]).toBe(before);
+      expect(state.undoStack).toHaveLength(0);
+    });
+
+    it('no commitea si la celda ya tiene esa superficie (arrastre limpio)', () => {
+      let state = makeState();
+      state = setTool(state, 'paint');
+      state = paintSurface(state, { x: -9.5, z: -7.5 }, TERRAIN_SURFACE_VALUES.water);
+      expect(state.undoStack).toHaveLength(1);
+      /* Mismo punto otra vez: sin commit redundante. */
+      state = paintSurface(state, { x: -9.5, z: -7.5 }, TERRAIN_SURFACE_VALUES.water);
+      expect(state.undoStack).toHaveLength(1);
+    });
+
+    it('no pinta si la herramienta no es paint', () => {
+      let state = makeState();
+      state = setTool(state, 'select');
+      const before = state.document.terrain.chunks[0].surfaces[0];
+      state = paintSurface(state, { x: -9.5, z: -7.5 }, TERRAIN_SURFACE_VALUES.water);
+      expect(state.document.terrain.chunks[0].surfaces[0]).toBe(before);
+    });
+
+    it('terrainCellAt resuelve chunk local e índice para el documento', () => {
+      const state = makeState();
+      const cell = terrainCellAt(state.document, { x: -9.5, z: -7.5 });
+      expect(cell).not.toBeNull();
+      expect(cell!.chunk.x).toBe(0);
+      expect(cell!.chunk.z).toBe(0);
+      expect(cell!.index).toBe(0);
+      expect(terrainCellAt(state.document, { x: 500, z: 500 })).toBeNull();
+    });
+
+    it('deshacer/rehacer restaura la superficie pintada', () => {
+      let state = makeState();
+      state = setTool(state, 'paint');
+      state = paintSurface(state, { x: -9.5, z: -7.5 }, TERRAIN_SURFACE_VALUES.water);
+      expect(state.document.terrain.chunks[0].surfaces[0]).toBe(1);
+      state = undo(state);
+      expect(state.document.terrain.chunks[0].surfaces[0]).toBe(0);
+      state = redo(state);
+      expect(state.document.terrain.chunks[0].surfaces[0]).toBe(1);
+    });
+
+    it('hasChanges detecta el pintado', () => {
+      let state = makeState();
+      expect(hasChanges(state)).toBe(false);
+      state = setTool(state, 'paint');
+      state = paintSurface(state, { x: -9.5, z: -7.5 }, TERRAIN_SURFACE_VALUES.water);
+      expect(hasChanges(state)).toBe(true);
+    });
   });
 
   it('mueve, duplica y borra instancias', () => {

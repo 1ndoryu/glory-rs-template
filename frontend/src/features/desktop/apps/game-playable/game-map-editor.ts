@@ -29,6 +29,8 @@ import {
   addSpawnPoint,
   moveSpawnPoint,
   deleteSpawnPoint,
+  paintSurface,
+  setActiveSurface,
   undo,
   redo,
   setTool,
@@ -37,6 +39,7 @@ import {
   getValidationIssues,
   type MapEditorState,
   type MapEditorTool,
+  type TerrainSurfaceValue,
 } from './game-map-editor-core';
 import { createEditorToolbar } from './game-map-editor-toolbar';
 import {
@@ -116,6 +119,12 @@ export function createGameMapEditor(container: HTMLElement): GameMapEditorHandle
       redraw();
       return;
     }
+    /* [297A-66] Pincel: pintar la superficie de la celda bajo el cursor. */
+    if (state.tool === 'paint') {
+      state = paintSurface(state, world, state.activeSurface);
+      redraw();
+      return;
+    }
 
     /* Tool select: clic selecciona la instancia/spawn más cercano. */
     const threshold = 14;
@@ -134,11 +143,18 @@ export function createGameMapEditor(container: HTMLElement): GameMapEditorHandle
   };
 
   const onPointerMove = (event: PointerEvent): void => {
-    if (!state || !dragTargetId) return;
+    if (!state) return;
     const rect = canvas.getBoundingClientRect();
     const bounds = state.document.terrain.bounds;
     const transform = fitTransform(bounds, canvas.width, canvas.height);
     const world = screenToWorld(event.clientX - rect.left, event.clientY - rect.top, transform);
+    /* [297A-66] El pincel pinta al arrastrar (cada celda distinta commitea). */
+    if (state.tool === 'paint') {
+      state = paintSurface(state, world, state.activeSurface);
+      redraw();
+      return;
+    }
+    if (!dragTargetId) return;
     const isSpawn = state.document.spawnPoints.some((s) => s.id === dragTargetId);
     state = isSpawn
       ? moveSpawnPoint(state, dragTargetId, world)
@@ -166,6 +182,7 @@ export function createGameMapEditor(container: HTMLElement): GameMapEditorHandle
   toolbarElements.toolButtons.get('select')!.addEventListener('click', () => onTool('select'));
   toolbarElements.toolButtons.get('place')!.addEventListener('click', () => onTool('place'));
   toolbarElements.toolButtons.get('spawn')!.addEventListener('click', () => onTool('spawn'));
+  toolbarElements.toolButtons.get('paint')!.addEventListener('click', () => onTool('paint'));
   toolbarElements.btnUndo.addEventListener('click', () => { if (state) { state = undo(state); redraw(); } });
   toolbarElements.btnRedo.addEventListener('click', () => { if (state) { state = redo(state); redraw(); } });
   toolbarElements.btnDelete.addEventListener('click', () => {
@@ -215,6 +232,15 @@ export function createGameMapEditor(container: HTMLElement): GameMapEditorHandle
     }
   };
   toolbarElements.btnPublish.addEventListener('click', () => void onPublish());
+  /* [297A-66] Selector de superficie del pincel (handler nombrado para
+   * poder retirarlo en destroy). */
+  const onSurfaceChange = (): void => {
+    if (!state) return;
+    const value = Number(toolbarElements.surfaceSelect.value) as TerrainSurfaceValue;
+    if (value === 0 || value === 1) state = setActiveSurface(state, value);
+  };
+  toolbarElements.surfaceSelect.addEventListener('change', onSurfaceChange);
+  cleanups.push(() => toolbarElements.surfaceSelect.removeEventListener('change', onSurfaceChange));
 
   /* === Carga === */
   async function loadMap(): Promise<LoadedGameMap | null> {

@@ -592,6 +592,10 @@ realtime.
 
 **Límite 297A-65:** las instancias del catálogo aún no tienen representación visual 3D (la visual cache ignora ids fuera del fixture hasta Assets 3D), la cámara de la escena parte del origen del fixture y converge al spawn publicado en el primer `update` (la entidad local se siembra en el spawn del documento y la cámara lo sigue al instante), el runtime sigue sin invitados/reconexión diferenciada por mapa y el editor no previsualiza; la auditoría de expulsión y la purga de retención quedan para Fase 8.
 
+**Evidencia 297A-66:** herramienta pincel de superficie en el Editor de mapa 2D. `game-map-editor-core` añade la tool `paint`, `activeSurface` (suelo=0/agua=1, enteros allowlisted del contrato), `terrainCellAt` (mundo → chunk local + índice, fail-closed fuera de chunks) y `paintSurface` (pinta la celda bajo el cursor y commitea solo si cambia — arrastre limpio sin commits redundantes; no-op con tool ≠ paint). La vista expone el botón "pintar" y un select de superficie (suelo/agua) en el toolbar; clic y arrastre pintan sobre el canvas; el canvas sombrea las celdas con superficie > 0 (agua) bajo el grid para que el pincel sea visible. Undo/redo y `hasChanges` cubren el pintado. 14 tests frontend dirigidos PASS (7 nuevos del core del pincel + asserts del toolbar en la vista); type-check y diff-check PASS.
+
+**Límite 297A-66:** el pincel pinta solo superficies en chunks existentes (no crea terreno ni redimensiona bounds); sin pintado de altura (los vértices de `heights` se comparten entre chunks y requieren su propio bloque para no desincronizar bordes); sin caminos ni tipos de superficie adicionales (el contrato permite 0..15); la representación 3D del agua llega con Assets 3D.
+
 **Gate:** ningún invitado puede invocar admin ni reclamar el estado de otra identidad; el perfil no depende de datos enviados sin validar.
 
 **Auditoría de cierre — Fase 6:**

@@ -8,6 +8,8 @@ import { createEl } from '../../../../utils/dom';
 import {
   getValidationIssues,
   hasChanges,
+  TERRAIN_SURFACE_LABEL,
+  TERRAIN_SURFACE_VALUES,
   type MapEditorState,
   type MapEditorTool,
 } from './game-map-editor-core';
@@ -17,6 +19,7 @@ export interface EditorToolbarElements {
   readonly hint: HTMLElement;
   readonly issuesEl: HTMLElement;
   readonly assetSlot: HTMLElement;
+  readonly surfaceSelect: HTMLSelectElement;
   readonly toolButtons: ReadonlyMap<MapEditorTool, HTMLButtonElement>;
   readonly btnUndo: HTMLButtonElement;
   readonly btnRedo: HTMLButtonElement;
@@ -32,12 +35,16 @@ export function createEditorToolbar(): EditorToolbarElements {
   const btnSelect = createEl('button', { type: 'button', className: 'boton boton-pequeno', textContent: 'seleccionar' });
   const btnPlace = createEl('button', { type: 'button', className: 'boton boton-pequeno', textContent: 'colocar' });
   const btnSpawn = createEl('button', { type: 'button', className: 'boton boton-pequeno', textContent: 'spawn' });
+  const btnPaint = createEl('button', { type: 'button', className: 'boton boton-pequeno', textContent: 'pintar' });
   toolButtons.set('select', btnSelect);
   toolButtons.set('place', btnPlace);
   toolButtons.set('spawn', btnSpawn);
+  toolButtons.set('paint', btnPaint);
 
-  /* [297A-64] La paleta se puebla al cargar el catálogo (opciones reales). */
+  /* [297A-64] La paleta se puebla al cargar el catálogo (opciones reales).
+   * [297A-66] El pincel usa un select propio de superficies (suelo/agua). */
   const assetSlot = createEl('span', { className: 'juegoConfig__editor-asset' });
+  const surfaceSlot = createEl('span', { className: 'juegoConfig__editor-surface' });
   const btnUndo = createEl('button', { type: 'button', className: 'boton boton-pequeno', textContent: 'deshacer' });
   const btnRedo = createEl('button', { type: 'button', className: 'boton boton-pequeno', textContent: 'rehacer' });
   const btnDelete = createEl('button', { type: 'button', className: 'boton boton-pequeno', textContent: 'borrar' });
@@ -45,8 +52,8 @@ export function createEditorToolbar(): EditorToolbarElements {
   const btnPublish = createEl('button', { type: 'button', className: 'boton boton-pequeno', textContent: 'publicar mapa' });
 
   const toolbar = createEl('div', { className: 'juegoConfig__editor-toolbar' },
-    btnSelect, btnPlace, btnSpawn,
-    assetSlot,
+    btnSelect, btnPlace, btnSpawn, btnPaint,
+    assetSlot, surfaceSlot,
     btnUndo, btnRedo, btnDelete, btnDuplicate,
     btnPublish,
   );
@@ -54,10 +61,26 @@ export function createEditorToolbar(): EditorToolbarElements {
   const hint = createEl('p', { className: 'juegoConfig__editor-hint', textContent: 'cargando mapa…' });
   const issuesEl = createEl('p', { className: 'juegoConfig__editor-issues', role: 'status' });
 
+  /* [297A-66] Select de superficie del pincel (suelo/agua), fijo; la vista
+   * engancha onChange. */
+  const surfaceSelect = createEl('select', {
+    className: 'juegoConfig__editor-surface-select',
+    'aria-label': 'superficie del pincel',
+  });
+  for (const [key, value] of Object.entries(TERRAIN_SURFACE_VALUES)) {
+    const option = createEl('option', {
+      value: String(value),
+      textContent: TERRAIN_SURFACE_LABEL[key as keyof typeof TERRAIN_SURFACE_LABEL] ?? key,
+    });
+    surfaceSelect.appendChild(option);
+  }
+  surfaceSlot.appendChild(surfaceSelect);
+
   const refresh = (state: MapEditorState): void => {
     for (const [tool, button] of toolButtons) {
       button.classList.toggle('boton--activo', state.tool === tool);
     }
+    surfaceSelect.value = String(state.activeSurface);
     btnUndo.disabled = state.undoStack.length === 0;
     btnRedo.disabled = state.redoStack.length === 0;
     btnDelete.disabled = state.selectedId === null;
@@ -77,6 +100,7 @@ export function createEditorToolbar(): EditorToolbarElements {
     hint,
     issuesEl,
     assetSlot,
+    surfaceSelect,
     toolButtons,
     btnUndo,
     btnRedo,

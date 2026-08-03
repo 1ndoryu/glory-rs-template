@@ -16,7 +16,28 @@ import {
   type Vector2,
 } from '../../../game-core';
 
-export type MapEditorTool = 'select' | 'place' | 'spawn';
+export type MapEditorTool = 'select' | 'place' | 'spawn' | 'paint';
+
+/* [297A-66] Superficies del pincel de terreno: enteros allowlisted 0..15 del
+ * contrato. El valor es semántica de Bosque (suelo/agua) que el runtime
+ * traduce visualmente; el editor no inventa valores fuera del contrato. */
+export const TERRAIN_SURFACE_VALUES = {
+  ground: 0,
+  water: 1,
+} as const;
+
+export type TerrainSurfaceValue = (typeof TERRAIN_SURFACE_VALUES)[keyof typeof TERRAIN_SURFACE_VALUES];
+
+export const TERRAIN_SURFACE_LABEL: Record<keyof typeof TERRAIN_SURFACE_VALUES, string> = {
+  ground: 'suelo',
+  water: 'agua',
+};
+
+export interface PaintSurfacePoint {
+  readonly x: number;
+  readonly z: number;
+  readonly surface: TerrainSurfaceValue;
+}
 
 export interface MapEditorState {
   /** Borrador actual (inmutable por operación). */
@@ -30,6 +51,8 @@ export interface MapEditorState {
   readonly selectedId: string | null;
   /** Asset de la paleta activo para colocar (tool 'place'). */
   readonly activeAssetId: string | null;
+  /** Superficie activa del pincel (tool 'paint'). */
+  readonly activeSurface: TerrainSurfaceValue;
   /** Catálogo de assets activos que alimenta la paleta y el manifest. */
   readonly catalog: readonly GameAssetAdminEntry[];
   readonly undoStack: readonly MapVersion[];
@@ -55,6 +78,7 @@ export function createMapEditorState(
     tool: 'select',
     selectedId: null,
     activeAssetId: catalog[0]?.id ?? null,
+    activeSurface: TERRAIN_SURFACE_VALUES.ground,
     catalog,
     undoStack: [],
     redoStack: [],
@@ -128,6 +152,54 @@ export function select(state: MapEditorState, id: string | null): MapEditorState
 
 export function setActiveAsset(state: MapEditorState, assetId: string | null): MapEditorState {
   return { ...state, activeAssetId: assetId };
+}
+
+export function setActiveSurface(state: MapEditorState, surface: TerrainSurfaceValue): MapEditorState {
+  return { ...state, activeSurface: surface };
+}
+
+/* [297A-66] Celda (chunk local + índice) bajo una posición de mundo. El chunk
+ * (0,0) comienza en bounds.minX/minZ; los índices de chunk son locales al
+ * documento. Devuelve null si la celda cae fuera de un chunk existente. */
+export function terrainCellAt(
+  document: MapVersion,
+  world: Vector2,
+): { chunk: MapVersion['terrain']['chunks'][number]; index: number } | null {
+  const terrain = document.terrain;
+  const gx = Math.floor((world.x - terrain.bounds.minX) / terrain.cellSize);
+  const gz = Math.floor((world.z - terrain.bounds.minZ) / terrain.cellSize);
+  const chunkX = Math.floor(gx / terrain.chunkSize);
+  const chunkZ = Math.floor(gz / terrain.chunkSize);
+  const chunk = terrain.chunks.find((c) => c.x === chunkX && c.z === chunkZ);
+  if (!chunk) return null;
+  const localX = gx - chunkX * terrain.chunkSize;
+  const localZ = gz - chunkZ * terrain.chunkSize;
+  const index = localZ * terrain.chunkSize + localX;
+  if (index < 0 || index >= chunk.surfaces.length) return null;
+  return { chunk, index };
+}
+
+/** Pinta la superficie de la celda bajo la posición (tool 'paint'). No-op si
+ * la celda no existe (fuera de chunks) o ya tiene esa superficie (evita
+ * commits redundantes en el arrastre del pincel). */
+export function paintSurface(
+  state: MapEditorState,
+  world: Vector2,
+  surface: TerrainSurfaceValue,
+): MapEditorState {
+  if (state.tool !== 'paint') return state;
+  const cell = terrainCellAt(state.document, world);
+  if (!cell || cell.chunk.surfaces[cell.index] === surface) return state;
+  const surfaces = [...cell.chunk.surfaces];
+  surfaces[cell.index] = surface;
+  const chunks = state.document.terrain.chunks.map((c) => (
+    c === cell.chunk ? { ...c, surfaces } : c
+  ));
+  const next: MapVersion = {
+    ...state.document,
+    terrain: { ...state.document.terrain, chunks },
+  };
+  return commit(state, next);
 }
 
 /** Coloca una instancia del asset de la paleta en la posición dada (mundo). */

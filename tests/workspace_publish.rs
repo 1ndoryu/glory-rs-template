@@ -24,6 +24,9 @@ struct TestContext {
     admin_id: Uuid,
     releases_created: Vec<i32>,
     resources_created: Vec<Uuid>,
+    /* [038A-2] Release activa al iniciar el test: `cleanup()` la restaura
+     * para no dejar el estado de rama alterado (higiene ante el guard). */
+    previous_active_version: Option<i32>,
 }
 
 impl TestContext {
@@ -44,11 +47,17 @@ impl TestContext {
             .await
             .expect("admin de prueba creado");
 
+        let previous_active_version = WorkspaceRepository::get_active(&pool)
+            .await
+            .expect("consulta de release activa")
+            .map(|r| r.version);
+
         Self {
             pool,
             admin_id,
             releases_created: Vec::new(),
             resources_created: Vec::new(),
+            previous_active_version,
         }
     }
 
@@ -89,6 +98,12 @@ impl TestContext {
                 .await
                 .expect("recurso limpiado");
         }
+        /* [038A-2] Restaurar la release que estaba activa al iniciar el test.
+         * Sin esto, un test que publica (auto-activa) dejaría la rama apuntando
+         * a una release de prueba aunque `cleanup()` la borre después. */
+        if let Some(version) = self.previous_active_version {
+            let _ = WorkspaceService::activate_version(&self.pool, version, true).await;
+        }
         sqlx::query("DELETE FROM users WHERE id = $1")
             .bind(self.admin_id)
             .execute(&self.pool)
@@ -97,8 +112,13 @@ impl TestContext {
     }
 }
 
-/// Árbol mínimo válido: un folder con un recurso público, una app raíz y un
-/// shortcut opcional. Sin publicLocator para no acoplar al contrato de overlay.
+/// Árbol mínimo válido: los nodos de sistema obligatorios + un folder con un
+/// recurso público y una app raíz. Sin publicLocator para no acoplar al
+/// contrato de overlay.
+/// [038A-2] `tree_with_ids` incluye SIEMPRE los nodos de sistema canónicos
+/// (trash/admin/settings/profile/about): el guard de `validate_release_tree`
+/// los exige y todo árbol de test debe cumplirlo. Los IDs únicos por ejecución
+/// se aplican a folder/recurso para que el diff del summary sea estable.
 fn valid_tree(resource_ref: Option<Uuid>) -> serde_json::Value {
     tree_with_ids(resource_ref, "documentos", "about", "recurso")
 }
@@ -107,6 +127,8 @@ fn valid_tree(resource_ref: Option<Uuid>) -> serde_json::Value {
 /// [297A-58] Los tests que verifican el summary deben usar IDs únicos por
 /// ejecución: el diff se calcula contra la release anterior REAL de la BD
 /// (estado de rama), no contra una historia fija de versiones.
+/// [038A-2] Los nodos de sistema usan sus IDs canónicos fijos; solo folder y
+/// recurso reciben IDs únicos.
 fn tree_with_ids(
     resource_ref: Option<Uuid>,
     folder_id: &str,
@@ -114,14 +136,49 @@ fn tree_with_ids(
     resource_node_id: &str,
 ) -> serde_json::Value {
     let mut nodes = serde_json::Map::new();
+    /* Nodos de sistema obligatorios [038A-2]: mismo set canónico que el shell.
+     * `about` se genera con el id pasado (el test usa `about-{uniq}` en el
+     * test de summary; el guard exige el id `about`), por eso aquí `about`
+     * usa `about_id` — el llamador debe pasar `"about"` salvo que el test
+     * pruebe otra cosa. */
     nodes.insert(
-        folder_id.into(),
+        "trash".into(),
         json!({
-            "id": folder_id,
+            "id": "trash",
             "parentId": "desktop",
             "type": "folder",
-            "label": "Documentos",
+            "label": "Papelera",
             "position": { "col": 0, "row": 0 }
+        }),
+    );
+    nodes.insert(
+        "admin".into(),
+        json!({
+            "id": "admin",
+            "parentId": "desktop",
+            "type": "app",
+            "label": "Admin",
+            "position": { "col": 2, "row": 0 }
+        }),
+    );
+    nodes.insert(
+        "settings".into(),
+        json!({
+            "id": "settings",
+            "parentId": "desktop",
+            "type": "app",
+            "label": "Ajustes",
+            "position": { "col": 3, "row": 0 }
+        }),
+    );
+    nodes.insert(
+        "profile".into(),
+        json!({
+            "id": "profile",
+            "parentId": "desktop",
+            "type": "app",
+            "label": "Perfil",
+            "position": { "col": 4, "row": 0 }
         }),
     );
     nodes.insert(
@@ -132,6 +189,16 @@ fn tree_with_ids(
             "type": "app",
             "label": "Acerca de",
             "position": { "col": 1, "row": 0 }
+        }),
+    );
+    nodes.insert(
+        folder_id.into(),
+        json!({
+            "id": folder_id,
+            "parentId": "desktop",
+            "type": "folder",
+            "label": "Documentos",
+            "position": { "col": 5, "row": 0 }
         }),
     );
     if let Some(ref_id) = resource_ref {

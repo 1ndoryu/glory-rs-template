@@ -63,10 +63,13 @@ describe('createGameMapEditor (297A-64)', () => {
     expect(host.textContent).toContain('seleccionar');
     expect(host.textContent).toContain('colocar');
     expect(host.textContent).toContain('spawn');
+    expect(host.textContent).toContain('pintar');
     expect(host.textContent).toContain('publicar mapa');
     /* La paleta se puebla con assets activos. */
     expect(host.textContent).toContain('Árbol');
     expect(host.textContent).toContain('Roca');
+    /* [297A-66] El pincel expone el selector de superficies suelo/agua. */
+    expect(host.querySelector('select[aria-label="superficie del pincel"]')).not.toBeNull();
     handle.destroy();
   });
 

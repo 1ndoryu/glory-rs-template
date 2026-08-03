@@ -6,17 +6,11 @@ import { SettingsService, AnalyticsService } from '../services';
 import { showProfile } from '../store';
 import { showToast } from '../components/ui/toast';
 import { createTextarea } from '../components/ui/textarea';
-import { createSettingsPanel } from '../features/settings/settings-panel';
+import { createFontPanel } from '../features/settings/font-panel';
 import { safeClick, safeRun, safeEffect } from '../utils/safe-async';
 import { renderArticleList, openEditor, disposeAdminArticleLists } from './admin-articles';
 import { renderProjectList, openProjectEditor, disposeAdminProjectLists } from './admin-projects';
 import { renderProductList, openProductEditor, disposeAdminProductLists } from './admin-products';
-import { renderWorkspaceAdmin, createPublicarAccion, disposeAdminWorkspaceLists } from './admin-workspace';
-import {
-  renderNotificationsAdminList,
-  openNuevoAvisoModal,
-  disposeAdminNotificationsLists,
-} from './admin-notifications';
 import { createTabs } from '../components/ui/tabs';
 import { createVacio } from '../components/ui/empty-state';
 import { createEl } from '../utils/dom';
@@ -26,8 +20,6 @@ export function disposeAdminPage(page: HTMLElement): void {
   disposeAdminArticleLists(page);
   disposeAdminProjectLists(page);
   disposeAdminProductLists(page);
-  disposeAdminNotificationsLists(page);
-  disposeAdminWorkspaceLists(page);
 }
 
 /* [018A-1] Vista de Admin para el runtime de ventanas: devuelve la página
@@ -67,16 +59,6 @@ export function createAdminWindowView(): { page: Promise<HTMLElement>; actions: 
     contentArea.id = `admin-${name}`;
 
     switch (name) {
-      /* [028A-14] Tab "escritorio": gobernanza del workspace (release activa,
-       * historial, validacion y activacion de versiones). El caso Papelera
-       * (release incompleta vigente) se detecta desde aqui. */
-      case 'escritorio': {
-        const panel = createEl('div', { className: 'admin-lista' });
-        contentArea.appendChild(panel);
-        void renderWorkspaceAdmin(panel);
-        setWindowActions([createPublicarAccion()]);
-        break;
-      }
       /* [018A-1] Las listas viven solas en el body; el botón de alta va a la
        * franja inferior de la ventana (fuera del body padded), al final. */
       case 'articulos': {
@@ -106,21 +88,8 @@ export function createAdminWindowView(): { page: Promise<HTMLElement>; actions: 
         setWindowActions([btnNuevo]);
         break;
       }
-      case 'novedades': {
-        /* [028A-5] El admin de novedades vive en esta página (no en la app
-         * notifications, eliminada); el alta usa un modal. */
-        const lista = createEl('div', { className: 'admin-lista' });
-        contentArea.appendChild(lista);
-        void renderNotificationsAdminList(lista);
-        const btnNuevo = createEl('button', { className: 'boton', textContent: '+ nuevo aviso' });
-        btnNuevo.addEventListener('click', () => openNuevoAvisoModal(() => {
-          void renderNotificationsAdminList(lista);
-        }));
-        setWindowActions([btnNuevo]);
-        break;
-      }
       case 'fuentes':
-        contentArea.appendChild(createSettingsPanel());
+        contentArea.appendChild(createFontPanel());
         setWindowActions([]);
         break;
       case 'sitio': {
@@ -141,13 +110,9 @@ export function createAdminWindowView(): { page: Promise<HTMLElement>; actions: 
 
   const tabs = createTabs({
     tabs: [
-      { id: 'escritorio', label: 'escritorio' },
       { id: 'articulos', label: 'articulos' },
       { id: 'proyectos', label: 'proyectos' },
       { id: 'productos', label: 'productos' },
-      /* [297A-62] El tab "juego" desaparece del Admin: la configuración del
-       * Bosque (personajes + assets) vive dentro de la ventana del juego. */
-      { id: 'novedades', label: 'novedades' },
       { id: 'fuentes', label: 'fuentes' },
       { id: 'sitio', label: 'sitio' },
       { id: 'estadisticas', label: 'estadisticas' },
@@ -158,6 +123,12 @@ export function createAdminWindowView(): { page: Promise<HTMLElement>; actions: 
 
   page.append(tabs.el, contentArea);
   return { page: Promise.resolve(page), actions: actionsBar };
+}
+
+/* [legacy] Ruta /admin del router (sin ventana): solo el contenido. La franja
+ * de acciones pertenece al chrome de la ventana, no a la página en sí. */
+export async function renderAdmin(): Promise<HTMLElement> {
+  return createAdminWindowView().page;
 }
 
 function renderSitioTab(): { element: HTMLElement; createSaveAction: () => HTMLElement } {
@@ -174,7 +145,7 @@ function renderSitioTab(): { element: HTMLElement; createSaveAction: () => HTMLE
   container.appendChild(aboutArea);
 
   safeEffect(async () => {
-        const s = await SettingsService.getPublic();
+    const s = await SettingsService.getAll();
     aboutContent = s.about_content || '';
     const textarea = aboutArea.querySelector('textarea');
     if (textarea) textarea.value = aboutContent;

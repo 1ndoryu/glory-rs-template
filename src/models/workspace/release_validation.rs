@@ -5,6 +5,12 @@
 //! públicos), un release SÍ admite nodos `app` y `requires: "admin"`, porque
 //! es la foto completa del escritorio. La validación de refs contra la BD
 //! (recursos `active + ready + public`) vive en `WorkspaceService::publish`.
+//! [038A-2] El release es la foto completa e inmutable del escritorio: un
+//! release sin los nodos del sistema deja el OS inservible (p. ej. sin la
+//! Papelera no se puede restaurar nada). Por eso `validate_release_tree`
+//! exige la presencia de `SYSTEM_NODE_IDS` (ver abajo): ninguna fuente —
+//! panel admin, API, tests de integración, procesos externos — puede publicar
+//! o activar una release incompleta.
 
 use serde_json::Value as JsonValue;
 
@@ -14,6 +20,26 @@ const MAX_LABEL_LENGTH: usize = 255;
 const MAX_REF_ID_LENGTH: usize = 256;
 const MAX_GRID_COORDINATE: u64 = 10_000;
 const MAX_MOBILE_ORDER: u64 = 100_000;
+
+/// Nodos del sistema del shell que TODO release debe contener.
+/// [038A-2] Fuente canónica: los nodos que el AppRegistry del frontend
+/// registra como parte del OS (default-release.ts + ADMIN_NODES en stores.ts).
+/// `trash` (Papelera) es irremplazable: sin él el usuario no puede restaurar
+/// contenido borrado. El resto (admin/settings/profile/about) son la
+/// navegación de gobierno del escritorio y nunca deben faltar en una foto
+/// pública. Los nodos de contenido (documentos, store, orders, downloads,
+/// projects) y los prototipos de juego son opcionales: el admin puede
+/// ocultarlos legítimamente (ver v3).
+pub const SYSTEM_NODE_IDS: &[&str] = &["trash", "admin", "settings", "profile", "about"];
+
+/// Comprueba que el árbol contenga todos los nodos del sistema obligatorios.
+/// Devuelve el primer id ausente. [038A-2]
+fn first_missing_system_node(nodes: &serde_json::Map<String, JsonValue>) -> Option<&'static str> {
+    SYSTEM_NODE_IDS
+        .iter()
+        .copied()
+        .find(|id| !nodes.contains_key(*id))
+}
 
 /// Tipos de nodo válidos en un release.
 fn is_valid_node_type(node_type: &str) -> bool {
@@ -39,6 +65,15 @@ pub fn validate_release_tree(tree: &JsonValue) -> Result<(), String> {
         validate_node(id, node, nodes)?;
     }
     validate_parent_graph(nodes)?;
+
+    /* [038A-2] Tras validar la estructura, exigir la presencia de los nodos de
+     * sistema: ninguna fuente puede publicar/activar una release que deje el
+     * OS sin Papelera, admin, settings, profile o about. */
+    if let Some(missing) = first_missing_system_node(nodes) {
+        return Err(format!(
+            "El release debe contener el nodo de sistema '{missing}'"
+        ));
+    }
     Ok(())
 }
 

@@ -161,15 +161,6 @@
   margin-top: var(--espacio-xs);
 }
 
-/* [018A-85] Portada opcional del proyecto en el catálogo público. */
-.proyecto-imagen {
-  display: block;
-  max-width: 100%;
-  height: auto;
-  border: var(--borde);
-  margin-bottom: var(--espacio-sm);
-}
-
 /* === CUENTA === */
 .account-app {
   display: flex;
@@ -188,8 +179,7 @@
 
 .account-app__message,
 .account-app__secondary,
-.account-app__error,
-.account-app__feedback {
+.account-app__error {
   margin: 0;
   line-height: var(--linea-altura);
 }
@@ -205,27 +195,24 @@
   gap: var(--espacio-lg);
 }
 
-/* [018A-65] El layout flex (icono+texto centrados) lo aporta la receta
- * compartida .boton-con-icono de components.css; aquí solo queda la alineación
- * propia dentro del contenedor de acciones. Los declarations display/align/gap
- * anteriores eran código muerto: la superficie .desktop-window .boton los
- * sobreescribía con más especificidad. */
 .account-app__submit,
 .account-app__action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espacio-sm);
   align-self: flex-start;
+  text-decoration: underline;
 }
 
 .account-app__submit:disabled {
   cursor: wait;
 }
 
-/* [018A-65] El icono usa espacio-md menos 1px para que el SVG quede un punto
- * más compacto respecto a la caja del botón; sigue derivado de token. */
 .account-app__icon {
   display: inline-grid;
   place-items: center;
-  width: calc(var(--espacio-md) - 1px);
-  height: calc(var(--espacio-md) - 1px);
+  width: var(--espacio-md);
+  height: var(--espacio-md);
 }
 
 .account-app__icon svg {
@@ -288,78 +275,9 @@
   border-bottom: var(--borde);
 }
 
-/* [297A-62] Encabezado de sección del panel de configuración del Bosque:
- * título + botón de alta en la misma fila, separados con el espacio del OS. */
-.admin-seccion {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--espacio-md);
-}
-
 .admin-acciones {
   display: flex;
   gap: var(--espacio-md);
-}
-
-/* [028A-14] Panel de gobernanza del workspace (tab "escritorio"). */
-.admin-workspace-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: var(--espacio-sm);
-}
-
-.admin-workspace-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--espacio-xs);
-  padding: var(--espacio-sm);
-  border: var(--borde);
-}
-
-.admin-workspace-card-etiqueta {
-  font-size: var(--tamano-pequeno);
-  opacity: 0.7;
-}
-
-.admin-workspace-card-valor {
-  font-weight: var(--peso-medio);
-}
-
-/* [028A-14] Aviso cuando la version activa no es la ultima publicada
- * (caso Papelera: una release incompleta quedo vigente sin avisar). */
-.admin-escritorio-aviso {
-  padding: var(--espacio-sm);
-  border: var(--borde);
-  font-weight: var(--peso-medio);
-}
-
-.admin-workspace-item-cabecera {
-  display: flex;
-  align-items: center;
-  gap: var(--espacio-sm);
-}
-
-.admin-workspace-item {
-  gap: var(--espacio-sm);
-}
-
-.admin-escritorio-detalle {
-  display: flex;
-  flex-direction: column;
-  gap: var(--espacio-xs);
-}
-
-.admin-escritorio-detalle-titulo {
-  margin: 0;
-}
-
-.admin-escritorio-detalle-ok {
-  margin: 0;
-}
-
-.admin-escritorio-detalle-item {
-  padding-left: var(--espacio-md);
 }
 
 /* [317A-2] Paginas raiz (galeria, proyectos) que renderizan en el area de
@@ -385,6 +303,14 @@
   flex-direction: column;
   gap: var(--espacio-lg);
 }
+
+.font-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-lg);
+}
+
+
 
 /* === ESTADÍSTICAS === */
 .stats-grid {
@@ -462,3 +388,4 @@
 }
 
 } /* @layer components */
+

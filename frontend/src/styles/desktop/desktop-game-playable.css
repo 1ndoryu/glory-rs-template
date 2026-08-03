@@ -177,6 +177,16 @@
   touch-action: none;
 }
 
+/* [297A-66] Selector de superficie del pincel: compacto, mismo estilo del OS. */
+.juegoConfig__editor-surface-select {
+  padding: 2px 4px;
+  border: var(--sistema-borde);
+  background: var(--sistema-superficie);
+  color: var(--sistema-texto);
+  font: inherit;
+  font-size: var(--tamano-pequeno);
+}
+
 .juegoConfig__editor-footer {
   display: flex;
   flex-direction: column;

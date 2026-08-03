@@ -23,6 +23,11 @@
 | ¿Cómo se revisan SOLID y escalabilidad por fase?        | `Agente/documentacion/arquitectura/checkpoints-solid-escalabilidad-2026-07-31.md` |
 | ¿Cómo se agrega una nueva app al OS (receta canónica)?  | `Agente/documentacion/arquitectura/guia-agregar-app-2026-07-31.md`                 |
 | ¿Cómo se cargan apps pesadas y cuál es su presupuesto?   | `Agente/documentacion/arquitectura/adr-carga-apps-pesadas-2026-07-31.md`           |
+| ¿Cómo se planifica el bosque multijugador 3D? | `Agente/planes/plan-juego-bosque-multijugador-2026-08-01.md` |
+| ¿Cómo se administran GLB y se edita terreno 3D desde una vista 2D? | `Agente/planes/plan-assets-terreno-bosque-3d-2026-08-01.md` |
+| ¿Por qué Three.js, assets externos y terreno lógico 2D? | `Agente/documentacion/arquitectura/adr-bosque-3d-assets-terreno-2d-2026-08-01.md` |
+| ¿Cómo se extrae el motor agnóstico para futuros juegos? | `Agente/planes/plan-glory-render-motor-juegos-2026-08-01.md` |
+| ¿Cuál es la frontera del repositorio `glory-render`? | `Agente/documentacion/arquitectura/adr-glory-render-repositorio-agnostico-2026-08-01.md` |
 | ¿Cómo se paga la deuda SOLID del runtime de apps?       | `Agente/planes/plan-deuda-solid-runtime-2026-07-31.md`                             |
 | ¿Por qué se cierran ventanas al abrir otra y cómo se resuelve? | `Agente/planes/plan-cierre-automatico-ventanas-2026-07-31.md`                |
 | ¿Cómo se implementan los programas editoriales por vertical? | `Agente/planes/plan-programas-editoriales-2026-07-31.md`                       |
@@ -49,6 +54,8 @@
 - Contratos de interacción y medición: activos; se cierran dentro de las tareas dueñas 297A-9–17.
 - Quality gate Sentinel/VarSense: implementado y archivado; CI y self-check usan el mismo core.
 - Plan móvil: activo y bloqueado por runtime/workspace; tablet conserva desktop.
+- Plan del bosque multijugador 3D: dirección Three.js aprobada; assets externos GLB y terreno finito editable en 2D quedan planificados, mientras gameplay/realtime siguen bloqueados por dependencias.
+- Plan `glory-render`: propuesto para después de GAME-01/Fase 8; `frontend/src/features/game-core/` es candidato provisional y no se extrae sin segundo consumidor real.
 - Plan visual antiguo: referencia histórica del concepto aprobado.
 - Plan wandori.us original: superado; no es especificación activa.
 - Plan Sentinel/VarSense editor-agnóstico: trabajo histórico documentado en tareas completadas.

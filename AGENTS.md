@@ -22,6 +22,7 @@ applyTo: '**'
 - Quality gate: `Agente/planes/completados/plan-escalabilidad-sentinel-wandorius-2026-07-29.md`.
 - Interacción/comandos/medición: `Agente/planes/plan-contratos-interaccion-comandos-medicion-2026-07-29.md`.
 - Reglas pendientes: `Agente/prevencion/prevencion-wandorius-sentinel-varsense-2026-07-29.md`.
+- Motor futuro agnóstico: `Agente/planes/plan-glory-render-motor-juegos-2026-08-01.md` y ADR `Agente/documentacion/arquitectura/adr-glory-render-repositorio-agnostico-2026-08-01.md`.
 - Índice: `Agente/documentacion/indice-documentacion-2026-07-29.md`.
 
 No dupliques decisiones: actualiza primero la fuente correspondiente y luego sus referencias.
@@ -40,6 +41,8 @@ No dupliques decisiones: actualiza primero la fuente correspondiente y luego sus
 - RouteAppAdapter para URL ↔ app/recurso.
 - AnalyticsDispatcher tipado.
 - Una app devuelve contenido; solo el shell crea ventana/chrome.
+
+**Juegos reutilizables:** `frontend/src/features/game-core/` es provisional. Después de GAME-01/Fase 8, la lógica agnóstica se extraerá a `glory-render/` dentro de este workspace, con Git/CI/versionado propios; no entran identidad, OS, backend, salas ni reglas de Bosque.
 
 **Backend por dominios:** identity, workspace, content, media, commerce, analytics y audit. Flujo obligatorio: `handler -> service/command -> repository/adaptador`. SQL solo en repositories; transacciones/outbox en services.
 
@@ -108,7 +111,7 @@ Orden obligatorio:
 7. Indicar exactamente qué corregir y qué comando repetir.
 8. Exit code no cero ante error de herramienta, regla bloqueante o test fallido.
 
-El script decide alcance automáticamente, es incremental local y full en CI. Debe ser no interactivo, acotado, redactor de secretos y con cache segura de etapas PASS. No reemplaza tests ni convierte fallos en warnings. Sentinel/VarSense usan su core/CLI oficial; el script no duplica reglas. El detalle vive en `.quality-reports/`, no en stdout/contexto.
+El script decide alcance automáticamente, es incremental local y full en CI. Debe ser no interactivo, acotado, redactor de secretos y con cache segura de etapas PASS. No reemplaza tests ni convierte fallos en warnings. Sentinel/VarSense usan su core/CLI oficial; el script no duplica reglas. El detalle vive en `.quality-reports/`, no en stdout/contexto. `cargo test`, `cargo clippy`, `cargo bench` y `task:check --full` están protegidos por un cooldown de 180 minutos y una sola ejecución pesada; un full diferido cae a `local-light`. `--allow-heavy` es una excepción manual auditable.
 
 ## 8. Estándares esenciales
 
@@ -125,6 +128,8 @@ El script decide alcance automáticamente, es incremental local y full en CI. De
 ## 9. Validación
 
 - Cierre normal: `npm run task:check -- {ID}`; el alcance se calcula automáticamente.
+- Rust local: no ejecutar `cargo test 2>&1` por tarea; la redirección sigue siendo el mismo test pesado. Usar el gate y reservar `--full` para cierre de fase/CI o una excepción justificada.
+- Targets: `npm run quality:cleanup:dry` revisa `C:\tmp\glory-target`; `npm run quality:cleanup` aplica cuota/retención sin tocar targets con proceso activo.
 - Compatibilidad: `npm run self-check -- -TareaId {ID}` llama al mismo core y no duplica validaciones.
 - CI usa el mismo core en modo full y publica `.quality-reports/`.
 - UI todavía exige prueba visual real; el gate no sustituye navegador ni casos negativos.

@@ -1,8 +1,9 @@
 /* GAME-01 — Dibujo del Editor de mapa 2D (canvas).
  * [297A-64] Transformaciones mundo↔pantalla y render top-down del borrador:
  * grid de terreno por cellSize, instancias como símbolos por categoría y
- * spawns con selección. Separado de la vista para mantener <300 líneas por
- * módulo y para que el dibujo sea independiente de la UI. */
+ * spawns con selección. [297A-66] Superficies pintadas: las celdas con valor
+ * > 0 (agua) se sombrean bajo el grid para que el pincel sea visible.
+ * Separado de la vista para mantener <300 líneas por módulo. */
 
 import type { AssetCategory, Vector2 } from '../../../game-core';
 import type { MapEditorState } from './game-map-editor-core';
@@ -84,8 +85,27 @@ export function drawMap(canvas: HTMLCanvasElement, state: MapEditorState): void 
   const bounds = state.document.terrain.bounds;
   const transform = fitTransform(bounds, width, height);
 
-  /* Grid de terreno: celdas por cellSize con grilla fina. */
+  /* [297A-66] Superficies pintadas: por cada chunk, celdas con valor > 0 se
+   * rellenan (agua ≈ sombreado) antes del grid para que el pincel sea visible
+   * sin tapar instancias ni spawns. */
   const cellSize = state.document.terrain.cellSize;
+  const chunkSize = state.document.terrain.chunkSize;
+  for (const chunk of state.document.terrain.chunks) {
+    for (let cellIndex = 0; cellIndex < chunk.surfaces.length; cellIndex += 1) {
+      const surface = chunk.surfaces[cellIndex];
+      if (surface <= 0) continue;
+      const localX = cellIndex % chunkSize;
+      const localZ = Math.floor(cellIndex / chunkSize);
+      const worldX = bounds.minX + (chunk.x * chunkSize + localX) * cellSize;
+      const worldZ = bounds.minZ + (chunk.z * chunkSize + localZ) * cellSize;
+      const topLeft = worldToScreen({ x: worldX, z: worldZ + cellSize }, transform);
+      const bottomRight = worldToScreen({ x: worldX + cellSize, z: worldZ }, transform);
+      context.fillStyle = surface === 1 ? '#d7d7d1' : '#e4e4df';
+      context.fillRect(topLeft.x, topLeft.y, bottomRight.x - topLeft.x, bottomRight.y - topLeft.y);
+    }
+  }
+
+  /* Grid de terreno: celdas por cellSize con grilla fina. */
   context.strokeStyle = '#000000';
   context.lineWidth = 1;
   const startX = Math.floor(bounds.minX / cellSize) * cellSize;
