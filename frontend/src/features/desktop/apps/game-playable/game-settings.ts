@@ -34,6 +34,7 @@ import { createSelect } from '../../../../components/ui/select';
 import { createTabs } from '../../../../components/ui/tabs';
 import { showToast } from '../../../../components/ui/toast';
 import { showConfirm } from '../../../../components/ui/confirm';
+import { createGameMapEditor } from './game-map-editor';
 
 const TONO_ETIQUETA: Record<string, string> = {
   ink: 'ink',
@@ -51,6 +52,7 @@ const ACCION_ETIQUETA: Record<string, string> = {
 
 const gameCharacterListGenerations = new WeakMap<HTMLElement, number>();
 const gameAssetListGenerations = new WeakMap<HTMLElement, number>();
+const gameMapEditorCleanups = new WeakMap<HTMLElement, () => void>();
 
 function tonoLabel(entry: GameCharacterAdminEntry): string {
   return TONO_ETIQUETA[entry.bodyTone] ?? entry.bodyTone;
@@ -566,10 +568,18 @@ export function createGameSettingsPanel(options: { onBack: () => void }): GameSe
     actividadContenido,
   );
 
+  /* [297A-64] Tab "mapa": editor 2D del Bosque dentro de la misma ventana.
+   * Se monta bajo demanda y se destruye al salir del panel (teardown del
+   * editor: listeners, ResizeObserver y cargas pendientes). */
+  const mapa = createEl('section', {},
+    createEl('h3', { className: 'mt-lg mb-sm', textContent: 'editor de mapa' }),
+  );
+
   const paneles = new Map<string, HTMLElement>([
     ['personajes', personajes],
     ['assets', assets],
     ['actividad', actividad],
+    ['mapa', mapa],
   ]);
   const activos = new Map<string, boolean>();
 
@@ -578,6 +588,7 @@ export function createGameSettingsPanel(options: { onBack: () => void }): GameSe
       { id: 'personajes', label: 'personajes' },
       { id: 'assets', label: 'assets' },
       { id: 'actividad', label: 'actividad' },
+      { id: 'mapa', label: 'mapa' },
     ],
     initial: 'personajes',
     onSwitch: (id) => {
@@ -594,6 +605,12 @@ export function createGameSettingsPanel(options: { onBack: () => void }): GameSe
       } else if (id === 'actividad' && !activos.get('actividad')) {
         activos.set('actividad', true);
         void renderActividadGlobal(actividadContenido);
+      } else if (id === 'mapa' && !activos.get('mapa')) {
+        activos.set('mapa', true);
+        /* [297A-64] El editor destruye su runtime al salir del panel: el
+         * teardown queda registrado en el WeakMap y se libera en destroy(). */
+        const editor = createGameMapEditor(mapa);
+        gameMapEditorCleanups.set(mapa, editor.destroy);
       }
     },
   });
@@ -631,6 +648,8 @@ export function createGameSettingsPanel(options: { onBack: () => void }): GameSe
     destroy: () => {
       gameCharacterListGenerations.delete(personajesLista);
       gameAssetListGenerations.delete(assetsLista);
+      gameMapEditorCleanups.get(mapa)?.();
+      gameMapEditorCleanups.delete(mapa);
       element.remove();
     },
   };

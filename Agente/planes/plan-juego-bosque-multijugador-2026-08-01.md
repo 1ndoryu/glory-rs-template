@@ -584,6 +584,10 @@ realtime.
 
 **Límite 297A-63:** el panel no previsualiza modelos (GLB llegan con Assets 3D); el editor de mapa y el runtime aún no consumen el catálogo; la auditoría de expulsión y la purga de retención quedan para Fase 8.
 
+**Evidencia 297A-64:** Editor de mapa 2D como tab "mapa" de la configuración del Bosque (misma ventana, carga bajo demanda): canvas 2D top-down (grid de terreno por cellSize, instancias como símbolos por categoría, spawns, selección), paleta de assets del catálogo activo, command stack con undo/redo (colocar/mover/duplicar/borrar instancias y spawns, ids generados `inst-n`/`spawn-n`), validación local con `validateMapVersion`, carga del mapa activo (`GET /api/game/maps/bosque`) con fallback al fixture y publicación atómica (`POST /api/admin/game/maps` con `expectedVersion` + conflicto 409 visible). `GameMapAdminService` valida estrictamente el envelope público y el documento; la vista reutiliza el patrón WeakMap/generación del panel. El runtime aún consume el fixture (consumo del mapa publicado queda para el bloque siguiente).
+
+**Límite 297A-64:** el editor no previsualiza en 3D (reusar renderer llega con su bloque); sin pintado de altura/superficie por pincel (solo grid y colocación de instancias/spawns), sin borrador persistido server-side (el borrador es local y publicar es atómico), sin exportar/importar y sin editor de proxies de colisión (Assets 3D).
+
 **Gate:** ningún invitado puede invocar admin ni reclamar el estado de otra identidad; el perfil no depende de datos enviados sin validar.
 
 **Auditoría de cierre — Fase 6:**

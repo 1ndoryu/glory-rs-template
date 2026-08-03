@@ -146,6 +146,56 @@
   }
 }
 
+/* [297A-64] Editor de mapa 2D dentro del tab "mapa" de la configuración.
+ * Chrome B&W del OS: toolbar compacto arriba, canvas con borde 1px y footer
+ * con hint/estado. El canvas es bloque y llena el alto disponible. */
+.juegoConfig__editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espacio-xs);
+  align-items: center;
+}
+
+.juegoConfig__editor-toolbar .boton--activo {
+  color: var(--sistema-superficie);
+  background: var(--sistema-texto);
+}
+
+.juegoConfig__editor-toolbar .boton:disabled {
+  opacity: 0.4;
+}
+
+.juegoConfig__editor-canvas {
+  flex: 1 1 auto;
+  min-height: 320px;
+  border: var(--sistema-borde);
+  background: var(--sistema-superficie);
+}
+
+.juegoConfig__editor-surface {
+  display: block;
+  touch-action: none;
+}
+
+.juegoConfig__editor-footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-xs);
+}
+
+.juegoConfig__editor-hint,
+.juegoConfig__editor-issues {
+  margin: 0;
+  font-size: var(--tamano-pequeno);
+  color: var(--sistema-texto);
+}
+
+@media (max-width: 767px) {
+  .juegoConfig__editor-canvas {
+    min-height: 240px;
+  }
+}
+
 @media (max-width: 767px) {
   .juegoFixture {
     min-height: 100%;
