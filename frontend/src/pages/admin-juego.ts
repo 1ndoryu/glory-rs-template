@@ -34,10 +34,11 @@ const TONO_ETIQUETA: Record<string, string> = {
 };
 
 /* [297A-56] Etiquetas legibles de las acciones auditadas (el valor crudo de
- * la API es character.created/character.updated). */
+ * la API es character.created/character.updated). [297A-59] map.published. */
 const ACCION_ETIQUETA: Record<string, string> = {
   'character.created': 'creado',
   'character.updated': 'actualizado',
+  'map.published': 'publicado',
 };
 
 const gameCharacterListGenerations = new WeakMap<HTMLElement, number>();
@@ -73,8 +74,12 @@ export async function renderGameCharacterAdminList(container: HTMLElement): Prom
   }
 
   /* [297A-56] La actividad se carga en paralelo con la lista pero nunca
-   * rompe el catálogo: si falla, solo la sección lo indica. */
-  const auditResult = await tryCatch(GameAuditService.listCharacterEvents({ limit: 10 }));
+   * rompe el catálogo: si falla, solo la sección lo indica.
+   * [297A-59] Las publicaciones de mapas usan el mismo patrón aislado. */
+  const [auditResult, mapAuditResult] = await Promise.all([
+    tryCatch(GameAuditService.listCharacterEvents({ limit: 10 })),
+    tryCatch(GameAuditService.listMapEvents({ limit: 10 })),
+  ]);
   if (gameCharacterListGenerations.get(container) !== generation) return;
 
   const items = result.value;
@@ -85,6 +90,7 @@ export async function renderGameCharacterAdminList(container: HTMLElement): Prom
     container.appendChild(createVacio('no hay personajes en el catálogo'));
   }
   container.appendChild(renderActividad(auditResult));
+  container.appendChild(renderActividadMapas(mapAuditResult));
 }
 
 function formatFechaHora(iso: string): string {
@@ -92,6 +98,33 @@ function formatFechaHora(iso: string): string {
   if (Number.isNaN(date.getTime())) return '';
   const hora = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
   return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()} ${hora}`;
+}
+
+/** Sección de publicaciones de mapas recientes (últimos eventos auditados).
+ * [297A-59] Cierra el límite de 297A-58: el listado admin ya existía por API
+ * y ahora el tab "juego" lo visualiza (el payload es `{ schemaVersion,
+ * contentHash }`, sin nombre de mapa: se muestra el entityId + versión). */
+function renderActividadMapas(result: { ok: true; value: GameAuditEventEntry[] } | { ok: false; error: string }): HTMLElement {
+  const seccion = createEl('section');
+  seccion.appendChild(createEl('h3', { className: 'mt-lg mb-md', textContent: 'publicaciones de mapas' }));
+  if (!result.ok) {
+    seccion.appendChild(createVacio('no se pudo cargar la actividad de mapas'));
+    return seccion;
+  }
+  if (result.value.length === 0) {
+    seccion.appendChild(createVacio('sin publicaciones recientes'));
+    return seccion;
+  }
+  for (const event of result.value) {
+    const label = ACCION_ETIQUETA[event.action] ?? event.action;
+    const version = typeof event.payload?.schemaVersion === 'number' ? ` · v${event.payload.schemaVersion}` : '';
+    const info = createEl('div', {},
+      createEl('span', { textContent: `${label} · ${event.entityId}${version}` }),
+      createEl('small', { className: 'ml-sm', textContent: formatFechaHora(event.createdAt) }),
+    );
+    seccion.appendChild(createEl('div', { className: 'admin-item' }, info));
+  }
+  return seccion;
 }
 
 /** Sección de actividad reciente del catálogo (últimos eventos auditados). */

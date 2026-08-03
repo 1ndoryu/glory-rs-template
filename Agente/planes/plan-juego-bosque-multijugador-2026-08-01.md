@@ -568,6 +568,10 @@ realtime.
 
 **Límite 297A-58:** no hay panel UI de auditoría de mapas (el listado admin existe por API; la visualización llega con los paneles de mapa/assets), no hay auditoría de assets ni de expulsión (sus bloques la registrarán), el DTO no expone `actorId` (privacidad) y la purga de retención queda para Fase 8.
 
+**Evidencia 297A-59:** panel UI de la auditoría de publicaciones de mapas en el tab "juego" del Admin (sección "publicaciones de mapas"): `GameAuditService.listMapEvents` consume `GET /api/admin/game/audit/maps` con el mismo DTO acotado del catálogo, el validador `isValidAuditEvent` pasó a pares acción-entidad estrictos (`map.published`↔`map`) y la sección se carga en paralelo y aislada — si falla, solo la sección lo indica y el catálogo sigue funcionando. Se muestra `publicado · <mapId> · v<schemaVersion>` con fecha/hora. Cierra el límite de visualización declarado en 297A-58.
+
+**Límite 297A-59:** el panel es informativo (el editor de mapa y Assets 3D llegan en sus bloques de Fase 7); la auditoría de assets y de expulsión siguen pendientes; el DTO no expone `actorId` ni coordenadas, y la purga de retención queda para Fase 8.
+
 **Gate:** ningún invitado puede invocar admin ni reclamar el estado de otra identidad; el perfil no depende de datos enviados sin validar.
 
 **Auditoría de cierre — Fase 6:**
@@ -587,6 +591,7 @@ realtime.
 - [ ] Añadir preview de borrador y publicación atómica.
 - [x] Auditoría persistente de cambios sensibles del catálogo (`297A-55`): `game_audit_events` registra crear/actualizar/desactivar con actor, acción y estado visual en la misma transacción; listado admin acotado sin identidades. La auditoría de mapa/assets y la garantía de versión de la sala activa llegan con sus bloques.
 - [x] Auditoría de la publicación de mapas (`297A-58`): `map.published` se registra en `game_audit_events` dentro de la misma transacción de la publicación (repo transaccional, patrón 297A-55); listado admin acotado por API. La auditoría de assets/expulsión y la garantía de versión de la sala activa llegan con sus bloques.
+- [x] Panel UI de auditoría de publicaciones de mapas (`297A-59`): sección "publicaciones de mapas" en el tab "juego" (últimas 10 publicaciones con versión y fecha, carga paralela aislada y pares acción-entidad estrictos en el validador).
 
 **Gate:** un admin importa un GLB, crea terreno 2D, coloca instancias, guarda, previsualiza y publica; un usuario normal recibe rechazo server-side aunque fuerce el cliente.
 

@@ -14,6 +14,20 @@ function auditEvent(overrides: Record<string, unknown> = {}): Record<string, unk
   };
 }
 
+/* [297A-59] Evento de publicación de mapa (payload acotado del backend). */
+function mapAuditEvent(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: 9,
+    actorKind: 'admin',
+    action: 'map.published',
+    entityKind: 'map',
+    entityId: 'bosque',
+    payload: { schemaVersion: 3, contentHash: 'abc' },
+    createdAt: '2026-08-02T10:00:00Z',
+    ...overrides,
+  };
+}
+
 describe('GameAuditService', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -62,6 +76,38 @@ describe('GameAuditService', () => {
     const controller = new AbortController();
 
     await GameAuditService.listCharacterEvents({ signal: controller.signal });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.signal).toBe(controller.signal);
+  });
+
+  it('loads map publish events from the maps audit endpoint', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify([mapAuditEvent(), mapAuditEvent({ id: 10 })]), { status: 200 }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(GameAuditService.listMapEvents({ limit: 10 })).resolves.toEqual([
+      expect.objectContaining({ id: 9, action: 'map.published', entityKind: 'map' }),
+      expect.objectContaining({ id: 10 }),
+    ]);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/admin/game/audit/maps?limit=10');
+    expect(init.method).toBe('GET');
+  });
+
+  it('keeps map events in the shared validator and rejects mismatched pairs', () => {
+    expect(isValidAuditEvent(mapAuditEvent())).toBe(true);
+    expect(isValidAuditEvent(mapAuditEvent({ action: 'map.deleted' }))).toBe(false);
+    expect(isValidAuditEvent(mapAuditEvent({ entityKind: 'character' }))).toBe(false);
+    expect(isValidAuditEvent(auditEvent({ action: 'map.published' }))).toBe(false);
+  });
+
+  it('preserves the abort signal on map events too', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const controller = new AbortController();
+
+    await GameAuditService.listMapEvents({ signal: controller.signal });
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(init.signal).toBe(controller.signal);
   });
