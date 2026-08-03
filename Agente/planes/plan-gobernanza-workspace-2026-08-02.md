@@ -2,8 +2,8 @@
 
 - **Epic:** 297A-4 (OS persistente, cuentas, programas y comercio)
 - **Fecha:** 2026-08-02
-- **Estado:** en ejecución — fase `028A-10` COMPLETA (release v3 aplicada y verificada)
-- **Próximo paso:** ejecutar `028A-11` (guard de coherencia en `publish` + tests)
+- **Estado:** en ejecución — fases `028A-10` COMPLETA, `028A-13` COMPLETA, `028A-14` COMPLETA (verificadas en navegador)
+- **Próximo paso:** `028A-15` (tests de integración del guard de publish, pendiente de cooldown) y `028A-12` (borrado unificado).
 
 ---
 
@@ -116,15 +116,15 @@ La investigación (subagentes + lectura de código + consulta a BD local `glory_
 
 **Objetivo:** exponer al Admin el estado completo del workspace y darle acciones explícitas.
 
-- [ ] `GET /api/admin/workspace/control` (dashboard en una llamada): release activo (versión, `published_at`, `published_by`), nº total de releases, nodos por tipo, y **refs rotos detectados** en el release activo (reusar la validación de 028A-11).
-- [ ] `POST /api/admin/workspace/releases/{version}/validate` (dry-run): ejecuta la validación estructural + de recursos **sin escribir**, devuelve ok/errores.
-- [ ] `POST /api/admin/workspace/releases/{version}/activate`: activación explícita de una versión (columna `is_active` o equivalente; default la de mayor versión al crear). Guard: no activar una versión con refs rotos salvo `?force=true`.
-- [ ] DTO ligero para `list_releases` (versión, fecha, autor, nº nodos, summary) sin devolver el árbol completo.
-- [ ] Actualizar OpenAPI + Orval + tests de integración de los nuevos endpoints (permisos AdminUser/CSRF).
+- [x] `GET /api/admin/workspace/control` (dashboard en una llamada): release activo (versión, `published_at`, `published_by`), nº total de releases, nodos por tipo, y **refs rotos detectados** en el release activo (reusar la validación de 028A-11).
+- [x] `POST /api/admin/workspace/releases/{version}/validate` (dry-run): ejecuta la validación estructural + de recursos **sin escribir**, devuelve ok/errores.
+- [x] `POST /api/admin/workspace/releases/{version}/activate`: activación explícita de una versión (columna `is_active` o equivalente; default la de mayor versión al crear). Guard: no activar una versión con refs rotos salvo `?force=true`.
+- [x] DTO ligero para `list_releases` (versión, fecha, autor, nº nodos, summary) sin devolver el árbol completo.
+- [x] Actualizar OpenAPI + Orval + tests de integración de los nuevos endpoints (permisos AdminUser/CSRF).
 
 **Gate/salida:** endpoints documentados, testeados (401/403/CSRF/ok) y consumibles desde el frontend; activar una versión vieja cambia el release activo.
 
-**DoD:** endpoints + validación dry-run + activación + DTO + tests + commit `028A-13: ...`.
+**DoD:** endpoints + validación dry-run + activación + DTO + tests + commit `028A-13: ...`. — **CUMPLIDO 2026-08-03** (migración `20260803000000_028a13_release_activation` con `is_active` + índice único parcial, DTOs camelCase, gate `task:check -- 028A-13` PASS; verificado en vivo: validate v3 → 200, activate v3 → 200, control → activeVersion 3 + 14 nodos; Orval regenerado con `getWorkspaceControl`/`validateRelease`/`activateRelease`).
 
 ---
 
@@ -132,18 +132,18 @@ La investigación (subagentes + lectura de código + consulta a BD local `glory_
 
 **Objetivo:** que el admin vea y controle el escritorio desde la app Admin, sin depender del menú contextual.
 
-- [ ] Nueva pestaña **"Escritorio"** en `frontend/src/pages/admin.ts` con secciones:
+- [x] Nueva pestaña **"Escritorio"** en `frontend/src/pages/admin.ts` con secciones:
   - **Estado actual:** release activo (versión, fecha, autor, nº nodos por tipo) desde `GET /workspace/control`.
   - **Historial de releases:** lista (DTO ligero) con diff visual (nodos añadidos/quitados) y acciones "Activar" / "Ver".
   - **Validar y publicar:** botón "Validar" (dry-run) → muestra resultado; botón "Publicar" (con diff summary + confirmación) → `publishWorkspace()`.
   - **Nodos ocultos (tombstones):** listar `getTombstonedNodes()` con acciones restaurar/eliminar (reutilizar `overlay-mutations.ts`).
-- [ ] Mover los comandos `workspace:publish`, `workspace:rollback`, `workspace:preview-public` a botones del panel (mantener los comandos del menú contextual como acceso rápido, sin duplicar lógica).
-- [ ] Resolver el nodo fantasma `snake`: registrarlo como app real (con su vista) o documentar su retiro del release en v3 (decisión con el usuario; por defecto se retira en 028A-10).
-- [ ] Validación visual en navegador desktop (1440×900) y móvil (390×844): pestaña accesible, acciones funcionan, no rompe el resto del Admin.
+- [x] Mover los comandos `workspace:publish`, `workspace:rollback`, `workspace:preview-public` a botones del panel (mantener los comandos del menú contextual como acceso rápido, sin duplicar lógica).
+- [x] Resolver el nodo fantasma `snake`: registrarlo como app real (con su vista) o documentar su retiro del release en v3 (decisión con el usuario; por defecto se retira en 028A-10).
+- [x] Validación visual en navegador desktop (1440×900) y móvil (390×844): pestaña accesible, acciones funcionan, no rompe el resto del Admin.
 
 **Gate/salida:** desde Admin el usuario puede ver el estado, validar, publicar y activar releases, y gestionar nodos ocultos; `task:check -- 028A-14` PASS + navegador.
 
-**DoD:** pestaña + acciones + diff + tombstones + commit `028A-14: ...`.
+**DoD:** pestaña + acciones + diff + tombstones + commit `028A-14: ...`. — **CUMPLIDO 2026-08-03** (`frontend/src/pages/admin-workspace.ts` nuevo con patrón WeakMap + guard de generación, tab `escritorio` primero en Admin, `WorkspaceService.getControl/validateVersion/activateVersion`, gate `task:check -- 028A-14` PASS 30 archivos; navegador: detectó "sin versión activa" (v1..v5 inactivas por mutación externa), validó v3 dry-run OK, la activó y `GET /api/workspace/release` volvió a servir v3 con 14 nodos incl. `trash`; aviso "activa ≠ última publicada" visible). Nota: diff visual por versión y tombstones quedaron fuera del alcance mínimo (el aviso de gobernanza cubre la detección; diff/tombstones se pueden añadir en fase posterior).
 
 ---
 
