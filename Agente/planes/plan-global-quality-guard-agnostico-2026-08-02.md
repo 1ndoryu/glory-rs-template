@@ -138,7 +138,7 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 
 - [x] Buscar desde el directorio actual hacia arriba hasta la raíz del workspace (`discoverPolicy`); la resolución física del directorio inicial evita seguir una ruta lógica con junction/symlink.
 - [ ] Usar únicamente `sentinel.config.json` como fuente canónica; no inferir reglas leyendo `AGENTS.md` ni scripts arbitrarios.
-- [x] Canonicalizar la ruta antes de leerla y rechazar `sentinel.config.json` symlink/junction; la configuración externa no se carga (`policy.mjs` + `policy.test.mjs`).
+- [x] Canonicalizar la ruta antes de leerla y rechazar `sentinel.config.json` symlink/junction en el loader y en el guard; la configuración externa no se carga ni se sigue desde los shims (`policy.mjs`, `quality-command-guard.mjs` y tests).
 - [x] Calcular `policyHash` desde la configuración descubierta y asociarlo al estado/reporte; el fingerprint de caché lo incluye para invalidar PASS cuando cambia la política. (`scripts/quality/policy.mjs`, `cache.mjs`, `reporter.mjs`)
 - [ ] Asociar también la identidad a un runtime global instalado y a leases firmados. *(pendiente del runtime global)*
 - [ ] Si no existe política: `pass-through` silencioso para permitir trabajar en cualquier proyecto.

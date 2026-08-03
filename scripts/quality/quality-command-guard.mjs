@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { validatePolicy } from './policy.mjs';
 import { decisionForGuard } from './policy-decision.mjs';
@@ -38,7 +38,14 @@ function findQualityRoot(startPath = process.cwd()) {
 
 function readV2GuardPolicy(root) {
   const policyPath = path.join(root, 'sentinel.config.json');
-  if (!existsSync(policyPath)) return { status: 'no-policy' };
+  let metadata;
+  try {
+    metadata = lstatSync(policyPath);
+  } catch (error) {
+    if (error?.code === 'ENOENT') return { status: 'no-policy' };
+    return { status: 'invalid-policy' };
+  }
+  if (metadata.isSymbolicLink() || !metadata.isFile()) return { status: 'invalid-policy' };
   let raw;
   try { raw = JSON.parse(readFileSync(policyPath, 'utf8')); }
   catch { return { status: 'invalid-policy' }; }
@@ -137,7 +144,10 @@ export function inspectDirectCommand({ executable, args = [], cwd = process.cwd(
   const discovered = policy.status === 'policy'
     ? { status: 'policy', policy: { mode: policy.mode } }
     : { status: policy.status };
-  const decision = decisionForGuard(discovered, reason);
+  const baseDecision = decisionForGuard(discovered, reason);
+  const decision = policy.status === 'invalid-policy' && reason
+    ? { ...baseDecision, blocked: true, observed: false, reason }
+    : baseDecision;
   if (!reason || !decision.blocked && !decision.observed) {
     return { ...decision, blocked: false, root, policyStatus: policy.status };
   }

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -89,6 +89,34 @@ test('bloquea rustfmt directo para evitar el bypass de cargo fmt', async () => {
   const decision = inspectDirectCommand({ executable: 'rustfmt.exe', args: ['src/lib.rs'], cwd: root });
   assert.equal(decision.blocked, true);
   assert.equal(decision.category, 'tool');
+});
+
+test('un symlink roto de política no se clasifica como no-policy', async () => {
+  const root = await fixtureRoot();
+  const missing = path.join(root, 'missing-sentinel.config.json');
+  await rm(path.join(root, 'sentinel.config.json'));
+  await symlink(missing, path.join(root, 'sentinel.config.json'), 'file');
+  const decision = inspectDirectCommand({ executable: 'npx', args: ['vitest', 'run'], cwd: root });
+  assert.equal(decision.policyStatus, 'invalid-policy');
+  assert.equal(decision.blocked, true);
+  assert.equal(decision.exitCode, QUALITY_GUARD_EXIT_CODE);
+});
+
+test('una política symlink se trata como inválida y no se sigue fuera del workspace', async () => {
+  const root = await fixtureRoot();
+  const outside = await mkdtemp(path.join(os.tmpdir(), 'glory-quality-command-guard-outside-'));
+  try {
+    await writeFile(path.join(outside, 'sentinel.config.json'), JSON.stringify({ schemaVersion: 2 }), 'utf8');
+    await rm(path.join(root, 'sentinel.config.json'));
+    await symlink(path.join(outside, 'sentinel.config.json'), path.join(root, 'sentinel.config.json'), 'file');
+    const decision = inspectDirectCommand({ executable: 'npx', args: ['vitest', 'run'], cwd: root });
+    assert.equal(decision.policyStatus, 'invalid-policy');
+    assert.equal(decision.blocked, true);
+    assert.equal(decision.exitCode, QUALITY_GUARD_EXIT_CODE);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(outside, { recursive: true, force: true });
+  }
 });
 
 test('un proyecto sin política pasa sin bloqueo', async () => {
