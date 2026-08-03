@@ -15,7 +15,7 @@ import { runSentinel } from './adapters/sentinel.mjs';
 import { runVarsense } from './adapters/varsense.mjs';
 import { runCustom } from './adapters/custom.mjs';
 import { runBoundedStages } from './stage-runner.mjs';
-import { pruneReportBranches } from './report-retention.mjs';
+import { runReportRetentionBestEffort } from './report-retention-stage.mjs';
 
 let interrupted = false;
 function handleInterruption(signal) {
@@ -120,16 +120,12 @@ async function main() {
         const reminders = selectReminders(scope, stages, context.qualityConfig.maxReminders, context);
         /* La poda nunca cambia el resultado del gate: registra su estado para
          * el reporte y continúa aunque el filesystem esté ocupado. */
-        try {
-          context.reportRetention = await pruneReportBranches({
-            projectRoot: context.projectRoot,
-            currentBranchKey: context.branch.branchKey,
-            currentTaskId: args.taskId,
-            config: context.qualityConfig.reportRetention,
-          });
-        } catch (error) {
-          context.reportRetention = { status: 'error', message: error.message };
-        }
+        context.reportRetention = await runReportRetentionBestEffort({
+          projectRoot: context.projectRoot,
+          currentBranchKey: context.branch.branchKey,
+          currentTaskId: args.taskId,
+          config: context.qualityConfig.reportRetention,
+        });
         const report = await createReport(context, args, scope, stages, reminders, startedAt);
         printCompact(report, context);
         finalStatus = interrupted ? 'cancelled' : report.report.decision.label;

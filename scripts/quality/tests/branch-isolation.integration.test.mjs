@@ -92,6 +92,7 @@ test('CI y detached mantienen namespaces distintos aunque compartan commit', asy
   const projectRoot = await mkdtemp(path.join(os.tmpdir(), 'quality-branch-identities-'));
   try {
     const ci = await identityFor(projectRoot, undefined, { CI: 'true', GITHUB_REF_NAME: 'release/2026' });
+    const reusedRunner = await identityFor(projectRoot, undefined, { CI: 'true', GITHUB_REF_NAME: 'feature/2026' });
     const detached = await resolveBranchIdentity(projectRoot, {
       env: {},
       runGit: async args => (args[0] === 'rev-parse'
@@ -99,12 +100,17 @@ test('CI y detached mantienen namespaces distintos aunque compartan commit', asy
         : { code: 1, stdout: '' }),
     });
     assert.equal(ci.source, 'ci');
+    assert.equal(reusedRunner.source, 'ci');
     assert.equal(detached.source, 'detached');
+    assert.notEqual(ci.canonicalRef, reusedRunner.canonicalRef);
     assert.notEqual(ci.canonicalRef, detached.canonicalRef);
+    assert.notEqual(ci.branchKey, reusedRunner.branchKey);
     assert.notEqual(ci.branchKey, detached.branchKey);
     assert.match(ci.branchKey, /^[A-Za-z0-9._-]+$/u);
+    assert.match(reusedRunner.branchKey, /^[A-Za-z0-9._-]+$/u);
     assert.match(detached.branchKey, /^[A-Za-z0-9._-]+$/u);
     assert.equal(createBranchKey(ci.canonicalRef), ci.branchKey);
+    assert.equal(createBranchKey(reusedRunner.canonicalRef), reusedRunner.branchKey);
     assert.equal(createBranchKey(detached.canonicalRef), detached.branchKey);
   } finally {
     await rm(projectRoot, { recursive: true, force: true });
