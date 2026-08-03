@@ -120,7 +120,7 @@ El gate no debe escribir todos los resultados en un único namespace creciente. 
 
 El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y boundaries del analizador. No se puede reutilizar ese nombre introduciendo `gate` y `guard` sin contrato de migración.
 
-- [ ] Definir `sentinel.config.json` v2 como un envelope con secciones `policy`, `gate`, `guard`, `runtime`, `analyzers.sentinel` y `analyzers.varsense`.
+- [x] Definir y validar localmente `sentinel.config.json` v2 como envelope con `mode`, `gate`, `guard`, `runtime`, `analyzers.sentinel` y `analyzers.varsense` (`policy.mjs`); publicar el JSON Schema final sigue ligado a Sentinel Core upstream.
 - [ ] Mapear automáticamente la configuración v1 actual a `analyzers.sentinel` sin cambiar severidades ni patrones; unknown keys deben fallar en `sentinel doctor`, no ignorarse.
 - [ ] Migrar `quality.config.json` (timeouts, perfiles, cooldown, presupuestos), `varsense.config.json` y `quality-tools.json` mediante un comando `sentinel doctor --migrate --dry-run` antes de escribir.
 - [x] Crear `sentinel.lock.json` para fijar runtime, protocolo, versión/commit/hash de Sentinel y VarSense; el runtime local queda explícitamente como `project-adapter`, sin simular instalación global.
@@ -141,10 +141,10 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 - [x] Canonicalizar la ruta antes de leerla y rechazar `sentinel.config.json` symlink/junction en el loader y en el guard; la configuración externa no se carga ni se sigue desde los shims (`policy.mjs`, `quality-command-guard.mjs` y tests).
 - [x] Calcular `policyHash` desde la configuración descubierta y asociarlo al estado/reporte; el fingerprint de caché lo incluye para invalidar PASS cuando cambia la política. (`scripts/quality/policy.mjs`, `cache.mjs`, `reporter.mjs`)
 - [ ] Asociar también la identidad a un runtime global instalado y a leases firmados. *(pendiente del runtime global)*
-- [ ] Si no existe política: `pass-through` silencioso para permitir trabajar en cualquier proyecto.
+- [x] Si no existe política, la decisión local es `pass-through` y el guard permite trabajar sin bloquear (`policy-decision.mjs`, `quality-command-guard.mjs` + tests); el comportamiento del runtime global sigue pendiente.
 - [ ] Si existe una política inválida: no bloquear comandos desconocidos; mostrar una advertencia concisa y hacer fallar `sentinel doctor`/CI para que el proyecto corrija su configuración.
-- [ ] Si `mode` es `observe`: registrar el hallazgo y mostrar la recomendación, pero no impedir la ejecución.
-- [ ] Si `mode` es `enforce`: bloquear únicamente las clases declaradas y devolver código no cero.
+- [x] Si `mode` es `observe`, el guard registra `observed` y no bloquea la ejecución; la comparación dual contra Sentinel Core upstream sigue pendiente.
+- [x] Si `mode` es `enforce`, el guard bloquea solo comandos declarados y devuelve código 78; el enforcement del launcher global sigue pendiente.
 - [ ] VarSense no crea cooldown, lock ni reporte paralelo: Sentinel le entrega el manifiesto de archivos y recoge sus hallazgos con el contrato de analizador.
 
 ## Arquitectura por fases

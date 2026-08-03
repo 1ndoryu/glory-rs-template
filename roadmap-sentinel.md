@@ -141,7 +141,7 @@ Una regla no ejecuta procesos, no escribe archivos, no imprime salida humana y n
 - [x] Reproducir `runCustom` con una fixture que falle y corregir la propagación de `hasErrors`/exit code mediante `custom-rules.mjs`.
 - [x] Definir contrato estructurado para el bridge custom y retirar Bash/grep del camino normal; los scripts legacy quedan como referencia histórica.
 - [x] Diferenciar severity declarada, código de herramienta, timeout, crash y finding bloqueante en `common.mjs`/reporter.
-- [x] Exponer decisión local de política (`no-policy`, `legacy-v1`, `observe`, `enforce`, `pass-through`, `invalid-policy`) en guard/doctor/reporte mediante `scripts/quality/policy-decision.mjs`; la matriz global de shells/runtime continúa pendiente.
+- [x] Exponer y probar la decisión local de política (`no-policy`, `legacy-v1`, `observe`, `enforce`, `pass-through`, `invalid-policy`) en guard/doctor/reporte mediante `scripts/quality/policy-decision.mjs`; la matriz global de shells/runtime continúa pendiente.
 - [x] Añadir pruebas de regresión para custom con error, warning, información y salida estructurada.
 - [x] Verificar que logs/reportes redaccionan secretos y credenciales sin truncar el diagnóstico esencial; `redaction.test.mjs` cubre token, bearer y password.
 - [x] Ejecutar `npm run quality:test` y `task:check` full; baseline actual: 23 tests de quality, gate PASS en 52s, 38 archivos y reportes JSON/Markdown.
@@ -309,7 +309,7 @@ El reporte `297A-49` tardó 533833 ms: Rust consumió 483037 ms (90,5 %) y expir
 
 - [ ] Definir el contrato `analyze/check/guard/doctor/status` sin romper el CLI `sentinel analyze` actual.
 - [ ] Definir el contrato de analyzer: manifest de alcance, configuración efectiva, cancelación, timeout, salida normalizada, métricas y estados de error.
-- [x] Diseñar/validar localmente el envelope `sentinel.config.json` v2 y mapear la configuración Sentinel v1 actual mediante migración dry-run; backup/rollback aplicado y runtime global siguen pendientes.
+- [x] Diseñar/validar localmente el envelope `sentinel.config.json` v2 y mapear la configuración Sentinel v1 actual mediante migración dry-run; `no-policy/observe/enforce` del guard local están cubiertos, mientras backup/rollback aplicado y runtime global siguen pendientes.
 - [x] Crear `sentinel.lock.json` con versión/commit/hash de Sentinel, VarSense y protocolo; preflight verifica `git archive`, checkout limpio y realpath dentro del workspace; el runtime local declara `identitySha256` + `artifactSha256: null` hasta existir runtime global.
 - [ ] Exigir `artifactSha256` real para runtime global instalado y completar instalación/rollback sin ejecutar plugins o binarios arbitrarios del repositorio.
 - [ ] Extraer scheduler, cooldown, locks, scope, caché y reporter desde `scripts/quality` al runtime de Sentinel; conservar `task:check` como alias temporal.
