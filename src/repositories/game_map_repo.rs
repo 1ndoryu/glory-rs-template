@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde_json::Value as JsonValue;
-use sqlx::{FromRow, PgPool};
+use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 /// Fila interna del snapshot publicado. No se expone directamente desde HTTP.
@@ -41,10 +41,13 @@ impl GameMapRepository {
         .await
     }
 
-    /// Publica una versión dentro de una transacción serializada por mapa.
-    /// `None` significa que `expected_version` ya no es la versión activa.
+    /// Publica una versión dentro de la transacción ya abierta por el servicio
+    /// (serializada por mapa mediante advisory lock). `None` significa que
+    /// `expected_version` ya no es la versión activa.
+    /// [297A-58] La transacción la abre el servicio para que el evento de
+    /// auditoría de la publicación se escriba (o se descarte) con el cambio.
     pub async fn publish(
-        pool: &PgPool,
+        tx: &mut Transaction<'_, Postgres>,
         map_id: &str,
         expected_version: i32,
         schema_version: i32,
@@ -52,13 +55,11 @@ impl GameMapRepository {
         document: &JsonValue,
         published_by: Uuid,
     ) -> Result<Option<GameMapVersionRow>, sqlx::Error> {
-        let mut tx = pool.begin().await?;
-
         /* El lock transaccional evita carreras tanto en la primera publicación
          * como en actualizaciones posteriores, sin mantener locks permanentes. */
         sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
             .bind(map_id)
-            .execute(&mut *tx)
+            .execute(&mut **tx)
             .await?;
 
         let active_version: Option<i32> = sqlx::query_scalar(
@@ -68,11 +69,10 @@ impl GameMapRepository {
              LIMIT 1",
         )
         .bind(map_id)
-        .fetch_optional(&mut *tx)
+        .fetch_optional(&mut **tx)
         .await?;
 
         if active_version.unwrap_or(0) != expected_version {
-            tx.rollback().await?;
             return Ok(None);
         }
 
@@ -82,7 +82,7 @@ impl GameMapRepository {
              WHERE map_id = $1",
         )
         .bind(map_id)
-        .fetch_one(&mut *tx)
+        .fetch_one(&mut **tx)
         .await?;
 
         sqlx::query(
@@ -91,7 +91,7 @@ impl GameMapRepository {
              WHERE map_id = $1 AND is_active = TRUE",
         )
         .bind(map_id)
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await?;
 
         let row = sqlx::query_as::<_, GameMapVersionRow>(
@@ -108,10 +108,9 @@ impl GameMapRepository {
         .bind(content_hash)
         .bind(document)
         .bind(published_by)
-        .fetch_one(&mut *tx)
+        .fetch_one(&mut **tx)
         .await?;
 
-        tx.commit().await?;
         Ok(Some(row))
     }
 }

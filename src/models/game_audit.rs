@@ -9,6 +9,8 @@ pub const GAME_AUDIT_MAX_LIST_LIMIT: i64 = 100;
 /// Acciones allowlisted del catálogo; el servidor nunca acepta una acción del cliente.
 pub const ACTION_CHARACTER_CREATED: &str = "character.created";
 pub const ACTION_CHARACTER_UPDATED: &str = "character.updated";
+/// [297A-58] Publicación de una nueva versión activa de un mapa del juego.
+pub const ACTION_MAP_PUBLISHED: &str = "map.published";
 
 /// Evento persistido de auditoría. `actor_id` se conserva en BD para trazabilidad,
 /// pero no se expone en el listado admin (privacidad: solo el `actor_kind`).

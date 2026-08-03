@@ -7,6 +7,7 @@ use crate::models::game_map::{
     MapVersion, PublishMapRequest, MAP_VERSION_MAX_JSON_BYTES,
 };
 use crate::repositories::game_map_repo::{GameMapRepository, GameMapVersionRow};
+use crate::services::game_audit_svc::GameAuditService;
 
 pub struct GameMapService;
 
@@ -30,6 +31,9 @@ impl GameMapService {
 
     /// Publica un snapshot validado como nueva versión activa del mapa.
     /// La autorización ya fue resuelta por el extractor `AdminUser` del handler.
+    /// [297A-58] La publicación y su evento de auditoría comparten transacción;
+    /// el payload del evento solo lleva metadata (versión, schema, hash), nunca
+    /// el documento ni coordenadas.
     pub async fn publish(
         pool: &PgPool,
         published_by: Uuid,
@@ -58,11 +62,14 @@ impl GameMapService {
 
         let content_hash = document_content_hash(&canonical_document)
             .ok_or_else(|| AppError::Validation("No se pudo calcular el hash del mapa".into()))?;
+        let schema_version = i32::from(document.schema_version);
+
+        let mut tx = pool.begin().await?;
         let row = GameMapRepository::publish(
-            pool,
+            &mut tx,
             &map_id,
             request.expected_version,
-            i32::from(document.schema_version),
+            schema_version,
             &content_hash,
             &canonical_document,
             published_by,
@@ -71,6 +78,14 @@ impl GameMapService {
         .ok_or_else(|| {
             AppError::Conflict("La versión activa cambió; vuelve a leer el mapa".into())
         })?;
+
+        let payload = serde_json::json!({
+            "version": row.version,
+            "schemaVersion": row.schema_version,
+            "contentHash": row.content_hash,
+        });
+        GameAuditService::record_map_publish(&mut tx, published_by, &row.map_id, &payload).await?;
+        tx.commit().await?;
 
         Ok(Self::to_public(row))
     }

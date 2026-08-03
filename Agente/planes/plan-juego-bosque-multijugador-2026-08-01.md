@@ -564,6 +564,10 @@ realtime.
 
 **Límite 297A-57:** sin dos salas ni coordinador compartido (store single-instance hasta Fase 8), sin backoff con factor de aleatoriedad real probado en carga, sin reclamación invitado→cuenta ni expulsión; el estado `reconnecting` es informativo (no hay reintento activo de snapshots ni resync diferencial); la decisión de no reintentar tras 4001 supone que el usuario quiere que la conexión más nueva gane (documentada en el código).
 
+**Evidencia 297A-58:** auditoría de la publicación de mapas: `game_map_repo.publish` pasó a mutación transaccional y `GameMapService.publish` registra `map.published` en `game_audit_events` (actor kind `admin`, entidad y payload acotado) **dentro de la misma transacción** — nunca evento huérfano, mismo patrón que 297A-55. `GET /api/admin/game/audit/maps` lista eventos acotados (1..=100, por defecto 50) con filtro `entityId`, solo `AdminUser` (401/403) y acciones allowlisted server-side (`map.published`); el DTO no expone identidades ni datos privados. 13/13 tests HTTP PostgreSQL (3 nuevos de auditoría de mapas en `tests/game_audit.rs`: evento en publicación, filtro/límite y autorización 401/403), fmt, check y clippy PASS.
+
+**Límite 297A-58:** no hay panel UI de auditoría de mapas (el listado admin existe por API; la visualización llega con los paneles de mapa/assets), no hay auditoría de assets ni de expulsión (sus bloques la registrarán), el DTO no expone `actorId` (privacidad) y la purga de retención queda para Fase 8.
+
 **Gate:** ningún invitado puede invocar admin ni reclamar el estado de otra identidad; el perfil no depende de datos enviados sin validar.
 
 **Auditoría de cierre — Fase 6:**
@@ -582,6 +586,7 @@ realtime.
 - [ ] Persistir borrador con revisión optimista y conflicto visible.
 - [ ] Añadir preview de borrador y publicación atómica.
 - [x] Auditoría persistente de cambios sensibles del catálogo (`297A-55`): `game_audit_events` registra crear/actualizar/desactivar con actor, acción y estado visual en la misma transacción; listado admin acotado sin identidades. La auditoría de mapa/assets y la garantía de versión de la sala activa llegan con sus bloques.
+- [x] Auditoría de la publicación de mapas (`297A-58`): `map.published` se registra en `game_audit_events` dentro de la misma transacción de la publicación (repo transaccional, patrón 297A-55); listado admin acotado por API. La auditoría de assets/expulsión y la garantía de versión de la sala activa llegan con sus bloques.
 
 **Gate:** un admin importa un GLB, crea terreno 2D, coloca instancias, guarda, previsualiza y publica; un usuario normal recibe rechazo server-side aunque fuerce el cliente.
 

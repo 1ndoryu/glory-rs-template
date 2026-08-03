@@ -126,6 +126,107 @@ async fn json_body(response: axum::response::Response) -> Value {
     serde_json::from_slice(&body).expect("json válido")
 }
 
+/* [297A-58] Auditoría de publicación de mapas: mismos helpers de sesión, pero
+ * el publish requiere CSRF + origin y los snapshots son inmutables (el usuario
+ * autor no se borra; el resto del cleanup sí). */
+fn unique_map_id() -> String {
+    format!("map-test-{}", Uuid::new_v4())
+}
+
+fn valid_map_document(id: &str) -> Value {
+    json!({
+        "schemaVersion": 1,
+        "id": id,
+        "terrain": {
+            "schemaVersion": 1,
+            "bounds": { "minX": 0.0, "maxX": 32.0, "minZ": 0.0, "maxZ": 32.0 },
+            "cellSize": 2.0,
+            "chunkSize": 16,
+            "chunks": [{
+                "x": 0,
+                "z": 0,
+                "heights": vec![0.0; 289],
+                "surfaces": vec![0; 256]
+            }]
+        },
+        "assetManifest": {
+            "tree-v1": {
+                "id": "tree-v1",
+                "category": "tree",
+                "contentHash": "sha256:tree-v1",
+                "collisionProxy": { "kind": "circle", "radius": 0.5 }
+            }
+        },
+        "instances": [{
+            "id": "tree-instance",
+            "assetVersionId": "tree-v1",
+            "position": { "x": 8.0, "z": 8.0 },
+            "rotationY": 0.0,
+            "scale": 1.0,
+            "terrainAnchor": "surface"
+        }],
+        "spawnPoints": [{
+            "id": "spawn",
+            "position": { "x": 2.0, "z": 2.0 },
+            "radius": 0.5
+        }]
+    })
+}
+
+fn admin_map_publish_request(session: &str, csrf: &str, map_id: &str) -> Request<Body> {
+    Request::builder()
+        .method("POST")
+        .uri("/api/admin/game/maps")
+        .header("origin", "http://localhost:5173")
+        .header("content-type", "application/json")
+        .header("cookie", format!("session_id={session}; csrf_token={csrf}"))
+        .header("x-csrf-token", csrf)
+        .body(Body::from(
+            json!({
+                "expectedVersion": 0,
+                "document": valid_map_document(map_id)
+            })
+            .to_string(),
+        ))
+        .expect("request de publicación válida")
+}
+
+fn map_audit_list_request(session: Option<&str>, entity_id: Option<&str>) -> Request<Body> {
+    let mut uri = "/api/admin/game/audit/maps".to_string();
+    if let Some(id) = entity_id {
+        uri = format!("{uri}?entityId={id}");
+    }
+    let mut builder = Request::builder().uri(uri);
+    if let Some(session) = session {
+        builder = builder.header("cookie", format!("session_id={session}"));
+    }
+    builder.body(Body::empty()).expect("request válida")
+}
+
+/* Los snapshots son inmutables: el usuario que ya es autor se conserva por la
+ * FK RESTRICT; los demás sí se limpian. */
+async fn cleanup_map_author(app: &AppState, user_id: Uuid) {
+    sqlx::query("DELETE FROM game_audit_events WHERE actor_id = $1")
+        .bind(user_id)
+        .execute(&app.pool)
+        .await
+        .expect("auditoría limpiada");
+    sqlx::query("DELETE FROM auth_sessions WHERE user_id = $1")
+        .bind(user_id)
+        .execute(&app.pool)
+        .await
+        .expect("sesiones limpiadas");
+    sqlx::query(
+        "DELETE FROM users
+         WHERE id = $1
+           AND NOT EXISTS (SELECT 1 FROM game_map_versions WHERE published_by = $1)",
+    )
+    .bind(user_id)
+    .execute(&app.pool)
+    .await
+    .expect("usuario limpiado si no es autor");
+}
+
 #[tokio::test]
 async fn admin_character_changes_are_audited_with_visible_state() {
     let app = state().await;
@@ -245,4 +346,93 @@ async fn audit_list_filters_by_entity_and_bounds_the_limit() {
         .execute(&app.pool)
         .await
         .expect("personaje limpiado");
+}
+
+#[tokio::test]
+async fn map_publication_is_audited_with_metadata_only() {
+    let app = state().await;
+    let (admin_id, admin_session, admin_csrf) = create_user(&app, "admin").await;
+    let map = unique_map_id();
+
+    let published = create_router_with_state(app.clone())
+        .oneshot(admin_map_publish_request(&admin_session, &admin_csrf, &map))
+        .await
+        .expect("publicación responde");
+    assert_eq!(published.status(), StatusCode::OK);
+
+    let list = create_router_with_state(app.clone())
+        .oneshot(map_audit_list_request(Some(&admin_session), Some(&map)))
+        .await
+        .expect("auditoría responde");
+    let body = json_body(list).await;
+    let events = body.as_array().expect("lista de eventos");
+    assert_eq!(events.len(), 1, "una publicación = un evento");
+    let event = &events[0];
+    assert_eq!(event["action"], "map.published");
+    assert_eq!(event["actorKind"], "admin");
+    assert_eq!(event["entityKind"], "map");
+    assert_eq!(event["entityId"], map);
+    assert_eq!(event["payload"]["version"], 1);
+    assert!(event["payload"].get("schemaVersion").is_some());
+    assert!(event["payload"].get("contentHash").is_some());
+    assert!(
+        event["payload"].get("document").is_none(),
+        "el evento nunca lleva el documento del mapa"
+    );
+    assert!(
+        event["payload"].get("instances").is_none(),
+        "el evento no expone coordenadas ni instancias"
+    );
+
+    cleanup_map_author(&app, admin_id).await;
+}
+
+#[tokio::test]
+async fn map_audit_requires_admin_and_does_not_leak_actor_id() {
+    let app = state().await;
+    let (admin_id, _admin_session, _admin_csrf) = create_user(&app, "admin").await;
+    let (user_id, user_session, _user_csrf) = create_user(&app, "user").await;
+
+    let without_session = create_router_with_state(app.clone())
+        .oneshot(map_audit_list_request(None, None))
+        .await
+        .expect("auditoría responde");
+    let non_admin = create_router_with_state(app.clone())
+        .oneshot(map_audit_list_request(Some(&user_session), None))
+        .await
+        .expect("auditoría responde");
+
+    cleanup_map_author(&app, admin_id).await;
+    cleanup_map_author(&app, user_id).await;
+    assert_eq!(without_session.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(non_admin.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn map_audit_filters_by_map_id() {
+    let app = state().await;
+    let (admin_id, admin_session, admin_csrf) = create_user(&app, "admin").await;
+    let first_map = unique_map_id();
+    let second_map = unique_map_id();
+
+    for map in [&first_map, &second_map] {
+        create_router_with_state(app.clone())
+            .oneshot(admin_map_publish_request(&admin_session, &admin_csrf, map))
+            .await
+            .expect("publicación responde");
+    }
+
+    let filtered = create_router_with_state(app.clone())
+        .oneshot(map_audit_list_request(
+            Some(&admin_session),
+            Some(&first_map),
+        ))
+        .await
+        .expect("auditoría responde");
+    let body = json_body(filtered).await;
+    let events = body.as_array().expect("lista de eventos");
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0]["entityId"], first_map);
+
+    cleanup_map_author(&app, admin_id).await;
 }

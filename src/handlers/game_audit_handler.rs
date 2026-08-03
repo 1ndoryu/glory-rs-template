@@ -50,9 +50,39 @@ pub async fn list_game_audit_characters(
     ))
 }
 
+/// [297A-58] Listado de eventos de publicación de mapas (admin). Mismo contrato
+/// acotado que el catálogo: nunca expone identidades, el documento ni
+/// coordenadas; el payload solo lleva versión, schema y hash.
+#[utoipa::path(
+    get,
+    path = "/api/admin/game/audit/maps",
+    params(
+        ("entityId" = Option<String>, Query, description = "Filtra por id de mapa"),
+        ("limit" = Option<i64>, Query, description = "Máximo de eventos (1..=100, por defecto 50)")
+    ),
+    responses(
+        (status = 200, description = "Eventos de publicación de mapas", body = [GameAuditEventResponse]),
+        (status = 401, description = "No autorizado", body = ErrorResponse),
+        (status = 403, description = "Prohibido", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
+pub async fn list_game_audit_maps(
+    State(state): State<AppState>,
+    _admin: AdminUser,
+    Query(params): Query<GameAuditQuery>,
+) -> Result<Json<Vec<GameAuditEventResponse>>, AppError> {
+    Ok(Json(
+        GameAuditService::list_map_events(&state.pool, params.entity_id.as_deref(), params.limit)
+            .await?,
+    ))
+}
+
 pub fn routes() -> Router<AppState> {
-    Router::new().route(
-        "/admin/game/audit/characters",
-        get(list_game_audit_characters),
-    )
+    Router::new()
+        .route(
+            "/admin/game/audit/characters",
+            get(list_game_audit_characters),
+        )
+        .route("/admin/game/audit/maps", get(list_game_audit_maps))
 }

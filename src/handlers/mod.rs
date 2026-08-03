@@ -64,6 +64,7 @@ impl utoipa::Modify for SecurityAddon {
         game_character_handler::create_game_character,
         game_character_handler::update_game_character,
         game_audit_handler::list_game_audit_characters,
+        game_audit_handler::list_game_audit_maps,
         game_map_handler::get_active_map,
         game_map_handler::publish_map,
         game_profile_handler::get_game_profile,
