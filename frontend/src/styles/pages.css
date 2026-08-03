@@ -302,6 +302,66 @@
   gap: var(--espacio-md);
 }
 
+/* [028A-14] Panel de gobernanza del workspace (tab "escritorio"). */
+.admin-workspace-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--espacio-sm);
+}
+
+.admin-workspace-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-xs);
+  padding: var(--espacio-sm);
+  border: var(--borde);
+}
+
+.admin-workspace-card-etiqueta {
+  font-size: var(--tamano-pequeno);
+  opacity: 0.7;
+}
+
+.admin-workspace-card-valor {
+  font-weight: var(--peso-medio);
+}
+
+/* [028A-14] Aviso cuando la version activa no es la ultima publicada
+ * (caso Papelera: una release incompleta quedo vigente sin avisar). */
+.admin-escritorio-aviso {
+  padding: var(--espacio-sm);
+  border: var(--borde);
+  font-weight: var(--peso-medio);
+}
+
+.admin-workspace-item-cabecera {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-sm);
+}
+
+.admin-workspace-item {
+  gap: var(--espacio-sm);
+}
+
+.admin-escritorio-detalle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-xs);
+}
+
+.admin-escritorio-detalle-titulo {
+  margin: 0;
+}
+
+.admin-escritorio-detalle-ok {
+  margin: 0;
+}
+
+.admin-escritorio-detalle-item {
+  padding-left: var(--espacio-md);
+}
+
 /* [317A-2] Paginas raiz (galeria, proyectos) que renderizan en el area de
  * contenido principal: llenan la altura para centrar los estados vacios. */
 .pagina-contenido {

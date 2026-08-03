@@ -11,6 +11,9 @@ import {
   getReleaseByVersion,
   listReleases,
   publishRelease,
+  getWorkspaceControl,
+  validateRelease,
+  activateRelease,
 } from '../api/generated/workspace-handler/workspace-handler';
 import {
   getOverlay,
@@ -29,6 +32,26 @@ export interface ReleaseListItem {
   version: number;
   published_at: string;
   published_by: string | null;
+  is_active: boolean;
+  node_count: number;
+  diff_from: number | null;
+  summary: Record<string, unknown>;
+}
+
+export interface ReleaseControl {
+  active_version: number | null;
+  active_node_count: number | null;
+  active_published_at: string | null;
+  active_published_by: string | null;
+  latest_version: number | null;
+  total_releases: number;
+}
+
+export interface ReleaseValidation {
+  version: number;
+  valid: boolean;
+  issues: Array<{ node_id: string; message: string }>;
+  broken_refs: Array<{ id: string; ref_id: string; label: string }>;
 }
 
 export interface WorkspaceOverlayResponse {
@@ -86,13 +109,82 @@ export const WorkspaceService = {
     const result = unwrapGeneratedResponse<{ items: Array<{
       id: string;
       version: number;
-      published_at: string;
-      published_by?: string | null;
+      publishedAt: string;
+      publishedBy?: string | null;
+      isActive: boolean;
+      nodeCount: number;
+      diffFrom?: number | null;
+      summary: Record<string, unknown>;
     }> }>(response, [200]);
     return result.items.map((item) => ({
-      ...item,
-      published_by: item.published_by ?? null,
+      id: item.id,
+      version: item.version,
+      published_at: item.publishedAt,
+      published_by: item.publishedBy ?? null,
+      is_active: item.isActive,
+      node_count: item.nodeCount,
+      diff_from: item.diffFrom ?? null,
+      summary: item.summary,
     }));
+  },
+
+  /** Estado actual de la gobernanza del workspace (admin — dashboard). */
+  async getControl(): Promise<ReleaseControl> {
+    const response = await getWorkspaceControl();
+    const data = unwrapGeneratedResponse<{
+      activeVersion?: number | null;
+      activeNodeCount?: number | null;
+      activePublishedAt?: string | null;
+      activePublishedBy?: string | null;
+      latestVersion?: number | null;
+      totalReleases: number;
+    }>(response, [200]);
+    return {
+      active_version: data.activeVersion ?? null,
+      active_node_count: data.activeNodeCount ?? null,
+      active_published_at: data.activePublishedAt ?? null,
+      active_published_by: data.activePublishedBy ?? null,
+      latest_version: data.latestVersion ?? null,
+      total_releases: data.totalReleases,
+    };
+  },
+
+  /** Validación dry-run de una release publicada (admin). */
+  async validateVersion(version: number): Promise<ReleaseValidation> {
+    const response = await validateRelease(version);
+    const data = unwrapGeneratedResponse<{
+      version: number;
+      valid: boolean;
+      issues?: Array<{ nodeId?: string; message: string }>;
+      brokenRefs?: Array<{ id: string; refId?: string; label?: string }>;
+    }>(response, [200]);
+    return {
+      version: data.version,
+      valid: data.valid,
+      issues: (data.issues ?? []).map((issue) => ({
+        node_id: issue.nodeId ?? '',
+        message: issue.message,
+      })),
+      broken_refs: (data.brokenRefs ?? []).map((ref) => ({
+        id: ref.id,
+        ref_id: ref.refId ?? '',
+        label: ref.label ?? '',
+      })),
+    };
+  },
+
+  /** Activar una release existente (admin). */
+  async activateVersion(version: number, force = false): Promise<ReleaseInfo> {
+    const response = await activateRelease(
+      version,
+      force ? { force: true } : undefined,
+    );
+    const data = unwrapGeneratedResponse<{
+      version: number;
+      tree: Record<string, unknown>;
+      published_at: string;
+    }>(response, [200]);
+    return toReleaseInfo(data);
   },
 
   /** Publicar un nuevo release (admin). */

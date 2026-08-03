@@ -11,6 +11,7 @@ import { safeClick, safeRun, safeEffect } from '../utils/safe-async';
 import { renderArticleList, openEditor, disposeAdminArticleLists } from './admin-articles';
 import { renderProjectList, openProjectEditor, disposeAdminProjectLists } from './admin-projects';
 import { renderProductList, openProductEditor, disposeAdminProductLists } from './admin-products';
+import { renderWorkspaceAdmin, createPublicarAccion, disposeAdminWorkspaceLists } from './admin-workspace';
 import {
   renderNotificationsAdminList,
   openNuevoAvisoModal,
@@ -26,6 +27,7 @@ export function disposeAdminPage(page: HTMLElement): void {
   disposeAdminProjectLists(page);
   disposeAdminProductLists(page);
   disposeAdminNotificationsLists(page);
+  disposeAdminWorkspaceLists(page);
 }
 
 /* [018A-1] Vista de Admin para el runtime de ventanas: devuelve la página
@@ -65,6 +67,16 @@ export function createAdminWindowView(): { page: Promise<HTMLElement>; actions: 
     contentArea.id = `admin-${name}`;
 
     switch (name) {
+      /* [028A-14] Tab "escritorio": gobernanza del workspace (release activa,
+       * historial, validacion y activacion de versiones). El caso Papelera
+       * (release incompleta vigente) se detecta desde aqui. */
+      case 'escritorio': {
+        const panel = createEl('div', { className: 'admin-lista' });
+        contentArea.appendChild(panel);
+        void renderWorkspaceAdmin(panel);
+        setWindowActions([createPublicarAccion()]);
+        break;
+      }
       /* [018A-1] Las listas viven solas en el body; el botón de alta va a la
        * franja inferior de la ventana (fuera del body padded), al final. */
       case 'articulos': {
@@ -129,6 +141,7 @@ export function createAdminWindowView(): { page: Promise<HTMLElement>; actions: 
 
   const tabs = createTabs({
     tabs: [
+      { id: 'escritorio', label: 'escritorio' },
       { id: 'articulos', label: 'articulos' },
       { id: 'proyectos', label: 'proyectos' },
       { id: 'productos', label: 'productos' },
