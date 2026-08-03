@@ -34,6 +34,7 @@ Los repositorios upstream y una instalación global administrada no forman parte
 - `scripts/quality/lock-generator.mjs`: generación/verificación local del lock sin instalación, comparación estructural ignorando `generatedAt`, backup `.bak` y escritura atómica.
 - `scripts/quality/sentinel-doctor.mjs --lock`: diagnóstico/generación explícita; `--check` no escribe y `--write` no modifica analyzers.
 - `scripts/quality/tests/lock-generator.test.mjs`: 6 fixtures de parseo, generación, no-escritura, mismatch, backup y symlink/tamper.
+- `scripts/quality/policy-decision.mjs`: contrato local único para `no-policy`, `legacy-v1`, `observe`, `enforce`, `pass-through` e `invalid-policy`; el campo es aditivo en identidad/reporte y no pretende sustituir el runtime global.
 
 ## Gates pendientes
 

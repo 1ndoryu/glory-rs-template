@@ -168,13 +168,13 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 ### Fase 2 — Resolución por workspace y rama *(contrato local parcial; enforcement global bloqueado)*
 
 - [ ] Implementar descubrimiento de raíz y política en cada comando, sin estado de proceso que sobreviva al cambio de rama.
-- [ ] Diferenciar `no-policy`, `observe`, `enforce` y `invalid-policy` en el resultado y el reporte.
+- [x] Diferenciar `no-policy`, `legacy-v1`, `observe`, `enforce`, `pass-through` e `invalid-policy` en el guard, doctor e identidad/reporte local (`scripts/quality/policy-decision.mjs` + fixtures); el enforcement global sigue pendiente.
 - [x] Invalidar la caché local por `policyHash` además de modo, herramientas, configuración y archivos.
 - [ ] Invalidar decisiones/cooldowns del runtime global por `projectRoot + policyHash + runtimeVersion`. *(pendiente del runtime global)*
 - [ ] Mantener cooldown/locks solo para comandos declarados como pesados por la política; no compartirlos entre proyectos.
 - [ ] Emitir leases efímeros firmados para que los procesos hijos iniciados por `sentinel check` puedan usar herramientas pesadas sin que el propio shim los bloquee; el lease debe estar ligado a PID, proyecto, comando, expiración y task ID.
 - [ ] Definir la frontera de enforcement: shims cubren shells normales; el launcher del agente/CI debe invocar `sentinel guard` antes de ejecutar procesos. Rutas absolutas y shells `--noprofile --norc` se registran como bypass no interceptable por un script de proyecto, no se presentan como cobertura completa.
-- [ ] Añadir `sentinel doctor` con diagnóstico de raíz, política, hash, modo, shims, PATH y comando recomendado.
+- [x] Añadir al diagnóstico local la decisión estable (`action`, `mode`, `blocked`, `reason`) junto con raíz, hash y comando recomendado; diagnóstico de shims/PATH global queda pendiente del runtime externo.
 
 **Gate:** matriz con dos proyectos y dos ramas: el proyecto configurado bloquea lo declarado; el proyecto sin política pasa; cambiar de rama actualiza la decisión sin reiniciar el editor.
 

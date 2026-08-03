@@ -2,6 +2,7 @@ import path from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { validatePolicy } from './policy.mjs';
+import { decisionForGuard } from './policy-decision.mjs';
 import { BLOCKED_CARGO_COMMANDS, BLOCKED_NPM_SCRIPTS, BLOCKED_TOOLS } from './policy-defaults.mjs';
 
 export const QUALITY_GUARD_EXIT_CODE = 78;
@@ -133,16 +134,19 @@ export function inspectDirectCommand({ executable, args = [], cwd = process.cwd(
     }
   }
 
-  if (!reason || policy.status === 'no-policy' || policy.status === 'invalid-policy' || policy.mode === 'pass-through') {
-    return { blocked: false, root, policyStatus: policy.status };
+  const discovered = policy.status === 'policy'
+    ? { status: 'policy', policy: { mode: policy.mode } }
+    : { status: policy.status };
+  const decision = decisionForGuard(discovered, reason);
+  if (!reason || !decision.blocked && !decision.observed) {
+    return { ...decision, blocked: false, root, policyStatus: policy.status };
   }
-  if (policy.mode === 'observe') return { blocked: false, root, policyStatus: policy.status, observed: reason, category };
   return {
-    blocked: true,
+    ...decision,
     category,
     command: reason,
     root,
-    exitCode: QUALITY_GUARD_EXIT_CODE,
+    exitCode: decision.blocked ? QUALITY_GUARD_EXIT_CODE : undefined,
     policyStatus: policy.status,
   };
 }

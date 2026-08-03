@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { migrateLegacyConfig, loadPolicy } from './policy.mjs';
+import { migrateLegacyConfig, loadPolicy, policyIdentity } from './policy.mjs';
 import { checkLock, writeLock } from './lock-generator.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -57,7 +57,12 @@ async function main(argv = process.argv.slice(2)) {
     return lockResult;
   }
   const discovered = await loadPolicy(options.cwd);
-  const result = { schemaVersion: 1, command: 'sentinel doctor', ...discovered };
+  const result = {
+    schemaVersion: 1,
+    command: 'sentinel doctor',
+    ...discovered,
+    decision: policyIdentity(discovered, null).decision,
+  };
   if (options.migrate) {
     const legacyRoot = resolveLegacyRoot(discovered);
     const migrated = migrateLegacyConfig({

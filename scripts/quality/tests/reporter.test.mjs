@@ -22,7 +22,7 @@ test('la salida compacta conserva estado, siguiente accion y limite de contexto'
         severity: 'error', ruleId: `R${index}`, message: 'hallazgo',
       })),
       reminders: ['uno', 'dos', 'tres', 'cuatro'],
-      policy: { policyHash: 'abc123', reason: 'política v2 válida' },
+      policy: { policyHash: 'abc123', reason: 'política v2 válida', decision: { action: 'enforce' } },
       nextCommand: 'npm run task:check -- T-1',
     },
   };
@@ -50,6 +50,7 @@ test('createReport serializa la identidad de política en JSON y Markdown', asyn
           policyPath: path.join(projectRoot, 'sentinel.config.json'),
           policyHash: 'policy-hash-test',
           runtimeVersion: '0.4.0',
+          decision: { status: 'policy', mode: 'enforce', action: 'enforce', blocked: false, reason: 'política v2 válida' },
           reason: 'política v2 válida',
           recommendedCommand: 'npm run task:check -- T-2',
         },

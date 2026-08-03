@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { access, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { BLOCKED_CARGO_COMMANDS, BLOCKED_NPM_SCRIPTS, BLOCKED_TOOLS, DEFAULT_GATE_COMMAND } from './policy-defaults.mjs';
+import { policyDecision } from './policy-decision.mjs';
 
 const POLICY_FILE = 'sentinel.config.json';
 const MAX_STRING_LENGTH = 160;
@@ -153,6 +154,7 @@ export function policyIdentity(discovered, runtimeVersion = null) {
     policyPath: discovered.policyPath,
     policyHash: discovered.policyHash ?? hashText(discovered.status),
     runtimeVersion,
+    decision: policyDecision(discovered),
     reason: policyReason(discovered),
     recommendedCommand: discovered.status === 'legacy-v1'
       ? 'npm run quality:doctor -- --migrate --dry-run'
