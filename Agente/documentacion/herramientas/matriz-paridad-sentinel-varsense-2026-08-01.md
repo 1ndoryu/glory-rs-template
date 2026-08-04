@@ -4,8 +4,10 @@
 
 | Herramienta | Versión | Commit | CLI | LSP/VS Code | Fixture/gate |
 | --- | --- | --- | --- | --- | --- |
-| Glory Sentinel | 0.4.0 | `107be9b61a7ed4676ee89b101ecff4112a039fb2` | PASS | Core editor-agnóstico PASS | `npm run test:unit`, `task:check` |
-| VarSense | 2.2.0 | `b1aa3f06ffbb96a55dd0156a99eae482f41311b8` | `scan`, `orphan-classes`, `all` | Core/LSP/VS Code PASS | 46 pruebas, `npm test` |
+| Glory Sentinel | 0.4.0 | `7ad3b766207bb28d89d38a938ee14fbad9f4cd49` | PASS | Core editor-agnóstico PASS | `npm run test:unit`, `task:check` |
+| VarSense | 2.2.0 | `4167868dd5d0e7674d5565ade399a57796d69cf3` | `scan`, `orphan-classes`, `all` | Core/LSP/VS Code PASS | 46 pruebas, `npm test` |
+
+> **Sync 038A-5 (2026-08-04):** los commits previos (`107be9b6`/`b1aa3f06`) resultaron inexistentes en los repos dev y en `origin`; las features solo vivían en la copia instalada. Se portaron los commits reales a `main` (sentinel `7ad3b76`, varsense `4167868`, pusheados a `1ndoryu/*`) y la copia instalada quedó re-sincronizada a esos commits (ver plan 028A-6, sección de inventario).
 
 ## Contratos
 
@@ -39,6 +41,5 @@ Los commits fijados en `quality-tools.json` son la fuente que consume este gate.
 
 - Benchmark small/medium/full con memoria RSS comparable en Windows/Linux CI.
 - Paridad visual del panel VS Code frente a CLI/LSP para los nuevos metadatos.
-- Publicar releases upstream en sus repositorios remotos; este workspace solo fija commits instalados.
-- Sincronizar los repositorios upstream `main` con los commits fijados, cuando exista autorización/checkout verificable; hasta entonces la copia instalada es la fuente efectiva del gate.
+- Publicar releases upstream en sus repositorios remotos; el sync de `main` con las features fijadas se completó el 2026-08-04 (038A-5); la publicación de tags/releases formales queda pendiente.
 - Instalar el runtime global, exigir `artifactSha256` real y ejecutar la matriz multi-shell/multi-proyecto; estas capacidades no se declaran implementadas en este repositorio.

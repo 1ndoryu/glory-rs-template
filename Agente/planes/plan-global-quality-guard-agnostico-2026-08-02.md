@@ -266,18 +266,18 @@ La migración a Sentinel como plano único deja documentación desincronizada co
 
 ### Repositorio glory-sentinel (repo dev `main` + copia instalada `.quality-tools/sentinel`)
 
-- [ ] **`README.md`** — reescribir: eliminar la era IA (análisis IA contextual, comando toggle IA, config `codeSentinel.aiAnalysis.*`, alias Gemini; todo eliminado en 0.4.0) y documentar CLI `analyze`/`--files-from`/`--format`/`--output`/`--config`, exit codes 0/1/2, JSON `schemaVersion: '1'`, validación estricta de `sentinel.config.json`, `portableBoundaries` y el catálogo completo de reglas del `ruleRegistry`. Posicionar Sentinel como plano de control de calidad agnóstico (VS Code + CLI + LSP).
-- [ ] **`help.txt`** — reemplazar el volcado del `--help` de Gemini CLI por el `--help` real de `sentinel analyze` (o eliminar; es residuo de la era IA).
-- [ ] **`rules.md`** — reescribir con los IDs reales del `ruleRegistry` (actualmente lista IDs de la era IA que no coinciden) o eliminar.
-- [ ] **`CHANGELOG.md`** — añadir entrada 0.4.x con las portable rules y `portableBoundaries`; marcar la deprecación del motor IA de la entrada 0.1.0.
-- [ ] **Sincronizar `main` con el commit fijado** (`107be9b6`): portable rules (`src/analyzers/static/portableRules.ts`), `portableBoundaries` en `config.ts` y reglas `unsafe-process-shell`/`default-export` en el registry. Sin esto, `main` está detrás de lo que el gate consume y los README describen features que el repo dev no tiene.
-- [x] **Parche local `[317A-3]`** declarado reproduciblemente en `scripts/quality/patches/sentinel-317a-3.patch` y `quality-tools.json` (`patchSha256=77bfdac2a3d245ecc50d9d79bc0539f52fdc0c72426aa21c53202c48c0bb9ed7`): `.boton-icono`, `botonIcono`, variantes kebab y fixture. Setup/lock verifican el archivo raíz, el diff aplicado y las rutas; sigue siendo patch local hasta upstream.
+- [x] **`README.md`** — reescrito (commit `95ac5b0` `038A-4`): era IA eliminada, CLI `analyze`/`--files-from`/`--format`/`--output`/`--config`, JSON `schemaVersion: '1'`, validación estricta de `sentinel.config.json`, `portableBoundaries`, catálogo completo de reglas y rol de plano global (VS Code + CLI + LSP).
+- [x] **`help.txt`** — reemplazado por el `--help` real de `sentinel analyze` (commit `7ad3b76` `038A-5`); ya no es el dump de la CLI Gemini.
+- [x] **`rules.md`** — regenerado desde `obtenerTodasLasReglas()` del `ruleRegistry` compilado: 105 IDs reales con severidad/categoría (commit `7ad3b76` `038A-5`).
+- [x] **`CHANGELOG.md`** — entrada 0.4.0 ampliada con portable rules/`portableBoundaries`/`unsafe-process-shell`/`default-export` y deprecación del motor IA marcada (commit `7ad3b76` `038A-5`).
+- [x] **Sincronizar `main`** — el commit fijado previo (`107be9b6`) resultó **inexistente** en el repo dev y en `origin` (las features solo vivían en la copia instalada). Se cherry-pickearon los commits reales `SNT-04` (`0f164e0`) y `SNT-02` (`e06a140`) sobre `main`, quedando `main=7ad3b76` con portable rules, `portableBoundaries` y las reglas del registry; push a `origin/main` (95ac5b0..7ad3b76).
+- [x] **Parche local `[317A-3]`** regenerado contra el nuevo `main` (el README ya quedó absorbido en main; el parche conserva solo las recetas de código) y re-declarado en `quality-tools.json` (`patchSha256=b660b7e050eccbd09ca07f542257a1917974e0cfef123ee3aa0ded2aba3dbf8d`); sigue siendo patch local hasta upstream.
 
 ### Repositorio varsense (repo dev `main` + copia instalada `.quality-tools/varsense`)
 
-- [ ] **`README.md`** — reescribir: nombre actual VarSense (no "CSS Variables Validator"), CLI `scan`/`orphan-classes`/`all`, binario `varsense`/`varsense-lsp`, LSP stdio, integración Zed y `tokenDetection` (hallazgos `token-duplicate`/`token-unused`).
-- [ ] **`CHANGELOG.md`** — añadir `all` y `tokenDetection` a 2.2.0.
-- [ ] **Sincronizar `main` con el commit fijado** (`b1aa3f06`): subcomando `all` y `tokenDetection`. El gate invoca `varsense all` (`adapters/varsense.mjs`), que solo existe en la copia instalada; contra `main` el gate fallaría.
+- [x] **`README.md`** — reescrito (commit `4167868` `038A-5`): nombre VarSense, CLI `scan`/`orphan-classes`/`all`, binarios `varsense`/`varsense-lsp`, LSP stdio, integración Zed y `tokenDetection` (`token-duplicate`/`token-unused`).
+- [x] **`CHANGELOG.md`** — añadidos `all` y `tokenDetection` a la entrada 2.2.0 (commit `4167868` `038A-5`).
+- [x] **Sincronizar `main`** — el commit fijado previo (`b1aa3f06`) resultó **inexistente** en el repo dev y en `origin`. `main` se fast-forwardeó a `b1aa3f0` (commits reales `SNT-03` `9e69deb` y `SNT-07` `b1aa3f0`) y luego `038A-5` añadió las docs, quedando `main=4167868` con `all` y `tokenDetection`; push a `origin/main` (b299040..4167868).
 
 ### Proyecto wandori.us (glory-rust-template)
 
@@ -286,7 +286,7 @@ La migración a Sentinel como plano único deja documentación desincronizada co
 - [x] **`Agente/documentacion/herramientas/matriz-paridad-sentinel-varsense-2026-08-01.md`** — añadir nota sobre `all`/`tokenDetection`/portable rules, copia instalada frente a repos `main`, lockfile, branch-key y límites del runtime global.
 - [x] **`Agente/documentacion/indice-documentacion-2026-07-29.md`** — enlazar el estado de versiones, hashes, ramas y retención mediante el plan global y los manifiestos canónicos.
 
-**Gate del inventario:** cada ítem cierra con evidencia (commit en el repo de la herramienta o en el proyecto) y el catálogo de reglas del README de Sentinel debe coincidir con `ruleRegistry.ts` de la copia instalada. Los repos dev sincronizados con las copias instaladas es prerequisito para que la documentación describa lo que el gate realmente consume.
+**Gate del inventario:** cada ítem cierra con evidencia (commit en el repo de la herramienta o en el proyecto) y el catálogo de reglas del README de Sentinel debe coincidir con `ruleRegistry.ts` de la copia instalada. Los repos dev sincronizados con las copias instaladas es prerequisito para que la documentación describa lo que el gate realmente consume. **Cerrado 2026-08-04:** repos dev `main` (sentinel `7ad3b76`, varsense `4167868`) pusheados a `origin`; docs regeneradas desde el código real; copias instaladas re-sincronizadas a los commits de `main`; `quality-tools.json` y `sentinel.lock.json` regenerados y verificados (`pass: match`).
 
 ## Definition of Done
 
