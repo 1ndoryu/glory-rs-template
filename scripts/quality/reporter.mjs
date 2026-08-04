@@ -15,12 +15,18 @@ function formatDuration(ms) {
   return `${Math.round(ms)}ms`;
 }
 
+function formatScope(scope) {
+  const fingerprint = scope.full ? 'full' : 'incremental';
+  const execution = (scope.executionFull ?? scope.full) ? 'full' : 'incremental';
+  return fingerprint === execution ? fingerprint : `${fingerprint} · ejecución ${execution}`;
+}
+
 function markdown(report) {
   const lines = [
     `# Quality report ${report.taskId}`,
     '',
     `- Estado: **${report.decision.label}**`,
-    `- Alcance: ${report.scope.full ? 'full' : 'incremental'} (${report.scope.files.length} archivos)`,
+    `- Alcance: ${formatScope(report.scope)} (${report.scope.files.length} archivos)`,
     `- Duración: ${report.durationMs}ms (${formatDuration(report.durationMs)})`,
     `- Política: ${report.policy.policyHash} · ${report.policy.decision?.action ?? 'unknown'} · ${report.policy.reason}`,
     ...(report.reportRetention?.status === 'error' ? [`- Retención: **error no bloqueante** — ${report.reportRetention.message}`] : []),
@@ -63,7 +69,13 @@ export async function createReport(context, args, scope, stages, reminders, star
       reason: 'identidad de política no disponible',
       recommendedCommand: `npm run task:check -- ${args.taskId}`,
     },
-    scope: { base: scope.base, full: scope.full, files: scope.files, profiles: [...scope.profiles] },
+    scope: {
+      base: scope.base,
+      full: scope.full,
+      executionFull: scope.executionFull ?? scope.full,
+      files: scope.files,
+      profiles: [...scope.profiles],
+    },
     tools: Object.fromEntries(Object.entries(context.tools).map(([name, tool]) => [name, {
       version: tool.version, commit: tool.commit, outputSchemaVersion: tool.outputSchemaVersion,
     }])),
@@ -86,7 +98,7 @@ export function compactLines(reportResult, context) {
   const { report } = reportResult;
   const lines = [
     `[quality] ${report.taskId} — ${report.decision.label}`,
-    `[quality] Scope: ${report.scope.full ? 'full' : 'incremental'} · ${report.scope.files.length} archivos`,
+    `[quality] Scope: ${formatScope(report.scope)} · ${report.scope.files.length} archivos`,
   ];
   for (const stage of report.stages) {
     lines.push(`[quality] ${stage.stage.padEnd(9)} ${stage.status.toUpperCase()}${stage.cached ? ' (cached)' : ''} · ${formatDuration(stage.durationMs)} · ${stage.summary}`);

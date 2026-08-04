@@ -3,7 +3,7 @@ import test from 'node:test';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { expandLocalDependencies, matches } from '../scope.mjs';
+import { expandLocalDependencies, matches, resolveExplicitProfiles } from '../scope.mjs';
 
 test('scope usa globs deterministas y normaliza separadores', () => {
   assert.equal(matches('frontend/src/router.ts', 'frontend/**/*.ts'), true);
@@ -13,6 +13,30 @@ test('scope usa globs deterministas y normaliza separadores', () => {
   assert.equal(matches('scripts/quality/cache.mjs', 'scripts/quality/'), true);
   assert.equal(matches('frontend/src/router.ts', 'backend/**/*.ts'), false);
   assert.equal(matches('frontend\\src\\router.ts', 'frontend/**/*.ts'), true);
+});
+
+test('resolveExplicitProfiles aplica CLI sobre entorno y allowlist estricta', () => {
+  const available = { docs: ['.md'], rust: ['.rs'] };
+  const cli = resolveExplicitProfiles({ profiles: ['docs'] }, available, {
+    GLORY_QUALITY_PROFILE: 'rust',
+  });
+  assert.equal(cli.explicit, true);
+  assert.equal(cli.source, 'cli');
+  assert.deepEqual([...cli.profiles], ['docs']);
+
+  const env = resolveExplicitProfiles({ profiles: [] }, available, {
+    GLORY_QUALITY_PROFILE: 'rust,docs,rust',
+  });
+  assert.equal(env.source, 'env');
+  assert.deepEqual([...env.profiles], ['rust', 'docs']);
+  assert.throws(
+    () => resolveExplicitProfiles({ profiles: ['unknown'] }, available, {}),
+    /Perfil no permitido: unknown/,
+  );
+  assert.throws(
+    () => resolveExplicitProfiles({ profiles: ['auth'] }, { ...available, auth: ['auth'] }, {}),
+    /Perfil sin etapa ejecutable: auth/,
+  );
 });
 
 test('scope incluye dependencias locales en el fingerprint incremental', async () => {

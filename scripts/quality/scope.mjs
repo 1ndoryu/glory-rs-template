@@ -1,6 +1,7 @@
 import { access, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { runProcess } from './runner.mjs';
+import { validateExecutableProfiles } from './profile-contract.mjs';
 
 function normalize(value) { return value.replace(/\\/g, '/'); }
 
@@ -90,6 +91,26 @@ export function matches(pathName, pattern) {
   return globToRegex(lowerPattern).test(lowerPath);
 }
 
+export function resolveExplicitProfiles(args, availableProfiles, env = process.env) {
+  const cliProfiles = Array.isArray(args.profiles) ? args.profiles : [];
+  const envProfiles = typeof env.GLORY_QUALITY_PROFILE === 'string' && env.GLORY_QUALITY_PROFILE.trim().length > 0
+    ? env.GLORY_QUALITY_PROFILE.split(',').map(profile => profile.trim()).filter(Boolean)
+    : [];
+  const requested = cliProfiles.length > 0 ? cliProfiles : envProfiles;
+  if (requested.length === 0) return { profiles: new Set(), explicit: false, source: null };
+  const unique = [...new Set(requested)];
+  const unknown = unique.filter(profile => !Object.prototype.hasOwnProperty.call(availableProfiles, profile));
+  if (unknown.length > 0) {
+    throw new Error(`Perfil no permitido: ${unknown.join(', ')}`);
+  }
+  validateExecutableProfiles(unique);
+  return {
+    profiles: new Set(unique),
+    explicit: true,
+    source: cliProfiles.length > 0 ? 'cli' : 'env',
+  };
+}
+
 export async function detectScope(context, args) {
   const base = args.base ?? 'HEAD';
   const [changedStatus, untracked, tracked] = await Promise.all([
@@ -106,14 +127,29 @@ export async function detectScope(context, args) {
   const fingerprintFiles = full
     ? [...new Set([...tracked, ...untracked])].sort()
     : await expandLocalDependencies(context.projectRoot, files);
-  const profiles = new Set();
+  const explicitProfiles = resolveExplicitProfiles(args, context.qualityConfig.profiles);
+  const profiles = explicitProfiles.explicit
+    ? explicitProfiles.profiles
+    : new Set();
 
-  for (const [profile, patterns] of Object.entries(context.qualityConfig.profiles)) {
-    if (full || files.some(file => patterns.some(pattern => matches(file, pattern)))) profiles.add(profile);
+  if (!explicitProfiles.explicit) {
+    for (const [profile, patterns] of Object.entries(context.qualityConfig.profiles)) {
+      if (full || files.some(file => patterns.some(pattern => matches(file, pattern)))) profiles.add(profile);
+    }
+    if (full) ['rust', 'frontend', 'css', 'docs'].forEach(profile => profiles.add(profile));
   }
-  if (full) ['rust', 'frontend', 'css', 'docs'].forEach(profile => profiles.add(profile));
 
   const changedFilesPath = path.join(context.reportRoot, 'changed-files.txt');
   await writeFile(changedFilesPath, `${files.join('\n')}\n`, 'utf8');
-  return { base, files, fingerprintFiles, profiles, full, changedFilesPath };
+  return {
+    base,
+    files,
+    fingerprintFiles,
+    profiles,
+    full,
+    executionFull: full && !explicitProfiles.explicit,
+    profileOverride: explicitProfiles.explicit,
+    profileSource: explicitProfiles.source,
+    changedFilesPath,
+  };
 }

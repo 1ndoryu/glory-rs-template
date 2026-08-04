@@ -83,6 +83,7 @@
 - [x] Añadir generador local del lock (`quality:lock --check|--write`, `quality:doctor --lock`) con modo solo lectura, backup `.bak`, escritura atómica y protección contra symlinks; no instala runtime ni modifica analyzers.
 - [x] Alinear el inventario documental local: README raíz, `roadmap-sentinel.md`, matriz de paridad e índice canónico describen el gate, `varsense all`, lockfile, branch-key, retención y límites del runtime global.
 - [x] Completar `doctor --migrate --dry-run`: mapea Sentinel v1, quality, VarSense y tools a un preview aditivo, rechaza claves desconocidas y conserva `writes: []` sin modificar contratos.
+- [x] Definir precedencia local de perfiles: `--profile` CLI > `GLORY_QUALITY_PROFILE` > autodetección; ambos solo aceptan perfiles declarados y un perfil explícito filtra etapas incluso con `--full`/`--ci`.
 - [ ] Extraer el runtime y los shims a una instalación estable fuera de cualquier repositorio o rama. *(bloqueado: runtime/repos upstream no presentes en este checkout)*
 - [ ] Migrar wandori.us al runtime global sin duplicar reglas ni dejar rutas hardcodeadas en perfiles. *(depende de la anterior)*
 - [ ] Probar matriz multi-proyecto/multi-rama en PowerShell 5/7, CMD, CI, pipes y códigos de salida, con rollback. *(depende de runtime global)*

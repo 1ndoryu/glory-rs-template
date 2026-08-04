@@ -12,7 +12,10 @@ export async function runSentinel(context, scope) {
     '--format', 'json',
     '--output', reportPath,
   ];
-  if (!scope.full) args.push('--files-from', scope.changedFilesPath);
+  /* [028A-6] `full` describe el fingerprint; `executionFull` describe si
+   * Sentinel puede analizar todo el workspace. Un perfil explícito mantiene
+   * fingerprint full sin ampliar accidentalmente el análisis. */
+  if (!(scope.executionFull ?? scope.full) || scope.profileOverride) args.push('--files-from', scope.changedFilesPath);
 
   const result = await runStructuredTool(context, {
     name: 'sentinel', executable: process.execPath, args, reportPath,

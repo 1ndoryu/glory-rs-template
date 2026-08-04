@@ -8,12 +8,8 @@ import { selectReminders } from './reminders.mjs';
 import { cancelAll } from './runner.mjs';
 import { acquireTaskLock } from './lock.mjs';
 import { detectScope } from './scope.mjs';
-import { runDocs } from './adapters/docs.mjs';
-import { runFrontend } from './adapters/frontend.mjs';
-import { runRust } from './adapters/rust.mjs';
-import { runSentinel } from './adapters/sentinel.mjs';
-import { runVarsense } from './adapters/varsense.mjs';
-import { runCustom } from './adapters/custom.mjs';
+import { stageDefinitions } from './stage-definitions.mjs';
+import { isFullExecution } from './profile-contract.mjs';
 import { runBoundedStages } from './stage-runner.mjs';
 import { runReportRetentionBestEffort } from './report-retention-stage.mjs';
 
@@ -25,19 +21,6 @@ function handleInterruption(signal) {
 }
 process.once('SIGINT', () => handleInterruption('SIGINT'));
 process.once('SIGTERM', () => handleInterruption('SIGTERM'));
-
-function stageDefinitions(context, scope, taskId) {
-  const definitions = [{ name: 'sentinel', run: () => runSentinel(context, scope) }];
-  if (scope.full || scope.profiles.has('css') || scope.profiles.has('frontend')) {
-    definitions.push({ name: 'varsense', run: () => runVarsense(context) });
-  }
-  if (scope.full || scope.profiles.has('rust')) definitions.push({ name: 'rust', run: () => runRust(context) });
-  if (scope.full || scope.profiles.has('frontend')) definitions.push({ name: 'frontend', run: () => runFrontend(context) });
-  if (scope.full || scope.profiles.has('docs')) definitions.push({ name: 'docs', run: () => runDocs(context, taskId) });
-  /* [Auditoría v4] Custom checks: DOM abstraction, singleton state, window refs */
-  if (scope.full || scope.profiles.has('frontend')) definitions.push({ name: 'custom', run: () => runCustom({ ...context, scope }) });
-  return definitions;
-}
 
 async function executeStage(context, scope, definition, options) {
   const stageFingerprint = await fingerprint(context, scope, definition.name);
@@ -66,7 +49,13 @@ async function main() {
   process.env.GLORY_QUALITY_GATE_TOKEN ||= crypto.randomUUID();
 
   try {
-    if (args.full && !args.ci) {
+    /* [028A-6] Un perfil explícito se resuelve contra quality.config.json
+     * después de preflight; no se puede decidir el heavy path con seguridad
+     * antes de conocer la allowlist del proyecto. */
+    const explicitProfileRequested = Array.isArray(args.profiles) && args.profiles.length > 0
+      || typeof process.env.GLORY_QUALITY_PROFILE === 'string'
+      && process.env.GLORY_QUALITY_PROFILE.split(',').some(profile => profile.trim().length > 0);
+    if (args.full && !args.ci && !explicitProfileRequested) {
       const heavyDecision = await inspectHeavyRun({
         projectRoot,
         mode: 'full',
@@ -90,7 +79,11 @@ async function main() {
       let scope = await detectScope(context, args);
       let heavyLease = null;
       const previousHeavyToken = process.env.GLORY_HEAVY_RUN_TOKEN;
-      if ((args.full || args.ci) && scope.full) {
+      /* [028A-6] Un perfil explícito puede conservar `scope.full` para el
+       * fingerprint sin solicitar el heavy lease: solo se adquiere cuando
+       * realmente se ejecutarán todas las etapas. */
+      const runsAllStages = isFullExecution(scope);
+      if ((args.full || args.ci) && runsAllStages) {
         heavyLease = await acquireHeavyRun({
           projectRoot: context.projectRoot,
           mode: args.ci ? 'ci' : 'full',

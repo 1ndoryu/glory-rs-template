@@ -11,7 +11,7 @@ test('la salida compacta conserva estado, siguiente accion y limite de contexto'
     report: {
       taskId: 'T-1',
       decision: { label: 'FAIL' },
-      scope: { full: true, files: ['a.ts'] },
+      scope: { full: true, executionFull: false, files: ['a.ts'] },
       stages: Array.from({ length: 5 }, (_, index) => ({
         stage: `stage-${index}`,
         status: index === 0 ? 'fail' : 'pass',
@@ -31,6 +31,7 @@ test('la salida compacta conserva estado, siguiente accion y limite de contexto'
 
   assert.ok(lines.length <= 16);
   assert.match(lines[0], /T-1 — FAIL/);
+  assert.match(lines[1], /full · ejecución incremental/);
   assert.equal(lines.filter(line => line.includes('hallazgo')).length, 3);
   assert.match(lines.at(-1), /Next: npm run task:check/);
 });
@@ -56,7 +57,7 @@ test('createReport serializa la identidad de política en JSON y Markdown', asyn
         },
       },
       { taskId: 'T-2', ci: false, full: false },
-      { base: 'HEAD', full: false, files: [], profiles: [] },
+      { base: 'HEAD', full: false, executionFull: false, files: [], profiles: [] },
       [{ stage: 'sentinel', status: 'pass', durationMs: 1, findings: [], summary: '0 errores' }],
       [],
       Date.now(),

@@ -14,3 +14,10 @@ test('parseArgs acepta flags internos conocidos', () => {
   assert.equal(args.allowHeavy, true);
   assert.equal(args.base, 'HEAD~1');
 });
+
+test('parseArgs extrae perfiles repetidos y exige su valor', () => {
+  const args = parseArgs(['297A-6', '--profile', 'docs', '--profile', 'rust']);
+  assert.deepEqual(args.profiles, ['docs', 'rust']);
+  assert.throws(() => parseArgs(['297A-6', '--profile']), /Falta valor para --profile/);
+  assert.throws(() => parseArgs(['297A-6', '--profile', '--full']), /Falta valor para --profile/);
+});
