@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { readQualityReport } from '../report-reader.mjs';
+import { LEGACY_REPORT_COMPATIBILITY, readQualityReport } from '../report-reader.mjs';
 
 const branch = {
   branchKeyVersion: 1,
@@ -56,9 +56,16 @@ test('legacy solo se acepta con metadata exacta y sin metadata queda ambiguo', a
     await writeFile(path.join(root, '.quality-reports', '028A-6', 'latest.json'), JSON.stringify(report('028A-6', null)));
     const ambiguous = await readQualityReport({ projectRoot: root, taskId: '028A-6', branch });
     assert.equal(ambiguous.status, 'legacy-ambiguous');
+    assert.deepEqual(ambiguous.compatibility, LEGACY_REPORT_COMPATIBILITY);
+    assert.equal(ambiguous.warning, LEGACY_REPORT_COMPATIBILITY.warning);
     await writeFile(path.join(root, '.quality-reports', '028A-6', 'latest.json'), JSON.stringify(report('028A-6', branch)));
     const compatible = await readQualityReport({ projectRoot: root, taskId: '028A-6', branch });
-    assert.equal(compatible.status, 'legacy-compatible');  } finally {
+    assert.equal(compatible.status, 'legacy-compatible');
+    assert.equal(compatible.compatibility.mode, 'legacy-read-only');
+    assert.equal(compatible.compatibility.maxRuntimeVersions, 2);
+    assert.equal(compatible.compatibility.retireAfterCompatibilityVersion, 3);
+    assert.equal(compatible.warning, LEGACY_REPORT_COMPATIBILITY.warning);
+  } finally {
     await rm(root, { recursive: true, force: true });
   }
 });

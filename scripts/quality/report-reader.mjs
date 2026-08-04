@@ -5,6 +5,18 @@ import { branchReportRoot, BRANCH_KEY_VERSION, createBranchKey } from './branch-
 
 const TASK_ID_PATTERN = /^\d{2}[1-9ABC][A-Z]-\d+$/u;
 
+/* [028A-6] Compatibilidad temporal del lector histórico: solo lectura, sin
+ * migración automática ni escritura de alias. El runtime global será quien
+ * convierta este marcador en una retirada efectiva después de dos releases. */
+export const LEGACY_REPORT_COMPATIBILITY = Object.freeze({
+  mode: 'legacy-read-only',
+  compatibilityVersion: 1,
+  maxRuntimeVersions: 2,
+  retireAfterCompatibilityVersion: 3,
+  retirement: 'after-two-runtime-versions',
+  warning: 'Reporte legacy compatible: solo lectura; no se migra ni se escribe alias.',
+});
+
 function assertTaskId(taskId) {
   if (typeof taskId !== 'string' || !TASK_ID_PATTERN.test(taskId)) {
     throw new Error(`taskId inválido para lectura de reporte: ${String(taskId)}`);
@@ -104,10 +116,18 @@ export async function readQualityReport({ projectRoot, taskId, branch }) {
       status: 'legacy-ambiguous',
       path: legacy.path,
       report: null,
+      compatibility: LEGACY_REPORT_COMPATIBILITY,
+      warning: LEGACY_REPORT_COMPATIBILITY.warning,
       reason: 'metadata de rama ausente o no coincide; no se atribuye a la rama actual',
     };
   }
-  return { status: 'legacy-compatible', path: legacy.path, report: legacy.report };
+  return {
+    status: 'legacy-compatible',
+    path: legacy.path,
+    report: legacy.report,
+    compatibility: LEGACY_REPORT_COMPATIBILITY,
+    warning: LEGACY_REPORT_COMPATIBILITY.warning,
+  };
 }
 
 export async function main(argv = process.argv.slice(2), { projectRoot = process.cwd(), branchResolver } = {}) {
@@ -121,6 +141,7 @@ export async function main(argv = process.argv.slice(2), { projectRoot = process
   const result = await readQualityReport({ projectRoot: path.resolve(projectRoot), taskId, branch });
   process.stdout.write(`${JSON.stringify({ command: 'quality report read', ...result }, null, 2)}\n`);
   if (result.status === 'legacy-ambiguous') process.exitCode = 1;
+  if (result.status === 'legacy-compatible') process.stderr.write(`[quality:reports] warning: ${result.compatibility.warning}\n`);
   return result;
 }
 
