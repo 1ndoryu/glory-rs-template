@@ -145,7 +145,7 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 - [x] Si existe una política inválida: no bloquear comandos desconocidos; mostrar una advertencia/error conciso y hacer fallar `sentinel doctor`/CI para que el proyecto corrija su configuración. El guard solo bloquea el comando protegido que detecta; no bloquea comandos desconocidos (`policy-decision`, `quality-command-guard`, `sentinel-doctor` + tests).
 - [x] Si `mode` es `observe`, el guard registra `observed` y no bloquea la ejecución; la comparación dual contra Sentinel Core upstream sigue pendiente.
 - [x] Si `mode` es `enforce`, el guard bloquea solo comandos declarados y devuelve código 78; el enforcement del launcher global sigue pendiente.
-- [ ] VarSense no crea cooldown, lock ni reporte paralelo: Sentinel le entrega el manifiesto de archivos y recoge sus hallazgos con el contrato de analizador.
+- [x] VarSense no crea cooldown, lock ni reporte paralelo: el adapter ejecuta una sola invocación `all`, usa el `reportRoot`/logs del gate y devuelve hallazgos mediante `structured-tool`; la metadata `varsenseScope` conserva el manifiesto solicitado y marca `varsense-cli-{version}-no-files-from` porque la versión fijada aún no acepta `--files-from`. La entrega efectiva de `files-from` queda pendiente de actualizar VarSense/upstream.
 
 ## Arquitectura por fases
 
@@ -161,7 +161,7 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 - [x] Definir y validar localmente el contrato v2, errores allowlisted y límites de tamaño de strings/listas/rutas; publicar el JSON Schema queda ligado al runtime upstream.
 - [x] Añadir al reporte local la identidad estable de política: `projectRoot`, `policyPath`, `policyHash`, `runtimeVersion`, `reason` y comando recomendado; se mantiene `schemaVersion: 1` por compatibilidad aditiva.
 - [ ] Definir contrato final de salida de Sentinel Core con decisión/exitCode y transporte CLI/LSP. *(pendiente del runtime global)*
-- [ ] Definir contrato de plugin, taxonomía `analyze/check/guard/doctor` y matriz de compatibilidad Sentinel↔VarSense.
+- [ ] Definir contrato final de plugin, taxonomía `analyze/check/guard/doctor` y matriz de compatibilidad Sentinel↔VarSense. El contrato local parcial de salida/error y la limitación de scope de VarSense quedan documentados; el contrato Core/upstream sigue pendiente.
 - [ ] Definir compatibilidad Windows PowerShell 5/7, PowerShell Core, CMD, Bash/Git Bash (interactivo y `BASH_ENV`) y CI sin depender de variables específicas de VS Code.
 - [ ] Definir política de actualización, rollback y migración desde el guard actual.
 

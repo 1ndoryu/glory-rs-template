@@ -7,7 +7,7 @@ import { runCustom } from './adapters/custom.mjs';
 import { isFullExecution, PROFILE_STAGE_RULES } from './profile-contract.mjs';
 
 const STAGE_FACTORIES = {
-  varsense: context => ({ name: 'varsense', run: () => runVarsense(context) }),
+  varsense: (context, scope) => ({ name: 'varsense', run: () => runVarsense(context, scope) }),
   rust: context => ({ name: 'rust', run: () => runRust(context) }),
   frontend: context => ({ name: 'frontend', run: () => runFrontend(context) }),
   docs: (context, _scope, taskId) => ({ name: 'docs', run: () => runDocs(context, taskId) }),
