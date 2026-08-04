@@ -281,10 +281,10 @@ La migración a Sentinel como plano único deja documentación desincronizada co
 
 ### Proyecto wandori.us (glory-rust-template)
 
-- [ ] **`README.md` (raíz)** — documentar `npm run task:check`, el quality gate unificado, Sentinel y VarSense (hoy solo describe comandos `npm run check/check:back/check:front/codegen` del template base).
-- [ ] **`roadmap-sentinel.md`** — corregir contradicción: la sección "Hallazgos prioritarios" dice que `runVarsense` ejecuta `scan` y `orphan-classes` como procesos separados, pero el adaptador real invoca `varsense all`.
-- [ ] **`Agente/documentacion/herramientas/matriz-paridad-sentinel-varsense-2026-08-01.md`** — añadir nota aclaratoria: `all`/`tokenDetection`/portable rules existen en los commits fijados por `quality-tools.json`, pero los repos dev (`main`) están detrás; pendiente sincronizar.
-- [ ] **`Agente/documentacion/indice-documentacion-2026-07-29.md`** — enlazar este plan global y su inventario de correcciones.
+- [x] **`README.md` (raíz)** — documentar `npm run task:check`, el quality gate unificado, Sentinel y VarSense; aclarar que el runtime global aún no está instalado y que los wrappers directos no sustituyen el gate.
+- [x] **`roadmap-sentinel.md`** — corregir la contradicción de `runVarsense`: el adaptador real invoca `varsense all`; `scan` y `orphan-classes` quedan como compatibilidad CLI.
+- [x] **`Agente/documentacion/herramientas/matriz-paridad-sentinel-varsense-2026-08-01.md`** — añadir nota sobre `all`/`tokenDetection`/portable rules, copia instalada frente a repos `main`, lockfile, branch-key y límites del runtime global.
+- [x] **`Agente/documentacion/indice-documentacion-2026-07-29.md`** — enlazar el estado de versiones, hashes, ramas y retención mediante el plan global y los manifiestos canónicos.
 
 **Gate del inventario:** cada ítem cierra con evidencia (commit en el repo de la herramienta o en el proyecto) y el catálogo de reglas del README de Sentinel debe coincidir con `ruleRegistry.ts` de la copia instalada. Los repos dev sincronizados con las copias instaladas es prerequisito para que la documentación describa lo que el gate realmente consume.
 

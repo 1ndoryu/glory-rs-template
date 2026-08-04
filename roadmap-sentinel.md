@@ -53,12 +53,17 @@ Con este checklist cerrado, las mejoras restantes de este documento son backlog 
 
 ### Hallazgos prioritarios del orquestador
 
+> Este inventario histórico se conserva para trazabilidad. Los puntos sobre
+> `runVarsense` y el patch de VarSense fueron resueltos por `varsense all` y el
+> commit fijado 2.2.0; los hallazgos restantes se mantienen como backlog o
+> están cubiertos por los módulos actuales de `scripts/quality`.
+
 - `scripts/quality/adapters/custom.mjs` mantiene `hasErrors = false` y nunca lo actualiza; un script custom puede terminar con violaciones y el stage queda en PASS.
 - Los scripts custom se ejecutan con `bash`, dependen de `grep`, `awk`, `sed`, `find` y parsean emojis/salida humana; el comportamiento no es portable ni tiene contrato estructurado.
 - `runCustom` convierte en warnings los códigos de salida de reglas que deberían poder bloquear; además no conserva el severity declarado por cada regla.
-- `runVarsense` ejecuta `scan` y `orphan-classes` como procesos separados, por lo que puede reconstruir índices y recorrer archivos dos veces.
+- El adaptador actual de VarSense invoca `varsense all` una sola vez; `all` comparte el snapshot de documentos para scan, orphan-classes y tokenDetection. `scan` y `orphan-classes` se conservan como comandos de compatibilidad del CLI, no como etapas independientes del gate.
 - La cache de stages necesita incorporar explícitamente versión/commit de la herramienta, versión del parser, configuración efectiva y plataforma; el hash de archivos por sí solo puede reutilizar un PASS obsoleto.
-- `quality-tools.json` mantiene un parche de 12 KB para VarSense; la solución correcta es subir el soporte de clases dinámicas al core y retirar el parche local.
+- `quality-tools.json` conserva únicamente el manifiesto de versiones y el patch local declarado de Sentinel `[317A-3]`; el patch downstream histórico de clases dinámicas de VarSense fue retirado al fijarse el soporte en el commit upstream 2.2.0.
 - La detección incremental y los reportes son reutilizables, pero `docs.mjs`, reminders en español, IDs de roadmap y rutas `frontend/src` son políticas del proyecto.
 
 ## Frontera de reutilización
@@ -234,13 +239,17 @@ El reporte `297A-49` tardó 533833 ms: Rust consumió 483037 ms (90,5 %) y expir
 
 #### SNT-05C — Reportes por rama y retención acotada
 
+**Estado local:** implementado y cubierto por fixtures. La lista siguiente conserva
+solo los límites que dependen del runtime global o de pruebas multi-proceso reales;
+no describe como pendientes los contratos ya activos en `scripts/quality`.
+
 **Objetivo:** evitar que `.quality-reports` crezca indefinidamente y que resultados/cache/locks de una rama contaminen otra.
 
-- [ ] Resolver `branch-key` desde la rama Git, una ref CI allowlisted o `detached-<short-sha>`; guardar ref/SHA original en metadata y codificar la clave con límites estrictos.
-- [ ] Escribir en `.quality-reports/branches/<branch-key>/<task-id>/` los `latest.md/json`, logs y reportes de adapters.
-- [ ] Mover caché y locks a `.quality-reports/branches/<branch-key>/cache/` y `locks/`; incluir `branch-key`/commit/ref en identidad y fingerprints.
-- [ ] Leer el layout antiguo durante la transición y ofrecer un alias/puntero controlado para consumidores de `.quality-reports/<task-id>/latest.*`, sin symlinks inseguros.
-- [ ] Configurar TTL y cuota máxima; implementar poda determinista con `--dry-run`, protección de la rama activa, locks activos, procesos/escrituras recientes y límites de workspace.
+- [x] Resolver `branch-key` desde la rama Git, una ref CI allowlisted o `detached-<full-sha>`; guardar ref/SHA original en metadata y codificar la clave con límites estrictos.
+- [x] Escribir en `.quality-reports/branches/<branch-key>/<task-id>/` los `latest.md/json`, logs y reportes de adapters.
+- [x] Mover caché y locks a `.quality-reports/branches/<branch-key>/cache/` y `locks/`; incluir `branch-key`/commit/ref en identidad y fingerprints.
+- [x] Leer el layout antiguo solo durante la transición, en modo lectura y con metadata exacta de rama; no se escriben aliases ni symlinks inseguros. La retirada tras dos versiones queda pendiente.
+- [x] Configurar TTL y cuota máxima; implementar poda determinista con `--dry-run`, protección de la rama activa, locks activos, procesos/escrituras recientes y límites de workspace.
 - [x] Añadir fixtures locales para dos ramas concurrentes en namespaces, cambio de rama dentro del proceso, detached HEAD, identidades CI, nombres peligrosos/largos, symlinks y fallo de poda; la concurrencia multi-proceso/CI real queda ligada al runtime global.
 
 **Gate SNT-05C:** dos ramas producen namespaces y `latest` independientes; un PASS/cache/lock no cruza ramas; la poda libera únicamente candidatos elegibles, respeta TTL/cuota y no borra una ejecución activa ni rutas fuera del workspace. El reporte conserva bytes/candidatos y resultado de poda sin secretos.

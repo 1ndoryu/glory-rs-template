@@ -36,6 +36,7 @@
 | ¿Cómo funciona el registro verificado y recovery?       | `Agente/planes/plan-auth-verificado-2026-08-01.md` |
 | ¿Cuál es la paridad y el commit fijado de Sentinel/VarSense? | `Agente/documentacion/herramientas/matriz-paridad-sentinel-varsense-2026-08-01.md` |
 | ¿Cómo se migra Sentinel a plano global sin romper el gate? | `Agente/planes/plan-global-quality-guard-agnostico-2026-08-02.md` + `Agente/documentacion/arquitectura/adr-sentinel-plano-global-028a6-2026-08-03.md` |
+| ¿Qué versiones, hashes, ramas y retención usa el gate actual? | `sentinel.lock.json` + `quality-tools.json` + `quality.config.json` + `Agente/documentacion/herramientas/matriz-paridad-sentinel-varsense-2026-08-01.md` |
 | ¿Cómo se ejecuta backup, health y rollback sin SSH? | `Agente/documentacion/herramientas/runbook-coolify-backup-rollback-2026-08-01.md` |
 
 ## Regla de autoridad
@@ -60,7 +61,8 @@
 - Plan visual antiguo: referencia histórica del concepto aprobado.
 - Plan wandori.us original: superado; no es especificación activa.
 - Plan Sentinel/VarSense editor-agnóstico: trabajo histórico documentado en tareas completadas.
-- Matriz Sentinel/VarSense: actualizada con contrato de findings, comando combinado `all` y commits fijados.
+- Matriz Sentinel/VarSense: actualizada con contrato de findings, comando combinado `all`, commits fijados, lockfile, branch-key y límites de runtime global.
+- Migración global 028A-6: tramo documental local actualizado; instalación del runtime global, sincronización upstream y matriz multi-shell permanecen pendientes explícitos.
 - Auditoría arquitectónica frontend v1: activa; plan de refactorización parcialmente ejecutado.
 - Auditoría arquitectónica frontend v2: activa; 3 críticos, 5 altos, 8 medios identificados.
 - Plan refactorización arquitectura: activo; runtime móvil 297A-12 implementado parcialmente con `mobile-shell.ts`/`mobile-stack.ts`; revisar gate de transición antes de avanzar.

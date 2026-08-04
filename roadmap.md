@@ -81,6 +81,7 @@
 - [x] Añadir `policyHash`/identidad de política al reporte y fingerprint de caché; cambiar la política invalida PASS anteriores.
 - [x] Añadir `sentinel.lock.json` con runtime/analyzers fijados, versión/protocolo/commit/hash, patch local declarado, validación preflight, `git archive` reproducible y rechazo de checkouts modificados; runtime global queda explícitamente `project-adapter`.
 - [x] Añadir generador local del lock (`quality:lock --check|--write`, `quality:doctor --lock`) con modo solo lectura, backup `.bak`, escritura atómica y protección contra symlinks; no instala runtime ni modifica analyzers.
+- [x] Alinear el inventario documental local: README raíz, `roadmap-sentinel.md`, matriz de paridad e índice canónico describen el gate, `varsense all`, lockfile, branch-key, retención y límites del runtime global.
 - [ ] Extraer el runtime y los shims a una instalación estable fuera de cualquier repositorio o rama. *(bloqueado: runtime/repos upstream no presentes en este checkout)*
 - [ ] Migrar wandori.us al runtime global sin duplicar reglas ni dejar rutas hardcodeadas en perfiles. *(depende de la anterior)*
 - [ ] Probar matriz multi-proyecto/multi-rama en PowerShell 5/7, CMD, CI, pipes y códigos de salida, con rollback. *(depende de runtime global)*

@@ -1,8 +1,8 @@
-# Glory RS
+# Glory RS / wandori.us
 
-Template para sitios web con **Rust (Axum) + React (TypeScript) + OpenAPI** en un solo repositorio.
+Template y aplicación web con **Rust (Axum) + PostgreSQL + Vanilla TypeScript/Vite + OpenAPI** en un solo repositorio.
 
-Pensado para máxima velocidad de desarrollo, seguridad por defecto y escalabilidad.
+Pensado para velocidad de desarrollo, seguridad por defecto y calidad reproducible. El quality gate unificado usa `scripts/quality/task-check.mjs` como orquestador de transición, Sentinel como etapa/analyzer y VarSense como analizador especializado; el runtime global de Sentinel aún no forma parte de este checkout.
 
 ## Stack
 
@@ -21,8 +21,8 @@ Pensado para máxima velocidad de desarrollo, seguridad por defecto y escalabili
 | Hashing              | argon2                       | Hashing seguro de contraseñas           |
 | CORS                 | tower-http                   | Middleware CORS                         |
 | Linter               | clippy (paranoia)            | Código limpio                           |
-| Frontend             | React + TypeScript + Vite    | UI                                      |
-| State management     | React Query + Zustand        | Server state + client state             |
+| Frontend             | Vanilla TypeScript + Vite   | UI del OS retro y apps                 |
+| Estado               | Stores/adapters propios      | Estado runtime, sesión y workspace     |
 | Codegen              | Orval                        | Genera cliente TypeScript desde OpenAPI |
 
 ## Requisitos
@@ -77,8 +77,10 @@ npm run codegen
 ├── frontend/
 │   ├── src/
 │   │   ├── api/            # Cliente API generado por Orval
-│   │   ├── App.tsx         # Componente raíz
-│   │   └── main.tsx        # Entry point React
+│   │   ├── components/     # UI compartida
+│   │   ├── features/       # Runtime del OS y apps
+│   │   ├── pages/          # Vistas y adaptadores de ruta
+│   │   └── main.ts         # Entry point Vanilla TypeScript
 │   ├── orval.config.ts     # Configuración de codegen
 │   └── vite.config.ts      # Configuración de Vite + proxy
 ├── .env.example            # Variables de entorno de ejemplo
@@ -124,31 +126,44 @@ git checkout otro-sitio
 
 La estructura es idéntica en cada rama. Solo cambia el contenido específico del sitio.
 
-## Comandos útiles
+## Calidad y comandos de desarrollo
+
+El comando público de validación es el gate único. Decide el alcance por los
+archivos modificados, conserva los resultados por rama y escribe el detalle en
+`.quality-reports/branches/<branch-key>/<task-id>/`.
 
 ```bash
-# Comando unificado — verifica todo el proyecto (backend + frontend)
-npm run check
+# Gate local incremental; el ID debe existir en roadmap/planes/completados
+npm run task:check -- 028A-6
 
-# Backend
-cargo run                    # Iniciar servidor
-cargo check                  # Verificar compilación
-cargo clippy                 # Linter (nivel paranoia)
-npm test                    # cargo test con BD/contexto por rama
-cargo fmt                    # Formatear código
-npm run check:back           # cargo check + clippy con BD/contexto por rama
+# Gate completo para cierre de fase o CI (no repetir durante el cooldown)
+npm run task:check -- 028A-6 --full
+npm run task:check -- 028A-6 --ci
 
-# Frontend
-npm run dev:front            # Dev server con HMR
-npm run check:front          # Type-check TypeScript
+# Contratos y diagnóstico del stack de calidad
+npm run quality:test
+npm run quality:doctor
+npm run quality:lock -- --check
+npm run quality:reports:cleanup:dry
+```
+
+`sentinel.lock.json` fija las versiones, commits, protocolos y hashes de los
+analizadores instalados en `.quality-tools`. En la transición actual el runtime
+se declara `project-adapter` y `artifactSha256: null`; no se instala un runtime
+global ni se ejecuta código arbitrario desde la política del proyecto.
+
+Los wrappers de desarrollo (`npm run check:back`, `npm run check:front`,
+`npm run fmt:check` y `npm test`) siguen disponibles para trabajo específico,
+pero no sustituyen el reporte ni el control del gate. Para una validación que
+pueda cerrar una tarea, usa `task:check` desde la raíz del repositorio.
+
+### Desarrollo
+
+```bash
+npm run dev                  # Backend + contexto de desarrollo por rama
+npm run dev:front            # Frontend con HMR
 npm run codegen              # Regenerar cliente API desde OpenAPI
-
-# O directamente desde frontend/
-cd frontend
-npm run dev                  # Dev server con HMR
-npm run build                # Build producción
-npm run type-check           # Verificar tipos TypeScript
-npm run codegen              # Regenerar cliente API desde OpenAPI
+cd frontend && npm run build # Build frontend explícito
 ```
 
 ## Clippy nivel paranoia
@@ -158,4 +173,4 @@ El proyecto tiene configurado clippy en modo estricto (`[lints.clippy]` en Cargo
 - `clippy::all` → **deny** (error en cualquier warning estándar)
 - `clippy::pedantic` → **warn** (warnings extra para código idiomático)
 
-Antes de cada commit: `cargo fmt --check && npm run check:back && npm test` (los wrappers derivan BD/contexto por rama)
+Antes de cerrar una tarea: `npm run task:check -- <ID>`; para una fase o publicación, repetir con `--full` o `--ci`. El gate deriva la base de datos/contexto por rama cuando una etapa Rust lo necesita.
