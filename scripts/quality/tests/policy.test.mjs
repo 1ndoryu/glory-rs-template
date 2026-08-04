@@ -165,6 +165,30 @@ test('resuelve físicamente un startPath junction antes de buscar la política',
   }
 });
 
+test('usa solo sentinel.config.json como fuente canónica y no infiere reglas auxiliares', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'sentinel-policy-canonical-'));
+  try {
+    await mkdir(path.join(root, 'scripts', 'quality'), { recursive: true });
+    await writeFile(path.join(root, 'AGENTS.md'), '# reglas auxiliares que no son política\\n', 'utf8');
+    await writeFile(path.join(root, 'quality.config.json'), JSON.stringify({ mode: 'enforce', guard: { directCommands: {} } }), 'utf8');
+    await writeFile(path.join(root, 'scripts', 'quality', 'policy.mjs'), 'export const fake = true;\\n', 'utf8');
+    assert.equal((await loadPolicy(root)).status, 'no-policy');
+
+    await writeFile(path.join(root, 'sentinel.config.json'), JSON.stringify(validPolicy()), 'utf8');
+    const first = await loadPolicy(path.join(root, 'nested'));
+    await writeFile(path.join(root, 'AGENTS.md'), '# cambio auxiliar no canónico\\n', 'utf8');
+    await writeFile(path.join(root, 'quality.config.json'), JSON.stringify({ mode: 'observe' }), 'utf8');
+    await writeFile(path.join(root, 'scripts', 'quality', 'policy.mjs'), 'export const changed = true;\\n', 'utf8');
+    const second = await loadPolicy(path.join(root, 'nested'));
+    assert.equal(first.status, 'policy');
+    assert.equal(second.status, 'policy');
+    assert.equal(first.policyPath, path.join(root, 'sentinel.config.json'));
+    assert.equal(second.policyHash, first.policyHash);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('descubre la política en un ancestro y diferencia no-policy de legacy-v1', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'sentinel-policy-'));
   try {

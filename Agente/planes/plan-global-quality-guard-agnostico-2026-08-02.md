@@ -137,12 +137,12 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 ### Resolución de política
 
 - [x] Buscar desde el directorio actual hacia arriba hasta la raíz del workspace (`discoverPolicy`); la resolución física del directorio inicial evita seguir una ruta lógica con junction/symlink.
-- [ ] Usar únicamente `sentinel.config.json` como fuente canónica; no inferir reglas leyendo `AGENTS.md` ni scripts arbitrarios.
+- [x] Usar únicamente `sentinel.config.json` como fuente canónica; no inferir reglas leyendo `AGENTS.md` ni scripts arbitrarios. `discoverPolicy`/`loadPolicy` solo recorren ancestros buscando ese archivo, y la identidad/hash no cambia cuando se modifican documentos, `quality.config.json` o scripts auxiliares (`policy.mjs` + regresión canónica).
 - [x] Canonicalizar la ruta antes de leerla y rechazar `sentinel.config.json` symlink/junction en el loader y en el guard; la configuración externa no se carga ni se sigue desde los shims (`policy.mjs`, `quality-command-guard.mjs` y tests).
 - [x] Calcular `policyHash` desde la configuración descubierta y asociarlo al estado/reporte; el fingerprint de caché lo incluye para invalidar PASS cuando cambia la política. (`scripts/quality/policy.mjs`, `cache.mjs`, `reporter.mjs`)
 - [ ] Asociar también la identidad a un runtime global instalado y a leases firmados. *(pendiente del runtime global)*
 - [x] Si no existe política, la decisión local es `pass-through` y el guard permite trabajar sin bloquear (`policy-decision.mjs`, `quality-command-guard.mjs` + tests); el comportamiento del runtime global sigue pendiente.
-- [ ] Si existe una política inválida: no bloquear comandos desconocidos; mostrar una advertencia concisa y hacer fallar `sentinel doctor`/CI para que el proyecto corrija su configuración.
+- [x] Si existe una política inválida: no bloquear comandos desconocidos; mostrar una advertencia/error conciso y hacer fallar `sentinel doctor`/CI para que el proyecto corrija su configuración. El guard solo bloquea el comando protegido que detecta; no bloquea comandos desconocidos (`policy-decision`, `quality-command-guard`, `sentinel-doctor` + tests).
 - [x] Si `mode` es `observe`, el guard registra `observed` y no bloquea la ejecución; la comparación dual contra Sentinel Core upstream sigue pendiente.
 - [x] Si `mode` es `enforce`, el guard bloquea solo comandos declarados y devuelve código 78; el enforcement del launcher global sigue pendiente.
 - [ ] VarSense no crea cooldown, lock ni reporte paralelo: Sentinel le entrega el manifiesto de archivos y recoge sus hallazgos con el contrato de analizador.
