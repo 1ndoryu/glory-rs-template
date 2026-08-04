@@ -69,8 +69,9 @@ export async function writeStageLog(context, stage, content) {
   return target;
 }
 
-export function toolFailure(stage, execution, logPath, state = execution.timedOut ? 'timeout' : 'tool-error') {
+export function toolFailure(stage, execution, logPath, state = execution.timedOut ? 'timeout' : execution.cancelled ? 'cancelled' : 'tool-error') {
   const timedOut = state === 'timeout';
+  const cancelled = state === 'cancelled';
   const invalidOutput = state === 'invalid-output';
   return {
     stage,
@@ -78,15 +79,17 @@ export function toolFailure(stage, execution, logPath, state = execution.timedOu
     state,
     durationMs: execution.durationMs,
     findings: [{
-      ruleId: timedOut ? 'quality-timeout' : invalidOutput ? 'quality-invalid-output' : 'quality-tool-error',
+      ruleId: timedOut ? 'quality-timeout' : cancelled ? 'quality-cancelled' : invalidOutput ? 'quality-invalid-output' : 'quality-tool-error',
       severity: 'error',
       message: timedOut
         ? `${stage} excedió el timeout`
-        : invalidOutput
-          ? `${stage} produjo una salida estructuralmente inválida`
-          : `${stage} terminó con código ${execution.code}`,
+        : cancelled
+          ? `${stage} fue cancelado`
+          : invalidOutput
+            ? `${stage} produjo una salida estructuralmente inválida`
+            : `${stage} terminó con código ${execution.code}`,
     }],
-    summary: timedOut ? 'timeout' : invalidOutput ? 'invalid-output' : `error ${execution.code}`,
+    summary: timedOut ? 'timeout' : cancelled ? 'cancelled' : invalidOutput ? 'invalid-output' : `error ${execution.code}`,
     logPath,
   };
 }

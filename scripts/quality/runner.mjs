@@ -59,6 +59,11 @@ export function cancelAll() {
 export function runProcess(executable, args, options = {}) {
   return new Promise(resolve => {
     const startedAt = Date.now();
+    const initiallyCancelled = Boolean(options.isCancelled?.());
+    if (initiallyCancelled) {
+      resolve({ code: 130, signal: null, timedOut: false, cancelled: true, durationMs: 0, stdout: '', stderr: '' });
+      return;
+    }
     const child = spawn(executable, args, {
       cwd: options.cwd,
       env: safeEnvironment(options.env),
@@ -72,25 +77,36 @@ export function runProcess(executable, args, options = {}) {
     const stdout = { text: '', truncated: false };
     const stderr = { text: '', truncated: false };
     let timedOut = false;
+    let cancellationObserved = false;
     const timer = setTimeout(() => {
       timedOut = true;
       terminateTree(child);
     }, options.timeoutMs ?? 120_000);
+    const cancellationTimer = setInterval(() => {
+      if (!timedOut && !cancellationObserved && options.isCancelled?.()) {
+        cancellationObserved = true;
+        terminateTree(child);
+      }
+    }, 10);
 
     child.stdout.on('data', chunk => appendOutput(stdout, chunk));
     child.stderr.on('data', chunk => appendOutput(stderr, chunk));
     child.on('error', error => {
       clearTimeout(timer);
+      clearInterval(cancellationTimer);
       activeChildren.delete(child);
-      resolve({ code: 2, signal: null, timedOut: false, durationMs: Date.now() - startedAt, stdout: '', stderr: error.message });
+      resolve({ code: 2, signal: null, timedOut: false, cancelled: cancellationObserved, durationMs: Date.now() - startedAt, stdout: '', stderr: error.message });
     });
     child.on('close', (code, signal) => {
       clearTimeout(timer);
+      clearInterval(cancellationTimer);
       activeChildren.delete(child);
+      const cancelled = !timedOut && cancellationObserved;
       resolve({
-        code: timedOut ? 2 : code ?? 2,
+        code: timedOut ? 2 : cancelled ? 130 : code ?? 2,
         signal,
         timedOut,
+        cancelled,
         durationMs: Date.now() - startedAt,
         stdout: truncate(outputText(stdout)),
         stderr: truncate(outputText(stderr)),

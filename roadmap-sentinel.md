@@ -200,7 +200,7 @@ Una regla no ejecuta procesos, no escribe archivos, no imprime salida humana y n
 - [x] Definir fingerprint completo: contenido, config efectiva, tool commit, parser/runtime, OS, Node y dependencias locales importadas.
 - [x] Compartir snapshot de documentos de VarSense entre análisis relacionados e invalidar dependencias locales en el fingerprint.
 - [x] Ejecutar stages con runner acotado y backpressure; el default serial protege equipos de agentes compartidos.
-- [x] Cancelar procesos hijos y workers en timeout/interrupción; pruebas de timeout/cancelación pasan.
+- [x] Cancelar procesos hijos y workers en timeout/interrupción; el runner y el adapter conservan el estado `cancelled` separado de `tool-error`; pruebas de timeout/cancelación pasan.
 - [x] Añadir presupuesto de timeout y reportar cache hit/miss; el presupuesto RSS comparativo queda pendiente del benchmark upstream.
 - [x] Escribir cache/reportes de forma atómica y resistente a escrituras concurrentes; `atomic-file.test.mjs` confirma que nunca queda JSON parcial.
 
@@ -287,7 +287,7 @@ no describe como pendientes los contratos ya activos en `scripts/quality`.
 **Objetivo:** convertir `scripts/quality` en una librería/adaptador reutilizable, no en una colección de scripts de wandori.us.
 
 - [x] Extraer y probar `runner`, `redaction`, `atomic-file`, `lock`, `cache`, `preflight`, `reporter`, `scope` y stage runner como módulos agnósticos.
-- [x] Hacer adapters declarativos por herramienta: `structured-tool.mjs` centraliza executable, args, schema, timeout y error policy.
+- [x] Hacer adapters declarativos por herramienta: `structured-tool.mjs` centraliza executable, args, schema, timeout, cancelación y error policy.
 - [ ] Ejecutar stages independientes en paralelo y conservar el orden canónico solo al consolidar el reporte.
 - [x] Mantener `docs` y reminders como adapters del proyecto; el runner no añade reglas de producto al core.
 - [x] Definir modo local incremental, modo `--full` y modo CI reproducible; el check no instala ni muta dependencias.
@@ -366,7 +366,7 @@ no describe como pendientes los contratos ya activos en `scripts/quality`.
 - [ ] Fixtures de equivalencia para cada regla: fuente, expected JSON, severity, línea/columna, mensaje estable y falso positivo.
 - [ ] Mismos fixtures ejecutados por CLI, LSP y VS Code; diferencias solo en transporte/presentación.
 - [x] Tests de config estricta: claves desconocidas, rutas fuera del workspace, modos inválidos y políticas symlink/junction en loader y guard; globs peligrosos, severity/ruleId del analyzer y paridad upstream quedan pendientes del contrato Sentinel Core.
-- [ ] Tests de seguridad: secretos redacted, symlink/path traversal, shell injection, timeout, cancelación y procesos huérfanos.
+- [ ] Tests de seguridad: secretos redacted, symlink/path traversal, shell injection, timeout, cancelación y procesos huérfanos. La cancelación local del runner/adapter ya tiene regresión; siguen pendientes las pruebas del launcher/runtime global.
 - [ ] Ejecutar `npm run __sentinel_guard_probe__`: el guard debe devolver `BLOQUEADO` sin invocar npm; si aparece "Missing script", la shell/launcher está sin interceptor y no se puede cerrar la cobertura global.
 - [ ] Tests de cache: hit válido, cambio de contenido, config, commit, parser, schema y plataforma.
 - [ ] Benchmarks small/medium/full con límite de memoria, tiempo, concurrencia y cantidad de findings.

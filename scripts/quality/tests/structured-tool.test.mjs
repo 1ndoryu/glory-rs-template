@@ -31,6 +31,21 @@ test('structured adapter describe un reporte versionado', async () => {
   }
 });
 
+test('structured adapter conserva cancelled como estado distinto de tool-error', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'structured-cancelled-'));
+  try {
+    const result = await runStructuredTool({ projectRoot: root, reportRoot: root, logsRoot: root, isCancelled: () => true }, {
+      name: 'cancelled', executable: process.execPath,
+      args: ['-e', 'setTimeout(() => process.exit(0), 50)'], reportPath: path.join(root, 'cancelled.json'),
+      expectedSchemaVersion: '1', timeoutMs: 2000,
+    });
+    assert.equal(result.failure.state, 'cancelled');
+    assert.equal(result.failure.findings[0].ruleId, 'quality-cancelled');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('structured adapter distingue tool-error, timeout e reporte válido', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'structured-states-'));
   const context = { projectRoot: root, reportRoot: root, logsRoot: root, qualityConfig: {} };

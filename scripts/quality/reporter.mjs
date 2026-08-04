@@ -3,6 +3,7 @@ import { writeAtomic } from './atomic-file.mjs';
 import { sanitize } from './redaction.mjs';
 
 function finalDecision(stages) {
+  if (stages.some(stage => stage.state === 'cancelled')) return { exitCode: 130, label: 'CANCELLED' };
   if (stages.some(stage => stage.status === 'error')) return { exitCode: 2, label: 'SETUP ERROR' };
   if (stages.some(stage => stage.status === 'fail')) return { exitCode: 1, label: 'FAIL' };
   return { exitCode: 0, label: 'PASS' };

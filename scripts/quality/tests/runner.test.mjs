@@ -12,6 +12,34 @@ test('runner distingue éxito y timeout', async () => {
   assert.equal(timeout.timedOut, true);
 });
 
+test('runner conserva el estado cancelled solo ante transición durante la ejecución', async () => {
+  const notCancelled = await runProcess(
+    process.execPath,
+    ['-e', 'setTimeout(() => process.exit(0), 50)'],
+    { timeoutMs: 2_000, isCancelled: () => false },
+  );
+  assert.equal(notCancelled.code, 0);
+  assert.equal(notCancelled.cancelled, false);
+
+  let cancelled = false;
+  setTimeout(() => { cancelled = true; }, 30);
+  const cancelledResult = await runProcess(
+    process.execPath,
+    ['-e', 'setTimeout(() => process.exit(0), 200)'],
+    { timeoutMs: 2_000, isCancelled: () => cancelled },
+  );
+  assert.equal(cancelledResult.cancelled, true);
+  assert.equal(cancelledResult.code, 130);
+
+  const alreadyCancelled = await runProcess(
+    process.execPath,
+    ['-e', 'process.exit(0)'],
+    { timeoutMs: 2_000, isCancelled: () => true },
+  );
+  assert.equal(alreadyCancelled.cancelled, true);
+  assert.equal(alreadyCancelled.code, 130);
+});
+
 test('runner limita la captura de salida ruidosa', async () => {
   const noisy = await runProcess(
     process.execPath,

@@ -8,10 +8,14 @@ export async function runStructuredTool(context, definition) {
   const execution = await runProcess(definition.executable, definition.args, {
     cwd: definition.cwd ?? context.projectRoot,
     timeoutMs: definition.timeoutMs,
+    isCancelled: definition.isCancelled ?? context.isCancelled,
   });
   const logPath = await writeStageLog(context, definition.name, `${execution.stdout}\n${execution.stderr}`);
   if (execution.timedOut) {
     return { failure: toolFailure(definition.name, execution, logPath, 'timeout'), logPath, execution };
+  }
+  if (execution.cancelled) {
+    return { failure: toolFailure(definition.name, execution, logPath, 'cancelled'), logPath, execution };
   }
   if (execution.code === 2) {
     return { failure: toolFailure(definition.name, execution, logPath, 'tool-error'), logPath, execution };

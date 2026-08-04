@@ -102,6 +102,10 @@ async function main() {
         }
       }
       if (heavyLease?.allowed) process.env.GLORY_HEAVY_RUN_TOKEN = heavyLease.token;
+      /* [028A-6] Propaga la cancelación al contrato de adapters para que un
+       * proceso terminado por SIGINT conserve el estado `cancelled` y no se
+       * confunda con un error genérico de herramienta. */
+      context.isCancelled = () => interrupted;
       const definitions = stageDefinitions(context, scope, args.taskId);
       let finalStatus = 'error';
       try {

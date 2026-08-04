@@ -106,6 +106,30 @@ test('el reporte JSON, Markdown y compacto no exponen secretos de findings ni re
   }
 });
 
+test('createReport representa cancelación con exit code 130', async () => {
+  const projectRoot = await mkdtemp(path.join(os.tmpdir(), 'quality-reporter-cancelled-'));
+  try {
+    await mkdir(path.join(projectRoot, '.quality-reports', 'T-CANCEL'), { recursive: true });
+    const result = await createReport(
+      {
+        projectRoot,
+        reportRoot: path.join(projectRoot, '.quality-reports', 'T-CANCEL'),
+        qualityConfig: { maxFindings: 3 },
+        tools: {},
+      },
+      { taskId: 'T-CANCEL', ci: false, full: false },
+      { base: 'HEAD', full: false, files: [], profiles: [] },
+      [{ stage: 'sentinel', status: 'error', state: 'cancelled', durationMs: 1, findings: [], summary: 'cancelled' }],
+      [],
+      Date.now(),
+    );
+    assert.equal(result.report.decision.label, 'CANCELLED');
+    assert.equal(result.report.decision.exitCode, 130);
+  } finally {
+    await rm(projectRoot, { recursive: true, force: true });
+  }
+});
+
 test('createReport serializa la identidad de política en JSON y Markdown', async () => {
   const projectRoot = await mkdtemp(path.join(os.tmpdir(), 'quality-reporter-policy-'));
   try {
