@@ -162,10 +162,10 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 - [x] Añadir al reporte local la identidad estable de política: `projectRoot`, `policyPath`, `policyHash`, `runtimeVersion`, `reason` y comando recomendado; se mantiene `schemaVersion: 1` por compatibilidad aditiva.
 - [ ] Definir contrato final de salida de Sentinel Core con decisión/exitCode y transporte CLI/LSP. *(pendiente del runtime global)*
 - [ ] Definir contrato final de plugin, taxonomía `analyze/check/guard/doctor` y matriz de compatibilidad Sentinel↔VarSense. El contrato local parcial de salida/error ahora valida `entries` y estados fail-closed; el contrato Core/upstream y `cancelled` siguen pendientes.
-- [ ] Definir compatibilidad Windows PowerShell 5/7, PowerShell Core, CMD, Bash/Git Bash (interactivo y `BASH_ENV`) y CI sin depender de variables específicas de VS Code.
-- [ ] Definir política de actualización, rollback y migración desde el guard actual.
+- [x] Definir compatibilidad Windows PowerShell 5/7, PowerShell Core, CMD, Bash/Git Bash (interactivo y `BASH_ENV`) y CI sin depender de variables específicas de VS Code: contrato documental en `Agente/documentacion/herramientas/matriz-shells-sentinel-2026-08-04.md` (shims con `shell: false`, exit codes/redirecciones, frontera de enforcement con bypass no interceptable, launcher del agente/CI, refs CI allowlisted). La ejecución de la matriz real queda en Fase 4.
+- [x] Definir política de actualización, rollback y migración desde el guard actual: contrato documental en `Agente/documentacion/herramientas/politica-actualizacion-rollback-sentinel-2026-08-04.md` (versionado `%LOCALAPPDATA%\GlorySentinel`, flujo update/rollback con backup+hash+rename atómico, migración del guard actual, retirada tras dos releases y desinstalación solo de entradas administradas). La instalación/rollback efectivos quedan en Fase 1/5.
 
-**Gate:** ADR aprobado; fixtures y doctor local pasan. La fase 0 queda parcialmente cerrada: el schema/runtime global y la salida final permanecen pendientes upstream.
+**Gate:** ADR aprobado; fixtures y doctor local pasan; los contratos documentales de shells y de actualización/rollback quedan definidos. La fase 0 queda parcialmente cerrada: el schema/runtime global, la salida final y la ejecución de la matriz multi-shell permanecen pendientes upstream.
 
 ### Fase 1 — Sentinel Core global instalable y estable *(bloqueada: runtime upstream ausente)*
 

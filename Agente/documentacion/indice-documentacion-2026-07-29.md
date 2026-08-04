@@ -36,6 +36,8 @@
 | ¿Cómo funciona el registro verificado y recovery?       | `Agente/planes/plan-auth-verificado-2026-08-01.md` |
 | ¿Cuál es la paridad y el commit fijado de Sentinel/VarSense? | `Agente/documentacion/herramientas/matriz-paridad-sentinel-varsense-2026-08-01.md` |
 | ¿Cómo se migra Sentinel a plano global sin romper el gate? | `Agente/planes/plan-global-quality-guard-agnostico-2026-08-02.md` + `Agente/documentacion/arquitectura/adr-sentinel-plano-global-028a6-2026-08-03.md` |
+| ¿Cómo se actualiza, revierte y retira el runtime global de Sentinel? | `Agente/documentacion/herramientas/politica-actualizacion-rollback-sentinel-2026-08-04.md` |
+| ¿Qué shells cubre el interceptor de Sentinel y cuál es su frontera? | `Agente/documentacion/herramientas/matriz-shells-sentinel-2026-08-04.md` |
 | ¿Qué versiones, hashes, ramas y retención usa el gate actual? | `sentinel.lock.json` + `quality-tools.json` + `quality.config.json` + `Agente/documentacion/herramientas/matriz-paridad-sentinel-varsense-2026-08-01.md` |
 | ¿Cómo se ejecuta backup, health y rollback sin SSH? | `Agente/documentacion/herramientas/runbook-coolify-backup-rollback-2026-08-01.md` |
 
