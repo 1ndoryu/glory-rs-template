@@ -14,7 +14,7 @@
     "varsense": {
       "repository": "https://github.com/1ndoryu/varsense.git",
       "sourcePathEnv": "GLORY_VARSENSE_SOURCE_PATH",
-      "commit": "11f0932de5e66d88a79fdaa960ca77e5774d0a33",
+      "commit": "e8360927ee92c4067f1f501dd77b951c8bc4f61d",
       "version": "2.2.0",
       "outputSchemaVersion": "1",
       "buildScript": "compile",

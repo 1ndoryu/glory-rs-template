@@ -91,13 +91,13 @@
 
 **Gate/salida del tramo local:** contrato v2, dry-run, guard y tests pasan; el gate global multi-proyecto/multi-shell no se declara cerrado hasta instalar el runtime fijado y ejecutar la matriz externa.
 
-### 028A-8 — Optimización medible de Sentinel y VarSense (planificado)
+### 028A-8 — Optimización medible de Sentinel y VarSense (en curso, tramos 1–4 cerrados)
 
 **Depende de:** 028A-5 y 028A-6. Plan canónico: `Agente/planes/plan-optimizacion-sentinel-varsense-2026-08-02.md`.
 
-- [ ] Corregir la degradación full→local-light para que el alcance efectivo no siga ejecutando análisis completo tras el cooldown.
-- [ ] Compartir un manifiesto de alcance/hashes entre etapas y añadir métricas de descubrimiento, parseo, caché, archivos reutilizados, RSS y CPU.
-- [ ] Añadir modo incremental de VarSense con `--files-from`, índices persistentes de variables/clases y invalidación por dependencias.
+- [x] Corregir la degradación full→local-light para que el alcance efectivo no siga ejecutando análisis completo tras el cooldown: `scope.mjs` separa requested/automatic/effective/fullReason/heavyDeferred y `task-check.mjs` adquiere el lease pesado también para automaticFull; un full diferido degrada a local-light real (verificado en gate 028A-8 con `full · ejecución incremental (heavy-deferred)`).
+- [ ] Compartir un manifiesto de alcance/hashes entre etapas y añadir métricas de descubrimiento, parseo, caché, archivos reutilizados, RSS y CPU. *(el `scope-manifest.json` único con hashes ya está emitido y `run-frontend-tests` lo consume; quedan las métricas por etapa)*
+- [ ] Añadir modo incremental de VarSense con `--files-from`, índices persistentes de variables/clases y invalidación por dependencias. *(el adapter `--files-from` y el índice persistente están fijados: upstream `11f0932` en el `main` consumido, `capabilities.persistentIndex=true`, lock regenerado y gate real con reutilización (loaded=363, reused=364, reparsed=0); queda la selección de dependencias con el índice inverso para ampliar `--files-from` con consumidores)*
 - [ ] Optimizar Sentinel con caché por archivo/índice global, sin duplicar reglas con custom ni reducir cobertura.
 - [ ] Validar p50/p95, paridad CLI/LSP/VS Code/Zed, rollback y una matriz con otro proyecto/estructura.
 
