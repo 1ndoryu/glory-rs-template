@@ -1,7 +1,7 @@
 # Plan 028A-8 — Optimización medible de Sentinel y VarSense
 
 > **Fecha:** 2026-08-02
-> **Estado:** propuesto; no implementar hasta revisar el alcance y los objetivos.
+> **Estado:** ejecución incremental; el core VarSense ya tiene caché por archivo durante la vida del builder e invalidación explícita, pero el contrato CLI incremental, persistencia entre ejecuciones, watchers y dependencias aún están pendientes.
 > **Evidencia inicial:** los últimos reportes local-light tardan 16.6–35.1 s. VarSense consume 10.7–16.8 s y frontend 4.8–7.3 s. Sentinel va de 0.2 s incremental a 8–11 s cuando el alcance queda full. El full anterior llegó a 173.5 s, con Rust ocupando 114 s.
 > **Dependencias:** 028A-3/028A-5 (guard y gate único), SNT-10/028A-6 (Sentinel como plano único), `scripts/quality/cache.mjs`, `scope.mjs` y los repositorios versionados de Sentinel/VarSense.
 
@@ -17,7 +17,7 @@ Reducir el tiempo y el consumo de recursos del quality gate sin perder detecció
 - VarSense CLI no acepta actualmente `--files-from`; necesita un contrato incremental y cachés de índices para no recalcular tokens/clases/documentos.
 - Sentinel ya acepta `--files-from`, pero su tiempo sube cuando el alcance automático se marca full.
 - `detectScope` mezcla `args.full`, full automático por `fullPatterns` y el modo resultante. Cuando el full se difiere por cooldown, puede conservar `scope.full=true`, contradiciendo el mensaje `local-light`.
-- La caché actual es por etapa/fingerprint global. Un cambio pequeño invalida toda la etapa y no existe caché persistente por archivo para VarSense/Sentinel.
+- La caché del gate sigue siendo por etapa/fingerprint global. VarSense `main` ya tiene caché por archivo durante la vida de `ClassIndexBuilder` (`a72b39a`), pero no es persistente entre ejecuciones ni detecta cambios por sí sola: el caller debe invocar `invalidateFile` antes de reanalizar un archivo cambiado/eliminado.
 - La ejecución secuencial protege la máquina, pero no compensa el coste de volver a descubrir y parsear el mismo workspace.
 
 ## Objetivos cuantitativos
@@ -67,6 +67,8 @@ Medir en una máquina de referencia y publicar p50/p95; los objetivos iniciales 
 
 ### Fase 2 — VarSense incremental
 
+**Avance 2026-08-04 (SNT-09):** completado el primer subtramo de core: `ClassIndexBuilder` reutiliza definiciones CSS y tokens de consumidores por `fsPath`, poda archivos ausentes, expone `invalidateFile`/`clearCache` y separa `DocumentCacheProvider` del provider base. `varsense all` inyecta explícitamente el snapshot cacheable. Validación upstream: 53/53 tests, compile, lint, check:core y smoke LSP PASS. El builder es de vida corta en `classScanner`/LSP; conectar watchers persistentes, hash/versionado, índice inverso y dependencias queda para los siguientes subtramos.
+
 #### Contrato CLI de VarSense
 
 - [ ] Añadir `--files-from <manifest>` y un modo `incremental` al CLI agnóstico.
@@ -77,15 +79,16 @@ Medir en una máquina de referencia y publicar p50/p95; los objetivos iniciales 
 #### Índices persistentes
 
 - [ ] Crear índice de variables por archivo y hash de contenido; reconstruir solo variables modificadas.
-- [ ] Crear índice de clases CSS/consumidores por archivo; invalidar consumidores relacionados cuando cambia una definición o selector.
+- [x] Crear caché de resultados de clases CSS/consumidores por archivo durante la vida del builder; invalidación explícita de un archivo y limpieza total disponibles (`a72b39a`).
+- [ ] Persistir el índice entre ejecuciones e invalidar consumidores relacionados cuando cambia una definición o selector.
 - [ ] Mantener índice inverso `token/class → archivos consumidores` para seleccionar dependencias sin recorrer todo el workspace.
-- [ ] Cachear documentos parseados por `toolVersion + configHash + fileHash + parserVersion`.
+- [ ] Cachear documentos parseados persistentemente por `toolVersion + configHash + fileHash + parserVersion`; el snapshot en memoria de `varsense all` ya evita lecturas duplicadas dentro de una ejecución.
 - [ ] Invalidar globalmente solo si cambian `variables.css`, reglas de tokens, patrones de inclusión/exclusión o versión del parser.
 - [ ] Hacer que token duplicate/unused y orphan classes declaren sus dependencias; no asumir que todo cambio CSS invalida todo.
 
 #### Eficiencia de I/O
 
-- [ ] Compartir un inventario de archivos entre `VariableIndexBuilder`, `ClassIndexBuilder` y candidatos.
+- [ ] Compartir un inventario de archivos entre `VariableIndexBuilder`, `ClassIndexBuilder` y candidatos; actualmente solo se comparte el provider de documentos dentro de `all`.
 - [ ] Evitar tres recorridos glob completos de `frontend/src` en una misma ejecución.
 - [ ] Limitar concurrencia de parseo con un presupuesto configurable; no crear un worker por archivo.
 - [ ] Escribir solo el delta de findings y luego materializar el reporte combinado determinista.

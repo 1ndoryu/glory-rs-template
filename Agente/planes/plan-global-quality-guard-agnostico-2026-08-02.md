@@ -203,7 +203,7 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 - [ ] Añadir `sentinel.config.json` al proyecto con `sentinel check -- <TareaId>` como gate; conservar un alias temporal para `npm run task:check`.
 - [ ] Migrar `quality-command-guard.mjs`, `global-cargo-guard.ps1`, `npm.cmd`, `npx.cmd` y `cargo.cmd` al runtime global de Sentinel sin duplicar reglas.
 - [ ] Mantener `quality.config.json` solo para la transición de tiempos, alcance y cachés; la política de comandos y analizadores vive en Sentinel.
-- [ ] Integrar VarSense como adaptador de analizador (`files-from`, hallazgos tipados, caché e invalidación), sin un gate ni scheduler propio.
+- [ ] Integrar VarSense como adaptador de analizador (`files-from`, hallazgos tipados, caché e invalidación), sin un gate ni scheduler propio. El core local ya expone caché por archivo e invalidación explícita en `a72b39a`; falta el contrato incremental del adapter.
 - [ ] Actualizar `quality:install-guard` para instalar/copiar Sentinel y retirar rutas hardcodeadas del repositorio.
 - [ ] Ejecutar VarSense desde Sentinel y demostrar paridad de hallazgos con su CLI/LSP, sin permitir que VarSense cierre la tarea por separado.
 - [ ] Ejecutar primero en modo `observe` contra el gate actual y comparar reportes normalizados; activar `enforce` solo después de resolver diferencias, errores de herramienta y falsos positivos.
@@ -279,7 +279,8 @@ La migración a Sentinel como plano único deja documentación desincronizada co
 - [x] **`CHANGELOG.md`** — añadidos `all` y `tokenDetection` a la entrada 2.2.0 (commit `4167868` `038A-5`).
 - [x] **Sincronizar `main`** — el commit fijado previo (`b1aa3f06`) resultó **inexistente** en el repo dev y en `origin`. `main` se fast-forwardeó a `b1aa3f0` (commits reales `SNT-03` `9e69deb` y `SNT-07` `b1aa3f0`) y luego `038A-5` añadió las docs, quedando `main=4167868` con `all` y `tokenDetection`; push a `origin/main` (b299040..4167868). La copia `.quality-tools/varsense` se conserva como instalación derivada del mismo `main`; no añade delta de código, solo metadata administrativa permitida.
 - [x] **Cancelación cooperativa SNT-08 en core** — `main` local contiene `337c4cce` con `CancellationToken`/`CancellationError` para builders de variables y clases, propagación durante descubrimiento/lectura/extracción/cierre, preservación de errores normales de lectura y 50 tests upstream PASS.
-- [ ] **Publicar y fijar SNT-08** — `main` local contiene `337c4cce` con la cancelación cooperativa del core y 50 tests upstream PASS; no se actualiza `quality-tools.json`/`sentinel.lock.json` hasta que el commit sea alcanzable desde `origin`, porque el instalador debe poder reproducirlo en un checkout limpio.
+- [x] **Caché incremental SNT-09 en core** — `main` local contiene `a72b39a` con caché por archivo para clases, invalidación explícita y provider de cache separado; `varsense all` comparte el snapshot solo cuando se inyecta explícitamente.
+- [ ] **Publicar y fijar SNT-08/SNT-09** — `main` local contiene `a72b39a` (incluye SNT-08), pero los commits aún no son alcanzables desde `origin`; no se actualiza `quality-tools.json`/`sentinel.lock.json` hasta que el instalador pueda reproducirlos en un checkout limpio.
 
 ### Proyecto wandori.us (glory-rust-template)
 
