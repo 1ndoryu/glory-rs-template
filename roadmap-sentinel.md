@@ -48,7 +48,7 @@ Con este checklist cerrado, las mejoras restantes de este documento son backlog 
 | Herramienta | Versión/commit fijado | Estado observado |
 | --- | --- | --- |
 | Glory Sentinel | `0.4.0` / `7ad3b766207bb28d89d38a938ee14fbad9f4cd49` | CLI JSON versionado, config estricta y reglas portables de boundaries/arquitectura. Commit real de `main` (1ndoryu/glory-sentinel) tras el sync 038A-5. |
-| VarSense | `2.2.0` / `4167868dd5d0e7674d5565ade399a57796d69cf3` | Core/CLI/LSP equivalentes; índice dinámico, `all` y reglas de tokens compartidas. Commit real de `main` (1ndoryu/varsense) tras el sync 038A-5. |
+| VarSense | `2.2.0` / `4167868dd5d0e7674d5565ade399a57796d69cf3` | Commit reproducible consumido por el gate. `main` local además contiene SNT-08 (`337c4cce`), aún no publicado ni fijado en la instalación para no romper checkouts limpios. |
 | Quality gate | `scripts/quality/*.mjs` | Tiene preflight, lock, cache, redacción, reportes y perfiles; necesita endurecer errores, portabilidad y paralelismo. |
 
 ### Hallazgos prioritarios del orquestador
@@ -173,7 +173,8 @@ Una regla no ejecuta procesos, no escribe archivos, no imprime salida humana y n
 
 - [x] Llevar la extracción de clases dinámicas al commit upstream fijado mediante fixtures reproducibles; retirar el patch downstream del manifest.
 - [x] Implementar `varsense all`, que comparte provider/snapshot de documentos para `VariableIndex` y `ClassIndex` en una ejecución.
-- [ ] Invalidar índices por archivo y dependencias, no por workspace completo; cancelar trabajo obsoleto cuando cambia el documento.
+- [ ] Invalidar índices por archivo y dependencias, no por workspace completo.
+- [x] Añadir cancelación cooperativa editor-agnostic en `main` de VarSense para builders de variables/clases, con propagación estable y regresiones de cancelación/errores normales (commit local `337c4cce`; 50 tests upstream PASS). La fijación en `.quality-tools` queda pendiente de publicación en `origin`.
 - [ ] Añadir fixtures para clases estáticas, template strings, objetos `className`, factories, multilinea y falsos positivos.
 - [x] Garantizar paridad CLI/LSP/VS Code con suite upstream (45 pruebas, smoke LSP y check-core).
 - [x] Eliminar el parche de `quality-tools.json`; VarSense queda fijado en el commit real de `main` `4167868d...` (sync 038A-5).

@@ -1,5 +1,7 @@
 # Matriz de paridad Sentinel/VarSense — 2026-08-01
 
+> **Actualización 2026-08-04 — SNT-08:** VarSense `main` local contiene `337c4cce434e0af795f71dc9c7845ce7fa798745`, con cancelación cooperativa editor-agnostic en los builders de variables/clases y 50 tests upstream PASS. El commit aún no se fija en `quality-tools.json`/`sentinel.lock.json`: no es alcanzable desde `origin`, por lo que la instalación reproducible continúa en `4167868dd5d0e7674d5565ade399a57796d69cf3`.
+
 ## Versiones fijadas
 
 | Herramienta | Versión | Commit | CLI | LSP/VS Code | Fixture/gate |

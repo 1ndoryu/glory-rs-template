@@ -278,6 +278,8 @@ La migración a Sentinel como plano único deja documentación desincronizada co
 - [x] **`README.md`** — reescrito (commit `4167868` `038A-5`): nombre VarSense, CLI `scan`/`orphan-classes`/`all`, binarios `varsense`/`varsense-lsp`, LSP stdio, integración Zed y `tokenDetection` (`token-duplicate`/`token-unused`).
 - [x] **`CHANGELOG.md`** — añadidos `all` y `tokenDetection` a la entrada 2.2.0 (commit `4167868` `038A-5`).
 - [x] **Sincronizar `main`** — el commit fijado previo (`b1aa3f06`) resultó **inexistente** en el repo dev y en `origin`. `main` se fast-forwardeó a `b1aa3f0` (commits reales `SNT-03` `9e69deb` y `SNT-07` `b1aa3f0`) y luego `038A-5` añadió las docs, quedando `main=4167868` con `all` y `tokenDetection`; push a `origin/main` (b299040..4167868). La copia `.quality-tools/varsense` se conserva como instalación derivada del mismo `main`; no añade delta de código, solo metadata administrativa permitida.
+- [x] **Cancelación cooperativa SNT-08 en core** — `main` local contiene `337c4cce` con `CancellationToken`/`CancellationError` para builders de variables y clases, propagación durante descubrimiento/lectura/extracción/cierre, preservación de errores normales de lectura y 50 tests upstream PASS.
+- [ ] **Publicar y fijar SNT-08** — `main` local contiene `337c4cce` con la cancelación cooperativa del core y 50 tests upstream PASS; no se actualiza `quality-tools.json`/`sentinel.lock.json` hasta que el commit sea alcanzable desde `origin`, porque el instalador debe poder reproducirlo en un checkout limpio.
 
 ### Proyecto wandori.us (glory-rust-template)
 
@@ -286,7 +288,7 @@ La migración a Sentinel como plano único deja documentación desincronizada co
 - [x] **`Agente/documentacion/herramientas/matriz-paridad-sentinel-varsense-2026-08-01.md`** — añadir nota sobre `all`/`tokenDetection`/portable rules, copia instalada frente a repos `main`, lockfile, branch-key y límites del runtime global.
 - [x] **`Agente/documentacion/indice-documentacion-2026-07-29.md`** — enlazar el estado de versiones, hashes, ramas y retención mediante el plan global y los manifiestos canónicos.
 
-**Gate del inventario:** cada ítem cierra con evidencia (commit en el repo de la herramienta o en el proyecto) y el catálogo de reglas del README de Sentinel debe coincidir con `ruleRegistry.ts` de la copia instalada. Los repos dev sincronizados con las copias instaladas es prerequisito para que la documentación describa lo que el gate realmente consume. **Cerrado 2026-08-04:** repos dev `main` (sentinel `7ad3b76`, varsense `4167868`) pusheados a `origin`; docs regeneradas desde el código real; copias instaladas re-sincronizadas a los commits de `main`; `quality-tools.json` y `sentinel.lock.json` regenerados y verificados (`pass: match`).
+**Gate del inventario:** cada ítem cierra con evidencia (commit en el repo de la herramienta o en el proyecto) y el catálogo de reglas del README de Sentinel debe coincidir con `ruleRegistry.ts` de la copia instalada. Los repos dev sincronizados con las copias instaladas es prerequisito para que la documentación describa lo que el gate realmente consume. **Cerrado históricamente 2026-08-04 para los commits publicados:** Sentinel `main=7ad3b76` y VarSense `main=4167868` fueron sincronizados con `origin`; las copias instaladas y los locks coincidieron. Después, SNT-08 creó en VarSense `main` local `337c4cce`, todavía no publicado; por eso la instalación reproducible y `quality-tools.json`/`sentinel.lock.json` permanecen correctamente en `4167868`.
 
 ## Definition of Done
 
