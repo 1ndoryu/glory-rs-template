@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { lstat, readFile, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { migrateLegacyConfig, loadPolicy, policyIdentity } from './policy.mjs';
@@ -7,7 +7,18 @@ import { checkLock, writeLock } from './lock-generator.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 async function readJson(projectRoot, relativePath) {
-  return JSON.parse(await readFile(path.join(projectRoot, relativePath), 'utf8'));
+  const filePath = path.join(projectRoot, relativePath);
+  const metadata = await lstat(filePath);
+  if (!metadata.isFile() || metadata.isSymbolicLink()) {
+    throw new Error(`${relativePath}: no puede ser symlink/junction y debe ser un archivo regular`);
+  }
+  const canonicalRoot = await realpath(projectRoot);
+  const canonicalFile = await realpath(filePath);
+  const relative = path.relative(canonicalRoot, canonicalFile);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw new Error(`${relativePath}: su realpath debe permanecer dentro del workspace`);
+  }
+  return JSON.parse(await readFile(canonicalFile, 'utf8'));
 }
 
 export function resolveLegacyRoot(discovered) {
@@ -68,6 +79,7 @@ async function main(argv = process.argv.slice(2)) {
     const migrated = migrateLegacyConfig({
       sentinelConfig: await readJson(legacyRoot, 'sentinel.config.json'),
       qualityConfig: await readJson(legacyRoot, 'quality.config.json'),
+      varsenseConfig: await readJson(legacyRoot, 'varsense.config.json'),
       toolManifest: await readJson(legacyRoot, 'quality-tools.json'),
     });
     result.migration = {
@@ -75,8 +87,9 @@ async function main(argv = process.argv.slice(2)) {
       writes: [],
       target: 'sentinel.config.v2.preview.json',
       policy: migrated.policy,
+      mapped: migrated.mapped,
       legacyPreserved: migrated.legacy,
-      note: 'quality.config.json y quality-tools.json siguen siendo contratos legacy; no se aplicó una migración irreversible.',
+      note: 'El preview mapea los contratos legacy sin escribir; quality.config.json, varsense.config.json y quality-tools.json permanecen intactos hasta una migración global versionada.',
     };
   }
   const output = JSON.stringify(result, null, 2);

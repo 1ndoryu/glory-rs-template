@@ -36,19 +36,102 @@ test('valida una política v2 y rechaza claves desconocidas o rutas inseguras', 
 test('mapea la configuración legacy a una política v2 sin perder el analizador v1', () => {
   const migrated = migrateLegacyConfig({
     sentinelConfig: { includePatterns: ['**/*.ts'], rules: { 'catch-vacio': { severidad: 'error' } } },
-    qualityConfig: { schemaVersion: 1, maxConcurrentStages: 1 },
-    toolManifest: { tools: { sentinel: { version: '0.4.0', outputSchemaVersion: '1' } } },
+    qualityConfig: {
+      schemaVersion: 1,
+      maxConcurrentStages: 1,
+      timeoutsMs: { sentinel: 120000 },
+      heavyRun: { cooldownMinutes: 180 },
+      reportRetention: { maxAgeDays: 7 },
+      fullPatterns: ['scripts/quality/'],
+      profiles: { docs: ['.md'] },
+    },
+    varsenseConfig: {
+      includePatterns: ['frontend/src/**/*.css'],
+      tokenDetection: { duplicate: { enabled: true, severity: 'warning' } },
+    },
+    toolManifest: {
+      schemaVersion: 1,
+      installRoot: '.quality-tools',
+      tools: {
+        sentinel: { version: '0.4.0', commit: 'sentinel-commit', outputSchemaVersion: '1' },
+        varsense: { version: '2.2.0', commit: 'varsense-commit', outputSchemaVersion: '1' },
+      },
+    },
   });
   assert.equal(migrated.policy.schemaVersion, 2);
   assert.equal(migrated.policy.gate.command[0], 'npm');
   assert.equal(migrated.policy.analyzers.sentinel.config.rules['catch-vacio'].severidad, 'error');
   assert.equal(migrated.policy.runtime.protocolVersion, 1);
   assert.equal(migrated.legacy.qualityConfig.maxConcurrentStages, 1);
+  assert.equal(migrated.legacy.varsenseConfig.tokenDetection.duplicate.enabled, true);
   assert.equal(migrated.legacy.toolManifest.tools.sentinel.version, '0.4.0');
+  assert.deepEqual(migrated.mapped.scheduler.heavyRun, { cooldownMinutes: 180 });
+  assert.deepEqual(migrated.mapped.scope.profiles, { docs: ['.md'] });
+  assert.equal(migrated.mapped.analyzers.varsense.config.includePatterns[0], 'frontend/src/**/*.css');
+});
+
+test('rechaza claves desconocidas o manifests incompletos antes de crear el preview', () => {
+  const validTools = {
+    schemaVersion: 1,
+    installRoot: '.quality-tools',
+    tools: {
+      sentinel: { version: '0.4.0', commit: 'a', outputSchemaVersion: '1' },
+      varsense: { version: '2.2.0', commit: 'b', outputSchemaVersion: '1' },
+    },
+  };
+  assert.throws(() => migrateLegacyConfig({
+    sentinelConfig: { includePatterns: ['..\\\\outside.json'], oldRule: true },
+    qualityConfig: {},
+    varsenseConfig: {},
+    toolManifest: validTools,
+  }), /sentinel.config.json v1: claves desconocidas/);
+  assert.throws(() => migrateLegacyConfig({
+    sentinelConfig: {},
+    qualityConfig: { unknown: true },
+    varsenseConfig: {},
+    toolManifest: validTools,
+  }), /quality.config.json: claves desconocidas/);
+  assert.throws(() => migrateLegacyConfig({
+    sentinelConfig: {},
+    qualityConfig: {},
+    varsenseConfig: {},
+    toolManifest: { ...validTools, tools: { sentinel: validTools.tools.sentinel } },
+  }), /exactamente sentinel y varsense/);
+  assert.throws(() => migrateLegacyConfig({
+    sentinelConfig: {},
+    qualityConfig: {},
+    varsenseConfig: {},
+    toolManifest: {
+      ...validTools,
+      tools: {
+        ...validTools.tools,
+        sentinel: {
+          ...validTools.tools.sentinel,
+          patch: { path: '..\\\\outside.patch', sha256: 'a'.repeat(64) },
+        },
+      },
+    },
+  }), /patch.path: debe ser una ruta relativa/);
+  assert.throws(() => migrateLegacyConfig({
+    sentinelConfig: {},
+    qualityConfig: {},
+    varsenseConfig: {},
+    toolManifest: {
+      ...validTools,
+      tools: {
+        ...validTools.tools,
+        varsense: {
+          ...validTools.tools.varsense,
+          patch: { path: 'scripts/patch', sha256: 'not-a-hash' },
+        },
+      },
+    },
+  }), /patch.sha256: debe ser SHA-256/);
 });
 
 test('doctor no inventa una migración para un proyecto sin política', async () => {
   assert.throws(() => resolveLegacyRoot({ projectRoot: null }), /No se encontró una raíz/);
+  assert.throws(() => migrateLegacyConfig({ sentinelConfig: {}, qualityConfig: {}, toolManifest: {} }), /configuración legacy incompleta/);
 });
 
 test('rechaza una política symlink para no cargar configuración fuera del workspace', async () => {
