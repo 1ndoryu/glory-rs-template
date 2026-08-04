@@ -7,14 +7,16 @@
 | Glory Sentinel | 0.4.0 | `7ad3b766207bb28d89d38a938ee14fbad9f4cd49` | PASS | Core editor-agnóstico PASS | `npm run test:unit`, `task:check` |
 | VarSense | 2.2.0 | `4167868dd5d0e7674d5565ade399a57796d69cf3` | `scan`, `orphan-classes`, `all` | Core/LSP/VS Code PASS | 46 pruebas, `npm test` |
 
-> **Sync 038A-5 (2026-08-04):** los commits previos (`107be9b6`/`b1aa3f06`) resultaron inexistentes en los repos dev y en `origin`; las features solo vivían en la copia instalada. Se portaron los commits reales a `main` (sentinel `7ad3b76`, varsense `4167868`, pusheados a `1ndoryu/*`) y la copia instalada quedó re-sincronizada a esos commits (ver plan 028A-6, sección de inventario).
+> **Sync 038A-5 (2026-08-04):** los commits previos (`107be9b6`/`b1aa3f06`) resultaron inexistentes en los repos dev y en `origin`. Las features estaban en el checkout instalado porque allí se habían trabajado originalmente; después se promovieron a `main` (Sentinel `7ad3b76`, VarSense `4167868`, pusheados a `1ndoryu/*`) y las instalaciones se re-sincronizaron a esos mismos commits. La fuente de desarrollo es `main`; `.quality-tools` es solo la instalación reproducible consumida por este gate.
 
 ## Contratos
 
 El gate de este checkout consume la copia instalada bajo `.quality-tools` y la
-valida contra `quality-tools.json` + `sentinel.lock.json`. Los repositorios de
-desarrollo upstream (`main`) no son una fuente implícita de runtime ni se
-consideran sincronizados sin evidencia de commit/hash.
+valida contra `quality-tools.json` + `sentinel.lock.json`. La fuente de desarrollo
+y mantenimiento es `main` en cada repositorio upstream; `.quality-tools` se deriva
+de esos commits fijados y puede añadir únicamente el patch local declarado. La
+paridad se verifica comparando commit, árbol y hash del patch, no por asumir que
+cualquier checkout instalado es una fuente independiente.
 
 - Los dos CLIs escriben JSON con `schemaVersion: 1`, `entries`, severidad y rango estable.
 - Sentinel añade `remediation`, `confidence` y `analyzerVersion` al contrato core; los adapters traducen sin importar APIs del editor.
@@ -35,7 +37,7 @@ consideran sincronizados sin evidencia de commit/hash.
 
 ## Nota de sincronización
 
-Los commits fijados en `quality-tools.json` son la fuente que consume este gate. Los repositorios de desarrollo upstream pueden estar detrás; este workspace no los sincroniza ni declara paridad de `main` sin un checkout verificable. La migración 028A-6 añade un contrato local de política v2, mantiene el formato Sentinel v1 como configuración del analizador durante la transición y no simula la instalación del runtime global.
+Los commits fijados en `quality-tools.json` identifican la instalación que consume este gate y corresponden a `main` upstream verificado: Sentinel `7ad3b766…` y VarSense `4167868dd…`. En Sentinel, el único delta instalado es el patch `[317A-3]`, cuyo diff y SHA-256 coinciden con el manifest y el lock; en VarSense no hay delta de código. La migración 028A-6 añade un contrato local de política v2, mantiene el formato Sentinel v1 como configuración del analizador durante la transición y no simula la instalación del runtime global.
 
 ## Pendientes explícitos
 

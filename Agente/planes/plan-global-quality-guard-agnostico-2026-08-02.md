@@ -270,14 +270,14 @@ La migración a Sentinel como plano único deja documentación desincronizada co
 - [x] **`help.txt`** — reemplazado por el `--help` real de `sentinel analyze` (commit `7ad3b76` `038A-5`); ya no es el dump de la CLI Gemini.
 - [x] **`rules.md`** — regenerado desde `obtenerTodasLasReglas()` del `ruleRegistry` compilado: 105 IDs reales con severidad/categoría (commit `7ad3b76` `038A-5`).
 - [x] **`CHANGELOG.md`** — entrada 0.4.0 ampliada con portable rules/`portableBoundaries`/`unsafe-process-shell`/`default-export` y deprecación del motor IA marcada (commit `7ad3b76` `038A-5`).
-- [x] **Sincronizar `main`** — el commit fijado previo (`107be9b6`) resultó **inexistente** en el repo dev y en `origin` (las features solo vivían en la copia instalada). Se cherry-pickearon los commits reales `SNT-04` (`0f164e0`) y `SNT-02` (`e06a140`) sobre `main`, quedando `main=7ad3b76` con portable rules, `portableBoundaries` y las reglas del registry; push a `origin/main` (95ac5b0..7ad3b76).
+- [x] **Sincronizar `main`** — el commit fijado previo (`107be9b6`) resultó **inexistente** en el repo dev y en `origin`. Se promovieron a `main` los commits reales `SNT-04` (`0f164e0`) y `SNT-02` (`e06a140`), quedando `main=7ad3b76` con portable rules, `portableBoundaries` y las reglas del registry; push a `origin/main` (95ac5b0..7ad3b76). La copia `.quality-tools/sentinel` se conserva como instalación derivada de ese `main` y añade únicamente el patch local `[317A-3]`, verificado por SHA-256.
 - [x] **Parche local `[317A-3]`** regenerado contra el nuevo `main` (el README ya quedó absorbido en main; el parche conserva solo las recetas de código) y re-declarado en `quality-tools.json` (`patchSha256=b660b7e050eccbd09ca07f542257a1917974e0cfef123ee3aa0ded2aba3dbf8d`); sigue siendo patch local hasta upstream.
 
 ### Repositorio varsense (repo dev `main` + copia instalada `.quality-tools/varsense`)
 
 - [x] **`README.md`** — reescrito (commit `4167868` `038A-5`): nombre VarSense, CLI `scan`/`orphan-classes`/`all`, binarios `varsense`/`varsense-lsp`, LSP stdio, integración Zed y `tokenDetection` (`token-duplicate`/`token-unused`).
 - [x] **`CHANGELOG.md`** — añadidos `all` y `tokenDetection` a la entrada 2.2.0 (commit `4167868` `038A-5`).
-- [x] **Sincronizar `main`** — el commit fijado previo (`b1aa3f06`) resultó **inexistente** en el repo dev y en `origin`. `main` se fast-forwardeó a `b1aa3f0` (commits reales `SNT-03` `9e69deb` y `SNT-07` `b1aa3f0`) y luego `038A-5` añadió las docs, quedando `main=4167868` con `all` y `tokenDetection`; push a `origin/main` (b299040..4167868).
+- [x] **Sincronizar `main`** — el commit fijado previo (`b1aa3f06`) resultó **inexistente** en el repo dev y en `origin`. `main` se fast-forwardeó a `b1aa3f0` (commits reales `SNT-03` `9e69deb` y `SNT-07` `b1aa3f0`) y luego `038A-5` añadió las docs, quedando `main=4167868` con `all` y `tokenDetection`; push a `origin/main` (b299040..4167868). La copia `.quality-tools/varsense` se conserva como instalación derivada del mismo `main`; no añade delta de código, solo metadata administrativa permitida.
 
 ### Proyecto wandori.us (glory-rust-template)
 
