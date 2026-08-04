@@ -203,3 +203,30 @@ test('descubre la política en un ancestro y diferencia no-policy de legacy-v1',
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test('cambiar la política en el mismo proceso no conserva estado de rama anterior', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'sentinel-policy-switch-'));
+  try {
+    const policy = validPolicy();
+    const policyPath = path.join(root, 'sentinel.config.json');
+    await writeFile(policyPath, JSON.stringify(policy), 'utf8');
+    const first = await loadPolicy(root);
+    assert.equal(first.status, 'policy');
+    assert.equal(first.policy.mode, 'enforce');
+
+    /* Simula el checkout de otra rama dentro del mismo proceso: la política
+     * cambia de contenido y el loader debe releerla del disco, sin caché de
+     * módulo ni hash residual. [028A-6] Descubrimiento fresco por comando. */
+    await writeFile(policyPath, JSON.stringify({ ...policy, mode: 'observe' }), 'utf8');
+    const second = await loadPolicy(root);
+    assert.equal(second.status, 'policy');
+    assert.equal(second.policy.mode, 'observe');
+    assert.notEqual(second.policyHash, first.policyHash);
+
+    await rm(policyPath);
+    const third = await loadPolicy(root);
+    assert.equal(third.status, 'no-policy');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

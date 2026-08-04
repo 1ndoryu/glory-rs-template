@@ -181,13 +181,13 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 
 ### Fase 2 — Resolución por workspace y rama *(contrato local parcial; enforcement global bloqueado)*
 
-- [ ] Implementar descubrimiento de raíz y política en cada comando, sin estado de proceso que sobreviva al cambio de rama.
+- [x] Implementar descubrimiento de raíz y política en cada comando, sin estado de proceso que sobreviva al cambio de rama: `discoverPolicy`/`loadPolicy` (`policy.mjs`) y `readV2GuardPolicy` (`quality-command-guard.mjs`) releen de disco en cada invocación, sin caché a nivel de módulo; regresión nueva en `policy.test.mjs` simula el cambio de política dentro del mismo proceso (enforce → observe → sin archivo) y verifica status/hash frescos (`policy.test.mjs`). El enforcement del runtime global sigue pendiente.
 - [x] Diferenciar `no-policy`, `legacy-v1`, `observe`, `enforce`, `pass-through` e `invalid-policy` en el guard, doctor e identidad/reporte local (`scripts/quality/policy-decision.mjs` + fixtures); el enforcement global sigue pendiente.
 - [x] Invalidar la caché local por `policyHash` además de modo, herramientas, configuración y archivos.
 - [ ] Invalidar decisiones/cooldowns del runtime global por `projectRoot + policyHash + runtimeVersion`. *(pendiente del runtime global)*
 - [ ] Mantener cooldown/locks solo para comandos declarados como pesados por la política; no compartirlos entre proyectos.
 - [ ] Emitir leases efímeros firmados para que los procesos hijos iniciados por `sentinel check` puedan usar herramientas pesadas sin que el propio shim los bloquee; el lease debe estar ligado a PID, proyecto, comando, expiración y task ID.
-- [ ] Definir la frontera de enforcement: shims cubren shells normales; el launcher del agente/CI debe invocar `sentinel guard` antes de ejecutar procesos. Rutas absolutas y shells `--noprofile --norc` se registran como bypass no interceptable por un script de proyecto, no se presentan como cobertura completa.
+- [x] Definir la frontera de enforcement: shims cubren shells normales; el launcher del agente/CI debe invocar `sentinel guard` antes de ejecutar procesos. Rutas absolutas y shells `--noprofile --norc` se registran como bypass no interceptable por un script de proyecto, no se presentan como cobertura completa. Contrato documental en `Agente/documentacion/herramientas/matriz-shells-sentinel-2026-08-04.md` §4; la ejecución de la matriz real queda en Fase 4.
 - [x] Añadir al diagnóstico local la decisión estable (`action`, `mode`, `blocked`, `reason`) junto con raíz, hash y comando recomendado; diagnóstico de shims/PATH global queda pendiente del runtime externo.
 - [x] Resolver la identidad de rama de forma segura para rama normal, detached HEAD, CI y nombres con `/`, espacios, unicode o longitud excesiva; añadir fixture determinista de `branch-key` (`scripts/quality/branch-identity.mjs`).
 - [x] Particionar reportes, logs, caché y locks por `projectRoot + branch-key`; conservar el SHA/ref original en metadata y evitar colisiones entre ramas (`preflight.mjs`, `cache.mjs`, `lock.mjs`, `reporter.mjs`).
@@ -196,7 +196,7 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 - [x] Exponer `quality:reports:cleanup:dry` y `quality:reports:cleanup`; el modo destructivo requiere `--cleanup --yes`.
 - [x] Cubrir con fixture de integración el aislamiento de dos ramas para reportes, caché y locks, además de identidades CI/detached con commit compartido (`scripts/quality/tests/branch-isolation.integration.test.mjs`). Traversal/symlink, retención y poda tienen cobertura focal; la poda best-effort integrada en `task-check` conserva el resultado del gate y está cubierta por `report-retention-stage.test.mjs`. El cambio de rama dentro del mismo proceso, los locks entre namespaces y refs largas/peligrosas quedan cubiertos por la fixture; la concurrencia multi-proceso y la matriz CI real siguen pendientes del runtime global.
 
-**Gate:** matriz con dos proyectos y dos ramas: el proyecto configurado bloquea lo declarado; el proyecto sin política pasa; cambiar de rama actualiza la decisión sin reiniciar el editor. Los reportes, locks y cachés quedan aislados por rama; la poda dry-run y aplicada respetan TTL/cuota, no toca una ejecución activa y no puede borrar fuera del workspace.
+**Gate:** matriz con dos proyectos y dos ramas: el proyecto configurado bloquea lo declarado; el proyecto sin política pasa; cambiar de rama actualiza la decisión sin reiniciar el editor (regresión de rediscovery de política en el mismo proceso). Los reportes, locks y cachés quedan aislados por rama; la poda dry-run y aplicada respetan TTL/cuota, no toca una ejecución activa y no puede borrar fuera del workspace. La frontera de enforcement queda definida documentalmente; la matriz de shells real y el enforcement del launcher siguen en Fase 4.
 
 ### Fase 3 — Adaptador de wandori.us y VarSense *(pendiente después de Fase 1)*
 
