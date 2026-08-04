@@ -291,7 +291,7 @@ no describe como pendientes los contratos ya activos en `scripts/quality`.
 - [ ] Ejecutar stages independientes en paralelo y conservar el orden canónico solo al consolidar el reporte.
 - [x] Mantener `docs` y reminders como adapters del proyecto; el runner no añade reglas de producto al core.
 - [x] Definir modo local incremental, modo `--full` y modo CI reproducible; el check no instala ni muta dependencias.
-- [ ] Publicar reporte Markdown/JSON, exit codes documentados y artifacts sin secretos; conservar detalle en `.quality-reports/`.
+- [x] Publicar reportes Markdown/JSON locales con exit codes diferenciados y artifacts sin secretos; `createReport` conserva el detalle completo, ordena findings de forma estable y `compactLines` limita solo la salida de terminal. La publicación CI multi-shell queda pendiente del runtime global.
 - [ ] Validar ejecución en Windows PowerShell, Git Bash, Linux CI y macOS sin asumir comandos POSIX.
 - [x] Proveer selector frontend explícito (`npm --prefix frontend run test:changed`) y conservar `test`/`test:full` como suite completa; no usar `passWithNoTests` para ocultar fallos.
 
@@ -370,7 +370,7 @@ no describe como pendientes los contratos ya activos en `scripts/quality`.
 - [ ] Ejecutar `npm run __sentinel_guard_probe__`: el guard debe devolver `BLOQUEADO` sin invocar npm; si aparece "Missing script", la shell/launcher está sin interceptor y no se puede cerrar la cobertura global.
 - [ ] Tests de cache: hit válido, cambio de contenido, config, commit, parser, schema y plataforma.
 - [ ] Benchmarks small/medium/full con límite de memoria, tiempo, concurrencia y cantidad de findings.
-- [ ] Tests de reporte: máximo de hallazgos/reminders, detalle completo en artifact, salida determinista y exit code.
+- [x] Tests de reporte: máximo de hallazgos/reminders en salida compacta, detalle completo en artifact, orden determinista, redacción de secretos y exit codes PASS/FAIL/SETUP ERROR/CANCELLED.
 - [ ] Pruebas de migración: versión anterior, versión nueva, rollback y supresión documentada.
 
 ## Definition of Done global

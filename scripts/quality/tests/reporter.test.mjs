@@ -106,6 +106,37 @@ test('el reporte JSON, Markdown y compacto no exponen secretos de findings ni re
   }
 });
 
+test('el artifact conserva todos los hallazgos y los ordena de forma determinista', async () => {
+  const projectRoot = await mkdtemp(path.join(os.tmpdir(), 'quality-reporter-order-'));
+  try {
+    const reportRoot = path.join(projectRoot, '.quality-reports', 'T-ORDER');
+    await mkdir(reportRoot, { recursive: true });
+    const result = await createReport(
+      { projectRoot, reportRoot, qualityConfig: { maxFindings: 2, maxReminders: 1 }, tools: {} },
+      { taskId: 'T-ORDER', ci: false, full: false },
+      { base: 'HEAD', full: false, files: ['a.ts'], profiles: [] },
+      [{
+        stage: 'sentinel', status: 'fail', durationMs: 1,
+        findings: [
+          { severity: 'warning', ruleId: 'z-rule', file: 'z.ts', line: 2, message: 'z' },
+          { severity: 'error', ruleId: 'b-rule', file: 'b.ts', line: 4, message: 'b' },
+          { severity: 'error', ruleId: 'a-rule', file: 'a.ts', line: 9, message: 'a' },
+        ], summary: '2 errores, 1 warning',
+      }],
+      ['uno', 'dos'],
+      Date.now(),
+    );
+    const persisted = JSON.parse(await readFile(result.jsonPath, 'utf8'));
+    assert.deepEqual(persisted.findings.map(finding => finding.ruleId), ['a-rule', 'b-rule', 'z-rule']);
+    assert.equal(persisted.findings.length, 3, 'el artifact no debe aplicar el límite de la salida compacta');
+    const compact = compactLines(result, { projectRoot, qualityConfig: { maxFindings: 2, maxReminders: 1 } });
+    assert.equal(compact.filter(line => line.includes('ERROR') || line.includes('WARNING')).length, 2);
+    assert.equal(compact.filter(line => line.includes('REMEMBER')).length, 1);
+  } finally {
+    await rm(projectRoot, { recursive: true, force: true });
+  }
+});
+
 test('createReport representa cancelación con exit code 130', async () => {
   const projectRoot = await mkdtemp(path.join(os.tmpdir(), 'quality-reporter-cancelled-'));
   try {

@@ -22,6 +22,29 @@ function formatScope(scope) {
   return fingerprint === execution ? fingerprint : `${fingerprint} · ejecución ${execution}`;
 }
 
+const SEVERITY_ORDER = new Map([['error', 0], ['warning', 1], ['info', 2]]);
+
+function compareText(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+/* Orden estable para comparar artifacts entre ejecuciones. No usa
+ * localeCompare: el locale del agente/CI no debe cambiar el JSON publicado. */
+function compareFindings(left, right) {
+  const severity = (SEVERITY_ORDER.get(left.severity) ?? 99) - (SEVERITY_ORDER.get(right.severity) ?? 99);
+  if (severity !== 0) return severity;
+  for (const [leftValue, rightValue] of [
+    [left.ruleId ?? '', right.ruleId ?? ''],
+    [left.file ?? '', right.file ?? ''],
+  ]) {
+    const result = compareText(String(leftValue), String(rightValue));
+    if (result !== 0) return result;
+  }
+  const line = Number(left.line ?? 0) - Number(right.line ?? 0);
+  if (line !== 0) return line;
+  return compareText(String(left.message ?? ''), String(right.message ?? ''));
+}
+
 function markdown(report) {
   const lines = [
     `# Quality report ${report.taskId}`,
@@ -48,9 +71,7 @@ function markdown(report) {
 
 export async function createReport(context, args, scope, stages, reminders, startedAt) {
   const decision = finalDecision(stages);
-  const findings = stages.flatMap(stage => stage.findings).sort((a, b) =>
-    (a.severity === 'error' ? 0 : 1) - (b.severity === 'error' ? 0 : 1)
-  );
+  const findings = stages.flatMap(stage => stage.findings).sort(compareFindings);
   const deferred = context.heavyDeferred ?? null;
   const report = sanitize({
     schemaVersion: 1,
