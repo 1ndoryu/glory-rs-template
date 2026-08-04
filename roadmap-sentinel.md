@@ -188,7 +188,7 @@ Una regla no ejecuta procesos, no escribe archivos, no imprime salida humana y n
 - [ ] Separar `RuleContext`, `Finding`, `Fix`, `Policy` y `Report`; aplicar DIP entre engine y parser/indexer.
 - [ ] Eliminar condicionales globales por proyecto/framework; usar profiles/capabilities declarativos.
 - [ ] Definir límites de tamaño para archivos, analizadores, adapters y servicios; dividir módulos antes de superar el límite.
-- [x] Añadir cancellation y concurrencia acotada de stages (configurable 1–4, default 1), con duración y conteos en reportes.
+- [x] Añadir cancellation y concurrencia acotada de stages (configurable 1–4, default 1), con duración y conteos en reportes; el runner drena etapas activas y no agenda trabajo nuevo tras error/cancelación.
 - [ ] Prohibir imports editor-specific en `core`, con check automático en CI para Sentinel y VarSense.
 
 **Gate:** una regla de prueba se registra una sola vez y aparece de forma equivalente en CLI/LSP/VS Code sin tocar adapters existentes.
@@ -288,7 +288,7 @@ no describe como pendientes los contratos ya activos en `scripts/quality`.
 
 - [x] Extraer y probar `runner`, `redaction`, `atomic-file`, `lock`, `cache`, `preflight`, `reporter`, `scope` y stage runner como módulos agnósticos.
 - [x] Hacer adapters declarativos por herramienta: `structured-tool.mjs` centraliza executable, args, schema, timeout, cancelación y error policy.
-- [ ] Ejecutar stages independientes en paralelo y conservar el orden canónico solo al consolidar el reporte.
+- [x] Ejecutar stages independientes en paralelo con límite configurable y conservar el orden canónico por índice; ante error o cancelación, detener nuevas asignaciones y drenar los workers activos antes de propagar el resultado (`stage-runner.mjs` + tests).
 - [x] Mantener `docs` y reminders como adapters del proyecto; el runner no añade reglas de producto al core.
 - [x] Definir modo local incremental, modo `--full` y modo CI reproducible; el check no instala ni muta dependencias.
 - [x] Publicar reportes Markdown/JSON locales con exit codes diferenciados y artifacts sin secretos; `createReport` conserva el detalle completo, ordena findings de forma estable y `compactLines` limita solo la salida de terminal. La publicación CI multi-shell queda pendiente del runtime global.
