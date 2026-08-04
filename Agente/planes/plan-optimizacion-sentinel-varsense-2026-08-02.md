@@ -74,7 +74,7 @@ Medir en una máquina de referencia y publicar p50/p95; los objetivos iniciales 
 - [x] Añadir `--files-from <manifest>` al CLI agnóstico; el modo `incremental` completo y la persistencia entre ejecuciones siguen pendientes (`858ec62`).
 - [x] Mantener `scan`, `orphan-classes` y `all` como comandos compatibles; el alcance filtra reportes sin romper los índices globales necesarios para exactitud.
 - [x] Validar rutas relativas dentro del workspace, duplicados, directorios, archivos eliminados y symlinks que escapan mediante `realpath`; 60/60 pruebas upstream PASS.
-- [x] Preparar el adapter para pasar `--files-from` solo en local-light cuando `capabilities.filesFrom=true`; full/CI conserva `all`. La capacidad se valida y se persiste en el lock; la instalación actual sin capacidad mantiene `no-files-from`.
+- [x] Preparar el adapter para pasar `--files-from` solo en local-light cuando `capabilities.filesFrom=true`; full/CI conserva `all`. La capacidad se valida y se persiste en el lock; el checkout `main` fijado ya expone la capacidad.
 - [ ] Publicar/fijar `858ec62`, declarar `capabilities.filesFrom` en `quality-tools.json`, regenerar el lock y ejecutar pruebas reales local-light/full/CI.
 
 #### Índices persistentes

@@ -143,7 +143,7 @@
 
 - [x] Añadir al plan `028A-6` la sección "Documentación afectada e inventario de correcciones" con todos los MDs desactualizados (README/help.txt/rules.md/CHANGELOG de sentinel, README/CHANGELOG de varsense, sincronización de repos dev con commits fijados, README raíz, roadmap-sentinel, matriz-paridad, índice de documentación).
 - [x] Reescribir `code-sentinel/README.md` eliminando la era IA (análisis IA, toggle IA, config `aiAnalysis.*`, alias Gemini; todo eliminado en 0.4.0) y documentando el estado real: CLI `analyze` + `--files-from`, exit codes 0/1/2, JSON `schemaVersion: '1'`, validación estricta de `sentinel.config.json` (incl. `portableBoundaries`), catálogo completo de reglas del `ruleRegistry` y rol de plano global. Commit `95ac5b0` en `1ndoryu/glory-sentinel`.
-- [x] Sincronizar el README actualizado a la copia instalada `.quality-tools/sentinel/` (la que ejecuta el gate).
+- [x] Sincronizar el README actualizado al `main` externo de `glory-sentinel` (`9f4ed4d`), que es el checkout consumido por el gate mediante `sourcePathEnv`.
 
 **Gate/salida:** README de sentinel sin restos de IA y coherente con el código fijado; el resto del inventario queda planificado en 028A-6 para implementarse con cada fase.
 

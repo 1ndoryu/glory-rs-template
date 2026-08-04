@@ -81,6 +81,7 @@ export function buildLock(analyzers, generatedAt = new Date().toISOString()) {
       sha256: value.sha256,
       patchSha256: value.patchSha256 ?? null,
       ...(value.capabilities === undefined ? {} : { capabilities: value.capabilities }),
+      ...(value.sourcePathEnv === undefined ? {} : { sourcePathEnv: value.sourcePathEnv }),
     }])),
   };
 }

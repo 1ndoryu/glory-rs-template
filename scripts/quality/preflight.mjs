@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runProcess } from './runner.mjs';
 import { loadPolicy, policyIdentity } from './policy.mjs';
-import { assertRuntimeLockHash, readLock, verifyInstalledAnalyzers } from './lockfile.mjs';
+import { assertRuntimeLockHash, readLock, resolveToolRoot, verifyInstalledAnalyzers } from './lockfile.mjs';
 import { branchReportRoot, resolveBranchIdentity } from './branch-identity.mjs';
 import { normalizeReportRetention } from './report-retention.mjs';
 
@@ -38,8 +38,7 @@ async function assertTaskExists(root, taskId) {
 }
 
 async function verifyTool(root, name, toolConfig, manifest) {
-  const installRoot = path.resolve(root, manifest.installRoot);
-  const toolRoot = path.join(installRoot, name);
+  const toolRoot = await resolveToolRoot(root, name, toolConfig, manifest);
   const cliPath = path.join(toolRoot, toolConfig.cli);
   if (!await exists(cliPath)) {
     throw new Error(`Falta ${name} ${toolConfig.version}. Ejecuta: npm run quality:setup`);

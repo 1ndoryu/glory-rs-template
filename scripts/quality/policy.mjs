@@ -3,6 +3,7 @@ import { lstat, readFile, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { BLOCKED_CARGO_COMMANDS, BLOCKED_NPM_SCRIPTS, BLOCKED_TOOLS, DEFAULT_GATE_COMMAND } from './policy-defaults.mjs';
 import { policyDecision } from './policy-decision.mjs';
+import { validateSourcePathEnv } from './source-path.mjs';
 
 const POLICY_FILE = 'sentinel.config.json';
 const MAX_STRING_LENGTH = 160;
@@ -18,7 +19,7 @@ const LEGACY_SENTINEL_KEYS = new Set(['includePatterns', 'excludePatterns', 'dir
 const LEGACY_QUALITY_KEYS = new Set(['schemaVersion', 'maxFindings', 'maxReminders', 'maxTerminalLines', 'lockWaitMs', 'maxConcurrentStages', 'timeoutsMs', 'performanceBudgets', 'heavyRun', 'reportRetention', 'fullPatterns', 'profiles']);
 const LEGACY_VARSENSE_KEYS = new Set(['variableFiles', 'includePatterns', 'excludePatterns', 'scanAllFiles', 'hardcodedDetection', 'inlineDetection', 'tokenDetection', 'bannedProperties', 'orphanClassDetection']);
 const LEGACY_TOOL_MANIFEST_KEYS = new Set(['schemaVersion', 'installRoot', 'tools']);
-const LEGACY_TOOL_KEYS = new Set(['repository', 'commit', 'version', 'outputSchemaVersion', 'buildScript', 'cli', 'testScript', 'patch', 'capabilities']);
+const LEGACY_TOOL_KEYS = new Set(['repository', 'commit', 'version', 'outputSchemaVersion', 'buildScript', 'cli', 'testScript', 'patch', 'capabilities', 'sourcePath', 'sourcePathEnv']);
 
 function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
@@ -106,6 +107,10 @@ function validateLegacyContracts({ sentinelConfig, qualityConfig, varsenseConfig
     if (typeof tool.version !== 'string' || typeof tool.commit !== 'string') {
       throw new Error(`${label}: version y commit son obligatorios`);
     }
+    if (tool.sourcePath !== undefined && tool.sourcePathEnv !== undefined) {
+      throw new Error(`${label}: sourcePath y sourcePathEnv son mutuamente excluyentes`);
+    }
+    if (tool.sourcePathEnv !== undefined) validateSourcePathEnv(tool.sourcePathEnv, `${label}.sourcePathEnv`);
     if (tool.capabilities !== undefined) {
       validateLegacyKeys(tool.capabilities, new Set(['filesFrom']), `${label}.capabilities`);
       if (tool.capabilities.filesFrom !== undefined && typeof tool.capabilities.filesFrom !== 'boolean') {

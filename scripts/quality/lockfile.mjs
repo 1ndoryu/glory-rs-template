@@ -3,6 +3,7 @@ import { access, readFile, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { runProcess } from './runner.mjs';
+import { resolveConfiguredSourcePath, validateSourcePath } from './source-path.mjs';
 
 const LOCK_SCHEMA_VERSION = 1;
 const LOCK_FILE = 'sentinel.lock.json';
@@ -53,6 +54,24 @@ function validateInstallRoot(value) {
   if (value.replace(/\\/g, '/').split('/').includes('..')) fail('installRoot no puede salir del workspace');
 }
 
+export async function resolveToolRoot(workspaceRoot, name, config, manifest) {
+  const configuredSourcePath = resolveConfiguredSourcePath(config, `quality-tools.json.tools.${name}`);
+  if (configuredSourcePath !== null) {
+    try {
+      return await realpath(configuredSourcePath);
+    } catch {
+      fail(`quality-tools.json.tools.${name}.sourcePath externo no existe o no es resoluble`);
+    }
+  }
+  validateInstallRoot(manifest.installRoot);
+  const installRoot = await assertInsideWorkspace(
+    workspaceRoot,
+    path.resolve(workspaceRoot, manifest.installRoot),
+    'quality-tools.installRoot',
+  );
+  return assertInsideWorkspace(workspaceRoot, path.join(installRoot, name), `quality-tools.${name}`);
+}
+
 export async function assertInsideWorkspace(workspaceRoot, target, label, { allowMissing = false } = {}) {
   let rootReal;
   let targetReal;
@@ -91,7 +110,7 @@ export function validateLock(lock, manifest) {
   if (lock.schemaVersion !== LOCK_SCHEMA_VERSION) fail(`schemaVersion debe ser ${LOCK_SCHEMA_VERSION}`);
   if (typeof lock.generatedAt !== 'string' || Number.isNaN(Date.parse(lock.generatedAt))) fail('generatedAt inválido');
 
-  validateInstallRoot(manifest?.installRoot);
+  if (manifest?.installRoot !== undefined) validateInstallRoot(manifest.installRoot);
   if (!isRecord(lock.runtime)) fail('runtime debe ser un objeto');
   validateKeys(lock.runtime, new Set(['status', 'version', 'commit', 'identitySha256', 'artifactSha256']), 'runtime');
   if (!RUNTIME_STATUSES.has(lock.runtime.status)) fail('runtime.status inválido');
@@ -119,10 +138,17 @@ export function validateLock(lock, manifest) {
     const entry = lock.analyzers[name];
     const expected = manifestTools[name];
     if (!isRecord(entry)) fail(`analyzers.${name} debe ser un objeto`);
-    validateKeys(entry, new Set(['version', 'protocolVersion', 'commit', 'sha256', 'patchSha256', 'capabilities']), `analyzers.${name}`);
+    validateKeys(entry, new Set(['version', 'protocolVersion', 'commit', 'sha256', 'patchSha256', 'capabilities', 'sourcePathEnv', 'sourcePathRealpath']), `analyzers.${name}`);
     validateText(entry.version, `analyzers.${name}.version`);
     validateCapabilities(expected.capabilities, `quality-tools.json.tools.${name}.capabilities`);
     validateCapabilities(entry.capabilities, `analyzers.${name}.capabilities`);
+    const expectedSourcePath = resolveConfiguredSourcePath(expected, `quality-tools.json.tools.${name}`);
+    const expectedSourcePathEnv = expected.sourcePathEnv;
+    if (entry.sourcePathEnv !== expectedSourcePathEnv) fail(`analyzers.${name}.sourcePathEnv no coincide con quality-tools.json`);
+    if (entry.sourcePathRealpath !== undefined) validateSourcePath(entry.sourcePathRealpath, `analyzers.${name}.sourcePathRealpath`);
+    if (expectedSourcePath !== null && entry.sourcePathRealpath !== undefined) {
+      validateSourcePath(entry.sourcePathRealpath, `analyzers.${name}.sourcePathRealpath`);
+    }
     const expectedCapabilities = expected.capabilities ?? undefined;
     const actualCapabilities = entry.capabilities ?? undefined;
     if (JSON.stringify(actualCapabilities) !== JSON.stringify(expectedCapabilities)) {
@@ -150,6 +176,18 @@ export function validateLock(lock, manifest) {
   return lock;
 }
 
+async function validateResolvedSourcePaths(lock, manifest) {
+  for (const [name, config] of Object.entries(manifest.tools)) {
+    const configuredSourcePath = resolveConfiguredSourcePath(config, `quality-tools.json.tools.${name}`);
+    if (configuredSourcePath === null) continue;
+    const expectedRealpath = await realpath(configuredSourcePath).catch(() => null);
+    if (!expectedRealpath) fail(`analyzers.${name}.sourcePath externo no existe o no es resoluble`);
+    if (lock.analyzers[name].sourcePathRealpath !== undefined && lock.analyzers[name].sourcePathRealpath !== expectedRealpath) {
+      fail(`analyzers.${name}.sourcePathRealpath no coincide con el checkout actual`);
+    }
+  }
+}
+
 export async function readLock(workspaceRoot, manifest, lockFile = LOCK_FILE) {
   if (typeof lockFile !== 'string' || path.isAbsolute(lockFile) || lockFile.replace(/\\/g, '/').split('/').includes('..')) {
     fail('runtime.lockFile debe ser una ruta relativa dentro del workspace');
@@ -159,6 +197,7 @@ export async function readLock(workspaceRoot, manifest, lockFile = LOCK_FILE) {
     await assertInsideWorkspace(workspaceRoot, lockPath, 'runtime.lockFile');
     const lock = JSON.parse(await readFile(lockPath, 'utf8'));
     validateLock(lock, manifest);
+    await validateResolvedSourcePaths(lock, manifest);
     return { lock, lockPath };
   } catch (error) {
     if (error?.code === 'ENOENT') throw new Error(`Falta ${lockFile}; ejecuta el generador/verificador de lock antes del gate`);
@@ -268,14 +307,9 @@ async function gitDiffSha256(toolRoot) {
 
 export async function inspectInstalledAnalyzers(workspaceRoot, manifest) {
   const results = {};
-  validateInstallRoot(manifest.installRoot);
-  const installRoot = await assertInsideWorkspace(
-    workspaceRoot,
-    path.resolve(workspaceRoot, manifest.installRoot),
-    'quality-tools.installRoot',
-  );
+  if (manifest.installRoot !== undefined) validateInstallRoot(manifest.installRoot);
   for (const [name, config] of Object.entries(manifest.tools)) {
-    const toolRoot = await assertInsideWorkspace(workspaceRoot, path.join(installRoot, name), `quality-tools.${name}`);
+    const toolRoot = await resolveToolRoot(workspaceRoot, name, config, manifest);
     const cliPath = path.join(toolRoot, config.cli);
     try {
       await access(cliPath);
@@ -284,6 +318,10 @@ export async function inspectInstalledAnalyzers(workspaceRoot, manifest) {
     }
     const status = await gitStatusPorcelain(toolRoot);
     const untrustedChanges = untrustedCheckoutChanges(status.text);
+    const configuredSourcePath = resolveConfiguredSourcePath(config, `quality-tools.json.tools.${name}`);
+    if (configuredSourcePath !== null && config.patch !== undefined) {
+      throw new Error(`${name}: sourcePath externo no puede combinarse con patch local`);
+    }
     const patchSha256 = config.patch?.sha256 ?? null;
     if (patchSha256 !== null) {
       const declaredSha = await patchFileSha256(workspaceRoot, config.patch.path);
@@ -310,6 +348,9 @@ export async function inspectInstalledAnalyzers(workspaceRoot, manifest) {
     if (patchSha256 !== null && actualPatchSha !== patchSha256) {
       throw new Error(`${name}: patch aplicado no coincide con quality-tools.json`);
     }
+    if (configuredSourcePath !== null && revision.stdout.trim() !== config.commit) {
+      throw new Error(`${name}: sourcePath externo no coincide con el commit fijado`);
+    }
     results[name] = {
       version: version.stdout.trim(),
       protocolVersion: Number(config.outputSchemaVersion),
@@ -317,6 +358,7 @@ export async function inspectInstalledAnalyzers(workspaceRoot, manifest) {
       sha256,
       patchSha256,
       ...(config.capabilities === undefined ? {} : { capabilities: config.capabilities }),
+      ...(config.sourcePathEnv === undefined ? {} : { sourcePathEnv: config.sourcePathEnv, sourcePathRealpath: toolRoot }),
       cliPath,
     };
   }
@@ -360,6 +402,12 @@ export async function verifyInstalledAnalyzers(workspaceRoot, manifest, lock) {
     }
     if (installed.patchSha256 !== (expected.patchSha256 ?? null)) {
       throw new Error(`${name}: SHA-256 del patch instalado no coincide con sentinel.lock.json`);
+    }
+    if (installed.sourcePathEnv !== expected.sourcePathEnv) {
+      throw new Error(`${name}: sourcePath externo instalado no coincide con sentinel.lock.json`);
+    }
+    if (expected.sourcePathRealpath !== undefined && installed.sourcePathRealpath !== expected.sourcePathRealpath) {
+      throw new Error(`${name}: sourcePathRealpath instalado no coincide con sentinel.lock.json`);
     }
     results[name] = installed;
   }

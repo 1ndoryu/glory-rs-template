@@ -47,8 +47,8 @@ Con este checklist cerrado, las mejoras restantes de este documento son backlog 
 
 | Herramienta | Versión/commit fijado | Estado observado |
 | --- | --- | --- |
-| Glory Sentinel | `0.4.0` / `7ad3b766207bb28d89d38a938ee14fbad9f4cd49` | CLI JSON versionado, config estricta y reglas portables de boundaries/arquitectura. Commit real de `main` (1ndoryu/glory-sentinel) tras el sync 038A-5. |
-| VarSense | `2.2.0` / `4167868dd5d0e7674d5565ade399a57796d69cf3` | Commit reproducible consumido por el gate. `main` upstream tiene SNT-10 (`858ec62`, incluye SNT-09), pero aún no está fijado en la instalación. |
+| Glory Sentinel | `0.4.0` / `9f4ed4d4d866a016022f2458e69c0226eeee345a` | CLI JSON versionado, config estricta y reglas portables de boundaries/arquitectura; `[317A-3]` incorporado en `main`. Consumido por `sourcePathEnv` externo. |
+| VarSense | `2.2.0` / `858ec62c8efc1239fea241e3092e1939ae6b63df` | `main` upstream contiene SNT-08, SNT-09 y SNT-10; consumido directamente por `sourcePathEnv` externo. |
 | Quality gate | `scripts/quality/*.mjs` | Tiene preflight, lock, cache, redacción, reportes y perfiles; necesita endurecer errores, portabilidad y paralelismo. |
 
 ### Hallazgos prioritarios del orquestador
@@ -61,9 +61,9 @@ Con este checklist cerrado, las mejoras restantes de este documento son backlog 
 - `scripts/quality/adapters/custom.mjs` mantiene `hasErrors = false` y nunca lo actualiza; un script custom puede terminar con violaciones y el stage queda en PASS.
 - Los scripts custom se ejecutan con `bash`, dependen de `grep`, `awk`, `sed`, `find` y parsean emojis/salida humana; el comportamiento no es portable ni tiene contrato estructurado.
 - `runCustom` convierte en warnings los códigos de salida de reglas que deberían poder bloquear; además no conserva el severity declarado por cada regla.
-- El adaptador actual de VarSense invoca `varsense all` una sola vez; `all` comparte el snapshot de documentos para scan, orphan-classes y tokenDetection. `scan` y `orphan-classes` se conservan como comandos de compatibilidad del CLI, no como etapas independientes del gate. La instalación fijada 2.2.0 todavía no soporta `--files-from`; el adapter conserva el manifiesto solicitado y reporta `varsense-cli-2.2.0-no-files-from` de forma auditable, sin fallback silencioso ni scheduler paralelo. El upstream `main` ya incorpora el contrato seguro en `858ec62`, pendiente de publicación/fijación.
+- El adaptador actual de VarSense invoca `varsense all` una sola vez; `all` comparte el snapshot de documentos para scan, orphan-classes y tokenDetection. `scan` y `orphan-classes` se conservan como comandos de compatibilidad del CLI, no como etapas independientes del gate. El `main` fijado en 2.2.0 expone `--files-from`; `quality-tools.json` lo declara mediante `capabilities.filesFrom=true` y el adapter solo lo activa cuando recibe un manifiesto de alcance válido, sin fallback silencioso ni scheduler paralelo.
 - La cache de stages necesita incorporar explícitamente versión/commit de la herramienta, versión del parser, configuración efectiva y plataforma; el hash de archivos por sí solo puede reutilizar un PASS obsoleto.
-- `quality-tools.json` conserva únicamente el manifiesto de versiones y el patch local declarado de Sentinel `[317A-3]`; el patch downstream histórico de clases dinámicas de VarSense fue retirado al fijarse el soporte en el commit upstream 2.2.0.
+- `quality-tools.json` conserva únicamente el manifiesto de versiones, capacidades (`filesFrom`) y variables `sourcePathEnv` de los `main` externos; el patch downstream histórico de Sentinel `[317A-3]` ya fue incorporado en `glory-sentinel/main` (`9f4ed4d`) y el patch de clases dinámicas de VarSense fue retirado al fijarse el soporte upstream 2.2.0.
 - La detección incremental y los reportes son reutilizables, pero `docs.mjs`, reminders en español, IDs de roadmap y rutas `frontend/src` son políticas del proyecto.
 
 ## Frontera de reutilización
@@ -175,10 +175,10 @@ Una regla no ejecuta procesos, no escribe archivos, no imprime salida humana y n
 - [x] Implementar `varsense all`, que comparte provider/snapshot de documentos para `VariableIndex` y `ClassIndex` en una ejecución.
 - [x] Añadir cancelación cooperativa editor-agnostic en `main` de VarSense para builders de variables/clases, con propagación estable y regresiones de cancelación/errores normales (commit local `337c4cce`; 50 tests upstream PASS).
 - [x] Cachear resultados de clases por archivo durante la vida del builder, exponer `invalidateFile`/`clearCache`, separar `DocumentCacheProvider` y conectar el snapshot explícito en `varsense all` (commit local `a72b39a`; 53 tests upstream PASS).
-- [ ] Invalidar índices por archivo/dependencias entre ejecuciones y conectar watchers/LSP persistentes; el tramo actual requiere que el caller invoque explícitamente la invalidación. La fijación en `.quality-tools` queda pendiente de publicación en `origin`.
+- [ ] Invalidar índices por archivo/dependencias entre ejecuciones y conectar watchers/LSP persistentes; el tramo actual requiere que el caller invoque explícitamente la invalidación. La fijación publicada de `main` ya está cerrada; queda pendiente la persistencia entre ejecuciones y la conexión de watchers/LSP.
 - [ ] Añadir fixtures para clases estáticas, template strings, objetos `className`, factories, multilinea y falsos positivos.
 - [x] Garantizar paridad CLI/LSP/VS Code con suite upstream (45 pruebas, smoke LSP y check-core).
-- [x] Eliminar el parche de `quality-tools.json`; VarSense queda fijado en el commit real de `main` `4167868d...` (sync 038A-5).
+- [x] Eliminar los parches downstream de `quality-tools.json`; Sentinel y VarSense quedan fijados en sus `main` externos (`9f4ed4d` y `858ec62`) mediante `sourcePathEnv`, con `capabilities.filesFrom=true` declarada y validada por el lock.
 
 **Gate:** una ejecución comparte índices, conserva los hallazgos actuales y mejora tiempo/memoria frente al baseline.
 
@@ -321,10 +321,10 @@ no describe como pendientes los contratos ya activos en `scripts/quality`.
 - [ ] Definir el contrato `analyze/check/guard/doctor/status` sin romper el CLI `sentinel analyze` actual.
 - [ ] Definir el contrato de analyzer: manifest de alcance, configuración efectiva, cancelación, timeout, salida normalizada, métricas y estados de error.
 - [x] Diseñar/validar localmente el envelope `sentinel.config.json` v2 y mapear la configuración Sentinel v1 actual mediante migración dry-run; `no-policy/observe/enforce` del guard local están cubiertos, mientras backup/rollback aplicado y runtime global siguen pendientes.
-- [x] Crear `sentinel.lock.json` con versión/commit/hash de Sentinel, VarSense y protocolo; preflight verifica `git archive`, checkout limpio y realpath dentro del workspace; el runtime local declara `identitySha256` + `artifactSha256: null` explícito hasta existir runtime global. Locks históricos sin el campo se rechazan y se regeneran con `quality:lock --write`.
+- [x] Crear `sentinel.lock.json` con versión/commit/hash/capacidades de Sentinel y VarSense y protocolo; preflight resuelve las variables `GLORY_*_SOURCE_PATH`, verifica `git archive`, checkout limpio, CLI, versión, commit y realpath actual sin persistir rutas absolutas de una máquina en el lock. El runtime local declara `identitySha256` + `artifactSha256: null` explícito hasta existir runtime global. Locks históricos sin el campo se rechazan y se regeneran con `quality:lock --write`.
 - [ ] Exigir `artifactSha256` real para runtime global instalado y completar instalación/rollback sin ejecutar plugins o binarios arbitrarios del repositorio.
 - [ ] Extraer scheduler, cooldown, locks, scope, caché y reporter desde `scripts/quality` al runtime de Sentinel; conservar `task:check` como alias temporal.
-- [x] Preparar la integración versionada de `--files-from` en el adapter CLI JSON/JSONL: solo se añade el flag cuando `quality-tools.json.tools.varsense.capabilities.filesFrom=true`; la capacidad queda ligada a `sentinel.lock.json`, la instalación actual sin capacidad conserva `no-files-from` y sus comandos editoriales CLI/LSP no pueden cerrar el gate ni crear un reporte paralelo. Publicar/fijar `858ec62` y declarar la capacidad siguen pendientes.
+- [x] Activar la integración versionada de `--files-from` en el adapter CLI JSON/JSONL: solo se añade el flag cuando `quality-tools.json.tools.varsense.capabilities.filesFrom=true`; la capacidad queda ligada a `sentinel.lock.json` y al `main` publicado `858ec62`. Sin manifiesto de alcance válido no se inventa fallback ni se crea un reporte paralelo.
 - [ ] Emitir leases efímeros para que `sentinel check` ejecute herramientas pesadas sin quedar bloqueado por sus propios shims; auditar PID, proyecto, comando, expiración y task ID.
 - [ ] Probar enforcement de shells normales y del launcher del agente; documentar explícitamente rutas absolutas y `--noprofile --norc` como límites no interceptables por scripts del repositorio.
 - [ ] Ejecutar doble vía en `observe`, comparar findings ordenados y activar `enforce` solo tras paridad y cinco tareas reales dentro del presupuesto.

@@ -147,10 +147,26 @@ npm run quality:lock -- --check
 npm run quality:reports:cleanup:dry
 ```
 
-`sentinel.lock.json` fija las versiones, commits, protocolos y hashes de los
-analizadores instalados en `.quality-tools`. En la transición actual el runtime
-se declara `project-adapter` y `artifactSha256: null`; no se instala un runtime
-global ni se ejecuta código arbitrario desde la política del proyecto.
+`sentinel.lock.json` fija las versiones, commits, capacidades, protocolos y
+hashes de los analizadores. El gate consume los `main` externos mediante las
+variables `GLORY_SENTINEL_SOURCE_PATH` y `GLORY_VARSENSE_SOURCE_PATH`; no guarda
+rutas absolutas en el repositorio. En la transición actual el runtime se declara
+`project-adapter` y `artifactSha256: null`; no se instala un runtime global ni se
+ejecuta código arbitrario desde la política del proyecto.
+
+Antes de `quality:lock` o del gate, define las rutas locales a los checkouts
+publicados y limpios:
+
+```bash
+export GLORY_SENTINEL_SOURCE_PATH=/ruta/al/glory-sentinel
+export GLORY_VARSENSE_SOURCE_PATH=/ruta/al/varsense
+npm run quality:lock -- --check
+```
+
+En PowerShell usa `$env:GLORY_SENTINEL_SOURCE_PATH` y
+`$env:GLORY_VARSENSE_SOURCE_PATH`. El preflight comprueba `realpath`, Git, CLI,
+versión, commit, hash de archive y que el `realpath` resuelto siga
+apuntando al checkout actual sin persistir esa ruta en el lock.
 
 Los wrappers de desarrollo (`npm run check:back`, `npm run check:front`,
 `npm run fmt:check` y `npm test`) siguen disponibles para trabajo específico,

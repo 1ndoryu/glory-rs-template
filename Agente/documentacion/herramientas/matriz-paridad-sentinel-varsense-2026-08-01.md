@@ -1,25 +1,24 @@
 # Matriz de paridad Sentinel/VarSense — 2026-08-01
 
-> **Actualización 2026-08-04 — SNT-10:** VarSense `main` contiene `858ec62` (incluye `a72b39a` y `337c4cce`), con contrato CLI seguro `--files-from`, filtrado de reportes sin perder contexto global y validación `realpath` contra symlinks fuera del workspace. Validación upstream: 60/60 tests, compile, compile:tests, lint, check-core, smoke LSP y diff PASS. El commit aún no está publicado/fijado en `quality-tools.json`/`sentinel.lock.json`; la instalación reproducible continúa en `4167868dd5d0e7674d5565ade399a57796d69cf3`. Persistencia entre ejecuciones, watchers/LSP persistentes, grafo de dependencias y conexión del adapter siguen pendientes.
+> **Actualización 2026-08-04 — SNT-10 + sourcePathEnv:** VarSense `main` `858ec62` y Sentinel `main` `9f4ed4d` están publicados y son consumidos directamente por el gate mediante `sourcePathEnv`. Las copias `.quality-tools/sentinel` y `.quality-tools/varsense` fueron retiradas. El lock valida commit, capacidades, hash de archive y `sourcePathEnv`; preflight resuelve la ruta local, compara el `realpath` actual sin persistirlo y valida el checkout. Lock-check, preflight y 127/127 quality tests PASS. La persistencia entre ejecuciones, watchers/LSP persistentes y grafo de dependencias siguen pendientes.
 
 ## Versiones fijadas
 
 | Herramienta | Versión | Commit | CLI | LSP/VS Code | Fixture/gate |
 | --- | --- | --- | --- | --- | --- |
-| Glory Sentinel | 0.4.0 | `7ad3b766207bb28d89d38a938ee14fbad9f4cd49` | PASS | Core editor-agnóstico PASS | `npm run test:unit`, `task:check` |
-| VarSense | 2.2.0 | `4167868dd5d0e7674d5565ade399a57796d69cf3` | `scan`, `orphan-classes`, `all` (`--files-from` no disponible en instalación) | Core/LSP/VS Code PASS | 46 pruebas, `npm test` |
-| VarSense upstream candidato | 2.2.0 | `858ec62` | `scan`, `orphan-classes`, `all`, `--files-from` | CLI/core PASS; instalación pendiente | 60 pruebas, compile/lint/check-core/smoke LSP |
+| Glory Sentinel | 0.4.0 | `9f4ed4d4d866a016022f2458e69c0226eeee345a` | PASS | Core editor-agnóstico PASS | `npm run test:unit`, `task:check` |
+| VarSense | 2.2.0 | `858ec62c8efc1239fea241e3092e1939ae6b63df` | `scan`, `orphan-classes`, `all`, `--files-from`; sourcePathEnv externo | Core/LSP/VS Code PASS | 60 pruebas upstream, `npm test` |
+| VarSense upstream | 2.2.0 | `858ec62c8efc1239fea241e3092e1939ae6b63df` | `scan`, `orphan-classes`, `all`, `--files-from` | CLI/core PASS; sourcePath externo activo | 60 pruebas, compile/lint/check-core/smoke LSP |
 
-> **Sync 038A-5 (2026-08-04):** los commits previos (`107be9b6`/`b1aa3f06`) resultaron inexistentes en los repos dev y en `origin`. Las features estaban en el checkout instalado porque allí se habían trabajado originalmente; después se promovieron a `main` (Sentinel `7ad3b76`, VarSense `4167868`, pusheados a `1ndoryu/*`) y las instalaciones se re-sincronizaron a esos mismos commits. La fuente de desarrollo es `main`; `.quality-tools` es solo la instalación reproducible consumida por este gate.
+> **Migración 028A-6 (2026-08-04):** los commits de Sentinel y VarSense se promovieron a sus `main` publicados (`glory-sentinel=9f4ed4d`, `varsense=858ec62`). El gate consume directamente esos checkouts externos mediante `sourcePathEnv`; las copias `.quality-tools/sentinel` y `.quality-tools/varsense` fueron retiradas. `sentinel.lock.json` valida commit, capacidades y hash de archive; preflight comprueba el `realpath` resuelto sin persistirlo.
 
 ## Contratos
 
-El gate de este checkout consume la copia instalada bajo `.quality-tools` y la
-valida contra `quality-tools.json` + `sentinel.lock.json`. La fuente de desarrollo
-y mantenimiento es `main` en cada repositorio upstream; `.quality-tools` se deriva
-de esos commits fijados y puede añadir únicamente el patch local declarado. La
-paridad se verifica comparando commit, árbol y hash del patch, no por asumir que
-cualquier checkout instalado es una fuente independiente.
+El gate de este checkout consume los checkouts externos `main` declarados por
+`sourcePathEnv` en `quality-tools.json` y los valida contra `sentinel.lock.json`.
+Las copias históricas `.quality-tools/sentinel` y `.quality-tools/varsense` fueron
+retiradas. La paridad se verifica comparando commit, árbol, `sourcePathEnv` y el `realpath` resuelto
+y hash del archive; ya no se aplica un patch local al runtime instalado.
 
 - Los dos CLIs escriben JSON con `schemaVersion: 1`, `entries`, severidad y rango estable.
 - Sentinel añade `remediation`, `confidence` y `analyzerVersion` al contrato core; los adapters traducen sin importar APIs del editor.
@@ -40,7 +39,7 @@ cualquier checkout instalado es una fuente independiente.
 
 ## Nota de sincronización
 
-Los commits fijados en `quality-tools.json` identifican la instalación que consume este gate y corresponden a `main` upstream verificado: Sentinel `7ad3b766…` y VarSense `4167868dd…`. En Sentinel, el único delta instalado es el patch `[317A-3]`, cuyo diff y SHA-256 coinciden con el manifest y el lock; en VarSense no hay delta de código. La migración 028A-6 añade un contrato local de política v2, mantiene el formato Sentinel v1 como configuración del analizador durante la transición y no simula la instalación del runtime global.
+Los commits fijados en `quality-tools.json` identifican los checkouts `main` externos consumidos por este gate: Sentinel `9f4ed4d4…` y VarSense `858ec62c…`. `[317A-3]` ya está incorporado en Sentinel `main`; no hay patch local aplicado. El lock conserva el hash del archive y la variable `sourcePathEnv`; el `realpath` de cada checkout se valida en memoria. La migración 028A-6 mantiene el formato Sentinel v1 como configuración del analizador durante la transición y no simula la instalación del runtime global.
 
 ## Pendientes explícitos
 

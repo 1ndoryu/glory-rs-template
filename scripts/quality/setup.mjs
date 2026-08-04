@@ -3,6 +3,8 @@ import { createHash } from 'node:crypto';
 import { access, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { inspectInstalledAnalyzers } from './lockfile.mjs';
+import { resolveConfiguredSourcePath } from './source-path.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const manifestPath = path.join(projectRoot, 'quality-tools.json');
@@ -175,6 +177,28 @@ async function applyDeclaredPatch(name, config, toolRoot) {
 }
 
 async function installTool(name, config, installRoot) {
+  const configuredSourcePath = resolveConfiguredSourcePath(config, `quality-tools.json.tools.${name}`);
+  if (configuredSourcePath !== null) {
+    if (config.patch) throw new Error(`${name}: sourcePath externo no puede combinarse con patch local`);
+    const toolRootExternal = path.resolve(configuredSourcePath);
+    const gitRootExternal = path.join(toolRootExternal, '.git');
+    const cliPathExternal = path.join(toolRootExternal, config.cli);
+    if (!await exists(gitRootExternal) || !await exists(cliPathExternal)) {
+      throw new Error(`${name}: sourcePath externo no contiene un checkout Git y CLI válido`);
+    }
+    const currentCommit = await run('git', ['rev-parse', 'HEAD'], { cwd: toolRootExternal, capture: true });
+    if (currentCommit !== config.commit) throw new Error(`${name}: sourcePath externo está en ${currentCommit}; se esperaba ${config.commit}`);
+    const installedVersion = await run(process.execPath, [cliPathExternal, '--version'], { capture: true });
+    if (installedVersion !== config.version) throw new Error(`${name}: sourcePath externo reporta ${installedVersion}; se esperaba ${config.version}`);
+    process.stdout.write(`[quality:setup] ${name}: sourcePath externo verificado, no se modifica .quality-tools\\n`);
+    return {
+      commit: currentCommit,
+      version: installedVersion,
+      patchSha256: null,
+      sourcePathEnv: config.sourcePathEnv,
+      cli: config.cli,
+    };
+  }
   const toolRoot = path.join(installRoot, name);
   const gitRoot = path.join(toolRoot, '.git');
   const markerPath = path.join(toolRoot, '.quality-install.json');
@@ -249,6 +273,16 @@ async function installTool(name, config, installRoot) {
 
 async function main() {
   const manifest = await readManifest();
+  const externalOnly = Object.values(manifest.tools).every(config => resolveConfiguredSourcePath(config, 'quality-tools.json.tools') !== null);
+  if (externalOnly) {
+    const inspected = await inspectInstalledAnalyzers(projectRoot, manifest);
+    for (const [name, tool] of Object.entries(inspected)) {
+      process.stdout.write(`[quality:setup] ${name}: sourcePath externo verificado (${tool.commit}), no se modifica .quality-tools\\n`);
+    }
+    process.stdout.write('[quality:setup] Checkouts externos listos. Próximo: npm run task:check -- <ID>\\n');
+    return;
+  }
+
   const installRoot = path.resolve(projectRoot, manifest.installRoot);
   await mkdir(installRoot, { recursive: true });
   const installed = {};
