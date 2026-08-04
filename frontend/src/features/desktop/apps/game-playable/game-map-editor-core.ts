@@ -16,22 +16,57 @@ import {
   type Vector2,
 } from '../../../game-core';
 
-export type MapEditorTool = 'select' | 'place' | 'spawn' | 'paint';
+export type MapEditorTool = 'select' | 'place' | 'spawn' | 'paint' | 'height' | 'terrain';
 
 /* [297A-66] Superficies del pincel de terreno: enteros allowlisted 0..15 del
- * contrato. El valor es semántica de Bosque (suelo/agua) que el runtime
- * traduce visualmente; el editor no inventa valores fuera del contrato. */
+ * contrato. El valor es semántica de Bosque (suelo/agua/camino) que el
+ * runtime traduce visualmente (297A-33: 0 pale, 1 water, 2 middle); el editor
+ * no inventa valores fuera del contrato. [297A-68] Añade `path` (2) como
+ * tercer valor: el runtime ya lo mapea al material medio; el pincel lo
+ * ofrece con sombreado propio. */
 export const TERRAIN_SURFACE_VALUES = {
   ground: 0,
   water: 1,
+  path: 2,
 } as const;
+
+/* [297A-67] Niveles de altura del pincel: discretos, no negativos (sin cuevas
+ * ni voladizos en el MVP) y dentro del rango -64..64 del contrato. Cada valor
+ * pinta una malla de vértices compartidos entre chunks; el módulo de altura
+ * resuelve y aplica. */
+export const TERRAIN_HEIGHT_VALUES = [0, 0.25, 0.5, 1, 1.5, 2, 2.5, 3, 4] as const;
+
+export type TerrainHeightValue = (typeof TERRAIN_HEIGHT_VALUES)[number];
+
+export const TERRAIN_HEIGHT_LABEL: Record<number, string> = {
+  0: 'plano',
+  0.25: '0.25',
+  0.5: '0.5',
+  1: '1',
+  1.5: '1.5',
+  2: '2',
+  2.5: '2.5',
+  3: '3',
+  4: '4',
+};
+
+export const TERRAIN_HEIGHT_MAX = Math.max(...TERRAIN_HEIGHT_VALUES);
+
+export function isAllowedHeight(value: number): value is TerrainHeightValue {
+  return (TERRAIN_HEIGHT_VALUES as readonly number[]).includes(value);
+}
 
 export type TerrainSurfaceValue = (typeof TERRAIN_SURFACE_VALUES)[keyof typeof TERRAIN_SURFACE_VALUES];
 
 export const TERRAIN_SURFACE_LABEL: Record<keyof typeof TERRAIN_SURFACE_VALUES, string> = {
   ground: 'suelo',
   water: 'agua',
+  path: 'camino',
 };
+
+export function isAllowedSurface(value: number): value is TerrainSurfaceValue {
+  return Object.values(TERRAIN_SURFACE_VALUES).includes(value as TerrainSurfaceValue);
+}
 
 export interface PaintSurfacePoint {
   readonly x: number;
@@ -46,6 +81,9 @@ export interface MapEditorState {
   readonly baseDocument: MapVersion;
   /** Versión activa al cargar: `expectedVersion` para publicar (0 si ninguna). */
   readonly activeVersion: number;
+  /** [297A-71] Revisión del borrador en el servidor: `expectedRevision` para
+   * el próximo guardado (0 si aún no existe borrador). Sube tras cada guardado. */
+  readonly draftRevision: number;
   readonly tool: MapEditorTool;
   /** Id de instancia o spawn seleccionado (tool 'select'). */
   readonly selectedId: string | null;
@@ -53,6 +91,8 @@ export interface MapEditorState {
   readonly activeAssetId: string | null;
   /** Superficie activa del pincel (tool 'paint'). */
   readonly activeSurface: TerrainSurfaceValue;
+  /** Nivel de altura activo del pincel (tool 'height'). */
+  readonly activeHeight: TerrainHeightValue;
   /** Catálogo de assets activos que alimenta la paleta y el manifest. */
   readonly catalog: readonly GameAssetAdminEntry[];
   readonly undoStack: readonly MapVersion[];
@@ -70,15 +110,18 @@ export function createMapEditorState(
   baseDocument: MapVersion,
   activeVersion: number,
   catalog: readonly GameAssetAdminEntry[],
+  draftRevision = 0,
 ): MapEditorState {
   return {
     document: baseDocument,
     baseDocument,
     activeVersion,
+    draftRevision,
     tool: 'select',
     selectedId: null,
     activeAssetId: catalog[0]?.id ?? null,
     activeSurface: TERRAIN_SURFACE_VALUES.ground,
+    activeHeight: TERRAIN_HEIGHT_VALUES[0],
     catalog,
     undoStack: [],
     redoStack: [],
@@ -129,8 +172,9 @@ function nextNumericId(ids: readonly string[], prefix: string): string {
   return `${prefix}${max + 1}`;
 }
 
-/** Aplica una mutación y apila el snapshot anterior (undo), limpiando redo. */
-function commit(
+/** Aplica una mutación y apila el snapshot anterior (undo), limpiando redo.
+ * Exportado para el módulo de altura (segundo consumidor real del editor). */
+export function commit(
   state: MapEditorState,
   nextDocument: MapVersion,
 ): MapEditorState {
@@ -139,6 +183,18 @@ function commit(
     document: nextDocument,
     undoStack: [...state.undoStack.slice(-49), cloneDocument(state.document)],
     redoStack: [],
+  };
+}
+
+/** [297A-71] Registra la revisión devuelta por el servidor tras guardar el
+ * borrador. El documento no cambia; la base de la próxima operación optimista
+ * se actualiza al documento guardado para que `hasChanges` (y el pie del
+ * editor) reflejen que ya no hay cambios sin persistir. */
+export function setDraftRevision(state: MapEditorState, revision: number): MapEditorState {
+  return {
+    ...state,
+    draftRevision: revision,
+    baseDocument: cloneDocument(state.document),
   };
 }
 

@@ -35,6 +35,7 @@ import { createTabs } from '../../../../components/ui/tabs';
 import { showToast } from '../../../../components/ui/toast';
 import { showConfirm } from '../../../../components/ui/confirm';
 import { createGameMapEditor } from './game-map-editor';
+import { openAssetVersionsPanel } from './game-asset-versions';
 
 const TONO_ETIQUETA: Record<string, string> = {
   ink: 'ink',
@@ -234,7 +235,19 @@ function renderAssetItem(entry: GameAssetAdminEntry, container: HTMLElement): HT
     })(), 'no se pudo actualizar el estado del asset');
   });
 
-  const actions = createEl('div', { className: 'admin-acciones' }, tag, editButton, toggleButton);
+  /* [297A-73] Panel de versiones 3D (import GLB, preview, metadata, activar). */
+  const versionsButton = createEl('button', {
+    type: 'button',
+    className: 'boton boton-pequeno',
+    textContent: 'versiones 3D',
+  });
+  versionsButton.addEventListener('click', () => {
+    openAssetVersionsPanel(entry, () => {
+      void renderAssets(container);
+    });
+  });
+
+  const actions = createEl('div', { className: 'admin-acciones' }, tag, editButton, toggleButton, versionsButton);
   return createEl('div', { className: 'admin-item' }, info, actions);
 }
 

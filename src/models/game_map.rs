@@ -241,6 +241,52 @@ impl PublishMapRequest {
     }
 }
 
+/// Request admin para guardar el borrador editable de un mapa.
+/// La revisión es optimista: el servidor rechaza con 409 si `revision` ya no
+/// es la actual (otro editor guardó mientras tanto). `0` crea el borrador.
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SaveDraftRequest {
+    /// `0` para el primer guardado; después debe coincidir con la revisión actual.
+    pub expected_revision: i32,
+    /// Permite que el caller explicite el ID, pero siempre debe coincidir con `document.id`.
+    pub map_id: Option<String>,
+    #[schema(value_type = Object)]
+    pub document: JsonValue,
+}
+
+impl SaveDraftRequest {
+    pub fn validate_metadata(&self) -> Result<(), &'static str> {
+        if self.expected_revision < 0 {
+            return Err("expectedRevision no puede ser negativo");
+        }
+        if let Some(map_id) = &self.map_id {
+            if map_id.trim().is_empty() || map_id.chars().count() > MAP_VERSION_MAX_ID_LENGTH {
+                return Err("mapId no es válido");
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Envelope admin del borrador. No incluye `updated_by`, UUID interno ni flags;
+/// el documento ya fue validado por el service.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GameMapDraftPublic {
+    #[serde(rename = "mapId")]
+    pub map_id: String,
+    pub revision: i32,
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: i32,
+    #[serde(rename = "contentHash")]
+    pub content_hash: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: DateTime<Utc>,
+    #[schema(value_type = Object)]
+    pub document: JsonValue,
+}
+
 /// Envelope público del snapshot activo. No incluye `published_by`, UUID interno
 /// ni flags administrativos; el documento ya fue validado por el service.
 #[derive(Debug, Clone, Serialize, ToSchema)]

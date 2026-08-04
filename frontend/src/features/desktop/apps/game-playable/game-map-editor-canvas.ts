@@ -6,7 +6,10 @@
  * Separado de la vista para mantener <300 líneas por módulo. */
 
 import type { AssetCategory, Vector2 } from '../../../game-core';
-import type { MapEditorState } from './game-map-editor-core';
+import {
+  TERRAIN_HEIGHT_MAX,
+  type MapEditorState,
+} from './game-map-editor-core';
 
 export const CATEGORY_SYMBOL: Record<AssetCategory, string> = {
   terrain: '□',
@@ -84,12 +87,39 @@ export function drawMap(canvas: HTMLCanvasElement, state: MapEditorState): void 
 
   const bounds = state.document.terrain.bounds;
   const transform = fitTransform(bounds, width, height);
+  const cellSize = state.document.terrain.cellSize;
+  const chunkSize = state.document.terrain.chunkSize;
+
+  /* [297A-67] Altura pintada: sombreado gris por celda proporcional al
+   * promedio de sus cuatro vértices, visible solo con la herramienta altura.
+   * Se dibuja antes del grid para que el pincel se lea bajo la rejilla. */
+  if (state.tool === 'height') {
+    const vertexSide = chunkSize + 1;
+    for (const chunk of state.document.terrain.chunks) {
+      for (let cellIndex = 0; cellIndex < chunk.surfaces.length; cellIndex += 1) {
+        const localX = cellIndex % chunkSize;
+        const localZ = Math.floor(cellIndex / chunkSize);
+        const topLeft = localZ * vertexSide + localX;
+        const average = (
+          chunk.heights[topLeft]
+          + chunk.heights[topLeft + 1]
+          + chunk.heights[topLeft + vertexSide]
+          + chunk.heights[topLeft + vertexSide + 1]
+        ) / 4;
+        const shade = Math.round(255 - Math.min(1, average / TERRAIN_HEIGHT_MAX) * 90);
+        const worldX = bounds.minX + (chunk.x * chunkSize + localX) * cellSize;
+        const worldZ = bounds.minZ + (chunk.z * chunkSize + localZ) * cellSize;
+        const topLeftScreen = worldToScreen({ x: worldX, z: worldZ + cellSize }, transform);
+        const bottomRightScreen = worldToScreen({ x: worldX + cellSize, z: worldZ }, transform);
+        context.fillStyle = `rgb(${shade},${shade},${shade})`;
+        context.fillRect(topLeftScreen.x, topLeftScreen.y, bottomRightScreen.x - topLeftScreen.x, bottomRightScreen.y - topLeftScreen.y);
+      }
+    }
+  }
 
   /* [297A-66] Superficies pintadas: por cada chunk, celdas con valor > 0 se
    * rellenan (agua ≈ sombreado) antes del grid para que el pincel sea visible
    * sin tapar instancias ni spawns. */
-  const cellSize = state.document.terrain.cellSize;
-  const chunkSize = state.document.terrain.chunkSize;
   for (const chunk of state.document.terrain.chunks) {
     for (let cellIndex = 0; cellIndex < chunk.surfaces.length; cellIndex += 1) {
       const surface = chunk.surfaces[cellIndex];
@@ -100,8 +130,30 @@ export function drawMap(canvas: HTMLCanvasElement, state: MapEditorState): void 
       const worldZ = bounds.minZ + (chunk.z * chunkSize + localZ) * cellSize;
       const topLeft = worldToScreen({ x: worldX, z: worldZ + cellSize }, transform);
       const bottomRight = worldToScreen({ x: worldX + cellSize, z: worldZ }, transform);
-      context.fillStyle = surface === 1 ? '#d7d7d1' : '#e4e4df';
+      /* [297A-68] Camino (2) con tono propio: el runtime usa el material
+       * medio para esa superficie, el editor lo refleja más oscuro. */
+      context.fillStyle = surface === 1 ? '#d7d7d1' : surface === 2 ? '#c9c9c2' : '#e4e4df';
       context.fillRect(topLeft.x, topLeft.y, bottomRight.x - topLeft.x, bottomRight.y - topLeft.y);
+    }
+  }
+
+  /* [297A-69] Celdas vacías (sin chunk) con la tool terreno: se sombrean
+   * para mostrar dónde puede crearse un chunk contiguo sin reindexar. */
+  if (state.tool === 'terrain') {
+    const cellsX = Math.round((bounds.maxX - bounds.minX) / cellSize);
+    const cellsZ = Math.round((bounds.maxZ - bounds.minZ) / cellSize);
+    const hasChunk = (cx: number, cz: number): boolean => state.document.terrain.chunks
+      .some((c) => c.x === cx && c.z === cz);
+    for (let cz = 0; cz < cellsZ / chunkSize; cz += 1) {
+      for (let cx = 0; cx < cellsX / chunkSize; cx += 1) {
+        if (hasChunk(cx, cz)) continue;
+        const worldX = bounds.minX + cx * chunkSize * cellSize;
+        const worldZ = bounds.minZ + cz * chunkSize * cellSize;
+        const topLeft = worldToScreen({ x: worldX, z: worldZ + chunkSize * cellSize }, transform);
+        const bottomRight = worldToScreen({ x: worldX + chunkSize * cellSize, z: worldZ }, transform);
+        context.fillStyle = 'rgba(0,0,0,0.06)';
+        context.fillRect(topLeft.x, topLeft.y, bottomRight.x - topLeft.x, bottomRight.y - topLeft.y);
+      }
     }
   }
 
@@ -125,6 +177,24 @@ export function drawMap(canvas: HTMLCanvasElement, state: MapEditorState): void 
     context.moveTo(left.x, left.y);
     context.lineTo(right.x, right.y);
     context.stroke();
+  }
+
+  /* [297A-67] Puntos de vértice: con la herramienta altura se marcan los
+   * vértices de la malla (los que pinta el pincel) para que la rejilla de
+   * alturas sea visible aunque la celda sea plana. */
+  if (state.tool === 'height') {
+    const vertexSide = chunkSize + 1;
+    context.fillStyle = '#000000';
+    for (const chunk of state.document.terrain.chunks) {
+      for (let localZ = 0; localZ < vertexSide; localZ += 1) {
+        for (let localX = 0; localX < vertexSide; localX += 1) {
+          const worldX = bounds.minX + (chunk.x * chunkSize + localX) * cellSize;
+          const worldZ = bounds.minZ + (chunk.z * chunkSize + localZ) * cellSize;
+          const screen = worldToScreen({ x: worldX, z: worldZ }, transform);
+          context.fillRect(screen.x - 1, screen.y - 1, 2, 2);
+        }
+      }
+    }
   }
 
   /* Borde del mundo. */

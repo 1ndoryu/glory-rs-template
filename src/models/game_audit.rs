@@ -14,6 +14,10 @@ pub const ACTION_MAP_PUBLISHED: &str = "map.published";
 /// [297A-60] Cambios allowlisted del catálogo de assets del juego.
 pub const ACTION_ASSET_CREATED: &str = "asset.created";
 pub const ACTION_ASSET_UPDATED: &str = "asset.updated";
+/// [297A-72] Importación/edición/activación de versiones inmutables de asset.
+pub const ACTION_ASSET_VERSION_CREATED: &str = "asset.version.created";
+pub const ACTION_ASSET_VERSION_UPDATED: &str = "asset.version.updated";
+pub const ACTION_ASSET_VERSION_ACTIVATED: &str = "asset.version.activated";
 
 /// Evento persistido de auditoría. `actor_id` se conserva en BD para trazabilidad,
 /// pero no se expone en el listado admin (privacidad: solo el `actor_kind`).

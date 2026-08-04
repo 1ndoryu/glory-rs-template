@@ -5,6 +5,9 @@ import {
   isValidAdminAssetLabel,
   isValidAdminAssetCategory,
   isValidAdminAssetEntry,
+  isValidGameAssetVersionAdminEntry,
+  isValidGameAssetVersionProxy,
+  isValidUpdateGameAssetVersionInput,
   GAME_ASSET_CATEGORIES,
 } from './game-asset-admin.service';
 
@@ -117,5 +120,137 @@ describe('GameAssetAdminService', () => {
     await GameAssetAdminService.listAll({ signal: controller.signal });
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(init.signal).toBe(controller.signal);
+  });
+
+  /* === Assets 3D — versiones === */
+
+  it('validates version entries, proxies and metadata input', () => {
+    expect(isValidGameAssetVersionProxy({ kind: 'circle', radius: 0.5 })).toBe(true);
+    expect(isValidGameAssetVersionProxy({ kind: 'aabb', halfWidth: 1, halfDepth: 2 })).toBe(true);
+    expect(isValidGameAssetVersionProxy({ kind: 'circle' })).toBe(false);
+    expect(isValidGameAssetVersionProxy({ kind: 'aabb', halfWidth: 1 })).toBe(false);
+    expect(isValidGameAssetVersionProxy({ kind: 'casa', radius: 1 })).toBe(false);
+    expect(isValidGameAssetVersionProxy({ kind: 'circle', radius: -1 })).toBe(false);
+    expect(isValidGameAssetVersionProxy({ kind: 'circle', radius: 0.5, extra: true })).toBe(false);
+    expect(
+      isValidUpdateGameAssetVersionInput({ proxy: { kind: 'circle', radius: 0.5 }, scale: 1.5 }),
+    ).toBe(true);
+    expect(isValidUpdateGameAssetVersionInput({ proxy: null, scale: 1 })).toBe(true);
+    expect(isValidUpdateGameAssetVersionInput({ proxy: null, scale: 5 })).toBe(false);
+    expect(isValidUpdateGameAssetVersionInput({ proxy: { kind: 'casa' }, scale: 1 })).toBe(false);
+    expect(isValidUpdateGameAssetVersionInput({ scale: 1 })).toBe(false);
+  });
+
+  it('rejects malformed version admin entries', () => {
+    const base = {
+      assetId: 'oak',
+      version: 1,
+      contentHash: 'abc',
+      byteSize: 12,
+      kind: 'glb',
+      category: 'tree',
+      proxy: null,
+      scale: 1,
+      isActive: false,
+      createdAt: '2026-08-02T00:00:00Z',
+    };
+    expect(isValidGameAssetVersionAdminEntry(base)).toBe(true);
+    expect(isValidGameAssetVersionAdminEntry({ ...base, storagePath: 'assets/x.glb' })).toBe(false);
+    expect(isValidGameAssetVersionAdminEntry({ ...base, version: 0 })).toBe(false);
+    expect(isValidGameAssetVersionAdminEntry({ ...base, category: 'sky' })).toBe(false);
+    expect(isValidGameAssetVersionAdminEntry({ ...base, proxy: { kind: 'casa' } })).toBe(false);
+    expect(isValidGameAssetVersionAdminEntry({ ...base, byteSize: -3 })).toBe(false);
+  });
+
+  it('lists versions from the admin endpoint', async () => {
+    const version = {
+      assetId: 'oak',
+      version: 2,
+      contentHash: 'hash-2',
+      byteSize: 24,
+      kind: 'glb',
+      category: 'tree',
+      proxy: null,
+      scale: 1.25,
+      isActive: true,
+      createdAt: '2026-08-02T00:00:00Z',
+    };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify([version]), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(GameAssetAdminService.listVersions('oak')).resolves.toEqual([
+      expect.objectContaining({ version: 2, isActive: true }),
+    ]);
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toBe('/api/admin/game/assets/oak/versions');
+  });
+
+  function fullVersion(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      assetId: 'oak',
+      version: 1,
+      contentHash: 'hash-1',
+      byteSize: 12,
+      kind: 'glb',
+      category: 'tree',
+      proxy: null,
+      scale: 1,
+      isActive: false,
+      createdAt: '2026-08-02T00:00:00Z',
+      ...overrides,
+    };
+  }
+
+  it('imports a GLB via multipart FormData', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify(fullVersion()), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const glb = new Blob([new Uint8Array([0x67, 0x6c, 0x54, 0x46])], { type: 'model/gltf-binary' });
+    await GameAssetAdminService.importVersion('oak', glb);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.method).toBe('POST');
+    expect(init.body).toBeInstanceOf(FormData);
+  });
+
+  it('updates metadata and activates versions via PUT', async () => {
+    const fetchMock = vi.fn().mockImplementation(async () =>
+      new Response(JSON.stringify(fullVersion()), { status: 200 }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await GameAssetAdminService.updateVersionMetadata('oak', 1, {
+      proxy: { kind: 'circle', radius: 0.5 },
+      scale: 1.5,
+    });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/admin/game/assets/oak/versions/1');
+    expect(init.method).toBe('PUT');
+    expect(JSON.parse(String(init.body))).toEqual({
+      proxy: { kind: 'circle', radius: 0.5 },
+      scale: 1.5,
+    });
+
+    await GameAssetAdminService.activateVersion('oak', 1);
+    const [activateUrl, activateInit] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(activateUrl).toBe('/api/admin/game/assets/oak/versions/1/activate');
+    expect(activateInit.method).toBe('PUT');
+  });
+
+  it('reads the GLB binary via direct fetch (no JSON envelope)', async () => {
+    const bytes = new Uint8Array([0x67, 0x6c, 0x54, 0x46, 2, 0, 0, 0]);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(bytes.buffer as ArrayBuffer, { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await GameAssetAdminService.readVersionFile('oak', 1);
+    expect(result.size).toBeGreaterThan(0);
+    const header = new Uint8Array(await result.arrayBuffer());
+    expect([...header.slice(0, 4)]).toEqual([0x67, 0x6c, 0x54, 0x46]);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/admin/game/assets/oak/versions/1/file');
+    expect(init.credentials).toBe('include');
   });
 });

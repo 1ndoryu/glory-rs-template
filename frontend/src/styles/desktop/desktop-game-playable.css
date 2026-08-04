@@ -177,8 +177,10 @@
   touch-action: none;
 }
 
-/* [297A-66] Selector de superficie del pincel: compacto, mismo estilo del OS. */
-.juegoConfig__editor-surface-select {
+/* [297A-66/67] Selectores del pincel (superficie y nivel de altura):
+ * compactos, mismo estilo del OS. */
+.juegoConfig__editor-surface-select,
+.juegoConfig__editor-height-select {
   padding: 2px 4px;
   border: var(--sistema-borde);
   background: var(--sistema-superficie);
@@ -229,4 +231,23 @@
     right: var(--espacio-sm);
     bottom: calc(max(var(--espacio-sm), env(safe-area-inset-bottom)) + var(--areaControlSistemaMovil));
   }
+}
+
+/* [297A-73] Panel de versiones de Assets 3D: preview aislado monocromo con
+ * grid y caja envolvente, dentro del modal del OS. */
+.asset-preview-host {
+  width: 100%;
+  height: 320px;
+  background: var(--fondo);
+  border: 1px solid var(--borde);
+}
+
+.asset-preview-host canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.asset-preview-host + .modal-feedback {
+  margin-top: var(--espacio-sm);
 }

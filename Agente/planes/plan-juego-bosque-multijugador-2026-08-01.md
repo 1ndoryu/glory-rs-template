@@ -596,6 +596,79 @@ realtime.
 
 **Límite 297A-66:** el pincel pinta solo superficies en chunks existentes (no crea terreno ni redimensiona bounds); sin pintado de altura (los vértices de `heights` se comparten entre chunks y requieren su propio bloque para no desincronizar bordes); sin caminos ni tipos de superficie adicionales (el contrato permite 0..15); la representación 3D del agua llega con Assets 3D.
 
+#### 297A-67 — Pincel de altura con vértices compartidos
+
+- [x] Definir niveles discretos de altura allowlisted (`TERRAIN_HEIGHT_VALUES` 0/0.25/0.5/1/1.5/2/2.5/3/4, no negativos, dentro del rango -64..64 del contrato) y `isAllowedHeight` fail-closed; `activeHeight` en el estado del editor.
+- [x] Resolver mundo → vértice de la malla (chunkSize+1)² con `terrainVertexAt`: devuelve refs a TODOS los chunks existentes que contienen el vértice (interior, borde X/Z compartido o esquina de 4), fail-closed fuera de bounds.
+- [x] Pintar con `paintHeight` (tool `height`, nivel allowlisted): actualiza el vértice en todos los chunks compartidos para no descuadrar bordes y commitea solo si algo cambia (arrastre limpio).
+- [x] Canvas: sombreado gris por celda proporcional al promedio de sus cuatro vértices y puntos de vértice visibles solo con la herramienta altura; toolbar con botón "altura" y select de nivel.
+- [x] Cubrir con tests dirigidos: vértice interior único, borde X/Z compartido (2 chunks), esquina compartida por 4 chunks con pintado sincronizado, borde del mundo (chunk primario inexistente), fail-closed fuera de bounds, niveles fuera del allowlist, arrastre limpio, undo/redo y `hasChanges`.
+
+**Evidencia 297A-67:** `game-map-editor-height.ts` separa la lógica pura del pincel de altura (sin DOM); el core expone `commit` para el segundo consumidor real. Type-check PASS, 16 tests nuevos dirigidos PASS (más asserts del toolbar en la vista) y diff-check PASS.
+
+**Límite 297A-67:** el pincel pinta solo vértices de chunks existentes (no crea terreno ni redimensiona bounds); la altura aún no se representa en 3D (Assets 3D); el sombreado del canvas es local del editor; sin caminos ni tipos de superficie adicionales.
+
+#### 297A-68 — Superficie "camino" y allowlist de superficies
+
+- [x] Añadir `path` (2) a `TERRAIN_SURFACE_VALUES` y su etiqueta; el runtime ya traduce 2 → material medio (`surfaceMaterialIndex` de 297A-33), por lo que no cambia la escena.
+- [x] Añadir `isAllowedSurface` fail-closed y usarla en la vista (antes `value === 0 || value === 1`); el select del toolbar itera el objeto y ya ofrece camino sin cambios.
+- [x] Canvas: sombreado propio para camino (2) distinto de suelo/agua.
+- [x] Tests: pintar camino con commit, `isAllowedSurface` acepta 0/1/2 y rechaza -1/3/15; corregir 4 tests de superficie de 297A-66 que asumían suelo en la celda (0,0) del fixture (el contrato la define agua: `index % 11 === 0`), ahora pintan la celda índice 1 (suelo real).
+
+**Evidencia 297A-68:** 39 tests de editor PASS (core + vista + altura); type-check PASS y gate `task:check -- 297A-68` PASS. El circuito pintar→publicar→jugar traduce el camino sin tocar la escena.
+
+**Límite 297A-68:** sin caminos curvos ni anchos variables (el contrato solo codifica superficies por celda); sin tipos de superficie adicionales 3..15 (el runtime los usa con el material base); la representación 3D de altura/agua sigue siendo la de 297A-33.
+
+#### 297A-69 — Creación de terreno (chunks contiguos)
+
+- [x] `terrainChunkAt`: mundo → índices de chunk locales (mismo mapeo que el contrato).
+- [x] `canCreateChunk` fail-closed: rechaza chunk existente, cuota `maxChunks` agotada, índices negativos (exigirían reindexar y romperían la invariante de bounds) y huecos no contiguos al rectángulo actual; valida `maxWorldWidth/Depth` al expandir.
+- [x] `addTerrainChunk` (tool `terrain`): crea chunk plano (heights 0, superficies suelo) y expande `maxX/maxZ`; commitea una vez para undo/redo.
+- [x] Toolbar con botón "terreno" y canvas que sombrea las celdas vacías contiguas.
+- [x] Tests: resolución de chunk, no-duplicado, índices negativos, hueco no contiguo, expansión maxX y maxZ, undo/retiro y no-op con otra tool.
+
+**Evidencia 297A-69:** `game-map-editor-terrain.ts` separa la lógica pura (sin DOM); 7 tests nuevos PASS, 39 tests del editor PASS, type-check y gate `task:check -- 297A-69` PASS.
+
+**Límite 297A-69:** solo crea chunks contiguos hacia maxX/maxZ (sin reindexar negativos ni rellenar huecos interiores); no elimina chunks (borrado de terreno queda como bloque posterior); la creación no pinta altura/superficie automáticamente.
+
+#### 297A-70 — Preview 3D del borrador
+
+- [x] `buildPreviewChunkData`: datos puros de malla de todos los chunks con `buildTerrainMeshData` (misma transformación/cuotas que el runtime), sin Three.
+- [x] `createGameMapPreview`: adaptador Three que materializa los chunks del borrador con los materiales de superficie (pale/water/middle), marca spawns e instancias del fixture con primitivas, ajusta la cámara a bounds y libera geometrías, materiales, ResizeObserver y contexto WebGL en `destroy`.
+- [x] Toolbar: botón "preview 3D" que alterna el canvas 2D por el preview; cada `redraw` sincroniza el documento del borrador.
+- [x] Tests: tamaño de mallas (17² vértices, 16² celdas), alturas con tolerancia Float32 y orígenes de chunk desde bounds.
+
+**Evidencia 297A-70:** 3 tests nuevos + 4 de vista PASS; type-check y gate `task:check -- 297A-70` PASS. El preview no es un segundo motor: consume `game-core` y los materiales del runtime.
+
+**Límite 297A-70:** las instancias del catálogo (fuera del fixture) no tienen geometría 3D propia hasta Assets 3D; el preview no expone controles orbitales (cámara fija); sin simulación ni colisiones en el preview.
+
+#### 297A-71 — Borrador persistente del mapa con revisión optimista
+
+- [x] Migración `game_map_drafts`: un borrador por mapa (PK `map_id`), revisión > 0, hash, documento JSONB acotado (4 MiB) y `updated_by` FK opcional.
+- [x] `GET/PUT /api/admin/game/maps/:map_id/draft` con `AdminUser`/CSRF; el PUT exige que `mapId` del body coincida con la ruta y valida el documento con el mismo camino que publicar (422 ante inválido, 413 ante body sobredimensionado, 409 ante revisión obsoleta, 404 sin borrador).
+- [x] Repo `save_draft` con advisory lock por mapa, UPSERT y revisión +1 por guardado; `delete_draft` idempotente dentro de transacción.
+- [x] Publicar elimina el borrador en la misma transacción: la versión publicada pasa a ser la base y no queda un draft obsoleto.
+- [x] Editor: `loadMap` resuelve borrador → publicación activa → fixture (en paralelo), `draftRevision` en el estado (`setDraftRevision`), botón "guardar borrador" con 409 visible y revisión en el pie.
+- [x] Vista del editor dividida en `game-map-editor-interactions.ts` (pointer handlers) para mantener <300 líneas tras añadir el guardado.
+- [x] Tests: envelope estricto del borrador, roundtrip con revisión 1→2, stale 409, mapa incoherente 422, 413/422, publicación que limpia el draft (404 posterior) y GET público que nunca sirve el borrador.
+
+**Evidencia 297A-71:** `game_map_drafts` + endpoints; 5/5 tests HTTP PostgreSQL PASS (más 7/7 de regresión de `game_map_publish`); 68 tests frontend dirigidos PASS (servicio + vista + editor); gate `task:check -- 297A-71` PASS.
+
+**Límite 297A-71:** el guardado es manual (botón), no autosave diferido; el borrador no tiene historial ni compartición entre editores (la revisión optimista resuelve el conflicto con 409); no hay purga de borradores antiguos (retención en Fase 8).
+
+#### 297A-72 — Assets 3D backend: versiones inmutables por hash
+
+- [x] Migración `game_asset_versions`: versión por asset (UNIQUE asset+version), hash SHA-256, storage content-addressed `assets/{hash}.glb` (índice no único: varias versiones pueden compartir archivo), tamaño ≤ 16 MiB, categoría allowlisted, proxy JSONB con CHECK de forma, scale 0.1..4 y una sola activa por asset.
+- [x] Import multipart `POST /api/admin/game/assets/:id/versions`: valida magic glTF + versión 2 + tamaño ANTES de guardar, escribe por hash (dedup en disco) y registra la versión con auditoría `asset.version.created` en la misma transacción.
+- [x] Listado admin `GET .../versions` (sin storage paths) y contrato público `GET /api/game/assets/:id/active` con `versionId` `{asset}-v{N}`, hash, categoría, proxy y scale (sin `isActive`/`byteSize`/rutas).
+- [x] `PUT .../versions/:version` edita proxy/scale SOLO en inactivas (409 si activa); `PUT .../versions/:version/activate` desactiva las demás y congela la versión.
+- [x] Trigger de inmutabilidad: la versión activa no puede editarse ni borrarse (ni por SQL directo); las inactivas sí pueden editar metadata/borrarse.
+- [x] Tests: autorización/CSRF, GLB inválido/versión/size, dedup por hash, numeración, metadata, activación única, contrato público y trigger.
+
+**Evidencia 297A-72:** 6/6 tests HTTP PostgreSQL PASS (más 9/9 de regresión `game_asset`/`game_asset_admin`); el storage se verifica por hash en disco. El panel UI de import/preview llega en el siguiente bloque.
+
+**Límite 297A-72:** el import no analiza la geometría del GLB (bounds/materiales/animaciones: análisis en bloque posterior); no hay UI de import/preview ni consumo del runtime; la purga de versiones huérfanas y la retención quedan para Fase 8.
+
 **Gate:** ningún invitado puede invocar admin ni reclamar el estado de otra identidad; el perfil no depende de datos enviados sin validar.
 
 **Auditoría de cierre — Fase 6:**

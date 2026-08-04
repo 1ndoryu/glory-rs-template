@@ -11,6 +11,7 @@ import {
   deleteSpawnPoint,
   paintSurface,
   setActiveSurface,
+  isAllowedSurface,
   terrainCellAt,
   TERRAIN_SURFACE_VALUES,
   undo,
@@ -20,6 +21,7 @@ import {
   setActiveAsset,
   getValidationIssues,
   hasChanges,
+  setDraftRevision,
 } from './game-map-editor-core';
 import { FIXTURE_MAP_VERSION } from './game-fixture-map';
 import type { GameAssetAdminEntry } from '../../../../services/game-asset-admin.service';
@@ -78,12 +80,12 @@ describe('game-map-editor-core (297A-64)', () => {
       state = setTool(state, 'paint');
       state = setActiveSurface(state, TERRAIN_SURFACE_VALUES.water);
 
-      /* El fixture (0,0) tiene 0 en casi todas las celdas (superficie suelo).
-       * Celda global (0,0) → chunk 0,0, índice 0. */
-      const before = state.document.terrain.chunks[0].surfaces[0];
-      state = paintSurface(state, { x: -9.5, z: -7.5 }, TERRAIN_SURFACE_VALUES.water);
+      /* El fixture define agua en índice 0 (`index % 11 === 0`); la celda
+       * índice 1 es suelo. Celda global (1,0) → chunk 0,0, índice 1. */
+      const before = state.document.terrain.chunks[0].surfaces[1];
+      state = paintSurface(state, { x: -9, z: -8 }, TERRAIN_SURFACE_VALUES.water);
 
-      expect(state.document.terrain.chunks[0].surfaces[0]).toBe(1);
+      expect(state.document.terrain.chunks[0].surfaces[1]).toBe(1);
       expect(before).toBe(0);
       expect(state.undoStack).toHaveLength(1);
       expect(getValidationIssues(state)).toHaveLength(0);
@@ -92,58 +94,79 @@ describe('game-map-editor-core (297A-64)', () => {
     it('no pinta fuera de los chunks existentes (fail-closed)', () => {
       let state = makeState();
       state = setTool(state, 'paint');
-      const before = state.document.terrain.chunks[0].surfaces[0];
+      const before = state.document.terrain.chunks[0].surfaces[1];
       /* Mundo muy lejano: fuera de bounds y de chunks. */
       state = paintSurface(state, { x: 500, z: 500 }, TERRAIN_SURFACE_VALUES.water);
-      expect(state.document.terrain.chunks[0].surfaces[0]).toBe(before);
+      expect(state.document.terrain.chunks[0].surfaces[1]).toBe(before);
       expect(state.undoStack).toHaveLength(0);
     });
 
     it('no commitea si la celda ya tiene esa superficie (arrastre limpio)', () => {
       let state = makeState();
       state = setTool(state, 'paint');
-      state = paintSurface(state, { x: -9.5, z: -7.5 }, TERRAIN_SURFACE_VALUES.water);
+      state = paintSurface(state, { x: -9, z: -8 }, TERRAIN_SURFACE_VALUES.water);
       expect(state.undoStack).toHaveLength(1);
       /* Mismo punto otra vez: sin commit redundante. */
-      state = paintSurface(state, { x: -9.5, z: -7.5 }, TERRAIN_SURFACE_VALUES.water);
+      state = paintSurface(state, { x: -9, z: -8 }, TERRAIN_SURFACE_VALUES.water);
       expect(state.undoStack).toHaveLength(1);
     });
 
     it('no pinta si la herramienta no es paint', () => {
       let state = makeState();
       state = setTool(state, 'select');
-      const before = state.document.terrain.chunks[0].surfaces[0];
-      state = paintSurface(state, { x: -9.5, z: -7.5 }, TERRAIN_SURFACE_VALUES.water);
-      expect(state.document.terrain.chunks[0].surfaces[0]).toBe(before);
+      const before = state.document.terrain.chunks[0].surfaces[1];
+      state = paintSurface(state, { x: -9, z: -8 }, TERRAIN_SURFACE_VALUES.water);
+      expect(state.document.terrain.chunks[0].surfaces[1]).toBe(before);
     });
 
     it('terrainCellAt resuelve chunk local e índice para el documento', () => {
       const state = makeState();
-      const cell = terrainCellAt(state.document, { x: -9.5, z: -7.5 });
+      const cell = terrainCellAt(state.document, { x: -9, z: -8 });
       expect(cell).not.toBeNull();
       expect(cell!.chunk.x).toBe(0);
       expect(cell!.chunk.z).toBe(0);
-      expect(cell!.index).toBe(0);
+      expect(cell!.index).toBe(1);
       expect(terrainCellAt(state.document, { x: 500, z: 500 })).toBeNull();
     });
 
     it('deshacer/rehacer restaura la superficie pintada', () => {
       let state = makeState();
       state = setTool(state, 'paint');
-      state = paintSurface(state, { x: -9.5, z: -7.5 }, TERRAIN_SURFACE_VALUES.water);
-      expect(state.document.terrain.chunks[0].surfaces[0]).toBe(1);
+      state = paintSurface(state, { x: -9, z: -8 }, TERRAIN_SURFACE_VALUES.water);
+      expect(state.document.terrain.chunks[0].surfaces[1]).toBe(1);
       state = undo(state);
-      expect(state.document.terrain.chunks[0].surfaces[0]).toBe(0);
+      expect(state.document.terrain.chunks[0].surfaces[1]).toBe(0);
       state = redo(state);
-      expect(state.document.terrain.chunks[0].surfaces[0]).toBe(1);
+      expect(state.document.terrain.chunks[0].surfaces[1]).toBe(1);
     });
 
     it('hasChanges detecta el pintado', () => {
       let state = makeState();
       expect(hasChanges(state)).toBe(false);
       state = setTool(state, 'paint');
-      state = paintSurface(state, { x: -9.5, z: -7.5 }, TERRAIN_SURFACE_VALUES.water);
+      state = paintSurface(state, { x: -9, z: -8 }, TERRAIN_SURFACE_VALUES.water);
       expect(hasChanges(state)).toBe(true);
+    });
+
+    /* [297A-68] Camino como tercera superficie allowlisted: el contrato admite
+     * 0..15 y el runtime mapea 2 al material medio. */
+    it('pinta un camino (superficie 2) y lo valida como superficie permitida', () => {
+      let state = makeState();
+      state = setTool(state, 'paint');
+      state = setActiveSurface(state, TERRAIN_SURFACE_VALUES.path);
+      state = paintSurface(state, { x: -9, z: -8 }, TERRAIN_SURFACE_VALUES.path);
+      expect(state.document.terrain.chunks[0].surfaces[1]).toBe(2);
+      expect(state.undoStack).toHaveLength(1);
+      expect(getValidationIssues(state)).toHaveLength(0);
+    });
+
+    it('isAllowedSurface acepta solo las superficies semánticas del editor', () => {
+      for (const value of Object.values(TERRAIN_SURFACE_VALUES)) {
+        expect(isAllowedSurface(value)).toBe(true);
+      }
+      expect(isAllowedSurface(-1)).toBe(false);
+      expect(isAllowedSurface(3)).toBe(false);
+      expect(isAllowedSurface(15)).toBe(false);
     });
   });
 
@@ -241,5 +264,19 @@ describe('game-map-editor-core (297A-64)', () => {
     state = setActiveAsset(state, 'water');
     expect(state.activeAssetId).toBe('water');
     expect(state.document).toBe(state.baseDocument);
+  });
+
+  /* [297A-71] Guardar el borrador actualiza la revisión y la base: el pie del
+   * editor deja de mostrar "borrador con cambios" tras persistir. */
+  it('setDraftRevision actualiza revisión y base (guardado limpio)', () => {
+    let state = makeState();
+    state = setTool(state, 'paint');
+    state = paintSurface(state, { x: -9, z: -8 }, TERRAIN_SURFACE_VALUES.water);
+    expect(hasChanges(state)).toBe(true);
+
+    state = setDraftRevision(state, 3);
+    expect(state.draftRevision).toBe(3);
+    expect(hasChanges(state)).toBe(false);
+    expect(state.document).not.toBe(state.baseDocument);
   });
 });

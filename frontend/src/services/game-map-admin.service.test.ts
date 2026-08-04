@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   GameMapAdminService,
   GAME_MAP_ID,
+  isValidGameMapDraftPublic,
   isValidGameMapVersionPublic,
   parseActiveMapEnvelope,
 } from './game-map-admin.service';
@@ -108,5 +109,81 @@ describe('GameMapAdminService (297A-64)', () => {
     await GameMapAdminService.getActive('bosque', { signal: controller.signal });
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(init.signal).toBe(controller.signal);
+  });
+});
+
+describe('GameMapAdminService draft (297A-71)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function draftEnvelope(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      mapId: 'bosque',
+      revision: 4,
+      schemaVersion: 1,
+      contentHash: 'sha256:abc',
+      updatedAt: '2026-08-03T00:00:00Z',
+      document: FIXTURE_MAP_VERSION,
+      ...overrides,
+    };
+  }
+
+  it('valida el envelope del borrador estricto (sin campos extra)', () => {
+    expect(isValidGameMapDraftPublic(draftEnvelope())).toBe(true);
+    expect(isValidGameMapDraftPublic(draftEnvelope({ secret: 1 }))).toBe(false);
+    expect(isValidGameMapDraftPublic(draftEnvelope({ revision: 0 }))).toBe(false);
+    expect(isValidGameMapDraftPublic(draftEnvelope({ revision: -1 }))).toBe(false);
+    expect(isValidGameMapDraftPublic(draftEnvelope({ updatedAt: '  ' }))).toBe(false);
+  });
+
+  it('carga el borrador validando el documento', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(draftEnvelope()), { status: 200 }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const loaded = await GameMapAdminService.getDraft('bosque');
+    expect(loaded?.revision).toBe(4);
+    expect(loaded?.document.id).toBe('fixture-bosque-v1');
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/admin/game/maps/bosque/draft');
+    expect(init.method).toBe('GET');
+  });
+
+  it('devuelve null ante 404 (no hay borrador todavía)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: 'not_found' }), { status: 404 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(GameMapAdminService.getDraft('bosque')).resolves.toBeNull();
+  });
+
+  it('guarda el borrador con expectedRevision y document exactos', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(draftEnvelope({ revision: 5 })), { status: 200 }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await GameMapAdminService.saveDraft(FIXTURE_MAP_VERSION, 4);
+    expect(result.revision).toBe(5);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/admin/game/maps/fixture-bosque-v1/draft');
+    expect(init.method).toBe('PUT');
+    const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+    expect(body.expectedRevision).toBe(4);
+    expect(body.mapId).toBe('fixture-bosque-v1');
+  });
+
+  it('rechaza guardar un documento inválido sin llamar a la red', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const broken = { ...FIXTURE_MAP_VERSION, schemaVersion: 99 as never };
+    await expect(GameMapAdminService.saveDraft(broken, 0)).rejects.toThrow(/inválido/);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

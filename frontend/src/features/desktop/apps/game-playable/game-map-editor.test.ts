@@ -53,6 +53,7 @@ describe('createGameMapEditor (297A-64)', () => {
       document: FIXTURE_MAP_VERSION,
       activeVersion: 3,
     } as never);
+    vi.spyOn(GameMapAdminService, 'getDraft').mockResolvedValue(null);
 
     const host = document.createElement('div');
     document.body.appendChild(host);
@@ -64,18 +65,26 @@ describe('createGameMapEditor (297A-64)', () => {
     expect(host.textContent).toContain('colocar');
     expect(host.textContent).toContain('spawn');
     expect(host.textContent).toContain('pintar');
+    expect(host.textContent).toContain('altura');
+    expect(host.textContent).toContain('terreno');
+    expect(host.textContent).toContain('preview 3D');
+    /* [297A-71] El toolbar expone el guardado del borrador. */
+    expect(host.textContent).toContain('guardar borrador');
     expect(host.textContent).toContain('publicar mapa');
     /* La paleta se puebla con assets activos. */
     expect(host.textContent).toContain('Árbol');
     expect(host.textContent).toContain('Roca');
     /* [297A-66] El pincel expone el selector de superficies suelo/agua. */
     expect(host.querySelector('select[aria-label="superficie del pincel"]')).not.toBeNull();
+    /* [297A-67] El pincel de altura expone su selector de nivel. */
+    expect(host.querySelector('select[aria-label="nivel de altura del pincel"]')).not.toBeNull();
     handle.destroy();
   });
 
-  it('usa el fixture como base cuando no hay mapa publicado', async () => {
+  it('usa el fixture como base cuando no hay mapa publicado ni borrador', async () => {
     vi.spyOn(GameAssetAdminService, 'listAll').mockResolvedValue(activeCatalog() as never);
     vi.spyOn(GameMapAdminService, 'getActive').mockResolvedValue(null);
+    vi.spyOn(GameMapAdminService, 'getDraft').mockResolvedValue(null);
 
     const host = document.createElement('div');
     document.body.appendChild(host);
@@ -87,9 +96,36 @@ describe('createGameMapEditor (297A-64)', () => {
     handle.destroy();
   });
 
+  /* [297A-71] El borrador editable manda sobre la publicación al abrir. */
+  it('continúa desde el borrador guardado cuando existe', async () => {
+    vi.spyOn(GameAssetAdminService, 'listAll').mockResolvedValue(activeCatalog() as never);
+    vi.spyOn(GameMapAdminService, 'getActive').mockResolvedValue({
+      document: FIXTURE_MAP_VERSION,
+      activeVersion: 2,
+    } as never);
+    const draftDocument = {
+      ...FIXTURE_MAP_VERSION,
+      spawnPoints: [{ id: 'spawn-edited', position: { x: 1, z: 1 }, radius: 0.5 }],
+    };
+    vi.spyOn(GameMapAdminService, 'getDraft').mockResolvedValue({
+      document: draftDocument,
+      revision: 4,
+    } as never);
+
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const handle = createGameMapEditor(host);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(host.textContent).toContain('borrador v4');
+    expect(host.textContent).toContain('v2');
+    handle.destroy();
+  });
+
   it('no monta la paleta si el catálogo falla pero mantiene el editor', async () => {
     vi.spyOn(GameAssetAdminService, 'listAll').mockRejectedValue(new Error('catalog down'));
     vi.spyOn(GameMapAdminService, 'getActive').mockResolvedValue(null);
+    vi.spyOn(GameMapAdminService, 'getDraft').mockResolvedValue(null);
 
     const host = document.createElement('div');
     document.body.appendChild(host);
@@ -104,6 +140,7 @@ describe('createGameMapEditor (297A-64)', () => {
   it('destroy retira el editor del DOM', async () => {
     vi.spyOn(GameAssetAdminService, 'listAll').mockResolvedValue(activeCatalog() as never);
     vi.spyOn(GameMapAdminService, 'getActive').mockResolvedValue(null);
+    vi.spyOn(GameMapAdminService, 'getDraft').mockResolvedValue(null);
 
     const host = document.createElement('div');
     document.body.appendChild(host);
