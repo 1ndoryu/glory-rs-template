@@ -32,9 +32,30 @@ async function createFixture() {
   return { root, toolRoot };
 }
 
+async function createCapabilityFixture() {
+  const fixture = await createFixture();
+  const manifestPath = path.join(fixture.root, 'quality-tools.json');
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+  manifest.tools.sentinel.capabilities = { filesFrom: true };
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+  return fixture;
+}
+
 test('parsea modos de lock y exige --lock para --write en doctor', () => {
   assert.deepEqual(parseLockArgs(['--check', '--json']), { mode: 'check', cwd: process.cwd(), json: true });
   assert.deepEqual(parseLockArgs(['--write', '--cwd', 'fixture']), { mode: 'write', cwd: 'fixture', json: false });
+});
+
+test('generateLock conserva capacidades declaradas en el lock', async () => {
+  const fixture = await createCapabilityFixture();
+  try {
+    const result = await generateLock(fixture.root);
+    assert.deepEqual(result.lock.analyzers.sentinel.capabilities, { filesFrom: true });
+    await writeFile(path.join(fixture.root, 'sentinel.lock.json'), `${JSON.stringify(result.lock, null, 2)}\n`, 'utf8');
+    assert.equal((await checkLock(fixture.root)).ok, true);
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
 });
 
 test('generateLock inspecciona el analyzer y construye un lock válido', async () => {

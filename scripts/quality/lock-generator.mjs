@@ -80,6 +80,7 @@ export function buildLock(analyzers, generatedAt = new Date().toISOString()) {
       commit: value.commit,
       sha256: value.sha256,
       patchSha256: value.patchSha256 ?? null,
+      ...(value.capabilities === undefined ? {} : { capabilities: value.capabilities }),
     }])),
   };
 }

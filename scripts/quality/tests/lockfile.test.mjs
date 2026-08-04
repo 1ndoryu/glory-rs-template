@@ -61,6 +61,27 @@ test('rechaza divergencia entre lockfile y quality-tools', () => {
   assert.throws(() => validateLock({ ...lock, runtime: { ...lock.runtime, status: 'not-installed', commit: 'repo-scripts' } }, manifest), /not-installed/);
 });
 
+test('valida capacidades declaradas del analyzer contra el lock', () => {
+  const lock = validLock();
+  const manifestWithCapability = {
+    ...manifest,
+    tools: {
+      ...manifest.tools,
+      varsense: { ...manifest.tools.varsense, capabilities: { filesFrom: true } },
+    },
+  };
+  const lockWithCapability = {
+    ...lock,
+    analyzers: {
+      ...lock.analyzers,
+      varsense: { ...lock.analyzers.varsense, capabilities: { filesFrom: true } },
+    },
+  };
+  assert.doesNotThrow(() => validateLock(lockWithCapability, manifestWithCapability));
+  assert.throws(() => validateLock(lock, manifestWithCapability), /capabilities no coincide/);
+  assert.throws(() => validateLock({ ...lockWithCapability, analyzers: { ...lockWithCapability.analyzers, varsense: { ...lockWithCapability.analyzers.varsense, capabilities: { filesFrom: false } } } }, manifestWithCapability), /capabilities no coincide/);
+});
+
 test('rechaza analyzer desconocido o campos extra', () => {
   const lock = validLock();
   assert.throws(() => validateLock({ ...lock, analyzers: { ...lock.analyzers, other: lock.analyzers.sentinel } }, manifest), /no coincide/);

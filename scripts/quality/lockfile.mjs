@@ -34,6 +34,15 @@ function validateText(value, label) {
   if (typeof value !== 'string' || value.length === 0 || value.length > 160) fail(`${label}: texto inválido`);
 }
 
+function validateCapabilities(value, label) {
+  if (value === undefined) return;
+  if (!isRecord(value)) fail(`${label}: debe ser un objeto`);
+  validateKeys(value, new Set(['filesFrom']), label);
+  if (value.filesFrom !== undefined && typeof value.filesFrom !== 'boolean') {
+    fail(`${label}.filesFrom debe ser booleano`);
+  }
+}
+
 function validateCommit(value, label, allowAliases = false) {
   if (allowAliases && ['not-installed', 'repo-scripts'].includes(value)) return;
   if (typeof value !== 'string' || !COMMIT_PATTERN.test(value)) fail(`${label}: commit inválido`);
@@ -110,8 +119,15 @@ export function validateLock(lock, manifest) {
     const entry = lock.analyzers[name];
     const expected = manifestTools[name];
     if (!isRecord(entry)) fail(`analyzers.${name} debe ser un objeto`);
-    validateKeys(entry, new Set(['version', 'protocolVersion', 'commit', 'sha256', 'patchSha256']), `analyzers.${name}`);
+    validateKeys(entry, new Set(['version', 'protocolVersion', 'commit', 'sha256', 'patchSha256', 'capabilities']), `analyzers.${name}`);
     validateText(entry.version, `analyzers.${name}.version`);
+    validateCapabilities(expected.capabilities, `quality-tools.json.tools.${name}.capabilities`);
+    validateCapabilities(entry.capabilities, `analyzers.${name}.capabilities`);
+    const expectedCapabilities = expected.capabilities ?? undefined;
+    const actualCapabilities = entry.capabilities ?? undefined;
+    if (JSON.stringify(actualCapabilities) !== JSON.stringify(expectedCapabilities)) {
+      fail(`analyzers.${name}.capabilities no coincide con quality-tools.json`);
+    }
     if (entry.version !== expected.version) fail(`analyzers.${name}.version no coincide con quality-tools.json`);
     const protocolVersion = Number(expected.outputSchemaVersion);
     if (!Number.isInteger(entry.protocolVersion) || entry.protocolVersion !== protocolVersion) {
@@ -300,6 +316,7 @@ export async function inspectInstalledAnalyzers(workspaceRoot, manifest) {
       commit: revision.stdout.trim(),
       sha256,
       patchSha256,
+      ...(config.capabilities === undefined ? {} : { capabilities: config.capabilities }),
       cliPath,
     };
   }

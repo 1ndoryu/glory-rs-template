@@ -18,7 +18,7 @@ const LEGACY_SENTINEL_KEYS = new Set(['includePatterns', 'excludePatterns', 'dir
 const LEGACY_QUALITY_KEYS = new Set(['schemaVersion', 'maxFindings', 'maxReminders', 'maxTerminalLines', 'lockWaitMs', 'maxConcurrentStages', 'timeoutsMs', 'performanceBudgets', 'heavyRun', 'reportRetention', 'fullPatterns', 'profiles']);
 const LEGACY_VARSENSE_KEYS = new Set(['variableFiles', 'includePatterns', 'excludePatterns', 'scanAllFiles', 'hardcodedDetection', 'inlineDetection', 'tokenDetection', 'bannedProperties', 'orphanClassDetection']);
 const LEGACY_TOOL_MANIFEST_KEYS = new Set(['schemaVersion', 'installRoot', 'tools']);
-const LEGACY_TOOL_KEYS = new Set(['repository', 'commit', 'version', 'outputSchemaVersion', 'buildScript', 'cli', 'testScript', 'patch']);
+const LEGACY_TOOL_KEYS = new Set(['repository', 'commit', 'version', 'outputSchemaVersion', 'buildScript', 'cli', 'testScript', 'patch', 'capabilities']);
 
 function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
@@ -105,6 +105,12 @@ function validateLegacyContracts({ sentinelConfig, qualityConfig, varsenseConfig
     }
     if (typeof tool.version !== 'string' || typeof tool.commit !== 'string') {
       throw new Error(`${label}: version y commit son obligatorios`);
+    }
+    if (tool.capabilities !== undefined) {
+      validateLegacyKeys(tool.capabilities, new Set(['filesFrom']), `${label}.capabilities`);
+      if (tool.capabilities.filesFrom !== undefined && typeof tool.capabilities.filesFrom !== 'boolean') {
+        throw new Error(`${label}.capabilities.filesFrom: debe ser booleano`);
+      }
     }
     if (tool.patch !== undefined) {
       if (!isRecord(tool.patch) || typeof tool.patch.path !== 'string' || typeof tool.patch.sha256 !== 'string') {
