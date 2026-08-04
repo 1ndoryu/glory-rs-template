@@ -6,7 +6,7 @@ applyTo: '**'
 
 ## 1. Prioridad actual
 
-1. Leer `roadmap.md` y ejecutar solo el primer bloque habilitado.
+1. Leer `roadmap.md` (debe listar siempre los planes pendientes de `Agente/planes/` y estar actualizado) y revisar `Agente/planes/` por planes activos; ejecutar solo el primer bloque habilitado.
 2. **Primero Sentinel/VarSense:** cerrar cada tarea con el quality gate unificado antes de avanzar.
 3. No iniciar seguridad, runtime, workspace, móvil, programas o comercio hasta cerrar su dependencia documental/técnica.
 4. Identidad visual aprobada; cambios materiales requieren actualizar manual y aprobación visual.
@@ -78,7 +78,7 @@ No dupliques decisiones: actualiza primero la fuente correspondiente y luego sus
 
 ## 6. Flujo obligatorio por tarea
 
-1. Leer roadmap completo, manuales aplicables y checklist del bloque.
+1. Leer roadmap completo (listado de planes pendientes y estado siempre actualizado), revisar `Agente/planes/` por planes activos, y leer manuales aplicables y checklist del bloque.
 2. Delegar a subagentes investigación, búsquedas, lecturas grandes y diagnósticos; el agente principal decide/edita/valida.
 3. Confirmar dependencias y aclarar solo dudas que cambien materialmente el resultado.
 4. Preguntar internamente: “¿es la mejor opción arquitectónica o el camino fácil?” Resolver raíz, no parche.
@@ -88,9 +88,9 @@ No dupliques decisiones: actualiza primero la fuente correspondiente y luego sus
 8. Probar el flujo real. UI requiere navegador y viewports; seguridad/comercio requieren casos negativos.
 9. Actualizar roadmap, completados, manuales, prevención y lecciones. Todo plan activo usa checklists, dependencia, gate y criterio de salida.
 10. Revisar `git status`/`diff`; stage explícito (nunca `git add .`), commit `{ID}: descripción`, pull/rebase y push.
-11. Releer roadmap como última acción y elegir solo el siguiente bloque habilitado.
+11. Releer roadmap y planes activos de `Agente/planes/` como última acción, actualizar el roadmap con el estado real de los planes, y elegir solo el siguiente bloque habilitado.
 
-> **Commit condicional:** el gate y este protocolo recomiendan commit/push al cerrar un bloque entregable. No se debe forzar commit para diagnósticos, prototipos intermedios o cambios compartidos que aún no estén listos; en esos casos el reporte deja el recordatorio de revisar `git status` y documentar el estado.
+> **Commit por tarea (obligatorio):** primero el gate, después el commit. Al cerrar una tarea entregable: ejecutar `npm run task:check -- {ID}` y, si pasa, commitear de inmediato. Cada tarea terminada = un commit `{ID}: descripción`; prohibido acumular archivos modificados pasando de una tarea a otra sin commitear. Diagnósticos, prototipos intermedios o cambios compartidos que aún no estén listos no se fuerzan como commit de bloque: en ese caso el reporte deja el recordatorio de revisar `git status` y documentar el estado, y no se inicia la siguiente tarea con cambios pendientes sin resolver.
 
 ## 7. Quality gate por tarea
 
@@ -99,6 +99,8 @@ El orquestador Node multiplataforma se ejecuta con un único comando público:
 ```text
 npm run task:check -- 297A-N
 ```
+
+Cuando el gate está configurado (como en este proyecto), el cierre de tarea es siempre por `task:check` y los comandos directos pesados quedan bloqueados por el guard. La skill global **`quality-gate-setup`** documenta esta configuración (archivos, scripts, lock, guard) y cómo replicarla en proyectos desde cero; si un proyecto no tiene gate configurado, se valida por stack hasta configurarlo.
 
 Orden obligatorio:
 
@@ -143,6 +145,7 @@ El script decide alcance automáticamente, es incremental local y full en CI. De
 - No reiniciar/recargar VS Code automáticamente.
 - Producción exclusivamente mediante `coolify-manager-rs`; prohibido SSH/docker/scp/curl directo al servidor.
 - Flujo deploy futuro: `deploy --update` -> `health` -> si falla `redeploy`/restore. Nunca desplegar sin instrucción y roadmap.
+- Concurrencia: el checkout es compartido con otros agentes/IDE/usuario. Stage únicamente tus propios archivos y hunks; prohibido `git add -A`/`git add .`; no descartar, stashear, commitear ni empujar cambios ajenos. Si la propiedad de un cambio es ambigua, déjalo sin commitear y documenta qué queda pendiente.
 
 ## 11. Herramientas obligatorias
 
@@ -205,6 +208,7 @@ Reglas:
 - Solo pendientes ejecutables; nunca visión histórica, completados, notas sueltas o especificaciones extensas.
 - Encabezado breve: producto, stack, deploy, epic y estado visual.
 - Enlaces a fuentes canónicas.
+- Planes pendientes: el roadmap lista los planes activos de `Agente/planes/` con su estado y se actualiza ante cualquier cambio (plan nuevo, avanzado, completado o movido a `planes/completados/`); nunca queda desactualizado respecto a los planes.
 - Un único “Siguiente bloque” claramente habilitado.
 - Tareas en orden real con ID, dependencia, checklist corto y criterio de salida.
 - Epic agrupa; tarea ejecutable cabe en un bloque/commit. Si no cabe, subdividir en plan, no inflar roadmap.

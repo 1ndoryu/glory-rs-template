@@ -64,3 +64,7 @@ glory-rust-template.code-workspace
 .tmp-sentinel/newfunc.txt
 .tmp-sentinel/rustRouteSyntaxRule.test.ts
 .tmp-sentinel/sample.rs
+.freebuff/desktop-v2.db
+.freebuff/desktop-v2.db-shm
+.freebuff/
+*.bak
