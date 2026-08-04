@@ -145,7 +145,7 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 - [x] Si existe una política inválida: no bloquear comandos desconocidos; mostrar una advertencia/error conciso y hacer fallar `sentinel doctor`/CI para que el proyecto corrija su configuración. El guard solo bloquea el comando protegido que detecta; no bloquea comandos desconocidos (`policy-decision`, `quality-command-guard`, `sentinel-doctor` + tests).
 - [x] Si `mode` es `observe`, el guard registra `observed` y no bloquea la ejecución; la comparación dual contra Sentinel Core upstream sigue pendiente.
 - [x] Si `mode` es `enforce`, el guard bloquea solo comandos declarados y devuelve código 78; el enforcement del launcher global sigue pendiente.
-- [x] VarSense no crea cooldown, lock ni reporte paralelo: el adapter ejecuta una sola invocación `all`, usa el `reportRoot`/logs del gate y devuelve hallazgos mediante `structured-tool`; la metadata `varsenseScope` conserva el manifiesto solicitado y marca `varsense-cli-{version}-no-files-from` porque la versión fijada aún no acepta `--files-from`. La entrega efectiva de `files-from` queda pendiente de actualizar VarSense/upstream.
+- [x] VarSense no crea cooldown, lock ni reporte paralelo: el adapter ejecuta una sola invocación `all`, usa el `reportRoot`/logs del gate y devuelve hallazgos mediante `structured-tool`; la metadata `varsenseScope` conserva el manifiesto solicitado y marca `varsense-cli-{version}-no-files-from` porque la instalación fijada aún no acepta `--files-from`. El upstream `main` ya entrega el contrato seguro en `858ec62`; la entrega efectiva del adapter queda pendiente de publicar/fijar ese commit.
 
 ## Arquitectura por fases
 
@@ -203,7 +203,7 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 - [ ] Añadir `sentinel.config.json` al proyecto con `sentinel check -- <TareaId>` como gate; conservar un alias temporal para `npm run task:check`.
 - [ ] Migrar `quality-command-guard.mjs`, `global-cargo-guard.ps1`, `npm.cmd`, `npx.cmd` y `cargo.cmd` al runtime global de Sentinel sin duplicar reglas.
 - [ ] Mantener `quality.config.json` solo para la transición de tiempos, alcance y cachés; la política de comandos y analizadores vive en Sentinel.
-- [ ] Integrar VarSense como adaptador de analizador (`files-from`, hallazgos tipados, caché e invalidación), sin un gate ni scheduler propio. El core local ya expone caché por archivo e invalidación explícita en `a72b39a`; falta el contrato incremental del adapter.
+- [ ] Integrar VarSense como adaptador de analizador (`files-from`, hallazgos tipados, caché e invalidación), sin un gate ni scheduler propio. El upstream `main` ya expone el contrato `--files-from` seguro en `858ec62`; el core local ya expone caché por archivo e invalidación explícita en `a72b39a`. Falta publicar/fijar el commit y conectar el adapter.
 - [ ] Actualizar `quality:install-guard` para instalar/copiar Sentinel y retirar rutas hardcodeadas del repositorio.
 - [ ] Ejecutar VarSense desde Sentinel y demostrar paridad de hallazgos con su CLI/LSP, sin permitir que VarSense cierre la tarea por separado.
 - [ ] Ejecutar primero en modo `observe` contra el gate actual y comparar reportes normalizados; activar `enforce` solo después de resolver diferencias, errores de herramienta y falsos positivos.

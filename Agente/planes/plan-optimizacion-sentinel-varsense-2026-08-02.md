@@ -14,7 +14,7 @@ Reducir el tiempo y el consumo de recursos del quality gate sin perder detecció
 ## Diagnóstico confirmado
 
 - `scripts/quality/adapters/varsense.mjs` siempre invoca `varsense all`; VarSense recorre variables, clases y candidatos del workspace aunque cambien pocos archivos.
-- VarSense CLI no acepta actualmente `--files-from`; necesita un contrato incremental y cachés de índices para no recalcular tokens/clases/documentos.
+- La instalación fijada de VarSense no acepta actualmente `--files-from`; el upstream `main` ya tiene el contrato seguro en `858ec62`. La integración en el adapter y la caché incremental entre ejecuciones siguen pendientes.
 - Sentinel ya acepta `--files-from`, pero su tiempo sube cuando el alcance automático se marca full.
 - `detectScope` mezcla `args.full`, full automático por `fullPatterns` y el modo resultante. Cuando el full se difiere por cooldown, puede conservar `scope.full=true`, contradiciendo el mensaje `local-light`.
 - La caché del gate sigue siendo por etapa/fingerprint global. VarSense `main` ya tiene caché por archivo durante la vida de `ClassIndexBuilder` (`a72b39a`), pero no es persistente entre ejecuciones ni detecta cambios por sí sola: el caller debe invocar `invalidateFile` antes de reanalizar un archivo cambiado/eliminado.
@@ -71,10 +71,10 @@ Medir en una máquina de referencia y publicar p50/p95; los objetivos iniciales 
 
 #### Contrato CLI de VarSense
 
-- [ ] Añadir `--files-from <manifest>` y un modo `incremental` al CLI agnóstico.
-- [ ] Mantener `scan`, `orphan-classes` y `all` como comandos compatibles; `all` queda para full/CI.
-- [ ] Validar que todas las rutas del manifiesto son relativas, existentes o marcadas como eliminadas, y están dentro del workspace.
-- [ ] Hacer que el adapter pase `--files-from` en local-light y `all` solo en full/CI.
+- [x] Añadir `--files-from <manifest>` al CLI agnóstico; el modo `incremental` completo y la persistencia entre ejecuciones siguen pendientes (`858ec62`).
+- [x] Mantener `scan`, `orphan-classes` y `all` como comandos compatibles; el alcance filtra reportes sin romper los índices globales necesarios para exactitud.
+- [x] Validar rutas relativas dentro del workspace, duplicados, directorios, archivos eliminados y symlinks que escapan mediante `realpath`; 60/60 pruebas upstream PASS.
+- [ ] Hacer que el adapter pase `--files-from` en local-light y `all` solo en full/CI; requiere publicar/fijar `858ec62` sin cambiar el lock de forma no reproducible.
 
 #### Índices persistentes
 

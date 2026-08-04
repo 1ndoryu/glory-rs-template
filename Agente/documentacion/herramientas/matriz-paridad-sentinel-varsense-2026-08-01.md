@@ -1,13 +1,14 @@
 # Matriz de paridad Sentinel/VarSense — 2026-08-01
 
-> **Actualización 2026-08-04 — SNT-08/SNT-09:** VarSense `main` local contiene `a72b39a` (incluye `337c4cce`), con cancelación cooperativa y caché de índices de clases por archivo, invalidación explícita y provider de cache separado. Validación upstream: 53/53 tests, compile, lint, check-core y smoke LSP PASS. Los commits aún no se fijan en `quality-tools.json`/`sentinel.lock.json`: no son alcanzables desde `origin`, por lo que la instalación reproducible continúa en `4167868dd5d0e7674d5565ade399a57796d69cf3`. La invalidación entre ejecuciones, watchers/LSP persistentes y el grafo de dependencias siguen pendientes.
+> **Actualización 2026-08-04 — SNT-10:** VarSense `main` contiene `858ec62` (incluye `a72b39a` y `337c4cce`), con contrato CLI seguro `--files-from`, filtrado de reportes sin perder contexto global y validación `realpath` contra symlinks fuera del workspace. Validación upstream: 60/60 tests, compile, compile:tests, lint, check-core, smoke LSP y diff PASS. El commit aún no está publicado/fijado en `quality-tools.json`/`sentinel.lock.json`; la instalación reproducible continúa en `4167868dd5d0e7674d5565ade399a57796d69cf3`. Persistencia entre ejecuciones, watchers/LSP persistentes, grafo de dependencias y conexión del adapter siguen pendientes.
 
 ## Versiones fijadas
 
 | Herramienta | Versión | Commit | CLI | LSP/VS Code | Fixture/gate |
 | --- | --- | --- | --- | --- | --- |
 | Glory Sentinel | 0.4.0 | `7ad3b766207bb28d89d38a938ee14fbad9f4cd49` | PASS | Core editor-agnóstico PASS | `npm run test:unit`, `task:check` |
-| VarSense | 2.2.0 | `4167868dd5d0e7674d5565ade399a57796d69cf3` | `scan`, `orphan-classes`, `all` | Core/LSP/VS Code PASS | 46 pruebas, `npm test` |
+| VarSense | 2.2.0 | `4167868dd5d0e7674d5565ade399a57796d69cf3` | `scan`, `orphan-classes`, `all` (`--files-from` no disponible en instalación) | Core/LSP/VS Code PASS | 46 pruebas, `npm test` |
+| VarSense upstream candidato | 2.2.0 | `858ec62` | `scan`, `orphan-classes`, `all`, `--files-from` | CLI/core PASS; instalación pendiente | 60 pruebas, compile/lint/check-core/smoke LSP |
 
 > **Sync 038A-5 (2026-08-04):** los commits previos (`107be9b6`/`b1aa3f06`) resultaron inexistentes en los repos dev y en `origin`. Las features estaban en el checkout instalado porque allí se habían trabajado originalmente; después se promovieron a `main` (Sentinel `7ad3b76`, VarSense `4167868`, pusheados a `1ndoryu/*`) y las instalaciones se re-sincronizaron a esos mismos commits. La fuente de desarrollo es `main`; `.quality-tools` es solo la instalación reproducible consumida por este gate.
 
