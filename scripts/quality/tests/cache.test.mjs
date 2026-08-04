@@ -58,3 +58,29 @@ test('cache separa el modo local del gate CI', async () => {
     await rm(projectRoot, { recursive: true, force: true });
   }
 });
+
+test('cache usa el alcance efectivo del guard, no solo context.full (028A-8)', async () => {
+  const projectRoot = await mkdtemp(path.join(os.tmpdir(), 'quality-cache-effective-'));
+  try {
+    await writeFile(path.join(projectRoot, 'input.ts'), 'export const value = 1;\n', 'utf8');
+    const base = {
+      projectRoot,
+      qualityConfig: { schemaVersion: 1, lockWaitMs: 0 },
+      toolManifest: { schemaVersion: 1, tools: {} },
+      policy: { policyHash: 'policy-a' },
+      lock: { schemaVersion: 1, analyzers: { sentinel: { sha256: 'lock-a' } } },
+    };
+    const scope = { files: ['input.ts'], fingerprintFiles: ['input.ts'] };
+    /* AutomaticFull permitido: context.full=false pero effectiveFull=true. */
+    const automaticFull = await fingerprint({ ...base, ci: false, full: false }, { ...scope, effectiveFull: true }, 'frontend');
+    const plainLocal = await fingerprint({ ...base, ci: false, full: false }, { ...scope, effectiveFull: false }, 'frontend');
+    assert.notEqual(automaticFull, plainLocal, 'un automaticFull no puede reutilizar un PASS local-light');
+    /* Full diferido: context.full=false y effectiveFull=false coinciden en
+     * local-light y no contaminan el fingerprint de un full permitido. */
+    const deferred = await fingerprint({ ...base, ci: false, full: false }, { ...scope, effectiveFull: false, requestedFull: true }, 'frontend');
+    assert.equal(deferred, plainLocal);
+    assert.notEqual(deferred, automaticFull);
+  } finally {
+    await rm(projectRoot, { recursive: true, force: true });
+  }
+});

@@ -16,10 +16,15 @@ function formatDuration(ms) {
   return `${Math.round(ms)}ms`;
 }
 
+/* [028A-8] Alcance honesto: requested/automatic/effective quedan separados en
+ * el JSON; el texto compacto muestra el motivo cuando el fingerprint no
+ * coincide con la ejecución efectiva (p. ej. full diferido por el guard). */
 function formatScope(scope) {
   const fingerprint = scope.full ? 'full' : 'incremental';
-  const execution = (scope.executionFull ?? scope.full) ? 'full' : 'incremental';
-  return fingerprint === execution ? fingerprint : `${fingerprint} · ejecución ${execution}`;
+  const execution = (scope.effectiveFull ?? scope.executionFull ?? scope.full) ? 'full' : 'incremental';
+  const base = fingerprint === execution ? fingerprint : `${fingerprint} · ejecución ${execution}`;
+  const reason = scope.fullReason && scope.fullReason !== 'incremental' ? ` (${scope.fullReason})` : '';
+  return `${base}${reason}`;
 }
 
 const SEVERITY_ORDER = new Map([['error', 0], ['warning', 1], ['info', 2]]);
@@ -78,7 +83,7 @@ export async function createReport(context, args, scope, stages, reminders, star
     taskId: args.taskId,
     generatedAt: new Date().toISOString(),
     durationMs: Date.now() - startedAt,
-    mode: args.ci ? 'ci' : (scope.executionFull ?? scope.full) ? 'full' : 'local-light',
+    mode: args.ci ? 'ci' : (scope.effectiveFull ?? scope.executionFull ?? scope.full) ? 'full' : 'local-light',
     heavyGuard: deferred,
     branch: context.branch ?? null,
     reportRetention: context.reportRetention ?? null,
@@ -94,8 +99,14 @@ export async function createReport(context, args, scope, stages, reminders, star
     scope: {
       base: scope.base,
       full: scope.full,
+      requestedFull: scope.requestedFull ?? scope.full,
+      automaticFull: scope.automaticFull ?? false,
+      effectiveFull: scope.effectiveFull ?? scope.executionFull ?? scope.full,
+      fullReason: scope.fullReason ?? null,
+      heavyDeferred: scope.heavyDeferred ?? false,
       executionFull: scope.executionFull ?? scope.full,
       files: scope.files,
+      deletedFiles: scope.deletedFiles ?? [],
       profiles: [...scope.profiles],
     },
     tools: Object.fromEntries(Object.entries(context.tools).map(([name, tool]) => [name, {

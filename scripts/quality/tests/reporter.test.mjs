@@ -195,6 +195,49 @@ test('createReport serializa la identidad de política en JSON y Markdown', asyn
     assert.equal(json.scope.executionFull, false);
     assert.match(markdown, /policy-hash-test/);
     assert.match(markdown, /política v2 válida/);
+    /* [028A-8] El reporte expone el motivo del alcance efectivo. */
+    assert.equal(json.scope.effectiveFull, false);
+    assert.equal(json.scope.fullReason, null);
+    assert.match(markdown, /Alcance/);
+  } finally {
+    await rm(projectRoot, { recursive: true, force: true });
+  }
+});
+
+test('createReport refleja un full diferido con effectiveFull=false y motivo', async () => {
+  const projectRoot = await mkdtemp(path.join(os.tmpdir(), 'quality-reporter-deferred-'));
+  try {
+    await mkdir(path.join(projectRoot, '.quality-reports', 'T-DEFER'), { recursive: true });
+    const result = await createReport(
+      {
+        projectRoot,
+        reportRoot: path.join(projectRoot, '.quality-reports', 'T-DEFER'),
+        qualityConfig: { maxFindings: 3 },
+        tools: {},
+      },
+      { taskId: 'T-DEFER', ci: false, full: false },
+      {
+        base: 'HEAD',
+        full: true,
+        requestedFull: true,
+        automaticFull: true,
+        effectiveFull: false,
+        fullReason: 'heavy-deferred',
+        heavyDeferred: true,
+        files: ['scripts/quality/scope.mjs'],
+        profiles: [],
+      },
+      [{ stage: 'sentinel', status: 'pass', durationMs: 1, findings: [], summary: '0 errores' }],
+      [],
+      Date.now(),
+    );
+    const json = JSON.parse(await readFile(result.jsonPath, 'utf8'));
+    assert.equal(json.scope.full, true);
+    assert.equal(json.scope.effectiveFull, false);
+    assert.equal(json.scope.fullReason, 'heavy-deferred');
+    assert.equal(json.scope.heavyDeferred, true);
+    const compact = compactLines(result, { projectRoot, qualityConfig: { maxFindings: 3 } });
+    assert.match(compact.join('\n'), /heavy-deferred/);
   } finally {
     await rm(projectRoot, { recursive: true, force: true });
   }

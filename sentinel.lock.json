@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-04T20:53:55.870Z",
+  "generatedAt": "2026-08-04T22:14:54.523Z",
   "runtime": {
     "status": "project-adapter",
     "version": "1.0.0-local",
@@ -20,11 +20,12 @@
     "varsense": {
       "version": "2.2.0",
       "protocolVersion": 1,
-      "commit": "858ec62c8efc1239fea241e3092e1939ae6b63df",
-      "sha256": "af0871ca28b3fe5a04fd6b9a4ca7a95adeaaedd1ba391485087539936def567d",
+      "commit": "11f0932de5e66d88a79fdaa960ca77e5774d0a33",
+      "sha256": "2a2513a92d8a7237fcd06faa49099e88a9bf013cc4faf044cea81740ee451deb",
       "patchSha256": null,
       "capabilities": {
-        "filesFrom": true
+        "filesFrom": true,
+        "persistentIndex": true
       },
       "sourcePathEnv": "GLORY_VARSENSE_SOURCE_PATH"
     }

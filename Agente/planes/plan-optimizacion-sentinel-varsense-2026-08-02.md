@@ -1,7 +1,7 @@
 # Plan 028A-8 — Optimización medible de Sentinel y VarSense
 
 > **Fecha:** 2026-08-02
-> **Estado:** ejecución incremental; el core VarSense ya tiene caché por archivo durante la vida del builder e invalidación explícita, pero el contrato CLI incremental, persistencia entre ejecuciones, watchers y dependencias aún están pendientes.
+> **Estado:** ejecución incremental; tramos 1 (alcance efectivo + manifiesto), 2 (índice persistente de VarSense entre ejecuciones) y 3 (fijación del upstream + activación de la capacidad en el gate) cerrados. Pendiente: selección de dependencias con el índice inverso, índices globales de Sentinel y métricas RSS/p50-p95.
 > **Evidencia inicial:** los últimos reportes local-light tardan 16.6–35.1 s. VarSense consume 10.7–16.8 s y frontend 4.8–7.3 s. Sentinel va de 0.2 s incremental a 8–11 s cuando el alcance queda full. El full anterior llegó a 173.5 s, con Rust ocupando 114 s.
 > **Dependencias:** 028A-3/028A-5 (guard y gate único), SNT-10/028A-6 (Sentinel como plano único), `scripts/quality/cache.mjs`, `scope.mjs` y los repositorios versionados de Sentinel/VarSense.
 
@@ -35,13 +35,15 @@ Medir en una máquina de referencia y publicar p50/p95; los objetivos iniciales 
 
 ### Fase de orquestación
 
-- [ ] Separar en `scope` los campos `requestedFull`, `automaticFull`, `effectiveFull`, `fullReason` y `heavyDeferred`.
-- [ ] Cuando el full se difiera, recalcular un `effectiveFull=false` real para Sentinel/VarSense/frontend; conservar solo validaciones locales necesarias y registrar el motivo.
-- [ ] Definir excepciones que sí obligan a full en CI: cambios de configuración de reglas, manifest de herramientas, migraciones o contratos globales.
-- [ ] Generar un único `scope-manifest.json` con archivos cambiados, eliminados, hashes de contenido, perfiles y dependencias locales.
-- [ ] Pasar ese manifiesto a Sentinel, VarSense, custom y selección de tests; eliminar descubrimientos Git/glob duplicados.
+**Avance 2026-08-04 (028A-8 tramo 1):** separados `requestedFull`/`automaticFull`/`effectiveFull`/`fullReason`/`heavyDeferred` en `scope.mjs` (`resolveFullDecision` puro + tests); un full diferido ya no vuelve a ser full por `automaticFull` y el lease pesado se solicita también para automaticFull (cambio de migraciones/config/`scripts/quality`), no solo con `--full`. `scope-manifest.json` único con cambiados/eliminados/hashes/perfiles/dependencias; `changed-files.txt` se conserva como transporte plano de `--files-from`; `run-frontend-tests.mjs` acepta `--scope-manifest` para no repetir descubrimiento Git; `custom`/`rust` usan el alcance efectivo. Caché: fingerprint v5 con `effectiveFull`. Reporte: `fullReason` + `heavyDeferred` en JSON/Markdown/compacto. Gate real 028A-8: PASS local-light diferido (sentinel/varsense/custom/docs), frontend bloqueado por `frontend/src/api/generated` ausente (preexistente).
 
-**Gate:** un full diferido no ejecuta análisis de workspace completo; el reporte distingue alcance solicitado, automático y efectivo.
+- [x] Separar en `scope` los campos `requestedFull`, `automaticFull`, `effectiveFull`, `fullReason` y `heavyDeferred`.
+- [x] Cuando el full se difiera, recalcular un `effectiveFull=false` real para Sentinel/VarSense/frontend; conservar solo validaciones locales necesarias y registrar el motivo.
+- [x] Definir excepciones que sí obligan a full en CI: cambios de configuración de reglas, manifest de herramientas, migraciones o contratos globales (patrones `fullPatterns` + modo CI ya obligan full).
+- [x] Generar un único `scope-manifest.json` con archivos cambiados, eliminados, hashes de contenido, perfiles y dependencias locales.
+- [x] Pasar ese manifiesto a Sentinel, VarSense, custom y selección de tests; eliminar descubrimientos Git/glob duplicados.
+
+**Gate:** un full diferido no ejecuta análisis de workspace completo; el reporte distingue alcance solicitado, automático y efectivo. Verificado en el gate real 028A-8 con `Scope: full · ejecución incremental (heavy-deferred)`.
 
 ## Fases de implementación
 
@@ -57,11 +59,11 @@ Medir en una máquina de referencia y publicar p50/p95; los objetivos iniciales 
 
 ### Fase 1 — Alcance efectivo y caché compartida del gate
 
-- [ ] Corregir la transición full→local-light en `task-check.mjs`/`scope.mjs`.
-- [ ] Hacer que `fingerprint` incluya el manifiesto de alcance y no obligue a reescanear archivos no afectados.
-- [ ] Persistir el manifiesto de archivos una sola vez por tarea y reutilizarlo en todas las etapas.
-- [ ] Invalidar de forma explícita ante borrados, renames, cambio de config, cambio de commit de herramienta o cambio de parser.
-- [ ] Mantener locks atómicos y escritura temporal; una caché corrupta se descarta sin ocultar el error.
+- [x] Corregir la transición full→local-light en `task-check.mjs`/`scope.mjs`: el lease se adquiere cuando `scope.effectiveFull && runsAllStages && !args.heavyDeferred` y la re-detección respeta `effectiveFull=false`.
+- [x] Hacer que `fingerprint` incluya el manifiesto de alcance y no obligue a reescanear archivos no afectados: modo por `scope.effectiveFull` y borrados/renombres marcados en el manifiesto.
+- [x] Persistir el manifiesto de archivos una sola vez por tarea y reutilizarlo en todas las etapas.
+- [x] Invalidar de forma explícita ante borrados, renames, cambio de config, cambio de commit de herramienta o cambio de parser.
+- [x] Mantener locks atómicos y escritura temporal; una caché corrupta se descarta sin ocultar el error (ya cubierto por `atomic-file.mjs`/`lock.mjs`, verificado de nuevo).
 
 **Gate:** tareas repetidas con el mismo alcance usan cache hit; un rename o cambio de configuración nunca reutiliza un resultado incompatible.
 
@@ -79,13 +81,15 @@ Medir en una máquina de referencia y publicar p50/p95; los objetivos iniciales 
 
 #### Índices persistentes
 
-- [ ] Crear índice de variables por archivo y hash de contenido; reconstruir solo variables modificadas.
+**Avance 2026-08-04 (028A-8 tramos 2–3):** índice persistente entre ejecuciones en el CLI de VarSense. Tramo 2 (worktree `028A-8/persistent-index`): `FilePersistentIndexStore` persiste por archivo definiciones CSS, tokens de consumo y variables, validados por SHA-256 de contenido y ligados a identidad `toolVersion+configHash+parserVersion`; el snapshot se guarda atómicamente y se reconcilia contra disco al cargar (expulsa entradas de archivos eliminados entre ejecuciones). `ClassIndexBuilder`/`VariableIndexBuilder` son store-first: un archivo sin cambios nunca se vuelve a parsear. El CLI acepta `--index-dir` en `scan`/`orphan-classes`/`all` y publica stats `loaded/reused/reparsed/removed/entries` en el JSON. Índice inverso `token/class → consumidores` listo para selección de dependencias. Validación upstream: tsc, lint, check:core, smoke LSP y `smoke:persistent-index` PASS; commit `11f0932`. Tramo 3: merge fast-forward al `main` consumido (`858ec62`→`11f0932`), recompilación del `dist` (ignorado por git, no afecta el lock), `quality-tools.json` con `commit=11f0932` + `capabilities.persistentIndex=true`, `sentinel.lock.json` regenerado y gate real con `--index-dir` activo y reutilización verificada.
+
+- [ ] Crear índice de variables por archivo y hash de contenido; reconstruir solo variables modificadas. *(tramo 2: hash por archivo + reuse store-first en `VariableIndexBuilder`; falta la selección de dependencias del índice inverso)*
 - [x] Crear caché de resultados de clases CSS/consumidores por archivo durante la vida del builder; invalidación explícita de un archivo y limpieza total disponibles (`a72b39a`).
-- [ ] Persistir el índice entre ejecuciones e invalidar consumidores relacionados cuando cambia una definición o selector.
-- [ ] Mantener índice inverso `token/class → archivos consumidores` para seleccionar dependencias sin recorrer todo el workspace.
-- [ ] Cachear documentos parseados persistentemente por `toolVersion + configHash + fileHash + parserVersion`; el snapshot en memoria de `varsense all` ya evita lecturas duplicadas dentro de una ejecución.
-- [ ] Invalidar globalmente solo si cambian `variables.css`, reglas de tokens, patrones de inclusión/exclusión o versión del parser.
-- [ ] Hacer que token duplicate/unused y orphan classes declaren sus dependencias; no asumir que todo cambio CSS invalida todo.
+- [x] Persistir el índice entre ejecuciones e invalidar consumidores relacionados cuando cambia una definición o selector. *(persistencia y poda por borrado en `11f0932`; la invalidación de consumidores por índice inverso queda en el siguiente tramo)*
+- [x] Mantener índice inverso `token/class → archivos consumidores` para seleccionar dependencias sin recorrer todo el workspace. *(helper `buildReverseIndex`; consumirlo para ampliar `--files-from` queda pendiente)*
+- [x] Cachear documentos parseados persistentemente por `toolVersion + configHash + fileHash + parserVersion`; el snapshot en memoria de `varsense all` ya evita lecturas duplicadas dentro de una ejecución. *(identidad completa en `indexIdentity`; `PARSER_VERSION` debe subirse si cambia la semántica de extracción/parseo)*
+- [x] Invalidar globalmente solo si cambian `variables.css`, reglas de tokens, patrones de inclusión/exclusión o versión del parser. *(la identidad incluye `configHash` y `parserVersion`; cambio de config invalida el snapshot completo, verificado en smoke)*
+- [ ] Hacer que token duplicate/unused y orphan classes declaren sus dependencias; no asumir que todo cambio CSS invalida todo. *(índice inverso disponible como base)*
 
 #### Eficiencia de I/O
 
@@ -94,7 +98,7 @@ Medir en una máquina de referencia y publicar p50/p95; los objetivos iniciales 
 - [ ] Limitar concurrencia de parseo con un presupuesto configurable; no crear un worker por archivo.
 - [ ] Escribir solo el delta de findings y luego materializar el reporte combinado determinista.
 
-**Gate:** cambio aislado de TS/CSS analiza únicamente archivos afectados y dependencias; cambio de tokens/configuración ejecuta invalidación global explicada en el reporte.
+**Gate (estado 2026-08-04, tramo 3):** el upstream `028A-8/persistent-index` (commit `11f0932`) se mergeó al `main` consumido de VarSense, `quality-tools.json` fija `commit=11f0932` con `capabilities.persistentIndex=true` y `sentinel.lock.json` se regeneró (backup `.bak` conservado). El gate real `task:check -- 028A-8` pasa con `persistentIndex.enabled=true` apuntando a `<branchCache>/varsense`; la segunda ejecución reutiliza el snapshot (loaded=363, reused=364, reparsed=0). El tiempo de VarSense sigue dominado por el análisis documental de los candidatos (los índices globales se conservan para exactitud); la selección de dependencias con el índice inverso es el siguiente subtramo.
 
 ### Fase 3 — Sentinel incremental y global indexes
 

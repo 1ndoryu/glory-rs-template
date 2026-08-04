@@ -10,14 +10,17 @@ async function runStep(context, name, executable, args) {
   return { name, execution };
 }
 
-export function shouldRunExtendedChecks(context) {
-  return Boolean(context.ci || context.full);
+/* [028A-8] Las validaciones extendidas (clippy/test) dependen del alcance
+ * efectivo: un automaticFull permitido las ejecuta aunque context.full siga
+ * false, y un full diferido no las ejecuta aunque requestedFull sea cierto. */
+export function shouldRunExtendedChecks(context, scope = {}) {
+  return Boolean(context.ci || (scope.effectiveFull ?? scope.executionFull ?? context.full));
 }
 
-export async function runRust(context) {
+export async function runRust(context, scope = {}) {
   const startedAt = Date.now();
   const steps = [];
-  const runExtendedChecks = shouldRunExtendedChecks(context);
+  const runExtendedChecks = shouldRunExtendedChecks(context, scope);
   const npm = npmInvocation(['run', 'fmt:check']);
   steps.push(await runStep(context, 'cargo fmt --check', npm.executable, npm.args));
 

@@ -1,4 +1,5 @@
 import { execFile, spawn } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -26,7 +27,7 @@ async function gitLines(args) {
   return stdout.split(/\r?\n/).map(value => value.trim()).filter(Boolean);
 }
 
-async function changedFiles() {
+async function gitChangedFiles() {
   const [tracked, untracked] = await Promise.all([
     gitLines(['diff', '--name-status', '--diff-filter=ACMRD', 'HEAD']),
     gitLines(['ls-files', '--others', '--exclude-standard']),
@@ -47,6 +48,20 @@ async function changedFiles() {
       if (!items.some(existing => existing.file === file)) items.push({ ...item, file });
       return items;
     }, [])
+    .sort((left, right) => left.file.localeCompare(right.file));
+}
+
+/* [028A-8] Reutiliza el scope-manifest.json del gate: la selección de tests no
+ * repite descubrimientos Git/glob. Los borrados se marcan con status 'D' para
+ * conservar el criterio full del selector sin código duplicado. */
+async function changedFilesFromManifest(manifestPath) {
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+  if (manifest?.schemaVersion !== 1 || !Array.isArray(manifest.files)) {
+    throw new Error(`scope-manifest inválido: ${manifestPath}`);
+  }
+  const deleted = new Set(manifest.deletedFiles ?? []);
+  return [...new Set(manifest.files)]
+    .map(file => ({ file, status: deleted.has(file) ? 'D' : 'M' }))
     .sort((left, right) => left.file.localeCompare(right.file));
 }
 
@@ -74,8 +89,17 @@ function runVitest(args) {
   });
 }
 
-const flags = new Set(process.argv.slice(2));
-const files = await changedFiles();
+const argv = process.argv.slice(2);
+const manifestIndex = argv.indexOf('--scope-manifest');
+if (manifestIndex >= 0 && !argv[manifestIndex + 1]) {
+  process.stderr.write('[frontend-tests] --scope-manifest requiere un path\n');
+  process.exit(2);
+}
+const manifestPath = manifestIndex >= 0 ? argv[manifestIndex + 1] : null;
+const flags = new Set(argv.filter((value, index) => value !== '--scope-manifest' && index !== manifestIndex + 1));
+const files = manifestPath
+  ? await changedFilesFromManifest(manifestPath)
+  : await gitChangedFiles();
 const frontendItems = files.filter(item => item.file.startsWith('frontend/'));
 const forceFull = flags.has('--full')
   || files.some(item => fullMarkers.has(item.file))

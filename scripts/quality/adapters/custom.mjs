@@ -20,7 +20,10 @@ export async function runCustom(context) {
   const startedAt = Date.now();
   try {
     const sourceRoot = path.join(context.projectRoot, 'frontend', 'src');
-    const selected = context.scope?.full ? null : context.scope.files
+    /* [028A-8] Un full diferido conserva scope.full=true (fingerprint) pero
+     * executionFull=false: custom debe analizar solo el conjunto cambiado. */
+    const executionFull = context.scope?.executionFull ?? context.scope?.full;
+    const selected = executionFull ? null : context.scope.files
       .filter(file => /^frontend\/src\/.*\.(?:ts|tsx|js|jsx)$/i.test(file))
       .map(file => path.join(context.projectRoot, file));
     const allFindings = await analyzeWorkspace(sourceRoot, selected);

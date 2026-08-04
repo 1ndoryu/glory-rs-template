@@ -112,9 +112,12 @@ function validateLegacyContracts({ sentinelConfig, qualityConfig, varsenseConfig
     }
     if (tool.sourcePathEnv !== undefined) validateSourcePathEnv(tool.sourcePathEnv, `${label}.sourcePathEnv`);
     if (tool.capabilities !== undefined) {
-      validateLegacyKeys(tool.capabilities, new Set(['filesFrom']), `${label}.capabilities`);
+      validateLegacyKeys(tool.capabilities, new Set(['filesFrom', 'persistentIndex']), `${label}.capabilities`);
       if (tool.capabilities.filesFrom !== undefined && typeof tool.capabilities.filesFrom !== 'boolean') {
         throw new Error(`${label}.capabilities.filesFrom: debe ser booleano`);
+      }
+      if (tool.capabilities.persistentIndex !== undefined && typeof tool.capabilities.persistentIndex !== 'boolean') {
+        throw new Error(`${label}.capabilities.persistentIndex: debe ser booleano`);
       }
     }
     if (tool.patch !== undefined) {

@@ -82,6 +82,27 @@ test('valida capacidades declaradas del analyzer contra el lock', () => {
   assert.throws(() => validateLock({ ...lockWithCapability, analyzers: { ...lockWithCapability.analyzers, varsense: { ...lockWithCapability.analyzers.varsense, capabilities: { filesFrom: false } } } }, manifestWithCapability), /capabilities no coincide/);
 });
 
+test('acepta la capacidad persistentIndex en manifest y lock', () => {
+  const lock = validLock();
+  const manifestWithCapability = {
+    ...manifest,
+    tools: {
+      ...manifest.tools,
+      varsense: { ...manifest.tools.varsense, capabilities: { filesFrom: true, persistentIndex: true } },
+    },
+  };
+  const lockWithCapability = {
+    ...lock,
+    analyzers: {
+      ...lock.analyzers,
+      varsense: { ...lock.analyzers.varsense, capabilities: { filesFrom: true, persistentIndex: true } },
+    },
+  };
+  assert.doesNotThrow(() => validateLock(lockWithCapability, manifestWithCapability));
+  assert.throws(() => validateLock({ ...lockWithCapability, analyzers: { ...lockWithCapability.analyzers, varsense: { ...lockWithCapability.analyzers.varsense, capabilities: { persistentIndex: 'yes' } } } }, manifestWithCapability), /persistentIndex debe ser booleano/);
+  assert.throws(() => validateLock({ ...lockWithCapability, analyzers: { ...lockWithCapability.analyzers, varsense: { ...lockWithCapability.analyzers.varsense, capabilities: { filesFrom: true, persistentIndex: true, extra: true } } } }, manifestWithCapability), /claves desconocidas/);
+});
+
 test('rechaza analyzer desconocido o campos extra', () => {
   const lock = validLock();
   assert.throws(() => validateLock({ ...lock, analyzers: { ...lock.analyzers, other: lock.analyzers.sentinel } }, manifest), /no coincide/);

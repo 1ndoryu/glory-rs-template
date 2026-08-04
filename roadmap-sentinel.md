@@ -41,6 +41,13 @@ Con este checklist cerrado, las mejoras restantes de este documento son backlog 
 - Mientras exista una regla en scripts locales, el adaptador debe marcarla como puente temporal y registrar su paridad con el core.
 - Cada fase termina con revisión SOLID, rendimiento, falsos positivos, seguridad de paths/secretos y compatibilidad Windows/Linux/macOS.
 
+## Estado 028A-8 (tramos 1–2 — alcance efectivo, manifiesto e índice persistente de VarSense)
+
+- **Tramo 1 (2026-08-04):** `scope.mjs` separa requested/automatic/effective/fullReason/heavyDeferred con `resolveFullDecision` puro; `task-check.mjs` adquiere el lease pesado para automaticFull; `cache.mjs` fingerprint v5 por `effectiveFull`; `reporter.mjs` expone el motivo; `custom`/`rust` consumen el alcance efectivo; `scope-manifest.json` único por tarea con hashes; `run-frontend-tests.mjs` reutiliza el manifiesto. Gate real: full diferido → `Scope: full · ejecución incremental (heavy-deferred)` con VarSense aplicando `--files-from`.
+- **Tramo 2 (2026-08-04):** índice persistente de VarSense entre ejecuciones en la rama upstream `028A-8/persistent-index` (commit `11f0932`, worktree aparte; el checkout consumido `858ec62` queda intacto). `FilePersistentIndexStore` guarda por archivo definiciones CSS, tokens de consumo y variables con hash SHA-256 de contenido, identidad `toolVersion+configHash+parserVersion`, escritura atómica y reconciliación contra disco al cargar (expulsa entradas de archivos eliminados entre ejecuciones). `ClassIndexBuilder`/`VariableIndexBuilder` son store-first: un archivo sin cambios nunca se re-parsea. El CLI acepta `--index-dir` y publica stats `loaded/reused/reparsed/removed/entries` en el JSON; índice inverso `buildReverseIndex` listo para selección de dependencias. Validación upstream: tsc, lint, check:core, smoke LSP y `smoke:persistent-index` PASS. El adapter local acepta la capacidad `persistentIndex` (validada en `policy.mjs`/`lockfile.mjs`, testeada en `varsense-contract.test.mjs`).
+- **Tramo 3 (2026-08-04, fijación):** merge fast-forward `858ec62`→`11f0932` en el `main` consumido de VarSense, recompilación del `dist` (ignorado por git, no altera el lock), `quality-tools.json` con `commit=11f0932` + `capabilities.persistentIndex=true`, `sentinel.lock.json` regenerado con backup `.bak`. Gate real `task:check -- 028A-8` PASS con `persistentIndex.enabled=true` → `<branchCache>/varsense`; segunda ejecución: loaded=363, reused=364, reparsed=0. El tiempo de VarSense sigue dominado por el análisis documental de los candidatos (índices globales conservados para exactitud).
+- Pendiente de 028A-8: selección de dependencias con el índice inverso (ampliar `--files-from` con consumidores), watchers/LSP, índices globales de Sentinel, presupuestos p50/p95 y benchmark.
+
 ## Estado inicial auditado
 
 ### Herramientas fijadas
@@ -48,7 +55,7 @@ Con este checklist cerrado, las mejoras restantes de este documento son backlog 
 | Herramienta | Versión/commit fijado | Estado observado |
 | --- | --- | --- |
 | Glory Sentinel | `0.4.0` / `9f4ed4d4d866a016022f2458e69c0226eeee345a` | CLI JSON versionado, config estricta y reglas portables de boundaries/arquitectura; `[317A-3]` incorporado en `main`. Consumido por `sourcePathEnv` externo. |
-| VarSense | `2.2.0` / `858ec62c8efc1239fea241e3092e1939ae6b63df` | `main` upstream contiene SNT-08, SNT-09 y SNT-10; consumido directamente por `sourcePathEnv` externo. |
+| VarSense | `2.2.0` / `11f0932de5e66d88a79fdaa960ca77e5774d0a33` | `main` contiene SNT-08/09/10 + `--index-dir` e índice persistente (028A-8); consumido por `sourcePathEnv` externo con `capabilities.filesFrom=true` y `persistentIndex=true`. |
 | Quality gate | `scripts/quality/*.mjs` | Tiene preflight, lock, cache, redacción, reportes y perfiles; necesita endurecer errores, portabilidad y paralelismo. |
 
 ### Hallazgos prioritarios del orquestador
@@ -175,7 +182,7 @@ Una regla no ejecuta procesos, no escribe archivos, no imprime salida humana y n
 - [x] Implementar `varsense all`, que comparte provider/snapshot de documentos para `VariableIndex` y `ClassIndex` en una ejecución.
 - [x] Añadir cancelación cooperativa editor-agnostic en `main` de VarSense para builders de variables/clases, con propagación estable y regresiones de cancelación/errores normales (commit local `337c4cce`; 50 tests upstream PASS).
 - [x] Cachear resultados de clases por archivo durante la vida del builder, exponer `invalidateFile`/`clearCache`, separar `DocumentCacheProvider` y conectar el snapshot explícito en `varsense all` (commit local `a72b39a`; 53 tests upstream PASS).
-- [ ] Invalidar índices por archivo/dependencias entre ejecuciones y conectar watchers/LSP persistentes; el tramo actual requiere que el caller invoque explícitamente la invalidación. La fijación publicada de `main` ya está cerrada; queda pendiente la persistencia entre ejecuciones y la conexión de watchers/LSP.
+- [ ] Invalidar índices por archivo/dependencias entre ejecuciones y conectar watchers/LSP persistentes. *(tramo 2: persistencia entre ejecuciones cerrada en `028A-8/persistent-index` con hash+identidad+poda por borrado; quedan la selección de dependencias con el índice inverso y los watchers/LSP)*
 - [ ] Añadir fixtures para clases estáticas, template strings, objetos `className`, factories, multilinea y falsos positivos.
 - [x] Garantizar paridad CLI/LSP/VS Code con suite upstream (45 pruebas, smoke LSP y check-core).
 - [x] Eliminar los parches downstream de `quality-tools.json`; Sentinel y VarSense quedan fijados en sus `main` externos (`9f4ed4d` y `858ec62`) mediante `sourcePathEnv`, con `capabilities.filesFrom=true` declarada y validada por el lock.
@@ -199,6 +206,8 @@ Una regla no ejecuta procesos, no escribe archivos, no imprime salida humana y n
 
 **Objetivo:** reducir tiempo de feedback sin sacrificar determinismo ni seguridad.
 
+- [x] Separar en `scope` los campos `requestedFull`/`automaticFull`/`effectiveFull`/`fullReason`/`heavyDeferred`; un full diferido por el guard degrada a local-light real y nunca vuelve a ser full por `automaticFull` (028A-8).
+- [x] Compartir un único `scope-manifest.json` por tarea (cambiados, eliminados, hashes, perfiles, dependencias); `run-frontend-tests` acepta `--scope-manifest` y el adapter de custom/rust usa el alcance efectivo (028A-8).
 - [x] Definir fingerprint completo: contenido, config efectiva, tool commit, parser/runtime, OS, Node y dependencias locales importadas.
 - [x] Compartir snapshot de documentos de VarSense entre análisis relacionados e invalidar dependencias locales en el fingerprint.
 - [x] Ejecutar stages con runner acotado y backpressure; el default serial protege equipos de agentes compartidos.

@@ -79,11 +79,15 @@ async function main() {
       let scope = await detectScope(context, args);
       let heavyLease = null;
       const previousHeavyToken = process.env.GLORY_HEAVY_RUN_TOKEN;
-      /* [028A-6] Un perfil explícito puede conservar `scope.full` para el
-       * fingerprint sin solicitar el heavy lease: solo se adquiere cuando
-       * realmente se ejecutarán todas las etapas. */
+      /* [028A-8] El lease se solicita cuando el alcance efectivo ejecutará las
+       * etapas completas, incluido un automaticFull (cambio de migraciones,
+       * config o scripts/quality), no solo cuando el usuario escribió --full.
+       * Un perfil explícito conserva `scope.full` para el fingerprint sin
+       * solicitar el lease: `isFullExecution` ya lo filtra. Si el guard
+       * bloquea, se re-detecta el alcance con heavyDeferred y effectiveFull
+       * queda realmente en false (local-light), nunca simulado. */
       const runsAllStages = isFullExecution(scope);
-      if ((args.full || args.ci) && runsAllStages) {
+      if (scope.effectiveFull && runsAllStages && !args.heavyDeferred) {
         heavyLease = await acquireHeavyRun({
           projectRoot: context.projectRoot,
           mode: args.ci ? 'ci' : 'full',

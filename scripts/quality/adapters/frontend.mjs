@@ -26,7 +26,12 @@ async function runStep(context, name, script) {
 export async function runFrontend(context) {
   const steps = [await runStep(context, 'type-check', 'type-check')];
   /* [018A-51] La suite completa queda reservada a CI; local sigue usando
-   * type-check + selección incremental para no levantar procesos innecesarios. */
+   * type-check + selección incremental para no levantar procesos innecesarios.
+   * [028A-8] La suite completa NO depende de scope.effectiveFull a propósito:
+   * local nunca ejecuta test:full (solo CI), mientras que el alcance efectivo
+   * decide qué archivos analizan Sentinel/VarSense/custom. El selector de
+   * tests (run-frontend-tests.mjs) ya puede consumir el scope-manifest para
+   * no repetir descubrimientos Git. */
   if (context.ci && steps[0].execution.code === 0) {
     steps.push(await runStep(context, 'test-full', 'test:full'));
     if (steps.at(-1).execution.code === 0) {

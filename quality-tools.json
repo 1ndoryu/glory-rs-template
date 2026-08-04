@@ -14,14 +14,15 @@
     "varsense": {
       "repository": "https://github.com/1ndoryu/varsense.git",
       "sourcePathEnv": "GLORY_VARSENSE_SOURCE_PATH",
-      "commit": "858ec62c8efc1239fea241e3092e1939ae6b63df",
+      "commit": "11f0932de5e66d88a79fdaa960ca77e5774d0a33",
       "version": "2.2.0",
       "outputSchemaVersion": "1",
       "buildScript": "compile",
       "cli": "dist/cli/index.js",
       "testScript": "test",
       "capabilities": {
-        "filesFrom": true
+        "filesFrom": true,
+        "persistentIndex": true
       }
     }
   }

@@ -38,9 +38,12 @@ function validateText(value, label) {
 function validateCapabilities(value, label) {
   if (value === undefined) return;
   if (!isRecord(value)) fail(`${label}: debe ser un objeto`);
-  validateKeys(value, new Set(['filesFrom']), label);
+  validateKeys(value, new Set(['filesFrom', 'persistentIndex']), label);
   if (value.filesFrom !== undefined && typeof value.filesFrom !== 'boolean') {
     fail(`${label}.filesFrom debe ser booleano`);
+  }
+  if (value.persistentIndex !== undefined && typeof value.persistentIndex !== 'boolean') {
+    fail(`${label}.persistentIndex debe ser booleano`);
   }
 }
 
