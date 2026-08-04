@@ -207,7 +207,7 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 - [ ] Actualizar `quality:install-guard` para instalar/copiar Sentinel y retirar rutas hardcodeadas del repositorio.
 - [ ] Ejecutar VarSense desde Sentinel y demostrar paridad de hallazgos con su CLI/LSP, sin permitir que VarSense cierre la tarea por separado.
 - [ ] Ejecutar primero en modo `observe` contra el gate actual y comparar reportes normalizados; activar `enforce` solo después de resolver diferencias, errores de herramienta y falsos positivos.
-- [ ] Mantener compatibilidad temporal con el guard actual y emitir advertencia de migración, sin bloquear una rama antigua.
+- [x] Mantener compatibilidad temporal con el guard actual y emitir advertencia de migración, sin bloquear una rama antigua: el guard local conserva el fallback `legacy-v1` (rama antigua sin política v2 no queda bloqueada) y `sentinel doctor --migrate --dry-run` emite el preview/advertencia de migración sin escribir; la retirada efectiva tras dos versiones y la advertencia del runtime global siguen pendientes.
 
 **Gate:** parcialmente verificado en transición: guard local, identidad de política, invalidación de caché y reportes pasan; instalación global, shells externos y runtime Sentinel quedan pendientes.
 
@@ -218,9 +218,9 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 - [ ] Probar rutas anidadas, junctions/symlinks permitidos, repositorio movido y checkout de ramas con/sin política.
 - [ ] CI usará la política del proyecto y el runtime fijado; nunca dependerá del perfil del desarrollador.
 - [ ] Probar agentes con PowerShell/Bash/CMD, procesos hijos, pipes, `2>&1`, shell sin perfil y rutas absolutas; cada caso debe indicar si se bloquea, se observa o requiere enforcement del launcher.
-- [ ] Publicar reportes compactos sin secretos y con máximo tres hallazgos/máximo cuatro recordatorios.
+- [x] Publicar reportes compactos sin secretos y con máximo tres hallazgos/máximo cuatro recordatorios: `compactLines` limita findings a `maxFindings` y reminders a `maxReminders` (3/4 por defecto) con límite defensivo en ambos; `createReport` redacta secretos en JSON/Markdown vía `sanitize`; regresiones nuevas en `tests/reporter.test.mjs` (límite de reminders en compacto y redacción end-to-end de findings/reminders en JSON, Markdown y compacto). La publicación de artifacts CI queda pendiente del runtime global.
 
-**Gate:** 100% de fixtures con decisión esperada, sin bloqueo cruzado entre proyectos y sin proceso huérfano.
+**Gate:** 100% de fixtures con decisión esperada, sin bloqueo cruzado entre proyectos y sin proceso huérfano. El contrato de reportes compactos (3 hallazgos / 4 recordatorios, sin secretos) queda cerrado localmente; la matriz multi-shell real y la publicación de artifacts CI siguen pendientes del runtime global.
 
 ### Fase 5 — Retirada segura del acoplamiento actual *(pendiente de dos releases y rollback probado)*
 

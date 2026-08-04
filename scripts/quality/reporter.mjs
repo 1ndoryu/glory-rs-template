@@ -107,7 +107,13 @@ export function compactLines(reportResult, context) {
     const location = finding.file ? `${finding.file}${finding.line ? `:${finding.line}` : ''} · ` : '';
     lines.push(`[quality] ${finding.severity.toUpperCase()} ${location}${finding.ruleId}: ${finding.message}`);
   }
-  for (const reminder of report.reminders) lines.push(`[quality] REMEMBER ${reminder}`);
+  /* [028A-6] Límite defensivo también aquí: el contrato compacto publica como
+   * máximo maxFindings hallazgos y maxReminders recordatorios (3/4 por
+   * defecto), aunque el origen pase listas más largas. El reporte JSON/Markdown
+   * completo conserva el detalle total. */
+  for (const reminder of report.reminders.slice(0, context.qualityConfig.maxReminders)) {
+    lines.push(`[quality] REMEMBER ${reminder}`);
+  }
   lines.push(`[quality] Report: ${path.relative(context.projectRoot, reportResult.markdownPath)}`);
   lines.push(`[quality] Next: ${report.nextCommand}`);
   return lines;

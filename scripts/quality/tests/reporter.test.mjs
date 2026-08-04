@@ -36,6 +36,76 @@ test('la salida compacta conserva estado, siguiente accion y limite de contexto'
   assert.match(lines.at(-1), /Next: npm run task:check/);
 });
 
+test('la salida compacta respeta maxReminders además de maxFindings', () => {
+  const reportResult = {
+    markdownPath: 'C:/repo/.quality-reports/T-3/latest.md',
+    report: {
+      taskId: 'T-3',
+      decision: { label: 'PASS' },
+      scope: { full: false, files: ['a.ts'] },
+      stages: [{ stage: 'sentinel', status: 'pass', summary: 'ok' }],
+      findings: [],
+      reminders: Array.from({ length: 8 }, (_, index) => `recordatorio-${index}`),
+      policy: { policyHash: 'abc', decision: { action: 'enforce' }, reason: 'v2' },
+      nextCommand: 'npm run task:check -- T-3',
+    },
+  };
+  const context = { projectRoot: 'C:/repo', qualityConfig: { maxFindings: 3, maxReminders: 4 } };
+  const lines = compactLines(reportResult, context);
+  const reminders = lines.filter(line => line.includes('REMEMBER'));
+  /* [028A-6] El contrato compacto limita los recordatorios a maxReminders (4),
+   * aunque el reporte JSON/Markdown conserve el detalle completo. */
+  assert.equal(reminders.length, 4);
+  assert.match(reminders[0], /recordatorio-0/);
+  assert.doesNotMatch(reminders.at(-1), /recordatorio-7/);
+});
+
+test('el reporte JSON, Markdown y compacto no exponen secretos de findings ni reminders', async () => {
+  const projectRoot = await mkdtemp(path.join(os.tmpdir(), 'quality-reporter-secret-'));
+  try {
+    await mkdir(path.join(projectRoot, '.quality-reports', 'T-4'), { recursive: true });
+    const secretFinding = {
+      severity: 'error',
+      ruleId: 'hardcoded-secret',
+      message: 'token=sk_test_abcdefghijklmnopqrstuvwxyz encontrado',
+    };
+    const result = await createReport(
+      {
+        projectRoot,
+        reportRoot: path.join(projectRoot, '.quality-reports', 'T-4'),
+        qualityConfig: { maxFindings: 3, maxReminders: 4 },
+        tools: {},
+        policyIdentity: {
+          projectRoot,
+          policyPath: null,
+          policyHash: 'p',
+          runtimeVersion: null,
+          decision: { status: 'no-policy', mode: 'observe', action: 'pass-through', blocked: false, reason: 'sin política' },
+          reason: 'sin política',
+          recommendedCommand: 'npm run task:check -- T-4',
+        },
+      },
+      { taskId: 'T-4', ci: false, full: false },
+      { base: 'HEAD', full: false, files: [], profiles: [] },
+      [{ stage: 'sentinel', status: 'fail', durationMs: 1, findings: [secretFinding], summary: '1 error' }],
+      ['Bearer secret_bearer_token_123456789012'],
+      Date.now(),
+    );
+    const json = JSON.parse(await readFile(result.jsonPath, 'utf8'));
+    const markdown = await readFile(result.markdownPath, 'utf8');
+    const compact = compactLines(result, { projectRoot, qualityConfig: { maxFindings: 3, maxReminders: 4 } });
+    const secrets = ['sk_test_abcdefghijklmnopqrstuvwxyz', 'secret_bearer_token_123456789012'];
+    for (const secret of secrets) {
+      assert.doesNotMatch(JSON.stringify(json), new RegExp(secret));
+      assert.doesNotMatch(markdown, new RegExp(secret));
+      assert.doesNotMatch(compact.join('\n'), new RegExp(secret));
+    }
+    assert.match(JSON.stringify(json), /REDACTED/);
+  } finally {
+    await rm(projectRoot, { recursive: true, force: true });
+  }
+});
+
 test('createReport serializa la identidad de política en JSON y Markdown', async () => {
   const projectRoot = await mkdtemp(path.join(os.tmpdir(), 'quality-reporter-policy-'));
   try {
