@@ -2,7 +2,14 @@
  * algunos seleccionan etapas ejecutables y otros solo clasifican cambios para
  * la autodetección. El selector explícito acepta únicamente los primeros para
  * no presentar una ejecución de Sentinel como cobertura de otra etapa. */
-export const EXECUTABLE_PROFILES = new Set(['rust', 'frontend', 'css', 'docs']);
+export const PROFILE_STAGE_RULES = Object.freeze({
+  css: Object.freeze(['varsense']),
+  frontend: Object.freeze(['varsense', 'frontend', 'custom']),
+  rust: Object.freeze(['rust']),
+  docs: Object.freeze(['docs']),
+});
+
+export const EXECUTABLE_PROFILES = new Set(Object.keys(PROFILE_STAGE_RULES));
 
 export function isFullExecution(scope) {
   return (scope.executionFull ?? scope.full) && !scope.profileOverride;

@@ -56,7 +56,7 @@ export async function createReport(context, args, scope, stages, reminders, star
     taskId: args.taskId,
     generatedAt: new Date().toISOString(),
     durationMs: Date.now() - startedAt,
-    mode: args.ci ? 'ci' : args.full ? 'full' : 'local-light',
+    mode: args.ci ? 'ci' : (scope.executionFull ?? scope.full) ? 'full' : 'local-light',
     heavyGuard: deferred,
     branch: context.branch ?? null,
     reportRetention: context.reportRetention ?? null,

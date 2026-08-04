@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { EXECUTABLE_PROFILES, isFullExecution, validateExecutableProfiles } from '../profile-contract.mjs';
+import { EXECUTABLE_PROFILES, isFullExecution, PROFILE_STAGE_RULES, validateExecutableProfiles } from '../profile-contract.mjs';
 
 test('el contrato expone solo perfiles con etapas ejecutables', () => {
-  assert.deepEqual([...EXECUTABLE_PROFILES], ['rust', 'frontend', 'css', 'docs']);
+  assert.deepEqual([...EXECUTABLE_PROFILES], ['css', 'frontend', 'rust', 'docs']);
+  assert.deepEqual(PROFILE_STAGE_RULES.frontend, ['varsense', 'frontend', 'custom']);
   assert.doesNotThrow(() => validateExecutableProfiles(['docs', 'frontend']));
   assert.throws(() => validateExecutableProfiles(['workspace']), /Perfil sin etapa ejecutable/);
 });

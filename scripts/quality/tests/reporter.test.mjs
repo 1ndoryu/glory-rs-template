@@ -56,8 +56,8 @@ test('createReport serializa la identidad de política en JSON y Markdown', asyn
           recommendedCommand: 'npm run task:check -- T-2',
         },
       },
-      { taskId: 'T-2', ci: false, full: false },
-      { base: 'HEAD', full: false, executionFull: false, files: [], profiles: [] },
+      { taskId: 'T-2', ci: false, full: true },
+      { base: 'HEAD', full: true, executionFull: false, profileOverride: true, files: [], profiles: ['docs'] },
       [{ stage: 'sentinel', status: 'pass', durationMs: 1, findings: [], summary: '0 errores' }],
       [],
       Date.now(),
@@ -65,6 +65,9 @@ test('createReport serializa la identidad de política en JSON y Markdown', asyn
     const json = JSON.parse(await readFile(result.jsonPath, 'utf8'));
     const markdown = await readFile(result.markdownPath, 'utf8');
     assert.equal(json.policy.policyHash, 'policy-hash-test');
+    assert.equal(json.mode, 'local-light');
+    assert.equal(json.scope.full, true);
+    assert.equal(json.scope.executionFull, false);
     assert.match(markdown, /policy-hash-test/);
     assert.match(markdown, /política v2 válida/);
   } finally {
