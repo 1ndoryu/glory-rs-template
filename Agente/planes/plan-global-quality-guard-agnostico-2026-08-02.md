@@ -161,7 +161,7 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 - [x] Definir y validar localmente el contrato v2, errores allowlisted y límites de tamaño de strings/listas/rutas; publicar el JSON Schema queda ligado al runtime upstream.
 - [x] Añadir al reporte local la identidad estable de política: `projectRoot`, `policyPath`, `policyHash`, `runtimeVersion`, `reason` y comando recomendado; se mantiene `schemaVersion: 1` por compatibilidad aditiva.
 - [ ] Definir contrato final de salida de Sentinel Core con decisión/exitCode y transporte CLI/LSP. *(pendiente del runtime global)*
-- [ ] Definir contrato final de plugin, taxonomía `analyze/check/guard/doctor` y matriz de compatibilidad Sentinel↔VarSense. El contrato local parcial de salida/error y la limitación de scope de VarSense quedan documentados; el contrato Core/upstream sigue pendiente.
+- [ ] Definir contrato final de plugin, taxonomía `analyze/check/guard/doctor` y matriz de compatibilidad Sentinel↔VarSense. El contrato local parcial de salida/error ahora valida `entries` y estados fail-closed; el contrato Core/upstream y `cancelled` siguen pendientes.
 - [ ] Definir compatibilidad Windows PowerShell 5/7, PowerShell Core, CMD, Bash/Git Bash (interactivo y `BASH_ENV`) y CI sin depender de variables específicas de VS Code.
 - [ ] Definir política de actualización, rollback y migración desde el guard actual.
 
@@ -172,7 +172,7 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 - [ ] Extraer el clasificador, scheduler, scope, caché y reporter a Sentinel Core, sin imports de wandori.us ni de VarSense.
 - [ ] Crear CLI global `sentinel check|guard|doctor|status|install|update|rollback`.
 - [ ] Instalar versiones en `%LOCALAPPDATA%\GlorySentinel\versions` y cambiar `current` de forma atómica.
-- [ ] Ejecutar analyzers mediante adapters aislados con timeout, cancelación, límite de salida y estados `tool-error/timeout/invalid-output`.
+- [x] Ejecutar analyzers mediante adapters locales aislados con timeout, límite de salida y estados distinguibles `tool-error/timeout/invalid-output`; el contrato valida raíz, `entries`, `findings`, `ruleId`, `message` y severidad allowlisted. El estado `cancelled` del runtime global y la salida final Core quedan pendientes (`structured-tool.mjs`, `common.mjs` + tests).
 - [ ] Generar shims con resolución del ejecutable real sin recursión; preservar argumentos, códigos de salida y redirecciones.
 - [ ] Dot-sourcear únicamente la ruta global estable en ambos perfiles; crear backup antes de cualquier modificación.
 - [ ] Mantener los wrappers del repositorio solo como adaptadores para desarrollo, no como dependencia del perfil global.

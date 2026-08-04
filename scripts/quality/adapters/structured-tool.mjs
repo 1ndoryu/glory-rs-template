@@ -10,8 +10,11 @@ export async function runStructuredTool(context, definition) {
     timeoutMs: definition.timeoutMs,
   });
   const logPath = await writeStageLog(context, definition.name, `${execution.stdout}\n${execution.stderr}`);
-  if (execution.code === 2 || execution.timedOut) {
-    return { failure: toolFailure(definition.name, execution, logPath), logPath, execution };
+  if (execution.timedOut) {
+    return { failure: toolFailure(definition.name, execution, logPath, 'timeout'), logPath, execution };
+  }
+  if (execution.code === 2) {
+    return { failure: toolFailure(definition.name, execution, logPath, 'tool-error'), logPath, execution };
   }
 
   try {
@@ -22,7 +25,7 @@ export async function runStructuredTool(context, definition) {
     return { report, logPath, execution };
   } catch (error) {
     return {
-      failure: toolFailure(definition.name, { ...execution, code: 2, stderr: error.message }, logPath),
+      failure: toolFailure(definition.name, { ...execution, code: 2, stderr: error.message }, logPath, 'invalid-output'),
       logPath,
       execution,
     };

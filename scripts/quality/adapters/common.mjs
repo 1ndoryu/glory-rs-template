@@ -2,6 +2,8 @@ import { readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { redact, truncate } from '../redaction.mjs';
 
+const SEVERITIES = new Set(['information', 'hint', 'info', 'critical', 'error', 'warning']);
+
 export function normalizeSeverity(value) {
   if (value === 'information' || value === 'hint' || value === 'info') return 'info';
   if (value === 'critical' || value === 'error') return 'error';
@@ -31,8 +33,32 @@ export function normalizeEntries(entries = []) {
 }
 
 export async function readToolReport(reportPath) {
-  try { return JSON.parse(await readFile(reportPath, 'utf8')); }
+  let report;
+  try { report = JSON.parse(await readFile(reportPath, 'utf8')); }
   catch (error) { throw new Error(`JSON inválido en ${reportPath}: ${error.message}`); }
+  if (!report || typeof report !== 'object' || Array.isArray(report)) {
+    throw new Error('el reporte debe ser un objeto');
+  }
+  if (!Array.isArray(report.entries)) {
+    throw new Error('el reporte debe contener entries como lista');
+  }
+  for (const entry of report.entries) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry) || !Array.isArray(entry.findings)) {
+      throw new Error('cada entrada del reporte debe contener findings como lista');
+    }
+    for (const finding of entry.findings) {
+      if (!finding || typeof finding !== 'object' || Array.isArray(finding)) {
+        throw new Error('cada finding debe ser un objeto');
+      }
+      if (typeof finding.ruleId !== 'string' || finding.ruleId.length === 0 || typeof finding.message !== 'string') {
+        throw new Error('cada finding debe contener ruleId y message');
+      }
+      if (!SEVERITIES.has(finding.severity)) {
+        throw new Error('severity de finding desconocida');
+      }
+    }
+  }
+  return report;
 }
 
 export async function writeStageLog(context, stage, content) {
@@ -43,18 +69,24 @@ export async function writeStageLog(context, stage, content) {
   return target;
 }
 
-export function toolFailure(stage, execution, logPath) {
-  const timedOut = execution.timedOut;
+export function toolFailure(stage, execution, logPath, state = execution.timedOut ? 'timeout' : 'tool-error') {
+  const timedOut = state === 'timeout';
+  const invalidOutput = state === 'invalid-output';
   return {
     stage,
     status: 'error',
+    state,
     durationMs: execution.durationMs,
     findings: [{
-      ruleId: timedOut ? 'quality-timeout' : 'quality-tool-error',
+      ruleId: timedOut ? 'quality-timeout' : invalidOutput ? 'quality-invalid-output' : 'quality-tool-error',
       severity: 'error',
-      message: timedOut ? `${stage} excedió el timeout` : `${stage} terminó con código ${execution.code}`,
+      message: timedOut
+        ? `${stage} excedió el timeout`
+        : invalidOutput
+          ? `${stage} produjo una salida estructuralmente inválida`
+          : `${stage} terminó con código ${execution.code}`,
     }],
-    summary: timedOut ? 'timeout' : `error ${execution.code}`,
+    summary: timedOut ? 'timeout' : invalidOutput ? 'invalid-output' : `error ${execution.code}`,
     logPath,
   };
 }
@@ -66,6 +98,7 @@ export function resultFromFindings(stage, findings, durationMs, logPath) {
   return {
     stage,
     status: errors > 0 ? 'fail' : 'pass',
+    state: errors > 0 || findings.length > 0 ? 'findings' : 'pass',
     durationMs,
     findings,
     summary: `${errors} errores, ${warnings} warnings, ${infos} info`,
