@@ -82,3 +82,47 @@ test('solo test, clippy y bench son comandos Cargo pesados', () => {
   assert.equal(isHeavyCargoCommand(['check']), false);
   assert.equal(isHeavyCargoCommand(['fmt', '--check']), false);
 });
+
+test('el cooldown de full no se comparte entre proyectos con el mismo targetBase', async () => {
+  const rootA = await mkdtemp(path.join(os.tmpdir(), 'glory-heavy-project-a-'));
+  const rootB = await mkdtemp(path.join(os.tmpdir(), 'glory-heavy-project-b-'));
+  const targetBase = path.join(rootA, 'target');
+  try {
+    for (const root of [rootA, rootB]) {
+      await writeFile(path.join(root, 'quality.config.json'), JSON.stringify({ heavyRun: { cooldownMinutes: 180 } }), 'utf8');
+    }
+    /* [028A-6] El cooldown vive en state.projects keyed por projectKey(root):
+     * un full en A no debe bloquear un full en B aunque compartan targetBase. */
+    const first = await acquireHeavyRun({ projectRoot: rootA, targetBase, mode: 'full', taskId: '028A-6' });
+    assert.equal(first.allowed, true);
+    await first.release({ status: 'pass' });
+
+    const blockedA = await inspectHeavyRun({ projectRoot: rootA, targetBase, mode: 'full' });
+    assert.equal(blockedA.allowed, false);
+    assert.equal(blockedA.reason, 'cooldown');
+    const allowedB = await inspectHeavyRun({ projectRoot: rootB, targetBase, mode: 'full' });
+    assert.equal(allowedB.allowed, true);
+  } finally {
+    for (const root of [rootA, rootB]) {
+      await rm(root, { recursive: true, force: true });
+      await rm(path.join(root, '..', 'glory-quality-guard'), { recursive: true, force: true });
+    }
+  }
+});
+
+test('un comando ligero no adquiere lease ni escribe cooldown', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'glory-heavy-light-'));
+  const targetBase = path.join(root, 'target');
+  try {
+    await writeFile(path.join(root, 'quality.config.json'), JSON.stringify({ heavyRun: { cooldownMinutes: 180 } }), 'utf8');
+    assert.equal(isHeavyCargoCommand(['check']), false);
+    assert.equal(isHeavyCargoCommand(['build']), false);
+    const light = await inspectHeavyRun({ projectRoot: root, targetBase, mode: 'local-light' });
+    assert.equal(light.allowed, true);
+    const afterLight = await inspectHeavyRun({ projectRoot: root, targetBase, mode: 'full' });
+    assert.equal(afterLight.allowed, true, 'un comando ligero no puede arrancar el cooldown');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(path.join(root, '..', 'glory-quality-guard'), { recursive: true, force: true });
+  }
+});
