@@ -52,6 +52,9 @@ jobs:
         run: npm run codegen:local
       - name: Ejecutar gate completo
         run: npm run task:check -- 297A-6 --ci
+      - name: Exportar métricas históricas
+        if: always()
+        run: node scripts/quality/export-ci-metrics.mjs
       - name: Publicar reportes
         if: always()
         uses: actions/upload-artifact@v4
@@ -60,3 +63,13 @@ jobs:
           path: .quality-reports/
           if-no-files-found: warn
           retention-days: 14
+      # [028A-8 Fase 4] Publicación de métricas históricas: solo timing/cache/
+      # estado (ya redactado en origen); nunca código fuente ni secretos.
+      - name: Publicar métricas históricas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-metrics
+          path: .quality-reports/ci-metrics.json
+          if-no-files-found: warn
+          retention-days: 30
