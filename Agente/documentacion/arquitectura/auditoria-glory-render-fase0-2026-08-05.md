@@ -8,7 +8,7 @@
 
 ## Resumen ejecutivo
 
-- **17 módulos fuente** en `frontend/src/features/game-core/` (~2 750 líneas incluyendo tests).
+- **15 archivos fuente** en `frontend/src/features/game-core/` (14 módulos + `index.ts`; verificado mecánicamente el 05-ago: sin imports de three/DOM/red/backend, sin imports fuera del paquete, sin ciclos) más 10 archivos de tests (~2 760 líneas incluyendo tests).
 - **14 módulos son núcleo agnóstico** (sin DOM, Three, red ni backend): candidatos directos a `glory-render/core`.
 - **1 módulo es frontera de realtime**: contrato puro v1 (sin transporte) — candidato a `core`, con semántica de salas que se revisa.
 - **0 módulos dependen de Three.js** dentro de `game-core/` (los adaptadores visuales viven fuera: `game-playable-scene.ts`, `game-map-editor-*.ts`, `game-asset-preview.ts`).
