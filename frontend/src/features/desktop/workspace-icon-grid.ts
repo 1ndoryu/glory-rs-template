@@ -275,7 +275,9 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
           const x = metrics.rtl
             ? rect.width - (col + 1) * metrics.cellWidth - col * metrics.columnGap
             : col * (metrics.cellWidth + metrics.columnGap);
-          const y = row * (metrics.cellHeight + metrics.rowGap);
+          /* [058A-1] rowGap efectivo: con align-content distribuido las filas
+           * reales no están a rowGap uniforme; replicar la distribución. */
+          const y = row * (metrics.cellHeight + metrics.rowGapEffective);
           cell.style.left = `${x}px`;
           cell.style.top = `${y}px`;
           cell.style.width = `${metrics.cellWidth}px`;

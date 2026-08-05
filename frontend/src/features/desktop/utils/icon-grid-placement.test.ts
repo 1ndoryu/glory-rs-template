@@ -13,6 +13,8 @@ const metrics: GridMetrics = {
   cellHeight: 64,
   columnGap: 12,
   rowGap: 24,
+  /* [058A-1] Sin distribución: rowGap efectivo = rowGap declarado. */
+  rowGapEffective: 24,
   left: 100,
   right: 100 + 4 * (88 + 12),
   top: 50,

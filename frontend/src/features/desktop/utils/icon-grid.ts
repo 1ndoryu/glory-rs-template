@@ -17,6 +17,10 @@ export interface GridMetrics {
   readonly cellHeight: number;
   readonly columnGap: number;
   readonly rowGap: number;
+  /** [058A-1] Gap de fila efectivo con align-content distribuido
+   * (space-between/around/evenly): el navegador reparte el sobrante vertical
+   * entre filas; getCellAt lo usa para que el snap-grid siga siendo exacto. */
+  readonly rowGapEffective: number;
   readonly left: number;
   readonly right: number;
   readonly top: number;
@@ -34,14 +38,29 @@ export function getGridMetrics(
   const columnGap = parseFloat(cs.columnGap) || 0;
   const rowGap = parseFloat(cs.rowGap) || 0;
   const template = cs.gridTemplateColumns;
-  const columns = !template || template === 'none' ? 1 : template.split(' ').length;
+  const declaredColumns = !template || template === 'none' ? 1 : template.split(' ').length;
   const first = gridEl.querySelector<HTMLElement>(itemSelector);
   const cellWidth = first ? first.getBoundingClientRect().width : 0;
   /* [297A-20] Altura de fila = grid-auto-rows (fijo) para que la geometría
    * coincida con el CSS grid real; fallback al alto del icono si no es fijo. */
   const autoRows = parseFloat(cs.gridAutoRows);
   const cellHeight = autoRows > 0 ? autoRows : (first ? first.getBoundingClientRect().height : 0);
+  /* [058A-1] Columnas VISIBLES por geometría, no tracks declarados: con
+   * repeat(auto-fill), un icono posicionado más allá del área visible crea un
+   * track implícito que gridTemplateColumns reporta y que infla el conteo.
+   * Con ese conteo el reflow creía que el icono "cabía" cuando en realidad
+   * estaba fuera del viewport (el icono más a la izquierda desaparecía al
+   * encoger la ventana). Fallback a tracks declarados si no hay items. */
+  const columns = cellWidth > 0
+    ? Math.max(1, Math.floor((rect.width + columnGap) / (cellWidth + columnGap)))
+    : declaredColumns;
   const rows = Math.max(1, Math.floor((rect.height + rowGap) / (cellHeight + rowGap)));
+  /* [058A-1] rowGap efectivo: con align-content space-between/around/evenly el
+   * sobrante vertical se reparte entre filas; el snap-grid debe replicarlo. */
+  const distribute = /space-between|space-around|space-evenly/.test(cs.alignContent);
+  const used = rows * cellHeight + (rows - 1) * rowGap;
+  const extra = Math.max(0, rect.height - used);
+  const rowGapEffective = distribute && rows > 1 ? rowGap + extra / (rows - 1) : rowGap;
   return {
     columns,
     rows,
@@ -49,6 +68,7 @@ export function getGridMetrics(
     cellHeight,
     columnGap,
     rowGap,
+    rowGapEffective,
     left: rect.left,
     right: rect.right,
     top: rect.top,
@@ -62,12 +82,16 @@ export function getCellAt(
   y: number,
   metrics: GridMetrics,
 ): GridPosition | null {
-  const { left, right, top, cellWidth, cellHeight, columnGap, rowGap, columns, rows, rtl } = metrics;
+  const { left, right, top, cellWidth, cellHeight, columnGap, rowGap, rowGapEffective, columns, rows, rtl } = metrics;
   if (cellWidth <= 0 || cellHeight <= 0) return null;
   const col = rtl
     ? Math.floor((right - x + columnGap) / (cellWidth + columnGap))
     : Math.floor((x - left + columnGap) / (cellWidth + columnGap));
-  const row = Math.floor((y - top + rowGap) / (cellHeight + rowGap));
+  /* [058A-1] Usar el gap de fila efectivo (distribuido) para que el mapeo
+   * y→fila coincida con las filas reales cuando align-content reparte el
+   * sobrante; sin esto el drop podía caer en la fila equivocada. */
+  const gapRow = rowGapEffective > 0 ? rowGapEffective : rowGap;
+  const row = Math.floor((y - top + gapRow) / (cellHeight + gapRow));
   if (col < 0 || row < 0 || col >= columns || row >= rows) return null;
   return { col, row };
 }

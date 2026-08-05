@@ -57,7 +57,15 @@
    * mientras los posicionados conservan su celda exacta. */
   grid-auto-flow: dense;
   gap: var(--espacio-xl) var(--espacio-md);
-  align-content: start;
+  /* [058A-1] Distribución del espacio libre y centrado del contenido de cada
+   * celda (solicitado por el usuario). Con auto-fill el eje horizontal queda
+   * lleno; el vertical reparte el sobrante entre filas. getGridMetrics/
+   * getCellAt replican esta distribución (rowGap efectivo) para que el
+   * snap-grid y el highlight de arrastre sigan siendo exactos. */
+  justify-content: space-between;
+  align-content: space-between;
+  align-items: center;
+  justify-items: center;
 }
 
 /* [297A-20] Icono anclado a una celda snap (col/row 1-based vía custom properties).
