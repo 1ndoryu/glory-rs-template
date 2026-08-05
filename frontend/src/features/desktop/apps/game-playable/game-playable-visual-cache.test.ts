@@ -3,9 +3,10 @@ import { describe, expect, it } from 'vitest';
 import {
   FIXTURE_MAP_VERSION,
   FIXTURE_PROPS,
+  type FixtureProp,
 } from './game-fixture-map';
 import { createGamePlayableVisualCache, groupMeshesByMaterial } from './game-playable-visual-cache';
-import type { VisibleMapContent } from '../../../game-core';
+import type { AssetInstance, VisibleMapContent } from '../../../game-core';
 
 function createMaterials(): {
   ink: THREE.Material;
@@ -104,14 +105,30 @@ describe('GamePlayableVisualCache', () => {
   it('uses AssetInstance transform instead of fixture display coordinates', () => {
     const scene = new THREE.Scene();
     const materials = createMaterials();
+    /* [GAME-01-VIS] El fixture ya no lleva props (mapa limpio); el test define
+     * su propia instancia contra el catálogo de assets del documento. */
+    const prop: FixtureProp = {
+      id: 'rock-north',
+      assetVersionId: 'asset-rock',
+      kind: 'rock',
+      x: -5.2,
+      z: 4.8,
+      scale: 0.8,
+    };
+    const sourceInstance: AssetInstance = {
+      id: prop.id,
+      assetVersionId: prop.assetVersionId,
+      position: { x: prop.x, z: prop.z },
+      rotationY: 0,
+      scale: prop.scale,
+      terrainAnchor: 'surface',
+    };
     const cache = createGamePlayableVisualCache({
       scene,
       materials,
       map: FIXTURE_MAP_VERSION,
-      props: new Map(FIXTURE_PROPS.map(prop => [prop.id, prop])),
+      props: new Map([[prop.id, prop]]),
     });
-    const prop = FIXTURE_PROPS.find(candidate => candidate.id === 'rock-north')!;
-    const sourceInstance = FIXTURE_MAP_VERSION.instances.find(instance => instance.id === prop.id)!;
     const content: VisibleMapContent = {
       chunkKeys: ['0:0'],
       chunks: [FIXTURE_MAP_VERSION.terrain.chunks[0]],

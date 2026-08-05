@@ -30,22 +30,10 @@ const FIXTURE_ASSETS: readonly GameAssetVersion[] = [
   { id: 'asset-tree-collider', category: 'tree', contentHash: 'fixture-tree-v1', collisionProxy: { kind: 'circle', radius: 0.7 } },
 ];
 
-export const FIXTURE_PROPS: readonly FixtureProp[] = [
-  { id: 'conifer-west-1', assetVersionId: 'asset-conifer', kind: 'conifer', x: -8.2, z: -5.3, scale: 0.9 },
-  { id: 'conifer-west-2', assetVersionId: 'asset-conifer', kind: 'conifer', x: -7.2, z: -2.8, scale: 1.1 },
-  { id: 'conifer-west-3', assetVersionId: 'asset-conifer', kind: 'conifer', x: -8.6, z: 1.4, scale: 0.85 },
-  { id: 'conifer-west-4', assetVersionId: 'asset-conifer', kind: 'conifer', x: -6.6, z: 6.1, scale: 0.95 },
-  { id: 'broadleaf-north-1', assetVersionId: 'asset-broadleaf', kind: 'broadleaf', x: -3.2, z: -6.1, scale: 0.95 },
-  { id: 'broadleaf-north-2', assetVersionId: 'asset-broadleaf', kind: 'broadleaf', x: -1.4, z: 6.4, scale: 0.85 },
-  { id: 'broadleaf-east-1', assetVersionId: 'asset-broadleaf', kind: 'broadleaf', x: 2.4, z: 5.8, scale: 0.9 },
-  { id: 'broadleaf-east-2', assetVersionId: 'asset-broadleaf', kind: 'broadleaf', x: 8.0, z: 5.4, scale: 0.95 },
-  { id: 'conifer-east-1', assetVersionId: 'asset-conifer', kind: 'conifer', x: 8.4, z: -6.0, scale: 1.05 },
-  { id: 'rock-north', assetVersionId: 'asset-rock', kind: 'rock', x: -5.2, z: 4.8, scale: 0.8 },
-  { id: 'rock-south', assetVersionId: 'asset-rock', kind: 'rock', x: 3.4, z: -5.3, scale: 0.65 },
-  { id: 'rock-east', assetVersionId: 'asset-rock', kind: 'rock', x: 5.9, z: 3.8, scale: 0.55 },
-  { id: 'pond-east', assetVersionId: 'asset-pond', kind: 'pond', x: 5.2, z: -1.4, scale: 1, width: 2.6, depth: 1.7 },
-  { id: 'pond-west', assetVersionId: 'asset-pond', kind: 'pond', x: -4.4, z: 5.3, scale: 1, width: 1.5, depth: 0.9 },
-];
+/* [GAME-01-VIS] Mapa limpio (05-ago): sin props para validar piso, cámara y
+ * movimiento sin obstáculos visuales. El pipeline de instancias y el catálogo
+ * de assets siguen intactos para cuando lleguen los assets definitivos. */
+export const FIXTURE_PROPS: readonly FixtureProp[] = [];
 
 const terrainHeights = Array.from({ length: 17 * 17 }, (_, index) => {
   const x = index % 17;
