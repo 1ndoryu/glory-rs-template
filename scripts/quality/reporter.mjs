@@ -60,6 +60,9 @@ function markdown(report) {
     `- Política: ${report.policy.policyHash} · ${report.policy.decision?.action ?? 'unknown'} · ${report.policy.reason}`,
     ...(report.reportRetention?.status === 'error' ? [`- Retención: **error no bloqueante** — ${report.reportRetention.message}`] : []),
     ...(report.reportRetention?.overQuota ? [`- Retención: **overQuota** — ${report.reportRetention.currentBranchBytes} bytes en la rama activa`] : []),
+    ...(report.targetMaintenance?.status === 'error' ? [`- Targets: **error no bloqueante** — ${report.targetMaintenance.message}`] : []),
+    ...(report.targetMaintenance?.removed?.length ? [`- Targets: **${report.targetMaintenance.removed.length} podados** (${report.targetMaintenance.removed.map(item => `${item.name}:${item.reason}`).join(', ')}) — ${report.targetMaintenance.totalBytes} bytes restantes`] : []),
+    ...(report.targetMaintenance?.skipped === 'cooldown' ? ['- Targets: supervisados hace menos de la ventana; pase completo con `npm run quality:cleanup`'] : []),
     ...(report.heavyGuard ? [`- Full diferido: **${report.heavyGuard.reason}** — ${report.heavyGuard.nextAllowedAt ?? report.heavyGuard.message ?? 'reintento bloqueado'}`] : []),
     '',
     '## Etapas',
@@ -87,6 +90,7 @@ export async function createReport(context, args, scope, stages, reminders, star
     heavyGuard: deferred,
     branch: context.branch ?? null,
     reportRetention: context.reportRetention ?? null,
+    targetMaintenance: context.targetMaintenance ?? null,
     policy: context.policyIdentity ?? {
       projectRoot: context.projectRoot,
       policyPath: null,

@@ -12,6 +12,7 @@ import { stageDefinitions } from './stage-definitions.mjs';
 import { isFullExecution } from './profile-contract.mjs';
 import { runBoundedStages } from './stage-runner.mjs';
 import { runReportRetentionBestEffort } from './report-retention-stage.mjs';
+import { runTargetMaintenanceBestEffort } from './target-maintenance-stage.mjs';
 
 let interrupted = false;
 function handleInterruption(signal) {
@@ -126,6 +127,16 @@ async function main() {
           currentBranchKey: context.branch.branchKey,
           currentTaskId: args.taskId,
           config: context.qualityConfig.reportRetention,
+        });
+        /* [028A-6] Supervisión automática de targets de cargo: con throttle
+         * (una vez por ventana) y presupuesto de tiempo, nunca bloquea el
+         * gate. Elimina targets viejos/sobre cuota sin tocar procesos vivos
+         * (marcadores del guard + ejecutables en uso). */
+        /* [028A-6] targetRoot por defecto: C:\tmp\glory-target (o
+         * CARGO_TARGET_DIR_BASE). La política de cuota/edad viene de
+         * quality.config.json heavyRun; no hay clave targetRoot en la config. */
+        context.targetMaintenance = await runTargetMaintenanceBestEffort({
+          projectRoot: context.projectRoot,
         });
         const report = await createReport(context, args, scope, stages, reminders, startedAt);
         printCompact(report, context);

@@ -131,7 +131,7 @@ El script decide alcance automáticamente, es incremental local y full en CI. De
 
 - Cierre normal: `npm run task:check -- {ID}`; el alcance se calcula automáticamente.
 - Rust local: no ejecutar `cargo test 2>&1` por tarea; la redirección sigue siendo el mismo test pesado. Usar el gate y reservar `--full` para cierre de fase/CI o una excepción justificada.
-- Targets: `npm run quality:cleanup:dry` revisa `C:\tmp\glory-target`; `npm run quality:cleanup` aplica cuota/retención sin tocar targets con proceso activo.
+- **Targets: supervisión automática en cada gate** (`task:check` → `runTargetMaintenanceBestEffort`): con throttle de 6 h y presupuesto de 60 s poda `C:\tmp\glory-target` por cuota (`heavyRun.maxTargetGb`, 15 por defecto) y edad (`maxTargetAgeDays`), sin tocar nunca un target con proceso vivo (marcador del guard, ejecutable cargado o escritura en la última media hora). El resultado aparece en el reporte (`targetMaintenance`) sin afectar la decisión. `npm run quality:cleanup:dry` revisa sin borrar; `npm run quality:cleanup` fuerza el pase completo y rearma el throttle. Si el disco vuelve a llenarse, el problema es otro directorio fuera de `C:\tmp\glory-target` (p. ej. `glory-target-codegen` usa `CARGO_TARGET_DIR_BASE` propio): usa `df -h /c` + `du --max-depth=1` para localizarlo.
 - Compatibilidad: `npm run self-check -- -TareaId {ID}` llama al mismo core y no duplica validaciones.
 - CI usa el mismo core en modo full y publica `.quality-reports/`.
 - UI todavía exige prueba visual real; el gate no sustituye navegador ni casos negativos.
