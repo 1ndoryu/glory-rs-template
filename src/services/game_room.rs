@@ -17,8 +17,8 @@ use crate::models::game_profile::GAME_PROFILE_DEFAULT_CHARACTER_ID;
 use crate::models::game_realtime::{
     assess_sequence, consume_rate_budget, GameRealtimeClientMessage, GameRealtimeEntity,
     GameRealtimeErrorCode, GameRealtimeErrorPayload, GameRealtimeHeartbeatAckPayload,
-    GameRealtimeServerMessage, GameRealtimeSnapshotPayload, SequenceDecision,
-    GAME_REALTIME_MAX_PLAYERS_PER_ROOM, GAME_REALTIME_PROTOCOL_VERSION,
+    GameRealtimeServerMessage, GameRealtimeServerRestartPayload, GameRealtimeSnapshotPayload,
+    SequenceDecision, GAME_REALTIME_MAX_PLAYERS_PER_ROOM, GAME_REALTIME_PROTOCOL_VERSION,
 };
 use crate::services::game_room_map::GameRoomMap;
 
@@ -142,6 +142,25 @@ impl GameRoomState {
 
     pub fn metrics(&self) -> GameRoomMetricsSnapshot {
         self.metrics.snapshot()
+    }
+
+    /// [Decisión 8] Anuncia el reinicio coordinado a todas las salas activas:
+    /// cada actor reenvía `server_restart` a sus jugadores con la cuenta atrás.
+    /// Las salas sin jugadores no fallan (broadcast no-op); el aviso queda
+    /// pendiente de la expiración/drenaje que planifica el publicador.
+    pub async fn announce_restart(&self, reason: &str, restart_in_seconds: u64) {
+        let rooms = self.rooms.lock().await;
+        for handle in rooms.values() {
+            let _ = handle.send(RoomCommand::Broadcast {
+                message: GameRealtimeServerMessage::ServerRestart {
+                    v: GAME_REALTIME_PROTOCOL_VERSION,
+                    payload: GameRealtimeServerRestartPayload {
+                        reason: reason.to_string(),
+                        restart_in_seconds,
+                    },
+                },
+            });
+        }
     }
 
     /// Registra un mapa adicional para pruebas de salas concurrentes; los
@@ -384,6 +403,9 @@ enum RoomCommand {
     Disconnect {
         player_id: String,
     },
+    Broadcast {
+        message: GameRealtimeServerMessage,
+    },
 }
 
 struct RoomPlayer {
@@ -442,6 +464,11 @@ async fn run_room(
                     }
                     if players.is_empty() {
                         empty_since = Some(now_secs());
+                    }
+                }
+                RoomCommand::Broadcast { message } => {
+                    for player in players.values_mut() {
+                        send_message(player, message.clone());
                     }
                 }
             },
@@ -967,6 +994,73 @@ mod tests {
 
         first_joined.disconnect().await;
         second_joined.disconnect().await;
+    }
+
+    /* [Decisión 8] Drena mensajes hasta el `server_restart` (los snapshots
+     * del tick pueden llegar antes) o falla con timeout. */
+    async fn recv_until_restart(
+        messages: &mut mpsc::Receiver<GameRealtimeServerMessage>,
+    ) -> GameRealtimeServerMessage {
+        loop {
+            let message = tokio::time::timeout(std::time::Duration::from_secs(1), messages.recv())
+                .await
+                .expect("timeout esperando server_restart")
+                .expect("canal cerrado");
+            if matches!(message, GameRealtimeServerMessage::ServerRestart { .. }) {
+                return message;
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn announce_restart_broadcasts_to_all_players_of_active_rooms() {
+        /* [Decisión 8] El aviso de reinicio coordinado llega a todos los
+         * jugadores de cada sala activa con motivo y cuenta atrás. Se drena
+         * hasta el `server_restart` porque entre medias pueden llegar
+         * snapshots del tick. */
+        let state = GameRoomState::with_map_and_ttl(map(), 60);
+        let (first_output, mut first_messages) = mpsc::channel(32);
+        let (second_output, mut second_messages) = mpsc::channel(32);
+        let first = state
+            .join(Uuid::new_v4(), first_output)
+            .await
+            .expect("first");
+        let second = state
+            .join(Uuid::new_v4(), second_output)
+            .await
+            .expect("second");
+
+        state
+            .announce_restart("publicación de versión nueva", 300)
+            .await;
+
+        let first_restart = recv_until_restart(&mut first_messages).await;
+        let second_restart = recv_until_restart(&mut second_messages).await;
+        for restart in [first_restart, second_restart] {
+            match restart {
+                GameRealtimeServerMessage::ServerRestart { v, payload } => {
+                    assert_eq!(v, GAME_REALTIME_PROTOCOL_VERSION);
+                    assert_eq!(payload.reason, "publicación de versión nueva");
+                    assert_eq!(payload.restart_in_seconds, 300);
+                }
+                other => panic!("server_restart esperado, llegó {other:?}"),
+            }
+        }
+        first.disconnect().await;
+        second.disconnect().await;
+    }
+
+    #[tokio::test]
+    async fn announce_restart_without_players_is_noop() {
+        /* Sala vacía: el broadcast no falla y el actor sigue aceptando joins. */
+        let state = GameRoomState::with_map_and_ttl(map(), 60);
+        state.announce_restart("reinicio", 60).await;
+        let (output, _messages) = mpsc::channel(32);
+        let joined = state
+            .join(Uuid::new_v4(), output)
+            .await
+            .expect("join tras noop");
+        joined.disconnect().await;
     }
 
     #[tokio::test]

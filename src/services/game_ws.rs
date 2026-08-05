@@ -81,6 +81,14 @@ impl GameWsState {
         self.room_state.has_map()
     }
 
+    /// [Decisión 8] Passthrough del aviso de reinicio coordinado: difunde
+    /// `server_restart` con la cuenta atrás a todas las salas activas.
+    pub async fn announce_restart(&self, reason: &str, restart_in_seconds: u64) {
+        self.room_state
+            .announce_restart(reason, restart_in_seconds)
+            .await;
+    }
+
     #[must_use]
     pub fn room_join_error_code(
         error: RoomJoinError,
@@ -119,5 +127,66 @@ mod tests {
         let state = GameWsState::with_max_connections(0);
         assert!(state.try_acquire().is_none());
         assert_eq!(state.active_connections(), 0);
+    }
+
+    #[tokio::test]
+    async fn announce_restart_passthrough_reaches_room_players() {
+        use super::GameRoomMap;
+        use crate::services::game_room_map::RoomSpawn;
+        use tokio::sync::mpsc;
+        use uuid::Uuid;
+
+        let state = GameWsState::with_max_connections_and_room_ttl(8, 60);
+        let map = GameRoomMap::from_parts(
+            "forest".to_string(),
+            1,
+            crate::services::game_room_map::RoomBounds {
+                min_x: 0.0,
+                max_x: 32.0,
+                min_z: 0.0,
+                max_z: 32.0,
+            },
+            Vec::new(),
+            vec![RoomSpawn {
+                x: 2.0,
+                z: 2.0,
+                radius: 1.0,
+            }],
+        )
+        .expect("map fixture");
+        state.set_room_map(Some(map));
+        let (output, mut messages) = mpsc::channel(32);
+        let joined = state
+            .room_state()
+            .join(Uuid::new_v4(), output)
+            .await
+            .expect("join");
+
+        state.announce_restart("migración coordinada", 120).await;
+
+        /* Los snapshots del tick pueden llegar antes; drena hasta el aviso. */
+        let restart = loop {
+            let message = tokio::time::timeout(std::time::Duration::from_secs(1), messages.recv())
+                .await
+                .expect("timeout server_restart")
+                .expect("canal cerrado");
+            if matches!(
+                message,
+                crate::models::game_realtime::GameRealtimeServerMessage::ServerRestart { .. }
+            ) {
+                break message;
+            }
+        };
+        match restart {
+            crate::models::game_realtime::GameRealtimeServerMessage::ServerRestart {
+                payload,
+                ..
+            } => {
+                assert_eq!(payload.reason, "migración coordinada");
+                assert_eq!(payload.restart_in_seconds, 120);
+            }
+            other => panic!("server_restart esperado, llegó {other:?}"),
+        }
+        joined.disconnect().await;
     }
 }

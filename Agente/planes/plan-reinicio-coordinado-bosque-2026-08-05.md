@@ -23,17 +23,20 @@
   tras el cierre del socket ya usa backoff con jitter (297A-57), y el join recarga la
   versión activa de la BD (297A-65).
 
-## Fase 1 — Broadcast del aviso (backend)
+## Fase 1 — Broadcast del aviso (backend) — CERRADA (05-ago)
 
-- [ ] `RoomCommand::Broadcast { message }` en `run_room`: enviar el mensaje a todos
+- [x] `RoomCommand::Broadcast { message }` en `run_room`: enviar el mensaje a todos
   los players activos (`try_send` al output, sin bloquear el actor ni el tick).
-- [ ] `GameRoomState::announce_restart(reason, seconds)`: iterar los rooms activos y
+- [x] `GameRoomState::announce_restart(reason, seconds)`: iterar los rooms activos y
   difundir `GameRealtimeServerMessage::ServerRestart` (v:1).
-- [ ] `GameWsState::announce_restart(reason, seconds)` como passthrough del wrapper.
-- [ ] Tests: el broadcast llega a todos los players de cada sala; sala vacía no falla;
-  room inexistente es no-op.
+- [x] `GameWsState::announce_restart(reason, seconds)` como passthrough del wrapper.
+- [x] Tests: el broadcast llega a todos los players de cada sala (2 jugadores de la
+  misma sala reciben el aviso con motivo y cuenta); sala vacía es no-op y sigue
+  aceptando joins; passthrough del wrapper llega al room (3 tests nuevos,
+  18 unitarios del lib en verde vía cargo test directo por gate bloqueado).
 
-**Gate F1:** cargo check + tests de `game_room` (en el full CI por cooldown).
+**Gate F1:** cargo check + tests de `game_room` — PASS vía cargo directo (el gate
+está bloqueado por WIP ajeno en `tools/sentinel`; sin tocar SNT-11).
 
 ## Fase 2 — Trigger de publicación y migración coordinada
 
