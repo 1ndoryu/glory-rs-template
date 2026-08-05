@@ -147,22 +147,26 @@
 
 **Gate/salida:** README de sentinel sin restos de IA y coherente con el código fijado; el resto del inventario queda planificado en 028A-6 para implementarse con cada fase.
 
-### SNT-11 — Cooldown de full obligatorio: sin excepción manual (PRIORIDAD)
+### SNT-11 — Cooldown de full: cooldown obligatorio + excepción manual auditada (cerrada, 05-ago)
 
 **Motivo:** el 05-ago la excepción manual (`--allow-heavy` / `GLORY_QUALITY_ALLOW_HEAVY`) saltó
-el cooldown de 180 min y ralentizó el equipo en desarrollo. Decisión del usuario: **no se permite
-saltar el cooldown**; el mecanismo que lo permite queda **desactivado (no borrado)**. `028A-16` lo
-hizo auditable; este bloque lo desactiva.
+el cooldown de 180 min y ralentizó el equipo en desarrollo. `028A-16` lo hizo auditable; SNT-11
+primero lo desactivó y, por decisión explícita del usuario el mismo día, **se re-activó la concesión
+manual SIN eliminar el cooldown**: `HEAVY_MANUAL_OVERRIDE_ENABLED=true` — el cooldown sigue
+bloqueando las ejecuciones pesadas normales (sin excepción) y toda activación manual con motivo
+concede y queda auditada en `heavy-overrides.log` como `granted:true` (fuente, comando, PID,
+motivo, tarea). Un intento sin motivo se rechaza (`heavy-reason-required`). CI (modo sancionado)
+sigue autorizado a full sin cooldown.
 
-- [x] Desactivar la concesión manual del guard sin borrar el mecanismo: `HEAVY_MANUAL_OVERRIDE_ENABLED=false`
-  en `heavy-run-guard.mjs` conserva parsing, auditoría y logging; solo CI (modo sancionado) sigue
-  autorizado. `--allow-heavy`/env/token ya no conceden; los intentos quedan en `heavy-overrides.log`
-  como denegados. Tests del guard actualizados (213/213 quality) y gate 297A-77 PASS (sentinel 0
-  errores tras excluir `tools/sentinel` del scan; clippy/tests Rust pendientes del `--full` sin
-  bypass cuando expire el cooldown).
+- [x] Cooldown conservado como mecanismo: las ejecuciones normales (sin `--allow-heavy`) siguen
+diferidas por el cooldown de 180 min.
+- [x] Excepción manual re-activada con auditoría: `--allow-heavy --heavy-reason "<motivo>"` (o
+`GLORY_QUALITY_ALLOW_HEAVY=1` / `GLORY_HEAVY_RUN_TOKEN`) concede sobre el cooldown y queda
+registrado en `heavy-overrides.log` con `granted:true`. Tests del guard actualizados (215/215
+quality) y gate PASS.
 
-**Gate/salida:** `task:check --full` tras el cooldown no concede con `--allow-heavy` (queda
-registrado como denegado); `npm run quality:test` (guard) PASS.
+**Gate/salida:** `task:check --full --allow-heavy --heavy-reason "<motivo>"` concede (auditado);
+`task:check --full` sin excepción se difiere por cooldown; `npm run quality:test` (guard) PASS.
 
 ### 028A-16 — Auditoría del uso de excepciones del guard (prevención cooldown)
 

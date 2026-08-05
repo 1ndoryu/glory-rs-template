@@ -85,6 +85,7 @@ impl GameWsState {
         self.room_state.set_map(map);
     }
 
+    #[must_use]
     pub fn has_room_map(&self) -> bool {
         self.room_state.has_map()
     }

@@ -5,7 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { acquireHeavyRun, inspectHeavyRun, isHeavyCargoCommand, logHeavyOverride } from '../heavy-run-guard.mjs';
 
-test('el guard limita full a una ejecución cada tres horas y la excepción manual queda desactivada', async () => {
+test('el guard limita full a una ejecución cada tres horas y la excepción manual con motivo concede (auditada)', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'glory-heavy-guard-'));
   const targetBase = path.join(root, 'target');
   try {
@@ -17,16 +17,16 @@ test('el guard limita full a una ejecución cada tres horas y la excepción manu
     const blocked = await inspectHeavyRun({ projectRoot: root, targetBase, mode: 'full' });
     assert.equal(blocked.allowed, false);
     assert.equal(blocked.reason, 'cooldown');
-    /* [SNT-11] La excepción manual está desactivada: --allow-heavy ya no
-     * concede aunque haya motivo; el cooldown sigue bloqueando y el intento
-     * queda auditado como denegado. */
+    /* [SNT-11] El cooldown NO se elimina: sin excepción sigue bloqueando. La
+     * excepción manual (re-activada por decisión del usuario el 05-ago) con
+     * motivo SÍ concede y queda auditada como granted:true. */
     const override = await acquireHeavyRun({ projectRoot: root, targetBase, mode: 'full', allowHeavy: true, heavyReason: 'test override explícito' });
-    assert.equal(override.allowed, false);
-    assert.equal(override.reason, 'cooldown');
+    assert.equal(override.allowed, true);
     const logText = await readFile(path.join(root, '.quality-reports', 'heavy-overrides.log'), 'utf8');
     const entry = JSON.parse(logText.trim().split(/\r?\n/).at(-1));
-    assert.equal(entry.granted, false);
+    assert.equal(entry.granted, true);
     assert.equal(entry.source, 'flag');
+    assert.equal(entry.reason, 'test override explícito');
   } finally {
     await rm(root, { recursive: true, force: true });
     await rm(path.join(root, '..', 'glory-quality-guard'), { recursive: true, force: true });
@@ -110,7 +110,7 @@ test('un override sin motivo se rechaza y no concede la excepción (028A-16)', a
   }
 });
 
-test('la excepción manual no concede aunque haya motivo y queda auditada como denegada (SNT-11)', async () => {
+test('la excepción manual con motivo concede sobre el cooldown y queda auditada (SNT-11 re-activado)', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'glory-heavy-reason-ok-'));
   const targetBase = path.join(root, 'target');
   try {
@@ -119,17 +119,17 @@ test('la excepción manual no concede aunque haya motivo y queda auditada como d
     const first = await acquireHeavyRun({ projectRoot: root, targetBase, mode: 'full', taskId: '028A-16' });
     assert.equal(first.allowed, true);
     await first.release({ status: 'pass' });
-    /* [SNT-11] Con el mecanismo desactivado, un intento con motivo queda
-     * denegado por cooldown y se registra como granted:false (auditable). */
-    const denied = await acquireHeavyRun({
+    /* [SNT-11] Con motivo, la excepción manual (re-activada el 05-ago) concede
+     * sobre el cooldown y se registra como granted:true (auditable); el
+     * cooldown sigue valiendo para las ejecuciones sin excepción. */
+    const granted = await acquireHeavyRun({
       projectRoot: root, targetBase, mode: 'full', allowHeavy: true,
       taskId: '028A-16', command: 'cargo test', heavyReason: 'validar fase antes de cerrar',
     });
-    assert.equal(denied.allowed, false);
-    assert.equal(denied.reason, 'cooldown');
+    assert.equal(granted.allowed, true);
     const logText = await readFile(path.join(root, '.quality-reports', 'heavy-overrides.log'), 'utf8');
     const entry = JSON.parse(logText.trim().split(/\r?\n/).at(-1));
-    assert.equal(entry.granted, false);
+    assert.equal(entry.granted, true);
     assert.equal(entry.source, 'flag');
     assert.equal(entry.reason, 'validar fase antes de cerrar');
     assert.equal(entry.taskId, '028A-16');

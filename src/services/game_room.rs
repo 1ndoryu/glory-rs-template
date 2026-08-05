@@ -136,10 +136,12 @@ impl GameRoomState {
         }
     }
 
+    #[must_use]
     pub fn has_map(&self) -> bool {
         !self.maps.read().expect("maps lock").is_empty()
     }
 
+    #[must_use]
     pub fn metrics(&self) -> GameRoomMetricsSnapshot {
         self.metrics.snapshot()
     }

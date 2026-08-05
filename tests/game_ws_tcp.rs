@@ -494,17 +494,17 @@ async fn restart_announces_countdown_then_closes_with_restart_code_and_client_re
     let (mut socket, _) = connect_async(&url).await.expect("upgrade WebSocket válido");
     let ticket = ticket_store
         .issue(Uuid::new_v4(), None, 30, TEST_SECRET)
-        .expect("ticket válido");    socket
-        .send(join_message(&ticket))
-        .await
-        .expect("join TCP");
+        .expect("ticket válido");
+    socket.send(join_message(&ticket)).await.expect("join TCP");
     /* El join es asíncrono: esperar `joined` garantiza que la sala ya está
      * registrada antes de programar la migración (si no, el aviso sería
      * no-op y el cierre llegaría sin él). */
     let joined = read_message_type(&mut socket, "joined").await;
     assert_eq!(joined["type"], "joined");
 
-    state.game_ws_state.schedule_restart("publicación de versión nueva", 1);
+    state
+        .game_ws_state
+        .schedule_restart("publicación de versión nueva", 1);
 
     let restart = read_message_type(&mut socket, "server_restart").await;
     assert_eq!(restart["payload"]["reason"], "publicación de versión nueva");
