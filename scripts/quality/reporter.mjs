@@ -33,6 +33,30 @@ function compareText(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
+/* [028A-17] Ubicación legible de un hallazgo: ruta relativa al workspace
+ * (nunca absoluta), con línea y columna cuando el analyzer las manda.
+ * El JSON conserva `file` tal cual llega del adapter; solo el texto del
+ * reporte (Markdown y terminal) se normaliza para que el agente pueda abrir
+ * el archivo de inmediato. */
+function formatFindingLocation(finding, projectRoot) {
+  if (!finding?.file) return '';
+  let file = String(finding.file).replace(/\\/gu, '/');
+  if (projectRoot) {
+    const relative = path.relative(projectRoot, finding.file).replace(/\\/gu, '/');
+    /* Solo se usa la relativa si no escapa del workspace: ni `..` (el padre
+     * mismo) ni `../…`, ni una ruta absoluta de otro disco. Si escapa, se
+     * conserva la ruta original (fuera del workspace el relativo no aporta). */
+    const escapes = relative === '..' || relative.startsWith('../') || path.isAbsolute(relative);
+    if (!escapes) file = relative;
+  }
+  let location = file;
+  if (Number.isInteger(finding.line)) location += `:${finding.line}`;
+  /* La columna solo tiene sentido tras la línea; sin línea, `archivo:5`
+   * parecería una línea y confundiría. */
+  if (Number.isInteger(finding.line) && Number.isInteger(finding.column)) location += `:${finding.column}`;
+  return location;
+}
+
 /* Orden estable para comparar artifacts entre ejecuciones. No usa
  * localeCompare: el locale del agente/CI no debe cambiar el JSON publicado. */
 function compareFindings(left, right) {
@@ -76,7 +100,14 @@ function markdown(report) {
   ];
   if (report.findings.length > 0) {
     lines.push('', '## Hallazgos', '');
-    for (const item of report.findings) lines.push(`- [${item.severity}] ${item.ruleId}: ${item.message}`);
+    const projectRoot = report.policy?.projectRoot ?? null;
+    for (const item of report.findings) {
+      const location = formatFindingLocation(item, projectRoot);
+      /* Sin ubicación no se pintan backticks vacíos (`` ` ` `` feo en MD):
+       * la línea queda como severidad + regla + mensaje. */
+      const located = location ? `\`${location}\` ` : '';
+      lines.push(`- [${item.severity}] ${located}${item.ruleId}: ${item.message}`);
+    }
   }
   lines.push('', '## Recordatorios', '', ...report.reminders.map(item => `- ${item}`), '');
   lines.push('- Detalle de timing por etapa: `metrics.json` (duración, cache hit/miss, invalidación y métricas del analizador)');
@@ -191,8 +222,9 @@ export function compactLines(reportResult, context) {
     lines.push(`[quality] ${stage.stage.padEnd(9)} ${stage.status.toUpperCase()}${stage.cached ? ' (cached)' : ''} · ${formatDuration(stage.durationMs)} · ${stage.summary}${formatStageDetail(stage)}`);
   }
   for (const finding of report.findings.slice(0, context.qualityConfig.maxFindings)) {
-    const location = finding.file ? `${finding.file}${finding.line ? `:${finding.line}` : ''} · ` : '';
-    lines.push(`[quality] ${finding.severity.toUpperCase()} ${location}${finding.ruleId}: ${finding.message}`);
+    const location = formatFindingLocation(finding, context.projectRoot);
+    const prefix = location ? `${location} · ` : '';
+    lines.push(`[quality] ${finding.severity.toUpperCase()} ${prefix}${finding.ruleId}: ${finding.message}`);
   }
   /* [028A-6] Límite defensivo también aquí: el contrato compacto publica como
    * máximo maxFindings hallazgos y maxReminders recordatorios (3/4 por
