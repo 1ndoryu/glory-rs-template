@@ -217,7 +217,7 @@ registrado como denegado); `npm run quality:test` (guard) PASS.
 
 **Depende de:** GAME-01/Fase 8 estabilizada y de un segundo caso real que justifique cada abstracción. Plan: `Agente/planes/plan-glory-render-motor-juegos-2026-08-01.md`.
 
-- [ ] Auditar `frontend/src/features/game-core/` y clasificar qué pertenece al motor agnóstico, al adaptador Three, al OS, al backend o a Bosque.
+- [x] Auditar `frontend/src/features/game-core/` y clasificar qué pertenece al motor agnóstico, al adaptador Three, al OS, al backend o a Bosque — cerrada el 05-ago en `Agente/documentacion/arquitectura/auditoria-glory-render-fase0-2026-08-05.md`: 14 módulos CORE puros + `game-realtime` de frontera (sin transporte), 0 dependencias de Three/DOM/red/backend en el paquete y sin ciclos; la extracción espera un segundo consumidor real (criterio del plan).
 - [ ] Crear `glory-render/` dentro de este workspace como repositorio Git independiente, con `core`, contratos, adaptador Three, fixtures, CI, SemVer y quality gate propios.
 - [ ] Migrar Bosque a exports públicos sin copiar lógica; fijar integración por submódulo/commit o artefacto reproducible.
 - [ ] Crear un segundo juego mínimo de conformidad que pruebe fixtures, lifecycle, renderer fake, límites y compatibilidad sin depender de wandori.us.

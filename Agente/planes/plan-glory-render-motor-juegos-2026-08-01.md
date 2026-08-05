@@ -19,9 +19,9 @@ Extraer la lógica realmente reutilizable del primer juego a `glory-render`, int
 
 ## Fase 0 — Inventario y frontera
 
-- [ ] Auditar `frontend/src/features/game-core/` y clasificar cada módulo: core agnóstico, adaptador Three, integración OS, dominio Bosque o backend.
-- [ ] Registrar API pública actual, invariantes, errores, límites y dependencias transitivas.
-- [ ] Identificar duplicación probable en un segundo juego sin extraer abstracciones sin caso real.
+- [x] Auditar `frontend/src/features/game-core/` y clasificar cada módulo: core agnóstico, adaptador Three, integración OS, dominio Bosque o backend — `Agente/documentacion/arquitectura/auditoria-glory-render-fase0-2026-08-05.md` (05-ago): 14 módulos CORE puros, `game-realtime.ts` como CORE de frontera (sin transporte), 0 dependencias de Three/DOM/red/backend en el paquete, sin ciclos de dependencias.
+- [x] Registrar API pública actual, invariantes, errores, límites y dependencias transitivas — inventario completo en la auditoría (re-exports de `index.ts`, cuotas, invariantes fail-closed, grafo de dependencias).
+- [x] Identificar duplicación probable en un segundo juego sin extraer abstracciones sin caso real — simulación/colisión/interpolación/streaming/presupuestos; criterio de no extracción sin segundo consumidor.
 - [ ] Elegir integración inicial: submódulo fijado por commit + dependencia local para desarrollo.
 - [ ] Definir política de licencias, versionado SemVer, changelog, CI, quality gate y propietarios.
 
