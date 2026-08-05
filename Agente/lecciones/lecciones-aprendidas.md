@@ -39,6 +39,12 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 - El contrato de suite completa debe permanecer explícito (`test`/`test:full`), mientras el modo local selectivo se ofrece como comando separado para no convertir un PASS parcial en una garantía global.
 - Limitar workers y captura de salida evita que varios agentes saturen CPU/memoria; el gate debe fallar rápido ante locks duplicados y dejar el detalle en artifacts, no en stdout/contexto.
 
+## 058A-3 — El render filtra lo que el sync no puede garantizar
+
+- El sync local (`article-notas-sync`) ya exige `published && slug` antes de crear el nodo, pero los releases públicos ya publicados pueden persistir nodos huérfanos con `publicLocator` roto (slug nulo). La condición de escritura no garantiza que el estado persistido sea válido: la garantía de «nunca aparecen» vive en el filtro de render del shell.
+- Un nodo del workspace solo debe mostrarse si su apertura hace algo útil (navegar, abrir app, visor local o URL pública). Centralizar esa regla en un helper único (`canOpenNodeFromShell`) evita que Finder, escritorio y launcher móvil dupliquen criterios y diverjan.
+- `resolvePublicResourceTarget` devuelve `null` para locators que no pasan el allowlist (p. ej. `slug: null`) — es la misma regla que produce el aviso «sin referencia pública disponible», así que filtrar por ella y mantener el toast como red de seguridad cubre ambos extremos sin silenciar fallos.
+
 ## 038A-1 — Procesos huérfanos en Windows rompen dev y poda de targets
 
 - `child.kill()` de Node en Windows NO mata el árbol de procesos: cargo → glory-backend quedan huérfanos (nietos), bloqueando recompilaciones ("Acceso denegado os error 5" al reutilizar el .exe) y haciendo que `clean-cargo-target.ps1` detecte "build activo" y salte toda la limpieza.

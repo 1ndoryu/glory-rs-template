@@ -23,7 +23,6 @@ import { DESKTOP_MIN_WIDTH, getGridMetrics, planPlacement, reflowPositions } fro
 import { moveNodesPosition } from '../runtime/workspace/overlay-mutations';
 import { reconcileChildren } from '../../utils/reconcile';
 import { resolvePublicResourceTarget } from '../runtime/workspace/public-resource-locator';
-import { showToast } from '../../components/ui/toast';
 
 const SHELL_ICON_MAP: Record<string, IconNode> = {
   'profile': FileUser,
@@ -66,9 +65,9 @@ function resolveActivate(
   if (node.type === 'resource' && node.resourceKind) {
     const entry = resolvePublicResourceTarget(node);
     if (entry) return () => { void openAppWindow(entry.appId, entry.params); };
-    return () => {
-      showToast('Este recurso todavía no tiene una referencia pública disponible');
-    };
+    /* [058A-3] Sin URL pública el recurso no se muestra en el escritorio:
+     * devolver undefined excluye el nodo del grid (activableNodes). */
+    return undefined;
   }
   if (node.refId) return () => { void openAppWindow(node.refId!); };
   return undefined;

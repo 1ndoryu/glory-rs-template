@@ -15,7 +15,6 @@ import { moveMobileNodesPosition, workspaceStore } from '../runtime/workspace/wo
 import { getMobileCellAt, getMobileGridMetrics, planMobilePlacement, sortMobileNodes } from '../runtime/workspace/mobile-grid';
 import type { ResolvedNode } from '../runtime/workspace/types';
 import { resolvePublicResourceTarget } from '../runtime/workspace/public-resource-locator';
-import { showToast } from '../../components/ui/toast';
 import { loadNotifications, notificationsStore, unreadNotificationCount } from '../notifications/notifications-store';
 import { createNotificationsPopover } from '../notifications/notifications-popover';
 
@@ -58,9 +57,9 @@ function resolveNodeAction(
   if (node.type === 'resource' && node.resourceKind) {
     const publicTarget = resolvePublicResourceTarget(node);
     if (publicTarget) return () => { void openApp(publicTarget.appId, publicTarget.params); };
-    return () => {
-      showToast('Este recurso todavía no tiene una referencia pública disponible');
-    };
+    /* [058A-3] Sin URL pública no se crea el botón: createIconButton devuelve
+     * null para actions undefined y el recurso no aparece en el launcher. */
+    return undefined;
   }
   if (node.refId && AppRegistry.get(node.refId)) return () => { void openApp(node.refId!); };
   return undefined;

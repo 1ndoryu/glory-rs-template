@@ -26,7 +26,7 @@ import {
 import { enableDrag, makeDropTarget } from '../../utils/icon-drag';
 import { authStore } from '../../../../store';
 import type { ResolvedNode } from '../../../runtime/workspace/types';
-import { resolvePublicResourceTarget } from '../../../runtime/workspace/public-resource-locator';
+import { resolvePublicResourceTarget, canOpenNodeFromShell } from '../../../runtime/workspace/public-resource-locator';
 import { AppRegistry } from '../../../runtime/app-registry';
 import { resolveResourceIcon, resolveResourceIconType } from '../../../runtime/resource-type-registry';
 import { showToast } from '../../../../components/ui/toast';
@@ -178,7 +178,11 @@ export function createFinderPreview(options: FinderOptions): HTMLElement {
       pathEl.appendChild(crumb);
     }
 
-    const children = getChildren(currentFolderId);
+    const children = getChildren(currentFolderId)
+      /* [058A-3] Solo se listan nodos con apertura posible (carpeta, app,
+       * visor de imagen o URL pública). Los recursos con locator roto o sin
+       * URL no aparecen: su doble clic solo produciría un aviso. */
+      .filter((child) => canOpenNodeFromShell(child, { allowImagePreview: true }));
     grid.innerHTML = '';
 
     /* [018A-91] Sin estado vacío textual: una carpeta sin hijos deja el grid

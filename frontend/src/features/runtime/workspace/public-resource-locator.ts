@@ -32,3 +32,28 @@ export function resolvePublicResourceTarget(
 
   return { appId: app.id, params };
 }
+
+export interface ShellOpenOptions {
+  /** El Finder tiene visor local de imágenes (preview pública); el escritorio
+   * y el launcher móvil no, así que sin locator la imagen no se abre. */
+  readonly allowImagePreview?: boolean;
+}
+
+/* [058A-3] Filtro de visibilidad del shell: un nodo solo aparece si su doble
+ * clic / toque puede hacer algo útil (navegar, abrir app, visor o URL pública).
+ * Sin esto, recursos con locator roto (slug nulo) o borrados se listaban en el
+ * Finder y solo producían el aviso "sin referencia pública disponible". */
+export function canOpenNodeFromShell(
+  node: Pick<ResolvedNode, 'type' | 'requires' | 'publicLocator' | 'refId' | 'resourceKind'>,
+  options: ShellOpenOptions = {},
+): boolean {
+  if (node.type === 'folder') return true;
+  if (node.type === 'app') return Boolean(node.refId);
+  if (node.type === 'resource') {
+    if (options.allowImagePreview && node.resourceKind === 'image' && node.refId) return true;
+    if (node.resourceKind) return resolvePublicResourceTarget(node) !== null;
+    return false;
+  }
+  if (node.type === 'shortcut') return resolvePublicResourceTarget(node) !== null;
+  return false;
+}
