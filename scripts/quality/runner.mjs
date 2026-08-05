@@ -64,10 +64,29 @@ export function runProcess(executable, args, options = {}) {
       resolve({ code: 130, signal: null, timedOut: false, cancelled: true, durationMs: 0, stdout: '', stderr: '' });
       return;
     }
-    const child = spawn(executable, args, {
+    /* [028A-6 Fase 3] En Windows los shims npm.cmd/npx.cmd son archivos
+     * batch: spawn con shell:false falla con EINVAL, y spawn shell:true
+     * con args concatena sin escapar (DEP0190). Para esos shims se arma la
+     * línea de comando con quoting propio y se delega al shell sin array de
+     * args (sin concatenación ciega); el resto de etapas conserva
+     * shell:false estricto. */
+    const isWindowsShim = process.platform === 'win32' && /\.(cmd|bat)$/i.test(executable);
+    let spawnTarget = executable;
+    let spawnArgs = args;
+    if (isWindowsShim) {
+      /* En cmd.exe una comilla literal dentro de un argumento entre comillas
+       * se duplica (""): el backslash no es escape en cmd. Los args de los
+       * shims son tokens estáticos de npm (nombres de script), sin comillas;
+       * el quoting solo cubre espacios por robustez. */
+      spawnTarget = [executable, ...args]
+        .map(part => /\s|"/.test(part) ? `"${part.replace(/"/g, '""')}"` : part)
+        .join(' ');
+      spawnArgs = [];
+    }
+    const child = spawn(spawnTarget, spawnArgs, {
       cwd: options.cwd,
       env: safeEnvironment(options.env),
-      shell: false,
+      shell: isWindowsShim,
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     });

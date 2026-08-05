@@ -11,8 +11,13 @@ export function normalizeSeverity(value) {
 }
 
 export function npmInvocation(args) {
-  if (!process.env.npm_execpath) throw new Error('npm_execpath ausente; ejecuta mediante npm run task:check');
-  return { executable: process.execPath, args: [process.env.npm_execpath, ...args] };
+  /* [028A-6 Fase 3] Bajo `npm run` el ejecutor es npm_execpath; bajo `node
+   * ...` directo (p. ej. stage-process.mjs del gate agnóstico) se usa el npm
+   * del PATH. Ambos caminos resuelven el mismo npm. */
+  if (process.env.npm_execpath) {
+    return { executable: process.execPath, args: [process.env.npm_execpath, ...args] };
+  }
+  return { executable: process.platform === 'win32' ? 'npm.cmd' : 'npm', args };
 }
 
 export function conciseFailure(output, fallback) {

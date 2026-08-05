@@ -122,6 +122,37 @@ export async function expandLocalDependencies(root, files) {
   return [...resolved].sort();
 }
 
+/* [028A-6 Fase 3] Reconstruye el objeto scope desde el scope-manifest que
+ * detectScope escribió (vía observe). task:check consulta el guard de
+ * ejecuciones pesadas y puede diferir a local-light; el gate agnóstico debe
+ * reutilizar exactamente esa decisión para que la comparación compare el
+ * mismo alcance (mismos archivos, mismos perfiles, mismo executionFull).
+ * changedFilesPath apunta a un archivo nuevo en reportRoot escrito desde
+ * manifest.files (la etapa escribe su propio transporte --files-from). */
+export function manifestToScope(manifest, reportRoot = null) {
+  const files = Array.isArray(manifest.files) ? manifest.files : [];
+  const profiles = Array.isArray(manifest.profiles) ? new Set(manifest.profiles) : new Set();
+  const changedFilesPath = reportRoot ? path.join(reportRoot, 'changed-files.txt') : null;
+  return {
+    base: manifest.base ?? 'HEAD',
+    files,
+    deletedFiles: Array.isArray(manifest.deletedFiles) ? manifest.deletedFiles : [],
+    fingerprintFiles: Array.isArray(manifest.fingerprintFiles) ? manifest.fingerprintFiles : files,
+    profiles,
+    full: Boolean(manifest.requestedFull || manifest.automaticFull),
+    requestedFull: Boolean(manifest.requestedFull),
+    automaticFull: Boolean(manifest.automaticFull),
+    effectiveFull: Boolean(manifest.effectiveFull),
+    fullReason: manifest.fullReason ?? 'incremental',
+    heavyDeferred: Boolean(manifest.heavyDeferred),
+    executionFull: Boolean(manifest.effectiveFull && !manifest.profileOverride),
+    profileOverride: Boolean(manifest.profileOverride),
+    profileSource: manifest.profileOverride ? 'manifest' : null,
+    changedFilesPath,
+    manifestPath: reportRoot ? path.join(reportRoot, 'scope-manifest.json') : null,
+  };
+}
+
 export function matches(pathName, pattern) {
   const lowerPath = pathName.replace(/\\/g, '/').toLowerCase();
   const lowerPattern = pattern.replace(/\\/g, '/').toLowerCase();
