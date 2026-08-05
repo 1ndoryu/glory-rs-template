@@ -11,6 +11,21 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, '..');
 
+/* [028A-17] El umbral de líneas del roadmap vive en quality.config.json
+ * (fuente canónica del gate docs-roadmap-max-lines). El watcher lo lee con
+ * el mismo fallback 700 para no desincronizarse si alguien ajusta la config. */
+function readRoadmapMaxLines() {
+  try {
+    const config = JSON.parse(readFileSync(resolve(projectRoot, 'quality.config.json'), 'utf-8'));
+    if (Number.isInteger(config.roadmapMaxLines) && config.roadmapMaxLines >= 100) {
+      return config.roadmapMaxLines;
+    }
+  } catch {
+    /* Config ausente o corrupta: se conserva el default. */
+  }
+  return 700;
+}
+
 function findRoadmaps() {
   const paths = [
     resolve(projectRoot, 'roadmap.md'),
@@ -48,11 +63,22 @@ function parsePendingTasks(filePath) {
   return tasks;
 }
 
+function reportRoadmapSize(filePath) {
+  const content = readFileSync(filePath, 'utf-8');
+  /* Misma medida que wc -l (nº de saltos de línea); el split() sumaría 1. */
+  const lines = (content.match(/\n/g) ?? []).length;
+  const maxLines = readRoadmapMaxLines();
+  if (lines > maxLines) {
+    console.log(`${filePath}:1:1: warning: ROADMAP ${lines} lineas (max ${maxLines}) — compacta completadas a Agente/completados/`);
+  }
+}
+
 function report() {
   const roadmaps = findRoadmaps();
   let totalTasks = 0;
 
   for (const roadmap of roadmaps) {
+    reportRoadmapSize(roadmap);
     const tasks = parsePendingTasks(roadmap);
     totalTasks += tasks.length;
 

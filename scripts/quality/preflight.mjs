@@ -55,11 +55,18 @@ async function verifyTool(root, name, toolConfig, manifest) {
 }
 
 export function validateQualityConfig(qualityConfig) {
-  const allowed = new Set(['schemaVersion', 'maxFindings', 'maxReminders', 'maxTerminalLines', 'lockWaitMs', 'maxConcurrentStages', 'timeoutsMs', 'performanceBudgets', 'heavyRun', 'reportRetention', 'fullPatterns', 'profiles', 'stageTimeBudgets', 'indexRetention']);
+  const allowed = new Set(['schemaVersion', 'maxFindings', 'maxReminders', 'maxTerminalLines', 'lockWaitMs', 'maxConcurrentStages', 'timeoutsMs', 'performanceBudgets', 'heavyRun', 'reportRetention', 'fullPatterns', 'profiles', 'stageTimeBudgets', 'indexRetention', 'roadmapMaxLines']);
   const unknown = Object.keys(qualityConfig).filter(key => !allowed.has(key));
   if (unknown.length > 0) throw new Error(`quality.config.json: claves desconocidas: ${unknown.join(', ')}`);
   for (const key of ['maxFindings', 'maxReminders', 'maxTerminalLines']) {
     if (!Number.isInteger(qualityConfig[key]) || qualityConfig[key] < 1) throw new Error(`quality.config.json: ${key} inválido`);
+  }
+  /* [028A-17] Límite de líneas del roadmap: opcional (default 700 en el
+   * adapter). Si se define debe ser entero ≥100 para que la regla bloqueante
+   * tenga sentido (un límite minúsculo rompería cualquier repo). */
+  if (qualityConfig.roadmapMaxLines !== undefined
+    && (!Number.isInteger(qualityConfig.roadmapMaxLines) || qualityConfig.roadmapMaxLines < 100)) {
+    throw new Error('quality.config.json: roadmapMaxLines debe ser un entero >= 100');
   }
   if (!Number.isInteger(qualityConfig.lockWaitMs) || qualityConfig.lockWaitMs < 0 || qualityConfig.lockWaitMs > 300_000) {
     throw new Error('quality.config.json: lockWaitMs debe ser un entero entre 0 y 300000');

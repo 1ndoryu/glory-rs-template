@@ -6,11 +6,36 @@ async function exists(target) {
   try { await access(target); return true; } catch { return false; }
 }
 
+/* [028A-17] Límite de tamaño del roadmap: cuando roadmap.md crece, se vuelve
+ * difícil de mantener y los agentes pierden la visión del siguiente bloque.
+ * La regla es BLOQUEANTE (severity error → FAIL del gate): el roadmap debe
+ * compactarse moviendo tareas completadas a Agente/completados/ en vez de
+ * acumular historia. El límite se configura en quality.config.json
+ * (roadmapMaxLines, 700 por defecto). */
+/* Misma medida que `wc -l` (nº de saltos de línea): un fichero de 701
+ * líneas reales tiene 701 `\n`. Un split() con el salto final sumaría 1. */
+function roadmapLineCount(content) {
+  return (content.match(/\n/gu) ?? []).length;
+}
+
 export async function runDocs(context, taskId) {
   const startedAt = Date.now();
   const findings = [];
   const roadmapPath = path.join(context.projectRoot, 'roadmap.md');
   const roadmap = await readFile(roadmapPath, 'utf8');
+
+  const maxLines = Number.isInteger(context.qualityConfig?.roadmapMaxLines)
+    ? context.qualityConfig.roadmapMaxLines
+    : 700;
+  const roadmapLines = roadmapLineCount(roadmap);
+  if (roadmapLines > maxLines) {
+    findings.push({
+      ruleId: 'docs-roadmap-max-lines',
+      severity: 'error',
+      file: 'roadmap.md',
+      message: `roadmap.md supera las ${maxLines} líneas (${roadmapLines}). Compacta: mueve tareas completadas a Agente/completados/tareas-YYYY-MM-DD.md y retíralas del roadmap antes de cerrar.`,
+    });
+  }
 
   if (!roadmap.includes(taskId)) {
     findings.push({ ruleId: 'docs-task-missing', severity: 'error', file: 'roadmap.md', message: `${taskId} no aparece en roadmap.md` });

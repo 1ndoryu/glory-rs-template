@@ -207,6 +207,7 @@ Reglas:
 
 ## 13. Cómo organizar `roadmap.md`
 
+- **Límite de tamaño bloqueante (700 líneas):** `roadmap.md` no puede superar 700 líneas (configurable en `quality.config.json` → `roadmapMaxLines`). El gate (`docs` → `docs-roadmap-max-lines`, severity error) FALLA la tarea si se supera. Al acercarse al límite, compactar: mover tareas completadas a `Agente/completados/tareas-YYYY-MM-DD.md` y retirarlas del roadmap; nunca acumular historia. `npm run roadmap` (watcher) también avisa con el mismo umbral.
 - Solo pendientes ejecutables; nunca visión histórica, completados, notas sueltas o especificaciones extensas.
 - Encabezado breve: producto, stack, deploy, epic y estado visual.
 - Enlaces a fuentes canónicas.
