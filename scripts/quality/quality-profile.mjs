@@ -35,14 +35,34 @@ export function summarize(values) {
 }
 
 function parseArgs(argv) {
-  const parsed = { taskId: null, limit: 20, json: null };
+  const parsed = { taskId: null, limit: 20, json: null, budgets: null };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === '--task-id') parsed.taskId = argv[++index] ?? null;
     else if (arg === '--limit') parsed.limit = Number(argv[++index]) || 20;
     else if (arg === '--json') parsed.json = argv[++index] ?? null;
+    else if (arg === '--budgets') parsed.budgets = argv[++index] ?? null;
   }
   return parsed;
+}
+
+/* [028A-8 Fase 0] Presupuesto de tiempo por etapa que falla SOLO ante
+ * regresión confirmada: exige muestras suficientes (>= minSamples) y que el
+ * p95 supere el presupuesto. Una variación aislada de la máquina con pocas
+ * ejecuciones nunca declara regresión. No es parte del gate: es diagnóstico. */
+export function evaluateStageBudgets(profile, budgets, minSamples = 5) {
+  if (!budgets || typeof budgets !== 'object') return [];
+  const violations = [];
+  for (const [stage, budgetMs] of Object.entries(budgets)) {
+    if (!Number.isInteger(budgetMs) || budgetMs < 1) continue;
+    const found = profile.stages.find(item => item.stage === stage);
+    if (!found) continue;
+    if (found.samples < minSamples) continue;
+    if (found.p95 !== null && found.p95 > budgetMs) {
+      violations.push({ stage, budgetMs, p95: found.p95, samples: found.samples });
+    }
+  }
+  return violations;
 }
 
 /* [028A-8] Colecta latest.json de cada tarea bajo el branch; opcionalmente se
@@ -112,6 +132,18 @@ async function main() {
   await writeFile(outputPath, `${JSON.stringify(profile, null, 2)}\n`, 'utf8');
   for (const line of renderCompact(profile)) console.log(line);
   process.stdout.write(`[profile] Detalle: ${path.relative(projectRoot, outputPath)}\n`);
+  /* [028A-8 Fase 0] Regresión confirmada: solo con muestras suficientes y p95
+   * por encima del presupuesto. Exit 1 informa, no bloquea el gate. */
+  if (args.budgets) {
+    let budgets;
+    try { budgets = JSON.parse(args.budgets); }
+    catch { budgets = null; }
+    const violations = evaluateStageBudgets(profile, budgets);
+    for (const violation of violations) {
+      process.stderr.write(`[profile] REGRESIÓN ${violation.stage}: p95 ${violation.p95}ms > presupuesto ${violation.budgetMs}ms (${violation.samples} muestras)\n`);
+    }
+    if (violations.length > 0) process.exitCode = 1;
+  }
 }
 
 await main();

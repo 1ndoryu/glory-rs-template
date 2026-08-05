@@ -16,7 +16,7 @@ const GATE_KEYS = new Set(['command', 'taskIdRequired']);
 const GUARD_KEYS = new Set(['directCommands']);
 const DIRECT_COMMAND_KEYS = new Set(['npmScripts', 'npxTools', 'cargoSubcommands', 'tools']);
 const LEGACY_SENTINEL_KEYS = new Set(['includePatterns', 'excludePatterns', 'directoryExceptions', 'portableBoundaries', 'rules']);
-const LEGACY_QUALITY_KEYS = new Set(['schemaVersion', 'maxFindings', 'maxReminders', 'maxTerminalLines', 'lockWaitMs', 'maxConcurrentStages', 'timeoutsMs', 'performanceBudgets', 'heavyRun', 'reportRetention', 'fullPatterns', 'profiles']);
+const LEGACY_QUALITY_KEYS = new Set(['schemaVersion', 'maxFindings', 'maxReminders', 'maxTerminalLines', 'lockWaitMs', 'maxConcurrentStages', 'timeoutsMs', 'performanceBudgets', 'heavyRun', 'reportRetention', 'fullPatterns', 'profiles', 'stageTimeBudgets']);
 const LEGACY_VARSENSE_KEYS = new Set(['variableFiles', 'includePatterns', 'excludePatterns', 'scanAllFiles', 'hardcodedDetection', 'inlineDetection', 'tokenDetection', 'bannedProperties', 'orphanClassDetection']);
 const LEGACY_TOOL_MANIFEST_KEYS = new Set(['schemaVersion', 'installRoot', 'tools']);
 const LEGACY_TOOL_KEYS = new Set(['repository', 'commit', 'version', 'outputSchemaVersion', 'buildScript', 'cli', 'testScript', 'patch', 'capabilities', 'sourcePath', 'sourcePathEnv']);
@@ -63,9 +63,17 @@ function validateLegacyContracts({ sentinelConfig, qualityConfig, varsenseConfig
       throw new Error(`quality.config.json.${key}: debe ser un entero no negativo`);
     }
   }
-  for (const key of ['timeoutsMs', 'performanceBudgets', 'heavyRun', 'reportRetention', 'profiles']) {
+  for (const key of ['timeoutsMs', 'performanceBudgets', 'heavyRun', 'reportRetention', 'profiles', 'stageTimeBudgets']) {
     if (qualityConfig[key] !== undefined && !isRecord(qualityConfig[key])) {
       throw new Error(`quality.config.json.${key}: debe ser un objeto`);
+    }
+  }
+  if (qualityConfig.stageTimeBudgets !== undefined) {
+    for (const [stage, budgetMs] of Object.entries(qualityConfig.stageTimeBudgets)) {
+      validateName(stage, 'quality.config.json.stageTimeBudgets');
+      if (!Number.isInteger(budgetMs) || budgetMs < 1) {
+        throw new Error(`quality.config.json.stageTimeBudgets.${stage}: debe ser un entero positivo (ms)`);
+      }
     }
   }
   if (qualityConfig.profiles !== undefined) {

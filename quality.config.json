@@ -17,6 +17,14 @@
     "entryCssGzipBytes": 16000,
     "largestChunkGzipBytes": 140000
   },
+  "stageTimeBudgets": {
+    "sentinel": 3000,
+    "varsense": 6000,
+    "frontend": 12000,
+    "rust": 120000,
+    "docs": 1000,
+    "custom": 1000
+  },
   "heavyRun": {
     "cooldownMinutes": 180,
     "maxTargetGb": 15,

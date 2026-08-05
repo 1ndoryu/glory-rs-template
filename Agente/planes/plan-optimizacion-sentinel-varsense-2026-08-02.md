@@ -1,7 +1,7 @@
 # Plan 028A-8 — Optimización medible de Sentinel y VarSense
 
 > **Fecha:** 2026-08-02
-> **Estado:** ejecución incremental; tramos 1 (alcance efectivo + manifiesto), 2 (índice persistente de VarSense entre ejecuciones), 3 (fijación del upstream + activación de la capacidad en el gate), 4 (selección de dependencias con el índice inverso + métricas Fase 0) y 5 (checkout interno de VarSense como submódulo) cerrados. Pendiente: índices globales de Sentinel y métricas RSS/p50-p95 del orquestador.
+> **Estado:** ejecución incremental; tramos 1 (alcance efectivo + manifiesto), 2 (índice persistente de VarSense entre ejecuciones), 3 (fijación del upstream + activación de la capacidad en el gate), 4 (selección de dependencias con el índice inverso + métricas Fase 0) y 5 (checkout interno de VarSense como submódulo) cerrados. Avance 2026-08-05: orquestador con métricas por etapa (razón de invalidación + métricas de VarSense + `metrics.json` por tarea + `quality:profile` p50/p95 + presupuestos de tiempo por etapa que solo fallan ante regresión confirmada). Pendiente: índices globales de Sentinel (Fase 3) y TTL/cuota separadas + CI histórico (resto Fase 4).
 > **Evidencia inicial:** los últimos reportes local-light tardan 16.6–35.1 s. VarSense consume 10.7–16.8 s y frontend 4.8–7.3 s. Sentinel va de 0.2 s incremental a 8–11 s cuando el alcance queda full. El full anterior llegó a 173.5 s, con Rust ocupando 114 s.
 > **Dependencias:** 028A-3/028A-5 (guard y gate único), SNT-10/028A-6 (Sentinel como plano único), `scripts/quality/cache.mjs`, `scope.mjs` y los repositorios versionados de Sentinel/VarSense.
 
@@ -49,13 +49,13 @@ Medir en una máquina de referencia y publicar p50/p95; los objetivos iniciales 
 
 ### Fase 0 — Instrumentación y baseline
 
-**Avance 2026-08-05:** VarSense ya publica `filesDiscovered/filesAnalyzed/filesReused/cacheHitRate/peakRssMb` (upstream `e836092`) y el orquestador las propaga al reporte del gate (`runVarsense.metrics` + `formatStageDetail`); `quality:profile` ofrece p50/p95 por etapa/total. Queda: medición separada por subfase de Sentinel, presupuesto de tiempo por etapa que falle solo ante regresión confirmada y baseline de cinco ejecuciones en fixture.
+**Avance 2026-08-05:** VarSense ya publica `filesDiscovered/filesAnalyzed/filesReused/cacheHitRate/peakRssMb` (upstream `e836092`) y el orquestador las propaga al reporte del gate (`runVarsense.metrics` + `formatStageDetail`); `quality:profile` ofrece p50/p95 por etapa/total; `quality.config.json.stageTimeBudgets` define presupuestos por etapa y `evaluateStageBudgets` declara regresión solo con ≥5 muestras y p95 sobre el presupuesto (diagnóstico con exit 1, no bloquea el gate). Queda: medición separada por subfase de Sentinel y baseline de cinco ejecuciones en fixture.
 
 - [x] Añadir medición separada de: descubrimiento de archivos, lectura, parseo, construcción de índices, reglas, serialización y escritura de reporte. *(VarSense: filesDiscovered/analyzed/reused/cacheHitRate/peakRssMb propagados al reporte; Sentinel aún sin métricas por subfase)*
 - [x] Publicar en JSON: `filesDiscovered`, `filesAnalyzed`, `filesReused`, `cacheHitRate`, `indexInvalidations`, `durationMs` y `peakRssMb` cuando esté disponible. *(en `latest.json` del gate y en `quality:profile`)*
 - [ ] Crear fixture pequeño, mediano y representativo del workspace real con cambios de CSS, TS, configuración, borrado y rename.
 - [ ] Medir cinco ejecuciones limpias y cinco incrementales de cada fixture; guardar baseline fuera de `.quality-reports/cache` para no contaminar fingerprints.
-- [ ] Añadir presupuesto de tiempo por etapa que falle solo ante regresión confirmada, no por variación aislada de la máquina.
+- [x] Añadir presupuesto de tiempo por etapa que falle solo ante regresión confirmada, no por variación aislada de la máquina. *(`stageTimeBudgets` en `quality.config.json` + `evaluateStageBudgets` en `quality-profile.mjs --budgets`: requiere ≥5 muestras y p95 sobre presupuesto; verificado con varsense a 4 muestras → no declara regresión)*
 
 **Gate:** baseline reproducible y reportes capaces de demostrar dónde se consumen los segundos.
 
@@ -126,8 +126,10 @@ filesAnalyzed/filesReused/cacheHitRate/peakRssMb del CLI al reporte
 (`quality-profile.mjs`, alias temporal de `sentinel profile`) lee los últimos
 `latest.json` de la rama y calcula p50/p95 por etapa y total sin ejecutar
 validaciones. El reporte del gate también expone `heavyOverride`/`OVERRIDE`
-(028A-16). Queda pendiente el detalle de timing en `metrics.json` por tarea
-(hoy vive en `latest.json`), TTL/cuota separadas para índices y CI histórico.
+(028A-16). `createReport` escribe además `metrics.json` por tarea (duración/cache/
+invalidación/métricas del analizador, redactado) consumido por `quality:profile`
+y candidato al histórico de CI. Quedan: TTL/cuota separadas para índices y CI
+histórico.
 
 - [x] Mostrar en el reporte si cada etapa fue `cache-hit`, incremental o full, cuántos archivos reutilizó y qué invalidó la caché. *(razón de invalidación por etapa + métricas de VarSense + p50/p95 vía `quality:profile`)*
 - [x] Mantener el stdout compacto; el detalle de timing vive en `.quality-reports/<task>/metrics.json`. *(nuevo `metrics.json` por tarea con duración/cache/invalidación/métricas del analizador, redactado; `quality:profile` lo consume junto a `latest.json`)*

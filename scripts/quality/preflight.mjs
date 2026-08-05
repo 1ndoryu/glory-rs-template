@@ -55,7 +55,7 @@ async function verifyTool(root, name, toolConfig, manifest) {
 }
 
 export function validateQualityConfig(qualityConfig) {
-  const allowed = new Set(['schemaVersion', 'maxFindings', 'maxReminders', 'maxTerminalLines', 'lockWaitMs', 'maxConcurrentStages', 'timeoutsMs', 'performanceBudgets', 'heavyRun', 'reportRetention', 'fullPatterns', 'profiles']);
+  const allowed = new Set(['schemaVersion', 'maxFindings', 'maxReminders', 'maxTerminalLines', 'lockWaitMs', 'maxConcurrentStages', 'timeoutsMs', 'performanceBudgets', 'heavyRun', 'reportRetention', 'fullPatterns', 'profiles', 'stageTimeBudgets']);
   const unknown = Object.keys(qualityConfig).filter(key => !allowed.has(key));
   if (unknown.length > 0) throw new Error(`quality.config.json: claves desconocidas: ${unknown.join(', ')}`);
   for (const key of ['maxFindings', 'maxReminders', 'maxTerminalLines']) {
@@ -76,6 +76,13 @@ export function validateQualityConfig(qualityConfig) {
   }
   if (!qualityConfig.performanceBudgets || Object.values(qualityConfig.performanceBudgets).some(value => !Number.isInteger(value) || value < 1)) {
     throw new Error('quality.config.json: performanceBudgets inválido');
+  }
+  if (qualityConfig.stageTimeBudgets !== undefined) {
+    for (const [stage, budgetMs] of Object.entries(qualityConfig.stageTimeBudgets)) {
+      if (!/^[A-Za-z0-9:_-]+$/.test(stage) || !Number.isInteger(budgetMs) || budgetMs < 1) {
+        throw new Error(`quality.config.json: stageTimeBudgets.${stage} inválido (entero positivo en ms)`);
+      }
+    }
   }
   if (!qualityConfig.heavyRun || !Number.isFinite(qualityConfig.heavyRun.cooldownMinutes) || qualityConfig.heavyRun.cooldownMinutes < 0 || qualityConfig.heavyRun.cooldownMinutes > 24 * 60) {
     throw new Error('quality.config.json: heavyRun.cooldownMinutes debe estar entre 0 y 1440');
