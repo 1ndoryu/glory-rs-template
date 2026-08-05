@@ -301,6 +301,29 @@ quality) y gate PASS.
 
 **Gate/salida:** orden móvil compacto y persistente, sin contaminar `position` desktop.
 
+### 018A-97 — Grid de iconos del escritorio coherente (placeholder + debug)
+
+**Motivo (05-ago, usuario):** el grid de iconos "está mal", hay fallas y el placeholder de
+arrastre junto con las rejillas rojas de debug (Ctrl+Shift+G) no son coherentes con las celdas
+reales. **Causa raíz identificada en plan `Agente/planes/plan-iconos-escritorio-grid-2026-08-05.md`:**
+`justify-content: space-between` horizontal reparte el sobrante pero ningún cálculo lo replica
+(falta `columnGapEffective`; solo existe `rowGapEffective`); el grid `direction: rtl` tiene tres
+fórmulas paralelas de geometría (getCellAt / positionCellHighlight / debugGridOverlay) que ya
+divergieron; `cellWidth` se mide del primer item, no del track; y la rejilla roja es depuración
+temporal (297A-20) que quedó en producción.
+
+- [ ] Unificar la geometría de celdas: `columnGapEffective` + `cellOriginAt(col,row,metrics)` único
+  (LTR/RTL) usado por getCellAt, highlight y debug; tests DOM sobre grid real con `space-between`+RTL.
+- [ ] Placeholder de arrastre: verificar en navegador que cae exactamente sobre la celda destino
+  (desktop ≥769 y tablet), ajustar transición y tests DOM del highlight.
+- [ ] Rejilla de debug: coherente (usa `cellOriginAt`) y dev-only, o retirada (borrar overlay,
+  atajo Ctrl+Shift+G y CSS `--depurar`/`__debug*`); VarSense sin huérfanas.
+- [ ] Verificación final: suite + type-check + gate; navegador 1440×900 / 1024×768 (arrastre,
+  colisiones, reflow al encoger) y móvil <768 (reorder por índice como fallback).
+
+**Gate/salida:** un único helper de geometría alimenta todo; el placeholder coincide con la celda
+real; sin rejillas rojas en producción; tests DOM fijan la geometría frente a `space-between`+RTL.
+
 ### 297A-21 — Notificaciones de novedades
 
 **Depende de:** 297A-13 y releases versionados.

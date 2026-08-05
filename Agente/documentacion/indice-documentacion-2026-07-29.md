@@ -33,6 +33,7 @@
 | ¿Cuál es el inventario y frontera de `glory-render` (Fase 0)? | `Agente/documentacion/arquitectura/auditoria-glory-render-fase0-2026-08-05.md` |
 | ¿Cómo se integra y versiona `glory-render` (submódulo, SemVer, CI)? | `Agente/documentacion/arquitectura/estrategia-integracion-glory-render-2026-08-05.md` |
 | ¿Cómo se paga la deuda SOLID del runtime de apps?       | `Agente/planes/plan-deuda-solid-runtime-2026-07-31.md`                             |
+| ¿Cómo se arregla el grid/placeholder/debug de iconos del escritorio? | `Agente/planes/plan-iconos-escritorio-grid-2026-08-05.md` |
 | ¿Por qué se cierran ventanas al abrir otra y cómo se resuelve? | `Agente/planes/plan-cierre-automatico-ventanas-2026-07-31.md`                |
 | ¿Cómo se implementan los programas editoriales por vertical? | `Agente/planes/plan-programas-editoriales-2026-07-31.md`                       |
 | ¿Cómo se protege el checkout, webhook y descarga digital? | `Agente/planes/plan-comercio-seguro-2026-08-01.md`                              |
