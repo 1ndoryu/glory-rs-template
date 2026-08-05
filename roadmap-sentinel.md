@@ -7,6 +7,8 @@
 
 > **Estado (018A-43):** mínimo operativo cerrado y verificado; el roadmap principal queda desbloqueado. El commit no es requisito universal: el reporte recuerda cuándo conviene hacer staging/commit/push y cuándo documentar trabajo intermedio o compartido. El gate sí exige prueba y reporte reproducibles.
 
+> **Toma de tareas (028A-17, 2026-08-05):** los agentes marcan la tarea que empiezan y la liberan al terminar. `npm run task:take -- --task <ID> --by <agente>` crea un marcado en `.quality-reports/task-takeover/<taskId>.json` (ignorado por git) cuyo identificador `T-<epochMs>-<hex8>` codifica el instante exacto de la toma; `npm run task:status` lista tomas y expiraciones; `npm run task:release -- --task <ID>` libera. Reglas: una tarea tomada por otro agente activo se rechaza (exit 1); un marcado que supera 6 h sin liberarse se considera olvidado y cualquier agente puede re-tomarlo (`--force`, con aviso) o liberarlo. `task:check` avisa al inicio si la tarea está tomada por otro agente activo y añade recordatorio de liberarla si la tomó este agente; el reporte expone `taskTakeover`. Verificado: `quality:test` 200/200 y flujo real take/status/conflicto/check/release en vivo. Regla documentada en `AGENTS.md` §6.
+
 > **Decisión de alcance:** las fases SNT-02 a SNT-10 que siguen con casillas abiertas son backlog diferido. No se ejecutan como requisito de una tarea del producto mientras el gate mínimo pase, no haya regresión de rendimiento y no aparezca un finding bloqueante real. Las extensiones de reglas, paridad de adapters, benchmarks y publicación upstream quedan para una iteración específica de tooling.
 
 ## Prioridad para desbloquear el roadmap principal

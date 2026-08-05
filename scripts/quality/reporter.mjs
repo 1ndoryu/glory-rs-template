@@ -67,6 +67,7 @@ function markdown(report) {
     ...(report.indexMaintenance?.removed?.length ? [`- Índices: **${report.indexMaintenance.removed.length} podados** (${report.indexMaintenance.removed.map(item => `${item.branchKey}/${item.index}:${item.reason}`).join(', ')}) — ${report.indexMaintenance.remainingBytes} bytes restantes`] : []),
     ...(report.indexMaintenance?.skipped === 'cooldown' ? ['- Índices: supervisados hace menos de la ventana'] : []),
     ...(report.heavyGuard ? [`- Full diferido: **${report.heavyGuard.reason}** — ${report.heavyGuard.nextAllowedAt ?? report.heavyGuard.message ?? 'reintento bloqueado'}`] : []),
+    ...(report.taskTakeover ? [`- Toma de tarea: **${report.taskTakeover.takenBy}** (${report.taskTakeover.id}) desde ${report.taskTakeover.takenAt} — expira ${report.taskTakeover.expiresAt}`] : []),
     ...(report.heavyOverride ? [`- Excepción pesada: **OVERRIDE** — ${report.heavyOverride.granted ? 'concedida' : 'denegada'} · source ${report.heavyOverride.source}${report.heavyOverride.reason ? ` · motivo: ${report.heavyOverride.reason}` : ''}`] : []),
     '',
     '## Etapas',
@@ -98,6 +99,7 @@ export async function createReport(context, args, scope, stages, reminders, star
     targetMaintenance: context.targetMaintenance ?? null,
     indexMaintenance: context.indexMaintenance ?? null,
     heavyOverride: context.heavyOverride ?? null,
+    taskTakeover: context.taskTakeover ?? null,
     policy: context.policyIdentity ?? {
       projectRoot: context.projectRoot,
       policyPath: null,

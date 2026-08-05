@@ -14,6 +14,7 @@ import { runBoundedStages } from './stage-runner.mjs';
 import { runReportRetentionBestEffort } from './report-retention-stage.mjs';
 import { runTargetMaintenanceBestEffort } from './target-maintenance-stage.mjs';
 import { runIndexMaintenanceBestEffort } from './index-maintenance.mjs';
+import { defaultAgent, isStale, readTakeover, takeoverReminders } from './task-takeover.mjs';
 
 let interrupted = false;
 function handleInterruption(signal) {
@@ -102,6 +103,21 @@ async function main() {
       }
     }
     const context = await preflight(args);
+    /* [028A-17] Coordinación de tomas de tarea: el gate solo INFORMA. Si la
+     * tarea está tomada por otro agente activo, se avisa fuerte al inicio
+     * (el agente decide si es una validación legítima o un conflicto real).
+     * Al final, los reminders recuerdan liberar si la tomó este agente,
+     * re-tomarla si expiró, o marcarla si nadie la tomó. Un error de lectura
+     * del registro (permisos, archivo bloqueado en Windows) degrada a “sin
+     * información” y NUNCA convierte el gate en SETUP ERROR. */
+    try {
+      context.taskTakeover = await readTakeover(context.projectRoot, args.taskId);
+    } catch {
+      context.taskTakeover = null;
+    }
+    if (context.taskTakeover && context.taskTakeover.takenBy !== defaultAgent() && !isStale(context.taskTakeover)) {
+      process.stderr.write(`[quality] TAREA TOMADA por ${context.taskTakeover.takenBy} (${context.taskTakeover.id}) desde ${context.taskTakeover.takenAt} — expira ${context.taskTakeover.expiresAt}. Si no es tuya, coordina antes de cerrarla (npm run task:status); si es tuya, ejecuta el gate con GLORY_AGENT_ID=<tu-agente>.\n`);
+    }
     /* [018A-4] Un agente no debe acumular procesos esperando el mismo gate.
      * La espera larga queda disponible para consumidores de la librería, pero
      * el comando público falla rápido y deja una acción clara al agente. */
@@ -168,7 +184,15 @@ async function main() {
           definition => executeStage(context, scope, definition, args),
           { maxConcurrency: context.qualityConfig.maxConcurrentStages ?? 1, isCancelled: () => interrupted },
         );
-        const reminders = selectReminders(scope, stages, context.qualityConfig.maxReminders, context);
+        /* [028A-17] Recordatorios de toma de tarea ANTEPUESTOS: compactLines
+         * recorta a maxReminders (4 por defecto), así que si se añadieran al
+         * final, el recordatorio de liberar se perdería en la salida de
+         * terminal justo cuando más importa. Al anteponerlos siempre quedan
+         * visibles; el JSON/Markdown conservan la lista completa. */
+        const reminders = [
+          ...takeoverReminders({ taskId: args.taskId, entry: context.taskTakeover, agent: defaultAgent() }),
+          ...selectReminders(scope, stages, context.qualityConfig.maxReminders, context),
+        ].filter((reminder, index, all) => all.indexOf(reminder) === index);
         /* La poda nunca cambia el resultado del gate: registra su estado para
          * el reporte y continúa aunque el filesystem esté ocupado. */
         context.reportRetention = await runReportRetentionBestEffort({
