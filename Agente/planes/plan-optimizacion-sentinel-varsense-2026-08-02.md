@@ -134,8 +134,8 @@ histórico.
 - [x] Mostrar en el reporte si cada etapa fue `cache-hit`, incremental o full, cuántos archivos reutilizó y qué invalidó la caché. *(razón de invalidación por etapa + métricas de VarSense + p50/p95 vía `quality:profile`)*
 - [x] Mantener el stdout compacto; el detalle de timing vive en `.quality-reports/<task>/metrics.json`. *(nuevo `metrics.json` por tarea con duración/cache/invalidación/métricas del analizador, redactado; `quality:profile` lo consume junto a `latest.json`)*
 - [x] Añadir diagnóstico `sentinel profile <TareaId>` (alias temporal `npm run quality:profile`) que no ejecuta full: lee los últimos reportes y calcula p50/p95.
-- [ ] Aplicar TTL y cuota separadas para índices Sentinel/VarSense, sin mezclarlas con `C:\tmp\glory-target`.
-- [ ] Limpiar entradas huérfanas por `toolVersion/configHash` de forma acotada; nunca borrar una caché con lock activo.
+- [x] Aplicar TTL y cuota separadas para índices Sentinel/VarSense, sin mezclarlas con `C:\tmp\glory-target`. *(`index-maintenance.mjs` + `quality.config.json.indexRetention`: maxAgeDays/maxMiB/throttleHours; poda por edad y cuota de `<branch>/cache/<index>`; el branch actual y los locks activos se protegen; `RECENT_INDEX_WRITE_MS` de 30 min; pase con throttle de 6 h y presupuesto de 60 s, reportado en `latest.json` como `indexMaintenance`)*
+- [x] Limpiar entradas huérfanas por `toolVersion/configHash` de forma acotada; nunca borrar una caché con lock activo. *(los índices son caché regenerable: la identidad y la expulsión por borrado la gestiona el store de VarSense al cargar; la poda del orquestador nunca toca ramas con lock de tarea activo, verificado por test)*
 - [ ] Hacer que CI publique métricas históricas sin subir código fuente ni secretos.
 
 **Gate:** el equipo puede saber si una tarea fue lenta por análisis, caché fría, invalidación o espera, sin leer logs enormes.

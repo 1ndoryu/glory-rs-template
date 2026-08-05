@@ -13,6 +13,7 @@ import { isFullExecution } from './profile-contract.mjs';
 import { runBoundedStages } from './stage-runner.mjs';
 import { runReportRetentionBestEffort } from './report-retention-stage.mjs';
 import { runTargetMaintenanceBestEffort } from './target-maintenance-stage.mjs';
+import { runIndexMaintenanceBestEffort } from './index-maintenance.mjs';
 
 let interrupted = false;
 function handleInterruption(signal) {
@@ -169,6 +170,15 @@ async function main() {
          * quality.config.json heavyRun; no hay clave targetRoot en la config. */
         context.targetMaintenance = await runTargetMaintenanceBestEffort({
           projectRoot: context.projectRoot,
+        });
+        /* [028A-8 Fase 4] Supervisión de índices de analizadores (varsense):
+         * TTL y cuota separados de los targets de cargo, con throttle por
+         * ventana y presupuesto de tiempo; nunca borra una rama con lock
+         * activo ni un índice reescrito en la última media hora. */
+        context.indexMaintenance = await runIndexMaintenanceBestEffort({
+          projectRoot: context.projectRoot,
+          currentBranchKey: context.branch.branchKey,
+          config: context.qualityConfig.indexRetention,
         });
         const report = await createReport(context, args, scope, stages, reminders, startedAt);
         printCompact(report, context);

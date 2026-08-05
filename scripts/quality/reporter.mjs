@@ -63,6 +63,9 @@ function markdown(report) {
     ...(report.targetMaintenance?.status === 'error' ? [`- Targets: **error no bloqueante** — ${report.targetMaintenance.message}`] : []),
     ...(report.targetMaintenance?.removed?.length ? [`- Targets: **${report.targetMaintenance.removed.length} podados** (${report.targetMaintenance.removed.map(item => `${item.name}:${item.reason}`).join(', ')}) — ${report.targetMaintenance.totalBytes} bytes restantes`] : []),
     ...(report.targetMaintenance?.skipped === 'cooldown' ? ['- Targets: supervisados hace menos de la ventana; pase completo con `npm run quality:cleanup`'] : []),
+    ...(report.indexMaintenance?.status === 'error' ? [`- Índices: **error no bloqueante** — ${report.indexMaintenance.message}`] : []),
+    ...(report.indexMaintenance?.removed?.length ? [`- Índices: **${report.indexMaintenance.removed.length} podados** (${report.indexMaintenance.removed.map(item => `${item.branchKey}/${item.index}:${item.reason}`).join(', ')}) — ${report.indexMaintenance.remainingBytes} bytes restantes`] : []),
+    ...(report.indexMaintenance?.skipped === 'cooldown' ? ['- Índices: supervisados hace menos de la ventana'] : []),
     ...(report.heavyGuard ? [`- Full diferido: **${report.heavyGuard.reason}** — ${report.heavyGuard.nextAllowedAt ?? report.heavyGuard.message ?? 'reintento bloqueado'}`] : []),
     ...(report.heavyOverride ? [`- Excepción pesada: **OVERRIDE** — ${report.heavyOverride.granted ? 'concedida' : 'denegada'} · source ${report.heavyOverride.source}${report.heavyOverride.reason ? ` · motivo: ${report.heavyOverride.reason}` : ''}`] : []),
     '',
@@ -93,6 +96,7 @@ export async function createReport(context, args, scope, stages, reminders, star
     branch: context.branch ?? null,
     reportRetention: context.reportRetention ?? null,
     targetMaintenance: context.targetMaintenance ?? null,
+    indexMaintenance: context.indexMaintenance ?? null,
     heavyOverride: context.heavyOverride ?? null,
     policy: context.policyIdentity ?? {
       projectRoot: context.projectRoot,

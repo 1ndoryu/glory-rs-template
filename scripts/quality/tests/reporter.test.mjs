@@ -185,6 +185,33 @@ test('el reporte expone OVERRIDE (concedida/denegada) y el detalle de etapa con 
   }
 });
 
+test('el reporte refleja el mantenimiento de índices (podados/cooldown/error) (028A-8 Fase 4)', async () => {
+  const projectRoot = await mkdtemp(path.join(os.tmpdir(), 'quality-reporter-index-'));
+  try {
+    const base = async indexMaintenance => {
+      await mkdir(path.join(projectRoot, '.quality-reports', 'T-IDX'), { recursive: true });
+      return createReport(
+        { projectRoot, reportRoot: path.join(projectRoot, '.quality-reports', 'T-IDX'), qualityConfig: { maxFindings: 3 }, tools: {}, indexMaintenance },
+        { taskId: 'T-IDX', ci: false, full: false },
+        { base: 'HEAD', full: false, files: [], profiles: [] },
+        [{ stage: 'sentinel', status: 'pass', durationMs: 1, findings: [], summary: '0 errores' }],
+        [],
+        Date.now(),
+      );
+    };
+    const pruned = await base({ status: 'pass', removed: [{ branchKey: 'b-1', index: 'varsense', reason: 'age' }], remainingBytes: 100 });
+    const json = JSON.parse(await readFile(pruned.jsonPath, 'utf8'));
+    assert.equal(json.indexMaintenance.removed.length, 1);
+    assert.match(await readFile(pruned.markdownPath, 'utf8'), /Índices: \*\*1 podados\*\*/);
+    const cooldown = await base({ status: 'pass', skipped: 'cooldown' });
+    assert.match(await readFile(cooldown.markdownPath, 'utf8'), /Índices: supervisados hace menos de la ventana/);
+    const broken = await base({ status: 'error', message: 'disk lleno' });
+    assert.match(await readFile(broken.markdownPath, 'utf8'), /Índices: \*\*error no bloqueante\*\*/);
+  } finally {
+    await rm(projectRoot, { recursive: true, force: true });
+  }
+});
+
 test('createReport representa cancelación con exit code 130', async () => {
   const projectRoot = await mkdtemp(path.join(os.tmpdir(), 'quality-reporter-cancelled-'));
   try {

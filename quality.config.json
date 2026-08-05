@@ -25,6 +25,11 @@
     "docs": 1000,
     "custom": 1000
   },
+  "indexRetention": {
+    "maxAgeDays": 7,
+    "maxMiB": 256,
+    "throttleHours": 6
+  },
   "heavyRun": {
     "cooldownMinutes": 180,
     "maxTargetGb": 15,

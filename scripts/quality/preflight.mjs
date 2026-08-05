@@ -55,7 +55,7 @@ async function verifyTool(root, name, toolConfig, manifest) {
 }
 
 export function validateQualityConfig(qualityConfig) {
-  const allowed = new Set(['schemaVersion', 'maxFindings', 'maxReminders', 'maxTerminalLines', 'lockWaitMs', 'maxConcurrentStages', 'timeoutsMs', 'performanceBudgets', 'heavyRun', 'reportRetention', 'fullPatterns', 'profiles', 'stageTimeBudgets']);
+  const allowed = new Set(['schemaVersion', 'maxFindings', 'maxReminders', 'maxTerminalLines', 'lockWaitMs', 'maxConcurrentStages', 'timeoutsMs', 'performanceBudgets', 'heavyRun', 'reportRetention', 'fullPatterns', 'profiles', 'stageTimeBudgets', 'indexRetention']);
   const unknown = Object.keys(qualityConfig).filter(key => !allowed.has(key));
   if (unknown.length > 0) throw new Error(`quality.config.json: claves desconocidas: ${unknown.join(', ')}`);
   for (const key of ['maxFindings', 'maxReminders', 'maxTerminalLines']) {
@@ -82,6 +82,18 @@ export function validateQualityConfig(qualityConfig) {
       if (!/^[A-Za-z0-9:_-]+$/.test(stage) || !Number.isInteger(budgetMs) || budgetMs < 1) {
         throw new Error(`quality.config.json: stageTimeBudgets.${stage} inválido (entero positivo en ms)`);
       }
+    }
+  }
+  if (qualityConfig.indexRetention !== undefined) {
+    const { maxAgeDays, maxMiB, throttleHours } = qualityConfig.indexRetention;
+    if (!Number.isInteger(maxAgeDays) || maxAgeDays < 1 || maxAgeDays > 365) {
+      throw new Error('quality.config.json: indexRetention.maxAgeDays debe estar entre 1 y 365');
+    }
+    if (!Number.isInteger(maxMiB) || maxMiB < 1 || maxMiB > 1024 * 1024) {
+      throw new Error('quality.config.json: indexRetention.maxMiB inválido');
+    }
+    if (!Number.isInteger(throttleHours) || throttleHours < 1 || throttleHours > 720) {
+      throw new Error('quality.config.json: indexRetention.throttleHours debe estar entre 1 y 720');
     }
   }
   if (!qualityConfig.heavyRun || !Number.isFinite(qualityConfig.heavyRun.cooldownMinutes) || qualityConfig.heavyRun.cooldownMinutes < 0 || qualityConfig.heavyRun.cooldownMinutes > 24 * 60) {
