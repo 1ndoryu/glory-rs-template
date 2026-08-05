@@ -211,10 +211,10 @@ impl ArticleService {
     /// restaurarla desde la Papelera admin.
     pub async fn delete(pool: &PgPool, id: Uuid) -> Result<(), AppError> {
         let mut tx = pool.begin().await?;
-        if !ArticleRepository::delete(&mut *tx, id).await? {
+        if !ArticleRepository::delete(&mut tx, id).await? {
             return Err(AppError::NotFound("Articulo no encontrado".into()));
         }
-        ResourceRepository::soft_delete_kind_tx(&mut *tx, id, ResourceKind::Article).await?;
+        ResourceRepository::soft_delete_kind_tx(&mut tx, id, ResourceKind::Article).await?;
         tx.commit().await?;
         Ok(())
     }
@@ -240,10 +240,10 @@ impl ArticleService {
     /// transacción; devuelve el artículo restaurado.
     pub async fn restore(pool: &PgPool, id: Uuid) -> Result<Article, AppError> {
         let mut tx = pool.begin().await?;
-        if !ArticleRepository::restore(&mut *tx, id).await? {
+        if !ArticleRepository::restore(&mut tx, id).await? {
             return Err(AppError::NotFound("Articulo no encontrado".into()));
         }
-        ResourceRepository::restore_kind_tx(&mut *tx, id, ResourceKind::Article).await?;
+        ResourceRepository::restore_kind_tx(&mut tx, id, ResourceKind::Article).await?;
         tx.commit().await?;
         ArticleRepository::find_by_id(pool, id)
             .await?

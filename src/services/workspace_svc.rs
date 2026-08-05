@@ -332,7 +332,7 @@ fn compute_release_summary(
 /// (artículos → `nota-{id}` bajo "Notas"; medios → `media-{id}` bajo la
 /// subcarpeta de "Documentos" según su tipo), replicando EXACTAMENTE el
 /// contrato que construye el frontend (`buildArticleNode` / `buildMediaNode`
-/// + carpetas) para que el escritorio muestre el contenido publicado en
+/// y carpetas) para que el escritorio muestre el contenido publicado en
 /// cualquier versión activa. Merge idempotente por id: si el nodo ya existe
 /// en el release (p. ej. el admin lo publicó como parte del árbol), se
 /// conserva el del release y no se duplica.
@@ -343,6 +343,16 @@ fn materialize_content_nodes(
     tree: &serde_json::Value,
     content: &[PublicContent],
 ) -> serde_json::Value {
+    /* Contrato de carpetas: mismas ids/etiquetas/parents que el frontend. */
+    const FOLDERS: &[(&str, &str, &str)] = &[
+        ("notas", "desktop", "Notas"),
+        ("documentos", "desktop", "Documentos"),
+        ("documentos-imagenes", "documentos", "Imágenes"),
+        ("documentos-audio", "documentos", "Audio"),
+        ("documentos-video", "documentos", "Vídeo"),
+        ("documentos-documentos", "documentos", "Documentos"),
+    ];
+
     /* Copia de trabajo; el release original queda intacto. */
     let mut out = tree.clone();
 
@@ -353,16 +363,6 @@ fn materialize_content_nodes(
         /* Sin `nodes`, no hay dónde materializar: devolver tal cual. */
         return out;
     };
-
-    /* Contrato de carpetas: mismas ids/etiquetas/parents que el frontend. */
-    const FOLDERS: &[(&str, &str, &str)] = &[
-        ("notas", "desktop", "Notas"),
-        ("documentos", "desktop", "Documentos"),
-        ("documentos-imagenes", "documentos", "Imágenes"),
-        ("documentos-audio", "documentos", "Audio"),
-        ("documentos-video", "documentos", "Vídeo"),
-        ("documentos-documentos", "documentos", "Documentos"),
-    ];
 
     /* Subcarpeta destino de cada tipo de media (mismo mapeo que el frontend). */
     let media_folder = |file_type: &str| match file_type {
@@ -420,8 +420,7 @@ fn materialize_content_nodes(
                 let folder_label = FOLDERS
                     .iter()
                     .find(|(id, _, _)| *id == folder_id)
-                    .map(|(_, _, label)| *label)
-                    .unwrap_or("Documentos");
+                    .map_or("Documentos", |(_, _, label)| *label);
                 ensure_folder(nodes, folder_id, "documentos", folder_label);
                 let node_id = format!("media-{}", item.id);
                 if nodes.contains_key(&node_id) {

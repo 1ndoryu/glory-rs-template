@@ -51,8 +51,13 @@ impl From<GameRoomMetricsSnapshot> for GameMetricsResponse {
         (status = 200, description = "Conteos agregados del realtime", body = GameMetricsResponse)
     )
 )]
+/* [SNT-11] Axum 0.7.9 solo implementa `Handler` para `FnOnce -> Fut`: el
+ * handler DEBE ser async aunque el cuerpo no tenga awaits (`metrics()` es
+ * síncrono por clippy en `GameRoomState`). Allow justificado por la
+ * restricción del framework, no para ocultar un fallo preexistente. */
+#[allow(clippy::unused_async)]
 pub async fn read_game_metrics(State(state): State<AppState>) -> Json<GameMetricsResponse> {
-    Json(state.game_ws_state.room_state().metrics().await.into())
+    Json(state.game_ws_state.room_state().metrics().into())
 }
 
 pub fn routes() -> Router<AppState> {

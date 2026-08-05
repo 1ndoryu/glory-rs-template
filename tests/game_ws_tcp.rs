@@ -279,7 +279,7 @@ async fn binary_first_message_over_tcp_is_rejected() {
 #[tokio::test]
 async fn ninth_tcp_player_is_rejected_with_room_full() {
     let state = test_state_with_capacity(9);
-    state.game_ws_state.set_room_map(Some(fixture_map())).await;
+    state.game_ws_state.set_room_map(Some(fixture_map()));
     let ticket_store = state.game_ticket_store.clone();
     let (url, shutdown, server_handle) = spawn_server(state).await;
     let mut sockets = Vec::new();
@@ -324,7 +324,7 @@ async fn ninth_tcp_player_is_rejected_with_room_full() {
 #[tokio::test]
 async fn joined_tcp_room_moves_authoritatively_and_rejects_sequence_replay() {
     let state = test_state();
-    state.game_ws_state.set_room_map(Some(fixture_map())).await;
+    state.game_ws_state.set_room_map(Some(fixture_map()));
     let ticket = state
         .game_ticket_store
         .issue(Uuid::new_v4(), None, 30, TEST_SECRET)
@@ -419,7 +419,7 @@ async fn metrics_endpoint_reports_aggregated_counts_without_identity() {
      * el mismo estado del router real: tras un join + movimientos, los conteos
      * reflejan la actividad sin exponer player ids ni posiciones. */
     let state = test_state();
-    state.game_ws_state.set_room_map(Some(fixture_map())).await;
+    state.game_ws_state.set_room_map(Some(fixture_map()));
     let ticket_store = state.game_ticket_store.clone();
     let (url, shutdown, server_handle) = spawn_server(state).await;
     let http_url = url

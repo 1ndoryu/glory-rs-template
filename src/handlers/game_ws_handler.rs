@@ -246,7 +246,7 @@ fn now_millis() -> u64 {
 }
 
 async fn ensure_room_map(state: &AppState) -> Result<(), String> {
-    if state.game_ws_state.has_room_map().await {
+    if state.game_ws_state.has_room_map() {
         return Ok(());
     }
     let Some(map_id) = std::env::var("GAME_MAP_ID")
@@ -259,7 +259,7 @@ async fn ensure_room_map(state: &AppState) -> Result<(), String> {
         .await
         .map_err(|_| "mapa activo no encontrado".to_string())?;
     let map = GameRoomMap::from_public(&public)?;
-    state.game_ws_state.set_room_map(Some(map)).await;
+    state.game_ws_state.set_room_map(Some(map));
     Ok(())
 }
 

@@ -94,10 +94,19 @@ export function isHeavyCargoCommand(args) {
   return command === 'test' || command === 'clippy' || command === 'bench';
 }
 
+/* [SNT-11] DESACTIVADO (2026-08-05): la excepción manual del guard ya NO
+ * concede saltos del cooldown de 180 min (decisión del usuario: no se permite
+ * saltar el cooldown). El mecanismo se conserva íntegro — parsing, auditoría y
+ * logging en heavy-overrides.log — para trazabilidad y posible re-activación
+ * solo con decisión explícita del usuario y ADR previo. Únicamente CI (modo
+ * sancionado, no corre en el equipo) sigue autorizado a full sin cooldown. */
+export const HEAVY_MANUAL_OVERRIDE_ENABLED = false;
+
 export function isHeavyOverride(options = {}) {
+  if (options.ci) return true;
+  if (!HEAVY_MANUAL_OVERRIDE_ENABLED) return false;
   return Boolean(
     options.allowHeavy
-    || options.ci
     || process.env.GLORY_QUALITY_ALLOW_HEAVY === '1'
     || process.env.GLORY_HEAVY_RUN_TOKEN,
   );
@@ -277,7 +286,9 @@ export async function acquireHeavyRun({
 export function formatHeavyGuardMessage(decision) {
   if (decision.reason === 'cooldown') {
     const minutes = Math.ceil(decision.remainingMs / 60_000);
-    return `Full diferido por cooldown: faltan aproximadamente ${minutes} min. Próxima ejecución: ${decision.nextAllowedAt}. Usa --allow-heavy solo si es imprescindible.`;
+    /* [SNT-11] La excepción manual está desactivada: ya no se sugiere
+     * --allow-heavy; la única salida es esperar el cooldown (o CI). */
+    return `Full diferido por cooldown: faltan aproximadamente ${minutes} min. Próxima ejecución: ${decision.nextAllowedAt}. La excepción manual está desactivada (SNT-11): espera al cooldown o usa CI.`;
   }
   return decision.message || 'Full diferido porque ya hay otra ejecución pesada activa.';
 }

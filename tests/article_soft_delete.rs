@@ -64,9 +64,10 @@ async fn create_admin(state: &AppState) -> Uuid {
 }
 
 async fn session(state: &AppState, user_id: Uuid) -> (String, String) {
-    let result = SessionService::create(&state.pool, user_id, None, Some("article-soft-delete-test"))
-        .await
-        .expect("debe poder crear la sesión de prueba");
+    let result =
+        SessionService::create(&state.pool, user_id, None, Some("article-soft-delete-test"))
+            .await
+            .expect("debe poder crear la sesión de prueba");
     (result.raw_token, result.csrf_token)
 }
 
@@ -106,7 +107,10 @@ fn admin_request(
         builder = builder.header("content-type", "application/json");
     }
     let mut request = builder
-        .body(body.map(|value| Body::from(value.to_string())).unwrap_or_else(Body::empty))
+        .body(
+            body.map(|value| Body::from(value.to_string()))
+                .unwrap_or_else(Body::empty),
+        )
         .expect("request admin válida");
     request
         .extensions_mut()
@@ -220,7 +224,10 @@ async fn soft_delete_moves_article_and_envelope_to_trash_and_restore_recovers_bo
         .iter()
         .filter_map(|item| item["id"].as_str())
         .collect();
-    assert!(!ids.contains(&article_id.as_str()), "no debe listar trashed");
+    assert!(
+        !ids.contains(&article_id.as_str()),
+        "no debe listar trashed"
+    );
 
     let public = router
         .clone()

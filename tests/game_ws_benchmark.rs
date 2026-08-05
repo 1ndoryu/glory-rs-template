@@ -75,7 +75,7 @@ fn fixture_map() -> GameRoomMap {
 }
 
 async fn spawn_server(state: AppState) -> (String, oneshot::Sender<()>, JoinHandle<()>) {
-    state.game_ws_state.set_room_map(Some(fixture_map())).await;
+    state.game_ws_state.set_room_map(Some(fixture_map()));
     let app = create_router_with_state(state);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await

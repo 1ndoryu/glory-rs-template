@@ -5,7 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { acquireHeavyRun, inspectHeavyRun, isHeavyCargoCommand, logHeavyOverride } from '../heavy-run-guard.mjs';
 
-test('el guard limita full a una ejecución cada tres horas y permite override explícito', async () => {
+test('el guard limita full a una ejecución cada tres horas y la excepción manual queda desactivada', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'glory-heavy-guard-'));
   const targetBase = path.join(root, 'target');
   try {
@@ -17,9 +17,16 @@ test('el guard limita full a una ejecución cada tres horas y permite override e
     const blocked = await inspectHeavyRun({ projectRoot: root, targetBase, mode: 'full' });
     assert.equal(blocked.allowed, false);
     assert.equal(blocked.reason, 'cooldown');
+    /* [SNT-11] La excepción manual está desactivada: --allow-heavy ya no
+     * concede aunque haya motivo; el cooldown sigue bloqueando y el intento
+     * queda auditado como denegado. */
     const override = await acquireHeavyRun({ projectRoot: root, targetBase, mode: 'full', allowHeavy: true, heavyReason: 'test override explícito' });
-    assert.equal(override.allowed, true);
-    await override.release({ status: 'pass' });
+    assert.equal(override.allowed, false);
+    assert.equal(override.reason, 'cooldown');
+    const logText = await readFile(path.join(root, '.quality-reports', 'heavy-overrides.log'), 'utf8');
+    const entry = JSON.parse(logText.trim().split(/\r?\n/).at(-1));
+    assert.equal(entry.granted, false);
+    assert.equal(entry.source, 'flag');
   } finally {
     await rm(root, { recursive: true, force: true });
     await rm(path.join(root, '..', 'glory-quality-guard'), { recursive: true, force: true });
@@ -103,20 +110,27 @@ test('un override sin motivo se rechaza y no concede la excepción (028A-16)', a
   }
 });
 
-test('un override con motivo se concede y queda registrado con el motivo (028A-16)', async () => {
+test('la excepción manual no concede aunque haya motivo y queda auditada como denegada (SNT-11)', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'glory-heavy-reason-ok-'));
   const targetBase = path.join(root, 'target');
   try {
     await writeFile(path.join(root, 'quality.config.json'), JSON.stringify({ heavyRun: { cooldownMinutes: 180 } }), 'utf8');
-    const granted = await acquireHeavyRun({
+    /* Arma el cooldown con una ejecución normal antes del intento. */
+    const first = await acquireHeavyRun({ projectRoot: root, targetBase, mode: 'full', taskId: '028A-16' });
+    assert.equal(first.allowed, true);
+    await first.release({ status: 'pass' });
+    /* [SNT-11] Con el mecanismo desactivado, un intento con motivo queda
+     * denegado por cooldown y se registra como granted:false (auditable). */
+    const denied = await acquireHeavyRun({
       projectRoot: root, targetBase, mode: 'full', allowHeavy: true,
       taskId: '028A-16', command: 'cargo test', heavyReason: 'validar fase antes de cerrar',
     });
-    assert.equal(granted.allowed, true);
-    await granted.release({ status: 'pass' });
+    assert.equal(denied.allowed, false);
+    assert.equal(denied.reason, 'cooldown');
     const logText = await readFile(path.join(root, '.quality-reports', 'heavy-overrides.log'), 'utf8');
     const entry = JSON.parse(logText.trim().split(/\r?\n/).at(-1));
-    assert.equal(entry.granted, true);
+    assert.equal(entry.granted, false);
+    assert.equal(entry.source, 'flag');
     assert.equal(entry.reason, 'validar fase antes de cerrar');
     assert.equal(entry.taskId, '028A-16');
     assert.equal(entry.command, 'cargo test');

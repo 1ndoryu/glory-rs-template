@@ -201,7 +201,7 @@ impl ResourceRepository {
     /// [038A-2] Contenido publicado que el escritorio debe mostrar SIEMPRE,
     /// cualquier versión de release activa: artículos y medios con
     /// `editorial='ready' AND visibility='public' AND lifecycle='active'`.
-    /// JOIN con `articles` (slug) y `media` (file_type) para que
+    /// JOIN con `articles` (slug) y `media` (`file_type`) para que
     /// `materialize_content_nodes` pueda construir los nodos con el contrato
     /// del frontend (publicLocator reader / subcarpeta de Documentos). Es la
     /// fuente de la release efectiva: el contenido no depende del overlay

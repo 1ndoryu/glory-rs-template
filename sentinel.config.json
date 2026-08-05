@@ -37,6 +37,7 @@
           "**/target/**",
           "**/.quality-tools/**",
           "**/.quality-reports/**",
+          "tools/sentinel/**",
           "frontend/src/api/generated/**",
           "frontend/src/utils/dom.ts"
         ],

@@ -205,11 +205,9 @@ impl ArticleRepository {
         .bind(offset)
         .fetch_all(pool)
         .await?;
-        let (total,): (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM articles WHERE trashed = TRUE",
-        )
-        .fetch_one(pool)
-        .await?;
+        let (total,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM articles WHERE trashed = TRUE")
+            .fetch_one(pool)
+            .await?;
         Ok((articles, total))
     }
 

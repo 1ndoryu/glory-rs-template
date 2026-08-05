@@ -73,12 +73,12 @@ impl GameWsState {
         self.room_state.clone()
     }
 
-    pub async fn set_room_map(&self, map: Option<GameRoomMap>) {
-        self.room_state.set_map(map).await;
+    pub fn set_room_map(&self, map: Option<GameRoomMap>) {
+        self.room_state.set_map(map);
     }
 
-    pub async fn has_room_map(&self) -> bool {
-        self.room_state.has_map().await
+    pub fn has_room_map(&self) -> bool {
+        self.room_state.has_map()
     }
 
     #[must_use]

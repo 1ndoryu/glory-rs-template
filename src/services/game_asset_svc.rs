@@ -126,7 +126,7 @@ impl GameAssetService {
                 .map_err(|error| AppError::Internal(format!("Error guardando el GLB: {error}")))?;
         }
 
-        let storage_rel = format!("{}/{}.glb", GAME_ASSET_STORAGE_PREFIX, content_hash);
+        let storage_rel = format!("{GAME_ASSET_STORAGE_PREFIX}/{content_hash}.glb");
         let byte_size = i32::try_from(bytes.len())
             .map_err(|_| AppError::Validation("GLB demasiado grande".into()))?;
 
@@ -162,7 +162,7 @@ impl GameAssetService {
 
     /// [297A-73] Devuelve el contenido binario de una versión (GLB) para el
     /// preview 3D del panel admin. Solo admin (capacidad en el handler); el
-    /// path se resuelve contra upload_dir sin exponer rutas de storage.
+    /// path se resuelve contra `upload_dir` sin exponer rutas de storage.
     pub async fn read_version_file(
         pool: &PgPool,
         upload_dir: &str,

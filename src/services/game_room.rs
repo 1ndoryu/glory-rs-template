@@ -51,6 +51,7 @@ pub struct GameRoomMetrics {
 }
 
 impl GameRoomMetrics {
+    #[must_use]
     pub fn snapshot(&self) -> GameRoomMetricsSnapshot {
         GameRoomMetricsSnapshot {
             joins: self.joins.load(Ordering::Acquire),
@@ -125,7 +126,9 @@ impl GameRoomState {
         state
     }
 
-    pub async fn set_map(&self, map: Option<GameRoomMap>) {
+    /* [SNT-11] Accesos síncronos (RwLock cortos, sin `.await`): clippy exige
+     * quitar `async`; los llamadores ya no usan `.await`. */
+    pub fn set_map(&self, map: Option<GameRoomMap>) {
         let mut maps = self.maps.write().expect("maps lock");
         maps.clear();
         if let Some(map) = map {
@@ -133,11 +136,11 @@ impl GameRoomState {
         }
     }
 
-    pub async fn has_map(&self) -> bool {
+    pub fn has_map(&self) -> bool {
         !self.maps.read().expect("maps lock").is_empty()
     }
 
-    pub async fn metrics(&self) -> GameRoomMetricsSnapshot {
+    pub fn metrics(&self) -> GameRoomMetricsSnapshot {
         self.metrics.snapshot()
     }
 
@@ -974,14 +977,14 @@ mod tests {
             .join(Uuid::new_v4(), first_output)
             .await
             .expect("first");
-        let metrics = state.metrics().await;
+        let metrics = state.metrics();
         assert_eq!(metrics.joins, 1);
         assert_eq!(metrics.active_players, 1);
         assert_eq!(metrics.rooms_created, 1);
         first.disconnect().await;
         /* La desconexión se procesa de forma asíncrona en el actor. */
         tokio::time::sleep(std::time::Duration::from_millis(60)).await;
-        let after = state.metrics().await;
+        let after = state.metrics();
         assert_eq!(after.disconnects, 1);
         assert_eq!(after.active_players, 0);
     }

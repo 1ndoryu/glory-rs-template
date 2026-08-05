@@ -11,7 +11,7 @@ pub const GAME_ASSET_GLB_MAX_BYTES: usize = 16 * 1024 * 1024;
 pub const GAME_ASSET_GLB_KIND: &str = "glb";
 /// Magic header del contenedor GLB (`glTF` en little-endian) y versión 2.
 pub const GAME_ASSET_GLB_MAGIC: [u8; 4] = [0x67, 0x6C, 0x54, 0x46];
-/// Prefijo de storage por hash bajo upload_dir (content-addressed).
+/// Prefijo de storage por hash bajo `upload_dir` (content-addressed).
 pub const GAME_ASSET_STORAGE_PREFIX: &str = "assets";
 
 /// Categorías del catálogo, alineadas con `AssetCategory` del contrato de mapa

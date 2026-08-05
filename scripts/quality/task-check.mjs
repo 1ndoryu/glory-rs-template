@@ -79,21 +79,23 @@ async function main() {
         allowHeavy: args.allowHeavy,
         heavyReason: args.heavyReason,
       });
-      /* [028A-16] Un override sin motivo también se registra en el log de
-       * auditoría (intento denegado): el flag ya llegó al gate, debe quedar
-       * trazado aunque no conceda la excepción. */
-      if (!heavyDecision.allowed && heavyDecision.reason === 'heavy-reason-required') {
-        /* [028A-16] Esta rama solo se alcanza cuando manualOverrideSource
-         * devolvió algo no nulo (la excepción es el motivo del rechazo), así
-         * que el source siempre está disponible; sin fallback a 'env'. */
-        await logHeavyOverride({
-          projectRoot,
-          source: manualOverrideSource({ allowHeavy: args.allowHeavy }),
-          command: `task:check ${args.taskId}`,
-          reason: null,
-          granted: false,
-          taskId: args.taskId,
-        });
+      /* [028A-16][SNT-11] Todo intento manual de excepción denegado por el
+       * guard queda auditado — motivo ausente o cooldown con el mecanismo
+       * desactivado: el flag ya llegó al gate y debe quedar trazado aunque no
+       * conceda la excepción. `manualOverrideSource` no nulo implica que el
+       * flag/env llegó; sin fallback a 'env'. */
+      if (!heavyDecision.allowed) {
+        const manualSource = manualOverrideSource({ allowHeavy: args.allowHeavy });
+        if (manualSource) {
+          await logHeavyOverride({
+            projectRoot,
+            source: manualSource,
+            command: `task:check ${args.taskId}`,
+            reason: typeof args.heavyReason === 'string' ? args.heavyReason : null,
+            granted: false,
+            taskId: args.taskId,
+          });
+        }
       }
       if (!heavyDecision.allowed) {
         args.full = false;

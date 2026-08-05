@@ -73,9 +73,11 @@ pub async fn get_active_map(
 )]
 pub async fn get_map_draft(
     State(state): State<AppState>,
-    admin: AdminUser,
+    _admin: AdminUser,
     Path(map_id): Path<String>,
 ) -> Result<Json<GameMapDraftPublic>, AppError> {
+    /* [SNT-11] `_admin` conserva el extractor (auth) aunque la lectura del
+     * borrador no use el id del actor. */
     Ok(Json(GameMapService::get_draft(&state.pool, &map_id).await?))
 }
 
