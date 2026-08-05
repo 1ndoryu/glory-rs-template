@@ -9,7 +9,7 @@ import { showConfirm } from '../components/ui/confirm';
 import { clearArticleCache } from '../components/layout/sidebar';
 import { createEl } from '../utils/dom';
 import { createVacio } from '../components/ui/empty-state';
-import { subscribeArticleEditorSaved } from '../features/runtime/article-editor-events';
+import { publishArticleEditorSaved, subscribeArticleEditorSaved } from '../features/runtime/article-editor-events';
 import { showToast } from '../components/ui/toast';
 import type { Article } from '../api/types';
 
@@ -105,6 +105,9 @@ export async function renderArticleList(container: HTMLElement): Promise<void> {
       const result = await safeRun(ArticleService.delete(article.id), 'error al eliminar');
       if (!result.ok) return;
       showToast('articulo eliminado');
+      /* [028A-12] El borrado es soft delete: notifica al canal de dominio para
+       * que article-notas-sync retire el nodo del escritorio (tombstone). */
+      publishArticleEditorSaved({ articleId: article.id, operation: 'deleted' });
       clearArticleCache();
       await renderArticleList(container);
     }));

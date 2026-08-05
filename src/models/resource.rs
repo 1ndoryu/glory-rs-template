@@ -71,3 +71,17 @@ pub struct CreateResourceParams<'a> {
     pub editorial: EditorialState,
     pub visibility: VisibilityState,
 }
+
+/// [038A-2] Contenido publicado listo para materializar en la release efectiva.
+/// Extiende `Resource` con los campos específicos que cada tipo necesita para
+/// construir su nodo de escritorio con el mismo contrato que el frontend:
+/// artículos → `slug` (publicLocator del reader), medios → `file_type`
+/// (subcarpeta destino en Documentos).
+#[derive(Debug, Clone, FromRow, Serialize, ToSchema)]
+pub struct PublicContent {
+    pub id: Uuid,
+    pub kind: ResourceKind,
+    pub title: String,
+    pub slug: Option<String>,
+    pub file_type: Option<String>,
+}

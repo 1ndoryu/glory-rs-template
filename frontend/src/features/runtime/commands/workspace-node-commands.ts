@@ -10,6 +10,7 @@ import {
   tombstoneSubtree,
   renameNode,
   workspaceStore,
+  isSystemNode,
 } from '../workspace/workspace-store';
 import { showConfirm } from '../../../components/ui/confirm';
 import { showPrompt } from '../../../components/ui/prompt';
@@ -116,6 +117,9 @@ CommandRegistry.register({
     if (!targetId) return { state: 'hidden', reason: 'no target' };
     const nodeId = resolveWorkspaceNodeId(targetId);
     if (!nodeId) return { state: 'hidden', reason: 'node not found in workspace' };
+    /* [038A-2] Eliminar un nodo de sistema (Papelera, admin, settings,
+     * profile, about) no está disponible: son parte fija del OS. */
+    if (isSystemNode(nodeId)) return { state: 'hidden', reason: 'system node' };
     return { state: 'enabled' };
   },
   execute: async (ctx?: CommandContext): Promise<CommandResult> => {
@@ -125,6 +129,13 @@ CommandRegistry.register({
     if (!nodeId) return { status: 'failure', reason: 'node not found' };
     const ws = workspaceStore.get();
     const node = ws.nodes[nodeId];
+    if (!node) return { status: 'failure', reason: 'node not found' };
+    /* [038A-2] Doble guardia por si algo invoca el comando sin pasar por
+     * isAvailable (atajos, programas, integraciones). */
+    if (isSystemNode(nodeId)) {
+      console.warn(`[038A-2] No se puede eliminar el nodo de sistema «${nodeId}»`);
+      return { status: 'failure', reason: 'system node' };
+    }
     if (node?.type === 'folder') {
       const confirmed = await showConfirm(`¿Eliminar la carpeta «${node.label}» y su contenido? Se podrá restaurar desde la papelera.`);
       if (!confirmed) return { status: 'cancelled' };

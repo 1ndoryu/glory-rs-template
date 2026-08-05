@@ -2,6 +2,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::errors::AppError;
+use crate::models::resource::{PublicContent, ResourceKind};
 use crate::models::workspace::{
     validate_release_tree, BrokenResourceRef, ReleaseControlResponse, ReleaseListItem,
     ReleaseTreeIssue, ReleaseValidationResponse, WorkspaceRelease, WorkspaceReleasePublic,
@@ -17,24 +18,41 @@ impl WorkspaceService {
     /// Obtener el release activo (público).
     /// [028A-13] La activa es la marcada `is_active`; si por cualquier motivo
     /// no hubiera ninguna (p. ej. migración a medias), cae al MAX(version).
+    /// [038A-2] La respuesta es la release EFECTIVA: el contenido publicado
+    /// (artículos/medios `active + ready + public`) se materializa siempre en
+    /// el árbol, cualquier versión activa, para que el escritorio lo muestre
+    /// aunque la foto de la release no lo incluya. Solo desaparece al
+    /// eliminarlo de verdad (trashed) o despublicarlo.
     pub async fn get_active_release(pool: &PgPool) -> Result<WorkspaceReleasePublic, AppError> {
         let release = WorkspaceRepository::get_active(pool)
             .await?
             .or(WorkspaceRepository::get_latest(pool).await?)
-            .map(WorkspaceReleasePublic::from)
             .ok_or_else(|| AppError::NotFound("No hay releases publicados".into()))?;
-        Ok(release)
+        let content = ResourceRepository::find_public_content(pool).await?;
+        Ok(WorkspaceReleasePublic {
+            version: release.version,
+            tree: materialize_content_nodes(&release.tree, &content),
+            published_at: release.published_at,
+        })
     }
 
     /// Obtener un release por versión (público).
+    /// [038A-2] Igual que `get_active_release`: el contenido publicado se
+    /// materializa en cualquier versión consultada; el escritorio no puede
+    /// perder contenido por un cambio de versión.
     pub async fn get_release_by_version(
         pool: &PgPool,
         version: i32,
     ) -> Result<WorkspaceReleasePublic, AppError> {
-        WorkspaceRepository::get_by_version(pool, version)
+        let release = WorkspaceRepository::get_by_version(pool, version)
             .await?
-            .map(WorkspaceReleasePublic::from)
-            .ok_or_else(|| AppError::NotFound(format!("Release v{version} no encontrado")))
+            .ok_or_else(|| AppError::NotFound(format!("Release v{version} no encontrado")))?;
+        let content = ResourceRepository::find_public_content(pool).await?;
+        Ok(WorkspaceReleasePublic {
+            version: release.version,
+            tree: materialize_content_nodes(&release.tree, &content),
+            published_at: release.published_at,
+        })
     }
 
     /// Listar todos los releases en DTO ligero (admin — historial).
@@ -307,4 +325,130 @@ fn compute_release_summary(
         "modified": modified,
         "nodeCount": node_count,
     })
+}
+
+/// [038A-2] Materializa el contenido publicado en el árbol de una release.
+/// Toma el árbol base (proxy: clon) y le inserta los nodos de contenido
+/// (artículos → `nota-{id}` bajo "Notas"; medios → `media-{id}` bajo la
+/// subcarpeta de "Documentos" según su tipo), replicando EXACTAMENTE el
+/// contrato que construye el frontend (`buildArticleNode` / `buildMediaNode`
+/// + carpetas) para que el escritorio muestre el contenido publicado en
+/// cualquier versión activa. Merge idempotente por id: si el nodo ya existe
+/// en el release (p. ej. el admin lo publicó como parte del árbol), se
+/// conserva el del release y no se duplica.
+///
+/// El árbol base NO se muta: se trabaja sobre un valor propio, ya que la
+/// release inmutable nunca debe verse alterada al servirse.
+fn materialize_content_nodes(
+    tree: &serde_json::Value,
+    content: &[PublicContent],
+) -> serde_json::Value {
+    /* Copia de trabajo; el release original queda intacto. */
+    let mut out = tree.clone();
+
+    let Some(nodes) = out
+        .get_mut("nodes")
+        .and_then(serde_json::Value::as_object_mut)
+    else {
+        /* Sin `nodes`, no hay dónde materializar: devolver tal cual. */
+        return out;
+    };
+
+    /* Contrato de carpetas: mismas ids/etiquetas/parents que el frontend. */
+    const FOLDERS: &[(&str, &str, &str)] = &[
+        ("notas", "desktop", "Notas"),
+        ("documentos", "desktop", "Documentos"),
+        ("documentos-imagenes", "documentos", "Imágenes"),
+        ("documentos-audio", "documentos", "Audio"),
+        ("documentos-video", "documentos", "Vídeo"),
+        ("documentos-documentos", "documentos", "Documentos"),
+    ];
+
+    /* Subcarpeta destino de cada tipo de media (mismo mapeo que el frontend). */
+    let media_folder = |file_type: &str| match file_type {
+        "image" => "documentos-imagenes",
+        "audio" => "documentos-audio",
+        "video" => "documentos-video",
+        _ => "documentos-documentos",
+    };
+
+    let ensure_folder = |nodes: &mut serde_json::Map<String, serde_json::Value>,
+                         id: &str,
+                         parent: &str,
+                         label: &str| {
+        if nodes.contains_key(id) {
+            return;
+        }
+        nodes.insert(
+            id.to_string(),
+            serde_json::json!({
+                "id": id,
+                "parentId": parent,
+                "type": "folder",
+                "label": label,
+                "requires": "public",
+            }),
+        );
+    };
+
+    for item in content {
+        match item.kind {
+            ResourceKind::Article => {
+                ensure_folder(nodes, "notas", "desktop", "Notas");
+                let node_id = format!("nota-{}", item.id);
+                if nodes.contains_key(&node_id) {
+                    continue;
+                }
+                nodes.insert(
+                    node_id.clone(),
+                    serde_json::json!({
+                        "id": node_id,
+                        "parentId": "notas",
+                        "type": "resource",
+                        "label": item.title,
+                        "refId": item.id.to_string(),
+                        "resourceKind": "article",
+                        "publicLocator": { "appId": "reader", "params": { "slug": item.slug } },
+                        "requires": "public",
+                    }),
+                );
+            }
+            ResourceKind::Media => {
+                ensure_folder(nodes, "documentos", "desktop", "Documentos");
+                let file_type = item.file_type.as_deref().unwrap_or("document");
+                let folder_id = media_folder(file_type);
+                let folder_label = FOLDERS
+                    .iter()
+                    .find(|(id, _, _)| *id == folder_id)
+                    .map(|(_, _, label)| *label)
+                    .unwrap_or("Documentos");
+                ensure_folder(nodes, folder_id, "documentos", folder_label);
+                let node_id = format!("media-{}", item.id);
+                if nodes.contains_key(&node_id) {
+                    continue;
+                }
+                let resource_kind = match file_type {
+                    "image" => "image",
+                    "audio" => "audio",
+                    "video" => "video",
+                    _ => "document",
+                };
+                nodes.insert(
+                    node_id.clone(),
+                    serde_json::json!({
+                        "id": node_id,
+                        "parentId": folder_id,
+                        "type": "resource",
+                        "label": item.title,
+                        "refId": item.id.to_string(),
+                        "resourceKind": resource_kind,
+                        "requires": "public",
+                    }),
+                );
+            }
+            _ => {}
+        }
+    }
+
+    out
 }

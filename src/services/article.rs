@@ -159,8 +159,21 @@ impl ArticleService {
         id: Uuid,
         req: UpdateArticleRequest,
     ) -> Result<Article, AppError> {
-        ArticleRepository::update(
-            pool,
+        /* [038A-2] El status legacy ('published'/'draft') sincroniza el envelope
+         * `resources` en la misma transacción: publicar => ready/public,
+         * despublicar => draft/private. None (autosave sin tocar status)
+         * conserva el editorial/visibilidad actuales. Sin esta sincronización
+         * el contenido publicado no calificaría para `find_public_content`
+         * (release efectiva) ni para `collect_broken_resource_refs`. */
+        let (is_visible, editorial) = match req.status.as_deref() {
+            Some("published") => (Some(true), Some(EditorialState::Ready)),
+            Some(_) => (Some(false), Some(EditorialState::Draft)),
+            None => (None, None),
+        };
+
+        let mut tx = pool.begin().await?;
+        let article = ArticleRepository::update(
+            &mut *tx,
             id,
             UpdateArticleParams {
                 title: req.title.as_deref(),
@@ -172,14 +185,69 @@ impl ArticleService {
             },
         )
         .await?
-        .ok_or_else(|| AppError::NotFound("Articulo no encontrado".into()))
+        .ok_or_else(|| AppError::NotFound("Articulo no encontrado".into()))?;
+
+        let envelope_updated = ResourceRepository::update_resource_metadata(
+            &mut *tx,
+            id,
+            ResourceKind::Article,
+            req.title.as_deref(),
+            is_visible,
+            editorial,
+        )
+        .await?;
+        if !envelope_updated {
+            return Err(AppError::NotFound(
+                "Envelope del articulo no encontrado".into(),
+            ));
+        }
+
+        tx.commit().await?;
+        Ok(article)
     }
 
+    /// [028A-12] Soft delete transaccional: marca el artículo y su envelope
+    /// `resources` (lifecycle = trashed) juntos; la fila se conserva para
+    /// restaurarla desde la Papelera admin.
     pub async fn delete(pool: &PgPool, id: Uuid) -> Result<(), AppError> {
-        if !ArticleRepository::delete(pool, id).await? {
+        let mut tx = pool.begin().await?;
+        if !ArticleRepository::delete(&mut *tx, id).await? {
             return Err(AppError::NotFound("Articulo no encontrado".into()));
         }
+        ResourceRepository::soft_delete_kind_tx(&mut *tx, id, ResourceKind::Article).await?;
+        tx.commit().await?;
         Ok(())
+    }
+
+    /// [028A-12] Lista paginada de la papelera (admin).
+    pub async fn list_trashed(
+        pool: &PgPool,
+        page: i64,
+        per_page: i64,
+    ) -> Result<PaginatedArticles, AppError> {
+        let per_page = per_page.clamp(1, 100);
+        let page = page.max(1);
+        let (articles, total) = ArticleRepository::list_trashed(pool, page, per_page).await?;
+        Ok(PaginatedArticles {
+            items: articles,
+            total,
+            page,
+            per_page,
+        })
+    }
+
+    /// [028A-12] Restaura el artículo y su envelope `resources` en la misma
+    /// transacción; devuelve el artículo restaurado.
+    pub async fn restore(pool: &PgPool, id: Uuid) -> Result<Article, AppError> {
+        let mut tx = pool.begin().await?;
+        if !ArticleRepository::restore(&mut *tx, id).await? {
+            return Err(AppError::NotFound("Articulo no encontrado".into()));
+        }
+        ResourceRepository::restore_kind_tx(&mut *tx, id, ResourceKind::Article).await?;
+        tx.commit().await?;
+        ArticleRepository::find_by_id(pool, id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Articulo no encontrado".into()))
     }
 
     /// Genera un slug URL-safe unico a partir del titulo

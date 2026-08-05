@@ -1,3 +1,4 @@
+use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -40,7 +41,7 @@ impl ArticleRepository {
         sqlx::query_as::<_, Article>(
             "INSERT INTO articles (id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at) \
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) \
-             RETURNING id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at, system_alias",
+             RETURNING id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at, system_alias, trashed, deleted_at",
         )
         .bind(id)
         .bind(params.title)
@@ -55,10 +56,12 @@ impl ArticleRepository {
         .await
     }
 
+    /// [028A-12] Las queries por defecto excluyen los artículos en la
+    /// papelera (trashed); la Papelera admin usa `list_trashed`.
     pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Article>, sqlx::Error> {
         sqlx::query_as::<_, Article>(
-            "SELECT id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at, system_alias \
-             FROM articles WHERE id = $1",
+            "SELECT id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at, system_alias, trashed, deleted_at \
+             FROM articles WHERE id = $1 AND trashed = FALSE",
         )
         .bind(id)
         .fetch_optional(pool)
@@ -67,8 +70,8 @@ impl ArticleRepository {
 
     pub async fn find_by_slug(pool: &PgPool, slug: &str) -> Result<Option<Article>, sqlx::Error> {
         sqlx::query_as::<_, Article>(
-            "SELECT id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at, system_alias \
-             FROM articles WHERE slug = $1",
+            "SELECT id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at, system_alias, trashed, deleted_at \
+             FROM articles WHERE slug = $1 AND trashed = FALSE",
         )
         .bind(slug)
         .fetch_optional(pool)
@@ -85,8 +88,8 @@ impl ArticleRepository {
 
         let articles = if let Some(status_filter) = status {
             sqlx::query_as::<_, Article>(
-                "SELECT id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at, system_alias \
-                 FROM articles WHERE status = $1 \
+                "SELECT id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at, system_alias, trashed, deleted_at \
+                 FROM articles WHERE status = $1 AND trashed = FALSE \
                  ORDER BY is_pinned DESC, COALESCE(published_at, created_at) DESC \
                  LIMIT $2 OFFSET $3",
             )
@@ -97,8 +100,8 @@ impl ArticleRepository {
             .await?
         } else {
             sqlx::query_as::<_, Article>(
-                "SELECT id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at, system_alias \
-                 FROM articles \
+                "SELECT id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at, system_alias, trashed, deleted_at \
+                 FROM articles WHERE trashed = FALSE \
                  ORDER BY is_pinned DESC, COALESCE(published_at, created_at) DESC \
                  LIMIT $1 OFFSET $2",
             )
@@ -109,12 +112,12 @@ impl ArticleRepository {
         };
 
         let (total,): (i64,) = if let Some(status_filter) = status {
-            sqlx::query_as("SELECT COUNT(*) FROM articles WHERE status = $1")
+            sqlx::query_as("SELECT COUNT(*) FROM articles WHERE status = $1 AND trashed = FALSE")
                 .bind(status_filter)
                 .fetch_one(pool)
                 .await?
         } else {
-            sqlx::query_as("SELECT COUNT(*) FROM articles")
+            sqlx::query_as("SELECT COUNT(*) FROM articles WHERE trashed = FALSE")
                 .fetch_one(pool)
                 .await?
         };
@@ -122,21 +125,29 @@ impl ArticleRepository {
         Ok((articles, total))
     }
 
+    /// [038A-2] Update dentro de una transacción (el service sincroniza el
+    /// envelope `resources` en la misma tx al publicar/despublicar).
     pub async fn update(
-        pool: &PgPool,
+        conn: &mut sqlx::PgConnection,
         id: Uuid,
         params: UpdateArticleParams<'_>,
     ) -> Result<Option<Article>, sqlx::Error> {
         /* Si se cambia a published y no tenia published_at, setearlo */
-        let Some(current) = Self::find_by_id(pool, id).await? else {
+        let current_row: Option<(String, Option<chrono::DateTime<Utc>>)> = sqlx::query_as(
+            "SELECT status, published_at FROM articles WHERE id = $1 AND trashed = FALSE",
+        )
+        .bind(id)
+        .fetch_optional(&mut *conn)
+        .await?;
+        let Some((current_status, current_published_at)) = current_row else {
             return Ok(None);
         };
 
-        let new_status = params.status.unwrap_or(&current.status);
-        let published_at = if new_status == "published" && current.published_at.is_none() {
+        let new_status = params.status.unwrap_or(&current_status);
+        let published_at = if new_status == "published" && current_published_at.is_none() {
             Some(chrono::Utc::now())
         } else {
-            current.published_at
+            current_published_at
         };
 
         sqlx::query_as::<_, Article>(
@@ -149,8 +160,8 @@ impl ArticleRepository {
                 is_pinned = COALESCE($6, is_pinned), \
                 published_at = $7, \
                 updated_at = NOW() \
-             WHERE id = $8 \
-             RETURNING id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at, system_alias",
+             WHERE id = $8 AND trashed = FALSE \
+             RETURNING id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at, system_alias, trashed, deleted_at",
         )
         .bind(params.title)
         .bind(params.content)
@@ -160,24 +171,67 @@ impl ArticleRepository {
         .bind(params.is_pinned)
         .bind(published_at)
         .bind(id)
-        .fetch_optional(pool)
+        .fetch_optional(&mut *conn)
         .await
     }
 
-    pub async fn delete(pool: &PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query("DELETE FROM articles WHERE id = $1")
-            .bind(id)
-            .execute(pool)
-            .await?;
+    /// [028A-12] Soft delete: marca la papelera sin borrar la fila. La fila
+    /// del envelope `resources` se marca en el service (misma transacción).
+    pub async fn delete(conn: &mut sqlx::PgConnection, id: Uuid) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query(
+            "UPDATE articles SET trashed = TRUE, deleted_at = NOW(), updated_at = NOW() \
+             WHERE id = $1 AND trashed = FALSE",
+        )
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    /// [028A-12] Lista paginada de la papelera (más recientes primero).
+    pub async fn list_trashed(
+        pool: &PgPool,
+        page: i64,
+        per_page: i64,
+    ) -> Result<(Vec<Article>, i64), sqlx::Error> {
+        let offset = (page - 1) * per_page;
+        let articles = sqlx::query_as::<_, Article>(
+            "SELECT id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at, system_alias, trashed, deleted_at \
+             FROM articles WHERE trashed = TRUE \
+             ORDER BY deleted_at DESC \
+             LIMIT $1 OFFSET $2",
+        )
+        .bind(per_page)
+        .bind(offset)
+        .fetch_all(pool)
+        .await?;
+        let (total,): (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM articles WHERE trashed = TRUE",
+        )
+        .fetch_one(pool)
+        .await?;
+        Ok((articles, total))
+    }
+
+    /// [028A-12] Restaura un artículo de la papelera (idempotente).
+    pub async fn restore(conn: &mut sqlx::PgConnection, id: Uuid) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query(
+            "UPDATE articles SET trashed = FALSE, deleted_at = NULL, updated_at = NOW() \
+             WHERE id = $1 AND trashed = TRUE",
+        )
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
         Ok(result.rows_affected() > 0)
     }
 
     pub async fn slug_exists(pool: &PgPool, slug: &str) -> Result<bool, sqlx::Error> {
-        let (exists,): (bool,) =
-            sqlx::query_as("SELECT EXISTS(SELECT 1 FROM articles WHERE slug = $1)")
-                .bind(slug)
-                .fetch_one(pool)
-                .await?;
+        let (exists,): (bool,) = sqlx::query_as(
+            "SELECT EXISTS(SELECT 1 FROM articles WHERE slug = $1 AND trashed = FALSE)",
+        )
+        .bind(slug)
+        .fetch_one(pool)
+        .await?;
         Ok(exists)
     }
 
@@ -187,8 +241,8 @@ impl ArticleRepository {
         alias: &str,
     ) -> Result<Option<Article>, sqlx::Error> {
         sqlx::query_as::<_, Article>(
-            "SELECT id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at, system_alias \
-             FROM articles WHERE system_alias = $1",
+            "SELECT id, title, slug, content, excerpt, cover_image, status, is_pinned, published_at, created_at, updated_at, system_alias, trashed, deleted_at \
+             FROM articles WHERE system_alias = $1 AND trashed = FALSE",
         )
         .bind(alias)
         .fetch_optional(pool)

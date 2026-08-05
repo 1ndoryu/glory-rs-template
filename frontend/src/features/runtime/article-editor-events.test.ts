@@ -28,4 +28,14 @@ describe('article editor events', () => {
 
     expect(events).toEqual(['updated:article-2']);
   });
+
+  it('[028A-12] admite la operación deleted del soft delete', () => {
+    const listener = vi.fn();
+    const stop = subscribeArticleEditorSaved(listener);
+
+    publishArticleEditorSaved({ articleId: 'article-3', operation: 'deleted' });
+    expect(listener).toHaveBeenCalledWith({ articleId: 'article-3', operation: 'deleted' });
+
+    stop();
+  });
 });

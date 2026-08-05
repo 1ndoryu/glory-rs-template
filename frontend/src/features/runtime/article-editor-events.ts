@@ -4,7 +4,7 @@
 
 export interface ArticleEditorSavedEvent {
   readonly articleId: string;
-  readonly operation: 'created' | 'updated';
+  readonly operation: 'created' | 'updated' | 'deleted';
 }
 
 type Listener = (event: ArticleEditorSavedEvent) => void;

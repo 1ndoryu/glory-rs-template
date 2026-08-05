@@ -430,3 +430,51 @@ async fn publish_rejects_structural_issues() {
 
     ctx.cleanup().await;
 }
+
+/* [038A-2] Regresión del incidente: la Papelera (y el resto de nodos de
+ * sistema) desaparecía cuando un publish dejaba activa una release incompleta
+ * (tests v4/v5 publicados contra BD de rama sin nodos de sistema). El guard
+ * debe rechazar el árbol ANTES de publicar. */
+#[tokio::test]
+async fn publish_rejects_tree_without_system_nodes() {
+    let _guard = publish_lock().lock().await;
+    let ctx = TestContext::new().await;
+
+    /* Árbol con folder/app válidos pero SIN trash (ni el resto de nodos de
+     * sistema). Reproduce el árbol mínimo de 3 nodos que causó el incidente. */
+    let mut nodes = serde_json::Map::new();
+    nodes.insert(
+        "documentos".into(),
+        json!({
+            "id": "documentos",
+            "parentId": "desktop",
+            "type": "folder",
+            "label": "Documentos"
+        }),
+    );
+    nodes.insert(
+        "about".into(),
+        json!({
+            "id": "about",
+            "parentId": "desktop",
+            "type": "app",
+            "label": "Acerca de"
+        }),
+    );
+    let no_trash = json!({ "nodes": nodes });
+
+    let err = WorkspaceService::publish(&ctx.pool, no_trash, ctx.admin_id)
+        .await
+        .expect_err("debe rechazar árbol sin Papelera");
+    match err {
+        glory_backend::errors::AppError::Validation(m) => {
+            assert!(
+                m.contains("nodo de sistema 'trash'"),
+                "mensaje debe nombrar el nodo faltante: {m}"
+            );
+        }
+        other => panic!("esperaba Validation, obtuve: {other:?}"),
+    }
+
+    ctx.cleanup().await;
+}

@@ -117,6 +117,12 @@ export function initArticleNotasSync(): () => void {
   if (initialized) return () => {};
   initialized = true;
   return subscribeArticleEditorSaved((event) => {
+    /* [028A-12] El soft delete llega por el canal de dominio: retira el nodo
+     * directamente (el fetch del artículo daría 404 tras el borrado). */
+    if (event.operation === 'deleted') {
+      removeArticleNode(event.articleId);
+      return;
+    }
     void syncArticleToWorkspace(event.articleId);
   });
 }

@@ -48,10 +48,25 @@ export async function fetchWorkspaceRelease(): Promise<void> {
   }
 }
 
+export function isMaterializedContentNode(node: WorkspaceNode): boolean {
+  /* [038A-2] Los nodos `nota-{id}` y `media-{id}` son la forma física del
+   * contenido publicado y el servidor los materializa SIEMPRE en la release
+   * efectiva (cualquier versión activa). No se hornean en el release al
+   * publicar: hornearlos los cristalizaría en la foto del layout cuando su
+   * fuente viva ya es la BD (articles/media publicados). Si se hornearan,
+   * una release publicada antes de despublicar un artículo seguiría
+   * mostrándolo, violando “solo desaparece al eliminarse de verdad”. */
+  return (node.id.startsWith('nota-') || node.id.startsWith('media-'))
+    && node.type === 'resource';
+}
+
 export async function publishWorkspace(): Promise<{ version: number } | null> {
   const resolved = workspaceStore.get();
   const nodes: Record<NodeId, WorkspaceNode> = {};
   for (const [id, node] of Object.entries(resolved.nodes)) {
+    if (isMaterializedContentNode(node)) {
+      continue;
+    }
     nodes[id] = {
       id: node.id,
       parentId: node.parentId,
@@ -96,6 +111,6 @@ export async function rollbackWorkspace(targetVersion: number): Promise<boolean>
 }
 
 /* Re-export submodules for backward compatibility */
-export { moveNodePosition, moveNodesPosition, moveMobileNodesPosition, moveNodeToParent, addOverlayNode, tombstoneNode, tombstoneSubtree, renameNode, restoreNode, resetOverlay, reorderDesktopNodes, reorderWorkspaceNodes, createFolder, getTombstonedNodes, getChildren } from './overlay-mutations';
+export { moveNodePosition, moveNodesPosition, moveMobileNodesPosition, moveNodeToParent, addOverlayNode, tombstoneNode, tombstoneSubtree, renameNode, restoreNode, resetOverlay, reorderDesktopNodes, reorderWorkspaceNodes, createFolder, getTombstonedNodes, getChildren, isSystemNode, SYSTEM_NODE_IDS } from './overlay-mutations';
 export { getClipboard, setClipboard, clearClipboard, pasteFromClipboard } from './clipboard';
 export type { ClipboardMode, ClipboardEntry } from './clipboard';

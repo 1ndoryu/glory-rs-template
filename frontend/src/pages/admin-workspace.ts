@@ -11,7 +11,7 @@ import { createVacio } from '../components/ui/empty-state';
 import { showToast } from '../components/ui/toast';
 import { showConfirm } from '../components/ui/confirm';
 import { WorkspaceService } from '../services';
-import { publishWorkspace } from '../features/runtime/workspace/workspace-store';
+import { publishWorkspace, fetchWorkspaceRelease } from '../features/runtime/workspace/workspace-store';
 import type { ReleaseValidation } from '../services/workspace.service';
 
 const escritorioCleanups = new WeakMap<HTMLElement, () => void>();
@@ -166,6 +166,11 @@ export async function renderWorkspaceAdmin(container: HTMLElement): Promise<void
           return;
         }
         showToast(`v${release.version} activada`);
+        /* [038A-2] Refresca el escritorio real: el contenido publicado debe
+         * seguir visible tras activar otra versión (la materialización del
+         * servidor lo garantiza, pero el store local debe re-fetch para que
+         * el shell lo pinte sin depender del overlay del admin anterior). */
+        await fetchWorkspaceRelease();
         await renderWorkspaceAdmin(container);
       }));
       acciones.appendChild(btActivar);

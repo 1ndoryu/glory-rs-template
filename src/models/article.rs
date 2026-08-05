@@ -28,6 +28,10 @@ pub struct Article {
     pub updated_at: DateTime<Utc>,
     /// [297A-10] Alias de sistema (e.g. 'about') para artículos especiales.
     pub system_alias: Option<String>,
+    /// [028A-12] Soft delete: el borrado conserva la fila para restaurarla
+    /// desde la Papelera admin. Las queries por defecto excluyen trashed.
+    pub trashed: bool,
+    pub deleted_at: Option<DateTime<Utc>>,
 }
 
 /// Request para crear un articulo

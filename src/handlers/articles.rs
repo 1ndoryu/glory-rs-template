@@ -155,13 +155,13 @@ pub async fn update_article(
     Ok(Json(article))
 }
 
-/// Eliminar articulo (admin)
+/// Eliminar articulo (admin) — soft delete: la fila va a la Papelera.
 #[utoipa::path(
     delete,
     path = "/api/admin/articles/{id}",
     params(("id" = Uuid, Path, description = "ID del articulo")),
     responses(
-        (status = 204, description = "Articulo eliminado"),
+        (status = 204, description = "Articulo eliminado (soft delete)"),
         (status = 404, description = "No encontrado", body = ErrorResponse),
         (status = 401, description = "No autorizado", body = ErrorResponse)
     ),
@@ -174,6 +174,46 @@ pub async fn delete_article(
 ) -> Result<StatusCode, AppError> {
     ArticleService::delete(&state.pool, id).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Listar la Papelera de artículos (admin).
+#[utoipa::path(
+    get,
+    path = "/api/admin/articles/trashed",
+    params(ArticleQueryParams),
+    responses(
+        (status = 200, description = "Lista de articulos en la papelera", body = PaginatedArticles)
+    ),
+    security(("session_cookie" = []))
+)]
+pub async fn list_trashed_articles(
+    State(state): State<AppState>,
+    _auth: AdminUser,
+    Query(params): Query<ArticleQueryParams>,
+) -> Result<Json<PaginatedArticles>, AppError> {
+    let articles = ArticleService::list_trashed(&state.pool, params.page, params.per_page).await?;
+    Ok(Json(articles))
+}
+
+/// Restaurar articulo desde la Papelera (admin).
+#[utoipa::path(
+    post,
+    path = "/api/admin/articles/{id}/restore",
+    params(("id" = Uuid, Path, description = "ID del articulo")),
+    responses(
+        (status = 200, description = "Articulo restaurado", body = Article),
+        (status = 404, description = "No encontrado en la papelera", body = ErrorResponse),
+        (status = 401, description = "No autorizado", body = ErrorResponse)
+    ),
+    security(("session_cookie" = []))
+)]
+pub async fn restore_article(
+    State(state): State<AppState>,
+    _auth: AdminUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Article>, AppError> {
+    let article = ArticleService::restore(&state.pool, id).await?;
+    Ok(Json(article))
 }
 
 /// Obtener articulo publicado por alias de sistema (publico)
@@ -232,14 +272,16 @@ pub fn routes() -> Router<AppState> {
         .route("/articles", get(list_articles))
         .route("/articles/slug/:slug", get(get_article_by_slug))
         .route("/articles/alias/:alias", get(get_article_by_alias))
-        /* Admin: CRUD completo */
+        /* Admin: CRUD completo + Papelera */
         .route(
             "/admin/articles",
             post(create_article).get(list_articles_admin),
         )
+        .route("/admin/articles/trashed", get(list_trashed_articles))
         .route(
             "/admin/articles/:id",
             get(get_article).put(update_article).delete(delete_article),
         )
         .route("/admin/articles/:id/alias", put(set_article_alias))
+        .route("/admin/articles/:id/restore", post(restore_article))
 }
