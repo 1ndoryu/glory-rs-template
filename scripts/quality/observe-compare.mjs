@@ -16,13 +16,14 @@ import { projectRoot } from './preflight.mjs';
 const execFileAsync = promisify(execFile);
 
 function parseArgs(argv) {
-  const parsed = { taskId: null, full: false, ci: false, profile: null, keepStages: false };
+  const parsed = { taskId: null, full: false, ci: false, profile: null, base: null, keepStages: false };
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index];
     if (arg === '--task-id') parsed.taskId = argv[++index] ?? null;
     else if (arg === '--full') parsed.full = true;
     else if (arg === '--ci') parsed.ci = true;
     else if (arg === '--profile') parsed.profile = argv[++index] ?? null;
+    else if (arg === '--base') parsed.base = argv[++index] ?? null;
     else if (arg === '--keep-stages') parsed.keepStages = true;
   }
   return parsed;
@@ -102,8 +103,9 @@ async function main() {
   const sentinelReport = path.join(observeRoot, 'sentinel-check');
   const sentinelCheckRoot = path.join(projectRoot, '.quality-reports', 'check', args.taskId);
 
-  /* 1. Gate actual: task:check. */
-  const actualArgs = ['run', 'task:check', '--', args.taskId, ...(args.full ? ['--full'] : []), ...(args.ci ? ['--ci'] : []), ...(args.profile ? ['--profile', args.profile] : [])];
+  /* 1. Gate actual: task:check. --base permite comparar el diff de un
+   * commit histórico (árbol limpio) en vez de solo el working tree. */
+  const actualArgs = ['run', 'task:check', '--', args.taskId, ...(args.full ? ['--full'] : []), ...(args.ci ? ['--ci'] : []), ...(args.profile ? ['--profile', args.profile] : []), ...(args.base ? ['--base', args.base] : [])];
   let actual = null;
   try {
     await execFileAsync(process.platform === 'win32' ? 'npm.cmd' : 'npm', actualArgs, { cwd: projectRoot, timeout: 30 * 60_000 });
@@ -128,7 +130,7 @@ async function main() {
     actualManifestExists = true;
   } catch { /* No reporte del gate actual: abajo se reporta y se aborta. */ }
   const sentinelCli = path.join(projectRoot, 'tools', 'sentinel', 'out', 'cli', 'index.js');
-  const generateArgs = ['scripts/quality/stages.mjs', '--task-id', args.taskId, '--output', stagesJson, '--report-root', sentinelReport, '--scope-manifest', actualScopeManifest, ...(args.full ? ['--full'] : []), ...(args.ci ? ['--ci'] : []), ...(args.profile ? ['--profile', args.profile] : [])];
+  const generateArgs = ['scripts/quality/stages.mjs', '--task-id', args.taskId, '--output', stagesJson, '--report-root', sentinelReport, '--scope-manifest', actualScopeManifest, ...(args.full ? ['--full'] : []), ...(args.ci ? ['--ci'] : []), ...(args.profile ? ['--profile', args.profile] : []), ...(args.base ? ['--base', args.base] : [])];
   if (!actualManifestExists) {
     process.stderr.write(`[observe] SETUP ERROR — el gate actual no escribió scope-manifest (${actualScopeManifest}); no hay alcance válido para comparar.\n`);
     process.exitCode = 2;
