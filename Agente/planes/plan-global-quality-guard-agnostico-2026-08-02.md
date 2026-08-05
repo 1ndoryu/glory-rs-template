@@ -167,10 +167,12 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 
 **Gate:** ADR aprobado; fixtures y doctor local pasan; los contratos documentales de shells y de actualización/rollback quedan definidos. La fase 0 queda parcialmente cerrada: el schema/runtime global, la salida final y la ejecución de la matriz multi-shell permanecen pendientes upstream.
 
-### Fase 1 — Sentinel Core global instalable y estable *(bloqueada: runtime upstream ausente)*
+### Fase 1 — Sentinel Core global instalable y estable *(bloqueada: runtime upstream ausente; scope extraído)*
 
-- [ ] Extraer el clasificador, scheduler, scope, caché y reporter a Sentinel Core, sin imports de wandori.us ni de VarSense.
-- [ ] Crear CLI global `sentinel check|guard|doctor|status|install|update|rollback`.
+**Avance 2026-08-05 (primer módulo):** el alcance incremental del orquestador fue extraído a Sentinel Core en `src/core/scope.ts` (port agnóstico de `scripts/quality/scope.mjs`, sin imports de wandori.us ni de VarSense; `resolveFullDecision`, `matches`/globs, `resolveExplicitProfiles`, `expandLocalDependencies` y `detectScope` con git vía `execFile`). El CLI gana `sentinel check <task-id> --dry-run` (calcula el alcance efectivo, escribe `changed-files.txt` + `scope-manifest.json` y devuelve JSON; el orquestador completo sigue pendiente y `check` exige `--dry-run` para no simular un gate que aún no existe). El checkout consumido pasó a ser el submódulo interno `tools/sentinel` (mismo patrón que `tools/varsense`). Evidencia: 320 tests de la suite upstream PASS (5 nuevos de scope, incluido un `detectScope` sobre un repo git real), compile + `check:core` PASS, demo end-to-end del CLI y fijación en `quality-tools.json`/`sentinel.lock.json` (commit `5a968c8`). Pendiente de esta fase: scheduler/cooldown, caché, reporter combinado, clasificador, resto del CLI global y shims.
+
+- [ ] Extraer el clasificador, scheduler, scope, caché y reporter a Sentinel Core, sin imports de wandori.us ni de VarSense. *(scope extraído en `5a968c8`; scheduler/caché/reporter/clasificador pendientes)*
+- [ ] Crear CLI global `sentinel check|guard|doctor|status|install|update|rollback`. *(check --dry-run con scope ya existe; guard/doctor/status/install pendientes)*
 - [ ] Instalar versiones en `%LOCALAPPDATA%\GlorySentinel\versions` y cambiar `current` de forma atómica.
 - [x] Ejecutar analyzers mediante adapters locales aislados con timeout, límite de salida y estados distinguibles `tool-error/timeout/cancelled/invalid-output`; el contrato valida raíz, `entries`, `findings`, `ruleId`, `message` y severidad allowlisted. La cancelación local se propaga desde el gate al runner, solo se marca ante una transición durante la ejecución (o cancelación previa explícita), conserva `quality-cancelled`, drena etapas activas y no agenda nuevas; el reporte final usa `CANCELLED`/130. El estado/salida del runtime global Core queda pendiente (`runner.mjs`, `stage-runner.mjs`, `structured-tool.mjs`, `common.mjs`, `reporter.mjs` + tests).
 - [ ] Generar shims con resolución del ejecutable real sin recursión; preservar argumentos, códigos de salida y redirecciones.

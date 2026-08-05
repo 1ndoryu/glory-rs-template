@@ -160,7 +160,7 @@ El script decide alcance automáticamente, es incremental local y full en CI. De
 
 ### Glory Sentinel
 
-- Repo: `C:\Users\Owner\OneDrive\Documentos\WP\app\public\wp-content\themes\glorytemplate\.agent\code-sentinel`; reglas bajo core/analyzers, agnósticas del proyecto.
+- Checkout interno: submódulo `tools/sentinel` (commit pin en `.gitmodules` + gitlink en main); `quality-tools.json` usa `sourcePath` relativo y `quality:setup` inicializa/compila el CLI en clon limpio. Editar el core directamente en `tools/sentinel` (la Fase 1 del plan 028A-6 extrae el orquestador del gate a `src/core/scope.ts` y `sentinel check --dry-run`); al fijar un commit nuevo, `git submodule update` + commit del gitlink y regenerar `sentinel.lock.json`. Reglas bajo core/analyzers, agnósticas del proyecto.
 - wandori.us configura reglas en `sentinel.config.json`; no crea regex/scripts paralelos.
 - CLI, LSP, VS Code y Zed deben producir hallazgos equivalentes mediante fixtures.
 - No usar `sentinel-disable-file` salvo justificación por regla/archivo/tarea/fecha de retirada.

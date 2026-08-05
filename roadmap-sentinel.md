@@ -41,6 +41,11 @@ Con este checklist cerrado, las mejoras restantes de este documento son backlog 
 - Mientras exista una regla en scripts locales, el adaptador debe marcarla como puente temporal y registrar su paridad con el core.
 - Cada fase termina con revisión SOLID, rendimiento, falsos positivos, seguridad de paths/secretos y compatibilidad Windows/Linux/macOS.
 
+## Estado 028A-8 (tramos 1–5) y 028A-6 (SNT-10 — Fase 1 en curso)
+
+- **028A-8 tramo 5 + submódulo de Sentinel (2026-08-05):** el checkout consumido de Sentinel pasó a ser el submódulo interno `tools/sentinel` (commit pin en `.gitmodules` + gitlink); `quality-tools.json` usa `sourcePath: "tools/sentinel"` y `quality:setup` inicializa/compila en clon limpio. **El gate ya no depende de ninguna variable `GLORY_*`**: sentinel y varsense quedan fijados por gitlink; el lock no declara `sourcePathEnv`. Setup y `quality:test` 136/136 PASS sin env.
+- **028A-6 Fase 1 (primer módulo, 2026-08-05):** el alcance incremental del orquestador fue extraído a Sentinel Core (`src/core/scope.ts`, port agnóstico de `scripts/quality/scope.mjs`) y el CLI gana `sentinel check <task-id> --dry-run` (calcula el alcance, escribe `changed-files.txt` + `scope-manifest.json` y devuelve JSON; el gate completo sigue en el orquestador). Upstream publicado en `5a968c8` (origin/main); 320 tests de la suite PASS (5 nuevos de scope con repo git real). La migración es incremental: `scripts/quality` sigue siendo el gate hasta que se extraigan scheduler/caché/reporter.
+
 ## Estado 028A-8 (tramos 1–4 — alcance efectivo, manifiesto, índice persistente, dependencias y métricas)
 
 - **Tramo 1 (2026-08-04):** `scope.mjs` separa requested/automatic/effective/fullReason/heavyDeferred con `resolveFullDecision` puro; `task-check.mjs` adquiere el lease pesado para automaticFull; `cache.mjs` fingerprint v5 por `effectiveFull`; `reporter.mjs` expone el motivo; `custom`/`rust` consumen el alcance efectivo; `scope-manifest.json` único por tarea con hashes; `run-frontend-tests.mjs` reutiliza el manifiesto. Gate real: full diferido → `Scope: full · ejecución incremental (heavy-deferred)` con VarSense aplicando `--files-from`.

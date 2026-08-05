@@ -5,3 +5,6 @@
 [submodule "tools/varsense"]
 	path = tools/varsense
 	url = https://github.com/1ndoryu/varsense.git
+[submodule "tools/sentinel"]
+	path = tools/sentinel
+	url = https://github.com/1ndoryu/glory-sentinel.git
