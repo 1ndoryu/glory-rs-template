@@ -259,6 +259,13 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 - Un roadmap de calidad puede mantener una visión amplia sin convertir cada regla futura, benchmark o paridad de adapters en una dependencia del producto.
 - La fuente canónica debe declarar explícitamente qué checklist desbloquea el trabajo y qué backlog queda diferido; así el agente ejecuta el gate reproducible sin inflar el contexto ni iniciar migraciones upstream innecesarias.
 
+## 058A-4 — Una banda de selección sin recorte crea scroll accidental
+
+- Arrastrar un rectángulo de selección más allá de los bordes del contenedor dentro de un scroll container (`overflow: auto`) crea scrollable overflow: los scrollbars vertical y horizontal del Finder se activaban durante el gesto aunque el usuario solo quisiera seleccionar. El fix raíz es recortar la banda a `clientWidth/clientHeight` del contenedor en cada `pointermove` y llamar `e.preventDefault()`; no basta con `overflow: hidden` en la banda (no impide el scroll del ancestro).
+- El re-render completo del grid por cada cambio de selección es inviable con la banda (decenas de cambios por gesto): la actualización selectiva de clases sobre los ítems existentes (Map id → elemento) reduce el costo a un `classList.toggle` por ítem. La selección provisional de la banda debe ser feedback CSS sin tocar el store hasta soltar (el store solo se actualiza en `onApply`).
+- Los límites de Sentinel (util ≤150 líneas, componente ≤300) no son negociables al cierre: una util con lógica de geometría pura se extrae a un módulo math testable sin DOM (`selection-band-math.ts`), y al extraer hay que verificar que no se pierdan constantes compartidas (`MOVE_THRESHOLD_PX`).
+- Un clic derecho sobre un ítem ya seleccionado debe abrir el menú sobre TODA la selección (targets multi), no solo sobre ese ítem; un clic derecho sobre un ítem no seleccionado reemplaza la selección por ese único ítem (comportamiento Windows).
+
 ## 018A-44 — Retirar nombres legacy después de extraer la responsabilidad
 
 - Cuando un módulo deja de contener la responsabilidad que dio origen a su nombre, conservarlo como alias perpetúa una arquitectura equivocada y hace que futuras apps vuelvan a depender del boundary antiguo.

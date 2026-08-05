@@ -13,12 +13,16 @@ import { createDesktopIcon } from './components/desktop-icon';
 import { openAppWindow } from '../runtime/route-app-adapter';
 import { authStore } from '../../store';
 import { openContextMenu } from './components/desktop-context-menu';
-import { selectionStore, selectSingle, clearSelection, isSelected } from '../runtime/selection-store';
+import type { CommandTarget } from '../runtime/command-registry';
+import { selectionStore, selectSingle, selectMany, clearSelection, isSelected, toggleSelect, extendSelect, getSelectedIds } from '../runtime/selection-store';
 import { workspaceStore, reorderDesktopNodes } from '../runtime/workspace/workspace-store';
 import type { ResolvedNode } from '../runtime/workspace/types';
 import { AppRegistry } from '../runtime/app-registry';
 import { resolveResourceIcon, resolveResourceIconType } from '../runtime/resource-type-registry';
 import { enableDrag } from './utils/icon-drag';
+import { enableSelectionBand } from './utils/selection-band';
+import { buildGroupPlacementMoves } from './utils/icon-group-drag';
+import { createDebugGridOverlay } from './utils/debug-grid-overlay';
 import { DESKTOP_MIN_WIDTH, getGridMetrics, planPlacement, reflowPositions } from './utils/icon-grid';
 import { moveNodesPosition } from '../runtime/workspace/overlay-mutations';
 import { reconcileChildren } from '../../utils/reconcile';
@@ -108,12 +112,17 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
 
   const dragCleanups = new Map<string, () => void>();
 
+  /* [058A-4] Nodos visibles actuales en orden de grid: idsInOrder para el rango
+   * con Shift y fuente de ítems de la banda de selección. Se actualiza en cada
+   * render del workspace. */
+  let activableNodes: ResolvedNode[] = [];
+
   const stopWorkspace = workspaceStore.subscribe((ws) => {
     const desktopNodes = Object.values(ws.nodes)
       .filter((n) => n.parentId === 'desktop')
       .sort((a, b) => (a.mobileOrder ?? 0) - (b.mobileOrder ?? 0));
 
-    const activableNodes = desktopNodes.filter(n => resolveActivate(n, extraActions));
+    activableNodes = desktopNodes.filter(n => resolveActivate(n, extraActions));
 
     const activeIds = new Set(activableNodes.map(n => n.id));
     for (const [id, cleanup] of dragCleanups) {
@@ -145,7 +154,18 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
         iconEl.addEventListener('mousedown', (e) => {
           if (e.button === 0 && e.detail === 1) {
             const nid = iconEl.getAttribute('data-node-id');
-            if (nid) selectSingle(nid, 'desktop');
+            if (!nid) return;
+            /* [058A-4] Selección múltiple estilo Windows: Ctrl/Cmd alterna,
+             * Shift extiende rango (orden visible del grid) y el clic simple
+             * reemplaza. Un clic sobre un ítem YA seleccionado conserva la
+             * selección (permite arrastrar el grupo, igual que Windows). */
+            if (e.ctrlKey || e.metaKey) {
+              toggleSelect(nid, 'desktop');
+            } else if (e.shiftKey) {
+              extendSelect(nid, activableNodes.map(n => n.id), 'desktop');
+            } else if (!isSelected(nid, 'desktop')) {
+              selectSingle(nid, 'desktop');
+            }
           }
         });
 
@@ -156,10 +176,19 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
           const ws = workspaceStore.get();
           const currentNode = ws.nodes[nid];
           if (!currentNode) return;
-          selectSingle(nid, 'desktop');
+          /* [058A-4] Clic derecho sobre un ítem de la multi-selección: el menú
+           * actúa sobre TODOS los seleccionados. Sobre un ítem no seleccionado,
+           * se selecciona solo ese (comportamiento Windows). */
+          const alreadySelected = isSelected(nid, 'desktop');
+          const ids = alreadySelected ? getSelectedIds() : [nid];
+          if (!alreadySelected) selectSingle(nid, 'desktop');
+          const targets = ids
+            .map(id => ws.nodes[id])
+            .filter((n): n is ResolvedNode => Boolean(n))
+            .map((n): CommandTarget => ({ id: n.refId ?? n.id, kind: n.type === 'app' ? 'app' : 'shortcut' }));
           openContextMenu({
             context: 'icon',
-            targets: [{ id: currentNode.refId ?? nid, kind: currentNode.type === 'app' ? 'app' : 'shortcut' }],
+            targets,
             capability: authStore.get().capability,
             x: e.clientX,
             y: e.clientY,
@@ -195,7 +224,18 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
             const desktopNodes = Object.values(ws.nodes).filter((n) => n.parentId === 'desktop');
             const metrics = getGridMetrics(grid);
             const plan = planPlacement(desktopNodes, draggedId, { col, row }, metrics);
-            moveNodesPosition(plan.moves);
+            const st = selectionStore.get();
+            const isGroup = st.source === 'desktop' && st.selectedIds.length > 1 && st.selectedIds.includes(draggedId);
+            if (!isGroup) {
+              moveNodesPosition(plan.moves);
+              return;
+            }
+            /* [058A-4] Drag de grupo: mantiene el offset relativo de los
+             * seleccionados respecto al arrastrado (delta del plan), sin
+             * resolver colisiones del grupo contra otros iconos (mejora
+             * futura). Si el arrastrado no tiene move/position válidos,
+             * buildGroupPlacementMoves devuelve null y se cae al plan único. */
+            moveNodesPosition(buildGroupPlacementMoves(desktopNodes, draggedId, plan, st.selectedIds) ?? plan.moves);
           },
         });
         dragCleanups.set(node.id, cleanup);
@@ -228,8 +268,24 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
     }
   });
 
-  grid.addEventListener('mousedown', (e) => {
-    if (e.target === grid) clearSelection();
+  /* [058A-4] Banda de selección (rubber band) desde el fondo del escritorio.
+   * El clic simple en el fondo sin arrastre termina en onApply([], false) →
+   * clearSelection (comportamiento anterior). El feedback provisional usa
+   * .desktop-icon--banded (mismo patrón visual que --selected) sin tocar el
+   * store hasta soltar. Con Ctrl/Cmd la banda es aditiva. */
+  const stopSelectionBand = enableSelectionBand({
+    container: grid,
+    getItems: () => Array.from(grid.children)
+      .filter((el): el is HTMLElement => el instanceof HTMLElement && el.classList.contains('desktop-icon--interactive') && Boolean(el.getAttribute('data-node-id')))
+      .map(el => ({ id: el.getAttribute('data-node-id')!, el })),
+    itemFeedbackClass: 'desktop-icon--banded',
+    onApply: (ids, additive) => {
+      if (ids.length === 0 && !additive) {
+        clearSelection();
+        return;
+      }
+      selectMany(ids, 'desktop', { additive });
+    },
   });
 
   /* [297A-20] Reflow eficiente al cambiar el tamaño del grid.
@@ -241,57 +297,15 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
   let resizeTimer: ReturnType<typeof setTimeout> | undefined;
   let frameHandle: number | undefined;
 
-  /* [297A-20][DEPURACION TEMPORAL] Overlay que muestra el límite del grid y
-   * cada celda con su col,row. Activar con Ctrl+Shift+G.
-   * PENDIENTE: eliminar junto con el CSS .desktop-icon-grid--depurar. */
-  let debugRender: (() => void) | undefined;
-
-  const toggleDebugGrid = (): void => {
-    const active = grid.classList.toggle('desktop-icon-grid--depurar');
-    let layer = grid.querySelector<HTMLElement>('.desktop-icon-grid__debug');
-    if (!active) {
-      layer?.remove();
-      debugRender = undefined;
-      return;
-    }
-    if (!layer) {
-      layer = createEl('div', { className: 'desktop-icon-grid__debug' });
-      grid.appendChild(layer);
-    }
-    debugRender = (): void => {
-      if (!layer) return;
-      layer.replaceChildren();
-      const metrics = getGridMetrics(grid);
-      const rect = grid.getBoundingClientRect();
-      for (let row = 0; row < metrics.rows; row++) {
-        for (let col = 0; col < metrics.columns; col++) {
-          const cell = createEl('div', { className: 'desktop-icon-grid__debug-celda' });
-          cell.textContent = `${col},${row}`;
-          /* Misma geometría que getCellAt: col 0 = derecha en RTL.
-           * [297A-20] Fórmula corregida: right - (col+1)*cellWidth - col*gap
-           * (antes se restaba un gap de más por columna y la cuadrícula
-           * quedaba desplazada respecto a las celdas reales). */
-          const x = metrics.rtl
-            ? rect.width - (col + 1) * metrics.cellWidth - col * metrics.columnGap
-            : col * (metrics.cellWidth + metrics.columnGap);
-          /* [058A-1] rowGap efectivo: con align-content distribuido las filas
-           * reales no están a rowGap uniforme; replicar la distribución. */
-          const y = row * (metrics.cellHeight + metrics.rowGapEffective);
-          cell.style.left = `${x}px`;
-          cell.style.top = `${y}px`;
-          cell.style.width = `${metrics.cellWidth}px`;
-          cell.style.height = `${metrics.cellHeight}px`;
-          layer.appendChild(cell);
-        }
-      }
-    };
-    debugRender();
-  };
+  /* [297A-20][DEPURACION TEMPORAL] Overlay del snap-grid (Ctrl+Shift+G):
+   * muestra el límite y cada celda con col,row. PENDIENTE: eliminar junto
+   * con el CSS .desktop-icon-grid--depurar. */
+  const debugOverlay = createDebugGridOverlay(grid);
 
   const onKeyDown = (e: KeyboardEvent): void => {
     if (e.ctrlKey && e.shiftKey && (e.key === 'G' || e.key === 'g')) {
       e.preventDefault();
-      toggleDebugGrid();
+      debugOverlay.toggle();
     }
   };
 
@@ -301,12 +315,12 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
       const metrics = getGridMetrics(grid);
       lastColumns = metrics.columns;
       lastRows = metrics.rows;
-      debugRender?.();
+      debugOverlay.refresh();
       return;
     }
     const metrics = getGridMetrics(grid);
     if (metrics.columns === lastColumns && metrics.rows === lastRows) {
-      debugRender?.();
+      debugOverlay.refresh();
       return;
     }
     lastColumns = metrics.columns;
@@ -315,7 +329,7 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
     const desktopNodes = Object.values(ws.nodes).filter((n) => n.parentId === 'desktop');
     const plan = reflowPositions(desktopNodes, metrics);
     if (plan.moves.length > 0) moveNodesPosition(plan.moves);
-    debugRender?.();
+    debugOverlay.refresh();
   };
 
   const onWindowResize = (): void => {
@@ -334,12 +348,14 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
   const destroy = (): void => {
     stopWorkspace();
     stopSelection();
+    stopSelectionBand();
     window.removeEventListener('resize', onWindowResize);
     window.removeEventListener('keydown', onKeyDown);
     window.clearTimeout(resizeTimer);
     if (frameHandle !== undefined) cancelAnimationFrame(frameHandle);
     for (const cleanup of dragCleanups.values()) cleanup();
     dragCleanups.clear();
+    debugOverlay.dispose();
     grid.replaceChildren();
   };
 

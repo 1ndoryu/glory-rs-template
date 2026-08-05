@@ -14,16 +14,21 @@ import {
   type IconNode,
 } from 'lucide';
 import { createEl } from '../../../../utils/dom';
-import { workspaceStore, getChildren } from '../../../runtime/workspace/workspace-store';
+import { workspaceStore, getChildren, moveNodeToParent } from '../../../runtime/workspace/workspace-store';
 import { openContextMenu } from '../../components/desktop-context-menu';
 import {
   selectionStore,
   selectSingle,
+  selectMany,
   selectBackground,
   isSelected,
   clearSelection,
+  toggleSelect,
+  extendSelect,
+  getSelectedIds,
 } from '../../../runtime/selection-store';
 import { enableDrag, makeDropTarget } from '../../utils/icon-drag';
+import { enableSelectionBand } from '../../utils/selection-band';
 import { authStore } from '../../../../store';
 import type { ResolvedNode } from '../../../runtime/workspace/types';
 import { resolvePublicResourceTarget, canOpenNodeFromShell } from '../../../runtime/workspace/public-resource-locator';
@@ -92,6 +97,13 @@ export function createFinderPreview(options: FinderOptions): HTMLElement {
 
   const pathEl = createEl('div', { className: 'desktop-finder__path' });
   const grid = createEl('div', { className: 'desktop-finder__grid' });
+
+  /* [058A-4] Ítems renderizados (id → elemento). Permite aplicar la selección
+   * por clase sobre elementos existentes en vez de reconstruir todo el grid en
+   * cada cambio del selectionStore (la banda de selección genera muchos
+   * cambios; un re-render completo por selección sería lento). Se limpia y
+   * repuebla en render(). */
+  const itemElements = new Map<string, HTMLElement>();
 
   function navigateTo(folderId: string, push = true): void {
     if (push && folderId !== currentFolderId) backStack.push(currentFolderId);
@@ -184,16 +196,35 @@ export function createFinderPreview(options: FinderOptions): HTMLElement {
        * URL no aparecen: su doble clic solo produciría un aviso. */
       .filter((child) => canOpenNodeFromShell(child, { allowImagePreview: true }));
     grid.innerHTML = '';
+    itemElements.clear();
+
+    /* [058A-4] idsInOrder del render actual: orden visible del grid para
+     * extender el rango con Shift desde el último seleccionado. */
+    const visibleIds = children.map(c => c.id);
 
     /* [018A-91] Sin estado vacío textual: una carpeta sin hijos deja el grid
      * en blanco (el clic derecho sobre el fondo sigue abriendo el menú porque
      * target === grid). */
 
     for (const child of children) {
-      const item = createFinderItem(child, navigateTo, options);
+      const item = createFinderItem(child, navigateTo, options, () => visibleIds);
+      itemElements.set(child.id, item);
 
       enableDrag({
         el: item, nodeId: child.id, context: 'finder', gridEl: grid,
+        /* [058A-4] Drag de grupo: se captura la selección finder en el
+         * pointerdown; al soltar sobre un target, onGroupDrop mueve todos los
+         * seleccionados (no solo el arrastrado). */
+        getGroupIds: () => {
+          const st = selectionStore.get();
+          return st.source === 'finder' && st.selectedIds.length > 1 ? st.selectedIds : [];
+        },
+        onGroupDrop: (_draggedId, targetId, groupIds) => {
+          for (const id of groupIds) {
+            if (id === targetId) continue;
+            moveNodeToParent(id, targetId);
+          }
+        },
       });
 
       if (child.type === 'folder') {
@@ -206,10 +237,38 @@ export function createFinderPreview(options: FinderOptions): HTMLElement {
 
   workspaceStore.subscribe(() => { render(); });
 
-  /* [018A-88] Re-render al cambiar la selección: los ítems aplican la clase
-   * --selected según selectionStore (antes la selección existía solo en el
-   * store, sin reflejo visual). */
-  selectionStore.subscribe(() => { render(); });
+  /* [058A-4] Actualización selectiva de la selección: se aplica/remueve la
+   * clase --selected y aria-selected sobre los ítems existentes SIN re-render
+   * completo (antes selectionStore.subscribe llamaba a render() y reconstruía
+   * todo el grid en cada clic; con la banda de selección eso sería inviable).
+   * El re-render completo sigue ocurriendo solo en cambios del workspace o
+   * navegación. */
+  selectionStore.subscribe(() => {
+    for (const [id, el] of itemElements) {
+      const selected = isSelected(id, 'finder');
+      el.classList.toggle('desktop-finder__item--selected', selected);
+      el.setAttribute('aria-selected', String(selected));
+    }
+  });
+
+  /* [058A-4] Banda de selección (rubber band) desde el fondo del grid del
+   * Finder. El clic simple en el fondo sin arrastre limpia la selección;
+   * con Ctrl/Cmd la banda es aditiva. El feedback provisional usa
+   * .desktop-finder__item--banded sin tocar el store hasta soltar. */
+  enableSelectionBand({
+    container: grid,
+    getItems: () => Array.from(grid.children)
+      .filter((el): el is HTMLElement => el instanceof HTMLElement && el.classList.contains('desktop-finder__item') && Boolean(el.getAttribute('data-node-id')))
+      .map(el => ({ id: el.getAttribute('data-node-id')!, el })),
+    itemFeedbackClass: 'desktop-finder__item--banded',
+    onApply: (ids, additive) => {
+      if (ids.length === 0 && !additive) {
+        clearSelection();
+        return;
+      }
+      selectMany(ids, 'finder', { additive });
+    },
+  });
 
   return finder;
 }
@@ -218,9 +277,10 @@ function createFinderItem(
   node: ResolvedNode,
   navigateTo: (folderId: string) => void,
   options: FinderOptions,
+  /* [058A-4] idsInOrder del render actual (orden visible del grid). */
+  getIdsInOrder: () => readonly string[],
 ): HTMLElement {
   const icon = getNodeIcon(node);
-  const isFolder = node.type === 'folder';
   const isImage = node.type === 'resource' && node.resourceKind === 'image';
 
   const item: HTMLElement = isImage
@@ -257,21 +317,46 @@ function createFinderItem(
 
   item.addEventListener('mousedown', ((e: MouseEvent) => {
     if (e.button === 0 && e.detail === 1) {
-      selectSingle(node.id, 'finder');
+      /* [058A-4] Selección múltiple estilo Windows: Ctrl/Cmd alterna, Shift
+       * extiende rango (orden visible) y el clic simple reemplaza. Un clic
+       * sobre un ítem YA seleccionado conserva la selección (permite
+       * arrastrar el grupo). */
+      if (e.ctrlKey || e.metaKey) {
+        toggleSelect(node.id, 'finder');
+      } else if (e.shiftKey) {
+        extendSelect(node.id, getIdsInOrder(), 'finder');
+      } else if (!isSelected(node.id, 'finder')) {
+        selectSingle(node.id, 'finder');
+      }
     }
   }) as EventListener);
 
   item.addEventListener('contextmenu', ((e: MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    selectSingle(node.id, 'finder');
 
-    const context = isFolder ? 'folder' : 'icon';
-    const kind = isFolder ? 'folder' as const : (node.type === 'resource' ? 'shortcut' as const : 'app' as const);
-    const targets = [{ id: node.refId ?? node.id, kind }];
+    /* [058A-4] Clic derecho sobre un ítem de la multi-selección: el menú actúa
+     * sobre TODOS los seleccionados; sobre un ítem no seleccionado, se
+     * selecciona solo ese. El contexto es 'folder' solo si todos los targets
+     * son carpetas; una selección mixta usa 'icon' (incluye copiar/cortar/
+     * eliminar multi). */
+    const alreadySelected = isSelected(node.id, 'finder');
+    const ids = alreadySelected ? getSelectedIds() : [node.id];
+    if (!alreadySelected) selectSingle(node.id, 'finder');
+
+    const ws = workspaceStore.get();
+    const targets = ids
+      .map(id => ws.nodes[id])
+      .filter((n): n is ResolvedNode => Boolean(n))
+      .map(n => {
+        const isFolderNode = n.type === 'folder';
+        const kind = isFolderNode ? 'folder' as const : (n.type === 'resource' ? 'shortcut' as const : 'app' as const);
+        return { id: n.refId ?? n.id, kind };
+      });
+    const allFolders = targets.every(t => t.kind === 'folder');
 
     openContextMenu({
-      context,
+      context: allFolders ? 'folder' : 'icon',
       targets,
       capability: authStore.get().capability,
       x: e.clientX,

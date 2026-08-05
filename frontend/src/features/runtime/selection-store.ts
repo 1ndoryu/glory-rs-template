@@ -60,6 +60,28 @@ export function toggleSelect(id: string, source: SelectionSource): void {
   });
 }
 
+/** Reemplazar (o ampliar si additive) la selección por un conjunto de ids.
+ * [058A-4] Lo usa la banda de selección (rubber band) al soltar: sin Ctrl
+ * reemplaza la selección con los ítems intersectados; con Ctrl/Cmd los suma a
+ * la selección actual. lastSelectedId queda en el último id para que Shift
+ * pueda extender desde ahí. */
+export function selectMany(
+  ids: readonly string[],
+  source: SelectionSource,
+  opts: { additive?: boolean } = {},
+): void {
+  const current = selectionStore.get();
+  const merged = opts.additive
+    ? Array.from(new Set([...current.selectedIds, ...ids]))
+    : [...ids];
+  selectionStore.set({
+    selectedIds: merged,
+    lastSelectedId: ids.length > 0 ? ids[ids.length - 1] : current.lastSelectedId,
+    isBackground: false,
+    source,
+  });
+}
+
 /** Extender selección desde el último seleccionado hasta el actual (Shift + clic).
  * idsInOrder = array ordenado de IDs visibles en el contenedor actual. */
 export function extendSelect(id: string, idsInOrder: readonly string[], source: SelectionSource): void {

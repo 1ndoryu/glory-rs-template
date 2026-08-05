@@ -158,6 +158,30 @@
   opacity: 0.4;
 }
 
+/* [058A-4] Banda de selección múltiple (rubber band) estilo Windows: rectángulo
+ * arrastrado desde el fondo del grid. Monocromo con tokens del sistema; relleno
+ * translúcido con --sistema-drop-target-fondo (misma receta que el drop target
+ * de arrastre). Se posiciona respecto al contenedor que la contiene (el grid
+ * debe ser su containing block: absolute o relative). */
+.desktop-selection-band {
+  position: absolute;
+  z-index: 3;
+  border: 1px solid var(--sistema-texto);
+  background: var(--sistema-drop-target-fondo);
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+/* [058A-4] Feedback provisional de la banda sobre ítems intersectados: mismo
+ * patrón visual que --selected (--sistema-inverso-*) pero SIN tocar el store;
+ * al soltar la banda aplica la selección real y estas clases se eliminan.
+ * Comparte receta entre el escritorio y el Finder. */
+.desktop-icon--banded .desktop-icon__label,
+.desktop-finder__item--banded .desktop-finder__label {
+  color: var(--sistema-inverso-texto);
+  background: var(--sistema-inverso-fondo);
+}
+
 .desktop-icon--ghost {
   opacity: 0.7;
   pointer-events: none;

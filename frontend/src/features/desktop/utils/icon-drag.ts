@@ -52,17 +52,27 @@ export function enableDrag(options: {
   itemSelector?: string;
   onReorder?: (draggedId: NodeId, targetIndex: number) => void;
   onPlaceCell?: (draggedId: NodeId, col: number, row: number) => void;
+  /* [058A-4] Drag de grupo: getGroupIds se consulta en pointerdown (selección
+   * en ese instante); si hay >1 ids y onGroupDrop, el drop sobre un target
+   * llama a onGroupDrop en vez de globalDropHandler (el caller mueve todo el
+   * grupo). El escritorio no lo usa: resuelve el grupo en onPlaceCell. */
+  getGroupIds?: () => readonly string[];
+  onGroupDrop?: (draggedId: NodeId, targetId: string, groupIds: readonly string[]) => void;
 }): () => void {
-  const { el, nodeId, context, gridEl, itemSelector = '.desktop-icon--interactive', onReorder, onPlaceCell } = options;
+  const { el, nodeId, context, gridEl, itemSelector = '.desktop-icon--interactive', onReorder, onPlaceCell, getGroupIds, onGroupDrop } = options;
   const DRAG_THRESHOLD = 6;
 
   let startX = 0;
   let startY = 0;
+  /* [058A-4] Grupo capturado al iniciar el gesto; no cambia durante el drag
+   * aunque la selección del store sí lo haga. */
+  let groupIds: readonly string[] = [];
 
   function onPointerDown(e: PointerEvent): void {
     if (e.button !== 0) return;
     startX = e.clientX;
     startY = e.clientY;
+    groupIds = getGroupIds?.() ?? [];
     el.style.touchAction = 'none';
 
     document.addEventListener('pointermove', onPointerMove);
@@ -137,13 +147,18 @@ export function enableDrag(options: {
         if (targetIndex >= 0) {
           onReorder(nodeId as NodeId, targetIndex);
         }
-      } else if (globalDropHandler && targetId) {
-        globalDropHandler({
-          sourceId: nodeId,
-          targetId,
-          sourceContext: context,
-          targetContext,
-        });
+      } else if ((globalDropHandler || onGroupDrop) && targetId) {
+        if (groupIds.length > 1 && onGroupDrop) {
+          /* [058A-4] Drag de grupo: el caller mueve todos los ids capturados. */
+          onGroupDrop(nodeId as NodeId, targetId, groupIds);
+        } else if (globalDropHandler) {
+          globalDropHandler({
+            sourceId: nodeId,
+            targetId,
+            sourceContext: context,
+            targetContext,
+          });
+        }
       }
     }
 
