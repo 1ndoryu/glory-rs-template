@@ -231,9 +231,9 @@ La edición en vivo no debe modificar el snapshot que usan otros jugadores. El m
 
 Esta fase define únicamente qué debe verse. No decide todavía movimiento, red, salas, persistencia, colisiones ni editor.
 
-- [ ] Aprobar la referencia guardada en `Agente/documentacion/producto/referencia-visual-bosque-2026-08-01.md` como atmósfera, no como asset para copiar.
+- [x] Aprobar la referencia guardada en `Agente/documentacion/producto/referencia-visual-bosque-2026-08-01.md` como atmósfera, no como asset para copiar: decisión de producto del 05-ago — la imagen es del usuario/tiene licencia y se usa como base de assets con más libertad.
 - [x] Comparar ambos bocetos y elegir Three.js 3D isométrico; conservar el cenital sin usarlo como renderer final.
-- [ ] Fijar gramática visual: escala de cámara, grosor de línea, densidad, capas, siluetas, agua/terreno y variante monocroma o paleta restringida.
+- [x] Fijar gramática visual: escala de cámara, grosor de línea, densidad, capas, siluetas, agua/terreno y variante monocroma o paleta restringida: decisión de producto del 05-ago — low poly intermedio-bajo, verde stylized muy colorido (Genshin solo como referencia de estilo) y cámara libre orbital; aplicada en `e9d7e09d` (paleta verde + cielo, cámara orbital con drag/rueda, controles por dispositivo).
 - [x] Definir el marco mínimo del OS: nombre `Bosque`, icono Lucide, ventana full-bleed en desktop/tablet y pantalla completa móvil: las apps `game`/`game-3d`/`game-playable` usan iconos Lucide, layout full-bleed y pantalla completa móvil vía el mismo runtime (018A-92, 297A-30).
 - [x] Confirmar que los elementos del boceto serán originales y que la referencia no se incrusta, calca ni distribuye dentro de la app: la referencia se conserva en `referencia-visual-bosque-2026-08-01.md` como atmósfera; el fixture y los modelos son originales (297A-30/33) y la revisión de procedencia queda en el ADR.
 
@@ -254,7 +254,7 @@ Planes específicos: `Agente/planes/plan-boceto-visual-bosque-2026-08-01.md` y `
 - [x] Liberar en el boceto 3D controles, observers, animation loop, geometrías, materiales, renderer y contexto WebGL al cerrar: teardown completo en `game-preview-3d.ts` (297A-44/74 exigen y prueban destrucción idempotente sin fugas de canvas/listeners/GPU).
 - [x] Integrar el boceto como contenido full-bleed, sin crear ventanas, taskbar, menús o z-index propios: ambas apps usan `layout: 'full-bleed'` y `MountedView` del shell (018A-92).
 - [x] Verificar desktop 1440×900, tablet 1024×768, móvil 390×844 y 320px: la validación visual del 05-ago cubrió el fixture en escritorio y el plan exige los viewports en navegador (018A-94); los viewports móviles/320px quedan pendientes de prueba visual dedicada (apartado 9).
-- [ ] Presentar capturas y la app real al usuario; iterar densidad, escala, árboles, agua, avatar, contraste y posible paleta hasta recibir aprobación explícita: pendiente de la decisión de producto de la Fase 0 (gramática visual y aprobación del usuario).
+- [ ] Presentar capturas y la app real al usuario; iterar densidad, escala, árboles, agua, avatar, contraste y posible paleta hasta recibir aprobación explícita: capturas del fixture con la nueva paleta presentadas el 05-ago (screenshot del preview con cielo azul, suelo verde lima, árboles low-poly y agua azul); pendiente solo la aprobación artística explícita del usuario sobre esas capturas.
 - [x] Mantener fuera del boceto: movimiento, controles, colisiones, salas, jugadores reales, login, guardado, analytics propio, admin y publicación — el boceto 3D no monta lógica de juego; la app jugable sí implementa movimiento/colisiones/salas/login, pero como entregas de fases posteriores, no del boceto.
 
 **Gate:** superado para la dirección 3D; faltan cierre técnico/commit del prototipo y parámetros de cámara, relieve y assets.
