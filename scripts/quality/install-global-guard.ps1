@@ -101,9 +101,14 @@ $bashMarkerEnd
     $realCargo = (Get-Command cargo.exe -CommandType Application | Select-Object -First 1).Source
     $realNpm = Resolve-RealCommandPath -Name 'npm'
     $realNpx = Resolve-RealCommandPath -Name 'npx'
+    # [SNT-10/028A-16] node.cmd es ahora un shim del guard (entrypoints de
+    # herramientas validadas); los shims npm/npx/cargo y el guard de bash lo
+    # usan para evitar recursión al resolver el node real.
+    $realNode = (Get-Command node.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
     [Environment]::SetEnvironmentVariable('GLORY_REAL_CARGO', $realCargo, 'User')
     [Environment]::SetEnvironmentVariable('GLORY_REAL_NPM', $realNpm, 'User')
     [Environment]::SetEnvironmentVariable('GLORY_REAL_NPX', $realNpx, 'User')
+    [Environment]::SetEnvironmentVariable('GLORY_REAL_NODE', $realNode, 'User')
     $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
     $pathEntries = @($userPath -split ';' | Where-Object { $_ })
     if ($pathEntries -notcontains $shimDirectory) {
@@ -112,6 +117,7 @@ $bashMarkerEnd
     $env:GLORY_REAL_CARGO = $realCargo
     $env:GLORY_REAL_NPM = $realNpm
     $env:GLORY_REAL_NPX = $realNpx
+    $env:GLORY_REAL_NODE = $realNode
     if (($env:Path -split ';') -notcontains $shimDirectory) { $env:Path = "$shimDirectory;$env:Path" }
     Write-Host '[glory-quality] Cooldown global: 3 horas por proyecto; usa --allow-heavy solo manualmente.' -ForegroundColor Yellow
 } else {

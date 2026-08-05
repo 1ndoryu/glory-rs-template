@@ -112,6 +112,15 @@ function npx {
     return $LASTEXITCODE
 }
 
+function node {
+    param([Parameter(ValueFromRemainingArguments = $true)][string[]]$NodeArguments)
+    $qualityExit = Invoke-GloryQualityCommandGuard -Executable 'node' -Arguments $NodeArguments
+    if ($qualityExit -ne 0) { return $qualityExit }
+    $realNode = (Get-Command node.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+    & $realNode @NodeArguments
+    return $LASTEXITCODE
+}
+
 function vitest {
     param([Parameter(ValueFromRemainingArguments = $true)][string[]]$VitestArguments)
     $qualityExit = Invoke-GloryQualityCommandGuard -Executable 'vitest' -Arguments $VitestArguments

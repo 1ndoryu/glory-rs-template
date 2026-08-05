@@ -14,6 +14,74 @@ const BLOCKED_NPM_SCRIPT_SET = new Set(BLOCKED_NPM_SCRIPTS);
 const BLOCKED_TOOL_SET = new Set(BLOCKED_TOOLS);
 const BLOCKED_CARGO_COMMAND_SET = new Set(BLOCKED_CARGO_COMMANDS);
 
+/* [SNT-10/028A-16] Entrypoints directos de herramientas validadas: `node
+ * node_modules/vitest/vitest.mjs run` elude el shim/función de `vitest`
+ * invocando el runtime directamente. El guard intercepta `node` SOLO cuando el
+ * primer argumento no-flag es el entrypoint de una herramienta bloqueada
+ * (misma allowlist que BLOCKED_TOOLS); cualquier otro script, eval, REPL o
+ * flag de node pasa intacto. Basename en minúsculas para cubrir rutas
+ * relativas, absolutas y con barras mezcladas. */
+const NODE_TOOL_ENTRYPOINTS = Object.freeze({
+  'vitest.mjs': 'vitest', 'vitest.js': 'vitest', vitest: 'vitest',
+  'tsc.js': 'tsc', tsc: 'tsc',
+  'eslint.js': 'eslint', 'eslint.cjs': 'eslint',
+  'prettier.cjs': 'prettier', 'prettier.js': 'prettier',
+});
+
+/* Flags de node que CONSUMEN su valor como argumento (código/módulo/condición):
+ * el siguiente argumento no es un script y no puede clasificarse como
+ * entrypoint de herramienta. Los flags sin valor (--version, --help, --watch…)
+ * simplemente se ignoran al recorrer los argumentos. */
+const NODE_VALUE_FLAGS = new Set([
+  '-e', '--eval', '-p', '--print', '-r', '--require', '--import',
+  '--loader', '-C', '--conditions', '--inspect', '--inspect-brk',
+  '--experimental-loader', '--env-file',
+]);
+
+function nodeToolFromArgs(args) {
+  const values = args.map(String);
+  for (let index = 0; index < values.length; index += 1) {
+    const value = values[index];
+    if (value.startsWith('-')) {
+      if (NODE_VALUE_FLAGS.has(value)) index += 1;
+      continue;
+    }
+    /* [SNT-10] Barras normalizadas antes del basename: en win32 path.basename
+     * ya colapsa backslashes, pero en un host POSIX no — el patrón es el mismo
+     * que normalize() de scope.mjs. */
+    const tool = NODE_TOOL_ENTRYPOINTS[path.basename(value.replace(/\\/g, '/')).toLowerCase()];
+    return tool ?? null;
+  }
+  return null;
+}
+
+/* [SNT-10/028A-16] `node --run <script>` (task runner de Node) ejecuta los
+ * scripts de package.json sin pasar por el shim de npm — un bypass de la misma
+ * clase que el entrypoint directo (en cmd no existe shim de vitest, así que el
+ * spawn interno no se intercepta). Devuelve el nombre del script si `--run` /
+ * `--run-script` aparece ANTES de un script path; se bloquea cuando coincide
+ * con npmScripts (test/test:full/type-check/build…). */
+function nodeRunScript(args) {
+  const values = args.map(String);
+  for (let index = 0; index < values.length; index += 1) {
+    const value = values[index];
+    if (value === '--run' || value === '--run-script') {
+      const script = values[index + 1];
+      return script && !script.startsWith('-') ? script : null;
+    }
+    if (value.startsWith('--run')) {
+      const equals = value.indexOf('=');
+      if (equals >= 0) return value.slice(equals + 1) || null;
+    }
+    if (value.startsWith('-')) {
+      if (NODE_VALUE_FLAGS.has(value)) index += 1;
+      continue;
+    }
+    return null; /* Un script path llegó antes de --run: no es task runner. */
+  }
+  return null;
+}
+
 function normalizeExecutable(value = '') {
   return path.basename(String(value)).toLowerCase().replace(/\.(cmd|exe)$/u, '');
 }
@@ -129,6 +197,22 @@ export function inspectDirectCommand({ executable, args = [], cwd = process.cwd(
     if (tool && matchesPolicyName(tool, npxTools)) {
       reason = `${command} ${tool}`;
       category = 'tool';
+    }
+  } else if (command === 'node') {
+    /* [SNT-10/028A-16] Bypass por runtime: node node_modules/vitest/vitest.mjs
+     * no pasa por el shim de vitest. Se bloquea solo si el script directo es
+     * el entrypoint de una herramienta de la allowlist, o si --run invoca un
+     * script de validación del guard. */
+    const runScript = nodeRunScript(values);
+    if (runScript && matchesPolicyName(runScript, npmScripts)) {
+      reason = `node --run ${runScript}`;
+      category = 'script';
+    } else {
+      const tool = nodeToolFromArgs(values);
+      if (tool && matchesPolicyName(tool, tools)) {
+        reason = `node ${tool} (entrypoint directo)`;
+        category = 'tool';
+      }
     }
   } else if (matchesPolicyName(command, tools)) {
     reason = command;

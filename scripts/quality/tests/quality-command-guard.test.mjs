@@ -26,6 +26,113 @@ test('bloquea vitest directo y recomienda task:check', async () => {
   assert.match(formatBlockMessage(decision), /npm run task:check/);
 });
 
+test('bloquea node con entrypoint directo de vitest (bypass por runtime, 028A-16)', async () => {
+  const root = await fixtureRoot();
+  const frontend = path.join(root, 'frontend');
+  await mkdir(frontend, { recursive: true });
+  const decision = inspectDirectCommand({
+    executable: 'node',
+    args: ['node_modules/vitest/vitest.mjs', 'run'],
+    cwd: frontend,
+  });
+  assert.equal(decision.blocked, true);
+  assert.equal(decision.category, 'tool');
+  assert.equal(decision.command, 'node vitest (entrypoint directo)');
+  assert.equal(decision.exitCode, QUALITY_GUARD_EXIT_CODE);
+  assert.match(formatBlockMessage(decision), /npm run task:check/);
+});
+
+test('bloquea node con entrypoints directos de tsc/eslint/prettier', async () => {
+  const root = await fixtureRoot();
+  const cases = [
+    ['node_modules/typescript/bin/tsc', 'tsc'],
+    ['./node_modules/eslint/bin/eslint.js', 'eslint'],
+    ['node_modules/prettier/bin/prettier.cjs', 'prettier'],
+    ['node_modules\\vitest\\vitest.mjs', 'vitest'],
+    ['vitest', 'vitest'],
+  ];
+  for (const [entrypoint, tool] of cases) {
+    const decision = inspectDirectCommand({ executable: 'node', args: [entrypoint], cwd: root });
+    assert.equal(decision.blocked, true, entrypoint);
+    assert.equal(decision.command, `node ${tool} (entrypoint directo)`, entrypoint);
+  }
+});
+
+test('bloquea node --run con scripts de validación (bypass del task runner)', async () => {
+  const root = await fixtureRoot();
+  const blocked = [
+    ['--run', 'test'],
+    ['--run-script', 'test:full'],
+    ['--run=type-check'],
+  ];
+  for (const args of blocked) {
+    const decision = inspectDirectCommand({ executable: 'node', args, cwd: root });
+    assert.equal(decision.blocked, true, `args=${JSON.stringify(args)}`);
+    assert.equal(decision.category, 'script', `args=${JSON.stringify(args)}`);
+    assert.match(decision.command, /^node --run /, `args=${JSON.stringify(args)}`);
+  }
+  const allowed = inspectDirectCommand({ executable: 'node', args: ['--run', 'dev'], cwd: root });
+  assert.equal(allowed.blocked, false);
+});
+
+test('node NO bloquea eval, version, flags o scripts normales', async () => {
+  const root = await fixtureRoot();
+  const allowed = [
+    ['--version'],
+    ['-v'],
+    ['-e', 'console.log(1)'],
+    ['--eval', '1 + 1'],
+    ['-p', '2 ** 8'],
+    ['scripts/quality/bench-baseline.mjs', '--dry-run'],
+    ['server.js'],
+    ['--watch', 'server.js'],
+    [],
+  ];
+  for (const args of allowed) {
+    const decision = inspectDirectCommand({ executable: 'node', args, cwd: root });
+    assert.equal(decision.blocked, false, `args=${JSON.stringify(args)}`);
+  }
+});
+
+test('node con token del gate no se bloquea (vía sancionada)', async () => {
+  const root = await fixtureRoot();
+  const previous = process.env.GLORY_QUALITY_GATE_TOKEN;
+  process.env.GLORY_QUALITY_GATE_TOKEN = 'token-de-test';
+  try {
+    const decision = inspectDirectCommand({
+      executable: 'node',
+      args: ['node_modules/vitest/vitest.mjs', 'run'],
+      cwd: root,
+    });
+    assert.equal(decision.blocked, false);
+  } finally {
+    if (previous === undefined) delete process.env.GLORY_QUALITY_GATE_TOKEN;
+    else process.env.GLORY_QUALITY_GATE_TOKEN = previous;
+  }
+});
+
+test('node fuera de un proyecto Glory no se bloquea', async () => {
+  const cwd = await mkdtemp(path.join(os.tmpdir(), 'unrelated-node-'));
+  const decision = inspectDirectCommand({ executable: 'node', args: ['node_modules/vitest/vitest.mjs', 'run'], cwd });
+  assert.equal(decision.blocked, false);
+});
+
+test('node bajo política v2 observe observa sin bloquear', async () => {
+  const root = await fixtureRoot();
+  const policy = {
+    schemaVersion: 2,
+    mode: 'observe',
+    gate: { command: ['sentinel', 'check', '--'], taskIdRequired: true },
+    guard: { directCommands: { npmScripts: ['test:*'], npxTools: ['vitest'], cargoSubcommands: ['test'], tools: ['vitest', 'rustfmt'] } },
+    runtime: { minimumVersion: '0.4.0', protocolVersion: 1, lockFile: 'sentinel.lock.json' },
+    analyzers: { sentinel: { enabled: true }, varsense: { enabled: false } },
+  };
+  await writeFile(path.join(root, 'sentinel.config.json'), JSON.stringify(policy), 'utf8');
+  const decision = inspectDirectCommand({ executable: 'node', args: ['node_modules/vitest/vitest.mjs', 'run'], cwd: root });
+  assert.equal(decision.blocked, false);
+  assert.equal(decision.observed, 'node vitest (entrypoint directo)');
+});
+
 test('bloquea scripts frontend de validación, incluso con --prefix', async () => {
   const root = await fixtureRoot();
   const decision = inspectDirectCommand({
