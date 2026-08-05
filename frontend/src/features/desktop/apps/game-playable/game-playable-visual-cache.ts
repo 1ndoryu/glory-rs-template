@@ -41,8 +41,53 @@ interface InstancedPropBatch {
   readonly kind: FixtureProp['kind'];
   readonly prototype: THREE.Group;
   readonly meshes: readonly THREE.InstancedMesh[];
-  readonly localMatrices: readonly THREE.Matrix4[];
+  /** Matrices locales alineadas con `meshes`; cada entrada agrupa las matrices
+   * de TODOS los meshes del prototipo fusionados en ese InstancedMesh por
+   * compartir geometría+material. count = instancias × matrices locales. */
+  readonly localMatrixGroups: readonly (readonly THREE.Matrix4[])[];
   readonly helper: THREE.Object3D;
+}
+
+interface PrototypeMeshGroup {
+  readonly geometry: THREE.BufferGeometry;
+  readonly material: THREE.Material;
+  readonly localMatrices: THREE.Matrix4[];
+}
+
+/** Batching por materiales: agrupa los meshes del prototipo por identidad de
+ * geometría+material (WeakMap de ids por instancia), fusionando meshes que
+ * comparten ambos en un solo grupo. Pura y testeable con prototipos sintéticos. */
+export function groupMeshesByMaterial(prototype: THREE.Group): PrototypeMeshGroup[] {
+  const geometryIds = new WeakMap<THREE.BufferGeometry, number>();
+  const materialIds = new WeakMap<THREE.Material, number>();
+  const groups: PrototypeMeshGroup[] = [];
+  let nextId = 0;
+  const idFor = <T extends object>(value: T, ids: WeakMap<T, number>): number => {
+    const existing = ids.get(value);
+    if (existing !== undefined) return existing;
+    ids.set(value, nextId);
+    nextId += 1;
+    return nextId - 1;
+  };
+  prototype.traverse((child) => {
+    if (!(child instanceof THREE.Mesh)) return;
+    if (Array.isArray(child.material)) return;
+    const geometryId = idFor(child.geometry, geometryIds);
+    const materialId = idFor(child.material, materialIds);
+    const existing = groups.find(group =>
+      idFor(group.geometry, geometryIds) === geometryId
+      && idFor(group.material, materialIds) === materialId);
+    if (existing) {
+      existing.localMatrices.push(child.matrixWorld.clone());
+    } else {
+      groups.push({
+        geometry: child.geometry,
+        material: child.material,
+        localMatrices: [child.matrixWorld.clone()],
+      });
+    }
+  });
+  return groups;
 }
 
 export function createGamePlayableVisualCache(options: GamePlayableVisualCacheOptions): GamePlayableVisualCache {
@@ -111,6 +156,24 @@ export class GamePlayableVisualCache {
     this.batches.clear();
   }
 
+  /** Número de InstancedMesh activos por material agrupado. Evidencia el
+   * ahorro del batching por materiales (meshes del prototipo que comparten
+   * geometría+material se fusionan en un solo draw call instanciado). */
+  public batchDrawCallCount(): number {
+    return Array.from(this.batches.values())
+      .reduce((total, batch) => total + batch.meshes.length, 0);
+  }
+
+  /** Número total de meshes fuente del prototipo (sin fusión) para comparar
+   * contra `batchDrawCallCount()` y medir el ahorro real del batching. */
+  public batchSourceMeshCount(): number {
+    return Array.from(this.batches.values())
+      .reduce((total, batch) => total + batch.localMatrixGroups.reduce(
+        (sum, group) => sum + group.length,
+        0,
+      ), 0);
+  }
+
   private createTerrain(key: string, chunk: MapVersion['terrain']['chunks'][number]): THREE.Mesh {
     const data = buildTerrainMeshData(
       chunk,
@@ -137,25 +200,29 @@ export class GamePlayableVisualCache {
   private createBatch(kind: FixtureProp['kind']): InstancedPropBatch {
     const prototype = this.createPrototype(kind);
     prototype.updateMatrixWorld(true);
+    const groups = this.groupPrototypeMeshes(prototype);
     const meshes: THREE.InstancedMesh[] = [];
-    const localMatrices: THREE.Matrix4[] = [];
-    prototype.traverse((child) => {
-      if (!(child instanceof THREE.Mesh)) return;
-      if (Array.isArray(child.material)) return;
-      const mesh = new THREE.InstancedMesh(
-        child.geometry,
-        child.material,
-        VISUAL_CACHE_LIMITS.maxInstancesPerKind,
-      );
+    const localMatrixGroups: (readonly THREE.Matrix4[])[] = [];
+    for (const group of groups) {
+      /* Batching por materiales: todos los meshes del prototipo que comparten
+       * la misma geometría+material se dibujan con UN solo InstancedMesh.
+       * count = instancias visibles × meshes fusionados; cada bloque de
+       * matrices usa la matriz local del mesh correspondiente. */
+      const capacity = VISUAL_CACHE_LIMITS.maxInstancesPerKind * group.localMatrices.length;
+      const mesh = new THREE.InstancedMesh(group.geometry, group.material, capacity);
       mesh.count = 0;
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       mesh.frustumCulled = true;
       this.options.scene.add(mesh);
       meshes.push(mesh);
-      localMatrices.push(child.matrixWorld.clone());
-    });
-    return { kind, prototype, meshes, localMatrices, helper: new THREE.Object3D() };
+      localMatrixGroups.push(group.localMatrices);
+    }
+    return { kind, prototype, meshes, localMatrixGroups, helper: new THREE.Object3D() };
+  }
+
+  private groupPrototypeMeshes(prototype: THREE.Group): PrototypeMeshGroup[] {
+    return groupMeshesByMaterial(prototype);
   }
 
   private syncBatch(batch: InstancedPropBatch, visibleProps: readonly VisibleProp[]): void {
@@ -190,8 +257,11 @@ export class GamePlayableVisualCache {
       );
       helper.updateMatrix();
       for (const [meshIndex, mesh] of batch.meshes.entries()) {
-        const matrix = helper.matrix.clone().multiply(batch.localMatrices[meshIndex]);
-        mesh.setMatrixAt(index, matrix);
+        const localMatrices = batch.localMatrixGroups[meshIndex];
+        for (let local = 0; local < localMatrices.length; local += 1) {
+          const matrix = helper.matrix.clone().multiply(localMatrices[local]);
+          mesh.setMatrixAt(index * localMatrices.length + local, matrix);
+        }
       }
       const outline = this.outlineObjects.get(prop.id);
       if (outline) {
@@ -200,10 +270,10 @@ export class GamePlayableVisualCache {
         this.createOutline(prop, instance, batch.prototype);
       }
     }
-    for (const mesh of batch.meshes) {
-      mesh.count = visibleProps.length;
+    for (const [meshIndex, mesh] of batch.meshes.entries()) {
+      mesh.count = visibleProps.length * batch.localMatrixGroups[meshIndex].length;
       mesh.instanceMatrix.needsUpdate = true;
-      if (visibleProps.length > 0) mesh.computeBoundingSphere();
+      if (mesh.count > 0) mesh.computeBoundingSphere();
     }
   }
 

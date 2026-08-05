@@ -412,3 +412,49 @@ async fn second_tcp_upgrade_is_rejected_when_global_capacity_is_full() {
     let _ = shutdown.send(());
     server_handle.await.expect("server shutdown");
 }
+
+#[tokio::test]
+async fn metrics_endpoint_reports_aggregated_counts_without_identity() {
+    /* Fase 8: métricas agregadas sin coordenadas ni identidad. El endpoint usa
+     * el mismo estado del router real: tras un join + movimientos, los conteos
+     * reflejan la actividad sin exponer player ids ni posiciones. */
+    let state = test_state();
+    state.game_ws_state.set_room_map(Some(fixture_map())).await;
+    let ticket_store = state.game_ticket_store.clone();
+    let (url, shutdown, server_handle) = spawn_server(state).await;
+    let http_url = url
+        .replace("ws://", "http://")
+        .replace("/api/game/ws", "/api/game/metrics");
+
+    let (mut socket, _) = connect_async(&url).await.expect("upgrade de jugador");
+    let ticket = ticket_store
+        .issue(Uuid::new_v4(), 30, TEST_SECRET)
+        .expect("ticket válido");
+    socket.send(join_message(&ticket)).await.expect("join");
+    let joined = read_message_type(&mut socket, "joined").await;
+    assert_eq!(joined["type"], "joined");
+    let snapshot = read_message_type(&mut socket, "snapshot").await;
+    let sequence = snapshot["payload"]["snapshotSequence"]
+        .as_u64()
+        .expect("secuencia");
+    /* Esperar al menos un tick más para que el contador de snapshots suba. */
+    read_snapshot_after(&mut socket, sequence).await;
+
+    let response = reqwest::get(http_url).await.expect("GET métricas");
+    assert_eq!(response.status().as_u16(), 200);
+    let metrics: serde_json::Value = response.json().await.expect("JSON métricas");
+    assert!(metrics["active_players"].as_u64().unwrap_or(0) >= 1);
+    assert!(metrics["joins"].as_u64().unwrap_or(0) >= 1);
+    /* El snapshot inicial del join no pasa por broadcast_snapshot; al menos el
+     * del primer tick de la sala sí cuenta. */
+    assert!(metrics["snapshots_sent"].as_u64().unwrap_or(0) >= 1);
+    assert!(metrics["rooms_created"].as_u64().unwrap_or(0) >= 1);
+    /* El DTO agregado no expone identidades ni coordenadas. */
+    assert!(metrics.get("playerId").is_none());
+    assert!(metrics.get("position").is_none());
+    assert!(metrics.get("entities").is_none());
+
+    drop(socket);
+    let _ = shutdown.send(());
+    server_handle.await.expect("server shutdown");
+}

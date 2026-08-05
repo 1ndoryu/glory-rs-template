@@ -19,12 +19,25 @@ import {
   readRendererMetrics,
   type GameRendererMetrics,
 } from './game-renderer-metrics';
+import {
+  createGpuFrameProbe,
+  estimateGpuMemory,
+  readGpuIdentity,
+  type GpuFrameProbe,
+  type GpuIdentity,
+  type GpuMemoryEstimate,
+} from './game-gpu-probe';
 
 export interface GamePlayableStreamingStats {
   readonly cacheSize: number;
   readonly visibleChunks: number;
   readonly visibleInstances: number;
   readonly visibleAssets: number;
+}
+
+export interface GamePlayableBatchStats {
+  readonly drawCalls: number;
+  readonly sourceMeshes: number;
 }
 
 export interface GamePlayableSceneHandle {
@@ -34,6 +47,10 @@ export interface GamePlayableSceneHandle {
   readonly render: () => void;
   readonly streamingStats: () => GamePlayableStreamingStats;
   readonly rendererMetrics: () => GameRendererMetrics;
+  readonly batchStats: () => GamePlayableBatchStats;
+  readonly gpuIdentity: () => GpuIdentity | null;
+  readonly gpuFrameMs: () => number | null;
+  readonly gpuMemoryEstimate: () => GpuMemoryEstimate;
   readonly destroy: () => void;
 }
 
@@ -41,6 +58,9 @@ const CAMERA_HEIGHT = 15;
 const CAMERA_DISTANCE = 13;
 const STREAM_HALF_WIDTH = 4;
 const STREAM_HALF_DEPTH = 4;
+/* Culling avanzado: radio circular de visibilidad (unidades de mundo) que
+ * recorta chunks/instancias en las esquinas de la ventana rectangular. */
+const STREAM_MAX_DISTANCE = 26;
 
 export function mountGamePlayableScene(
   host: HTMLElement,
@@ -81,6 +101,16 @@ export function mountGamePlayableScene(
     map: mapVersion,
     props: new Map(FIXTURE_PROPS.map(prop => [prop.id, prop])),
   });
+
+  /* Probe físico de GPU: identidad, tiempo de frame y memoria estimada. El
+   * contexto WebGL real viene del renderer; el probe es opcional y nunca
+   * rompe el fixture si la extensión no existe. */
+  const gl = renderer.getContext() as unknown as Parameters<typeof createGpuFrameProbe>[0] | null;
+  const gpuFrameProbe: GpuFrameProbe = gl
+    ? createGpuFrameProbe(gl as Parameters<typeof createGpuFrameProbe>[0])
+    : { available: false, beginFrame() {}, endFrame() {}, readFrameMs: () => null, dispose() {} };
+  const gpuIdentity: GpuIdentity | null = gl ? readGpuIdentity(gl as Parameters<typeof readGpuIdentity>[0]) : null;
+  let lastGpuFrameMs: number | null = null;
   let currentStreamingStats: GamePlayableStreamingStats = {
     cacheSize: 0,
     visibleChunks: 0,
@@ -95,6 +125,7 @@ export function mountGamePlayableScene(
       halfWidth: STREAM_HALF_WIDTH,
       halfDepth: STREAM_HALF_DEPTH,
       marginCells: 0,
+      maxDistance: STREAM_MAX_DISTANCE,
     });
     visualCache.sync(visible);
     currentStreamingStats = {
@@ -178,8 +209,47 @@ export function mountGamePlayableScene(
 
   const render = (): void => {
     if (destroyed) return;
+    gpuFrameProbe.beginFrame();
     renderer.render(scene, camera);
+    gpuFrameProbe.endFrame();
+    const frameMs = gpuFrameProbe.readFrameMs();
+    if (frameMs !== null) lastGpuFrameMs = frameMs;
     currentRendererMetrics = readRendererMetrics(renderer.info, readAvailableHeapMemory());
+  };
+
+  const estimateGpuSceneMemory = (): GpuMemoryEstimate => {
+    const textures: Parameters<typeof estimateGpuMemory>[0] extends readonly (infer T)[] ? T[] : never[] = [];
+    const geometries: Parameters<typeof estimateGpuMemory>[1] extends readonly (infer T)[] ? T[] : never[] = [];
+    const seenTextures = new Set<THREE.Texture>();
+    const seenGeometries = new Set<THREE.BufferGeometry>();
+    scene.traverse((object) => {
+      if (object instanceof THREE.Mesh || object instanceof THREE.LineSegments) {
+        if (!seenGeometries.has(object.geometry)) {
+          seenGeometries.add(object.geometry);
+          const position = object.geometry.getAttribute('position');
+          const vertexCount = position ? position.count : 0;
+          const indexCount = object.geometry.index ? object.geometry.index.count : 0;
+          geometries.push({ vertexCount: vertexCount + indexCount, bytesPerVertex: 12 });
+        }
+      }
+      if (object instanceof THREE.Mesh || object instanceof THREE.LineSegments
+        || object instanceof THREE.InstancedMesh) {
+        const assigned = Array.isArray(object.material) ? object.material : [object.material];
+        for (const material of assigned) {
+          const candidate = (material as THREE.MeshBasicMaterial & { map?: THREE.Texture }).map;
+          if (candidate && !seenTextures.has(candidate)) {
+            seenTextures.add(candidate);
+            const image = candidate.image as { width?: number; height?: number } | undefined;
+            textures.push({
+              width: image?.width ?? 0,
+              height: image?.height ?? 0,
+              bytesPerPixel: 4,
+            });
+          }
+        }
+      }
+    });
+    return estimateGpuMemory(textures, geometries);
   };
 
   resize();
@@ -191,9 +261,17 @@ export function mountGamePlayableScene(
     render,
     streamingStats: () => currentStreamingStats,
     rendererMetrics: () => currentRendererMetrics,
+    batchStats: () => ({
+      drawCalls: visualCache.batchDrawCallCount(),
+      sourceMeshes: visualCache.batchSourceMeshCount(),
+    }),
+    gpuIdentity: () => gpuIdentity,
+    gpuFrameMs: () => lastGpuFrameMs,
+    gpuMemoryEstimate: estimateGpuSceneMemory,
     destroy: () => {
       if (destroyed) return;
       destroyed = true;
+      gpuFrameProbe.dispose();
       visualCache.destroy();
       disposeScene(scene, materials);
       renderer.dispose();

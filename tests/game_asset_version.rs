@@ -601,7 +601,13 @@ async fn version_file_serves_glb_bytes_only_to_admin() {
     assert_eq!(public_file.status(), StatusCode::UNAUTHORIZED);
 
     let non_admin = create_router_with_state(app.clone())
-        .oneshot(json_request("GET", &user_session, &user_csrf, uri.clone(), None))
+        .oneshot(json_request(
+            "GET",
+            &user_session,
+            &user_csrf,
+            uri.clone(),
+            None,
+        ))
         .await
         .expect("router responde");
     assert_eq!(non_admin.status(), StatusCode::FORBIDDEN);
@@ -659,12 +665,11 @@ async fn published_version_cannot_be_mutated_by_database_update() {
     /* [297A-72] Los intentos directos en BD corren bajo el mismo mutex que los
      * cleanups usan para deshabilitar el trigger: nunca se solapan. */
     let _guard = TRIGGER_MUTEX.lock().await;
-    let update_result = sqlx::query(
-        "UPDATE game_asset_versions SET content_hash = 'tampered' WHERE asset_id = $1",
-    )
-    .bind(&asset_id)
-    .execute(&app.pool)
-    .await;
+    let update_result =
+        sqlx::query("UPDATE game_asset_versions SET content_hash = 'tampered' WHERE asset_id = $1")
+            .bind(&asset_id)
+            .execute(&app.pool)
+            .await;
     let delete_result = sqlx::query("DELETE FROM game_asset_versions WHERE asset_id = $1")
         .bind(&asset_id)
         .execute(&app.pool)
@@ -682,6 +687,9 @@ async fn published_version_cannot_be_mutated_by_database_update() {
         update_result.is_err(),
         "el trigger debe bloquear la actualización"
     );
-    assert!(delete_result.is_err(), "el trigger debe bloquear el borrado");
+    assert!(
+        delete_result.is_err(),
+        "el trigger debe bloquear el borrado"
+    );
     assert_ne!(hash.0, "tampered");
 }

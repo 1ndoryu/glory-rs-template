@@ -413,6 +413,9 @@ function mountGamePlayableRuntime(
       frameCount += 1;
       const streaming = scene.streamingStats();
       const rendererMetrics = scene.rendererMetrics();
+      const batchStats = scene.batchStats();
+      const gpuFrameMs = scene.gpuFrameMs();
+      const gpuMemory = scene.gpuMemoryEstimate();
       const performanceSnapshot = frameMonitor.snapshot();
       const performanceBudget = evaluateGamePerformanceBudget(performanceSnapshot, rendererMetrics);
       view.element.dataset.visibleChunks = String(streaming.visibleChunks);
@@ -425,6 +428,16 @@ function mountGamePlayableRuntime(
       view.element.dataset.rendererBudgetStatus = performanceBudget.status;
       view.element.dataset.rendererBudgetFrameStatus = performanceBudget.frame.status;
       view.element.dataset.rendererBudgetHeapStatus = performanceBudget.jsHeapUsedBytes.status;
+      view.element.dataset.batchDrawCalls = String(batchStats.drawCalls);
+      view.element.dataset.batchSourceMeshes = String(batchStats.sourceMeshes);
+      if (gpuFrameMs !== null) view.element.dataset.gpuFrameMs = gpuFrameMs.toFixed(2);
+      view.element.dataset.gpuTextureBytes = String(gpuMemory.textureBytes);
+      view.element.dataset.gpuGeometryBytes = String(gpuMemory.geometryBytes);
+      const gpuIdentity = scene.gpuIdentity();
+      if (gpuIdentity) {
+        view.element.dataset.gpuVendor = gpuIdentity.vendor;
+        view.element.dataset.gpuRenderer = gpuIdentity.renderer;
+      }
       if (rendererMetrics.jsHeapUsedBytes !== undefined) {
         view.element.dataset.jsHeapUsedBytes = String(rendererMetrics.jsHeapUsedBytes);
       }

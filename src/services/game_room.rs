@@ -4,11 +4,13 @@
 //! transporte solo entrega mensajes ya parseados y recibe envelopes bounded.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use tokio::sync::{mpsc, oneshot, RwLock};
+use std::sync::RwLock;
+
+use tokio::sync::{mpsc, oneshot};
 use uuid::Uuid;
 
 use crate::models::game_realtime::{
@@ -32,11 +34,60 @@ fn empty_room_expired(empty_since: u64, now: u64, ttl_secs: u64) -> bool {
     now.saturating_sub(empty_since) >= ttl_secs
 }
 
+/// Métricas agregadas del realtime: solo conteos, sin coordenadas precisas ni
+/// identidad. Los contadores atómicos son la fuente de `GET /api/game/metrics`.
+#[derive(Debug, Default, Clone)]
+pub struct GameRoomMetrics {
+    pub joins: Arc<AtomicU64>,
+    pub joins_rejected: Arc<AtomicU64>,
+    pub disconnects: Arc<AtomicU64>,
+    pub rooms_created: Arc<AtomicU64>,
+    pub snapshots_sent: Arc<AtomicU64>,
+    pub backpressure_evictions: Arc<AtomicU64>,
+    pub rate_limited: Arc<AtomicU64>,
+    pub sequence_rejected: Arc<AtomicU64>,
+    pub active_players: Arc<AtomicU64>,
+}
+
+impl GameRoomMetrics {
+    pub fn snapshot(&self) -> GameRoomMetricsSnapshot {
+        GameRoomMetricsSnapshot {
+            joins: self.joins.load(Ordering::Acquire),
+            joins_rejected: self.joins_rejected.load(Ordering::Acquire),
+            disconnects: self.disconnects.load(Ordering::Acquire),
+            rooms_created: self.rooms_created.load(Ordering::Acquire),
+            snapshots_sent: self.snapshots_sent.load(Ordering::Acquire),
+            backpressure_evictions: self.backpressure_evictions.load(Ordering::Acquire),
+            rate_limited: self.rate_limited.load(Ordering::Acquire),
+            sequence_rejected: self.sequence_rejected.load(Ordering::Acquire),
+            active_players: self.active_players.load(Ordering::Acquire),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GameRoomMetricsSnapshot {
+    pub joins: u64,
+    pub joins_rejected: u64,
+    pub disconnects: u64,
+    pub rooms_created: u64,
+    pub snapshots_sent: u64,
+    pub backpressure_evictions: u64,
+    pub rate_limited: u64,
+    pub sequence_rejected: u64,
+    pub active_players: u64,
+}
+
 #[derive(Clone)]
 pub struct GameRoomState {
-    map: Arc<RwLock<Option<Arc<GameRoomMap>>>>,
-    room: Arc<tokio::sync::Mutex<Option<RoomHandle>>>,
+    /// Salas activas claveadas por `map.map_version()`; cada mapa tiene su
+    /// propio actor con cap de 8 y TTL independiente (Fase 8: dos salas
+    /// concurrentes dentro del presupuesto). `std::sync::RwLock` porque los
+    /// accesos son cortos y nunca se mantienen a través de un `.await`.
+    maps: Arc<RwLock<HashMap<String, Arc<GameRoomMap>>>>,
+    rooms: Arc<tokio::sync::Mutex<HashMap<String, RoomHandle>>>,
     empty_ttl_secs: u64,
+    metrics: Arc<GameRoomMetrics>,
 }
 
 impl Default for GameRoomState {
@@ -54,9 +105,10 @@ impl GameRoomState {
     #[must_use]
     pub fn empty_with_ttl(empty_ttl_secs: u64) -> Self {
         Self {
-            map: Arc::new(RwLock::new(None)),
-            room: Arc::new(tokio::sync::Mutex::new(None)),
+            maps: Arc::new(RwLock::new(HashMap::new())),
+            rooms: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
             empty_ttl_secs,
+            metrics: Arc::new(GameRoomMetrics::default()),
         }
     }
 
@@ -67,19 +119,35 @@ impl GameRoomState {
 
     #[must_use]
     pub fn with_map_and_ttl(map: GameRoomMap, empty_ttl_secs: u64) -> Self {
-        Self {
-            map: Arc::new(RwLock::new(Some(Arc::new(map)))),
-            room: Arc::new(tokio::sync::Mutex::new(None)),
-            empty_ttl_secs,
-        }
+        let state = Self::empty_with_ttl(empty_ttl_secs);
+        state.register_map(map);
+        state
     }
 
     pub async fn set_map(&self, map: Option<GameRoomMap>) {
-        *self.map.write().await = map.map(Arc::new);
+        let mut maps = self.maps.write().expect("maps lock");
+        maps.clear();
+        if let Some(map) = map {
+            maps.insert(map.map_version(), Arc::new(map));
+        }
     }
 
     pub async fn has_map(&self) -> bool {
-        self.map.read().await.is_some()
+        !self.maps.read().expect("maps lock").is_empty()
+    }
+
+    pub async fn metrics(&self) -> GameRoomMetricsSnapshot {
+        self.metrics.snapshot()
+    }
+
+    /// Registra un mapa adicional para pruebas de salas concurrentes; los
+    /// jugadores de cada mapa quedan aislados en su propio actor.
+    pub fn register_map(&self, map: GameRoomMap) {
+        let version = map.map_version();
+        self.maps
+            .write()
+            .expect("maps lock")
+            .insert(version, Arc::new(map));
     }
 
     pub async fn join(
@@ -88,34 +156,75 @@ impl GameRoomState {
         output: mpsc::Sender<GameRealtimeServerMessage>,
     ) -> Result<JoinedRoom, RoomJoinError> {
         let map = self
-            .map
+            .maps
             .read()
-            .await
-            .clone()
+            .expect("maps lock")
+            .values()
+            .next()
+            .cloned()
             .ok_or(RoomJoinError::MapUnavailable)?;
-        let mut room = self.room.lock().await;
-        let handle = match room.as_ref() {
+        self.join_with_map(&map.map_version(), map, subject, output)
+            .await
+    }
+
+    /// Entra en la sala del mapa indicado. Fase 8: usado por pruebas de dos
+    /// salas y disponible para el transporte cuando haya más de un mapa.
+    pub async fn join_on(
+        &self,
+        map_key: &str,
+        subject: Uuid,
+        output: mpsc::Sender<GameRealtimeServerMessage>,
+    ) -> Result<JoinedRoom, RoomJoinError> {
+        let map = self
+            .maps
+            .read()
+            .expect("maps lock")
+            .get(map_key)
+            .cloned()
+            .ok_or(RoomJoinError::MapUnavailable)?;
+        self.join_with_map(&map.map_version(), map, subject, output)
+            .await
+    }
+
+    async fn join_with_map(
+        &self,
+        map_key: &str,
+        map: Arc<GameRoomMap>,
+        subject: Uuid,
+        output: mpsc::Sender<GameRealtimeServerMessage>,
+    ) -> Result<JoinedRoom, RoomJoinError> {
+        let mut rooms = self.rooms.lock().await;
+        let handle = match rooms.get(map_key) {
             Some(handle) if !handle.is_closed() => handle.clone(),
             _ => {
-                let handle = RoomHandle::start(map.clone(), self.empty_ttl_secs);
-                *room = Some(handle.clone());
+                let handle =
+                    RoomHandle::start(map.clone(), self.empty_ttl_secs, self.metrics.clone());
+                self.metrics.rooms_created.fetch_add(1, Ordering::Release);
+                rooms.insert(map_key.to_string(), handle.clone());
                 handle
             }
         };
-        drop(room);
-        match handle.join(subject, output.clone()).await {
+        drop(rooms);
+        match handle
+            .join(subject, output.clone(), self.metrics.clone())
+            .await
+        {
             Err(RoomJoinError::Busy) if handle.is_closed() => {
-                let mut room = self.room.lock().await;
-                let replacement = match room.as_ref() {
+                let mut rooms = self.rooms.lock().await;
+                let replacement = match rooms.get(map_key) {
                     Some(current) if !current.is_closed() => current.clone(),
                     _ => {
-                        let replacement = RoomHandle::start(map, self.empty_ttl_secs);
-                        *room = Some(replacement.clone());
+                        let replacement =
+                            RoomHandle::start(map, self.empty_ttl_secs, self.metrics.clone());
+                        self.metrics.rooms_created.fetch_add(1, Ordering::Release);
+                        rooms.insert(map_key.to_string(), replacement.clone());
                         replacement
                     }
                 };
-                drop(room);
-                replacement.join(subject, output).await
+                drop(rooms);
+                replacement
+                    .join(subject, output, self.metrics.clone())
+                    .await
             }
             result => result,
         }
@@ -175,13 +284,19 @@ struct RoomHandle {
 }
 
 impl RoomHandle {
-    fn start(map: Arc<GameRoomMap>, empty_ttl_secs: u64) -> Self {
+    fn start(map: Arc<GameRoomMap>, empty_ttl_secs: u64, metrics: Arc<GameRoomMetrics>) -> Self {
         let (commands, receiver) = mpsc::channel(ROOM_COMMAND_CAPACITY);
         let handle = Self {
             commands,
             closed: Arc::new(AtomicBool::new(false)),
         };
-        tokio::spawn(run_room(map, receiver, handle.clone(), empty_ttl_secs));
+        tokio::spawn(run_room(
+            map,
+            receiver,
+            handle.clone(),
+            empty_ttl_secs,
+            metrics,
+        ));
         handle
     }
 
@@ -193,6 +308,7 @@ impl RoomHandle {
         &self,
         subject: Uuid,
         output: mpsc::Sender<GameRealtimeServerMessage>,
+        metrics: Arc<GameRoomMetrics>,
     ) -> Result<JoinedRoom, RoomJoinError> {
         let (reply, response) = oneshot::channel();
         self.commands
@@ -200,6 +316,7 @@ impl RoomHandle {
                 subject,
                 output,
                 reply,
+                metrics,
             })
             .map_err(|error| match error {
                 mpsc::error::TrySendError::Full(_) => RoomJoinError::Busy,
@@ -232,6 +349,7 @@ enum RoomCommand {
         subject: Uuid,
         output: mpsc::Sender<GameRealtimeServerMessage>,
         reply: oneshot::Sender<Result<JoinedRoom, RoomJoinError>>,
+        metrics: Arc<GameRoomMetrics>,
     },
     Client {
         player_id: String,
@@ -257,6 +375,7 @@ async fn run_room(
     mut commands: mpsc::Receiver<RoomCommand>,
     handle: RoomHandle,
     empty_ttl_secs: u64,
+    metrics: Arc<GameRoomMetrics>,
 ) {
     let mut players = HashMap::<String, RoomPlayer>::new();
     let mut tick = 0_u64;
@@ -268,18 +387,24 @@ async fn run_room(
     loop {
         tokio::select! {
             Some(command) = commands.recv() => match command {
-                RoomCommand::Join { subject, output, reply } => {
-                    let result = join_player(&map, &mut players, subject, output, handle.clone());
+                RoomCommand::Join { subject, output, reply, metrics } => {
+                    let result = join_player(&map, &mut players, subject, output, handle.clone(), &metrics);
                     if result.is_ok() {
                         empty_since = None;
+                    } else {
+                        metrics.joins_rejected.fetch_add(1, Ordering::Release);
                     }
                     let _ = reply.send(result);
                 }
                 RoomCommand::Client { player_id, message } => {
-                    handle_client_message(&mut players, &player_id, message, tick);
+                    handle_client_message(&mut players, &player_id, message, tick, &metrics);
                 }
                 RoomCommand::Disconnect { player_id } => {
-                    players.remove(&player_id);
+                    let removed = players.remove(&player_id);
+                    if removed.is_some() {
+                        metrics.disconnects.fetch_add(1, Ordering::Release);
+                        metrics.active_players.fetch_sub(1, Ordering::AcqRel);
+                    }
                     if players.is_empty() {
                         empty_since = Some(now_secs());
                     }
@@ -289,7 +414,7 @@ async fn run_room(
                 tick = tick.saturating_add(1);
                 update_players(&map, &mut players);
                 snapshot_sequence = snapshot_sequence.saturating_add(1);
-                broadcast_snapshot(&mut players, tick, snapshot_sequence);
+                broadcast_snapshot(&mut players, tick, snapshot_sequence, &metrics);
                 if players.is_empty() {
                     let since = empty_since.get_or_insert_with(now_secs);
                     if empty_room_expired(*since, now_secs(), empty_ttl_secs) {
@@ -311,6 +436,7 @@ fn join_player(
     subject: Uuid,
     output: mpsc::Sender<GameRealtimeServerMessage>,
     handle: RoomHandle,
+    metrics: &Arc<GameRoomMetrics>,
 ) -> Result<JoinedRoom, RoomJoinError> {
     /* [297A-57] Reconexión persistente: el mismo subject reemplaza su conexión
      * previa en vez de ser rechazado. Al eliminar el RoomPlayer viejo, su
@@ -344,6 +470,8 @@ fn join_player(
             rate_history: Vec::new(),
         },
     );
+    metrics.joins.fetch_add(1, Ordering::Release);
+    metrics.active_players.fetch_add(1, Ordering::Release);
     Ok(JoinedRoom {
         player_id: player_id.clone(),
         map_version: map.map_version(),
@@ -358,12 +486,14 @@ fn handle_client_message(
     player_id: &str,
     message: GameRealtimeClientMessage,
     tick: u64,
+    metrics: &Arc<GameRoomMetrics>,
 ) {
     let Some(player) = players.get_mut(player_id) else {
         return;
     };
     let now = now_millis();
     let Ok(history) = consume_rate_budget(&player.rate_history, now) else {
+        metrics.rate_limited.fetch_add(1, Ordering::Release);
         send_error(
             player,
             GameRealtimeErrorCode::RateLimited,
@@ -385,6 +515,7 @@ fn handle_client_message(
                     player.direction = (payload.direction.x, payload.direction.z);
                 }
                 SequenceDecision::Replay => {
+                    metrics.sequence_rejected.fetch_add(1, Ordering::Release);
                     send_error(
                         player,
                         GameRealtimeErrorCode::SequenceReplay,
@@ -393,6 +524,7 @@ fn handle_client_message(
                     );
                 }
                 SequenceDecision::Jump => {
+                    metrics.sequence_rejected.fetch_add(1, Ordering::Release);
                     send_error(
                         player,
                         GameRealtimeErrorCode::SequenceJump,
@@ -438,6 +570,7 @@ fn broadcast_snapshot(
     players: &mut HashMap<String, RoomPlayer>,
     tick: u64,
     snapshot_sequence: u64,
+    metrics: &Arc<GameRoomMetrics>,
 ) {
     let mut entities = players
         .iter()
@@ -471,8 +604,14 @@ fn broadcast_snapshot(
             },
         };
         match player.output.try_send(message) {
-            Ok(()) => {}
+            Ok(()) => {
+                metrics.snapshots_sent.fetch_add(1, Ordering::Release);
+            }
             Err(mpsc::error::TrySendError::Full(_) | mpsc::error::TrySendError::Closed(_)) => {
+                metrics
+                    .backpressure_evictions
+                    .fetch_add(1, Ordering::Release);
+                metrics.active_players.fetch_sub(1, Ordering::AcqRel);
                 slow_players.push(id.clone());
             }
         }
@@ -667,5 +806,113 @@ mod tests {
         /* Una sala llena aún acepta la reconexión de un jugador presente. */
         let (reconnect_output, _reconnect_messages) = mpsc::channel(32);
         assert!(state.join(subject, reconnect_output).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn two_concurrent_rooms_are_isolated_with_independent_capacity() {
+        /* Fase 8: dos salas concurrentes dentro del presupuesto. Cada mapa
+         * registrado tiene su propio actor con cap de 8 y TTL independiente;
+         * los jugadores de una sala no aparecen en la otra. */
+        let first_map = map();
+        let mut second_bounds = first_map.bounds;
+        second_bounds.max_x = 64.0;
+        second_bounds.max_z = 64.0;
+        let second_map = GameRoomMap::from_parts(
+            "second-forest".to_string(),
+            1,
+            second_bounds,
+            Vec::new(),
+            vec![super::super::game_room_map::RoomSpawn {
+                x: 10.0,
+                z: 10.0,
+                radius: 1.0,
+            }],
+        )
+        .expect("segundo mapa");
+        let state = GameRoomState::with_map_and_ttl(first_map, 60);
+        state.register_map(second_map);
+
+        let (first_output, mut first_messages) = mpsc::channel(32);
+        let first_joined = state
+            .join_on("forest@1", Uuid::new_v4(), first_output)
+            .await
+            .expect("sala forest");
+        let (second_output, mut second_messages) = mpsc::channel(32);
+        let second_joined = state
+            .join_on("second-forest@1", Uuid::new_v4(), second_output)
+            .await
+            .expect("sala second");
+        assert_ne!(first_joined.player_id, second_joined.player_id);
+        assert_eq!(first_joined.map_version, "forest@1");
+        assert_eq!(second_joined.map_version, "second-forest@1");
+
+        /* Cada sala emite su propio snapshot con UNA sola entidad (aislamiento). */
+        let first_snapshot =
+            tokio::time::timeout(std::time::Duration::from_secs(1), first_messages.recv())
+                .await
+                .expect("snapshot primera sala")
+                .expect("snapshot");
+        let second_snapshot =
+            tokio::time::timeout(std::time::Duration::from_secs(1), second_messages.recv())
+                .await
+                .expect("snapshot segunda sala")
+                .expect("snapshot");
+        let first_entities = match first_snapshot {
+            GameRealtimeServerMessage::Snapshot { payload, .. } => payload.entities,
+            _ => panic!("snapshot esperado"),
+        };
+        let second_entities = match second_snapshot {
+            GameRealtimeServerMessage::Snapshot { payload, .. } => payload.entities,
+            _ => panic!("snapshot esperado"),
+        };
+        assert_eq!(first_entities.len(), 1);
+        assert_eq!(second_entities.len(), 1);
+        assert_ne!(first_entities[0].id, second_entities[0].id);
+
+        /* Capacidad independiente: llenar la primera sala no afecta a la segunda. */
+        for _ in 0..GAME_REALTIME_MAX_PLAYERS_PER_ROOM - 1 {
+            let (output, _messages) = mpsc::channel(32);
+            state
+                .join_on("forest@1", Uuid::new_v4(), output)
+                .await
+                .expect("capacidad sala forest");
+        }
+        let (extra_output, _extra_messages) = mpsc::channel(32);
+        assert!(matches!(
+            state
+                .join_on("forest@1", Uuid::new_v4(), extra_output)
+                .await,
+            Err(RoomJoinError::Full)
+        ));
+        let (second_extra_output, mut second_extra_messages) = mpsc::channel(32);
+        let extra = state
+            .join_on("second-forest@1", Uuid::new_v4(), second_extra_output)
+            .await
+            .expect("segunda sala sigue aceptando");
+        let _ = second_extra_messages.recv().await;
+        extra.disconnect().await;
+
+        first_joined.disconnect().await;
+        second_joined.disconnect().await;
+    }
+
+    #[tokio::test]
+    async fn metrics_track_joins_rejections_and_active_players() {
+        let state = GameRoomState::with_map_and_ttl(map(), 60);
+        let (first_output, _first_messages) = mpsc::channel(32);
+        let first = state
+            .join(Uuid::new_v4(), first_output)
+            .await
+            .expect("first");
+        let metrics = state.metrics().await;
+        assert_eq!(metrics.joins, 1);
+        assert_eq!(metrics.active_players, 1);
+        assert_eq!(metrics.rooms_created, 1);
+        first.disconnect().await;
+        /* La desconexión se procesa de forma asíncrona en el actor. */
+        tokio::time::sleep(std::time::Duration::from_millis(60)).await;
+        let after = state.metrics().await;
+        assert_eq!(after.disconnects, 1);
+        assert_eq!(after.active_players, 0);
     }
 }

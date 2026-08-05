@@ -85,6 +85,11 @@ export class MapChunkCache {
     if (!Number.isSafeInteger(marginCells) || marginCells < 0 || marginCells > 8) {
       throw new Error('marginCells inválido');
     }
+    const maxDistance = request.maxDistance;
+    if (maxDistance !== undefined
+      && (!Number.isFinite(maxDistance) || maxDistance <= 0)) {
+      throw new Error('maxDistance inválido');
+    }
 
     const span = this.map.terrain.chunkSize * this.map.terrain.cellSize;
     const minX = Math.floor((request.center.x - request.halfWidth - this.map.terrain.bounds.minX) / span)
@@ -95,11 +100,16 @@ export class MapChunkCache {
       - marginCells;
     const maxZ = Math.floor((request.center.z + request.halfDepth - this.map.terrain.bounds.minZ) / span)
       + marginCells;
+    const maxDistanceSquared = maxDistance === undefined
+      ? undefined
+      : maxDistance * maxDistance;
     const candidates = Array.from(this.chunks.values())
       .filter(record => record.chunk.x >= minX
         && record.chunk.x <= maxX
         && record.chunk.z >= minZ
         && record.chunk.z <= maxZ)
+      .filter(record => maxDistanceSquared === undefined
+        || this.chunkDistanceSquared(record.chunk, request.center, span) <= maxDistanceSquared)
       .sort((a, b) => {
         const aDistance = this.chunkDistanceSquared(a.chunk, request.center, span);
         const bDistance = this.chunkDistanceSquared(b.chunk, request.center, span);
@@ -121,6 +131,8 @@ export class MapChunkCache {
       .flatMap(record => record.instanceIds)
       .map(id => this.instancesById.get(id))
       .filter((instance): instance is MapVersion['instances'][number] => instance !== undefined)
+      .filter(instance => maxDistanceSquared === undefined
+        || distanceSquared(instance, request.center) <= maxDistanceSquared)
       .sort((a, b) => distanceSquared(a, request.center) - distanceSquared(b, request.center));
     const assetVersionIds = Array.from(new Set(candidateInstances.map(instance => instance.assetVersionId)))
       .filter(id => this.map.assetManifest[id] !== undefined)

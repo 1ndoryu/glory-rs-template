@@ -4,7 +4,7 @@ import {
   FIXTURE_MAP_VERSION,
   FIXTURE_PROPS,
 } from './game-fixture-map';
-import { createGamePlayableVisualCache } from './game-playable-visual-cache';
+import { createGamePlayableVisualCache, groupMeshesByMaterial } from './game-playable-visual-cache';
 import type { VisibleMapContent } from '../../../game-core';
 
 function createMaterials(): {
@@ -171,5 +171,52 @@ describe('GamePlayableVisualCache', () => {
     materials.middle.dispose();
     materials.water.dispose();
     materials.lines.dispose();
+  });
+
+  it('batches prototype meshes sharing geometry+material into one group', () => {
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const material = new THREE.MeshBasicMaterial({ color: 0x111111 });
+    const otherMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const prototype = new THREE.Group();
+    const first = new THREE.Mesh(geometry, material);
+    first.position.x = -1;
+    const second = new THREE.Mesh(geometry, material);
+    second.position.x = 1;
+    const third = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), otherMaterial);
+    prototype.add(first, second, third);
+    prototype.updateMatrixWorld(true);
+
+    const groups = groupMeshesByMaterial(prototype);
+
+    expect(groups).toHaveLength(2);
+    const shared = groups.find(group => group.material === material);
+    const unique = groups.find(group => group.material === otherMaterial);
+    expect(shared?.localMatrices).toHaveLength(2);
+    expect(unique?.localMatrices).toHaveLength(1);
+    expect(shared?.geometry).toBe(geometry);
+    geometry.dispose();
+    (third.geometry as THREE.BufferGeometry).dispose();
+    material.dispose();
+    otherMaterial.dispose();
+  });
+
+  it('reports merged draw calls vs source meshes for the fixture prototypes', () => {
+    const scene = new THREE.Scene();
+    const materials = createMaterials();
+    const cache = createGamePlayableVisualCache({
+      scene,
+      materials,
+      map: FIXTURE_MAP_VERSION,
+      props: new Map(FIXTURE_PROPS.map(prop => [prop.id, prop])),
+    });
+
+    /* Cada prototipo del fixture usa geometrías y materiales distintos, así
+     * que el batching no reduce draw calls hoy; el contrato expone ambas
+     * cifras para medir el ahorro cuando un prototipo repita geometría+material. */
+    expect(cache.batchSourceMeshCount()).toBeGreaterThanOrEqual(cache.batchDrawCallCount());
+    expect(cache.batchSourceMeshCount()).toBeGreaterThan(0);
+
+    cache.destroy();
+    Object.values(materials).forEach(material => material.dispose());
   });
 });

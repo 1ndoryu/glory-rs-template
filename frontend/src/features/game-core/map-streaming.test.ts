@@ -85,4 +85,63 @@ describe('MapChunkCache', () => {
     expect(() => cache.select({ center: { x: 0, z: 0 }, halfWidth: 0, halfDepth: 1 })).toThrow('ventana visible');
     expect(() => cache.select({ center: { x: 0, z: 0 }, halfWidth: 1, halfDepth: 1, marginCells: 9 })).toThrow('marginCells');
   });
+
+  it('culls chunks beyond the circular maxDistance even inside the window', () => {
+    const cache = new MapChunkCache(fixtureMap(), {
+      maxVisibleChunks: 3,
+      maxCachedChunks: 3,
+    });
+
+    /* La ventana rectangular cubre los chunks 0/1/2 (x: -10..38), pero el
+     * radio de visibilidad solo alcanza el centro del chunk 0 desde (0,0). */
+    const visible = cache.select({
+      center: { x: 0, z: 0 },
+      halfWidth: 30,
+      halfDepth: 20,
+      marginCells: 0,
+      maxDistance: 10,
+    });
+
+    expect(visible.chunkKeys).toEqual(['0:0']);
+    expect(visible.instances.map(instance => instance.id)).toEqual(['instance-a']);
+    /* El chunk 1 queda dentro de la ventana pero fuera del radio circular. */
+    expect(visible.chunkKeys).not.toContain('1:0');
+  });
+
+  it('culls instances beyond maxDistance while keeping nearer chunks', () => {
+    const cache = new MapChunkCache(fixtureMap(), {
+      maxVisibleChunks: 3,
+      maxCachedChunks: 3,
+      maxVisibleInstances: 3,
+    });
+
+    const visible = cache.select({
+      center: { x: 0, z: 0 },
+      halfWidth: 30,
+      halfDepth: 20,
+      marginCells: 0,
+      maxDistance: 20,
+    });
+
+    /* Chunk 0 (x≈0) y chunk 1 (x≈16) entran por radio; la instancia en x=32
+     * (chunk 2, centro a 32) queda fuera del radio y se descarta. */
+    expect([...visible.chunkKeys].sort()).toEqual(['0:0', '1:0']);
+    expect(visible.instances.map(instance => instance.id).sort()).toEqual(['instance-a', 'instance-b']);
+  });
+
+  it('rejects an invalid maxDistance', () => {
+    const cache = new MapChunkCache(fixtureMap());
+    expect(() => cache.select({
+      center: { x: 0, z: 0 },
+      halfWidth: 1,
+      halfDepth: 1,
+      maxDistance: 0,
+    })).toThrow('maxDistance');
+    expect(() => cache.select({
+      center: { x: 0, z: 0 },
+      halfWidth: 1,
+      halfDepth: 1,
+      maxDistance: Number.NaN,
+    })).toThrow('maxDistance');
+  });
 });

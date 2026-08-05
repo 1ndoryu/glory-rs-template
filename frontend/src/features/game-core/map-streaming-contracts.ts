@@ -23,6 +23,11 @@ export interface VisibleMapRequest {
   readonly halfWidth: number;
   readonly halfDepth: number;
   readonly marginCells?: number;
+  /** Culling avanzado por distancia: radio circular de visibilidad en unidades
+   * de mundo desde el centro. Sin él, la ventana es rectangular; con él, los
+   * chunks/instancias más allá del radio se descartan aunque caigan dentro de
+   * la ventana (recorta esquinas y presupuesto de draw calls). */
+  readonly maxDistance?: number;
 }
 
 export interface VisibleMapContent {

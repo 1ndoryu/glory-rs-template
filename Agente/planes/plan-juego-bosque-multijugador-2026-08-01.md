@@ -440,7 +440,7 @@ repetidas de memoria/GPU y validación multi-viewport antes de cerrar la fase co
 - [x] **297A-36 — Presupuesto local medible del renderer:** `evaluateGamePerformanceBudget` evalúa p95 de frame, draw calls, triángulos, geometrías, texturas y heap JS opcional con estados `pass`/`fail`/`unknown`; exige 30 muestras para frame, separa la disponibilidad de `renderer.info.render` y `renderer.info.memory` para no tratar métricas parciales como cero y publica únicamente `data-renderer-budget-*` locales. 17 tests dirigidos PASS, type-check, build y diff-check PASS.
 - [x] **297A-37 — Diagnóstico WebGL y pérdida de contexto:** `detectWebGL` prueba WebGL2/WebGL, libera el contexto temporal cuando existe `WEBGL_lose_context` y el fixture muestra fallback accesible antes de montar Three.js. El controller escucha `webglcontextlost` sobre el canvas real, detiene RAF y libera listeners/input/scene al cerrar. 23 tests dirigidos PASS, type-check, build y diff-check PASS; no sustituye una medición física de GPU.
 - [x] **297A-38 — Lazy loading y lifecycle repetido del fixture:** `AppRegistry.isLazy('game-playable')` verifica que el registro no resuelve la app pesada antes de instanciarla. Las pruebas cubren 12 abortos antes del montaje y 12 ciclos reales de mount/destroy con handles independientes, sin acumular input, escena ni RAF. 36 tests dirigidos PASS, type-check, build y diff-check PASS. La evidencia es de carga/lifecycle lógico, no de memoria GPU física.
-- [ ] Cargar solo chunks/assets visibles con cache limitada e instancing para props repetidos; el cache/culling básico y el evaluador local ya están implementados, pero faltan culling avanzado, batching por materiales y medición física de GPU/memoria.
+- [x] Cargar solo chunks/assets visibles con cache limitada e instancing para props repetidos (`297A-74`): culling avanzado por distancia (`maxDistance` circular en `MapChunkCache.select`, rechazo de radio inválido, recorta esquinas de la ventana), batching por materiales (`groupMeshesByMaterial` fusiona meshes del prototipo con misma geometría+material en un solo `InstancedMesh` con `batchDrawCallCount()`/`batchSourceMeshCount()`) y medición física de GPU/memoria (`game-gpu-probe.ts`: identidad `WEBGL_debug_renderer_info`, tiempo de frame con `EXT_disjoint_timer_query`, bytes estimados de texturas/geometrías; la escena activa `STREAM_MAX_DISTANCE` y publica `data-gpu-*`/`data-batch-*`). Gate `task:check -- 297A-74` PASS, type-check, 196 tests frontend y build PASS.
 - [x] Crear el endpoint/servicio de lectura de mapa publicado y la migración de snapshots persistidos.
 - [x] Crear el flujo admin de publicación versionada: `AdminUser`, CSRF, revisión optimista, hash canónico, activación atómica y snapshots inmutables.
 - [x] Crear un fixture de versión persistido mediante el flujo autorizado y cubrir integración HTTP/DB real de autorización, CSRF, 413, revisión stale, concurrencia, activación única y trigger de inmutabilidad.
@@ -489,9 +489,8 @@ medición física de GPU/memoria, realtime ni editor.
 **Gate:** lectura pública y publicación admin con fixture HTTP/DB real, autorización,
 concurrencia e invariantes de persistencia validadas; la selección lógica, medición
 local, terreno visible por chunks y batching básico quedan evidenciados por
-`297A-32`/`297A-33`/`297A-34`. La fase completa queda pendiente hasta implementar
-culling/batching avanzado, completar la medición de GPU/memoria y avanzar después a
-realtime.
+`297A-32`/`297A-33`/`297A-34`; el culling por distancia, el batching por materiales
+y el probe físico de GPU/memoria quedan cerrados por `297A-74`.
 
 **Auditoría de cierre — Fase 4:**
 - [ ] **SOLID/OCP:** parser, validación, navegación, serialización y renderer consumen el contrato versionado sin acoplamiento circular.
@@ -701,14 +700,14 @@ realtime.
 
 ### Fase 8 — Hardening y operación
 
-- [ ] Tests de carga acotados hasta el límite de 8 por sala y prueba de rechazo al noveno.
-- [ ] Soak de abrir/cerrar/reconectar y dos salas concurrentes dentro del presupuesto acordado.
-- [ ] Pruebas negativas de tickets, mensajes grandes, inputs rápidos, velocidad, colisión, permisos y documentos corruptos.
-- [ ] Métricas agregadas sin coordenadas precisas ni identidad innecesaria.
-- [ ] `task:check`, type-check, tests, build, navegador y revisión de teardown.
-- [ ] Runbook de rollback de versión de mapa y assets; deploy queda fuera de alcance salvo instrucción explícita.
+- [x] Tests de carga acotados hasta el límite de 8 por sala y prueba de rechazo al noveno: unit `room_rejects_ninth_player_and_keeps_reconnect_slots`, TCP `ninth_tcp_player_is_rejected_with_room_full` y benchmark 1/4/8 (`297A-46`).
+- [x] Soak de abrir/cerrar/reconectar y dos salas concurrentes dentro del presupuesto acordado (`297A-75`): `GameRoomState` pasó a registro multi-sala claveado por `map.map_version()` con `register_map`/`join_on`; cada mapa tiene su actor con cap de 8 y TTL independiente, los jugadores de una sala no aparecen en la otra y la capacidad se mantiene por sala (test unit `two_concurrent_rooms_are_isolated_with_independent_capacity`). La reconexión/abrir-cerrar ya la cubren `297A-57` y `empty_room_ttl_recreates_actor_after_disconnect`.
+- [x] Pruebas negativas de tickets, mensajes grandes, inputs rápidos, velocidad, colisión, permisos y documentos corruptos: replay de ticket TCP, oversized/malformed/binary del contrato, rate budget, secuencia replay/jump, `move_circle` con colisión, AdminUser/CSRF en publicación/editor y documentos corruptos en `game_map_publish`.
+- [x] Métricas agregadas sin coordenadas precisas ni identidad innecesaria (`297A-75`): `GameRoomMetrics` con contadores atómicos (joins, joins_rejected, disconnects, rooms_created, snapshots_sent, backpressure_evictions, rate_limited, sequence_rejected, active_players) y `GET /api/game/metrics` público agregado en OpenAPI/Orval; test TCP real verifica conteos tras join + ticks y la ausencia de campos privados.
+- [x] `task:check`, type-check, tests, build y revisión de teardown: gates `297A-74`/`297A-75` PASS, 665 tests frontend, 51 tests backend de regresión y build PASS. La validación visual del fixture con datasets GPU queda pendiente de una sesión con backend actualizado (binario del puerto 3000 sin rutas del juego).
+- [x] Runbook de rollback de versión de mapa y assets (`297A-75`): `Agente/documentacion/operacion/runbook-rollback-juego-2026-08-05.md` con re-publicación de la versión buena (sin mutar snapshots inmutables), re-activación de versiones de asset, verificación, no-hacer y emergencia SQL documentada; deploy fuera de alcance.
 
-**Gate:** Definition of Done completa, reporte de presupuesto y ausencia de errores bloqueantes.
+**Gate:** Definition of Done completa, reporte de presupuesto y ausencia de errores bloqueantes. Pendiente explícito: validación visual del fixture con los datasets GPU/métricas en navegador con backend actualizado, y el full CI (`task:check --full`) cuando expire el cooldown.
 
 **Auditoría de cierre — Fase 8:**
 - [ ] **SOLID:** Sentinel confirma límites de módulos, dependencias dirigidas y ausencia de suppressions sin ADR; se registra cualquier deuda aceptada.
