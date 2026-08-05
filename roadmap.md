@@ -305,7 +305,10 @@ quality) y gate PASS.
 
 **Motivo (05-ago, usuario):** el grid de iconos "está mal", hay fallas y el placeholder de
 arrastre junto con las rejillas rojas de debug (Ctrl+Shift+G) no son coherentes con las celdas
-reales. **Causa raíz identificada en plan `Agente/planes/plan-iconos-escritorio-grid-2026-08-05.md`:**
+reales. Además "los iconos interactúan extraños cuando los juntas": se altera todo en vez de
+alterarse 1 solo (drag de grupo decidido por la selección del drop, sin colisiones ni clamp, y
+reflow que reempaqueta todo el grid). **Causa raíz identificada en plan
+`Agente/planes/plan-iconos-escritorio-grid-2026-08-05.md`:**
 `justify-content: space-between` horizontal reparte el sobrante pero ningún cálculo lo replica
 (falta `columnGapEffective`; solo existe `rowGapEffective`); el grid `direction: rtl` tiene tres
 fórmulas paralelas de geometría (getCellAt / positionCellHighlight / debugGridOverlay) que ya
@@ -316,13 +319,18 @@ temporal (297A-20) que quedó en producción.
   (LTR/RTL) usado por getCellAt, highlight y debug; tests DOM sobre grid real con `space-between`+RTL.
 - [ ] Placeholder de arrastre: verificar en navegador que cae exactamente sobre la celda destino
   (desktop ≥769 y tablet), ajustar transición y tests DOM del highlight.
+- [ ] Drag de grupo predecible: decidir el grupo por el gesto (pointerdown), arrastrar un icono no
+  seleccionado altera solo ese, el grupo se mueve sin superposiciones ni fuera-de-bounds (clamp),
+  y el reflow por resize no reempaqueta todo el grid.
 - [ ] Rejilla de debug: coherente (usa `cellOriginAt`) y dev-only, o retirada (borrar overlay,
   atajo Ctrl+Shift+G y CSS `--depurar`/`__debug*`); VarSense sin huérfanas.
 - [ ] Verificación final: suite + type-check + gate; navegador 1440×900 / 1024×768 (arrastre,
-  colisiones, reflow al encoger) y móvil <768 (reorder por índice como fallback).
+  colisiones, grupo seleccionado vs. no seleccionado, reflow al encoger) y móvil <768 (reorder por
+  índice como fallback).
 
 **Gate/salida:** un único helper de geometría alimenta todo; el placeholder coincide con la celda
-real; sin rejillas rojas en producción; tests DOM fijan la geometría frente a `space-between`+RTL.
+real; el drag de grupo no altera iconos no implicados (ni se superpone ni sale del grid); sin
+rejillas rojas en producción; tests DOM fijan la geometría frente a `space-between`+RTL.
 
 ### 297A-21 — Notificaciones de novedades
 

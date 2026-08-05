@@ -12,6 +12,11 @@ El grid de iconos del escritorio "está mal", hay fallas, y el **placeholder** d
 va a poner el icono) junto con las **rejillas rojas de debug** (Ctrl+Shift+G) no son coherentes con
 las celdas reales donde aterrizan los iconos.
 
+**Síntoma adicional (05-ago, usuario):** "los iconos interactúan extraños cuando los juntas — se
+altera todo en vez de alterarse 1 solo". Al arrastrar un icono sobre otro (o arrastrar uno con una
+selección múltiple residual), el movimiento no es puntual: se desplazan varios iconos, se superponen
+o el grid entero se reordena de golpe.
+
 ## Causas raíz identificadas (por código)
 
 1. **`justify-content: space-between` horizontal no se replica.** El grid declara
@@ -49,6 +54,23 @@ las celdas reales donde aterrizan los iconos.
    real montado (jsdom) que fije la geometría frente a `space-between` y RTL. La falla se cuela
    porque nadie verifica "el highlight cae exactamente sobre la celda real".
 
+6. **El drag de grupo se decide por la selección en el DROP, no por el gesto.** En
+   `workspace-icon-grid.ts`, `onPlaceCell` consulta `selectionStore.get()` al soltar:
+   `isGroup = source === 'desktop' && selectedIds.length > 1 && selectedIds.includes(draggedId)`.
+   No captura el gesto al iniciar el pointerdown (a diferencia de `enableDrag`, que sí captura
+   `groupIds` pero el escritorio no lo usa). Consecuencia: si queda una selección múltiple residual
+   (banda de selección, Ctrl+clic), arrastrar UN icono mueve TODOS los seleccionados — "se altera
+   todo en vez de alterarse 1 solo". Además la decisión puede cambiar entre el inicio y el drop si
+   la selección cambia a mitad del gesto.
+
+7. **El grupo no resuelve colisiones ni clampa al grid.** `buildGroupPlacementMoves` aplica el
+   mismo delta a cada miembro sin resolver colisiones contra los no seleccionados (se superponen) y
+   sin clampear a `metrics.columns/rows` (los miembros pueden quedar fuera de bounds y crear tracks
+   implícitos — el caso documentado en 058A-1). `planPlacement` solo resuelve la colisión del
+   arrastrado. Cuando el usuario encoge la ventana, `reflowPositions` reempaqueta TODOS los nodos
+   posicionados en orden fila/col para arreglar overlaps/fuera-de-bounds: el "arreglo" altera todo
+   el escritorio de golpe en vez de solo los iconos implicados.
+
 ## Objetivo
 
 Un único cálculo de geometría de celdas (con `columnGapEffective` y RTL) consumido por
@@ -84,7 +106,29 @@ horizontal y RTL.
 
 **Gate F2:** el placeholder coincide con la celda destino en desktop y tablet; tests verdes.
 
-### Fase 3 — Rejilla de debug coherente o retirada
+### Fase 3 — Interacción de grupo predecible (se altera 1 solo, o el grupo completo conscientemente)
+
+- [ ] Capturar el grupo al INICIO del gesto (pointerdown), no al soltar: en `onPlaceCell` leer la
+  selección capturada al iniciar el drag (mismo patrón que `groupIds` de `enableDrag`, pasándole
+  `getGroupIds` desde `workspace-icon-grid.ts`) y usarla para decidir el drag de grupo.
+- [ ] Regla Windows: arrastrar un icono **seleccionado** mueve el grupo; arrastrar un icono **no
+  seleccionado** mueve solo ese icono (y la selección se reemplaza). Verificar que un clic simple
+  sobre un seleccionado sin arrastre conserva la selección (ya documentado en 058A-4).
+- [ ] Resolver colisiones del grupo: al soltar, los miembros que caigan en celdas ocupadas por no
+  seleccionados desplazan al ocupante (reusar `planPlacement` por miembro o resolver el grupo
+  como bloque); los miembros fuera de bounds se clampean a la celda más cercana válida (nunca
+  crear tracks implícitos).
+- [ ] Asegurar que `reflowPositions` (resize) no reempaquete todo el grid salvo que haya un
+  overlap/fuera-de-bounds real: con la geometría unificada (F1) y el grupo resuelto (F3), el
+  reflow solo debe tocar los nodos que realmente cambian.
+- [ ] Tests: unidad para `buildGroupPlacementMoves` (delta + clamp + colisión) y un test de
+  `onPlaceCell` con selección residual: arrastrar un icono no seleccionado mueve solo ese.
+
+**Gate F3:** con selección múltiple residual, arrastrar un icono no seleccionado altera solo ese;
+arrastrar uno seleccionado mueve el grupo sin superposiciones ni fuera-de-bounds; reflow no
+reordena todo el grid.
+
+### Fase 4 — Rejilla de debug coherente o retirada
 
 - [ ] Decisión: si la rejilla roja es herramienta interna de desarrollo, dejar de exponerla en
   build de producción (solo dev) y **hacer que use `cellOriginAt`** para no mentir.
@@ -93,9 +137,9 @@ horizontal y RTL.
   `workspace-icon-grid.ts` y el CSS `--depurar`/`__debug*`).
 - [ ] VarSense: verificar tokens y que no queden clases huérfanas tras el cambio.
 
-**Gate F3:** sin código de depuración visible en producción; si se mantiene, coherente y dev-only.
+**Gate F4:** sin código de depuración visible en producción; si se mantiene, coherente y dev-only.
 
-### Fase 4 — Verificación final
+### Fase 5 — Verificación final
 
 - [ ] Suite frontend completa + type-check + gate `task:check` (ID de tarea al abrir el bloque).
 - [ ] Navegador real: 1440×900 y 1024×768 — arrastrar iconos, soltar en celdas libres y ocupadas
@@ -103,19 +147,25 @@ horizontal y RTL.
   superponen), y el placeholder cae sobre la celda marcada.
 - [ ] Móvil (<768): sin posicionamiento libre (el reorder por índice sigue siendo el fallback).
 
-**Gate F4 / DoD:** grid coherente en desktop/tablet, placeholder exacto, sin rejillas rojas en
-producción, suite + navegador verdes.
+**Gate F5 / DoD:** grid coherente en desktop/tablet, placeholder exacto, drag de grupo predecible
+(sin alterar iconos no implicados), sin rejillas rojas en producción, suite + navegador verdes.
 
 ## Pruebas obligatorias
 
 - Unit/DOM: `icon-grid.test.ts` (nuevos tests de `columnGapEffective` y `cellOriginAt`), tests de
-  `icon-reorder` (highlight), suite completa del frontend.
-- Navegador: desktop 1440/1024, tablet, móvil; arrastre con sobrante horizontal y RTL.
+  `icon-reorder` (highlight), tests de `icon-group-drag` (delta + clamp + colisión) y de
+  `onPlaceCell` con selección residual, suite completa del frontend.
+- Navegador: desktop 1440/1024, tablet, móvil; arrastre con sobrante horizontal y RTL; grupo de 2-3
+  iconos seleccionados (arrastrar seleccionado vs. no seleccionado); resize con grupo fuera de
+  bounds.
 - Gate: `npm run task:check -- <ID>` y `--full` cuando el bloque cierre.
 
 ## Criterio de salida
 
 - Un único helper de geometría (`cellOriginAt`) alimenta getCellAt, highlight y debug.
 - El placeholder coincide con la celda real al arrastrar (verificado en navegador).
+- El drag de grupo se decide por el gesto (pointerdown), no por la selección del drop; arrastrar un
+  icono no seleccionado altera solo ese; el grupo se mueve sin superposiciones ni fuera-de-bounds.
+- El reflow por resize no reordena todo el grid salvo overlap/fuera-de-bounds real.
 - La rejilla roja de debug no aparece en producción (o es dev-only y coherente).
 - Los tests DOM fijan la geometría frente a `space-between` + RTL para que no regrese.
