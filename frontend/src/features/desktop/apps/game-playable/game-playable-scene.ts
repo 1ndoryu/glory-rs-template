@@ -54,42 +54,63 @@ export interface GamePlayableSceneHandle {
   readonly destroy: () => void;
 }
 
-const CAMERA_HEIGHT = 15;
-const CAMERA_DISTANCE = 13;
+/* Cámara orbital (Genshin): distancia y ángulos controlables. */
+const CAMERA_DISTANCE = 16;
+const CAMERA_MIN_DISTANCE = 7;
+const CAMERA_MAX_DISTANCE = 30;
+const CAMERA_MIN_POLAR = 0.35;
+const CAMERA_MAX_POLAR = 1.15;
 const STREAM_HALF_WIDTH = 4;
 const STREAM_HALF_DEPTH = 4;
 /* Culling avanzado: radio circular de visibilidad (unidades de mundo) que
  * recorta chunks/instancias en las esquinas de la ventana rectangular. */
 const STREAM_MAX_DISTANCE = 26;
+/* [GAME-01-VIS] Con cámara orbital libre el borde lejano del frustum cae más
+ * allá del jugador cuanto más zoom out; el radio de streaming crece con la
+ * distancia de cámara (+18 cubre el extremo horizontal del frustum a FOV 50°)
+ * para evitar pop-in al alejar. */
+const STREAM_MARGIN_BEYOND_CAMERA = 18;
+const FOG_NEAR_MARGIN = 8;
+const FOG_FAR_OFFSET = 34;
 
 export function mountGamePlayableScene(
   host: HTMLElement,
   map: WorldMap,
   mapVersion: MapVersion,
 ): GamePlayableSceneHandle {
+  /* [GAME-01-VIS] Dirección aprobada 05-ago: low poly verde stylized con
+   * cielo despejado (referencia de estilo tipo Genshin). El contrato de mapa
+   * no cambia; solo renderer, paleta y cámara. */
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xeeeeea);
-  scene.fog = new THREE.Fog(0xeeeeea, 22, 42);
+  scene.background = new THREE.Color(0x87ceeb);
+  const fog = new THREE.Fog(0x87ceeb, CAMERA_DISTANCE + FOG_NEAR_MARGIN, CAMERA_DISTANCE + FOG_FAR_OFFSET);
+  scene.fog = fog;
 
-  const camera = new THREE.OrthographicCamera(-10, 10, 8, -8, 0.1, 80);
+  /* [GAME-01-VIS] Cámara libre orbital tipo Genshin: el jugador arrastra
+   * para orbitar y usa la rueda/pellizco para acercar; el punto focal sigue
+   * al personaje. Sustituye la isométrica fija del boceto. */
+  const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 120);
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'low-power' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
   renderer.domElement.setAttribute('aria-label', 'Bosque jugable offline');
   host.appendChild(renderer.domElement);
 
+  /* Paleta verde stylized: ink = verde profundo (troncos/contorno), middle y
+   * paper = follaje en dos verdes, pale = verde claro, water = azul stylized.
+   * El contorno se mantiene verde oscuro para no romper la lectura low poly. */
   const materials: ForestMaterials = {
-    ink: new THREE.MeshToonMaterial({ color: 0x111111 }),
-    paper: new THREE.MeshToonMaterial({ color: 0xf8f8f4 }),
-    pale: new THREE.MeshToonMaterial({ color: 0xd7d7d1 }),
-    middle: new THREE.MeshToonMaterial({ color: 0x8d8d88 }),
-    water: new THREE.MeshToonMaterial({ color: 0x55555a }),
-    lines: new THREE.LineBasicMaterial({ color: 0x050505 }),
+    ink: new THREE.MeshToonMaterial({ color: 0x2f6b2f }),
+    paper: new THREE.MeshToonMaterial({ color: 0x7fbf4f }),
+    pale: new THREE.MeshToonMaterial({ color: 0xa8d98a }),
+    middle: new THREE.MeshToonMaterial({ color: 0x5a9e4b }),
+    water: new THREE.MeshToonMaterial({ color: 0x3d8bcd }),
+    lines: new THREE.LineBasicMaterial({ color: 0x1e4620 }),
   };
 
-  scene.add(new THREE.GridHelper(20, 20, 0x777777, 0xc8c8c2));
+  scene.add(new THREE.GridHelper(20, 20, 0x6f9e3f, 0xb9d99a));
 
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x555555, 2.2));
-  const sun = new THREE.DirectionalLight(0xffffff, 3.2);
+  scene.add(new THREE.HemisphereLight(0xfff7e0, 0x3a6b35, 1.6));
+  const sun = new THREE.DirectionalLight(0xfff2c8, 2.4);
   sun.position.set(-8, 18, 10);
   sun.castShadow = true;
   scene.add(sun);
@@ -120,12 +141,15 @@ export function mountGamePlayableScene(
   let currentRendererMetrics: GameRendererMetrics = readRendererMetrics({});
 
   const streamProps = (center: { x: number; z: number }): void => {
+    /* [GAME-01-VIS] Radio adaptativo: nunca por debajo del mínimo y crece con
+     * el zoom de la cámara orbital para cubrir el borde lejano del frustum. */
+    const maxDistance = Math.max(STREAM_MAX_DISTANCE, orbit.distance + STREAM_MARGIN_BEYOND_CAMERA);
     const visible = chunkCache.select({
       center,
       halfWidth: STREAM_HALF_WIDTH,
       halfDepth: STREAM_HALF_DEPTH,
       marginCells: 0,
-      maxDistance: STREAM_MAX_DISTANCE,
+      maxDistance,
     });
     visualCache.sync(visible);
     currentStreamingStats = {
@@ -139,30 +163,72 @@ export function mountGamePlayableScene(
   const entities = new Map<string, THREE.Group>();
   let currentPlayer = { x: 0, z: -0.5 };
   let cameraTarget = new THREE.Vector3(currentPlayer.x, 0, currentPlayer.z);
+  /* [GAME-01-VIS] Estado orbital: distancia y ángulos que el jugador controla
+   * con arrastre (azimuth/polar) y rueda o pellizco (distancia). */
+  let orbit = { distance: CAMERA_DISTANCE, azimuth: Math.PI / 4, polar: 0.85 };
+  let dragging = false;
+  let lastPointer: { x: number; y: number } | null = null;
   let destroyed = false;
 
   const clampTarget = (target: THREE.Vector3): THREE.Vector3 => {
-    const width = Math.max(host.clientWidth, 1);
-    const height = Math.max(host.clientHeight, 1);
-    const halfHeight = 7.5;
-    const halfWidth = halfHeight * width / height;
+    const margin = 4;
     return new THREE.Vector3(
-      THREE.MathUtils.clamp(target.x, map.bounds.minX + Math.min(halfWidth, 4), map.bounds.maxX - Math.min(halfWidth, 4)),
+      THREE.MathUtils.clamp(target.x, map.bounds.minX + margin, map.bounds.maxX - margin),
       0,
-      THREE.MathUtils.clamp(target.z, map.bounds.minZ + Math.min(halfHeight, 4), map.bounds.maxZ - Math.min(halfHeight, 4)),
+      THREE.MathUtils.clamp(target.z, map.bounds.minZ + margin, map.bounds.maxZ - margin),
     );
   };
 
   const updateCamera = (): void => {
     const desired = clampTarget(new THREE.Vector3(currentPlayer.x, 0, currentPlayer.z));
     cameraTarget.lerp(desired, 0.14);
-    camera.position.set(
-      cameraTarget.x + CAMERA_DISTANCE,
-      CAMERA_HEIGHT,
-      cameraTarget.z + CAMERA_DISTANCE,
+    const sinPolar = Math.sin(orbit.polar);
+    const offset = new THREE.Vector3(
+      orbit.distance * sinPolar * Math.sin(orbit.azimuth),
+      orbit.distance * Math.cos(orbit.polar),
+      orbit.distance * sinPolar * Math.cos(orbit.azimuth),
     );
-    camera.lookAt(cameraTarget.x, 0, cameraTarget.z);
+    camera.position.copy(cameraTarget).add(offset);
+    camera.lookAt(cameraTarget);
+    /* Niebla adaptativa: cerca y lejos escalan con el zoom para que la escena
+     * nunca se lave a distancia máxima ni se pierda el horizonte a mínimo. */
+    fog.near = orbit.distance + FOG_NEAR_MARGIN;
+    fog.far = orbit.distance + FOG_FAR_OFFSET;
   };
+
+  /* Arrastre para orbitar: un solo puntero gira; dos dedos (móvil) hacen
+   * pinch para zoom. La cámara nunca decide estado de juego. */
+  const onOrbitStart = (event: PointerEvent): void => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    dragging = true;
+    lastPointer = { x: event.clientX, y: event.clientY };
+    host.setPointerCapture?.(event.pointerId);
+  };
+  const onOrbitMove = (event: PointerEvent): void => {
+    if (!dragging || !lastPointer) return;
+    const dx = event.clientX - lastPointer.x;
+    const dy = event.clientY - lastPointer.y;
+    lastPointer = { x: event.clientX, y: event.clientY };
+    orbit.azimuth -= dx * 0.008;
+    orbit.polar = THREE.MathUtils.clamp(orbit.polar + dy * 0.008, CAMERA_MIN_POLAR, CAMERA_MAX_POLAR);
+  };
+  const onOrbitEnd = (): void => {
+    dragging = false;
+    lastPointer = null;
+  };
+  const onWheel = (event: WheelEvent): void => {
+    event.preventDefault();
+    orbit.distance = THREE.MathUtils.clamp(
+      orbit.distance * (event.deltaY > 0 ? 1.08 : 0.92),
+      CAMERA_MIN_DISTANCE,
+      CAMERA_MAX_DISTANCE,
+    );
+  };
+  host.addEventListener('pointerdown', onOrbitStart);
+  host.addEventListener('pointermove', onOrbitMove);
+  host.addEventListener('pointerup', onOrbitEnd);
+  host.addEventListener('pointercancel', onOrbitEnd);
+  host.addEventListener('wheel', onWheel, { passive: false });
 
   const createEntity = (id: string, characterId: string, localEntityId = 'local'): THREE.Group => {
     const remote = id !== localEntityId;
@@ -219,12 +285,7 @@ export function mountGamePlayableScene(
     if (destroyed) return;
     const width = Math.max(host.clientWidth, 1);
     const height = Math.max(host.clientHeight, 1);
-    const halfHeight = 8;
-    const halfWidth = halfHeight * width / height;
-    camera.left = -halfWidth;
-    camera.right = halfWidth;
-    camera.top = halfHeight;
-    camera.bottom = -halfHeight;
+    camera.aspect = width / height;
     camera.updateProjectionMatrix();
     renderer.setSize(width, height, false);
     updateCamera();
@@ -294,6 +355,11 @@ export function mountGamePlayableScene(
     destroy: () => {
       if (destroyed) return;
       destroyed = true;
+      host.removeEventListener('pointerdown', onOrbitStart);
+      host.removeEventListener('pointermove', onOrbitMove);
+      host.removeEventListener('pointerup', onOrbitEnd);
+      host.removeEventListener('pointercancel', onOrbitEnd);
+      host.removeEventListener('wheel', onWheel);
       gpuFrameProbe.dispose();
       visualCache.destroy();
       disposeScene(scene, materials);

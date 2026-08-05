@@ -65,15 +65,32 @@
   text-align: center;
 }
 
+/* [GAME-01-VIS] Controles táctiles SOLO en móvil (<768px): en desktop el
+ * jugador usa teclado/ratón y el D-pad no debe aparecer (decisión 05-ago). */
 .juegoFixture__controles {
   position: absolute;
   right: var(--espacio-md);
   bottom: var(--espacio-md);
   z-index: 3;
-  display: grid;
+  display: none;
   grid-template: repeat(3, var(--areaControlSistemaMovil)) / repeat(3, var(--areaControlSistemaMovil));
   gap: 2px;
   pointer-events: none;
+}
+
+@media (max-width: 767px) {
+  .juegoFixture__controles {
+    display: grid;
+  }
+
+  /* [GAME-01-VIS] En el launcher móvil el contenido es scrollable sin altura
+   * fija; el fixture debe ocupar exactamente el viewport disponible para que
+   * el canvas no se estire al alto del contenido (bug: 11048px en vez del
+   * alto visible). */
+  .juegoFixture {
+    height: 100dvh;
+    min-height: 0;
+  }
 }
 
 .juegoFixture__control {

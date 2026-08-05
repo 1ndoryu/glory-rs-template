@@ -42,7 +42,8 @@ export function buildPreviewChunkData(document: MapVersion): readonly PreviewChu
 
 export function createGameMapPreview(host: HTMLElement): GameMapPreviewHandle {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xeeeeea);
+  /* [GAME-01-VIS] Paleta verde stylized coherente con el runtime (05-ago). */
+  scene.background = new THREE.Color(0x87ceeb);
 
   const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'low-power' });
@@ -51,13 +52,13 @@ export function createGameMapPreview(host: HTMLElement): GameMapPreviewHandle {
   host.appendChild(renderer.domElement);
 
   const materials = {
-    pale: new THREE.MeshToonMaterial({ color: 0xd7d7d1 }),
-    water: new THREE.MeshToonMaterial({ color: 0x55555a }),
-    middle: new THREE.MeshToonMaterial({ color: 0x8d8d88 }),
-    spawn: new THREE.MeshBasicMaterial({ color: 0x111111 }),
+    pale: new THREE.MeshToonMaterial({ color: 0xa8d98a }),
+    water: new THREE.MeshToonMaterial({ color: 0x3d8bcd }),
+    middle: new THREE.MeshToonMaterial({ color: 0x5a9e4b }),
+    spawn: new THREE.MeshBasicMaterial({ color: 0x1e4620 }),
   };
 
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x555555, 2.2));
+  scene.add(new THREE.HemisphereLight(0xfff7e0, 0x3a6b35, 1.6));
   const sun = new THREE.DirectionalLight(0xffffff, 3.0);
   sun.position.set(-8, 18, 10);
   scene.add(sun);
