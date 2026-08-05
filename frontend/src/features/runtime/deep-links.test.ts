@@ -34,6 +34,15 @@ describe('canonical deep links', () => {
     expect(readerLink.parse({ slug: 'a/b' })).toBeNull();
   });
 
+  /* [058A-2] Los publicLocator del workspace pueden llegar con params null en
+   * runtime (datos incompletos). Antes isSafeSegment(null) crasheaba con
+   * TypeError desde el Finder; debe fallar la validación (fail-closed), no
+   * lanzar. */
+  it('rechaza valores null sin crashear (regresión del Finder)', () => {
+    expect(readerLink.parse({ slug: null } as unknown as Record<string, string>)).toBeNull();
+    expect(readerLink.stringify({ slug: null } as unknown as Record<string, string>)).toBeNull();
+  });
+
   it('rechaza parámetros en apps legacy sin contrato deepLink', () => {
     const legacyApp = { ...readerApp, deepLink: undefined } as AppDefinition;
     expect(parseAppParams(legacyApp, {})).toEqual({});

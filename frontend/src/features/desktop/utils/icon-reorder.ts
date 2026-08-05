@@ -87,7 +87,11 @@ export function positionCellHighlight(
     ? metrics.right - gridRect.left - (cell.col + 1) * metrics.cellWidth - cell.col * metrics.columnGap
     : metrics.left - gridRect.left + cell.col * (metrics.cellWidth + metrics.columnGap);
   hl.style.left = `${cellLeft}px`;
-  hl.style.top = `${metrics.top - gridRect.top + cell.row * (metrics.cellHeight + metrics.rowGap)}px`;
+  /* [058A-2] Usar el gap de fila efectivo igual que getCellAt: con
+   * align-content space-between/around/evenly el sobrante vertical se
+   * reparte entre filas, y usar rowGap fijo dejaba el highlight desfasado
+   * respecto a la celda real (el cuadrado se veía corrido hacia arriba). */
+  hl.style.top = `${metrics.top - gridRect.top + cell.row * (metrics.cellHeight + metrics.rowGapEffective)}px`;
   hl.style.width = `${metrics.cellWidth}px`;
   hl.style.height = `${metrics.cellHeight}px`;
 }

@@ -18,7 +18,12 @@ export function stableParamsKey(params?: PublicRouteParams): string {
   );
 }
 
-function isSafeSegment(value: string): boolean {
+function isSafeSegment(value: string | null | undefined): boolean {
+  /* [058A-2] Rechazar null/undefined sin reventar: los publicLocator del
+   * workspace pueden llegar con params null en runtime (datos incompletos),
+   * y antes esto crasheaba en value.length (TypeError) desde el Finder.
+   * Un locator malformado debe fallar la validación (fail-closed), no lanzar. */
+  if (value == null) return false;
   return value.length > 0
     && value !== '.'
     && value !== '..'
