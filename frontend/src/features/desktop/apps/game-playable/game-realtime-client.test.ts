@@ -94,7 +94,7 @@ describe('Bosque realtime client adapter', () => {
       payload: {
         snapshotSequence: 1,
         tick: 1,
-        entities: [{ id: 'p-local', position: { x: 0, z: 0 }, velocity: { x: 1, z: 0 }, radius: 0.5 }],
+        entities: [{ id: 'p-local', position: { x: 0, z: 0 }, velocity: { x: 1, z: 0 }, radius: 0.5, characterId: 'forest-scout' }],
       },
     }));
     socket.emit('message', JSON.stringify({
@@ -103,7 +103,7 @@ describe('Bosque realtime client adapter', () => {
       payload: {
         snapshotSequence: 2,
         tick: 2,
-        entities: [{ id: 'p-local', position: { x: 2, z: 0 }, velocity: { x: 3, z: 0 }, radius: 0.5 }],
+        entities: [{ id: 'p-local', position: { x: 2, z: 0 }, velocity: { x: 3, z: 0 }, radius: 0.5, characterId: 'forest-scout' }],
       },
     }));
 
@@ -138,7 +138,7 @@ describe('Bosque realtime client adapter', () => {
       payload: {
         snapshotSequence: 2,
         tick: 2,
-        entities: [{ id: 'p-local', position: { x: 2, z: 0 }, velocity: { x: 0, z: 0 }, radius: 0.5 }],
+        entities: [{ id: 'p-local', position: { x: 2, z: 0 }, velocity: { x: 0, z: 0 }, radius: 0.5, characterId: 'forest-scout' }],
       },
     }));
     socket.emit('message', JSON.stringify({
@@ -147,7 +147,7 @@ describe('Bosque realtime client adapter', () => {
       payload: {
         snapshotSequence: 1,
         tick: 1,
-        entities: [{ id: 'p-local', position: { x: -4, z: 0 }, velocity: { x: 0, z: 0 }, radius: 0.5 }],
+        entities: [{ id: 'p-local', position: { x: -4, z: 0 }, velocity: { x: 0, z: 0 }, radius: 0.5, characterId: 'forest-scout' }],
       },
     }));
     socket.emit('message', JSON.stringify({
@@ -161,6 +161,58 @@ describe('Bosque realtime client adapter', () => {
     expect(notices).toEqual(['secuencia repetida']);
     client.sendMove({ x: 1, z: 0 });
     expect(JSON.parse(socket.sent.at(-1) ?? '{}').type).toBe('move');
+    client.destroy();
+  });
+
+  it('resets snapshot state on joined so the new room is not treated as replay', () => {
+    vi.spyOn(Date, 'now').mockReturnValueOnce(1_000).mockReturnValueOnce(1_100);
+    const socket = new FakeSocket();
+    const client = createGameRealtimeClient({
+      ticketProvider: vi.fn().mockResolvedValue('ticket'),
+      socketFactory: () => socket,
+      socketUrl: 'ws://localhost/api/game/ws',
+    });
+
+    void client.connect();
+    socket.emit('open');
+    socket.emit('message', JSON.stringify({
+      v: 1,
+      type: 'joined',
+      payload: { playerId: 'p-old', mapVersion: 'forest@1', tick: 0 },
+    }));
+    /* Sala anterior con contador avanzado (p. ej. actor recreado por TTL). */
+    socket.emit('message', JSON.stringify({
+      v: 1,
+      type: 'snapshot',
+      payload: {
+        snapshotSequence: 9,
+        tick: 9,
+        entities: [{ id: 'p-old', position: { x: 5, z: 0 }, velocity: { x: 0, z: 0 }, radius: 0.5, characterId: 'forest-scout' }],
+      },
+    }));
+    expect(client.getRenderSnapshot()?.entities[0]?.position.x).toBe(5);
+
+    /* Reconexión: la sala nueva emite `joined` y reinicia su contador en 1.
+     * Sin el reset, la secuencia 1 <= 9 se descartaría como replay y la
+     * escena quedaría interpolando posiciones de otra sala. */
+    socket.emit('message', JSON.stringify({
+      v: 1,
+      type: 'joined',
+      payload: { playerId: 'p-new', mapVersion: 'forest@1', tick: 0 },
+    }));
+    socket.emit('message', JSON.stringify({
+      v: 1,
+      type: 'snapshot',
+      payload: {
+        snapshotSequence: 1,
+        tick: 1,
+        entities: [{ id: 'p-new', position: { x: 1, z: 0 }, velocity: { x: 0, z: 0 }, radius: 0.5, characterId: 'forest-scout' }],
+      },
+    }));
+
+    expect(client.getState()).toBe('connected');
+    expect(client.getPlayerId()).toBe('p-new');
+    expect(client.getRenderSnapshot()?.entities[0]?.position.x).toBe(1);
     client.destroy();
   });
 

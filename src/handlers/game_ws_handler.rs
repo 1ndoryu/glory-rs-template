@@ -13,6 +13,8 @@ use tokio::sync::mpsc;
 use tokio::time::timeout;
 
 use crate::errors::AppError;
+use crate::models::game_character::GameCharacterDefinition;
+use crate::models::game_profile::GAME_PROFILE_DEFAULT_CHARACTER_ID;
 use crate::models::game_realtime::{
     consume_rate_budget, parse_client_message, serialize_server_message, GameRealtimeClientMessage,
     GameRealtimeErrorCode, GameRealtimeErrorPayload, GameRealtimeJoinPayload,
@@ -107,7 +109,17 @@ async fn handle_socket(
 
     let (output, messages) = mpsc::channel(32);
     let room = state.game_ws_state.room_state();
-    let joined = match room.join(claims.subject, output).await {
+    /* [297A-77] El personaje viaja server-side en el ticket (resuelto en HTTP
+     * contra el perfil); si no hay perfil o el id es inválido, se aplica la
+     * opción por defecto del catálogo. Nunca se lee BD en el socket. */
+    let character_id = claims
+        .character_id
+        .filter(|id| GameCharacterDefinition::is_valid_id(id))
+        .unwrap_or_else(|| GAME_PROFILE_DEFAULT_CHARACTER_ID.to_string());
+    let joined = match room
+        .join_with_character(claims.subject, &character_id, output)
+        .await
+    {
         Ok(joined) => joined,
         Err(error) => {
             let code = error.code();
@@ -315,7 +327,7 @@ mod tests {
     fn valid_ticket_resolves_subject_once_and_replay_is_rejected() {
         let store = GameTicketStore::default();
         let subject = Uuid::new_v4();
-        let ticket = store.issue(subject, 30, "secret").expect("ticket");
+        let ticket = store.issue(subject, None, 30, "secret").expect("ticket");
 
         let claims = resolve_join_ticket(&store, Some("secret"), &ticket).expect("claims");
         assert_eq!(claims.subject, subject);
@@ -325,7 +337,9 @@ mod tests {
     #[test]
     fn missing_or_wrong_secret_fails_closed_without_resolving_identity() {
         let store = GameTicketStore::default();
-        let ticket = store.issue(Uuid::new_v4(), 30, "secret").expect("ticket");
+        let ticket = store
+            .issue(Uuid::new_v4(), None, 30, "secret")
+            .expect("ticket");
 
         assert!(resolve_join_ticket(&store, None, &ticket).is_err());
         assert!(resolve_join_ticket(&store, Some("wrong"), &ticket).is_err());

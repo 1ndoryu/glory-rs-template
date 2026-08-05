@@ -164,10 +164,14 @@ export function mountGamePlayableScene(
     camera.lookAt(cameraTarget.x, 0, cameraTarget.z);
   };
 
-  const createEntity = (id: string, localEntityId = 'local'): THREE.Group => {
+  const createEntity = (id: string, characterId: string, localEntityId = 'local'): THREE.Group => {
     const remote = id !== localEntityId;
-    const figure = createFigure(materials, remote);
+    /* [297A-77] Cada entidad lleva su personaje del catálogo: el tono se
+     * aplica en la figura (material compartido) para que los remotos se vean
+     * distintos y el local refleje su elección. */
+    const figure = createFigure(materials, remote, characterId);
     figure.userData.entityId = id;
+    figure.userData.characterId = characterId;
     scene.add(figure);
     entities.set(id, figure);
     return figure;
@@ -177,7 +181,12 @@ export function mountGamePlayableScene(
     if (destroyed) return;
     const activeIds = new Set<string>();
     for (const entity of snapshot.entities) {
-      const object = entities.get(entity.id) ?? createEntity(entity.id, localEntityId);
+      const existing = entities.get(entity.id);
+      /* Si el personaje cambió (reconexión con otro perfil), recrear la
+       * figura para aplicar el tono nuevo. */
+      const object = existing && existing.userData.characterId === entity.characterId
+        ? existing
+        : recreateEntity(entity.id, entity.characterId, existing, localEntityId);
       object.position.set(entity.position.x, 0.2, entity.position.z);
       activeIds.add(entity.id);
       if (entity.id === localEntityId) currentPlayer = entity.position;
@@ -190,6 +199,20 @@ export function mountGamePlayableScene(
     }
     streamProps(currentPlayer);
     updateCamera();
+  };
+
+  const recreateEntity = (
+    id: string,
+    characterId: string,
+    previous: THREE.Group | undefined,
+    localEntityId: string,
+  ): THREE.Group => {
+    if (previous) {
+      scene.remove(previous);
+      disposeObjectGeometries(previous);
+      entities.delete(id);
+    }
+    return createEntity(id, characterId, localEntityId);
   };
 
   const resize = (): void => {

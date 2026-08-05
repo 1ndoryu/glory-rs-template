@@ -46,6 +46,7 @@ export interface PlayerState {
   readonly position: Vector2;
   readonly velocity: Vector2;
   readonly radius: number;
+  readonly characterId: string;
 }
 
 export interface WorldState {
@@ -71,6 +72,8 @@ export interface SnapshotEntity {
   readonly position: Vector2;
   readonly velocity: Vector2;
   readonly radius: number;
+  /** ID del personaje del catálogo; el presentador lo mapea a su tono. */
+  readonly characterId: string;
 }
 
 export interface WorldSnapshot {

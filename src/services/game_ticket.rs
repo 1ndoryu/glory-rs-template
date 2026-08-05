@@ -13,6 +13,7 @@ use sha2::Sha256;
 use uuid::Uuid;
 
 use crate::errors::AppError;
+use crate::models::game_character::GameCharacterDefinition;
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -30,13 +31,18 @@ pub const GAME_GUEST_COOKIE_TTL_SECS: i64 = 2 * 60 * 60;
 pub struct GameTicketClaims {
     /// UUID resuelto por el servidor desde el handle; nunca procede del token.
     pub subject: Uuid,
+    /// Personaje del catálogo resuelto al emitir (cuenta con perfil); el
+    /// transporte lo usa para que cada jugador se vea con su tono. Los
+    /// invitados viajan sin personaje y el room aplica el default.
+    pub character_id: Option<String>,
     pub expires_at: i64,
     pub nonce: Uuid,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 struct PendingTicket {
     subject: Uuid,
+    character_id: Option<String>,
     expires_at: i64,
 }
 
@@ -58,8 +64,16 @@ pub struct GameTicketStore {
 
 impl GameTicketStore {
     /// Emite un ticket opaco: el UUID solo queda en este store server-side.
-    pub fn issue(&self, subject: Uuid, ttl_secs: i64, secret: &str) -> Result<String, AppError> {
-        issue_at(self, subject, ttl_secs, secret, now_unix())
+    /// `character_id` es opcional (los invitados no tienen perfil) y se
+    /// valida fail-closed contra el catálogo allowlisted.
+    pub fn issue(
+        &self,
+        subject: Uuid,
+        character_id: Option<&str>,
+        ttl_secs: i64,
+        secret: &str,
+    ) -> Result<String, AppError> {
+        issue_at(self, subject, character_id, ttl_secs, secret, now_unix())
     }
 
     /// Verifica y consume el ticket de forma atómica para impedir replay.
@@ -100,6 +114,7 @@ impl GameTicketStore {
 pub fn issue_at(
     store: &GameTicketStore,
     subject: Uuid,
+    character_id: Option<&str>,
     ttl_secs: i64,
     secret: &str,
     now: i64,
@@ -107,6 +122,11 @@ pub fn issue_at(
     validate_secret(secret)?;
     if now < 0 {
         return Err(AppError::Internal("reloj de ticket inválido".into()));
+    }
+    if let Some(character_id) = character_id {
+        if !GameCharacterDefinition::is_valid_id(character_id) {
+            return Err(AppError::Validation("id de personaje inválido".into()));
+        }
     }
 
     let ttl = normalize_ttl(ttl_secs);
@@ -126,6 +146,7 @@ pub fn issue_at(
         nonce,
         PendingTicket {
             subject,
+            character_id: character_id.map(str::to_string),
             expires_at,
         },
     );
@@ -190,6 +211,7 @@ pub fn consume_at(
 
     Ok(GameTicketClaims {
         subject: ticket.subject,
+        character_id: ticket.character_id,
         expires_at: ticket.expires_at,
         nonce,
     })
@@ -384,19 +406,48 @@ mod tests {
     fn issues_opaque_ticket_and_resolves_uuid_only_server_side() {
         let store = GameTicketStore::default();
         let subject = Uuid::new_v4();
-        let token =
-            issue_at(&store, subject, GAME_TICKET_MAX_TTL_SECS * 10, SECRET, NOW).expect("ticket");
+        let token = issue_at(
+            &store,
+            subject,
+            None,
+            GAME_TICKET_MAX_TTL_SECS * 10,
+            SECRET,
+            NOW,
+        )
+        .expect("ticket");
         assert!(!token.contains(&subject.to_string()));
         let claims = consume_at(&store, &token, SECRET, NOW).expect("claims");
         assert_eq!(claims.subject, subject);
+        assert_eq!(claims.character_id, None);
         assert_eq!(claims.expires_at, NOW + GAME_TICKET_MAX_TTL_SECS);
         assert!(token.starts_with("g1.game."));
     }
 
     #[test]
+    fn ticket_carries_resolved_character_and_rejects_invalid_ids() {
+        let store = GameTicketStore::default();
+        let token = issue_at(
+            &store,
+            Uuid::new_v4(),
+            Some("forest-scout"),
+            30,
+            SECRET,
+            NOW,
+        )
+        .expect("ticket con personaje");
+        let claims = consume_at(&store, &token, SECRET, NOW).expect("claims");
+        assert_eq!(claims.character_id.as_deref(), Some("forest-scout"));
+        /* El carácter nunca cruza el token firmado: sigue server-side. */
+        assert!(!token.contains("forest-scout"));
+        /* IDs fuera del catálogo allowlisted fallan fail-closed. */
+        assert!(issue_at(&store, Uuid::new_v4(), Some("UPPER"), 30, SECRET, NOW).is_err());
+        assert!(issue_at(&store, Uuid::new_v4(), Some(""), 30, SECRET, NOW).is_err());
+    }
+
+    #[test]
     fn non_positive_ttl_uses_safe_default() {
         let store = GameTicketStore::default();
-        let token = issue_at(&store, Uuid::new_v4(), 0, SECRET, NOW).expect("ticket");
+        let token = issue_at(&store, Uuid::new_v4(), None, 0, SECRET, NOW).expect("ticket");
         let claims = consume_at(&store, &token, SECRET, NOW).expect("claims");
         assert_eq!(claims.expires_at, NOW + GAME_TICKET_DEFAULT_TTL_SECS);
     }
@@ -404,7 +455,7 @@ mod tests {
     #[test]
     fn rejects_tampering_wrong_secret_wrong_purpose_and_malformed_tokens() {
         let store = GameTicketStore::default();
-        let token = issue_at(&store, Uuid::new_v4(), 30, SECRET, NOW).expect("ticket");
+        let token = issue_at(&store, Uuid::new_v4(), None, 30, SECRET, NOW).expect("ticket");
         let mut tampered = token.clone();
         tampered.push('x');
         assert!(consume_at(&store, &tampered, SECRET, NOW).is_err());
@@ -422,22 +473,22 @@ mod tests {
     #[test]
     fn rejects_expired_and_invalid_clock_tickets() {
         let store = GameTicketStore::default();
-        let token = issue_at(&store, Uuid::new_v4(), 30, SECRET, NOW).expect("ticket");
+        let token = issue_at(&store, Uuid::new_v4(), None, 30, SECRET, NOW).expect("ticket");
         assert!(consume_at(&store, &token, SECRET, NOW + 30).is_err());
-        assert!(issue_at(&store, Uuid::new_v4(), 30, SECRET, -1).is_err());
+        assert!(issue_at(&store, Uuid::new_v4(), None, 30, SECRET, -1).is_err());
         assert!(consume_at(&store, &token, SECRET, -1).is_err());
     }
 
     #[test]
     fn consumes_ticket_once_and_prunes_expired_entries() {
         let store = GameTicketStore::default();
-        let token = issue_at(&store, Uuid::new_v4(), 30, SECRET, NOW).expect("ticket");
+        let token = issue_at(&store, Uuid::new_v4(), None, 30, SECRET, NOW).expect("ticket");
         assert!(store.consume_at_for_test(&token, SECRET, NOW).is_ok());
         assert!(store.consume_at_for_test(&token, SECRET, NOW + 1).is_err());
         assert_eq!(store.pending.lock().expect("store").len(), 0);
 
-        let expired = issue_at(&store, Uuid::new_v4(), 1, SECRET, NOW).expect("ticket");
-        let fresh = issue_at(&store, Uuid::new_v4(), 30, SECRET, NOW + 2).expect("ticket");
+        let expired = issue_at(&store, Uuid::new_v4(), None, 1, SECRET, NOW).expect("ticket");
+        let fresh = issue_at(&store, Uuid::new_v4(), None, 30, SECRET, NOW + 2).expect("ticket");
         assert!(store
             .consume_at_for_test(&expired, SECRET, NOW + 2)
             .is_err());
@@ -455,7 +506,7 @@ mod tests {
     #[test]
     fn rejects_empty_secret_before_parsing() {
         let store = GameTicketStore::default();
-        assert!(issue_at(&store, Uuid::new_v4(), 30, " ", NOW).is_err());
+        assert!(issue_at(&store, Uuid::new_v4(), None, 30, " ", NOW).is_err());
         assert!(consume_at(&store, "malformed", " ", NOW).is_err());
     }
 

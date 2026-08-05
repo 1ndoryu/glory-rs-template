@@ -8,6 +8,7 @@ use utoipa::ToSchema;
 use crate::errors::AppError;
 use crate::handlers::auth::check_auth_action_rate_limit;
 use crate::middleware::OptionalAuthUser;
+use crate::repositories::game_profile_repo::GameProfileRepository;
 use crate::services::game_ticket::{
     GAME_GUEST_COOKIE_NAME, GAME_GUEST_COOKIE_TTL_SECS, GAME_TICKET_DEFAULT_TTL_SECS,
 };
@@ -48,10 +49,21 @@ pub async fn issue_game_ticket(
         .ok_or_else(|| AppError::Internal("secreto de tickets de juego no configurado".into()))?;
 
     if let Some(user_id) = auth.user_id {
-        let ticket =
-            state
-                .game_ticket_store
-                .issue(user_id, GAME_TICKET_DEFAULT_TTL_SECS, secret)?;
+        /* [297A-77] El personaje se resuelve aquí (capa HTTP con BD) y viaja
+         * server-side en el ticket; el transporte realtime lo usa para que
+         * cada jugador se vea con su tono sin tocar BD en el socket. Un
+         * fallo del perfil no bloquea el ticket: se emite sin personaje. */
+        let character_id = GameProfileRepository::get(&state.pool, user_id)
+            .await
+            .ok()
+            .flatten()
+            .map(|profile| profile.character_id);
+        let ticket = state.game_ticket_store.issue(
+            user_id,
+            character_id.as_deref(),
+            GAME_TICKET_DEFAULT_TTL_SECS,
+            secret,
+        )?;
         /* [297A-76] Reclamación invitado→cuenta: si una cookie temporal viaja
          * con una sesión autenticada, la identidad invitada se revoca server-
          * side (deja de resolver) aunque el navegador aún la conserve. La
@@ -81,9 +93,12 @@ pub async fn issue_game_ticket(
         let (subject, cookie) = state.game_ticket_store.issue_guest(secret)?;
         (subject, Some(cookie))
     };
-    let ticket = state
-        .game_ticket_store
-        .issue(subject, GAME_TICKET_DEFAULT_TTL_SECS, secret)?;
+    /* Los invitados no tienen perfil: el ticket viaja sin personaje y el room
+     * aplica la opción por defecto del catálogo. */
+    let ticket =
+        state
+            .game_ticket_store
+            .issue(subject, None, GAME_TICKET_DEFAULT_TTL_SECS, secret)?;
     let mut response_headers = HeaderMap::new();
     if let Some(guest_cookie) = guest_cookie {
         let secure = if state.site_url.starts_with("https") {

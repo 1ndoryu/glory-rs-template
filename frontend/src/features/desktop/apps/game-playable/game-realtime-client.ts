@@ -182,6 +182,16 @@ export function createGameRealtimeClient(
     if (message.type === 'joined') {
       playerId = message.payload.playerId;
       mapVersion = message.payload.mapVersion;
+      /* [297A-77] Nueva sesión: el contador de snapshot y los snapshots
+       * previos pertenecen al actor anterior, cuyo contador puede reiniciarse
+       * (sala recreada por TTL) o saltar. Sin este reset, el primer snapshot
+       * de la sala nueva se descartaría por parecer "replay" y la escena se
+       * quedaría interpolando posiciones de otra sala. */
+      lastSnapshotSequence = null;
+      previousSnapshot = null;
+      currentSnapshot = null;
+      previousSnapshotAt = 0;
+      currentSnapshotAt = 0;
       clearReconnect();
       notify('connected');
       clearHeartbeat();

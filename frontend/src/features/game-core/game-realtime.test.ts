@@ -77,6 +77,7 @@ describe('GAME-01 realtime contract v1', () => {
           position: { x: 20, z: 30 },
           velocity: { x: 4, z: -2 },
           radius: 0.5,
+          characterId: 'forest-scout',
         }],
       },
     };
@@ -96,13 +97,47 @@ describe('GAME-01 realtime contract v1', () => {
     }).ok).toBe(true);
   });
 
+  it('rejects snapshots with entities missing or misbounded characterId', () => {
+    const base = {
+      v: 1 as const,
+      type: 'snapshot' as const,
+      payload: {
+        snapshotSequence: 1,
+        tick: 1,
+        entities: [{
+          id: 'remote',
+          position: { x: 1, z: 1 },
+          velocity: { x: 0, z: 0 },
+          radius: 0.5,
+          characterId: 'forest-scout',
+        }],
+      },
+    };
+    expect(validateGameRealtimeServerMessage(base).ok).toBe(true);
+    const { characterId: _ignored, ...withoutCharacter } = base.payload.entities[0];
+    expect(validateGameRealtimeServerMessage({
+      ...base,
+      payload: { ...base.payload, entities: [withoutCharacter] },
+    }).ok).toBe(false);
+    expect(validateGameRealtimeServerMessage({
+      ...base,
+      payload: {
+        ...base.payload,
+        entities: [{
+          ...base.payload.entities[0],
+          characterId: 'x'.repeat(GAME_REALTIME_LIMITS.maxCharacterIdLength + 1),
+        }],
+      },
+    }).ok).toBe(false);
+  });
+
   it('filters snapshots by interest and keeps deterministic entity order', () => {
     const snapshot = {
       snapshotSequence: 3,
       tick: 8,
       entities: [
-        { id: 'z', position: { x: 0, z: 0 }, velocity: { x: 0, z: 0 }, radius: 0.5 },
-        { id: 'a', position: { x: 1, z: 1 }, velocity: { x: 0, z: 0 }, radius: 0.5 },
+        { id: 'z', position: { x: 0, z: 0 }, velocity: { x: 0, z: 0 }, radius: 0.5, characterId: 'forest-scout' },
+        { id: 'a', position: { x: 1, z: 1 }, velocity: { x: 0, z: 0 }, radius: 0.5, characterId: 'paper' },
       ],
     } as const;
     expect(filterGameRealtimeSnapshot(snapshot, new Set(['z', 'a'])).entities.map(entity => entity.id))

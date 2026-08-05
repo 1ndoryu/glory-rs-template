@@ -14,6 +14,7 @@ pub const GAME_REALTIME_MAX_TICKET_LENGTH: usize = 256;
 pub const GAME_REALTIME_MAX_CLIENT_VERSION_LENGTH: usize = 32;
 pub const GAME_REALTIME_MAX_MAP_VERSION_LENGTH: usize = 128;
 pub const GAME_REALTIME_MAX_ENTITY_ID_LENGTH: usize = 128;
+pub const GAME_REALTIME_MAX_CHARACTER_ID_LENGTH: usize = 64;
 pub const GAME_REALTIME_MAX_ERROR_MESSAGE_LENGTH: usize = 160;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -71,12 +72,15 @@ pub enum GameRealtimeClientMessage {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct GameRealtimeEntity {
     pub id: String,
     pub position: GameRealtimeVector,
     pub velocity: GameRealtimeVector,
     pub radius: f64,
+    /// ID del personaje del catálogo (297A-50); el cliente lo mapea a su
+    /// tono visual. Nunca es identidad de cuenta.
+    pub character_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -248,6 +252,7 @@ fn validate_server_message(
             let mut ids = BTreeSet::new();
             for entity in &payload.entities {
                 if !bounded_text(&entity.id, GAME_REALTIME_MAX_ENTITY_ID_LENGTH)
+                    || !bounded_text(&entity.character_id, GAME_REALTIME_MAX_CHARACTER_ID_LENGTH)
                     || !finite_vector(entity.position)
                     || !finite_vector(entity.velocity)
                     || !entity.radius.is_finite()
@@ -372,6 +377,7 @@ mod tests {
             position: GameRealtimeVector { x: 1.0, z: 2.0 },
             velocity: GameRealtimeVector { x: 0.0, z: 0.0 },
             radius: 0.5,
+            character_id: "forest-scout".to_string(),
         }
     }
 
@@ -481,6 +487,49 @@ mod tests {
             serialize_server_message(&huge),
             Err(RealtimeContractError::InvalidPayload(_))
         ));
+    }
+
+    #[test]
+    fn rejects_entities_without_character_id_or_oversized_character() {
+        let mut no_character = entity("a");
+        no_character.character_id.clear();
+        let invalid = GameRealtimeServerMessage::Snapshot {
+            v: 1,
+            payload: GameRealtimeSnapshotPayload {
+                snapshot_sequence: 1,
+                tick: 1,
+                entities: vec![no_character],
+            },
+        };
+        assert!(matches!(
+            serialize_server_message(&invalid),
+            Err(RealtimeContractError::InvalidPayload(_))
+        ));
+        let mut oversized_character = entity("a");
+        oversized_character.character_id = "x".repeat(GAME_REALTIME_MAX_CHARACTER_ID_LENGTH + 1);
+        let invalid = GameRealtimeServerMessage::Snapshot {
+            v: 1,
+            payload: GameRealtimeSnapshotPayload {
+                snapshot_sequence: 1,
+                tick: 1,
+                entities: vec![oversized_character],
+            },
+        };
+        assert!(matches!(
+            serialize_server_message(&invalid),
+            Err(RealtimeContractError::InvalidPayload(_))
+        ));
+        /* El campo se serializa camelCase en el wire: `characterId`. */
+        let message = GameRealtimeServerMessage::Snapshot {
+            v: 1,
+            payload: GameRealtimeSnapshotPayload {
+                snapshot_sequence: 1,
+                tick: 1,
+                entities: vec![entity("a")],
+            },
+        };
+        let bytes = serialize_server_message(&message).expect("snapshot");
+        assert!(String::from_utf8_lossy(&bytes).contains("characterId"));
     }
 
     #[test]

@@ -168,7 +168,7 @@ async fn valid_join_over_tcp_returns_map_unavailable_and_closes() {
     let state = test_state();
     let ticket = state
         .game_ticket_store
-        .issue(Uuid::new_v4(), 30, TEST_SECRET)
+        .issue(Uuid::new_v4(), None, 30, TEST_SECRET)
         .expect("ticket válido");
     let (url, shutdown, server_handle) = spawn_server(state).await;
     let (mut socket, _) = connect_async(url).await.expect("upgrade WebSocket válido");
@@ -196,7 +196,7 @@ async fn replayed_ticket_over_tcp_is_rejected_without_reopening_identity() {
     let state = test_state();
     let ticket = state
         .game_ticket_store
-        .issue(Uuid::new_v4(), 30, TEST_SECRET)
+        .issue(Uuid::new_v4(), None, 30, TEST_SECRET)
         .expect("ticket válido");
     let (url, shutdown, server_handle) = spawn_server(state).await;
 
@@ -287,7 +287,7 @@ async fn ninth_tcp_player_is_rejected_with_room_full() {
     for _ in 0..8 {
         let (mut socket, _) = connect_async(&url).await.expect("upgrade de jugador");
         let ticket = ticket_store
-            .issue(Uuid::new_v4(), 30, TEST_SECRET)
+            .issue(Uuid::new_v4(), None, 30, TEST_SECRET)
             .expect("ticket válido");
         socket
             .send(join_message(&ticket))
@@ -302,7 +302,7 @@ async fn ninth_tcp_player_is_rejected_with_room_full() {
         .await
         .expect("upgrade del noveno jugador");
     let extra_ticket = ticket_store
-        .issue(Uuid::new_v4(), 30, TEST_SECRET)
+        .issue(Uuid::new_v4(), None, 30, TEST_SECRET)
         .expect("ticket válido");
     extra
         .send(join_message(&extra_ticket))
@@ -327,7 +327,7 @@ async fn joined_tcp_room_moves_authoritatively_and_rejects_sequence_replay() {
     state.game_ws_state.set_room_map(Some(fixture_map())).await;
     let ticket = state
         .game_ticket_store
-        .issue(Uuid::new_v4(), 30, TEST_SECRET)
+        .issue(Uuid::new_v4(), None, 30, TEST_SECRET)
         .expect("ticket válido");
     let (url, shutdown, server_handle) = spawn_server(state).await;
     let (mut socket, _) = connect_async(url).await.expect("upgrade WebSocket válido");
@@ -428,7 +428,7 @@ async fn metrics_endpoint_reports_aggregated_counts_without_identity() {
 
     let (mut socket, _) = connect_async(&url).await.expect("upgrade de jugador");
     let ticket = ticket_store
-        .issue(Uuid::new_v4(), 30, TEST_SECRET)
+        .issue(Uuid::new_v4(), None, 30, TEST_SECRET)
         .expect("ticket válido");
     socket.send(join_message(&ticket)).await.expect("join");
     let joined = read_message_type(&mut socket, "joined").await;

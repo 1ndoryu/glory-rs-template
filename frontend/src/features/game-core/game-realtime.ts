@@ -16,6 +16,7 @@ export const GAME_REALTIME_LIMITS = {
   maxClientVersionLength: 32,
   maxMapVersionLength: 128,
   maxEntityIdLength: 128,
+  maxCharacterIdLength: 64,
   maxErrorMessageLength: 160,
 } as const;
 
@@ -50,6 +51,8 @@ export interface GameRealtimeEntity {
   readonly position: Vector2;
   readonly velocity: Vector2;
   readonly radius: number;
+  /** Personaje del catálogo resuelto server-side; nunca es identidad. */
+  readonly characterId: string;
 }
 
 export interface GameRealtimeJoinedPayload {
@@ -141,8 +144,9 @@ function readFiniteVector(value: unknown): Vector2 | undefined {
 }
 
 function readEntity(value: unknown): GameRealtimeEntity | undefined {
-  if (!isRecord(value) || !hasExactKeys(value, ['id', 'position', 'velocity', 'radius'])
+  if (!isRecord(value) || !hasExactKeys(value, ['id', 'position', 'velocity', 'radius', 'characterId'])
     || !validBoundedString(value.id, GAME_REALTIME_LIMITS.maxEntityIdLength)
+    || !validBoundedString(value.characterId, GAME_REALTIME_LIMITS.maxCharacterIdLength)
     || !readFiniteVector(value.position)
     || !readFiniteVector(value.velocity)
     || !isFiniteNumber(value.radius) || value.radius <= 0 || value.radius > 16) return undefined;
@@ -151,6 +155,7 @@ function readEntity(value: unknown): GameRealtimeEntity | undefined {
     position: readFiniteVector(value.position)!,
     velocity: readFiniteVector(value.velocity)!,
     radius: value.radius,
+    characterId: value.characterId,
   };
 }
 

@@ -261,7 +261,7 @@ async fn run_scenario(client_count: usize) {
     let mut tasks = Vec::with_capacity(client_count);
     for _ in 0..client_count {
         let ticket = ticket_store
-            .issue(Uuid::new_v4(), 30, TEST_SECRET)
+            .issue(Uuid::new_v4(), None, 30, TEST_SECRET)
             .expect("ticket de benchmark");
         tasks.push(tokio::spawn(run_client(url.clone(), ticket)));
     }

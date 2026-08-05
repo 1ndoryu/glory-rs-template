@@ -240,20 +240,36 @@ describe('GAME-01 game-core', () => {
       const previous = {
         tick: 4,
         entities: [
-          { id: 'local', position: { x: 0, z: 0 }, velocity: { x: 0, z: 0 }, radius: 0.5 },
+          { id: 'local', position: { x: 0, z: 0 }, velocity: { x: 0, z: 0 }, radius: 0.5, characterId: 'forest-scout' },
         ],
       } as const;
       const next = {
         tick: 5,
         entities: [
-          { id: 'local', position: { x: 2, z: 4 }, velocity: { x: 2, z: 4 }, radius: 0.5 },
-          { id: 'remote', position: { x: 8, z: 8 }, velocity: { x: 0, z: 0 }, radius: 0.5 },
+          { id: 'local', position: { x: 2, z: 4 }, velocity: { x: 2, z: 4 }, radius: 0.5, characterId: 'forest-scout' },
+          { id: 'remote', position: { x: 8, z: 8 }, velocity: { x: 0, z: 0 }, radius: 0.5, characterId: 'middle' },
         ],
       } as const;
       const result = interpolateSnapshots(previous, next, 0.5);
       expect(result.entities[0].position).toEqual({ x: 1, z: 2 });
       expect(result.entities[0].velocity).toEqual({ x: 1, z: 2 });
       expect(result.entities[1].position).toEqual({ x: 8, z: 8 });
+    });
+
+    it('carries the character through simulation into snapshots', () => {
+      const state = createWorldState([{
+        id: 'local',
+        position: { x: 5, z: 5 },
+        radius: 0.5,
+        characterId: 'forest-runner',
+      }]);
+      const ticked = simulateTick(
+        state,
+        emptyMap,
+        [{ playerId: 'local', direction: { x: 1, z: 0 }, sequence: 1 }],
+        0.1,
+      );
+      expect(snapshotFromState(ticked).entities[0]?.characterId).toBe('forest-runner');
     });
 
     it('serializes state in stable entity order', () => {

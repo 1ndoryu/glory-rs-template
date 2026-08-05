@@ -353,7 +353,13 @@ function mountGamePlayableRuntime(
     ? { position: { x: spawn.position.x, z: spawn.position.z }, radius: spawn.radius }
     : { position: { x: 0, z: -0.5 }, radius: 0.38 };
   let scene: GamePlayableSceneHandle | null = null;
-  let state: WorldState = createWorldState([{ id: 'local', ...localSpawn }]);
+  /* [297A-77] El jugador local offline lleva su personaje del catálogo para
+   * que la escena aplique el tono también en modo sin realtime. */
+  let state: WorldState = createWorldState([{
+    id: 'local',
+    ...localSpawn,
+    characterId: character?.id ?? 'forest-scout',
+  }]);
   let sequence = 0;
   let frameHandle = 0;
   let lastTime = performance.now();

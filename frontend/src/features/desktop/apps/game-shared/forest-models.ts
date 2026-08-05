@@ -55,9 +55,17 @@ export function createRock(materials: ForestMaterials, scale = 1): THREE.Group {
   return rock;
 }
 
-export function createFigure(materials: ForestMaterials, remote = false): THREE.Group {
+/* [297A-77] El tono del catálogo (ink/middle/paper) mapea directo a un
+ * material compartido del escenario: cada jugador se ve con su personaje. Si
+ * no hay tono, el remoto usa middle y el local ink (comportamiento previo). */
+export function createFigure(
+  materials: ForestMaterials,
+  remote = false,
+  tone?: string,
+): THREE.Group {
   const figure = new THREE.Group();
-  const material = remote ? materials.middle : materials.ink;
+  const toneKey = tone === 'ink' || tone === 'middle' || tone === 'paper' ? tone : null;
+  const material = toneKey ? materials[toneKey] : remote ? materials.middle : materials.ink;
   const body = outlined(new THREE.CylinderGeometry(0.28, 0.38, 1.2, 6), material, materials.lines);
   body.position.y = 0.9;
   const head = outlined(new THREE.IcosahedronGeometry(0.34, 1), material, materials.lines);

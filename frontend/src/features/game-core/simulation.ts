@@ -96,6 +96,9 @@ function normalizeState(value: unknown): WorldState {
       position: { x: valuePlayer.position.x, z: valuePlayer.position.z },
       velocity: { x: valuePlayer.velocity.x, z: valuePlayer.velocity.z },
       radius: valuePlayer.radius,
+      characterId: typeof valuePlayer.characterId === 'string' && valuePlayer.characterId.trim()
+        ? valuePlayer.characterId
+        : 'forest-scout',
     };
   }
 
@@ -128,6 +131,12 @@ export function createWorldState(players: unknown): WorldState {
       position: { x: player.position.x, z: player.position.z },
       velocity: { x: 0, z: 0 },
       radius: player.radius,
+      /* [297A-77] El personaje viaja en el snapshot para que el presentador
+       * aplique el tono; si no viene (fixtures sintéticos), default del
+       * catálogo. */
+      characterId: typeof player.characterId === 'string' && player.characterId.trim()
+        ? player.characterId
+        : 'forest-scout',
     };
   }
   return {

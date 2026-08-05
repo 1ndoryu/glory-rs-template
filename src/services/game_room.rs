@@ -13,6 +13,7 @@ use std::sync::RwLock;
 use tokio::sync::{mpsc, oneshot};
 use uuid::Uuid;
 
+use crate::models::game_profile::GAME_PROFILE_DEFAULT_CHARACTER_ID;
 use crate::models::game_realtime::{
     assess_sequence, consume_rate_budget, GameRealtimeClientMessage, GameRealtimeEntity,
     GameRealtimeErrorCode, GameRealtimeErrorPayload, GameRealtimeHeartbeatAckPayload,
@@ -155,6 +156,18 @@ impl GameRoomState {
         subject: Uuid,
         output: mpsc::Sender<GameRealtimeServerMessage>,
     ) -> Result<JoinedRoom, RoomJoinError> {
+        self.join_with_character(subject, GAME_PROFILE_DEFAULT_CHARACTER_ID, output)
+            .await
+    }
+
+    /// Entra con el personaje resuelto del catálogo (297A-77): el snapshot
+    /// lleva `character_id` para que cada jugador remoto se vea con su tono.
+    pub async fn join_with_character(
+        &self,
+        subject: Uuid,
+        character_id: &str,
+        output: mpsc::Sender<GameRealtimeServerMessage>,
+    ) -> Result<JoinedRoom, RoomJoinError> {
         let map = self
             .maps
             .read()
@@ -163,7 +176,7 @@ impl GameRoomState {
             .next()
             .cloned()
             .ok_or(RoomJoinError::MapUnavailable)?;
-        self.join_with_map(&map.map_version(), map, subject, output)
+        self.join_with_map(&map.map_version(), map, character_id, subject, output)
             .await
     }
 
@@ -182,14 +195,21 @@ impl GameRoomState {
             .get(map_key)
             .cloned()
             .ok_or(RoomJoinError::MapUnavailable)?;
-        self.join_with_map(&map.map_version(), map, subject, output)
-            .await
+        self.join_with_map(
+            &map.map_version(),
+            map,
+            GAME_PROFILE_DEFAULT_CHARACTER_ID,
+            subject,
+            output,
+        )
+        .await
     }
 
     async fn join_with_map(
         &self,
         map_key: &str,
         map: Arc<GameRoomMap>,
+        character_id: &str,
         subject: Uuid,
         output: mpsc::Sender<GameRealtimeServerMessage>,
     ) -> Result<JoinedRoom, RoomJoinError> {
@@ -206,7 +226,7 @@ impl GameRoomState {
         };
         drop(rooms);
         match handle
-            .join(subject, output.clone(), self.metrics.clone())
+            .join(subject, character_id, output.clone(), self.metrics.clone())
             .await
         {
             Err(RoomJoinError::Busy) if handle.is_closed() => {
@@ -223,7 +243,7 @@ impl GameRoomState {
                 };
                 drop(rooms);
                 replacement
-                    .join(subject, output, self.metrics.clone())
+                    .join(subject, character_id, output, self.metrics.clone())
                     .await
             }
             result => result,
@@ -307,6 +327,7 @@ impl RoomHandle {
     async fn join(
         &self,
         subject: Uuid,
+        character_id: &str,
         output: mpsc::Sender<GameRealtimeServerMessage>,
         metrics: Arc<GameRoomMetrics>,
     ) -> Result<JoinedRoom, RoomJoinError> {
@@ -314,6 +335,7 @@ impl RoomHandle {
         self.commands
             .try_send(RoomCommand::Join {
                 subject,
+                character_id: character_id.to_string(),
                 output,
                 reply,
                 metrics,
@@ -347,6 +369,7 @@ impl RoomHandle {
 enum RoomCommand {
     Join {
         subject: Uuid,
+        character_id: String,
         output: mpsc::Sender<GameRealtimeServerMessage>,
         reply: oneshot::Sender<Result<JoinedRoom, RoomJoinError>>,
         metrics: Arc<GameRoomMetrics>,
@@ -362,6 +385,7 @@ enum RoomCommand {
 
 struct RoomPlayer {
     subject: Uuid,
+    character_id: String,
     output: mpsc::Sender<GameRealtimeServerMessage>,
     position: (f64, f64),
     velocity: (f64, f64),
@@ -387,8 +411,16 @@ async fn run_room(
     loop {
         tokio::select! {
             Some(command) = commands.recv() => match command {
-                RoomCommand::Join { subject, output, reply, metrics } => {
-                    let result = join_player(&map, &mut players, subject, output, handle.clone(), &metrics);
+                RoomCommand::Join { subject, character_id, output, reply, metrics } => {
+                    let result = join_player(
+                        &map,
+                        &mut players,
+                        subject,
+                        &character_id,
+                        output,
+                        handle.clone(),
+                        &metrics,
+                    );
                     if result.is_ok() {
                         empty_since = None;
                     } else {
@@ -434,6 +466,7 @@ fn join_player(
     map: &GameRoomMap,
     players: &mut HashMap<String, RoomPlayer>,
     subject: Uuid,
+    character_id: &str,
     output: mpsc::Sender<GameRealtimeServerMessage>,
     handle: RoomHandle,
     metrics: &Arc<GameRoomMetrics>,
@@ -456,12 +489,13 @@ fn join_player(
     let initial = GameRealtimeSnapshotPayload {
         snapshot_sequence: 0,
         tick: 0,
-        entities: vec![entity(&player_id, (x, z), (0.0, 0.0))],
+        entities: vec![entity(&player_id, (x, z), (0.0, 0.0), character_id)],
     };
     players.insert(
         player_id.clone(),
         RoomPlayer {
             subject,
+            character_id: character_id.to_string(),
             output,
             position: (x, z),
             velocity: (0.0, 0.0),
@@ -574,7 +608,7 @@ fn broadcast_snapshot(
 ) {
     let mut entities = players
         .iter()
-        .map(|(id, player)| entity(id, player.position, player.velocity))
+        .map(|(id, player)| entity(id, player.position, player.velocity, &player.character_id))
         .collect::<Vec<_>>();
     entities.sort_by(|left, right| left.id.cmp(&right.id));
     let positions = players
@@ -621,7 +655,12 @@ fn broadcast_snapshot(
     }
 }
 
-fn entity(id: &str, position: (f64, f64), velocity: (f64, f64)) -> GameRealtimeEntity {
+fn entity(
+    id: &str,
+    position: (f64, f64),
+    velocity: (f64, f64),
+    character_id: &str,
+) -> GameRealtimeEntity {
     GameRealtimeEntity {
         id: id.to_string(),
         position: crate::models::game_realtime::GameRealtimeVector {
@@ -633,6 +672,7 @@ fn entity(id: &str, position: (f64, f64), velocity: (f64, f64)) -> GameRealtimeE
             z: velocity.1,
         },
         radius: PLAYER_RADIUS,
+        character_id: character_id.to_string(),
     }
 }
 
@@ -723,6 +763,36 @@ mod tests {
             snapshot,
             GameRealtimeServerMessage::Snapshot { .. }
         ));
+        joined.disconnect().await;
+    }
+
+    #[tokio::test]
+    async fn joined_room_carries_character_id_for_remote_tones() {
+        /* [297A-77] El snapshot del room lleva el personaje resuelto para que
+         * cada jugador remoto se vea con su tono: el initial (secuencia 0)
+         * debe incluirlo y el tick posterior también. */
+        let state = GameRoomState::with_map(map());
+        let (output, mut messages) = mpsc::channel(32);
+        let joined = state
+            .join_with_character(Uuid::new_v4(), "forest-runner", output)
+            .await
+            .expect("join");
+        assert_eq!(joined.initial_snapshot.entities.len(), 1);
+        assert_eq!(
+            joined.initial_snapshot.entities[0].character_id,
+            "forest-runner"
+        );
+        let snapshot = tokio::time::timeout(std::time::Duration::from_secs(1), messages.recv())
+            .await
+            .expect("snapshot timeout")
+            .expect("snapshot");
+        match snapshot {
+            GameRealtimeServerMessage::Snapshot { payload, .. } => {
+                assert_eq!(payload.entities.len(), 1);
+                assert_eq!(payload.entities[0].character_id, "forest-runner");
+            }
+            _ => panic!("snapshot esperado"),
+        }
         joined.disconnect().await;
     }
 
