@@ -39,12 +39,17 @@ disciplina de no incrustarla como textura/sprite/tileset literal si no se desea.
 - **Paleta:** verde con color stylized colorido (sustituye la dirección de tinta monocroma).
 - **Detalle poligonal:** low poly intermedio-bajo (no flat-shading extremo ni alta densidad).
 
-**Impacto pendiente:**
-- [ ] Actualizar `referencia-visual-bosque-2026-08-01.md` con la nueva dirección (verde
+**Impacto:**
+- [x] Actualizar `referencia-visual-bosque-2026-08-01.md` con la nueva dirección (verde
   stylized + cámara libre + Genshin como referencia de estilo).
-- [ ] Actualizar el ADR de Bosque: decisión de cámara (libre tipo Genshin), materiales
+- [x] Actualizar el ADR de Bosque: decisión de cámara (libre tipo Genshin), materiales
   (paleta verde stylized) y presupuesto de polígonos para low poly intermedio-bajo.
-- [ ] Ajustar el fixture/runtime a la nueva cámara y paleta (cambio visual, no de contrato).
+- [x] Ajustar el fixture/runtime a la nueva cámara y paleta — **implementado** (commit
+  `e9d7e09d`): paleta verde stylized + cielo en runtime y preview del editor, cámara
+  orbital libre (drag azimuth/polar, rueda/pinch zoom) con clamps, niebla y radio de
+  streaming adaptativos al zoom, controles táctiles solo en móvil y fix de layout móvil
+  (`100dvh`). Validado en navegador (píxeles verdes tipo Genshin, drag gira la cámara,
+  D-pad visible solo <768px), gate 297A-77 PASS y 688/688 tests frontend.
 - [ ] Contraste de estados (jugador local/remotos, selección, colisiones) con la nueva paleta.
 - [ ] Modo oscuro y `prefers-reduced-motion` (sin movimiento parpadeante).
 
@@ -56,7 +61,9 @@ disciplina de no incrustarla como textura/sprite/tileset literal si no se desea.
   fixture en tinta; **se retiraron los bocetos Bosque y Bosque 3D** (game/game-3d) por
   decisión del usuario.
 - [ ] Iterar densidad, escala, árboles, agua, avatar y contraste con la **nueva paleta verde
-  stylized** y aprobación explícita de las capturas finales.
+  stylized** y aprobación explícita de las capturas finales. La paleta y la cámara orbital
+  ya están aplicadas y validadas en navegador (commit `e9d7e09d`); falta solo la aprobación
+  artística final del usuario sobre capturas.
 
 > La validación técnica del fixture ya está cerrada (05-ago): WebGL2, GPU Intel Iris Xe y
 > personaje `forest-scout`. Esta casilla es la aprobación de **dirección artística**, no de funcionamiento.
@@ -88,6 +95,9 @@ jugadores.
   los estados (selección, colisión, conexión) se comunican por otro medio si es necesario.
 - **Agua/cielo:** aguas azules stylized y cielo despejado.
 - El chrome del OS permanece monocromo; solo el contenido del juego usa la paleta verde stylized.
+- **Implementación:** aplicada en runtime y preview del editor (commit `e9d7e09d`) —
+  `MeshToonMaterial` en verdes (ink 0x2f6b2f, paper 0x7fbf4f, pale 0xa8d98a, middle 0x5a9e4b),
+  agua 0x3d8bcd, líneas 0x1e4620 y cielo 0x87ceeb con luz hemisférica cálida.
 
 ## 5.1 Assets temporales
 
@@ -111,8 +121,9 @@ reales. Consecuencias:
 - La visibilidad de los controles se condiciona al breakpoint del OS (misma presentación
   desktop/móvil ya existente en el runtime).
 
-**Impacto:** ajustar el fixture/runtime para ocultar los controles DOM en ≥768 y mostrarlos
-en <768, sin duplicar lógica (el breakpoint del OS ya existe).
+**Impacto:** ✅ **implementado** (commit `e9d7e09d`): el D-pad se oculta en desktop (base
+`display: none`) y se muestra solo en <768px con el breakpoint del OS; el fixture ocupa
+`100dvh` en móvil para que el canvas no se estire. Sin lógica duplicada (solo CSS).
 
 ## 7. Persistencia del invitado
 
