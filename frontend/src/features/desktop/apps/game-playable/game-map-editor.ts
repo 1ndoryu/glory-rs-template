@@ -181,6 +181,15 @@ export function createGameMapEditor(container: HTMLElement): GameMapEditorHandle
     }
     const confirmed = await showConfirm(`publicar una versión inmutable del mapa (v${current.activeVersion + 1})?`);
     if (!confirmed) return;
+    /* [Decisión 8] Publicar migra el mundo: el servidor difunde `server_restart`
+     * con la cuenta atrás fija (300 s), drena las salas al expirar y todos los
+     * jugadores reconectan a la versión nueva. Se confirma explícitamente para
+     * que el admin sepa que la publicación interrumpe las partidas en curso.
+     * 5 min = GAME_RESTART_GRACE_SECONDS (300) del backend (game_ws.rs). */
+    const migrationConfirmed = await showConfirm(
+      'publicar reiniciará el mundo en 5 minutos: los jugadores en línea verán la cuenta atrás y volverán a la versión nueva. ¿continuar?',
+    );
+    if (!migrationConfirmed) return;
     const result = await tryCatch(GameMapAdminService.publish(current.document, current.activeVersion));
     if (!result.ok) {
       const message = result.error;
