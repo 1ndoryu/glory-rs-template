@@ -1,7 +1,7 @@
 # Plan 028A-6 — Sentinel como plano global de calidad agnóstico
 
 > **Fecha:** 2026-08-02
-> **Estado:** migración incremental en ejecución; el contrato local v2 y `doctor --migrate --dry-run` están implementados. La instalación global/upstream/multi-shell sigue bloqueada hasta disponer de los runtimes externos y sus fixtures.
+> **Estado:** migración incremental en ejecución; el contrato local v2 y `doctor --migrate --dry-run` están implementados. La instalación global quedó autorizada y ejecutada (2026-08-05) y la matriz multi-proyecto/multi-shell está cerrada (Fase 4, 2026-08-05); quedan la publicación de artifacts CI con el runtime fijado y la Fase 5 (retirada de wrappers del repo tras dos releases con rollback probado).
 >
 > **ADR:** `Agente/documentacion/arquitectura/adr-sentinel-plano-global-028a6-2026-08-03.md`.
 >
@@ -224,14 +224,16 @@ El proyecto ya usa `sentinel.config.json` v1 para reglas, includes, excludes y b
 
 ### Fase 4 — Integración multi-proyecto y CI *(pendiente de runtime global)*
 
-- [ ] Crear fixtures de un proyecto Node, Rust, Python y un proyecto sin política.
-- [ ] Probar `npm`, `npx`, `cargo`, `rustfmt`, comandos directos, `2>&1`, pipes y códigos de salida en PowerShell 5/7, CMD y Bash/Git Bash.
-- [ ] Probar rutas anidadas, junctions/symlinks permitidos, repositorio movido y checkout de ramas con/sin política.
-- [ ] CI usará la política del proyecto y el runtime fijado; nunca dependerá del perfil del desarrollador.
-- [ ] Probar agentes con PowerShell/Bash/CMD, procesos hijos, pipes, `2>&1`, shell sin perfil y rutas absolutas; cada caso debe indicar si se bloquea, se observa o requiere enforcement del launcher.
+- [x] Crear fixtures de un proyecto Node, Rust, Python, uno sin política y uno legacy v1: `tools/sentinel/src/test/fixtures/guard-matrix/` (node/rust/python con `sentinel.config.json` v2 enforce con sus listas, no-policy sin marcadores, legacy-v1 con `schemaVersion: 1`). *(cerrado 2026-08-05)*
+- [x] Probar `npm`, `npx`, `cargo`, `rustfmt`, comandos directos, `2>&1`, pipes y códigos de salida en PowerShell 5/7, CMD y Bash/Git Bash. *(cerrado: `guardMatrix.test.ts` (matriz de decisiones unit por fixture × comando, 33 casos) + `shellMatrix.test.ts` con los shims REALES del runtime en un sandbox (`writeSandboxRuntime`) en los 4 shells — cmd bloquea `npm run test`/`npx vitest`/`cargo test` con 78 y deja pasar `npm --version`; PowerShell 5.1 y 7 bloquean por shim de PATH y por dot-source del guard generado; bash bloquea SOLO con el guard dot-sourceado (el shim .cmd no aplica en bash — bypass documentado que requiere enforcement del launcher); el pipe `2>&1 | findstr` enmascara el exit 78 (el último comando decide) — documentado como límite inherente. Los shells ausentes se saltan, no fallan)*
+- [x] Probar rutas anidadas, junctions/symlinks permitidos, repositorio movido y checkout de ramas con/sin política. *(cerrado: `guardEdgeCases.test.ts` — raíz desde subdirectorio anidado, repo movido a otra ubicación (re-descubrimiento), toggle del marcador en el mismo árbol (simula rama con/sin política) y junction `mklink /J` (realpath resuelve la física; la junction se retira con rmdir por el EPERM de rmSync en Windows; skip si la plataforma no la soporta))*
+- [x] CI usará la política del proyecto y el runtime fijado; nunca dependerá del perfil del desarrollador. *(verificado 2026-08-05: `task:check` PASS con un PATH sin `GlorySentinel` ni `scripts/quality` — el gate usa las herramientas fijadas de `quality:setup` (sourcePath de los submódulos), igual que el runner limpio de `.github/workflows/quality.yml`)*
+- [x] Probar agentes con PowerShell/Bash/CMD, procesos hijos, pipes, `2>&1`, shell sin perfil y rutas absolutas; cada caso debe indicar si se bloquea, se observa o requiere enforcement del launcher. *(cerrado: la matriz de shells + los límites de la Fase 3 — ruta absoluta al binario real (0) y `bash --noprofile --norc` (0) requieren enforcement del launcher; el shim .cmd no intercepta bash (0); el pipe enmascara el exit (0); todos documentados)*
 - [x] Publicar reportes compactos sin secretos y con máximo tres hallazgos/máximo cuatro recordatorios: `compactLines` limita findings a `maxFindings` y reminders a `maxReminders` (3/4 por defecto) con límite defensivo en ambos; `createReport` redacta secretos en JSON/Markdown vía `sanitize`; el artifact completo conserva todos los hallazgos y los ordena por severidad, regla, archivo, línea y mensaje sin depender del locale; regresiones en `tests/reporter.test.mjs` cubren límites, redacción, orden estable, detalle completo y exit code `CANCELLED`. La publicación de artifacts CI queda pendiente del runtime global.
 
 **Gate:** 100% de fixtures con decisión esperada, sin bloqueo cruzado entre proyectos y sin proceso huérfano. El contrato local de reportes compactos y artifacts (detalle completo, orden estable, 3 hallazgos / 4 recordatorios en terminal, sin secretos y exit codes diferenciados) queda cerrado; la matriz multi-shell real y la publicación de artifacts CI siguen pendientes del runtime global.
+
+**Avance 2026-08-05 (matriz multi-proyecto y de shells cerrada):** la matriz expuso un **bug real del gate actual**: un cambio de submódulo (gitlink) entra en `git diff --name-status` como la ruta del DIRECTORIO del submódulo, y VarSense rechazaba la entrada con "Ruta directorio no permitida en --files-from" (exit 2) cada vez que el gitlink `tools/sentinel` estaba en el diff — el gate fallaba con SETUP ERROR. Corregido en `scripts/quality/scope.mjs`: `filterDirectoryEntries` excluye los directorios del scope de archivos (los eliminados se conservan en `deletedFiles`); con el fix, `task:check` **PASS con el gitlink en el diff y con PATH sin GlorySentinel** (evidencia CI). Upstream `8992cc1`: **469 tests PASS** (44 nuevos: matriz 33, shells 7, límites 4) + `check:core` OK; orquestador **207/207** (+1 test de regresión del filtro).
 
 ### Fase 5 — Retirada segura del acoplamiento actual *(pendiente de dos releases y rollback probado)*
 

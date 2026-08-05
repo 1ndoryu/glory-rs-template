@@ -54,6 +54,23 @@ function fullReason(args, automaticFull) {
  * compartido; los borrados/ilegibles no entran (el fingerprint del gate ya
  * marca rutas ausentes). El conjunto cambiado es acotado (≤25 típico), por lo
  * que la lectura extra no escala con el workspace completo. */
+/* [028A-6 Fase 4] Un cambio de submódulo (gitlink) entra en
+ * `git diff --name-status` como la ruta del DIRECTORIO del submódulo: no es
+ * un archivo, y los analizadores que abren cada entrada del transporte plano
+ * (VarSense --files-from) lo rechazan. Se excluyen los directorios del scope
+ * de archivos; los eliminados se conservan por separado en deletedFiles. */
+export async function filterDirectoryEntries(root, files) {
+  const result = await Promise.all(files.map(async (file) => {
+    try {
+      return (await lstat(path.join(root, file))).isDirectory() ? null : file;
+    } catch {
+      /* Eliminado o inaccesible: se conserva (la semántica del diff lo exige). */
+      return file;
+    }
+  }));
+  return result.filter((file) => file !== null);
+}
+
 async function hashChangedFiles(root, files) {
   const hashes = {};
   for (const relative of files) {
@@ -192,6 +209,10 @@ export async function detectScope(context, args) {
     gitLines(context.projectRoot, ['ls-files']),
   ]);
   const parsedChanged = parseChangedStatus(changedStatus);
+  /* [028A-6 Fase 4] `files` se conserva SIN filtrar para las decisiones
+   * (automaticFull/perfiles): un cambio solo-gitlink debe seguir siendo
+   * local-light, no full. El filtro de directorios se aplica SOLO al
+   * transporte plano y al manifiesto (más abajo). */
   const files = [...new Set([...parsedChanged.files, ...untracked])].sort();
   const automaticFull = files.length === 0 || parsedChanged.ambiguous || files.some(file =>
     context.qualityConfig.fullPatterns.some(pattern => matches(file, pattern))
@@ -228,8 +249,15 @@ export async function detectScope(context, args) {
    * en disco y provocarían ENOENT; se excluyen aquí y se conservan en el
    * manifest JSON (scope-manifest.json) para el análisis de cambios. */
   const existingFiles = files.filter(file => !parsedChanged.deletedFiles.includes(file));
+  /* [028A-6 Fase 4] Un cambio de submódulo (gitlink) aparece en
+   * `git diff --name-status` como la ruta del DIRECTORIO del submódulo: no
+   * es un archivo y los analizadores que abren cada entrada del transporte
+   * plano (VarSense --files-from) lo rechazan. El transporte y el manifiesto
+   * excluyen los directorios; la decisión de alcance ya usó `files` sin
+   * filtrar, así un cambio solo-gitlink no degrada a full. */
+  const transportFiles = await filterDirectoryEntries(context.projectRoot, existingFiles);
   const changedFilesPath = path.join(context.reportRoot, 'changed-files.txt');
-  await writeFile(changedFilesPath, `${existingFiles.join('\n')}\n`, 'utf8');
+  await writeFile(changedFilesPath, `${transportFiles.join('\n')}\n`, 'utf8');
   /* [028A-8] Manifiesto único de alcance: archivos cambiados/eliminados, hashes
    * de contenido, perfiles, dependencias locales y decisión full. Sentinel,
    * VarSense, custom y la selección de tests pueden consumirlo sin repetir
@@ -249,10 +277,10 @@ export async function detectScope(context, args) {
       : null,
     profiles: [...profiles],
     profileOverride: explicitProfiles.explicit,
-    files,
+    files: transportFiles,
     deletedFiles: parsedChanged.deletedFiles,
     fingerprintFiles,
-    fileHashes: await hashChangedFiles(context.projectRoot, files),
+    fileHashes: await hashChangedFiles(context.projectRoot, transportFiles),
   };
   await writeAtomic(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   return {

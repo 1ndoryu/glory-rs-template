@@ -3,7 +3,7 @@ import test from 'node:test';
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { expandLocalDependencies, loadInjectedScope, matches, resolveExplicitProfiles, resolveFullDecision } from '../scope.mjs';
+import { expandLocalDependencies, filterDirectoryEntries, loadInjectedScope, matches, resolveExplicitProfiles, resolveFullDecision } from '../scope.mjs';
 
 test('scope usa globs deterministas y normaliza separadores', () => {
   assert.equal(matches('frontend/src/router.ts', 'frontend/**/*.ts'), true);
@@ -37,6 +37,21 @@ test('resolveExplicitProfiles aplica CLI sobre entorno y allowlist estricta', ()
     () => resolveExplicitProfiles({ profiles: ['auth'] }, { ...available, auth: ['auth'] }, {}),
     /Perfil sin etapa ejecutable: auth/,
   );
+});
+
+test('filterDirectoryEntries excluye directorios (gitlinks de submódulos) del scope (028A-6 Fase 4)', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'quality-scope-filter-'));
+  try {
+    await mkdir(path.join(root, 'tools', 'sentinel'), { recursive: true });
+    await mkdir(path.join(root, 'src'), { recursive: true });
+    await writeFile(path.join(root, 'tools', 'sentinel', 'package.json'), '{}\n', 'utf8');
+    await writeFile(path.join(root, 'src', 'main.ts'), 'export const value = 1;\n', 'utf8');
+    /* filterDirectoryEntries conserva el orden de entrada; el sort final lo aplica detectScope. */
+    const files = await filterDirectoryEntries(root, ['tools/sentinel', 'src/main.ts', 'deleted.rs']);
+    assert.deepEqual(files, ['src/main.ts', 'deleted.rs']);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test('scope incluye dependencias locales en el fingerprint incremental', async () => {
