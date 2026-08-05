@@ -36,6 +36,12 @@ const GAME_WS_MAP_UNAVAILABLE: &str = "mapa realtime no disponible";
  * ping-pong entre pestañas/dispositivos del mismo usuario). */
 const GAME_WS_REPLACED_CLOSE_CODE: u16 = 4001;
 const GAME_WS_REPLACED_REASON: &str = "identidad reemplazada";
+/* [Decisión 8] Cierre por reinicio coordinado (drenaje tras la cuenta atrás):
+ * el cliente SÍ debe reintentar para recargar la versión nueva del mundo. El
+ * actor distingue el shutdown del reemplazo/TTL en `JoinedRoom::was_shutdown`.
+ */
+const GAME_WS_RESTART_CLOSE_CODE: u16 = 4002;
+const GAME_WS_RESTART_REASON: &str = "mundo reiniciado";
 
 /// Abre el transporte realtime; el primer mensaje completa la autenticación.
 pub async fn upgrade_game_ws(
@@ -220,12 +226,18 @@ async fn run_joined_session(
             outgoing = messages.recv() => {
                 let Some(message) = outgoing else {
                     /* [297A-57] El Sender se dropeó: la identidad fue reemplazada
-                     * por una conexión nueva (o la sala cerró). Cerrar con un
-                     * código distintivo para que el cliente no reintente. */
+                     * por una conexión nueva (o la sala cerró por TTL).
+                     * [Decisión 8] Si la sala cerró por drenaje coordinado, el
+                     * código es 4002 y el cliente reintenta la migración. */
+                    let (code, reason) = if joined.was_shutdown() {
+                        (GAME_WS_RESTART_CLOSE_CODE, GAME_WS_RESTART_REASON)
+                    } else {
+                        (GAME_WS_REPLACED_CLOSE_CODE, GAME_WS_REPLACED_REASON)
+                    };
                     let _ = socket
                         .send(Message::Close(Some(CloseFrame {
-                            code: GAME_WS_REPLACED_CLOSE_CODE,
-                            reason: GAME_WS_REPLACED_REASON.to_string().into(),
+                            code,
+                            reason: reason.to_string().into(),
                         })))
                         .await;
                     break;

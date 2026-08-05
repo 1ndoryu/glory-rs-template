@@ -149,17 +149,31 @@ impl GameRoomState {
     /// Las salas sin jugadores no fallan (broadcast no-op); el aviso queda
     /// pendiente de la expiración/drenaje que planifica el publicador.
     pub async fn announce_restart(&self, reason: &str, restart_in_seconds: u64) {
+        let message = GameRealtimeServerMessage::ServerRestart {
+            v: GAME_REALTIME_PROTOCOL_VERSION,
+            payload: GameRealtimeServerRestartPayload {
+                reason: reason.to_string(),
+                restart_in_seconds,
+            },
+        };
         let rooms = self.rooms.lock().await;
         for handle in rooms.values() {
             let _ = handle.send(RoomCommand::Broadcast {
-                message: GameRealtimeServerMessage::ServerRestart {
-                    v: GAME_REALTIME_PROTOCOL_VERSION,
-                    payload: GameRealtimeServerRestartPayload {
-                        reason: reason.to_string(),
-                        restart_in_seconds,
-                    },
-                },
+                message: message.clone(),
             });
+        }
+    }
+
+    /// [Decisión 8] Drena todas las salas al expirar la cuenta atrás: cada
+    /// actor cierra (break del loop) y los Senders de los players se dropean,
+    /// lo que cierra los sockets del transporte; el cliente reintenta con
+    /// backoff y el próximo join recarga la versión activa nueva de la BD.
+    pub async fn shutdown_all_rooms(&self) {
+        let rooms = self.rooms.lock().await;
+        for handle in rooms.values() {
+            if !handle.is_closed() {
+                let _ = handle.send(RoomCommand::Shutdown);
+            }
         }
     }
 
@@ -311,6 +325,13 @@ impl JoinedRoom {
     pub async fn disconnect(&self) {
         let _ = self.handle.disconnect(self.player_id.clone()).await;
     }
+
+    /// [Decisión 8] True si la sala cerró por drenaje coordinado (migración):
+    /// el transporte cierra el socket con un código que el cliente reintenta.
+    #[must_use]
+    pub fn was_shutdown(&self) -> bool {
+        self.handle.was_shutdown()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -323,6 +344,10 @@ pub enum RoomSendError {
 struct RoomHandle {
     commands: mpsc::Sender<RoomCommand>,
     closed: Arc<AtomicBool>,
+    /* [Decisión 8] La sala cerró por drenaje coordinado (no por reemplazo de
+     * identidad ni TTL): el transporte distingue el cierre para que el
+     * cliente reintente la reconexión tras la migración. */
+    shutdown: Arc<AtomicBool>,
 }
 
 impl RoomHandle {
@@ -331,6 +356,7 @@ impl RoomHandle {
         let handle = Self {
             commands,
             closed: Arc::new(AtomicBool::new(false)),
+            shutdown: Arc::new(AtomicBool::new(false)),
         };
         tokio::spawn(run_room(
             map,
@@ -344,6 +370,10 @@ impl RoomHandle {
 
     fn is_closed(&self) -> bool {
         self.closed.load(Ordering::Acquire)
+    }
+
+    fn was_shutdown(&self) -> bool {
+        self.shutdown.load(Ordering::Acquire)
     }
 
     async fn join(
@@ -406,6 +436,7 @@ enum RoomCommand {
     Broadcast {
         message: GameRealtimeServerMessage,
     },
+    Shutdown,
 }
 
 struct RoomPlayer {
@@ -470,6 +501,10 @@ async fn run_room(
                     for player in players.values_mut() {
                         send_message(player, message.clone());
                     }
+                }
+                RoomCommand::Shutdown => {
+                    handle.shutdown.store(true, Ordering::Release);
+                    break;
                 }
             },
             _ = interval.tick() => {
@@ -1048,6 +1083,26 @@ mod tests {
         }
         first.disconnect().await;
         second.disconnect().await;
+    }
+
+    #[tokio::test]
+    async fn shutdown_all_rooms_closes_player_outputs() {
+        /* [Decisión 8] Al expirar la cuenta atrás, drenar las salas cierra
+         * los Senders de los players: el transporte ve `recv → None` y
+         * cierra el socket; el cliente reintenta con backoff. */
+        let state = GameRoomState::with_map_and_ttl(map(), 60);
+        let (output, mut messages) = mpsc::channel(32);
+        let joined = state.join(Uuid::new_v4(), output).await.expect("join");
+
+        state.shutdown_all_rooms().await;
+
+        let outcome =
+            tokio::time::timeout(std::time::Duration::from_millis(300), messages.recv()).await;
+        assert!(
+            matches!(outcome, Ok(None)),
+            "el output debió cerrarse tras el shutdown: {outcome:?}"
+        );
+        joined.disconnect().await;
     }
 
     #[tokio::test]

@@ -38,21 +38,25 @@
 **Gate F1:** cargo check + tests de `game_room` — PASS vía cargo directo (el gate
 está bloqueado por WIP ajeno en `tools/sentinel`; sin tocar SNT-11).
 
-## Fase 2 — Trigger de publicación y migración coordinada
+## Fase 2 — Trigger de publicación y migración coordinada — CERRADA (05-ago)
 
-- [ ] `publish_map` (handler): tras `GameMapService::publish` exitoso, `tokio::spawn`
-  un task que difunde `announce_restart("publicación de versión nueva", 300)` y espera
-  la cuenta atrás.
-- [ ] Al expirar: drenar las salas (`RoomCommand::Shutdown` / cerrar actores): los
-  sockets se cierran y el cliente reintenta con backoff; el join recarga la versión
-  activa nueva de la BD.
-- [ ] Publicaciones concurrentes durante la cuenta atrás: la primera gana (no
-  acumular tasks); documentar sin over-engineering.
-- [ ] Sin jugadores conectados: el aviso es no-op; el primer join tras el drenaje crea
-  la sala con la versión nueva.
-- [ ] Tests con reloj inyectado/cuenta corta (p. ej. 1 s) + prueba TCP de reconexión.
+- [x] `publish_map` (handler): tras `GameMapService::publish` exitoso, `schedule_restart`
+  (`GameWsState`) difunde `announce_restart("publicación de versión nueva", 300)` en un
+  task y espera la cuenta atrás.
+- [x] Al expirar: `shutdown_all_rooms` (drena las salas): el actor hace break, los
+  Senders se dropean y el socket cierra con **4002 "mundo reiniciado"** (nuevo, distinto
+  del 4001 de identidad reemplazada) — el cliente reintenta con backoff; el mapa
+  cacheado se invalida y el join recarga la versión activa nueva de la BD.
+- [x] Publicaciones concurrentes durante la cuenta atrás: `restart_pending`
+  (AtomicBool) — la primera gana, las siguientes son no-op sin acumular tasks.
+- [x] Sin jugadores conectados: el aviso es no-op; tras el drenaje el primer join
+  recrea la sala con la versión nueva.
+- [x] Tests: `schedule_restart` con cuenta de 1 s (aviso → drenaje → mapa invalidado),
+  `shutdown_all_rooms` cierra outputs, y prueba TCP completa de reconexión tras 4002
+  (aviso → cierre → rejoin OK).
 
-**Gate F2:** cargo check + tests Rust (full CI) + prueba TCP.
+**Gate F2:** cargo check + lib 98/98 + game_ws_tcp 9/9 (validado vía cargo directo;
+full CI queda para F3).
 
 ## Fase 3 — Verificación y cierre
 
@@ -67,6 +71,9 @@ frontend completa verde, navegador verificado y documentación sincronizada.
 
 ## Pruebas obligatorias
 
-- Frontend: `game-restart-notice.test.ts` + suite completa + type-check.
-- Backend: tests de `game_room` (broadcast/shutdown), prueba TCP de reconexión.
-- Gate: `npm run task:check -- 297A-78` y `--full` tras cooldown.
+- Frontend: `game-restart-notice.test.ts` + `game-realtime-client.test.ts` (4002
+  reintenta, 4001 no) + suite completa + type-check — verde.
+- Backend: lib 98/98 (incluye broadcast, shutdown y schedule_restart con cuenta de
+  1 s) + `game_ws_tcp` 9/9 (aviso → cierre 4002 → reconexión) — verde.
+- Gate: `npm run task:check -- 297A-78` y `--full` tras cooldown (F3; hoy el gate
+  está bloqueado por WIP ajeno en `tools/sentinel`).

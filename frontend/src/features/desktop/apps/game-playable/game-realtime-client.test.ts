@@ -476,4 +476,39 @@ describe('Bosque realtime client adapter', () => {
     expect(sockets).toHaveLength(1);
     client.destroy();
   });
+
+  /* [Decisión 8] 4002 = el mundo se reinició (migración coordinada): a
+   * diferencia del reemplazo de identidad, el cliente SÍ reintenta con
+   * backoff para recargar la versión nueva. */
+  it('reconnects when the server restarts the world (close 4002)', () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const sockets: FakeSocket[] = [];
+    const states: string[] = [];
+    const client = createGameRealtimeClient({
+      ticketProvider: vi.fn().mockResolvedValue('ticket'),
+      socketFactory: () => {
+        const socket = new FakeSocket();
+        sockets.push(socket);
+        return socket;
+      },
+      socketUrl: 'ws://localhost/api/game/ws',
+      onState: state => states.push(state),
+    });
+
+    void client.connect();
+    sockets[0]!.emit('open');
+    sockets[0]!.emit('message', JSON.stringify({
+      v: 1,
+      type: 'joined',
+      payload: { playerId: 'p-local', mapVersion: 'forest@1', tick: 0 },
+    }));
+    expect(client.getState()).toBe('connected');
+
+    sockets[0]!.emit('close', 4002);
+    expect(states).toContain('reconnecting');
+    vi.advanceTimersByTime(1_000);
+    expect(sockets).toHaveLength(2);
+    client.destroy();
+  });
 });

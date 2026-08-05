@@ -149,6 +149,26 @@ where
     panic!("el servidor debe enviar un snapshot posterior a la secuencia {previous_sequence}");
 }
 
+/* [Decisión 8] Drena frames (snapshots del tick en vuelo) hasta el cierre
+ * del socket; devuelve el CloseFrame recibido o falla con timeout. */
+async fn read_close_frame<S>(
+    socket: &mut tokio_tungstenite::WebSocketStream<S>,
+) -> tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+{
+    loop {
+        let frame = tokio::time::timeout(std::time::Duration::from_secs(3), socket.next())
+            .await
+            .expect("timeout esperando cierre")
+            .expect("cierre esperado")
+            .expect("frame de cierre");
+        if let Message::Close(Some(close)) = frame {
+            return close.code;
+        }
+    }
+}
+
 async fn read_error<S>(socket: &mut tokio_tungstenite::WebSocketStream<S>) -> Value
 where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
@@ -455,6 +475,67 @@ async fn metrics_endpoint_reports_aggregated_counts_without_identity() {
     assert!(metrics.get("entities").is_none());
 
     drop(socket);
+    let _ = shutdown.send(());
+    server_handle.await.expect("server shutdown");
+}
+
+#[tokio::test]
+async fn restart_announces_countdown_then_closes_with_restart_code_and_client_reconnects() {
+    /* [Decisión 8] Flujo completo de la migración coordinada sobre TCP: el
+     * jugador recibe `server_restart` con la cuenta atrás; al expirar, la
+     * sala se drena y el socket cierra con 4002 (mundo reiniciado) — distinto
+     * del 4001 de identidad reemplazada; el mapa vuelve a estar disponible y
+     * un nuevo join funciona (el cliente reintenta con backoff). */
+    let state = test_state();
+    state.game_ws_state.set_room_map(Some(fixture_map()));
+    let ticket_store = state.game_ticket_store.clone();
+    let (url, shutdown, server_handle) = spawn_server(state.clone()).await;
+
+    let (mut socket, _) = connect_async(&url).await.expect("upgrade WebSocket válido");
+    let ticket = ticket_store
+        .issue(Uuid::new_v4(), None, 30, TEST_SECRET)
+        .expect("ticket válido");    socket
+        .send(join_message(&ticket))
+        .await
+        .expect("join TCP");
+    /* El join es asíncrono: esperar `joined` garantiza que la sala ya está
+     * registrada antes de programar la migración (si no, el aviso sería
+     * no-op y el cierre llegaría sin él). */
+    let joined = read_message_type(&mut socket, "joined").await;
+    assert_eq!(joined["type"], "joined");
+
+    state.game_ws_state.schedule_restart("publicación de versión nueva", 1);
+
+    let restart = read_message_type(&mut socket, "server_restart").await;
+    assert_eq!(restart["payload"]["reason"], "publicación de versión nueva");
+    assert_eq!(restart["payload"]["restartInSeconds"], 1);
+
+    /* La sala se drena tras la cuenta corta: el socket cierra con 4002. */
+    let close_code = read_close_frame(&mut socket).await;
+    assert_eq!(
+        close_code,
+        tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode::Library(4002)
+    );
+
+    /* El shutdown invalidó el mapa cacheado. En producción el publish ya
+     * actualizó la BD y `ensure_room_map` recarga la versión nueva; en el
+     * test (sin BD) se simula con el mapa de nuevo disponible. */
+    state.game_ws_state.set_room_map(Some(fixture_map()));
+
+    /* El join recarga el mapa (la versión nueva ya está activa). */
+    let (mut reconnected, _) = connect_async(&url).await.expect("reconexión tras reinicio");
+    let new_ticket = ticket_store
+        .issue(Uuid::new_v4(), None, 30, TEST_SECRET)
+        .expect("ticket nuevo");
+    reconnected
+        .send(join_message(&new_ticket))
+        .await
+        .expect("join tras reinicio");
+    let rejoined = read_message_type(&mut reconnected, "joined").await;
+    assert_eq!(rejoined["type"], "joined");
+
+    drop(socket);
+    drop(reconnected);
     let _ = shutdown.send(());
     server_handle.await.expect("server shutdown");
 }

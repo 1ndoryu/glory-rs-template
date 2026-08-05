@@ -25,6 +25,10 @@ const RECONNECT_JITTER_MS = 200;
  * abrió una conexión nueva (reemplazo): el cliente NO debe reintentar para
  * evitar el ping-pong entre pestañas/dispositivos del mismo usuario. */
 const GAME_WS_REPLACED_CLOSE_CODE = 4001;
+/* [Decisión 8] El servidor cierra con este código tras el drenaje coordinado
+ * de la migración: el mundo se reinició y el cliente SÍ debe reintentar (el
+ * backoff recarga la versión nueva). */
+const GAME_WS_RESTART_CLOSE_CODE = 4002;
 
 export type GameRealtimeConnectionState = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error' | 'closed';
 
@@ -267,8 +271,16 @@ export function createGameRealtimeClient(
     /* [297A-57] 4001 = el servidor reemplazó esta identidad por una conexión
      * nueva (otra pestaña/dispositivo del mismo usuario): no reintentar; la
      * sesión terminó deliberadamente. */
-    if ((event as CloseEvent | undefined)?.code === GAME_WS_REPLACED_CLOSE_CODE) {
+    const closeCode = (event as CloseEvent | undefined)?.code;
+    if (closeCode === GAME_WS_REPLACED_CLOSE_CODE) {
       notify('closed', 'identidad reemplazada');
+      return;
+    }
+    /* [Decisión 8] 4002 = el mundo se reinició (migración coordinada): el
+     * banner ya mostró la cuenta atrás y este cierre la cumple; se reintenta
+     * con backoff y el join recarga la versión activa nueva. */
+    if (closeCode === GAME_WS_RESTART_CLOSE_CODE) {
+      scheduleReconnect();
       return;
     }
     /* [297A-57] Caída inesperada (red, servidor o timeout): se programa la

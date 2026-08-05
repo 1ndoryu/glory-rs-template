@@ -9,6 +9,7 @@ use crate::models::game_map::{
     MAP_VERSION_MAX_JSON_BYTES,
 };
 use crate::services::game_map_svc::GameMapService;
+use crate::services::game_ws::GAME_RESTART_GRACE_SECONDS;
 use crate::AppState;
 
 /// Publicar una nueva versión activa de un mapa del juego (admin).
@@ -31,9 +32,14 @@ pub async fn publish_map(
     admin: AdminUser,
     Json(request): Json<PublishMapRequest>,
 ) -> Result<Json<GameMapVersionPublic>, AppError> {
-    Ok(Json(
-        GameMapService::publish(&state.pool, admin.user_id, request).await?,
-    ))
+    let published = GameMapService::publish(&state.pool, admin.user_id, request).await?;
+    /* [Decisión 8] Publicación exitosa ⇒ migración coordinada: difunde el
+     * aviso de reinicio, espera la cuenta atrás y drena las salas (el
+     * cliente reconecta y recarga la versión nueva). Fire-and-forget. */
+    state
+        .game_ws_state
+        .schedule_restart("publicación de versión nueva", GAME_RESTART_GRACE_SECONDS);
+    Ok(Json(published))
 }
 
 /// Obtener el snapshot publicado activo de un mapa del juego.
