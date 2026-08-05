@@ -822,12 +822,22 @@ Cada fase ejecutable cerrará con `npm run task:check -- GAME-01-Fn` o el ID que
 
 ## 12. Decisiones aún abiertas
 
-1. **Sala única vs instancias:** recomendación: mapa lógico único con salas de hasta 8 jugadores, elegidas por disponibilidad; el usuario debe confirmar si necesita que todos vean siempre a todos.
-2. **Controles:** teclado + WASD/flechas en desktop y joystick/tap en móvil, o solo teclado en la primera prueba.
-3. **Persistencia del invitado:** perder identidad al cerrar, conservarla en una cookie temporal o permitir reclamarla al registrar una cuenta.
-4. **Dirección cromática:** tinta monocroma como la referencia o tinta con una paleta muy restringida para diferenciar jugador, agua y estados interactivos.
-5. **Publicación en vivo:** aplicar la nueva versión solo a salas nuevas (recomendado) o permitir una transición coordinada de salas activas.
-6. **Escalado futuro:** single-instance primero; si se requieren varias réplicas habrá que elegir almacenamiento/coordination realtime antes de prometerlo.
+> Las decisiones 1-6 se confirmaron el 05-ago y tienen su fuente canónica en
+> `Agente/documentacion/producto/decisiones-pendientes-bosque-2026-08-05.md` y en el ADR
+> `Agente/documentacion/arquitectura/adr-bosque-mundo-unico-reinicio-coordinado-2026-08-05.md`.
+
+1. ~~Sala única vs instancias~~ → **DECIDIDO (05-ago): mundo único compartido, sin salas ni
+   matchmaking**; el cap 8 por sala pasa a ser límite global del mundo (pendiente de planificar
+   `GameRoomState`, decisión 4).
+2. ~~Controles~~ → **DECIDIDO (05-ago):** teclado/ratón en desktop, táctiles solo en móvil
+   (implementado, commit `e9d7e09d`).
+3. ~~Persistencia del invitado~~ → **DECIDIDO (05-ago):** invitado efímero (297A-76).
+4. ~~Dirección cromática~~ → **DECIDIDO (05-ago):** verde stylized tipo Genshin, sin distinción
+   por jugador (implementado, commit `e9d7e09d`).
+5. ~~Publicación en vivo~~ → **DECIDIDO (05-ago):** transición coordinada con aviso de reinicio
+   en 5 min; el contrato realtime ya incluye `server_restart` (ambos stacks + cliente); falta la
+   cuenta atrás y la migración coordinada server-side (decisión 8).
+6. ~~Escalado futuro~~ → **DECIDIDO (05-ago):** single-instance.
 7. **Restauración de sesión:** restaurar solo el contenedor de la app (recomendado) o reingresar automáticamente a la última sala; la segunda opción exige consentimiento y ticket nuevo.
 8. **Contrato de URL:** decidir si se comparte un mapa público/sala pública o si el deep link solo abre la app sin unirse; no se expondrán salas privadas ni identidades invitadas.
 9. **Accesibilidad del renderer:** overlay DOM con estado y controles accesibles, modo reducido y fallback informativo, o alcance explícito si alguna parte no puede hacerse accesible.

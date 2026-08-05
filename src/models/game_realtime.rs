@@ -16,6 +16,10 @@ pub const GAME_REALTIME_MAX_MAP_VERSION_LENGTH: usize = 128;
 pub const GAME_REALTIME_MAX_ENTITY_ID_LENGTH: usize = 128;
 pub const GAME_REALTIME_MAX_CHARACTER_ID_LENGTH: usize = 64;
 pub const GAME_REALTIME_MAX_ERROR_MESSAGE_LENGTH: usize = 160;
+/* Decisión 8 (05-ago): aviso de reinicio coordinado. El motivo va bounded y
+ * la cuenta atrás nunca supera 1 hora (el flujo oficial usa 300 s). */
+pub const GAME_REALTIME_MAX_RESTART_REASON_LENGTH: usize = 200;
+pub const GAME_REALTIME_MAX_RESTART_SECONDS: u64 = 3_600;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -127,6 +131,17 @@ pub struct GameRealtimeErrorPayload {
     pub fatal: bool,
 }
 
+/// Aviso de reinicio coordinado (decisión 8, 05-ago): el servidor anuncia que
+/// el mundo migrará a la versión nueva con cuenta atrás. `restart_in_seconds`
+/// se valida en 1..=`GAME_REALTIME_MAX_RESTART_SECONDS`; el motivo es texto
+/// bounded sin controles, igual que el resto del contrato.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GameRealtimeServerRestartPayload {
+    pub reason: String,
+    pub restart_in_seconds: u64,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum GameRealtimeServerMessage {
@@ -145,6 +160,10 @@ pub enum GameRealtimeServerMessage {
     Error {
         v: u8,
         payload: GameRealtimeErrorPayload,
+    },
+    ServerRestart {
+        v: u8,
+        payload: GameRealtimeServerRestartPayload,
     },
 }
 
@@ -280,6 +299,17 @@ fn validate_server_message(
             {
                 return Err(RealtimeContractError::InvalidPayload(
                     "error inválido".into(),
+                ));
+            }
+        }
+        GameRealtimeServerMessage::ServerRestart { v, payload } => {
+            if !valid_version(*v)
+                || !bounded_text(&payload.reason, GAME_REALTIME_MAX_RESTART_REASON_LENGTH)
+                || payload.restart_in_seconds < 1
+                || payload.restart_in_seconds > GAME_REALTIME_MAX_RESTART_SECONDS
+            {
+                return Err(RealtimeContractError::InvalidPayload(
+                    "server_restart inválido".into(),
                 ));
             }
         }
@@ -543,6 +573,57 @@ mod tests {
             serde_json::from_slice::<serde_json::Value>(&bytes).expect("json")["v"],
             1
         );
+    }
+
+    #[test]
+    fn server_restart_announces_coordinated_migration_with_bounded_countdown() {
+        /* Decisión 8: el contrato admite el aviso con motivo y cuenta atrás,
+         * serializado camelCase en el wire (`restartInSeconds`). */
+        let message = GameRealtimeServerMessage::ServerRestart {
+            v: 1,
+            payload: GameRealtimeServerRestartPayload {
+                reason: "publicación de versión nueva".to_string(),
+                restart_in_seconds: 300,
+            },
+        };
+        let bytes = serialize_server_message(&message).expect("server_restart");
+        let json = String::from_utf8_lossy(&bytes);
+        assert!(json.contains("\"type\":\"server_restart\""));
+        assert!(json.contains("restartInSeconds"));
+        /* Cuenta atrás fuera de rango y motivo excesivo: fail-closed. */
+        let zero = GameRealtimeServerMessage::ServerRestart {
+            v: 1,
+            payload: GameRealtimeServerRestartPayload {
+                reason: "x".to_string(),
+                restart_in_seconds: 0,
+            },
+        };
+        assert!(matches!(
+            serialize_server_message(&zero),
+            Err(RealtimeContractError::InvalidPayload(_))
+        ));
+        let huge = GameRealtimeServerMessage::ServerRestart {
+            v: 1,
+            payload: GameRealtimeServerRestartPayload {
+                reason: "x".to_string(),
+                restart_in_seconds: GAME_REALTIME_MAX_RESTART_SECONDS + 1,
+            },
+        };
+        assert!(matches!(
+            serialize_server_message(&huge),
+            Err(RealtimeContractError::InvalidPayload(_))
+        ));
+        let long_reason = GameRealtimeServerMessage::ServerRestart {
+            v: 1,
+            payload: GameRealtimeServerRestartPayload {
+                reason: "x".repeat(GAME_REALTIME_MAX_RESTART_REASON_LENGTH + 1),
+                restart_in_seconds: 300,
+            },
+        };
+        assert!(matches!(
+            serialize_server_message(&long_reason),
+            Err(RealtimeContractError::InvalidPayload(_))
+        ));
     }
 
     #[test]

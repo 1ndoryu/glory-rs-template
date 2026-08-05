@@ -24,8 +24,9 @@ disciplina de no incrustarla como textura/sprite/tileset literal si no se desea.
 - [x] Confirmar que los elementos del boceto serán originales → los ya implementados (fixture y
   modelos 297A-30/33) siguen siendo originales; con la licencia confirmada se permite derivar
   de la referencia en assets futuros.
-- [ ] Registrar la licencia concreta en la referencia (`referencia-visual-bosque-2026-08-01.md`)
-  para que quede constancia de la propiedad.
+- [x] Registrar la licencia concreta en la referencia (`referencia-visual-bosque-2026-08-01.md`)
+  para que quede constancia de la propiedad → se añadió la sección "Licencia y autoría"
+  (propiedad del usuario confirmada el 05-ago).
 
 ## 2. Gramática visual
 
@@ -83,8 +84,10 @@ jugadores.
   único compartido.
 - [ ] Definir el límite global de jugadores simultáneos y el presupuesto de snapshot/fanout
   para ese mundo único (el interés por proximidad ya existe).
-- [ ] Actualizar el plan, el ADR y el roadmap con la decisión (el roadmap aún describe
-  "salas de hasta 8").
+- [x] Actualizar el plan, el ADR y el roadmap con la decisión → el roadmap ya no describe
+  "salas de hasta 8" (objetivo = mundo único compartido), la sección 12 del plan marca las
+  decisiones 1-6 como decididas y se creó
+  `adr-bosque-mundo-unico-reinicio-coordinado-2026-08-05.md`.
 
 ## 5. Dirección cromática
 
@@ -144,8 +147,11 @@ reales. Consecuencias:
   "solo salas nuevas").
 
 **Impacto en arquitectura (pendiente de planificar):**
-- [ ] Añadir el evento de aviso de reinicio (p. ej. `server_restart` con cuenta atrás) al
-  contrato realtime v1 y al cliente.
+- [x] Añadir el evento de aviso de reinicio (p. ej. `server_restart` con cuenta atrás) al
+  contrato realtime v1 y al cliente → implementado: `server_restart` en `game-realtime.rs`
+  (Rust) y `game-realtime.ts` (TS) con motivo bounded (200) y cuenta atrás 1..=3600 s,
+  validación fail-closed en ambos stacks, tests en ambos lados y callback `onServerRestart`
+  en `game-realtime-client.ts`.
 - [ ] Implementar la cuenta atrás de 5 min y la migración coordinada en el servidor al publicar.
 - [ ] Revisar el runbook de rollback (297A-75) con la nueva política.
 

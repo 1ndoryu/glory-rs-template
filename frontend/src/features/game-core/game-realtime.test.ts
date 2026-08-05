@@ -166,6 +166,34 @@ describe('GAME-01 realtime contract v1', () => {
     expect(consumeGameRealtimeRateBudget(history, 1_101).ok).toBe(true);
   });
 
+  it('accepts a bounded server_restart notice and rejects unsafe countdowns', () => {
+    const valid = {
+      v: 1 as const,
+      type: 'server_restart' as const,
+      payload: { reason: 'publicación de versión nueva', restartInSeconds: 300 },
+    };
+    expect(validateGameRealtimeServerMessage(valid)).toEqual({ ok: true, value: valid });
+    expect(validateGameRealtimeServerMessage({
+      v: 1, type: 'server_restart', payload: { reason: 'x', restartInSeconds: 0 },
+    }).ok).toBe(false);
+    expect(validateGameRealtimeServerMessage({
+      v: 1,
+      type: 'server_restart',
+      payload: { reason: 'x', restartInSeconds: GAME_REALTIME_LIMITS.maxRestartSeconds + 1 },
+    }).ok).toBe(false);
+    expect(validateGameRealtimeServerMessage({
+      v: 1,
+      type: 'server_restart',
+      payload: { reason: 'x'.repeat(GAME_REALTIME_LIMITS.maxRestartReasonLength + 1), restartInSeconds: 300 },
+    }).ok).toBe(false);
+    expect(validateGameRealtimeServerMessage({
+      v: 1, type: 'server_restart', payload: { reason: 'aviso\nnueva línea', restartInSeconds: 300 },
+    }).ok).toBe(false);
+    expect(validateGameRealtimeServerMessage({
+      v: 1, type: 'server_restart', payload: { reason: 'x', restartInSeconds: 300, extra: true },
+    }).ok).toBe(false);
+  });
+
   it('keeps serialized server messages within the transport budget', () => {
     const result = serializeGameRealtimeServerMessage({
       v: 1,

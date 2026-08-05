@@ -22,6 +22,14 @@
 - Siluetas legibles a la escala de juego y un foco claro para personajes/jugadores.
 - Composición modular que permita construir mapas por piezas sin copiar la imagen.
 
+## Licencia y autoría
+
+- La imagen `bosque-tinta-mapa-2026-08-01.png` es **propiedad del usuario** (autoría/licencia
+  confirmada el 2026-08-05); puede usarse como **base de assets** sin restricción externa
+  conocida.
+- Los assets finales serán derivados originales; no se incrusta la imagen como textura,
+  sprite ni tileset literal salvo decisión explícita del usuario.
+
 ## Límites de uso
 
 - No usar esta imagen como textura, sprite, tileset ni asset distribuible salvo decisión

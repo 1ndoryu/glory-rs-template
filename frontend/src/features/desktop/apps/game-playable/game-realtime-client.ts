@@ -7,6 +7,7 @@ import {
   interpolateSnapshots,
   validateGameRealtimeServerMessage,
   type GameRealtimeServerMessage,
+  type GameRealtimeServerRestartPayload,
   type GameRealtimeSnapshotPayload,
   type Vector2,
   type WorldSnapshot,
@@ -43,6 +44,11 @@ export interface GameRealtimeClientOptions {
   readonly socketFactory: (url: string) => GameRealtimeSocket;
   readonly socketUrl: string;
   readonly onState?: (state: GameRealtimeConnectionState, message?: string) => void;
+  /* [Decisión 8] Aviso de reinicio coordinado (05-ago): el servidor anuncia
+   * la cuenta atrás de la migración del mundo. El consumidor decide cómo
+   * presentarlo (banner/estado); mientras no haya UX, el evento es seguro
+   * de ignorar: no afecta la simulación ni la conexión. */
+  readonly onServerRestart?: (payload: GameRealtimeServerRestartPayload) => void;
 }
 
 export interface GameRealtimeClientHandle {
@@ -207,6 +213,10 @@ export function createGameRealtimeClient(
     if (message.type === 'snapshot') {
       if (lastSnapshotSequence !== null && message.payload.snapshotSequence <= lastSnapshotSequence) return;
       updateSnapshot(message.payload);
+      return;
+    }
+    if (message.type === 'server_restart') {
+      options.onServerRestart?.(message.payload);
       return;
     }
     if (message.type === 'error') {

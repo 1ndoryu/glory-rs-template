@@ -18,6 +18,10 @@ export const GAME_REALTIME_LIMITS = {
   maxEntityIdLength: 128,
   maxCharacterIdLength: 64,
   maxErrorMessageLength: 160,
+  /* Decisión 8 (05-ago): aviso de reinicio coordinado. Motivo bounded y
+   * cuenta atrás acotada (el flujo oficial usa 300 s). */
+  maxRestartReasonLength: 200,
+  maxRestartSeconds: 3_600,
 } as const;
 
 type UnknownRecord = Record<string, unknown>;
@@ -72,6 +76,14 @@ export interface GameRealtimeHeartbeatAckPayload {
   readonly serverTick: number;
 }
 
+/** Aviso de reinicio coordinado (decisión 8, 05-ago): el servidor anuncia que
+ * el mundo migrará a la versión nueva con cuenta atrás. `restartInSeconds` se
+ * valida en 1..=maxRestartSeconds; el motivo es texto bounded sin controles. */
+export interface GameRealtimeServerRestartPayload {
+  readonly reason: string;
+  readonly restartInSeconds: number;
+}
+
 export type GameRealtimeErrorCode =
   | 'invalid_message'
   | 'unauthorized'
@@ -92,6 +104,7 @@ export type GameRealtimeServerMessage =
   | { readonly v: 1; readonly type: 'joined'; readonly payload: GameRealtimeJoinedPayload }
   | { readonly v: 1; readonly type: 'snapshot'; readonly payload: GameRealtimeSnapshotPayload }
   | { readonly v: 1; readonly type: 'heartbeat_ack'; readonly payload: GameRealtimeHeartbeatAckPayload }
+  | { readonly v: 1; readonly type: 'server_restart'; readonly payload: GameRealtimeServerRestartPayload }
   | { readonly v: 1; readonly type: 'error'; readonly payload: GameRealtimeErrorPayload };
 
 export type RealtimeParseResult<T> =
@@ -227,6 +240,13 @@ export function validateGameRealtimeServerMessage(value: unknown): RealtimeParse
   if (value.type === 'heartbeat_ack' && hasExactKeys(payload, ['serverTick'])
     && isFiniteSafeInteger(payload.serverTick)) {
     return { ok: true, value: { v: 1, type: 'heartbeat_ack', payload: { serverTick: payload.serverTick } } };
+  }
+  if (value.type === 'server_restart' && hasExactKeys(payload, ['reason', 'restartInSeconds'])
+    && validBoundedString(payload.reason, GAME_REALTIME_LIMITS.maxRestartReasonLength)
+    && isFiniteSafeInteger(payload.restartInSeconds)
+    && payload.restartInSeconds >= 1
+    && payload.restartInSeconds <= GAME_REALTIME_LIMITS.maxRestartSeconds) {
+    return { ok: true, value: { v: 1, type: 'server_restart', payload: { reason: payload.reason, restartInSeconds: payload.restartInSeconds } } };
   }
   const errorCodes = new Set<GameRealtimeErrorCode>([
     'invalid_message', 'unauthorized', 'rate_limited', 'sequence_replay',
