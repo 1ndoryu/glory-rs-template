@@ -1,13 +1,13 @@
-/* [GAME-01-VIS-3D] Puente temporal entre las rutas de los dos bocetos y el
- * RouteAppAdapter. El router exige una ruta conocida antes de delegarla; el
- * fallback solo aparece si el shell todavía no está montado. */
+/* [GAME-01] Puente temporal de rutas del juego hacia el RouteAppAdapter.
+ * El router exige una ruta conocida antes de delegarla; el fallback solo
+ * aparece si el shell todavía no está montado. Los bocetos game/game-3d se
+ * retiraron el 05-ago; queda el fixture jugable /forest-playable. */
 
 import { createEl } from '../../utils/dom';
 import { addRoute } from '../../router';
 
 function createPreviewFallback(): HTMLElement {
-  return createEl('p', { textContent: 'abriendo boceto del bosque…' });
+  return createEl('p', { textContent: 'abriendo el bosque…' });
 }
 
-addRoute({ path: '/forest-2d', render: createPreviewFallback });
-addRoute({ path: '/forest-3d', render: createPreviewFallback });
+addRoute({ path: '/forest-playable', render: createPreviewFallback });

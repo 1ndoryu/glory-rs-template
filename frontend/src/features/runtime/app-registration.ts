@@ -20,8 +20,6 @@ import { createDownloadsView, createOrdersView, createStoreView } from '../comme
 import { createPropertiesPreview } from '../desktop/apps/properties/properties-preview';
 import { initMediaGallerySync } from './workspace/media-gallery-sync';
 import './app-registration-admin';
-import './app-registration-game';
-import './app-registration-game-3d';
 import './app-registration-game-playable';
 
 /* === Finder === */

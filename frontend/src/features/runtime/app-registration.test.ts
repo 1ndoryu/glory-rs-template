@@ -4,29 +4,11 @@ import { AppRegistry } from './app-registry';
 import './app-registration';
 
 describe('Account app registration', () => {
-  it('registers the Bosque preview as a lazy public full-bleed app', async () => {
-    const game = AppRegistry.get('game');
-    expect(game).toBeDefined();
-    expect(game?.singleton).toBe(true);
-    expect(game?.requires).toBe('public');
-    expect(game?.layout).toBe('full-bleed');
-    expect(game?.deepLink?.stringify()).toBe('/forest-2d');
-    expect(game?.routePatterns).toBeUndefined();
-
-    const view = await AppRegistry.instantiate('game', {
-      signal: new AbortController().signal,
-    });
-    expect(view?.element.classList.contains('bosqueBoceto')).toBe(true);
-    expect(() => view?.destroy?.()).not.toThrow();
-  });
-
-  it('keeps the 3D alternative separate and lazy', () => {
-    const game3d = AppRegistry.get('game-3d');
-    expect(game3d).toBeDefined();
-    expect(game3d?.singleton).toBe(true);
-    expect(game3d?.requires).toBe('public');
-    expect(game3d?.layout).toBe('full-bleed');
-    expect(game3d?.deepLink?.stringify()).toBe('/forest-3d');
+  /* Los bocetos game (2D) y game-3d (3D) se retiraron el 05-ago: la
+   * dirección visual quedó decidida y solo vive la app jugable. */
+  it('removed the 2D and 3D sketch registrations', () => {
+    expect(AppRegistry.get('game')).toBeUndefined();
+    expect(AppRegistry.get('game-3d')).toBeUndefined();
   });
 
   it('keeps the playable fixture lazy until its first instantiation', () => {

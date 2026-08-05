@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { access } from 'node:fs/promises';
 import { analyzeWorkspace } from '../custom-rules.mjs';
 import { writeStageLog, resultFromFindings } from './common.mjs';
 
@@ -23,9 +24,14 @@ export async function runCustom(context) {
     /* [028A-8] Un full diferido conserva scope.full=true (fingerprint) pero
      * executionFull=false: custom debe analizar solo el conjunto cambiado. */
     const executionFull = context.scope?.executionFull ?? context.scope?.full;
-    const selected = executionFull ? null : context.scope.files
+    /* [GAME-01] Los archivos eliminados ya no existen en disco: analizar
+     * solo los presentes para no fallar con ENOENT al borrar una app. */
+    const selected = executionFull ? null : (await Promise.all(context.scope.files
       .filter(file => /^frontend\/src\/.*\.(?:ts|tsx|js|jsx)$/i.test(file))
-      .map(file => path.join(context.projectRoot, file));
+      .map(async file => {
+        const p = path.join(context.projectRoot, file);
+        return (await access(p).then(() => true).catch(() => false)) ? p : null;
+      }))).filter(Boolean);
     const allFindings = await analyzeWorkspace(sourceRoot, selected);
     const findings = allFindings.filter(item => !MIGRATED_TO_SENTINEL.has(item.ruleId));
     const logPath = await writeStageLog(context, 'custom', JSON.stringify({

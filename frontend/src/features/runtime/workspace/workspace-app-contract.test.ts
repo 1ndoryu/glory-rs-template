@@ -24,8 +24,6 @@ describe('workspace/AppRegistry anti-drift contract', () => {
       { nodeId: 'admin', appId: 'admin' },
       { nodeId: 'analytics', appId: 'analytics' },
       { nodeId: 'downloads', appId: 'downloads' },
-      { nodeId: 'game', appId: 'game' },
-      { nodeId: 'game3d', appId: 'game-3d' },
       { nodeId: 'gamePlayable', appId: 'game-playable' },
       { nodeId: 'mediaLibrary', appId: 'media-library' },
       { nodeId: 'orders', appId: 'orders' },

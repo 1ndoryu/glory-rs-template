@@ -223,8 +223,13 @@ export async function detectScope(context, args) {
     if (effectiveFull) ['rust', 'frontend', 'css', 'docs'].forEach(profile => profiles.add(profile));
   }
 
+  /* [GAME-01] El transporte plano alimenta analizadores que abren cada
+   * archivo (VarSense --files-from, Sentinel). Los eliminados ya no existen
+   * en disco y provocarían ENOENT; se excluyen aquí y se conservan en el
+   * manifest JSON (scope-manifest.json) para el análisis de cambios. */
+  const existingFiles = files.filter(file => !parsedChanged.deletedFiles.includes(file));
   const changedFilesPath = path.join(context.reportRoot, 'changed-files.txt');
-  await writeFile(changedFilesPath, `${files.join('\n')}\n`, 'utf8');
+  await writeFile(changedFilesPath, `${existingFiles.join('\n')}\n`, 'utf8');
   /* [028A-8] Manifiesto único de alcance: archivos cambiados/eliminados, hashes
    * de contenido, perfiles, dependencias locales y decisión full. Sentinel,
    * VarSense, custom y la selección de tests pueden consumirlo sin repetir

@@ -103,9 +103,16 @@ El mapa nunca incrusta GLB ni permite código, shaders arbitrarios, URIs externa
 ## Decisiones todavía abiertas
 
 1. Relieve: plano, alturas discretas o colinas suaves. **Resuelto (297A-67):** alturas discretas allowlisted 0–4 con pincel de vértices compartidos entre chunks; sin cuevas ni voladizos.
-2. Cámara jugable: libre como el boceto o isométrica limitada siguiendo al personaje. **Resuelto:** cámara isométrica limitada con órbita acotada + recenter (297A-30/70).
-3. Materiales: monocromo estricto o paleta muy restringida dentro del mundo 3D. **Pendiente de decisión de producto:** tinta monocroma base implementada; la paleta restringida está en `decisiones-pendientes-bosque-2026-08-05.md` (sección 5).
+2. Cámara jugable: libre como el boceto o isométrica limitada siguiendo al personaje. **Cambiada (2026-08-05):** cámara **libre y movible por el jugador** (órbita controlada, estilo Genshin Impact como referencia); sustituye la isométrica limitada del boceto inicial. Requiere ajustar el runtime y el presupuesto de draw calls para el nuevo encuadre.
+3. Materiales: monocromo estricto o paleta muy restringida dentro del mundo 3D. **Cambiada (2026-08-05):** **verde stylized muy colorido, low poly intermedio-bajo**, con Genshin Impact solo como referencia de estilo (no se importan sus assets). Sustituye la tinta monocroma base implementada; requiere repaleta del fixture y los materiales.
 4. Primera animación: personaje rígido/provisional o GLB con rig y clips `idle/walk`. **Pendiente:** avatar actual con `createFigure` (tono por personaje, 297A-77); rig/clips GLB futuros en Fase 9/Assets.
+
+> **Actualización visual (2026-08-05):** la dirección aprobada pasa de tinta monocroma a
+> low poly verde stylized colorido con cámara libre (decisión del usuario). El contrato de
+> mapa, el editor 2D y la autoridad server-side no cambian; solo cambian renderer, paleta,
+> cámara y presupuesto poligonal (low poly intermedio-bajo). Ver
+> `Agente/documentacion/producto/referencia-visual-bosque-2026-08-01.md` y
+> `Agente/documentacion/producto/decisiones-pendientes-bosque-2026-08-05.md`.
 
 ## Presupuestos (estado al 2026-08-05)
 

@@ -1,6 +1,6 @@
 /* GAME-01 — Registro del vertical slice offline.
- * Es una app aparte de `game` y `game-3d`: los previews siguen siendo
- * referencias visuales y esta entrada es la única que monta movimiento local. */
+ * Los bocetos game/game-3d se retiraron el 05-ago; esta entrada es la única
+ * app del juego y monta el movimiento local. */
 
 import { Gamepad2 } from 'lucide';
 import type { MountedView, RenderContext } from '../../core/lifecycle';
