@@ -58,6 +58,7 @@ glory-rust-template.code-workspace
 .sentinel-report.md
 .quality-tools/
 .quality-reports/
+.quality-bench/
 .cargo/config.toml
 .tmp-sentinel/edit.mjs
 .tmp-sentinel/expected-findings.json

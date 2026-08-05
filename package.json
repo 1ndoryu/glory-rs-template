@@ -29,6 +29,7 @@
     "test": "node scripts/run-with-db.mjs test",
     "roadmap": "node scripts/check-roadmap.mjs",
     "roadmap:watch": "node scripts/check-roadmap.mjs --watch",
-    "quality:profile": "node scripts/quality/quality-profile.mjs"
+    "quality:profile": "node scripts/quality/quality-profile.mjs",
+    "quality:bench": "node scripts/quality/bench-baseline.mjs"
   }
 }
