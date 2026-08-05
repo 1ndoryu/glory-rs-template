@@ -29,8 +29,11 @@ interface DragSession extends HighlightSession {
   readonly sourceContext: string;
   readonly ghost: HTMLElement;
   readonly onReorder?: (draggedId: NodeId, targetIndex: number) => void;
-  /** [297A-20] Soltar en celda snap del grid del escritorio. */
-  readonly onPlaceCell?: (draggedId: NodeId, col: number, row: number) => void;
+  /** [297A-20] Soltar en celda snap del grid del escritorio.
+   * [018A-97] groupIds = grupo capturado al INICIO del gesto (pointerdown),
+   * no la selección en el momento del drop: arrastrar un icono no
+   * seleccionado altera solo ese aunque quede una selección residual. */
+  readonly onPlaceCell?: (draggedId: NodeId, col: number, row: number, groupIds: readonly string[]) => void;
 }
 
 let activeSession: DragSession | null = null;
@@ -51,11 +54,12 @@ export function enableDrag(options: {
   gridEl: HTMLElement;
   itemSelector?: string;
   onReorder?: (draggedId: NodeId, targetIndex: number) => void;
-  onPlaceCell?: (draggedId: NodeId, col: number, row: number) => void;
-  /* [058A-4] Drag de grupo: getGroupIds se consulta en pointerdown (selección
-   * en ese instante); si hay >1 ids y onGroupDrop, el drop sobre un target
-   * llama a onGroupDrop en vez de globalDropHandler (el caller mueve todo el
-   * grupo). El escritorio no lo usa: resuelve el grupo en onPlaceCell. */
+  onPlaceCell?: (draggedId: NodeId, col: number, row: number, groupIds: readonly string[]) => void;
+  /* [058A-4][018A-97] Drag de grupo: getGroupIds se consulta en pointerdown
+   * (selección en ese instante) y el grupo capturado NO cambia durante el
+   * drag aunque la selección del store sí lo haga. El escritorio lo entrega
+   * a onPlaceCell para decidir el grupo por el gesto; onGroupDrop lo usa el
+   * Finder (reorder por índice). */
   getGroupIds?: () => readonly string[];
   onGroupDrop?: (draggedId: NodeId, targetId: string, groupIds: readonly string[]) => void;
 }): () => void {
@@ -135,7 +139,10 @@ export function enableDrag(options: {
     if (activeSession.placement && onPlaceCell) {
       const metrics = getGridMetrics(gridEl, itemSelector);
       const cell = getCellAt(e.clientX, e.clientY, metrics);
-      if (cell) onPlaceCell(nodeId, cell.col, cell.row);
+      /* [018A-97] Entregar el grupo capturado en pointerdown para que el
+       * escritorio decida el drag de grupo por el gesto, no por la selección
+       * del drop. */
+      if (cell) onPlaceCell(nodeId, cell.col, cell.row, groupIds);
     } else if (target) {
       const targetId = target.dataset.dropId ?? '';
       const targetContext = target.dataset.dropContext ?? '';

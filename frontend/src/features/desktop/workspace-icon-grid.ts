@@ -21,9 +21,9 @@ import { AppRegistry } from '../runtime/app-registry';
 import { resolveResourceIcon, resolveResourceIconType } from '../runtime/resource-type-registry';
 import { enableDrag } from './utils/icon-drag';
 import { enableSelectionBand } from './utils/selection-band';
-import { buildGroupPlacementMoves } from './utils/icon-group-drag';
-import { createDebugGridOverlay } from './utils/debug-grid-overlay';
-import { DESKTOP_MIN_WIDTH, getGridMetrics, planPlacement, reflowPositions } from './utils/icon-grid';
+import { planDesktopPlacement } from './utils/icon-group-drag';
+import { DESKTOP_MIN_WIDTH, getGridMetrics } from './utils/icon-grid';
+import { reflowPositions } from './utils/icon-grid-placement';
 import { moveNodesPosition } from '../runtime/workspace/overlay-mutations';
 import { reconcileChildren } from '../../utils/reconcile';
 import { resolvePublicResourceTarget } from '../runtime/workspace/public-resource-locator';
@@ -201,6 +201,11 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
           context: 'desktop',
           gridEl: grid,
           itemSelector: '.desktop-icon--interactive',
+          /* [018A-97] El grupo se captura en pointerdown (inicio del gesto) y
+           * enableDrag lo entrega a onPlaceCell; así la decisión no depende de
+           * la selección en el momento del drop. Solo los ids de la superficie
+           * escritorio participan (018A-95: el Finder no contamina el grupo). */
+          getGroupIds: () => getSelectedIds().filter((id) => isSelected(id, 'desktop')),
           onReorder: (draggedId, targetIndex) => {
             /* Reorder por índice (mobileOrder) — usado solo como fallback móvil.
              * En desktop/tablet el drag usa onPlaceCell (297A-20). */
@@ -216,26 +221,19 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
             reordered.splice(targetIndex, 0, draggedId);
             reorderDesktopNodes(reordered);
           },
-          onPlaceCell: (draggedId, col, row) => {
-            /* [297A-20] Snap-grid: resuelve colisiones y persiste en el overlay.
-             * workspaceStore ya devuelve nodos con position resuelta.
-             * Un solo update de overlay por soltada (moves en batch). */
+          onPlaceCell: (draggedId, col, row, groupIds) => {
+            /* [297A-20][018A-97] Snap-grid: resuelve el drag por el gesto y
+             * persiste en el overlay con un solo update (moves en batch).
+             * El grupo se decide con los ids capturados en pointerdown: con
+             * selección residual que no incluye al arrastrado, planDesktopPlacement
+             * cae al plan único (se altera solo ese icono); con el arrastrado
+             * seleccionado, clampa los miembros a los límites del grid y
+             * desplaza a los ocupantes de las celdas destino. */
             const ws = workspaceStore.get();
             const desktopNodes = Object.values(ws.nodes).filter((n) => n.parentId === 'desktop');
             const metrics = getGridMetrics(grid);
-            const plan = planPlacement(desktopNodes, draggedId, { col, row }, metrics);
-            const st = selectionStore.get();
-            const isGroup = st.source === 'desktop' && st.selectedIds.length > 1 && st.selectedIds.includes(draggedId);
-            if (!isGroup) {
-              moveNodesPosition(plan.moves);
-              return;
-            }
-            /* [058A-4] Drag de grupo: mantiene el offset relativo de los
-             * seleccionados respecto al arrastrado (delta del plan), sin
-             * resolver colisiones del grupo contra otros iconos (mejora
-             * futura). Si el arrastrado no tiene move/position válidos,
-             * buildGroupPlacementMoves devuelve null y se cae al plan único. */
-            moveNodesPosition(buildGroupPlacementMoves(desktopNodes, draggedId, plan, st.selectedIds) ?? plan.moves);
+            const plan = planDesktopPlacement(desktopNodes, draggedId, { col, row }, groupIds, metrics);
+            moveNodesPosition(plan.moves);
           },
         });
         dragCleanups.set(node.id, cleanup);
@@ -297,39 +295,28 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
   let resizeTimer: ReturnType<typeof setTimeout> | undefined;
   let frameHandle: number | undefined;
 
-  /* [297A-20][DEPURACION TEMPORAL] Overlay del snap-grid (Ctrl+Shift+G):
-   * muestra el límite y cada celda con col,row. PENDIENTE: eliminar junto
-   * con el CSS .desktop-icon-grid--depurar. */
-  const debugOverlay = createDebugGridOverlay(grid);
-
-  const onKeyDown = (e: KeyboardEvent): void => {
-    if (e.ctrlKey && e.shiftKey && (e.key === 'G' || e.key === 'g')) {
-      e.preventDefault();
-      debugOverlay.toggle();
-    }
-  };
-
+  /* [018A-97] La rejilla roja de debug (Ctrl+Shift+G) se retiró: tras unificar
+   * la geometría en cellOriginAt y cerrar el drag de grupo, ya no es necesaria
+   * y el DoD del plan exige sin código de depuración en producción. */
   const doReflow = (): void => {
     /* En móvil (<769) las posiciones se ignoran; no reencuadrar. */
     if (window.innerWidth < DESKTOP_MIN_WIDTH) {
       const metrics = getGridMetrics(grid);
       lastColumns = metrics.columns;
       lastRows = metrics.rows;
-      debugOverlay.refresh();
       return;
     }
     const metrics = getGridMetrics(grid);
-    if (metrics.columns === lastColumns && metrics.rows === lastRows) {
-      debugOverlay.refresh();
-      return;
-    }
+    if (metrics.columns === lastColumns && metrics.rows === lastRows) return;
     lastColumns = metrics.columns;
     lastRows = metrics.rows;
     const ws = workspaceStore.get();
     const desktopNodes = Object.values(ws.nodes).filter((n) => n.parentId === 'desktop');
+    /* [297A-20] El reflow solo devuelve movimientos que cambian: con la
+     * geometría unificada y el grupo resuelto no reempaqueta todo el grid
+     * salvo overlap/fuera-de-bounds reales tras un cambio de columnas/filas. */
     const plan = reflowPositions(desktopNodes, metrics);
     if (plan.moves.length > 0) moveNodesPosition(plan.moves);
-    debugOverlay.refresh();
   };
 
   const onWindowResize = (): void => {
@@ -338,7 +325,6 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
   };
 
   window.addEventListener('resize', onWindowResize);
-  window.addEventListener('keydown', onKeyDown);
   /* Inicializar métricas tras el primer paint (el grid ya está en el DOM). */
   frameHandle = requestAnimationFrame(() => {
     doReflow();
@@ -350,12 +336,10 @@ export function createWorkspaceIconGrid(extraActions?: Record<string, () => void
     stopSelection();
     stopSelectionBand();
     window.removeEventListener('resize', onWindowResize);
-    window.removeEventListener('keydown', onKeyDown);
     window.clearTimeout(resizeTimer);
     if (frameHandle !== undefined) cancelAnimationFrame(frameHandle);
     for (const cleanup of dragCleanups.values()) cleanup();
     dragCleanups.clear();
-    debugOverlay.dispose();
     grid.replaceChildren();
   };
 

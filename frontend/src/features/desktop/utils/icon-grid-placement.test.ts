@@ -3,7 +3,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { planPlacement, reflowPositions, type GridMetrics } from './icon-grid';
+import { planPlacement, reflowPositions } from './icon-grid-placement';
+import type { GridMetrics } from './icon-grid';
 import type { WorkspaceNode } from '../../runtime/workspace/types';
 
 const metrics: GridMetrics = {

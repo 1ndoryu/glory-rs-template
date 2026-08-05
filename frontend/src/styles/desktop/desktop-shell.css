@@ -127,31 +127,10 @@
   background: var(--sistema-inverso-fondo);
 }
 
-/* [297A-20][DEPURACION TEMPORAL] Límite del grid en rojo + celdas visibles.
- * Activar con Ctrl+Shift+G. PENDIENTE: eliminar con el toggle en
- * workspace-icon-grid.ts cuando se resuelva el tema de celdas inferiores. */
-.desktop-icon-grid--depurar {
-  outline: 2px dashed #ff0000;
-  outline-offset: -1px;
-}
-
-.desktop-icon-grid__debug {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 2;
-}
-
-.desktop-icon-grid__debug-celda {
-  position: absolute;
-  box-sizing: border-box;
-  border: 1px solid rgba(255, 0, 0, 0.55);
-  display: grid;
-  place-items: center;
-  font: 10px/1 var(--fuente-sistema-pixel);
-  color: rgba(255, 0, 0, 0.9);
-  pointer-events: none;
-}
+/* [018A-97] La rejilla roja de debug (Ctrl+Shift+G) y sus clases
+ * .desktop-icon-grid--depurar/__debug/__debug-celda se retiraron junto con
+ * debug-grid-overlay.ts: el DoD del plan 018A-97 exige sin código de
+ * depuración en producción. */
 
 /* [Plan 297A-11 §9.4] Icon drag states */
 .desktop-icon--dragging {

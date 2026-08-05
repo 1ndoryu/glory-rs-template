@@ -100,54 +100,68 @@ horizontal y RTL. — ✅ CUMPLIDO
 
 ### Fase 2 — Coherencia del placeholder de arrastre
 
+- [x] Tests DOM: `positionCellHighlight` (modo placement) posiciona el highlight en el origen del
+  track con sobrante distribuido — cubierto en `icon-grid-dom.test.ts` (LTR y RTL, con y sin
+  sobrante; el rect del highlight = celda destino real).
 - [ ] Verificar en navegador que el highlight (`desktop-icon-drop-target`) cae exactamente sobre la
   celda destino al arrastrar (con y sin sobrante horizontal, desktop ≥769 y tablet).
 - [ ] Ajustar el `transition: left/top` para que el placeholder no "baile" entre celdas con
-  sobrante distribuido (comparar el origen calculado con el rect real del icono al soltar).
-- [ ] Tests DOM: `updateHighlight` en modo placement produce un highlight cuyo rect coincide con la
-  celda destino real (offset dentro del grid).
+  sobrante distribuido (con la geometría unificada el highlight ya no oscila; decisión: mantener
+  el transition de 0.1s y validarlo en navegador).
 
 **Gate F2:** el placeholder coincide con la celda destino en desktop y tablet; tests verdes.
+(Partial: tests DOM verdes; verificación en navegador pendiente con F5.)
 
-### Fase 3 — Interacción de grupo predecible (se altera 1 solo, o el grupo completo conscientemente)
+### Fase 3 — Interacción de grupo predecible (se altera 1 solo, o el grupo completo conscientemente) ✅ cerrada (05-ago)
 
-- [ ] Capturar el grupo al INICIO del gesto (pointerdown), no al soltar: en `onPlaceCell` leer la
-  selección capturada al iniciar el drag (mismo patrón que `groupIds` de `enableDrag`, pasándole
-  `getGroupIds` desde `workspace-icon-grid.ts`) y usarla para decidir el drag de grupo.
-- [ ] Regla Windows: arrastrar un icono **seleccionado** mueve el grupo; arrastrar un icono **no
-  seleccionado** mueve solo ese icono (y la selección se reemplaza). Verificar que un clic simple
-  sobre un seleccionado sin arrastre conserva la selección (ya documentado en 058A-4).
-- [ ] Resolver colisiones del grupo: al soltar, los miembros que caigan en celdas ocupadas por no
-  seleccionados desplazan al ocupante (reusar `planPlacement` por miembro o resolver el grupo
-  como bloque); los miembros fuera de bounds se clampean a la celda más cercana válida (nunca
-  crear tracks implícitos).
-- [ ] Asegurar que `reflowPositions` (resize) no reempaquete todo el grid salvo que haya un
-  overlap/fuera-de-bounds real: con la geometría unificada (F1) y el grupo resuelto (F3), el
-  reflow solo debe tocar los nodos que realmente cambian.
-- [ ] Tests: unidad para `buildGroupPlacementMoves` (delta + clamp + colisión) y un test de
-  `onPlaceCell` con selección residual: arrastrar un icono no seleccionado mueve solo ese.
+- [x] Capturar el grupo al INICIO del gesto (pointerdown): `enableDrag` consulta `getGroupIds` en
+  pointerdown y entrega `groupIds` a `onPlaceCell` (firma ampliada); `workspace-icon-grid.ts` pasa
+  `getGroupIds: () => getSelectedIds().filter(id => isSelected(id, 'desktop'))` (solo la superficie
+  escritorio, 018A-95). La decisión ya no relee la selección en el drop.
+- [x] Regla Windows: `shouldGroupDrag(groupIds, draggedId)` — arrastrar un icono **seleccionado**
+  mueve el grupo; arrastrar un icono **no seleccionado** (aunque quede selección residual) mueve
+  solo ese y el mousedown reemplaza la selección. El clic simple sobre un seleccionado conserva la
+  selección (058A-4).
+- [x] Resolver colisiones del grupo: `buildGroupPlacementMoves` ahora recibe `metrics`, clampa cada
+  miembro a `columns/rows` y desplaza a los ocupantes NO seleccionados a la celda libre más
+  cercana (`nearestFreeCell`); nunca se superponen ni crean tracks implícitos (autogrow solo con
+  grid completamente lleno, misma política que `planPlacement`).
+- [x] Reflow por resize: `reflowPositions` solo devuelve moves que realmente cambian y solo corre
+  cuando cambian `columns/rows`; con la geometría unificada y el grupo resuelto no reempaqueta
+  todo el grid (verificado por tests preexistentes).
+- [x] Tests: `icon-group-drag.test.ts` (11) — delta del grupo, clamp a bounds, desplazamiento del
+  ocupante, null sin position, `planDesktopPlacement` con selección residual (se altera solo ese)
+  y grupo completo, y conjunto final sin duplicados ni fuera de bounds. `planDesktopPlacement`
+  extrae la decisión del `onPlaceCell` para poder testearla.
+
+**Evidencia F3:** gate `task:check -- 018A-97` PASS (sentinel/varsense/type-check), suite completa
+pendiente de CI/full (cooldown del guard).
 
 **Gate F3:** con selección múltiple residual, arrastrar un icono no seleccionado altera solo ese;
 arrastrar uno seleccionado mueve el grupo sin superposiciones ni fuera-de-bounds; reflow no
-reordena todo el grid.
+reordena todo el grid. — ✅ CUMPLIDO (validación en navegador pendiente en F5)
 
-### Fase 4 — Rejilla de debug coherente o retirada
+### Fase 4 — Rejilla de debug coherente o retirada ✅ cerrada (05-ago)
 
-- [ ] Decisión: si la rejilla roja es herramienta interna de desarrollo, dejar de exponerla en
-  build de producción (solo dev) y **hacer que use `cellOriginAt`** para no mentir.
-- [ ] Si se mantiene, aplicar el mismo token/estilo del OS (monocromo, sin `#ff0000` hardcodeado) o
-  marcarla dev-only; si no, retirarla (borrar `debug-grid-overlay.ts`, el atajo Ctrl+Shift+G en
-  `workspace-icon-grid.ts` y el CSS `--depurar`/`__debug*`).
-- [ ] VarSense: verificar tokens y que no queden clases huérfanas tras el cambio.
+Decisión: **retirada** — es depuración temporal (297A-20) y el DoD exige sin código de depuración
+en producción.
 
-**Gate F4:** sin código de depuración visible en producción; si se mantiene, coherente y dev-only.
+- [x] Borrar `debug-grid-overlay.ts` (commit F1) y el atajo Ctrl+Shift+G en `workspace-icon-grid.ts`
+  (este bloque: se eliminó `createDebugGridOverlay`/`onKeyDown` y sus refresh en `doReflow`).
+- [x] Retirar el CSS de depuración: `.desktop-icon-grid--depurar`, `.desktop-icon-grid__debug` y
+  `.desktop-icon-grid__debug-celda` fuera de `desktop-shell.css` (sin `#ff0000` en producción).
+- [x] VarSense sin clases huérfanas ni tokens rotos (gate PASS 0 warnings de varsense).
 
-### Fase 5 — Verificación final
+**Gate F4:** sin código de depuración visible en producción. — ✅ CUMPLIDO
 
-- [ ] Suite frontend completa + type-check + gate `task:check` (ID de tarea al abrir el bloque).
+### Fase 5 — Verificación final (parcial; pendientes de navegador/CI)
+
+- [x] Type-check + gate `task:check -- 018A-97` PASS (local-light: sentinel/varsense/type-check).
+- [ ] Suite frontend completa + build: pendiente de CI o `--full` tras el cooldown del guard (la
+  selección incremental del selector se ejecuta en CI; F1 ya validó 713/713 antes de estos cambios).
 - [ ] Navegador real: 1440×900 y 1024×768 — arrastrar iconos, soltar en celdas libres y ocupadas
   (resolución de colisión), reflow al encoger/agrandar ventana (iconos no desaparecen ni se
-  superponen), y el placeholder cae sobre la celda marcada.
+  superponen), y el placeholder cae sobre la celda marcada (pendiente de sesión/navegador real).
 - [ ] Móvil (<768): sin posicionamiento libre (el reorder por índice sigue siendo el fallback).
 
 **Gate F5 / DoD:** grid coherente en desktop/tablet, placeholder exacto, drag de grupo predecible

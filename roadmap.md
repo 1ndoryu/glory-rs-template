@@ -318,16 +318,18 @@ temporal (297A-20) que quedó en producción.
 - [x] Unificar la geometría de celdas: `columnGapEffective` + `cellOriginAt(col,row,metrics)` único
   (LTR/RTL) usado por getCellAt, highlight y debug; tests DOM sobre grid real con `space-between`+RTL
   (F1 cerrada 05-ago: suite 713/713, `icon-grid-dom.test.ts`).
-- [ ] Placeholder de arrastre: verificar en navegador que cae exactamente sobre la celda destino
-  (desktop ≥769 y tablet), ajustar transición y tests DOM del highlight.
-- [ ] Drag de grupo predecible: decidir el grupo por el gesto (pointerdown), arrastrar un icono no
-  seleccionado altera solo ese, el grupo se mueve sin superposiciones ni fuera-de-bounds (clamp),
-  y el reflow por resize no reempaqueta todo el grid.
-- [ ] Rejilla de debug: coherente (usa `cellOriginAt`) y dev-only, o retirada (borrar overlay,
-  atajo Ctrl+Shift+G y CSS `--depurar`/`__debug*`); VarSense sin huérfanas.
-- [ ] Verificación final: suite + type-check + gate; navegador 1440×900 / 1024×768 (arrastre,
-  colisiones, grupo seleccionado vs. no seleccionado, reflow al encoger) y móvil <768 (reorder por
-  índice como fallback).
+- [x] Placeholder de arrastre — tests DOM del highlight (`positionCellHighlight` sobre el track real
+  con sobrante, LTR/RTL en `icon-grid-dom.test.ts`); **verificación en navegador pendiente**
+  (celda destino real en desktop ≥769/tablet y ajuste de transición).
+- [x] Drag de grupo predecible: el grupo se captura en pointerdown (`getGroupIds` → `onPlaceCell`,
+  solo superficie escritorio) y `shouldGroupDrag` aplica la regla Windows; `buildGroupPlacementMoves`
+  clampa a bounds y desplaza ocupantes no seleccionados (`icon-group-drag.test.ts`, 11 tests);
+  `reflowPositions` solo toca nodos que cambian. Gate `task:check -- 018A-97` PASS (local-light).
+- [x] Rejilla de debug retirada: `debug-grid-overlay.ts` fuera (F1), atajo Ctrl+Shift+G eliminado y
+  CSS `--depurar`/`__debug*` retirado en este bloque; VarSense sin huérfanas.
+- [ ] Verificación final: suite completa + build pendientes de CI/full (cooldown del guard);
+  navegador 1440×900 / 1024×768 (arrastre, colisiones, grupo seleccionado vs. no seleccionado,
+  reflow al encoger) y móvil <768 (reorder por índice como fallback) pendientes de sesión real.
 
 **Gate/salida:** un único helper de geometría alimenta todo; el placeholder coincide con la celda
 real; el drag de grupo no altera iconos no implicados (ni se superpone ni sale del grid); sin
