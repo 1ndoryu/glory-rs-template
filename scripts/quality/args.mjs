@@ -1,7 +1,6 @@
 const TASK_ID_PATTERN = /^\d{2}[1-9ABC][A-Z]-\d+$/;
 
-export function parseArgs(rawArgs) {
-  const options = { fresh: false, full: false, ci: false, allowHeavy: false, debug: false, profiles: [], heavyReason: null };
+export function parseArgs(rawArgs) {    const options = { fresh: false, full: false, ci: false, allowHeavy: false, debug: false, profiles: [], heavyReason: null, scopeManifest: null };
   const positional = [];
 
   for (let index = 0; index < rawArgs.length; index += 1) {
@@ -14,6 +13,11 @@ export function parseArgs(rawArgs) {
       const reason = rawArgs[index + 1];
       if (!reason || reason.startsWith('--')) throw new Error('Falta valor para --heavy-reason');
       options.heavyReason = reason;
+      index += 1;
+    } else if (value === '--scope-manifest') {
+      const manifest = rawArgs[index + 1];
+      if (!manifest || manifest.startsWith('--')) throw new Error('Falta valor para --scope-manifest');
+      options.scopeManifest = manifest;
       index += 1;
     } else if (value === '--debug') options.debug = true;
     else if (value === '--base') {

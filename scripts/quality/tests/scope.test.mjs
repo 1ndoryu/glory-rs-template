@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { expandLocalDependencies, matches, resolveExplicitProfiles, resolveFullDecision } from '../scope.mjs';
+import { expandLocalDependencies, loadInjectedScope, matches, resolveExplicitProfiles, resolveFullDecision } from '../scope.mjs';
 
 test('scope usa globs deterministas y normaliza separadores', () => {
   assert.equal(matches('frontend/src/router.ts', 'frontend/**/*.ts'), true);
@@ -45,6 +45,124 @@ test('scope incluye dependencias locales en el fingerprint incremental', async (
     await writeFile(path.join(root, 'entry.ts'), "import { value } from './dependency';\nexport { value };\n", 'utf8');
     await writeFile(path.join(root, 'dependency.ts'), 'export const value = 1;\n', 'utf8');
     assert.deepEqual(await expandLocalDependencies(root, ['entry.ts']), ['dependency.ts', 'entry.ts']);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('loadInjectedScope replica el transporte local-light sin tocar git (028A-8 Fase 0)', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'quality-injected-'));
+  try {
+    const reportRoot = path.join(root, '.quality-reports', 'branch-key', '028A-16');
+    await mkdir(reportRoot, { recursive: true });
+    await writeFile(path.join(root, 'entry.ts'), "import { value } from './dependency';\nexport { value };\n", 'utf8');
+    await writeFile(path.join(root, 'dependency.ts'), 'export const value = 1;\n', 'utf8');
+    await writeFile(path.join(root, 'deleted.ts'), 'export const gone = true;\n', 'utf8');
+    const manifestPath = path.join(root, 'fixture.json');
+    /* Forma real del fixture de bench: el borrado vive SOLO en deletedFiles
+     * (no en files); el fingerprint debe sembrarlo igual que un git delete. */
+    await writeFile(manifestPath, JSON.stringify({
+      schemaVersion: 1,
+      files: ['entry.ts'],
+      deletedFiles: ['deleted.ts'],
+      profiles: ['frontend', 'css'],
+      requestedFull: false,
+      automaticFull: false,
+      effectiveFull: false,
+    }), 'utf8');
+    const context = { projectRoot: root, reportRoot };
+    const scope = await loadInjectedScope(context, { scopeManifest: manifestPath });
+    /* El borrado simulado se excluye del transporte plano (igual que git D). */
+    const transport = await readFile(path.join(reportRoot, 'changed-files.txt'), 'utf8');
+    assert.equal(transport.includes('deleted.ts'), false);
+    assert.equal(transport.includes('entry.ts'), true);
+    /* Fingerprint por dependencias locales, como detectScope local-light: el
+     * borrado simulado queda sembrado (expandLocalDependencies ordena). */
+    assert.deepEqual(scope.fingerprintFiles, ['deleted.ts', 'dependency.ts', 'entry.ts']);
+    assert.deepEqual(scope.profiles, new Set(['frontend', 'css']));
+    assert.equal(scope.effectiveFull, false);
+    assert.equal(scope.executionFull, false);
+    /* Manifiesto persistido con el fingerprint calculado. */
+    const persisted = JSON.parse(await readFile(path.join(reportRoot, 'scope-manifest.json'), 'utf8'));
+    assert.deepEqual(persisted.deletedFiles, ['deleted.ts']);
+    assert.deepEqual(persisted.fingerprintFiles, ['deleted.ts', 'dependency.ts', 'entry.ts']);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('loadInjectedScope rechaza manifiestos o rutas fuera del workspace', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'quality-injected-safe-'));
+  try {
+    const reportRoot = path.join(root, 'reports');
+    await mkdir(reportRoot, { recursive: true });
+    const context = { projectRoot: root, reportRoot };
+    /* Manifiesto fuera del workspace. */
+    await assert.rejects(
+      loadInjectedScope(context, { scopeManifest: path.join(os.tmpdir(), 'outside.json') }),
+      /fuera del workspace/,
+    );
+    /* Manifiesto inválido (JSON roto). */
+    const broken = path.join(root, 'broken.json');
+    await writeFile(broken, '{no-json', 'utf8');
+    await assert.rejects(loadInjectedScope(context, { scopeManifest: broken }), /scope-manifest inválido/);
+    /* Ruta que escapa del workspace dentro del manifiesto. */
+    const evil = path.join(root, 'evil.json');
+    await writeFile(evil, JSON.stringify({ files: ['../outside.ts'], deletedFiles: [] }), 'utf8');
+    await assert.rejects(loadInjectedScope(context, { scopeManifest: evil }), /fuera del workspace/);
+    const absolute = path.join(root, 'absolute.json');
+    await writeFile(absolute, JSON.stringify({ files: ['/etc/passwd'], deletedFiles: [] }), 'utf8');
+    await assert.rejects(loadInjectedScope(context, { scopeManifest: absolute }), /fuera del workspace/);
+    /* Manifiesto symlink que apunta fuera del workspace. */
+    const outside = path.join(os.tmpdir(), `outside-${Date.now()}.json`);
+    await writeFile(outside, JSON.stringify({ files: ['entry.ts'], deletedFiles: [] }), 'utf8');
+    const linked = path.join(root, 'linked.json');
+    await symlink(outside, linked, 'file');
+    await assert.rejects(loadInjectedScope(context, { scopeManifest: linked }), /no puede ser symlink/);
+    await rm(outside, { force: true });
+    /* Manifiesto inexistente. */
+    await assert.rejects(
+      loadInjectedScope(context, { scopeManifest: path.join(root, 'nope.json') }),
+      /no existe/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('loadInjectedScope replica el deferimiento del guard en manifiestos full (028A-8)', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'quality-injected-defer-'));
+  try {
+    const reportRoot = path.join(root, 'reports');
+    await mkdir(reportRoot, { recursive: true });
+    await writeFile(path.join(root, 'entry.ts'), 'export const value = 1;\n', 'utf8');
+    const manifestPath = path.join(root, 'full.json');
+    await writeFile(manifestPath, JSON.stringify({
+      schemaVersion: 1,
+      files: ['entry.ts'],
+      deletedFiles: [],
+      requestedFull: true,
+      automaticFull: true,
+      effectiveFull: true,
+      fullReason: 'requested',
+    }), 'utf8');
+    const context = { projectRoot: root, reportRoot };
+    /* Sin deferir: full efectivo. */
+    const full = await loadInjectedScope(context, { scopeManifest: manifestPath });
+    assert.equal(full.effectiveFull, true);
+    assert.equal(full.fullReason, 'requested');
+    /* Tras la denegación del guard: efectivo local-light, fingerprint full. */
+    const deferred = await loadInjectedScope(context, {
+      scopeManifest: manifestPath,
+      heavyDeferred: { reason: 'guard', nextAllowedAt: null },
+    });
+    assert.equal(deferred.effectiveFull, false);
+    assert.equal(deferred.executionFull, false);
+    assert.equal(deferred.heavyDeferred, true);
+    assert.equal(deferred.fullReason, 'heavy-deferred');
+    const persisted = JSON.parse(await readFile(path.join(reportRoot, 'scope-manifest.json'), 'utf8'));
+    assert.equal(persisted.effectiveFull, false);
+    assert.equal(persisted.fullReason, 'heavy-deferred');
   } finally {
     await rm(root, { recursive: true, force: true });
   }

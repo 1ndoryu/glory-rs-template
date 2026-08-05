@@ -7,7 +7,7 @@ import { createReport, printCompact } from './reporter.mjs';
 import { selectReminders } from './reminders.mjs';
 import { cancelAll } from './runner.mjs';
 import { acquireTaskLock } from './lock.mjs';
-import { detectScope } from './scope.mjs';
+import { detectScope, loadInjectedScope } from './scope.mjs';
 import { stageDefinitions } from './stage-definitions.mjs';
 import { isFullExecution } from './profile-contract.mjs';
 import { runBoundedStages } from './stage-runner.mjs';
@@ -28,8 +28,16 @@ async function executeStage(context, scope, definition, options) {
   const stageFingerprint = await fingerprint(context, scope, definition.name);
   let missReason = options.fresh ? 'fresh' : options.ci ? 'ci' : null;
   if (!options.fresh && !options.ci) {
+    const replayStartedAt = Date.now();
     const cached = await readCachedPass(context, definition.name, stageFingerprint);
-    if (cached) return { ...cached, cache: 'hit', cacheReason: 'match' };
+    if (cached) {
+      /* [028A-8 Fase 0] Un cache hit NO debe reproducir el durationMs original
+       * (el de la corrida que creó la caché): el reporte y el benchmark
+       * mostrarían una etapa incremental lenta cuando en realidad fue un
+       * replay instantáneo. Se mide el tiempo real del replay y se conserva
+       * la marca cache:'hit' para distinguir análisis de reutilización. */
+      return { ...cached, cache: 'hit', cacheReason: 'match', durationMs: Date.now() - replayStartedAt };
+    }
     /* [028A-8 Fase 4] La razón de invalidación (no-entry, fingerprint-mismatch,
      * not-pass) se captura ANTES de ejecutar: writeCachedPass solo escribe en
      * PASS y con el fingerprint exacto, así que un probe posterior devolvería
@@ -101,7 +109,11 @@ async function main() {
       isCancelled: () => interrupted,
     });
     try {
-      let scope = await detectScope(context, args);
+      /* [028A-8 Fase 0] Un scope-manifest inyectado (fixtures del benchmark)
+       * sustituye la detección git: alcance determinista sin mutar el árbol
+       * compartido. Los fixtures son local-light (effectiveFull=false), así
+       * que el bloqueo del guard pesado nunca se activa en este camino. */
+      let scope = args.scopeManifest ? await loadInjectedScope(context, args) : await detectScope(context, args);
       let heavyLease = null;
       const previousHeavyToken = process.env.GLORY_HEAVY_RUN_TOKEN;
       /* [028A-8] El lease se solicita cuando el alcance efectivo ejecutará las
@@ -126,7 +138,11 @@ async function main() {
           args.heavyDeferred = heavyLease;
           context.full = false;
           context.heavyDeferred = heavyLease;
-          scope = await detectScope(context, args);
+          /* [028A-8 Fase 0] Un scope inyectado (--scope-manifest) se re-carga
+           * en vez de caer a detección git: loadInjectedScope replica el
+           * diferimiento del guard (effectiveFull=false) sin descartar la
+           * decisión del manifiesto. */
+          scope = args.scopeManifest ? await loadInjectedScope(context, args) : await detectScope(context, args);
           process.stderr.write(`[quality] FULL diferido: ${formatHeavyGuardMessage(heavyLease)}\n`);
           process.stderr.write('[quality] Se ejecutará el modo local-light para no bloquear el equipo.\n');
         }

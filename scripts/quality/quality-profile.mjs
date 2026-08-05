@@ -146,4 +146,8 @@ async function main() {
   }
 }
 
-await main();
+/* [028A-8] Guarda de entrada: importar las funciones puras desde un test no
+ * debe escribir perfiles ni leer reportes (efecto lateral). */
+const isEntryPoint = typeof process.argv[1] === 'string'
+  && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isEntryPoint) await main();

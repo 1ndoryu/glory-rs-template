@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { aggregateRuns, formatBaseline } from '../bench-baseline.mjs';
+import { aggregateRuns, formatBaseline, normalizeGateResult } from '../bench-baseline.mjs';
 
 function run(taskId, durationMs, stages) {
   return { taskId, durationMs, stages };
@@ -51,4 +51,29 @@ test('formatBaseline imprime p50/p95 por modo y etapa', () => {
   assert.match(lines[0], /028A-16/);
   assert.match(lines[1], /clean: total p50 100ms · p95 200ms/);
   assert.ok(lines.some(line => line.includes('sentinel') && line.includes('p50 50ms')));
+});
+
+test('formatBaseline etiqueta fixtures sintéticos sin undefined (028A-8 Fase 0)', () => {
+  const baseline = {
+    taskId: '028A-16',
+    fixture: { id: 'small', changeTypes: ['ts', 'css'], files: 2, deletedFiles: 0 },
+    clean: { runs: 0, total: { p50: null, p95: null }, stages: [] },
+    incremental: { runs: 0, total: { p50: null, p95: null }, stages: [] },
+  };
+  const lines = formatBaseline(baseline);
+  assert.match(lines[0], /small — ts,css · 2 archivos/);
+  assert.equal(lines[0].includes('undefined'), false);
+});
+
+test('normalizeGateResult resuelve code 0 en éxito y el exit code real en rechazo (028A-8)', () => {
+  /* Regresión 1e2628bd: execFile resuelve sin campo `code`; la comprobación
+   * `result.code !== 0` marcaba fallida toda ejecución exitosa. */
+  const resolved = normalizeGateResult({ stdout: 'ok', stderr: '' }, null);
+  assert.equal(resolved.code, 0);
+  assert.equal(resolved.stdout, 'ok');
+  const rejected = normalizeGateResult(null, { code: 2, stderr: 'boom' });
+  assert.equal(rejected.code, 2);
+  assert.equal(rejected.stderr, 'boom');
+  const withoutCode = normalizeGateResult(null, { message: 'ENOENT' });
+  assert.equal(withoutCode.code, 1);
 });

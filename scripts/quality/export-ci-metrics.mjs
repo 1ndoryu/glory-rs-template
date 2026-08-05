@@ -58,4 +58,8 @@ async function main() {
   process.stdout.write(`[ci-metrics] ${runs.length} ejecuciones exportadas a ${path.relative(projectRoot, outputPath)}\n`);
 }
 
-await main();
+/* [028A-8 Fase 4] Guarda de entrada: importar las funciones de agregación
+ * desde un test no debe leer reportes ni escribir ci-metrics.json. */
+const isEntryPoint = typeof process.argv[1] === 'string'
+  && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isEntryPoint) await main();

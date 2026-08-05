@@ -29,3 +29,11 @@ test('parseArgs acepta --heavy-reason y exige su valor (028A-16)', () => {
   assert.throws(() => parseArgs(['297A-6', '--heavy-reason']), /Falta valor para --heavy-reason/);
   assert.throws(() => parseArgs(['297A-6', '--heavy-reason', '--full']), /Falta valor para --heavy-reason/);
 });
+
+test('parseArgs acepta --scope-manifest para fixtures del benchmark (028A-8)', () => {
+  const args = parseArgs(['297A-6', '--scope-manifest', 'fixtures/small.json']);
+  assert.equal(args.scopeManifest, 'fixtures/small.json');
+  assert.equal(args.scopeManifest !== null, true);
+  assert.throws(() => parseArgs(['297A-6', '--scope-manifest']), /Falta valor para --scope-manifest/);
+  assert.throws(() => parseArgs(['297A-6', '--scope-manifest', '--fresh']), /Falta valor para --scope-manifest/);
+});

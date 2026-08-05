@@ -1,4 +1,4 @@
-import { access, readFile, writeFile } from 'node:fs/promises';
+import { access, lstat, readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { runProcess } from './runner.mjs';
@@ -273,4 +273,82 @@ export async function detectScope(context, args) {
     changedFilesPath,
     manifestPath,
   };
+}
+
+/* [028A-8 Fase 0] Alcance inyectado para fixtures del benchmark: en lugar de
+ * descubrir cambios vía git (que mutaría el árbol compartido), se carga un
+ * scope-manifest determinista que referencía archivos reales. Reutiliza
+ * manifestToScope (observe) y replica el transporte de detectScope en
+ * local-light: changed-files.txt con los archivos presentes (los simulados
+ * como borrados/renombrados se excluyen, igual que un git delete), el
+ * manifiesto persistido y el fingerprint por dependencias locales. Seguridad:
+ * el manifiesto y sus rutas deben vivir dentro del workspace (rutas relativas).
+ * El gate usa este camino solo cuando --scope-manifest está presente; el
+ * flujo por git no cambia. */
+export async function loadInjectedScope(context, args) {
+  const manifestPath = path.resolve(args.scopeManifest);
+  const root = path.resolve(context.projectRoot);
+  if (manifestPath !== root && !manifestPath.startsWith(`${root}${path.sep}`)) {
+    throw new Error(`scope-manifest fuera del workspace: ${args.scopeManifest}`);
+  }
+  /* [028A-8] El manifiesto no puede ser un symlink que apunte fuera del
+   * workspace: igual que los módulos de retención, se valida con lstat antes
+   * de leerlo (un symlink pasaría el check de prefijo). */
+  let manifestMeta;
+  try { manifestMeta = await lstat(manifestPath); }
+  catch (error) {
+    if (error?.code === 'ENOENT') throw new Error(`scope-manifest no existe: ${args.scopeManifest}`);
+    throw error;
+  }
+  if (manifestMeta.isSymbolicLink()) throw new Error('scope-manifest no puede ser symlink');
+  let manifest;
+  try { manifest = JSON.parse(await readFile(manifestPath, 'utf8')); }
+  catch (error) { throw new Error(`scope-manifest inválido: ${error.message}`); }
+  for (const relative of [...(manifest.files ?? []), ...(manifest.deletedFiles ?? [])]) {
+    if (typeof relative !== 'string' || relative.trim().length === 0
+      || path.isAbsolute(relative) || normalize(relative).startsWith('../')) {
+      throw new Error(`scope-manifest: ruta fuera del workspace: ${relative}`);
+    }
+  }
+  const scope = manifestToScope(manifest, context.reportRoot);
+  /* [028A-8] Si el guard denegó el full del manifiesto (args.heavyDeferred
+   * llega desde task-check tras la denegación), se replica la semántica de
+   * detectScope: el fingerprint conserva la intención full pero la ejecución
+   * efectiva queda en local-light. Sin esto, re-cargar el manifiesto tras la
+   * denegación volvería a marcar effectiveFull=true y re-dispararía el lease. */
+  if (args.heavyDeferred) {
+    scope.effectiveFull = false;
+    scope.executionFull = false;
+    scope.heavyDeferred = true;
+    scope.fullReason = 'heavy-deferred';
+  }
+  const files = [...new Set(scope.files)].sort();
+  /* [028A-8] Misma semántica que detectScope: un git delete queda en `files`
+   * y se siembra en el fingerprint (como [missing:path] si ya no existe). Los
+   * borrados/renombres simulados del fixture se siembran igual, así que un
+   * cambio en un archivo "borrado" invalida la caché como un borrado real.
+   * En full (manifiesto pedido) se aproxima el conjunto completo con los
+   * archivos del manifiesto (los fixtures son local-light; el caso full
+   * inyectado es diagnóstico y queda documentado). */
+  const fingerprintFiles = scope.effectiveFull
+    ? [...new Set([...files, ...scope.deletedFiles])].sort()
+    : await expandLocalDependencies(context.projectRoot, [...files, ...scope.deletedFiles]);
+  const existingFiles = files.filter(file => !scope.deletedFiles.includes(file));
+  await writeFile(scope.changedFilesPath, `${existingFiles.join('\n')}\n`, 'utf8');
+  await writeAtomic(scope.manifestPath, `${JSON.stringify({
+    schemaVersion: 1,
+    generatedAt: new Date().toISOString(),
+    base: scope.base ?? 'HEAD',
+    requestedFull: scope.requestedFull,
+    automaticFull: scope.automaticFull,
+    effectiveFull: scope.effectiveFull,
+    fullReason: scope.fullReason ?? 'incremental',
+    heavyDeferred: scope.heavyDeferred ? { reason: args.heavyDeferred?.reason ?? 'guard' } : null,
+    profiles: [...scope.profiles],
+    profileOverride: scope.profileOverride,
+    files,
+    deletedFiles: scope.deletedFiles,
+    fingerprintFiles,
+  }, null, 2)}\n`);
+  return { ...scope, files, fingerprintFiles };
 }
