@@ -15,6 +15,10 @@
  *   ni siquiera con --force (--force solo afecta a task:take).
  * - El registro vive en `.quality-reports/task-takeover/<taskId>.json`
  *   (ignorado por git): es coordinación local del checkout, no un contrato.
+ * - Un marcado ilegible (JSON roto o esquema desconocido) no pertenece a
+ *   nadie: `status` lo lista como corrupto y `take`/`release` lo retiran
+ *   para poder re-tomar la tarea (antes bloqueaba el re-toma para siempre
+ *   con un falso "carrera de escritura").
  * - `task:check` solo informa/recuerda; nunca toma ni libera por sorpresa.
  *
  * Seguridad: el taskId se valida contra un patrón seguro (nada de traversal),
@@ -30,6 +34,11 @@ import { projectRoot } from './preflight.mjs';
 
 export const TAKEOVER_TTL_MS = 6 * 60 * 60 * 1000;
 export const TAKEOVER_SCHEMA_VERSION = 1;
+
+/* Centinela para marcados presentes pero ilegibles (JSON roto o esquema
+ * desconocido): no pertenecen a nadie; `status` los lista como corruptos y
+ * cualquier agente puede retirarlos con take/release. [018A-97] */
+export const CORRUPT_TAKEOVER = Symbol('corrupt-takeover');
 
 const SAFE_TASK_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u;
 
@@ -81,16 +90,25 @@ export function sanitizeAgentName(value) {
 }
 
 export async function readTakeover(root, taskId) {
+  let raw;
   try {
-    const raw = await readFile(takeoverEntryPath(root, taskId), 'utf8');
+    raw = await readFile(takeoverEntryPath(root, taskId), 'utf8');
+  } catch (error) {
+    /* Marcado inexistente (o leído a medias por otro proceso): sin tomar. */
+    if (error?.code === 'ENOENT') return null;
+    throw error;
+  }
+  try {
     const entry = JSON.parse(raw);
-    if (entry?.schemaVersion !== TAKEOVER_SCHEMA_VERSION || typeof entry.takenAtMs !== 'number') return null;
+    if (entry?.schemaVersion !== TAKEOVER_SCHEMA_VERSION || typeof entry.takenAtMs !== 'number') {
+      /* Archivo presente pero ilegible/ajeno: se distingue del "sin tomar"
+       * para que status lo liste y el re-toma lo retire (antes un marcado
+       * corrupto bloqueaba la tarea para siempre con un falso conflicto). */
+      return CORRUPT_TAKEOVER;
+    }
     return entry;
   } catch (error) {
-    /* Archivo inexistente o JSON corrupto (otro proceso escribiendo a medias
-     * o registro dañado): ambos se tratan como “sin tomar”, nunca como error
-     * que bloquee el gate. Un archivo corrupto persiste hasta ser re-tomado. */
-    if (error?.code === 'ENOENT' || error instanceof SyntaxError) return null;
+    if (error instanceof SyntaxError) return CORRUPT_TAKEOVER;
     throw error;
   }
 }
@@ -110,9 +128,13 @@ export async function listTakeovers(root, nowMs = Date.now()) {
     const taskId = name.slice(0, -'.json'.length);
     try {
       const entry = await readTakeover(root, taskId);
-      if (entry) entries.push({ taskId, entry, stale: isStale(entry, nowMs) });
+      if (entry === CORRUPT_TAKEOVER) {
+        /* Marcado ilegible: se lista como corrupto, no se aborta el listado. */
+        entries.push({ taskId, entry: null, stale: false, corrupt: true });
+      } else if (entry) {
+        entries.push({ taskId, entry, stale: isStale(entry, nowMs) });
+      }
     } catch {
-      /* Marcado ilegible/corrupto: se informa pero no aborta el listado. */
       entries.push({ taskId, entry: null, stale: false, corrupt: true });
     }
   }
@@ -130,6 +152,11 @@ export async function takeTask(root, taskId, { by = defaultAgent(), force = fals
   const target = takeoverEntryPath(root, taskId);
   await mkdir(path.dirname(target), { recursive: true });
   const existing = await readTakeover(root, taskId);
+  if (existing === CORRUPT_TAKEOVER) {
+    /* Marcado ilegible: no es de nadie; se retira y se toma de cero. */
+    await unlink(target).catch(() => {});
+    return { status: 'taken-over-corrupt', entry: await writeEntry(target, taskId, agent, nowMs) };
+  }
   if (existing && existing.takenBy === agent) {
     /* Re-toma del mismo agente (con o sin --force): renueva el marcado.
      * El archivo ya existe, así que se reemplaza atómicamente, no con `wx`. */
@@ -163,6 +190,12 @@ export async function takeTask(root, taskId, { by = defaultAgent(), force = fals
   } catch (error) {
     if (error?.code === 'EEXIST') {
       const other = await readTakeover(root, taskId);
+      if (other === CORRUPT_TAKEOVER) {
+        /* El marcado se corrompió entre la lectura y la escritura (o era
+         * ilegible): retirarlo y reintentar una vez con escritura atómica. */
+        await unlink(target).catch(() => {});
+        return { status: 'taken-over-corrupt', entry: await writeEntry(target, taskId, agent, nowMs) };
+      }
       if (other && !isStale(other, nowMs)) return { status: 'conflict', entry: other };
       return { status: 'conflict', entry: other ?? null };
     }
@@ -209,6 +242,11 @@ export async function releaseTask(root, taskId, { by = defaultAgent(), nowMs = D
   const target = takeoverEntryPath(root, taskId);
   const existing = await readTakeover(root, taskId);
   if (!existing) return { status: 'not-taken', entry: null };
+  if (existing === CORRUPT_TAKEOVER) {
+    /* Marcado ilegible: no es de nadie; cualquier agente puede retirarlo. */
+    await unlink(target).catch(() => {});
+    return { status: 'released-corrupt', entry: null };
+  }
   if (existing.takenBy !== agent && !isStale(existing, nowMs)) {
     return { status: 'conflict', entry: existing };
   }
@@ -223,6 +261,9 @@ export async function releaseTask(root, taskId, { by = defaultAgent(), nowMs = D
 export function takeoverReminders({ taskId, entry, agent = defaultAgent(), nowMs = Date.now() } = {}) {
   if (!entry) {
     return [`Marca la tarea antes de trabajarla: npm run task:take -- --task ${taskId} --by <agente>`];
+  }
+  if (entry === CORRUPT_TAKEOVER) {
+    return [`El marcado de ${taskId} es ilegible: re-tómala con npm run task:take -- --task ${taskId} --by <agente>`];
   }
   const stale = isStale(entry, nowMs);
   if (entry.takenBy === agent) {
@@ -263,9 +304,19 @@ async function main() {
       process.exitCode = 2;
       return;
     }
+    /* [018A-97] ID inválido (traversal, controles): error limpio, no un
+     * stack trace sin controlar desde takeTask. */
+    try {
+      sanitizeTaskId(args.task);
+    } catch (error) {
+      process.stderr.write(`[task-takeover] ${error.message}\n`);
+      process.exitCode = 2;
+      return;
+    }
+    const agent = sanitizeAgentName(args.by ?? defaultAgent());
     const result = command === 'take'
-      ? await takeTask(root, args.task, { by: args.by, force: args.force })
-      : await releaseTask(root, args.task, { by: args.by });
+      ? await takeTask(root, args.task, { by: agent, force: args.force })
+      : await releaseTask(root, args.task, { by: agent });
     const { entry } = result;
     if (result.status === 'conflict' && entry) {
       const stale = isStale(entry);
@@ -282,11 +333,19 @@ async function main() {
       process.exitCode = 1;
       return;
     }
+    if (result.status === 'not-taken') {
+      process.stdout.write(`[task-takeover] NO TOMADA ${args.task} — no había marcado que liberar\n`);
+      return;
+    }
     const verb = {
-      taken: 'TOMADA', refreshed: 'RENOVADA', 'taken-over-stale': 'RE-TOMADA (marcado olvidado liberado)',
+      taken: 'TOMADA', refreshed: 'RENOVADA',
+      'taken-over-stale': 'RE-TOMADA (marcado olvidado liberado)',
+      'taken-over-corrupt': 'RE-TOMADA (registro ilegible retirado)',
       released: 'LIBERADA', 'released-stale': 'LIBERADA (marcado olvidado)',
+      'released-corrupt': 'LIBERADA (registro ilegible retirado)',
     }[result.status] ?? result.status.toUpperCase();
-    process.stdout.write(`[task-takeover] ${verb} ${args.task} · ${entry?.id} · por ${entry?.takenBy}\n`);
+    const who = entry ? ` · ${entry.id} · por ${entry.takenBy}` : ` · por ${agent}`;
+    process.stdout.write(`[task-takeover] ${verb} ${args.task}${who}\n`);
     return;
   }
 
