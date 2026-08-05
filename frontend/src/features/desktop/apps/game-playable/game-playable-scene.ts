@@ -45,6 +45,9 @@ export interface GamePlayableSceneHandle {
   readonly update: (snapshot: WorldSnapshot, localEntityId?: string) => void;
   readonly resize: () => void;
   readonly render: () => void;
+  /* [GAME-01-VIS] Azimuth orbital actual para que el runtime convierta el
+   * input relativo a cámara en dirección de mundo (teclas tipo Genshin). */
+  readonly getCameraAzimuth: () => number;
   readonly streamingStats: () => GamePlayableStreamingStats;
   readonly rendererMetrics: () => GameRendererMetrics;
   readonly batchStats: () => GamePlayableBatchStats;
@@ -60,6 +63,10 @@ const CAMERA_MIN_DISTANCE = 7;
 const CAMERA_MAX_DISTANCE = 30;
 const CAMERA_MIN_POLAR = 0.35;
 const CAMERA_MAX_POLAR = 1.15;
+/* [GAME-01-VIS] Firmeza del follow de cámara (1/s): la cámara se mantiene
+ * pegada al personaje como en un mundo abierto, con suavizado exponencial
+ * independiente del framerate (a 60 fps ≈ 18% por frame). */
+const CAMERA_FOLLOW_RATE = 12;
 const STREAM_HALF_WIDTH = 4;
 const STREAM_HALF_DEPTH = 4;
 /* Culling avanzado: radio circular de visibilidad (unidades de mundo) que
@@ -163,6 +170,7 @@ export function mountGamePlayableScene(
   const entities = new Map<string, THREE.Group>();
   let currentPlayer = { x: 0, z: -0.5 };
   let cameraTarget = new THREE.Vector3(currentPlayer.x, 0, currentPlayer.z);
+  let lastCameraTime = performance.now();
   /* [GAME-01-VIS] Estado orbital: distancia y ángulos que el jugador controla
    * con arrastre (azimuth/polar) y rueda o pellizco (distancia). */
   let orbit = { distance: CAMERA_DISTANCE, azimuth: Math.PI / 4, polar: 0.85 };
@@ -180,8 +188,13 @@ export function mountGamePlayableScene(
   };
 
   const updateCamera = (): void => {
+    /* [GAME-01-VIS] Suavizado exponencial con delta real: el follow de cámara
+     * se siente igual a 30, 60 o 120 fps y nunca se despega del personaje. */
+    const now = performance.now();
+    const dt = Math.min(Math.max((now - lastCameraTime) / 1000, 0), 0.1);
+    lastCameraTime = now;
     const desired = clampTarget(new THREE.Vector3(currentPlayer.x, 0, currentPlayer.z));
-    cameraTarget.lerp(desired, 0.14);
+    cameraTarget.lerp(desired, 1 - Math.exp(-CAMERA_FOLLOW_RATE * dt));
     const sinPolar = Math.sin(orbit.polar);
     const offset = new THREE.Vector3(
       orbit.distance * sinPolar * Math.sin(orbit.azimuth),
@@ -343,6 +356,7 @@ export function mountGamePlayableScene(
     update,
     resize,
     render,
+    getCameraAzimuth: () => orbit.azimuth,
     streamingStats: () => currentStreamingStats,
     rendererMetrics: () => currentRendererMetrics,
     batchStats: () => ({

@@ -13,6 +13,7 @@ import {
   createWorldState,
   simulateTick,
   snapshotFromState,
+  rotateInputToWorld,
   FramePerformanceMonitor,
   type WorldState,
 } from '../../../game-core';
@@ -395,13 +396,18 @@ function mountGamePlayableRuntime(
     const delta = Math.min(Math.max((now - lastTime) / 1000, 0), 0.1);
     lastTime = now;
     const direction = input.getDirection();
+    /* [GAME-01-VIS] Teclas/pad relativos a la cámara: la intención se rota por
+     * el azimuth orbital antes de simular o enviar (W siempre aleja la cámara,
+     * como en Genshin). La simulación y el servidor siguen recibiendo X/Z de
+     * mundo; solo el input cambia de marco. */
+    const worldDirection = rotateInputToWorld(direction, scene.getCameraAzimuth());
     try {
       const networkSnapshot = realtime?.getState() === 'connected'
         ? realtime.getRenderSnapshot(now)
         : null;
       if (networkSnapshot) {
         if (now - lastNetworkMoveAt >= 66) {
-          realtime?.sendMove(normalizeRealtimeDirection(direction));
+          realtime?.sendMove(normalizeRealtimeDirection(worldDirection));
           lastNetworkMoveAt = now;
         }
         scene.update(networkSnapshot, realtime?.getPlayerId() ?? undefined);
@@ -409,7 +415,7 @@ function mountGamePlayableRuntime(
         state = simulateTick(
           state,
           mapResolution.map.world,
-          [{ playerId: 'local', direction, sequence: sequence++ }],
+          [{ playerId: 'local', direction: worldDirection, sequence: sequence++ }],
           delta,
         );
         scene.update(snapshotFromState(state));

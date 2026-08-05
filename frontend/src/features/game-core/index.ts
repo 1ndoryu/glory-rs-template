@@ -5,6 +5,7 @@ export * from './limits';
 export * from './map-validation';
 export * from './spatial-hash';
 export * from './collision';
+export * from './camera-frame';
 export * from './simulation';
 export * from './interpolation';
 export * from './map-version';

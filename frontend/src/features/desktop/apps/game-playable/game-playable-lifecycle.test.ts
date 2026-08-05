@@ -54,6 +54,7 @@ describe('Bosque playable WebGL lifecycle', () => {
       update: vi.fn(),
       resize: vi.fn(),
       render: vi.fn(),
+      getCameraAzimuth: () => 0,
       streamingStats: () => ({ cacheSize: 0, visibleChunks: 0, visibleInstances: 0, visibleAssets: 0 }),
       rendererMetrics: () => ({
         rendererInfoAvailable: true,
