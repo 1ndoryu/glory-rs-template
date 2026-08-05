@@ -21,6 +21,17 @@ test('aggregateRuns calcula p50/p95 por etapa y total (028A-8 Fase 0)', () => {
   assert.equal(sentinel.samples, 2);
 });
 
+test('aggregateRuns excluye ejecuciones fallidas y las cuenta aparte', () => {
+  const aggregate = aggregateRuns([
+    run('T', 500, [{ stage: 'sentinel', durationMs: 100 }]),
+    { failed: true, exitCode: 1, stderr: 'error', taskId: 'T', fresh: false },
+  ]);
+  assert.equal(aggregate.runs, 1);
+  assert.equal(aggregate.failed, 1);
+  assert.equal(aggregate.total.p50, 500);
+  assert.equal(aggregate.stages[0].samples, 1);
+});
+
 test('aggregateRuns ignora duraciones no finitas y etapas sin muestras', () => {
   const aggregate = aggregateRuns([
     run('T', 500, [{ stage: 'sentinel', durationMs: Number.NaN }, { stage: 'docs', durationMs: null }]),

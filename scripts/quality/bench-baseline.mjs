@@ -50,20 +50,41 @@ async function latestMetrics(taskId) {
   return best;
 }
 
-async function runGateOnce(taskId, fresh) {
+async function runGateOnce(taskId, fresh, startedAt = Date.now()) {
   const args = ['scripts/quality/task-check.mjs', taskId];
   if (fresh) args.push('--fresh');
-  const result = await execFileAsync(process.execPath, args, { cwd: projectRoot, windowsHide: true });
+  /* [028A-8] execFile promisificado RECHAZA cuando el gate sale no-cero
+   * (FAIL/SETUP-ERROR): se captura para atribuir la ejecución y continuar el
+   * benchmark en lugar de abortarlo a mitad con un stack trace — un gate que
+   * falla es exactamente el caso que más interesa medir. */
+  const result = await execFileAsync(process.execPath, args, { cwd: projectRoot, windowsHide: true, timeout: 5 * 60 * 1000 })
+    .catch(error => ({ code: error?.code ?? 1, stderr: String(error?.stderr ?? error?.message ?? '') }));
   const metrics = await latestMetrics(taskId);
-  if (!metrics) throw new Error(`Sin metrics.json tras ejecutar task:check ${taskId}${fresh ? ' --fresh' : ''}`);
+  /* [028A-8] Solo se atribuye la métrica si es más nueva que el arranque de la
+   * ejecución: un run fallido que no escribió metrics.json no puede heredar en
+   * silencio la ejecución anterior (atribución viciada). */
+  const freshEnough = metrics && Number.isFinite(Date.parse(metrics.generatedAt))
+    && Date.parse(metrics.generatedAt) >= startedAt;
+  if (result.code !== 0 || !freshEnough) {
+    return {
+      failed: true,
+      exitCode: result.code ?? 1,
+      stderr: result.stderr ?? '',
+      taskId,
+      fresh,
+    };
+  }
   return { ...metrics, exitCode: result.code ?? 0 };
 }
 
-/* [028A-8] Agrega ejecuciones por etapa y total: p50/p95 con summarize. */
+/* [028A-8] Agrega ejecuciones por etapa y total: p50/p95 con summarize. Las
+ * ejecuciones fallidas (sin métricas) se cuentan en `failed` y no contaminan
+ * los percentiles con duraciones heredadas. */
 export function aggregateRuns(runs) {
-  const stageNames = [...new Set(runs.flatMap(run => run.stages?.map(stage => stage.stage) ?? []))];
+  const succeeded = runs.filter(run => !run.failed);
+  const stageNames = [...new Set(succeeded.flatMap(run => run.stages?.map(stage => stage.stage) ?? []))];
   const stages = stageNames.map(stage => {
-    const samples = runs
+    const samples = succeeded
       .flatMap(run => run.stages ?? [])
       .filter(item => item.stage === stage)
       .map(item => item.durationMs)
@@ -71,8 +92,9 @@ export function aggregateRuns(runs) {
     return { stage, ...summarize(samples) };
   });
   return {
-    runs: runs.length,
-    total: summarize(runs.map(run => run.durationMs).filter(Number.isFinite)),
+    runs: succeeded.length,
+    failed: runs.length - succeeded.length,
+    total: summarize(succeeded.map(run => run.durationMs).filter(Number.isFinite)),
     stages,
   };
 }
@@ -96,9 +118,9 @@ async function main() {
     return;
   }
   const cleanRuns = [];
-  for (let index = 0; index < args.clean; index += 1) cleanRuns.push(await runGateOnce(args.taskId, true));
+  for (let index = 0; index < args.clean; index += 1) cleanRuns.push(await runGateOnce(args.taskId, true, Date.now()));
   const incrementalRuns = [];
-  for (let index = 0; index < args.incremental; index += 1) incrementalRuns.push(await runGateOnce(args.taskId, false));
+  for (let index = 0; index < args.incremental; index += 1) incrementalRuns.push(await runGateOnce(args.taskId, false, Date.now()));
   const baseline = {
     schemaVersion: 1,
     taskId: args.taskId,
@@ -109,6 +131,9 @@ async function main() {
   };
   const { mkdir } = await import('node:fs/promises');
   await mkdir(path.dirname(args.json), { recursive: true });
+  if (baseline.clean.failed || baseline.incremental.failed) {
+    process.stderr.write(`[bench] AVISO: ${baseline.clean.failed + baseline.incremental.failed} ejecuciones fallidas no entran en los percentiles.\n`);
+  }
   await writeFile(args.json, `${JSON.stringify(baseline, null, 2)}\n`, 'utf8');
   for (const line of formatBaseline(baseline)) process.stdout.write(`${line}\n`);
   process.stdout.write(`[bench] Detalle: ${path.relative(projectRoot, args.json)}\n`);
