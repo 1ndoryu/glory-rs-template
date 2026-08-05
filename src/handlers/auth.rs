@@ -382,6 +382,17 @@ pub async fn login(
             .map_err(|e| AppError::Internal(format!("Error construyendo cookie CSRF: {e}")))?,
     );
 
+    /* [297A-76] Reclamación invitado→cuenta: al autenticarse, la identidad
+     * temporal de juego deja de aplicarse. Se expira la cookie `guest_game`
+     * para que el navegador la elimine; la revocación server-side la hace
+     * el handler del ticket si el cliente la reenviara (fail-closed). */
+    headers.append(
+        SET_COOKIE,
+        "guest_game=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0"
+            .parse()
+            .expect("cookie estática de invitado"),
+    );
+
     Ok((headers, StatusCode::NO_CONTENT))
 }
 
@@ -452,6 +463,13 @@ pub async fn logout(
     response_headers.append(
         SET_COOKIE,
         "csrf_token=; Path=/; SameSite=Lax; Max-Age=0"
+            .parse()
+            .expect("cookie statique"),
+    );
+    /* [297A-76] El logout también expira la identidad temporal de juego. */
+    response_headers.append(
+        SET_COOKIE,
+        "guest_game=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0"
             .parse()
             .expect("cookie statique"),
     );

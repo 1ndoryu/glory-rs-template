@@ -77,6 +77,14 @@ impl GameTicketStore {
         issue_guest_at(self, secret, now_unix())
     }
 
+    /// Revoca la identidad invitada representada por la cookie: la entrada del
+    /// store se elimina y la cookie deja de resolver. La reclamación
+    /// invitado→cuenta limpia la identidad temporal al autenticarse; una
+    /// cookie robada/duplicada deja de ser válida de inmediato.
+    pub fn revoke_guest(&self, cookie: &str, secret: &str) -> Result<bool, AppError> {
+        revoke_guest_at(self, cookie, secret, now_unix())
+    }
+
     #[cfg(test)]
     fn consume_at_for_test(
         &self,
@@ -276,6 +284,59 @@ pub fn resolve_guest_at(
     Ok(Some(guest.subject))
 }
 
+/// Variante determinista para tests y futuros adaptadores de reloj.
+pub fn revoke_guest_at(
+    store: &GameTicketStore,
+    cookie: &str,
+    secret: &str,
+    now: i64,
+) -> Result<bool, AppError> {
+    validate_secret(secret)?;
+    if now < 0 || cookie.len() > GAME_TICKET_MAX_TOKEN_BYTES {
+        return Ok(false);
+    }
+    let parts: Vec<&str> = cookie.split('.').collect();
+    if parts.len() != 5
+        || parts[0] != PROTOCOL_VERSION
+        || parts[1] != GUEST_PURPOSE
+        || parts[2].is_empty()
+        || parts[3].is_empty()
+        || parts[4].is_empty()
+    {
+        return Ok(false);
+    }
+    let Ok(nonce) = parts[2].parse::<Uuid>() else {
+        return Ok(false);
+    };
+    let Ok(expires_at) = parts[3].parse::<i64>() else {
+        return Ok(false);
+    };
+    let payload = format!("{PROTOCOL_VERSION}.{GUEST_PURPOSE}.{nonce}.{expires_at}");
+    let Ok(signature) = hex::decode(parts[4]) else {
+        return Ok(false);
+    };
+    let mut mac = HmacSha256::new_from_slice(secret.as_bytes())
+        .map_err(|_| AppError::Internal("secreto HMAC inválido".into()))?;
+    mac.update(payload.as_bytes());
+    if mac.verify_slice(&signature).is_err() {
+        return Ok(false);
+    }
+    let mut guests = store
+        .guests
+        .lock()
+        .map_err(|_| AppError::Internal("almacén de invitados no disponible".into()))?;
+    let Some(guest) = guests.get(&nonce) else {
+        return Ok(false);
+    };
+    /* [297A-76] La revocación requiere firma y entrada vigente; la identidad
+     * temporal desaparece de inmediato (reclamación invitado→cuenta). */
+    if guest.expires_at != expires_at {
+        return Ok(false);
+    }
+    guests.remove(&nonce);
+    Ok(true)
+}
+
 fn validate_secret(secret: &str) -> Result<(), AppError> {
     if secret.trim().is_empty() {
         return Err(AppError::Internal(
@@ -311,7 +372,7 @@ fn now_unix() -> i64 {
 #[cfg(test)]
 mod tests {
     use super::{
-        consume_at, issue_at, issue_guest_at, resolve_guest_at, GameTicketStore,
+        consume_at, issue_at, issue_guest_at, resolve_guest_at, revoke_guest_at, GameTicketStore,
         GAME_GUEST_COOKIE_TTL_SECS, GAME_TICKET_DEFAULT_TTL_SECS, GAME_TICKET_MAX_TTL_SECS,
     };
     use uuid::Uuid;
@@ -432,5 +493,55 @@ mod tests {
             resolve_guest_at(&store, "g1.game.bad", SECRET, NOW).ok(),
             Some(None)
         );
+    }
+
+    #[test]
+    fn revoking_guest_cookie_invalidates_the_temporary_identity() {
+        let store = GameTicketStore::default();
+        let (_, cookie) = issue_guest_at(&store, SECRET, NOW).expect("guest");
+        assert!(resolve_guest_at(&store, &cookie, SECRET, NOW)
+            .ok()
+            .flatten()
+            .is_some());
+
+        assert_eq!(
+            revoke_guest_at(&store, &cookie, SECRET, NOW).ok(),
+            Some(true)
+        );
+        /* Después de la revocación la identidad temporal deja de resolver. */
+        assert_eq!(
+            resolve_guest_at(&store, &cookie, SECRET, NOW).ok(),
+            Some(None)
+        );
+        /* Revocar de nuevo no es un error: la entrada ya no existe. */
+        assert_eq!(
+            revoke_guest_at(&store, &cookie, SECRET, NOW).ok(),
+            Some(false)
+        );
+    }
+
+    #[test]
+    fn revoking_invalid_cookie_or_wrong_secret_fails_closed() {
+        let store = GameTicketStore::default();
+        let (_, cookie) = issue_guest_at(&store, SECRET, NOW).expect("guest");
+        let mut tampered = cookie.clone();
+        tampered.push('x');
+        assert_eq!(
+            revoke_guest_at(&store, &tampered, SECRET, NOW).ok(),
+            Some(false)
+        );
+        assert_eq!(
+            revoke_guest_at(&store, &cookie, "wrong-secret", NOW).ok(),
+            Some(false)
+        );
+        assert_eq!(
+            revoke_guest_at(&store, "g1.game.bad", SECRET, NOW).ok(),
+            Some(false)
+        );
+        /* La identidad sigue válida: la revocación fallida no la toca. */
+        assert!(resolve_guest_at(&store, &cookie, SECRET, NOW)
+            .ok()
+            .flatten()
+            .is_some());
     }
 }

@@ -268,6 +268,101 @@ async fn guest_ticket_rate_limit_is_per_ip_and_returns_429() {
 }
 
 #[tokio::test]
+async fn authenticated_session_revokes_stale_guest_identity_server_side() {
+    /* [297A-76] Reclamación invitado→cuenta: una cookie temporal que viaja con
+     * una sesión autenticada deja de resolver de inmediato (fail-closed), sin
+     * fusionar identidades ni degradar la cuenta. */
+    let state = test_state().await;
+    let router = production_router(&state, Some(TEST_SECRET));
+
+    /* Crear primero la identidad invitada y quedarnos con su cookie. */
+    let guest_response = router
+        .clone()
+        .oneshot(guest_ticket_request(None))
+        .await
+        .expect("router debe responder");
+    let guest_cookie_header = guest_response
+        .headers()
+        .get(SET_COOKIE)
+        .and_then(|value| value.to_str().ok())
+        .expect("cookie invitada")
+        .to_string();
+    let guest_cookie_value = guest_cookie_header
+        .split(';')
+        .next()
+        .expect("cookie")
+        .strip_prefix("guest_game=")
+        .expect("prefijo guest_game")
+        .to_string();
+    let guest_ticket = json_body(guest_response).await["ticket"]
+        .as_str()
+        .expect("ticket invitado")
+        .to_string();
+    let guest_subject = state
+        .game_ticket_store
+        .consume(&guest_ticket, TEST_SECRET)
+        .expect("ticket invitado consumible")
+        .subject;
+    assert!(
+        state
+            .game_ticket_store
+            .resolve_guest(&guest_cookie_value, TEST_SECRET)
+            .expect("store disponible")
+            .is_some(),
+        "la identidad invitada debe estar vigente antes del login"
+    );
+
+    /* La cuenta solicita ticket enviando también la cookie invitada. */
+    let user_id = create_user(&state).await;
+    let (session_token, csrf_token) = session(&state, user_id).await;
+    let authenticated = router
+        .clone()
+        .oneshot({
+            let mut builder = Request::builder()
+                .method("POST")
+                .uri("/api/game/ticket")
+                .header("origin", "http://localhost:5173")
+                .header(
+                    "cookie",
+                    format!("session_id={session_token}; csrf_token={csrf_token}; {guest_cookie_header}"),
+                )
+                .header("x-csrf-token", &csrf_token);
+            let mut request = builder
+                .body(Body::empty())
+                .expect("request de reclamación válida");
+            request
+                .extensions_mut()
+                .insert(ConnectInfo(SocketAddr::from(([127, 0, 0, 1], 40_003))));
+            request
+        })
+        .await
+        .expect("router debe responder");
+    assert_eq!(authenticated.status(), StatusCode::OK);
+    let authenticated_ticket = json_body(authenticated).await["ticket"]
+        .as_str()
+        .expect("ticket de cuenta")
+        .to_string();
+    let account_claims = state
+        .game_ticket_store
+        .consume(&authenticated_ticket, TEST_SECRET)
+        .expect("ticket de cuenta consumible");
+    assert_eq!(account_claims.subject, user_id);
+    assert_ne!(account_claims.subject, guest_subject);
+
+    /* La identidad invitada quedó revocada server-side: la cookie ya no resuelve. */
+    assert!(
+        state
+            .game_ticket_store
+            .resolve_guest(&guest_cookie_value, TEST_SECRET)
+            .expect("store disponible")
+            .is_none(),
+        "la identidad invitada debe revocarse al autenticarse"
+    );
+
+    cleanup(&state, user_id).await;
+}
+
+#[tokio::test]
 async fn ticket_fails_closed_when_secret_is_not_configured() {
     let state = test_state().await;
     let user_id = create_user(&state).await;

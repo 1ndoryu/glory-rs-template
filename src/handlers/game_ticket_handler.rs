@@ -52,6 +52,13 @@ pub async fn issue_game_ticket(
             state
                 .game_ticket_store
                 .issue(user_id, GAME_TICKET_DEFAULT_TTL_SECS, secret)?;
+        /* [297A-76] Reclamación invitado→cuenta: si una cookie temporal viaja
+         * con una sesión autenticada, la identidad invitada se revoca server-
+         * side (deja de resolver) aunque el navegador aún la conserve. La
+         * cuenta es la autoridad; nunca se fusiona ni degrada. */
+        if let Some(guest_cookie) = extract_cookie(&headers, GAME_GUEST_COOKIE_NAME) {
+            let _ = state.game_ticket_store.revoke_guest(guest_cookie, secret);
+        }
         return Ok((HeaderMap::new(), Json(GameTicketResponse { ticket })));
     }
 
