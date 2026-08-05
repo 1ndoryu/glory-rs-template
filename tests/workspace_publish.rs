@@ -229,9 +229,12 @@ async fn publish_accepts_valid_tree_and_computes_summary() {
      * contra la activa: con la activación explícita la activa puede no ser la
      * última publicada. La base del diff es la última, sea cual sea su estado. */
     let uniq = Uuid::new_v4().simple().to_string();
+    /* [038A-2] `about` debe usar el id canónico del guard de sistema; solo
+     * folder y recurso llevan IDs únicos por ejecución para que el diff del
+     * summary sea estable. */
     let (folder_id, about_id, resource_node_id) = (
         format!("doc-{uniq}"),
-        format!("about-{uniq}"),
+        "about".to_string(),
         format!("recurso-{uniq}"),
     );
     let tree = tree_with_ids(Some(resource_id), &folder_id, &about_id, &resource_node_id);
@@ -254,9 +257,13 @@ async fn publish_accepts_valid_tree_and_computes_summary() {
     assert_eq!(release.diff_from, Some(prev_version));
 
     let summary = release.summary.as_object().expect("summary objeto");
-    assert_eq!(summary["nodeCount"], json!(3));
+    /* [038A-2] El árbol válido incluye los 5 nodos de sistema + folder +
+     * recurso: nodeCount = 7. */
+    assert_eq!(summary["nodeCount"], json!(7));
     let added = summary["added"].as_array().expect("added lista");
-    for id in [&folder_id, &about_id, &resource_node_id] {
+    /* `about` ya existe en la release sembrada (v1), así que NO entra en
+     * `added`; solo los nodos únicos de esta ejecución deben aparecer. */
+    for id in [&folder_id, &resource_node_id] {
         assert!(
             added.contains(&json!(id)),
             "added debe incluir {id}: {summary:?}"
