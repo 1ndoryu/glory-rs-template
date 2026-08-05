@@ -19,7 +19,7 @@
     "task:release": "node scripts/quality/task-takeover.mjs release",
     "task:status": "node scripts/quality/task-takeover.mjs status",
     "quality:reports:read": "node scripts/quality/report-reader.mjs",
-    "quality:install-guard": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/quality/install-global-guard.ps1",
+    "quality:install-guard": "node scripts/quality/install-global-runtime.mjs",
     "task:check": "node scripts/quality/task-check.mjs",
     "check:back": "node scripts/run-with-db.mjs check && node scripts/run-with-db.mjs clippy",
     "check:front": "npm --prefix frontend run type-check",
