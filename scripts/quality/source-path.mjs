@@ -9,13 +9,16 @@ function hasControlCharacters(value) {
   });
 }
 
+function validateSourcePathRaw(value, label) {
+  if (typeof value !== 'string' || value.length === 0 || hasControlCharacters(value)) {
+    throw new Error(`${label} debe ser una ruta válida`);
+  }
+  return value;
+}
+
 export function validateSourcePath(value, label) {
-  if (
-    typeof value !== 'string'
-    || value.length === 0
-    || hasControlCharacters(value)
-    || (!path.isAbsolute(value) && !path.win32.isAbsolute(value))
-  ) {
+  validateSourcePathRaw(value, label);
+  if (!path.isAbsolute(value) && !path.win32.isAbsolute(value)) {
     throw new Error(`${label} debe ser una ruta absoluta válida`);
   }
   return value;
@@ -28,11 +31,22 @@ export function validateSourcePathEnv(value, label) {
   return value;
 }
 
-export function resolveConfiguredSourcePath(config, label) {
+export function resolveConfiguredSourcePath(config, label, options = {}) {
   if (config.sourcePath !== undefined && config.sourcePathEnv !== undefined) {
     throw new Error(`${label}: sourcePath y sourcePathEnv son mutuamente excluyentes`);
   }
-  if (config.sourcePath !== undefined) return validateSourcePath(config.sourcePath, `${label}.sourcePath`);
+  if (config.sourcePath !== undefined) {
+    validateSourcePathRaw(config.sourcePath, `${label}.sourcePath`);
+    if (path.isAbsolute(config.sourcePath) || path.win32.isAbsolute(config.sourcePath)) {
+      return config.sourcePath;
+    }
+    /* [028A-8] sourcePath interno (submódulo dentro del workspace): se resuelve
+     * contra baseDir para que el manifest sea portable entre máquinas. */
+    if (typeof options.baseDir !== 'string' || options.baseDir.length === 0) {
+      throw new Error(`${label}.sourcePath: ruta relativa requiere baseDir`);
+    }
+    return path.resolve(options.baseDir, config.sourcePath);
+  }
   if (config.sourcePathEnv === undefined) return null;
   const envName = validateSourcePathEnv(config.sourcePathEnv, `${label}.sourcePathEnv`);
   const value = process.env[envName];

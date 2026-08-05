@@ -13,7 +13,7 @@
     },
     "varsense": {
       "repository": "https://github.com/1ndoryu/varsense.git",
-      "sourcePathEnv": "GLORY_VARSENSE_SOURCE_PATH",
+      "sourcePath": "tools/varsense",
       "commit": "e8360927ee92c4067f1f501dd77b951c8bc4f61d",
       "version": "2.2.0",
       "outputSchemaVersion": "1",

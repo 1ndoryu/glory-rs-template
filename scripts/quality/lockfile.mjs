@@ -58,7 +58,7 @@ function validateInstallRoot(value) {
 }
 
 export async function resolveToolRoot(workspaceRoot, name, config, manifest) {
-  const configuredSourcePath = resolveConfiguredSourcePath(config, `quality-tools.json.tools.${name}`);
+  const configuredSourcePath = resolveConfiguredSourcePath(config, `quality-tools.json.tools.${name}`, { baseDir: workspaceRoot });
   if (configuredSourcePath !== null) {
     try {
       return await realpath(configuredSourcePath);
@@ -145,13 +145,11 @@ export function validateLock(lock, manifest) {
     validateText(entry.version, `analyzers.${name}.version`);
     validateCapabilities(expected.capabilities, `quality-tools.json.tools.${name}.capabilities`);
     validateCapabilities(entry.capabilities, `analyzers.${name}.capabilities`);
-    const expectedSourcePath = resolveConfiguredSourcePath(expected, `quality-tools.json.tools.${name}`);
     const expectedSourcePathEnv = expected.sourcePathEnv;
     if (entry.sourcePathEnv !== expectedSourcePathEnv) fail(`analyzers.${name}.sourcePathEnv no coincide con quality-tools.json`);
+    /* [028A-8] sourcePath interno no declara sourcePathEnv; el realpath del lock
+     * (si existe) se valida igualmente como ruta absoluta. */
     if (entry.sourcePathRealpath !== undefined) validateSourcePath(entry.sourcePathRealpath, `analyzers.${name}.sourcePathRealpath`);
-    if (expectedSourcePath !== null && entry.sourcePathRealpath !== undefined) {
-      validateSourcePath(entry.sourcePathRealpath, `analyzers.${name}.sourcePathRealpath`);
-    }
     const expectedCapabilities = expected.capabilities ?? undefined;
     const actualCapabilities = entry.capabilities ?? undefined;
     if (JSON.stringify(actualCapabilities) !== JSON.stringify(expectedCapabilities)) {
@@ -179,12 +177,12 @@ export function validateLock(lock, manifest) {
   return lock;
 }
 
-async function validateResolvedSourcePaths(lock, manifest) {
+async function validateResolvedSourcePaths(workspaceRoot, lock, manifest) {
   for (const [name, config] of Object.entries(manifest.tools)) {
-    const configuredSourcePath = resolveConfiguredSourcePath(config, `quality-tools.json.tools.${name}`);
+    const configuredSourcePath = resolveConfiguredSourcePath(config, `quality-tools.json.tools.${name}`, { baseDir: workspaceRoot });
     if (configuredSourcePath === null) continue;
     const expectedRealpath = await realpath(configuredSourcePath).catch(() => null);
-    if (!expectedRealpath) fail(`analyzers.${name}.sourcePath externo no existe o no es resoluble`);
+    if (!expectedRealpath) fail(`analyzers.${name}.sourcePath no existe o no es resoluble`);
     if (lock.analyzers[name].sourcePathRealpath !== undefined && lock.analyzers[name].sourcePathRealpath !== expectedRealpath) {
       fail(`analyzers.${name}.sourcePathRealpath no coincide con el checkout actual`);
     }
@@ -200,7 +198,7 @@ export async function readLock(workspaceRoot, manifest, lockFile = LOCK_FILE) {
     await assertInsideWorkspace(workspaceRoot, lockPath, 'runtime.lockFile');
     const lock = JSON.parse(await readFile(lockPath, 'utf8'));
     validateLock(lock, manifest);
-    await validateResolvedSourcePaths(lock, manifest);
+    await validateResolvedSourcePaths(workspaceRoot, lock, manifest);
     return { lock, lockPath };
   } catch (error) {
     if (error?.code === 'ENOENT') throw new Error(`Falta ${lockFile}; ejecuta el generador/verificador de lock antes del gate`);
@@ -321,9 +319,9 @@ export async function inspectInstalledAnalyzers(workspaceRoot, manifest) {
     }
     const status = await gitStatusPorcelain(toolRoot);
     const untrustedChanges = untrustedCheckoutChanges(status.text);
-    const configuredSourcePath = resolveConfiguredSourcePath(config, `quality-tools.json.tools.${name}`);
+    const configuredSourcePath = resolveConfiguredSourcePath(config, `quality-tools.json.tools.${name}`, { baseDir: workspaceRoot });
     if (configuredSourcePath !== null && config.patch !== undefined) {
-      throw new Error(`${name}: sourcePath externo no puede combinarse con patch local`);
+      throw new Error(`${name}: sourcePath no puede combinarse con patch local`);
     }
     const patchSha256 = config.patch?.sha256 ?? null;
     if (patchSha256 !== null) {

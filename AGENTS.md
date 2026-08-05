@@ -168,7 +168,7 @@ El script decide alcance automáticamente, es incremental local y full en CI. De
 
 ### VarSense
 
-- Repo: `C:\Users\Owner\OneDrive\Documentos\WP\app\public\wp-content\themes\glorytemplate\.agent\varsense`; valida tokens, hardcodes y clases CSS.
+- Checkout interno: submódulo `tools/varsense` (commit pin en `.gitmodules` + gitlink en main); `quality-tools.json` usa `sourcePath` relativo y `quality:setup` inicializa/compila el CLI en clon limpio. Editar el core directamente en `tools/varsense`; al fijar un commit nuevo, `git submodule update` + commit del gitlink y regenerar `sentinel.lock.json`. Valida tokens, hardcodes y clases CSS.
 - Config del proyecto define includes/excludes mínimos; no duplicar validación en scripts locales.
 - Ejecutar después de cambios CSS mediante `task:check`; corregir referencias inexistentes y huérfanas antes de cerrar.
 - Reglas visuales provienen del manual de identidad, no de decisiones ad-hoc del analizador.

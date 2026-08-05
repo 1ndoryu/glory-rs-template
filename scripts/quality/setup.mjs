@@ -176,21 +176,49 @@ async function applyDeclaredPatch(name, config, toolRoot) {
   );
 }
 
-async function installTool(name, config, installRoot) {
-  const configuredSourcePath = resolveConfiguredSourcePath(config, `quality-tools.json.tools.${name}`);
-  if (configuredSourcePath !== null) {
-    if (config.patch) throw new Error(`${name}: sourcePath externo no puede combinarse con patch local`);
-    const toolRootExternal = path.resolve(configuredSourcePath);
-    const gitRootExternal = path.join(toolRootExternal, '.git');
-    const cliPathExternal = path.join(toolRootExternal, config.cli);
-    if (!await exists(gitRootExternal) || !await exists(cliPathExternal)) {
-      throw new Error(`${name}: sourcePath externo no contiene un checkout Git y CLI válido`);
+async function ensureSourcePathReady(name, config) {
+  const configuredSourcePath = resolveConfiguredSourcePath(config, `quality-tools.json.tools.${name}`, { baseDir: projectRoot });
+  const toolRoot = path.resolve(configuredSourcePath);
+  const relativeFromRoot = path.relative(projectRoot, toolRoot);
+  const isInsideWorkspace = relativeFromRoot !== ''
+    && !relativeFromRoot.startsWith('..')
+    && !path.isAbsolute(relativeFromRoot);
+  if (!await exists(path.join(toolRoot, '.git'))) {
+    if (!isInsideWorkspace) throw new Error(`${name}: sourcePath no contiene un checkout Git válido`);
+    /* [028A-8] Clon limpio: el submódulo interno puede no estar inicializado. */
+    process.stdout.write(`[quality:setup] ${name}: inicializando submódulo ${relativeFromRoot}\n`);
+    await run('git', ['submodule', 'update', '--init', '--', relativeFromRoot.replace(/\\/g, '/')], { cwd: projectRoot });
+  }
+  if (!await exists(path.join(toolRoot, config.cli))) {
+    if (!isInsideWorkspace) throw new Error(`${name}: sourcePath no contiene un CLI válido; compílalo manualmente en ${toolRoot}`);
+    /* [028A-8] Clon limpio: el CLI del submódulo aún no está compilado. */
+    process.stdout.write(`[quality:setup] ${name}: compilando CLI del submódulo ${relativeFromRoot}\n`);
+    if (!npmCliPath) {
+      throw new Error('npm_execpath no está disponible; ejecuta este setup mediante npm run quality:setup');
     }
-    const currentCommit = await run('git', ['rev-parse', 'HEAD'], { cwd: toolRootExternal, capture: true });
-    if (currentCommit !== config.commit) throw new Error(`${name}: sourcePath externo está en ${currentCommit}; se esperaba ${config.commit}`);
-    const installedVersion = await run(process.execPath, [cliPathExternal, '--version'], { capture: true });
-    if (installedVersion !== config.version) throw new Error(`${name}: sourcePath externo reporta ${installedVersion}; se esperaba ${config.version}`);
-    process.stdout.write(`[quality:setup] ${name}: sourcePath externo verificado, no se modifica .quality-tools\\n`);
+    await run(process.execPath, [npmCliPath, 'ci', '--ignore-scripts'], { cwd: toolRoot });
+    await run(process.execPath, [npmCliPath, 'run', config.buildScript], { cwd: toolRoot });
+    if (config.testScript) {
+      await run(process.execPath, [npmCliPath, 'run', config.testScript], { cwd: toolRoot });
+    }
+  }
+  const currentCommit = await run('git', ['rev-parse', 'HEAD'], { cwd: toolRoot, capture: true });
+  if (currentCommit !== config.commit) {
+    throw new Error(`${name}: sourcePath está en ${currentCommit}; se esperaba ${config.commit}`);
+  }
+  const installedVersion = await run(process.execPath, [path.join(toolRoot, config.cli), '--version'], { capture: true });
+  if (installedVersion !== config.version) {
+    throw new Error(`${name}: sourcePath reporta ${installedVersion}; se esperaba ${config.version}`);
+  }
+  return { toolRoot, currentCommit, installedVersion };
+}
+
+async function installTool(name, config, installRoot) {
+  const configuredSourcePath = resolveConfiguredSourcePath(config, `quality-tools.json.tools.${name}`, { baseDir: projectRoot });
+  if (configuredSourcePath !== null) {
+    if (config.patch) throw new Error(`${name}: sourcePath no puede combinarse con patch local`);
+    const { currentCommit, installedVersion } = await ensureSourcePathReady(name, config);
+    process.stdout.write(`[quality:setup] ${name}: sourcePath verificado, no se modifica .quality-tools\\n`);
     return {
       commit: currentCommit,
       version: installedVersion,
@@ -273,13 +301,19 @@ async function installTool(name, config, installRoot) {
 
 async function main() {
   const manifest = await readManifest();
-  const externalOnly = Object.values(manifest.tools).every(config => resolveConfiguredSourcePath(config, 'quality-tools.json.tools') !== null);
+  const externalOnly = Object.values(manifest.tools).every(config => resolveConfiguredSourcePath(config, 'quality-tools.json.tools', { baseDir: projectRoot }) !== null);
   if (externalOnly) {
+    /* [028A-8] Un sourcePath interno (submódulo) debe estar inicializado y
+     * compilado antes de inspeccionar, para que un clon limpio sea reproducible. */
+    for (const [name, config] of Object.entries(manifest.tools)) {
+      if (resolveConfiguredSourcePath(config, `quality-tools.json.tools.${name}`, { baseDir: projectRoot }) === null) continue;
+      await ensureSourcePathReady(name, config);
+    }
     const inspected = await inspectInstalledAnalyzers(projectRoot, manifest);
     for (const [name, tool] of Object.entries(inspected)) {
-      process.stdout.write(`[quality:setup] ${name}: sourcePath externo verificado (${tool.commit}), no se modifica .quality-tools\\n`);
+      process.stdout.write(`[quality:setup] ${name}: sourcePath verificado (${tool.commit}), no se modifica .quality-tools\\n`);
     }
-    process.stdout.write('[quality:setup] Checkouts externos listos. Próximo: npm run task:check -- <ID>\\n');
+    process.stdout.write('[quality:setup] Checkouts listos. Próximo: npm run task:check -- <ID>\\n');
     return;
   }
 

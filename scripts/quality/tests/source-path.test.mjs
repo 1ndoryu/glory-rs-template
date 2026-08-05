@@ -33,3 +33,18 @@ test('rechaza declarar sourcePath y sourcePathEnv al mismo tiempo', () => {
     /mutuamente excluyentes/,
   );
 });
+
+test('resuelve sourcePath relativo contra baseDir (submódulo interno)', () => {
+  const root = path.resolve('workspace-raiz');
+  assert.equal(
+    resolveConfiguredSourcePath({ sourcePath: 'tools/varsense' }, 'tool', { baseDir: root }),
+    path.resolve(root, 'tools', 'varsense'),
+  );
+});
+
+test('rechaza sourcePath relativo sin baseDir', () => {
+  assert.throws(
+    () => resolveConfiguredSourcePath({ sourcePath: 'tools/varsense' }, 'tool'),
+    /requiere baseDir/,
+  );
+});
