@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { workspaceH, workspaceW } from './window-store';
 import { createPathDeepLink } from './deep-links';
 import { AppRegistry, type AppDefinition } from './app-registry';
 import {
@@ -7,9 +8,10 @@ import {
   registerShellWindow,
   focusWindow,
   closeWindow,
+  toggleMaximizeWindow,
   windowStore,
 } from './window-manager';
-import { initRouteAppAdapter } from './route-app-adapter';
+import { initRouteAppAdapter, openAppWindow } from './route-app-adapter';
 import { initWindowUrlSync } from './window-url-sync';
 import { addRoute, navigate, replacePath, setOutlet } from '../../router';
 import { authStore } from '../../store';
@@ -51,6 +53,19 @@ const localApp: AppDefinition = {
   render: () => ({ element: document.createElement('div') }),
 };
 
+/* [GAME-01-VIS] App que abre maximizada: la ventana nace con state
+ * 'maximized' ocupando el workspace y guarda preMaximizeBounds para restaurar. */
+const maximizedAppId = 'route-adapter-maximized-test';
+const maximizedApp: AppDefinition = {
+  id: maximizedAppId,
+  title: 'Maximizada de prueba',
+  icon: [],
+  singleton: false,
+  requires: 'public',
+  openMaximized: true,
+  render: () => ({ element: document.createElement('div') }),
+};
+
 const routedApp: AppDefinition = {
   id: routedAppId,
   title: 'Ruta de prueba',
@@ -65,6 +80,7 @@ AppRegistry.register(routedApp);
 AppRegistry.register(invalidParamsApp);
 AppRegistry.register(protectedApp);
 AppRegistry.register(localApp);
+AppRegistry.register(maximizedApp);
 addRoute({ path: '/runtime-test', render: () => document.createElement('div') });
 addRoute({ path: '/runtime-invalid/:slug', render: () => document.createElement('div') });
 addRoute({ path: '/runtime-protected', render: () => document.createElement('div') });
@@ -112,6 +128,24 @@ describe('RouteAppAdapter runtime reconciliation', () => {
       eventName: 'deep_link_opened',
       properties: { routeName: 'runtime-test', appId: routedAppId },
     }));
+  });
+
+  it('abre maximizada una app que declara openMaximized', async () => {
+    stopAdapter = initRouteAppAdapter();
+
+    await openAppWindow(maximizedAppId);
+
+    const window = windowStore.get().find((w) => w.appId === maximizedAppId);
+    expect(window?.state).toBe('maximized');
+    /* Ocupa el workspace completo (defaults del módulo en el test) y guarda
+     * las dimensiones previas para poder restaurar. */
+    expect(window?.bounds).toEqual({ x: 0, y: 0, w: workspaceW, h: workspaceH });
+    expect(window?.preMaximizeBounds).toBeDefined();
+    expect(window?.preMaximizeBounds?.w).toBeGreaterThan(0);
+
+    /* El toggle de restauración vuelve a las dimensiones de apertura. */
+    toggleMaximizeWindow(window!.instanceId);
+    expect(windowStore.get().find((w) => w.appId === maximizedAppId)?.state).toBe('open');
   });
 
   it('conserva ventanas restauradas al reconciliar la raíz inicial', () => {

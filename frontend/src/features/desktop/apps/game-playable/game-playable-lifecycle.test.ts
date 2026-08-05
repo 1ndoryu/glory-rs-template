@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../../api/client';
 import { authStore } from '../../../../store';
+/* [GAME-01-VIS] El comando game:character (editor del jugador) vive en el
+ * toolbar de la ventana; se registra con este side-effect del módulo. */
+import { CommandRegistry } from '../../../runtime/command-registry';
+import '../../../runtime/commands/toolbar-commands';
 
 const mocks = vi.hoisted(() => ({
   detectWebGL: vi.fn(),
@@ -106,7 +110,7 @@ describe('Bosque playable WebGL lifecycle', () => {
     view.destroy?.();
   });
 
-  it('exposes the player editor button after a successful hydration', async () => {
+  it('exposes the player character editor through the toolbar command, without scene text', async () => {
     mocks.detectWebGL.mockReturnValue({ available: true, kind: 'webgl2' });
     mocks.getGameProfile.mockResolvedValue({
       displayName: 'Guardián',
@@ -118,8 +122,14 @@ describe('Bosque playable WebGL lifecycle', () => {
     const view = renderGamePlayable({ signal: new AbortController().signal });
     await flushHydration();
 
-    const buttons = Array.from(view.element.querySelectorAll('button'));
-    expect(buttons.some(button => button.textContent === 'personaje')).toBe(true);
+    /* [GAME-01-VIS] El texto flotante se retiró de la escena; el editor del
+     * jugador se abre desde el toolbar (comando público game:character). */
+    expect(Array.from(view.element.querySelectorAll('button'))
+      .some(button => button.textContent === 'personaje')).toBe(false);
+    const command = CommandRegistry.get('game:character');
+    expect(command).toBeDefined();
+    expect(command?.isAvailable?.({ capability: 'public', presentationMode: 'desktop' }))
+      .toEqual({ state: 'enabled' });
     expect(view.element.dataset.playerName).toBe('Guardián');
 
     view.destroy?.();

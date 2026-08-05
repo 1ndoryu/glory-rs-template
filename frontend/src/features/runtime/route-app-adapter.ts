@@ -10,6 +10,7 @@ import {
   openWindow,
   focusWindow,
   restoreWindow,
+  toggleMaximizeWindow,
   windowStore,
 } from './window-manager';
 import { canOpenApp, findExistingWindow, validateRouteAccess } from './app-instances';
@@ -144,6 +145,10 @@ export async function openAppWindow(
   /* Push antes de publicar el cambio en windowStore: el sincronizador verá
    * la URL ya actualizada y no podrá reemplazar la entrada intencional. */
   if (options.history !== 'none' && canonicalPath) pushPath(canonicalPath);
-  openWindow(app, view, controller, undefined, params, titleOverride);
+  /* [GAME-01-VIS] Apertura expandida: la app declara openMaximized y la
+   * ventana nace maximizada (bounds = workspace + preMaximizeBounds para
+   * poder restaurar). Solo aplica a la apertura, no al foco de una ya abierta. */
+  const instanceId = openWindow(app, view, controller, undefined, params, titleOverride);
+  if (app.openMaximized) toggleMaximizeWindow(instanceId);
   dispatchEvent({ type: 'app_opened', appId });
 }

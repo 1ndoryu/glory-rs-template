@@ -38,6 +38,8 @@ export interface AppDefinition {
   readonly deepLink?: AppDeepLink;
   readonly layout?: 'padded' | 'full-bleed';
   readonly toolbar?: AppToolbarGroup[];
+  /** La ventana abre maximizada (ocupa el workspace completo). */
+  readonly openMaximized?: boolean;
   readonly render: AppRenderFn;
 }
 

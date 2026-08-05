@@ -20,10 +20,14 @@ describe('Account app registration', () => {
     expect(playable?.layout).toBe('full-bleed');
     expect(playable?.deepLink?.stringify()).toBe('/forest-playable');
     expect(playable?.routePatterns).toBeUndefined();
-    /* [297A-62] El toolbar real de la ventana del Bosque expone la
-     * configuración del juego; el comando game:settings es adminOnly y el
-     * shell oculta el grupo completo para no-admin. */
-    expect(playable?.toolbar).toEqual([{ label: 'Configuración', items: ['game:settings'] }]);
+    /* [GAME-01-VIS] El juego abre expandido y su toolbar expone el personaje
+     * del jugador (público) y la configuración (adminOnly: el shell oculta el
+     * grupo completo para no-admin). */
+    expect(playable?.openMaximized).toBe(true);
+    expect(playable?.toolbar).toEqual([
+      { label: 'Personaje', items: ['game:character'] },
+      { label: 'Configuración', items: ['game:settings'] },
+    ]);
   });
 
   it('registers a public singleton with the /login deep link', () => {

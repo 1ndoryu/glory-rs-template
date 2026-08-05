@@ -23,15 +23,8 @@
   touch-action: none;
 }
 
-.juegoFixture__guia {
-  position: absolute;
-  inset: var(--espacio-sm) var(--espacio-sm) auto;
-  z-index: 2;
-  pointer-events: none;
-}
-
-.juegoFixture__titulo,
-.juegoFixture__ayuda,
+/* [GAME-01-VIS] La guía (título/ayuda) se retiró el 05-ago: la vista queda
+ * limpia y el estado solo aparece en errores. */
 .juegoFixture__estado {
   width: fit-content;
   margin: 0;
@@ -41,19 +34,7 @@
   background: var(--sistema-superficie);
   font-family: var(--fuente-sistema);
   font-weight: var(--peso-normal);
-}
-
-.juegoFixture__titulo {
-  border-bottom: 0;
-  font-size: var(--tamano-texto);
-}
-
-.juegoFixture__ayuda,
-.juegoFixture__estado {
   font-size: var(--tamano-pequeno);
-}
-
-.juegoFixture__estado {
   position: absolute;
   right: var(--espacio-sm);
   bottom: var(--espacio-sm);
@@ -228,14 +209,6 @@
 @media (max-width: 767px) {
   .juegoFixture {
     min-height: 100%;
-  }
-
-  .juegoFixture__guia {
-    top: max(var(--espacio-sm), env(safe-area-inset-top));
-  }
-
-  .juegoFixture__ayuda {
-    max-width: 220px;
   }
 
   .juegoFixture__estado {

@@ -49,7 +49,6 @@ interface GamePlayableElements {
   readonly element: HTMLElement;
   readonly sceneHost: HTMLElement;
   readonly status: HTMLElement;
-  readonly editorButton: HTMLElement;
 }
 
 export function createGamePlayableView(): GamePlayableElements {
@@ -57,30 +56,18 @@ export function createGamePlayableView(): GamePlayableElements {
     className: 'juegoFixture__escena',
     ariaLabel: 'Escena jugable offline del Bosque',
   });
+  /* [GAME-01-VIS] El estado solo se muestra en errores; en juego normal la
+   * vista queda limpia, sin texto superpuesto (las letras se retiraron el
+   * 05-ago; el editor de personaje vive en el toolbar de la ventana). */
   const status = createEl('p', {
     className: 'juegoFixture__estado',
     textContent: 'cargando fixture offline…',
   });
   status.setAttribute('aria-live', 'polite');
-  /* [297A-54] El botón "personaje" abre el editor del jugador; el runtime le
-   * añade el listener cuando ya tiene el catálogo cargado. */
-  const editorButton = createEl('button', {
-    type: 'button',
-    className: 'boton boton-pequeno',
-    textContent: 'personaje',
-  });
-  const guide = createEl('header', { className: 'juegoFixture__guia' },
-    createEl('div', {},
-      createEl('h2', { className: 'juegoFixture__titulo', textContent: 'Bosque · prueba jugable' }),
-      createEl('p', { className: 'juegoFixture__ayuda', textContent: 'mueve con WASD o las flechas · toca el pad en móvil' }),
-    ),
-    createEl('div', { className: 'juegoFixture__acciones' }, editorButton),
-  );
   return {
-    element: createEl('section', { className: 'juegoFixture', ariaLabel: 'Bosque, fixture jugable offline' }, sceneHost, status, guide),
+    element: createEl('section', { className: 'juegoFixture', ariaLabel: 'Bosque, fixture jugable offline' }, sceneHost, status),
     sceneHost,
     status,
-    editorButton,
   };
 }
 
@@ -309,6 +296,8 @@ function mountGamePlayableRuntime(
   /* [297A-54] Editor del jugador: abre el modal del OS con el catálogo activo
    * y, al guardar, aplica el perfil persistido en vivo (dataset + estado) sin
    * rehidratar la escena ni reconectar realtime. */
+  /* [297A-54] El editor del jugador se abre desde el toolbar de la ventana
+   * (comando game:character), no desde un texto flotante sobre la escena. */
   const onEditCharacter = (): void => {
     openGameCharacterEditor({
       characters,
@@ -342,7 +331,7 @@ function mountGamePlayableRuntime(
   }
   /* [297A-54] El listener del editor se registra tras el chequeo de WebGL para
    * que el return temprano no deje listeners colgados (teardown por camino). */
-  view.editorButton.addEventListener('click', onEditCharacter);
+  view.element.addEventListener('game:character', onEditCharacter);
   view.element.dataset.webglKind = capabilities.kind ?? 'unknown';
   const input: GameInputHandle = createGameInput();
   view.element.appendChild(input.controls);
@@ -501,7 +490,7 @@ function mountGamePlayableRuntime(
     if (destroyed) return;
     destroyed = true;
     stopFrameLoop();
-    view.editorButton.removeEventListener('click', onEditCharacter);
+    view.element.removeEventListener('game:character', onEditCharacter);
     context.signal.removeEventListener('abort', destroy);
     document.removeEventListener('visibilitychange', onVisibilityChange);
     scene?.canvas.removeEventListener('webglcontextlost', onContextLost);

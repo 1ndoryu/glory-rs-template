@@ -2,7 +2,7 @@
  * Comandos referenciados por app toolbars (Papelera, Finder, Projects). */
 
 import { adminOnly, CommandRegistry, type CommandResult } from '../command-registry';
-import { Folder, Trash2, FolderCode, Settings } from 'lucide';
+import { Folder, Trash2, FolderCode, Settings, User } from 'lucide';
 
 CommandRegistry.register({
   id: 'trash:restore-all',
@@ -71,6 +71,32 @@ CommandRegistry.register(adminOnly({
  * contenido (la escena se retira un momento y aparece el panel con tabs).
  * adminOnly lo oculta para no-admin (fail-closed) y el grupo del toolbar se
  * re-renderiza en vivo con authStore. Sin ventana del juego, la abre. */
+/* [297A-54] Personaje del jugador desde el toolbar de la ventana del Bosque:
+ * mismo patrón que game:settings (evento sobre la ventana enfocada), pero
+ * público — cualquier jugador puede elegir su personaje. Al retirar el texto
+ * flotante de la escena (05-ago), este comando es la única entrada. */
+CommandRegistry.register({
+  id: 'game:character',
+  label: 'Personaje del Bosque',
+  icon: User,
+  order: 61,
+  contexts: ['toolbar'],
+  undoPolicy: 'none',
+  analyticsEvent: 'game.character',
+  isAvailable: () => ({ state: 'enabled' }),
+  execute: async (): Promise<CommandResult> => {
+    const { windowStore } = await import('../window-manager');
+    const focused = windowStore.get().find((w) => w.focused && w.appId === 'game-playable');
+    if (focused?.content) {
+      focused.content.dispatchEvent(new CustomEvent('game:character'));
+      return { status: 'success' };
+    }
+    const { openAppWindow } = await import('../route-app-adapter');
+    await openAppWindow('game-playable');
+    return { status: 'success' };
+  },
+});
+
 CommandRegistry.register(adminOnly({
   id: 'game:settings',
   label: 'Configuración del Bosque',

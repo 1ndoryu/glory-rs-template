@@ -17,11 +17,15 @@ AppRegistry.registerLazy({
   requires: 'public',
   deepLink: createPathDeepLink('/forest-playable'),
   layout: 'full-bleed',
+  /* [GAME-01-VIS] El juego abre expandido (maximizado) automáticamente; el
+   * usuario siempre puede restaurar con el control de la ventana. */
+  openMaximized: true,
   /* [297A-62] Configuración del juego dentro de la ventana: el toolbar real
    * del shell proyecta el comando `game:settings`, que es adminOnly; para
    * no-admin el grupo entero se oculta (fail-closed) y se re-renderiza en
-   * vivo con authStore. */
+   * vivo con authStore. El grupo "Personaje" es público (game:character). */
   toolbar: [
+    { label: 'Personaje', items: ['game:character'] },
     { label: 'Configuración', items: ['game:settings'] },
   ],
   load: () => import('../desktop/apps/game-playable/game-playable').then((module) => ({
