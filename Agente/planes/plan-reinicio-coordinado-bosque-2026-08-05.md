@@ -63,8 +63,13 @@ full CI queda para F3).
 - [ ] `task:check -- 297A-78 --full` (tras cooldown, sin excepción manual — SNT-11).
 - [ ] Flujo real en navegador: publicar → banner con cuenta atrás → socket cierra →
   reconexión → mundo nuevo renderiza.
-- [ ] Runbook de rollback actualizado con la política de migración coordinada.
-- [ ] Decisiones §8, roadmap y ADR coherentes.
+- [x] Runbook de rollback actualizado con la política de migración coordinada
+  (commit `92cdeaab`): el rollback de mapa sigue siendo re-publicación de la
+  versión buena; la migración coordinada reemplaza la política vieja de
+  "solo salas nuevas" (el reinicio avisa, drena y el cliente recarga).
+- [x] Decisiones §8, roadmap y ADR coherentes: decisión 8 marcada en el
+  documento de decisiones, roadmap sincronizado con F1/F2 cerradas (05-ago) y
+  ADR `adr-bosque-mundo-unico-reinicio-coordinado-2026-08-05.md` creado.
 
 **Gate F3 / DoD:** gate local-light PASS, full CI PASS (clippy + tests Rust), suite
 frontend completa verde, navegador verificado y documentación sincronizada.
