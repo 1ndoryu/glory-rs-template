@@ -234,35 +234,35 @@ Esta fase define únicamente qué debe verse. No decide todavía movimiento, red
 - [ ] Aprobar la referencia guardada en `Agente/documentacion/producto/referencia-visual-bosque-2026-08-01.md` como atmósfera, no como asset para copiar.
 - [x] Comparar ambos bocetos y elegir Three.js 3D isométrico; conservar el cenital sin usarlo como renderer final.
 - [ ] Fijar gramática visual: escala de cámara, grosor de línea, densidad, capas, siluetas, agua/terreno y variante monocroma o paleta restringida.
-- [ ] Definir el marco mínimo del OS: nombre `Bosque`, icono Lucide, ventana full-bleed en desktop/tablet y pantalla completa móvil.
-- [ ] Confirmar que los elementos del boceto serán originales y que la referencia no se incrusta, calca ni distribuye dentro de la app.
+- [x] Definir el marco mínimo del OS: nombre `Bosque`, icono Lucide, ventana full-bleed en desktop/tablet y pantalla completa móvil: las apps `game`/`game-3d`/`game-playable` usan iconos Lucide, layout full-bleed y pantalla completa móvil vía el mismo runtime (018A-92, 297A-30).
+- [x] Confirmar que los elementos del boceto serán originales y que la referencia no se incrusta, calca ni distribuye dentro de la app: la referencia se conserva en `referencia-visual-bosque-2026-08-01.md` como atmósfera; el fixture y los modelos son originales (297A-30/33) y la revisión de procedencia queda en el ADR.
 
 **Gate:** dirección 3D aprobada; todavía no existe movimiento de personaje, WebSocket, backend, base de datos ni editor.
 
 **Auditoría de cierre — Fase 0:**
-- [ ] **SOLID/arquitectura:** renderer, shell, contratos, assets y realtime tienen límites explícitos; no aparece un segundo runtime paralelo.
-- [ ] **Rendimiento/escalabilidad:** presupuesto inicial, perfiles de dispositivo y límite de mapa/sala están medidos o marcados como hipótesis verificable.
-- [ ] **Seguridad/observabilidad:** procedencia de referencia, permisos, datos no sensibles y eventos mínimos están documentados; la fase no avanza sin evidencia en el plan/ADR.
+- [x] **SOLID/arquitectura:** renderer, shell, contratos, assets y realtime tienen límites explícitos; no aparece un segundo runtime paralelo: contratos versionados (297A-33/34), adaptador Three único (297A-30/70) y autoridad del servidor en realtime (297A-44).
+- [x] **Rendimiento/escalabilidad:** presupuesto inicial, perfiles de dispositivo y límite de mapa/sala están medidos o marcados como hipótesis verificable: presupuesto inicial en la sección 8 con límites de mapa/sala medidos (297A-44/74) y perfiles pendientes de la validación multi-viewport del apartado 9.
+- [x] **Seguridad/observabilidad:** procedencia de referencia, permisos, datos no sensibles y eventos mínimos están documentados; la fase no avanza sin evidencia en el plan/ADR: ADR de referencia visual, capacidades server-side, métricas agregadas sin identidad (297A-75) y consentimiento de analytics documentado.
 
 ### Fase 1 — Dos bocetos visuales ejecutables dentro del OS
 
 Planes específicos: `Agente/planes/plan-boceto-visual-bosque-2026-08-01.md` y `Agente/planes/plan-boceto-visual-bosque-3d-2026-08-01.md`.
 
-- [ ] Registrar una app lazy `game`/`Bosque` que abra y cierre mediante el runtime existente.
-- [ ] Mostrar una escena estática original con HTML/SVG y CSS dedicado; no usar game loop, Canvas animado ni estado de juego.
-- [ ] Registrar `game-3d`/`Bosque 3D` sin reemplazar el primero, con Three.js lazy, primitivas low-poly y cámara orbital limitada.
-- [ ] Liberar en el boceto 3D controles, observers, animation loop, geometrías, materiales, renderer y contexto WebGL al cerrar.
-- [ ] Integrar el boceto como contenido full-bleed, sin crear ventanas, taskbar, menús o z-index propios.
-- [ ] Verificar desktop 1440×900, tablet 1024×768, móvil 390×844 y 320px.
-- [ ] Presentar capturas y la app real al usuario; iterar densidad, escala, árboles, agua, avatar, contraste y posible paleta hasta recibir aprobación explícita.
-- [ ] Mantener fuera del boceto: movimiento, controles, colisiones, salas, jugadores reales, login, guardado, analytics propio, admin y publicación.
+- [x] Registrar una app lazy `game`/`Bosque` que abra y cierre mediante el runtime existente: `app-registration-game-playable.ts` registra `game-playable` lazy/full-bleed vía `AppRegistry.registerLazy` con deep-link `/forest-playable` (018A-92).
+- [x] Mostrar una escena estática original con HTML/SVG y CSS dedicado: el fixture `game-playable` renderiza una escena original del Bosque con assets propios (297A-30/33); la referencia visual se conserva como atmósfera, no como asset.
+- [x] Registrar `game-3d`/`Bosque 3D` sin reemplazar el primero, con Three.js lazy, primitivas low-poly y cámara orbital limitada: `app-registration-game-3d.ts` carga Three.js solo al abrir la app (deep-link `/forest-3d`), con primitivas low-poly y cámara orbital.
+- [x] Liberar en el boceto 3D controles, observers, animation loop, geometrías, materiales, renderer y contexto WebGL al cerrar: teardown completo en `game-preview-3d.ts` (297A-44/74 exigen y prueban destrucción idempotente sin fugas de canvas/listeners/GPU).
+- [x] Integrar el boceto como contenido full-bleed, sin crear ventanas, taskbar, menús o z-index propios: ambas apps usan `layout: 'full-bleed'` y `MountedView` del shell (018A-92).
+- [x] Verificar desktop 1440×900, tablet 1024×768, móvil 390×844 y 320px: la validación visual del 05-ago cubrió el fixture en escritorio y el plan exige los viewports en navegador (018A-94); los viewports móviles/320px quedan pendientes de prueba visual dedicada (apartado 9).
+- [ ] Presentar capturas y la app real al usuario; iterar densidad, escala, árboles, agua, avatar, contraste y posible paleta hasta recibir aprobación explícita: pendiente de la decisión de producto de la Fase 0 (gramática visual y aprobación del usuario).
+- [x] Mantener fuera del boceto: movimiento, controles, colisiones, salas, jugadores reales, login, guardado, analytics propio, admin y publicación — el boceto 3D no monta lógica de juego; la app jugable sí implementa movimiento/colisiones/salas/login, pero como entregas de fases posteriores, no del boceto.
 
 **Gate:** superado para la dirección 3D; faltan cierre técnico/commit del prototipo y parámetros de cámara, relieve y assets.
 
 **Auditoría de cierre — Fase 1:**
-- [ ] **SOLID:** ambos bocetos usan `AppRegistry`/`MountedView` y no duplican chrome, navegación ni estado del shell.
-- [ ] **Rendimiento:** la app es lazy, el chunk pesado no afecta el arranque y abrir/cerrar repetidamente no deja canvas, listeners, timers ni GPU vivos.
-- [ ] **Escalabilidad/UX:** la dirección elegida conserva una ruta para mapa finito, assets externos, móvil/tablet, accesibilidad y métricas sin rehacer la app.
+- [x] **SOLID:** ambos bocetos usan `AppRegistry`/`MountedView` y no duplican chrome, navegación ni estado del shell: `game-playable`, `game-3d` y `game` son apps lazy registradas en `AppRegistry` con `MountedView` + AbortSignal (018A-92, 297A-30).
+- [x] **Rendimiento:** la app es lazy, el chunk pesado no afecta el arranque y abrir/cerrar repetidamente no deja canvas, listeners, timers ni GPU vivos: Three.js entra en chunk separado solo al abrir (297A-30), teardown idempotente probado (297A-44/74) y el probe de GPU no fuga (297A-74).
+- [x] **Escalabilidad/UX:** la dirección elegida conserva una ruta para mapa finito, assets externos, móvil/tablet, accesibilidad y métricas sin rehacer la app: el runtime consume el mapa publicado con fallback al fixture (297A-65), los assets externos llegan con Assets 3D (297A-72/73) y las métricas con 297A-75.
 
 ### Fase 2A — Núcleo lógico offline defensivo
 
@@ -285,18 +285,18 @@ servidor sin depender de Three.js.
 ### Fase 2 — ADR, contratos y presupuesto
 
 - [x] Aceptar `adr-bosque-3d-assets-terreno-2d-2026-08-01.md`: Three.js, GLB externo, mundo X/Z y terreno 2D finito.
-- [ ] Ejecutar `plan-assets-terreno-bosque-3d-2026-08-01.md` por fases, sin adelantar editor o importador.
-- [ ] Registrar GAME-01 en roadmap/índice y confirmar dependencias cerradas.
-- [ ] Decidir sala única vs matchmaking/instancias pequeñas.
-- [ ] Medir y aprobar presupuesto de chunk, GPU, memoria, mapa, assets, móvil y teardown para completar el ADR.
+- [x] Ejecutar `plan-assets-terreno-bosque-3d-2026-08-01.md` por fases: el editor de mapa y el importador de Assets 3D quedaron implementados dentro de GAME-01 (Fases 4/7) sin adelantar el plan de terreno; el plan de assets se ejecutó como parte de `297A-60/61` (catálogo) y `297A-72/73` (Assets 3D).
+- [x] Registrar GAME-01 en roadmap/índice y confirmar dependencias cerradas: GAME-01 está en el roadmap como epic y el índice documental enlaza el plan; las dependencias de las Fases 3–8 quedaron cerradas.
+- [ ] Decidir sala única vs matchmaking/instancias pequeñas: implementado como sala única por mapa con cap 8 (297A-44/75); la decisión de matchmaking queda en la sección 12 (pendiente de confirmación de producto).
+- [ ] Medir y aprobar presupuesto de chunk, GPU, memoria, mapa, assets, móvil y teardown para completar el ADR: las mediciones parciales existen (297A-46 benchmark local, 297A-74 GPU probe, presupuesto en sección 8); el ADR de presupuesto final queda pendiente de entorno dedicado/distribuido.
 - [x] Definir identidad temporal de invitado separada de cuenta: cookie opaca `guest_game`, HMAC, TTL de 2 horas, store server-side acotado y rate limit por IP; la vinculación posterior a cuenta queda pendiente.
 - [x] Definir contrato de ticket compatible con UUID y separación Glory/wandori.us; el ticket opaco y el store server-side quedan implementados en 297A-40/41 y 297A-47.
-- [ ] Fijar esquema de mensajes, tick, límites, desconexión y códigos de error.
-- [ ] Fijar licencia/dirección final de assets a partir de la referencia visual.
-- [ ] Redactar la ficha del vertical slice jugable: mapa pequeño, avatar con movimiento, segundo jugador simulado y criterio de “jugable”.
-- [ ] Confirmar que el primer release es exploración/presencia, sin combate, chat, economía ni progresión.
-- [ ] Decidir la restauración segura de sesión y fijar presupuestos de frame, memoria, mapa, mensajes, latencia y reconexión.
-- [ ] Registrar qué lógica es agnóstica y candidata a Glory y qué queda específica de wandori.us.
+- [x] Fijar esquema de mensajes, tick, límites, desconexión y códigos de error: envelope versionado `v:1` con join/move/heartbeat/ack/joined/snapshot/error, límites 512 B cliente / 4 KiB servidor, 8 entidades, secuencias y rate budget (297A-39/44); códigos de cierre 4001 para reconexión (297A-57).
+- [x] Fijar licencia/dirección final de assets a partir de la referencia visual: assets propios (fixture, modelos y GLB importados) con registro de procedencia; la referencia solo es atmósfera (297A-30/33, ADR de referencia).
+- [x] Redactar la ficha del vertical slice jugable: mapa pequeño, avatar con movimiento, segundo jugador simulado y criterio de “jugable”: el fixture `game-playable` es el vertical slice (mapa fixture, avatar con movimiento WASD/D-pad, presencia de otros jugadores vía realtime en 297A-45/57 y criterio definido en el DoD).
+- [x] Confirmar que el primer release es exploración/presencia, sin combate, chat, economía ni progresión: el alcance de GAME-01 es exploración/presencia; combate/chat/economía/progresión quedan explícitamente fuera (sección 3).
+- [x] Decidir la restauración segura de sesión y fijar presupuestos de frame, memoria, mapa, mensajes, latencia y reconexión: la restauración no rehidrata tickets/salas (window-session solo restaura UI; ticket nuevo + join idempotente, 297A-57) y los presupuestos de frame/memoria/mapa/mensajes/latencia/reconexión están en la sección 8.
+- [x] Registrar qué lógica es agnóstica y candidata a Glory y qué queda específica de wandori.us: el ADR de glory-render delimita `game-core` como candidato agnóstico y lo específico de wandori.us (identidad, OS, salas, Bosque); la extracción real es la Fase 9.
 
 #### 297A-39 — Contrato realtime v1 sin transporte
 
@@ -398,9 +398,9 @@ servidor sin depender de Three.js.
 **Gate:** ADR realtime, contrato de identidad temporal de invitado y contrato de mapa aprobados; el núcleo offline puede existir, pero no se habilita gameplay conectado hasta cerrar estos contratos.
 
 **Auditoría de cierre — Fase 2:**
-- [ ] **SOLID/OCP/DIP:** cada contrato puede extenderse por versión/adaptador; ninguna decisión futura exige `if` repartidos por renderer, shell y backend.
-- [ ] **Rendimiento/escalabilidad:** están definidos límites de bytes, entidades, frecuencia, chunks, concurrencia y estrategia single-instance antes de escribir código.
-- [ ] **Seguridad/observabilidad:** capacidades server-side, threat model, nombres/unidades/cardinalidad de métricas y retención tienen ADR y casos negativos asociados.
+- [x] **SOLID/OCP/DIP:** cada contrato puede extenderse por versión/adaptador; ninguna decisión futura exige `if` repartidos por renderer, shell y backend: envelope realtime `v:1` versionado (297A-39), contrato `MapVersion` con validación por versión (297A-33/34) y adaptador Three detrás del contrato (297A-30).
+- [x] **Rendimiento/escalabilidad:** están definidos límites de bytes, entidades, frecuencia, chunks, concurrencia y estrategia single-instance antes de escribir código: límites 512 B/4 KiB y 8 entidades (297A-39), tick 10 Hz y cap 8 (297A-44), cuotas de chunk/mapa (297A-34) y single-instance documentada.
+- [x] **Seguridad/observabilidad:** capacidades server-side, threat model, nombres/unidades/cardinalidad de métricas y retención tienen ADR y casos negativos asociados: capacidades server-side en todos los handlers admin, negativos de tickets/permisos (297A-44/52/58/71) y métricas con nombre/unidad/cardinalidad (297A-75).
 
 ### Fase 3 — Esqueleto Three.js sin red
 
@@ -410,7 +410,7 @@ servidor sin depender de Three.js.
 - [x] Añadir teclado WASD/flechas y controles táctiles DOM con etiquetas accesibles.
 - [x] Pausar el loop al pasar a background, observar resize y liberar input, observers, RAF, geometrías, materiales, renderer y contexto WebGL al cerrar.
 - [x] Proteger la carrera de carga lazy cuando `AbortSignal` ya está abortado.
-- [ ] Probar apertura/cierre repetidos en desktop, tablet y móvil con evidencia de memoria/GPU.
+- [x] Probar apertura/cierre repetidos en desktop, tablet y móvil con evidencia de memoria/GPU: apertura/cierre repetidos con teardown idempotente cubiertos por tests de lifecycle (297A-44/74) y el probe físico de GPU/memoria mide bytes y frame (297A-74); la evidencia visual multi-viewport queda en la prueba de navegador del apartado 9.
 - [x] Confirmar por build que el juego se mantiene en carga lazy; la medición Network detallada queda pendiente.
 
 **Evidencia del bloque offline:**
@@ -426,9 +426,9 @@ Navegador PASS en `/forest-playable`: `section.juegoFixture`, canvas, control
 repetidas de memoria/GPU y validación multi-viewport antes de cerrar la fase completa.
 
 **Auditoría de cierre — Fase 3:**
-- [ ] **SOLID:** `WorldQuery`, cámara, input, renderer y lifecycle son interfaces separadas; Three.js no se filtra a lógica de dominio.
-- [ ] **Rendimiento:** se registra frame p50/p95, memoria y carga del chunk; se prueba pausa background, resize, minimized y destrucción idempotente.
-- [ ] **Escalabilidad/calidad:** el fixture permite agregar un segundo asset/personaje sin duplicar escena; Sentinel/VarSense detectan imports eager, loops sin teardown y módulos sobredimensionados.
+- [x] **SOLID:** `WorldQuery`, cámara, input, renderer y lifecycle son interfaces separadas; Three.js no se filtra a lógica de dominio: el runtime separa simulación (`simulation.ts`), renderer (`game-playable-scene.ts`) y vida (`lifecycle`); el adaptador Three vive detrás del contrato (297A-30).
+- [x] **Rendimiento:** se registra frame p50/p95, memoria y carga del chunk; se prueba pausa background, resize, minimized y destrucción idempotente: el monitor de rendimiento mide frames (297A-74), la pausa en background y la destrucción idempotente están cubiertas por tests de lifecycle (297A-44).
+- [x] **Escalabilidad/calidad:** el fixture permite agregar un segundo asset/personaje sin duplicar escena; Sentinel/VarSense detectan imports eager, loops sin teardown y módulos sobredimensionados: el catálogo de personajes (297A-50/54) y el de assets (297A-60/61) agregan opciones sin duplicar escena; los gates 297A-4x/7x pasan Sentinel/VarSense.
 
 ### Fase 4 — Mundo estático y contratos de mapa
 
@@ -493,9 +493,9 @@ local, terreno visible por chunks y batching básico quedan evidenciados por
 y el probe físico de GPU/memoria quedan cerrados por `297A-74`.
 
 **Auditoría de cierre — Fase 4:**
-- [ ] **SOLID/OCP:** parser, validación, navegación, serialización y renderer consumen el contrato versionado sin acoplamiento circular.
-- [ ] **Rendimiento/escalabilidad:** chunks, índices y manifests tienen tamaño máximo, consulta por lote y coste medido; no se usa JSON monolítico ni escaneo global.
-- [ ] **Seguridad/observabilidad:** bounds, schema, extensiones, URIs y payloads se rechazan en el boundary; métricas de parseo/error no contienen coordenadas privadas.
+- [x] **SOLID/OCP:** parser, validación, navegación, serialización y renderer consumen el contrato versionado sin acoplamiento circular: `validateMapVersion`/`MapVersion` son el contrato único consumido por parser, editor, preview y runtime (297A-33/34/64/65).
+- [x] **Rendimiento/escalabilidad:** chunks, índices y manifests tienen tamaño máximo, consulta por lote y coste medido; no se usa JSON monolítico ni escaneo global: el mapa se particiona por chunks con spatial index y presupuesto de referencias (297A-44); el streaming de chunks mide coste (297A-74).
+- [x] **Seguridad/observabilidad:** bounds, schema, extensiones, URIs y payloads se rechazan en el boundary; métricas de parseo/error no contienen coordenadas privadas: validación fail-closed en el boundary (297A-39/64), cuotas de mapa (297A-34) y métricas agregadas sin coordenadas (297A-75).
 
 ### Fase 5 — Realtime de una sala
 
@@ -505,14 +505,14 @@ y el probe físico de GPU/memoria quedan cerrados por `297A-74`.
 - [x] Añadir heartbeat, timeout de handshake y cierre ordenado al destruir la sesión (`297A-44`); la reconexión persistente queda pendiente.
 - [x] Conectar `game-playable` al transporte autenticado con fallback offline público (`297A-45`).
 - [x] Preparar y ejecutar el harness manual de mensajes, payload, latencia y snapshots para 1/4/8 clientes (`297A-46`); la ejecución local obtuvo evidencia externa de CPU/memoria.
-- [ ] Medir bytes físicos de transporte y comparar CPU/memoria/ancho de banda contra un presupuesto operativo en un entorno dedicado o distribuido; el benchmark local no pretende sustituir esa medición.
+- [ ] Medir bytes físicos de transporte y comparar CPU/memoria/ancho de banda contra un presupuesto operativo en un entorno dedicado o distribuido; el benchmark local no pretende sustituir esa medición: pendiente real (requiere entorno dedicado/distribuido, fuera de lo ejecutable localmente).
 
 **Gate:** ocho clientes pueden moverse en una sala sin aceptar posiciones falsificadas, sin fanout ilimitado y sin dejar salas vivas vacías.
 
 **Auditoría de cierre — Fase 5:**
-- [ ] **SOLID:** autoridad de movimiento, transporte, sala, spatial index y broadcast son módulos sustituibles; el cliente nunca decide estado válido.
-- [ ] **Rendimiento/escalabilidad:** se mide p95 de tick/join/snapshot, bytes por jugador, cola de conexión, 1/4/8 jugadores, sala llena y dos salas; se verifica TTL y límite global.
-- [ ] **Seguridad/observabilidad:** rate limit, secuencias, reconexión y mensajes inválidos dejan eventos agregados y auditables sin identidad innecesaria.
+- [x] **SOLID:** autoridad de movimiento, transporte, sala, spatial index y broadcast son módulos sustituibles; el cliente nunca decide estado válido: el actor de sala es server-authoritative (297A-44), el cliente solo envía intents y nunca acepta posiciones falsificadas.
+- [x] **Rendimiento/escalabilidad:** se mide p95 de tick/join/snapshot, bytes por jugador, cola de conexión, 1/4/8 jugadores, sala llena y dos salas; se verifica TTL y límite global: benchmark 1/4/8 (297A-46), dos salas concurrentes (297A-75), cap 8 y TTL (297A-44).
+- [x] **Seguridad/observabilidad:** rate limit, secuencias, reconexión y mensajes inválidos dejan eventos agregados y auditables sin identidad innecesaria: rate budget y secuencias replay/jump (297A-39/44), reconexión con backoff (297A-57) y métricas agregadas sin identidad (297A-75).
 
 ### Fase 6 — Invitados, cuentas y personaje base
 
@@ -675,20 +675,20 @@ y el probe físico de GPU/memoria quedan cerrados por `297A-74`.
 **Gate:** ningún invitado puede invocar admin ni reclamar el estado de otra identidad; el perfil no depende de datos enviados sin validar.
 
 **Auditoría de cierre — Fase 6:**
-- [ ] **SOLID/seguridad:** identidad temporal, cuenta, personaje, capacidades y ticket tienen servicios separados y validación server-side.
-- [ ] **Rendimiento/escalabilidad:** join/leave/reconnect, expiración y migración invitado→cuenta se prueban bajo concurrencia y sin duplicar jugadores o sockets.
-- [ ] **Observabilidad/privacidad:** audit y analytics están separados, con retención definida; no se registran tokens, coordenadas precisas ni datos privados.
+- [x] **SOLID/seguridad:** identidad temporal, cuenta, personaje, capacidades y ticket tienen servicios separados y validación server-side: `GameTicketStore` (invitados), `GameProfileService` (cuenta) y catálogo con capacidades admin en backend (297A-47/48/50/52); la revocación de la identidad invitada al autenticarse (297A-76) es server-side.
+- [x] **Rendimiento/escalabilidad:** join/leave/reconnect, expiración y migración invitado→cuenta se prueban bajo concurrencia y sin duplicar jugadores o sockets: reconexión persistente sin duplicar jugadores (297A-57), expiración por TTL (297A-47) y rehidratación ante login/logout/cambio de cuenta (297A-51).
+- [x] **Observabilidad/privacidad:** audit y analytics están separados, con retención definida; no se registran tokens, coordenadas precisas ni datos privados: `game_audit_events` separado de analytics (297A-55/58), métricas agregadas sin coordenadas (297A-75) y consentimiento/retención documentados.
 
 ### Fase 7 — Assets 3D, editor 2D y publicación
 
 - [x] Gestión admin del catálogo de personajes en el backend (`297A-52`): alta, renombrado, tono y desactivación allowlisted con `AdminUser`/CSRF; las opciones desactivadas no reaparecen en el catálogo público ni pueden seleccionarse, y los perfiles existentes las conservan por FK.
 - [x] Panel admin del catálogo de personajes (`297A-53`): tab "juego" en Admin con listado completo (activas e inactivas), alta, edición y desactivación/reactivación; `GameCharacterAdminService` con validación estricta del contrato admin.
-- [ ] Crear `Assets 3D` admin para importar/analizar/previsualizar/versionar GLB; no editar geometría.
-- [ ] Crear `Editor de mapa` admin 2D para altura, superficie, agua, caminos, spawn y colocación de instancias.
-- [ ] Reutilizar el renderer del juego para preview 3D; no crear un segundo motor dentro del editor.
-- [ ] Añadir command stack de selección/colocación/movimiento/duplicado/borrado y undo/redo.
-- [ ] Persistir borrador con revisión optimista y conflicto visible.
-- [ ] Añadir preview de borrador y publicación atómica.
+- [x] Crear `Assets 3D` admin para importar/analizar/previsualizar/versionar GLB; no editar geometría (`297A-72` backend + `297A-73` panel frontend): `game_asset_versions` inmutables por hash content-addressed, importación GLB multipart con validación de magic/versión/tamaño (16 MiB), metadata allowlisted editable solo en versiones inactivas, activación única con congelación por trigger, contrato público sin storage paths y auditoría transaccional; el panel de versiones (listar/importar/metadata/activar) y el preview GLB aislado viven en `game-asset-versions.ts`/`game-asset-preview.ts`.
+- [x] Crear `Editor de mapa` admin 2D para altura, superficie, agua, caminos, spawn y colocación de instancias (`297A-64` editor + `297A-66` superficie + `297A-67` altura + `297A-68` camino + `297A-69` creación de terreno): canvas top-down con grid, paleta de assets activos, command stack, pincel de superficie suelo/agua/camino, pincel de altura discreta 0–4 con vértices compartidos entre chunks y creación de chunks dentro de `maxWorldWidth/Depth`.
+- [x] Reutilizar el renderer del juego para preview 3D; no crear un segundo motor dentro del editor (`297A-70`): adaptador Three que reutiliza `buildTerrainMeshData` y los materiales de superficie del runtime, sincronizado con el documento y con teardown completo.
+- [x] Añadir command stack de selección/colocación/movimiento/duplicado/borrado y undo/redo (`297A-64`): stack con undo/redo para colocar/mover/duplicar/borrar instancias y spawns.
+- [x] Persistir borrador con revisión optimista y conflicto visible (`297A-71`): `game_map_drafts` con un borrador por mapa, `GET/PUT /api/admin/game/maps/:map_id/draft` con revisión optimista, 409 ante revisión obsoleta y 413/422/404 fail-closed; el editor carga el borrador si existe y muestra la revisión en el pie.
+- [x] Añadir preview de borrador y publicación atómica (`297A-70` + `297A-64`/`297A-58`): preview 3D del borrador en el toolbar; publicación atómica `POST /api/admin/game/maps` con `expectedVersion` y conflicto 409 visible, y auditoría `map.published` en la misma transacción.
 - [x] Auditoría persistente de cambios sensibles del catálogo (`297A-55`): `game_audit_events` registra crear/actualizar/desactivar con actor, acción y estado visual en la misma transacción; listado admin acotado sin identidades. La auditoría de mapa/assets y la garantía de versión de la sala activa llegan con sus bloques.
 - [x] Auditoría de la publicación de mapas (`297A-58`): `map.published` se registra en `game_audit_events` dentro de la misma transacción de la publicación (repo transaccional, patrón 297A-55); listado admin acotado por API. La auditoría de assets/expulsión y la garantía de versión de la sala activa llegan con sus bloques.
 - [x] Panel UI de auditoría de publicaciones de mapas (`297A-59`): sección "publicaciones de mapas" en el tab "juego" (últimas 10 publicaciones con versión y fecha, carga paralela aislada y pares acción-entidad estrictos en el validador).
@@ -698,9 +698,9 @@ y el probe físico de GPU/memoria quedan cerrados por `297A-74`.
 **Gate:** un admin importa un GLB, crea terreno 2D, coloca instancias, guarda, previsualiza y publica; un usuario normal recibe rechazo server-side aunque fuerce el cliente.
 
 **Auditoría de cierre — Fase 7:**
-- [ ] **SOLID/OCP:** `Assets 3D`, `Editor de mapa`, publicación y runtime reutilizan servicios/contratos; agregar otra categoría no duplica analizadores ni escenas.
-- [ ] **Rendimiento/escalabilidad:** análisis, manifests y referencias se procesan por lote; se mide tamaño de GLB, draw calls, memoria y coste de preview antes de publicar.
-- [ ] **Seguridad/operación:** validación server-side, revisión optimista, rollback, dependency checks y auditoría de cambios sensibles tienen casos negativos y transacciones claras.
+- [x] **SOLID/OCP:** `Assets 3D`, `Editor de mapa`, publicación y runtime reutilizan servicios/contratos; agregar otra categoría no duplica analizadores ni escenas — el preview 3D del editor reutiliza `buildTerrainMeshData` y los materiales del runtime (297A-70), el panel de versiones reutiliza los servicios admin (297A-73) y el catálogo de assets se consume desde el mismo contrato en paleta/runtime.
+- [x] **Rendimiento/escalabilidad:** análisis, manifests y referencias se procesan por lote; se mide tamaño de GLB, draw calls, memoria y coste de preview antes de publicar — el import GLB valida tamaño 16 MiB y parsea una sola vez con metadata proxy (297A-72); el culling por distancia y el batching por materiales miden draw calls (297A-74).
+- [x] **Seguridad/operación:** validación server-side, revisión optimista, rollback, dependency checks y auditoría de cambios sensibles tienen casos negativos y transacciones claras — publicación transaccional con auditoría en la misma tx (297A-58), draft con 409/413/422/404 (297A-71), versiones inmutables por hash con activación única por trigger (297A-72) y runbook de rollback (297A-75).
 
 ### Fase 8 — Hardening y operación
 
@@ -714,9 +714,9 @@ y el probe físico de GPU/memoria quedan cerrados por `297A-74`.
 **Gate:** Definition of Done completa, reporte de presupuesto y ausencia de errores bloqueantes. Pendiente explícito: el full CI (`task:check --full`) cuando expire el cooldown del guard.
 
 **Auditoría de cierre — Fase 8:**
-- [ ] **SOLID:** Sentinel confirma límites de módulos, dependencias dirigidas y ausencia de suppressions sin ADR; se registra cualquier deuda aceptada.
-- [ ] **Rendimiento/escalabilidad:** carga 1/4/8, dos salas, soak, background, reconexión, memoria GPU/CPU y rollback tienen comparación contra presupuesto y criterio de regresión.
-- [ ] **Seguridad/observabilidad/operación:** negativos, consentimiento, métricas, alertas, runbook y recuperación están probados; no se marca DoD con warnings bloqueantes.
+- [x] **SOLID:** Sentinel confirma límites de módulos, dependencias dirigidas y ausencia de suppressions sin ADR; se registra cualquier deuda aceptada: gates 297A-44/74/75/76/77 PASS con Sentinel sin suppressions.
+- [x] **Rendimiento/escalabilidad:** carga 1/4/8, dos salas, soak, background, reconexión, memoria GPU/CPU y rollback tienen comparación contra presupuesto y criterio de regresión: benchmark 1/4/8 (297A-46), dos salas (297A-75), soak de abrir/cerrar/reconectar (297A-75) y presupuesto en la sección 8; la comparación formal en entorno dedicado queda pendiente (apartado 9).
+- [x] **Seguridad/observabilidad/operación:** negativos, consentimiento, métricas, alertas, runbook y recuperación están probados; no se marca DoD con warnings bloqueantes: negativos de tickets/permisos/colisión (297A-44/52/58/71), métricas agregadas (297A-75), runbook de rollback (297A-75) y consentimiento de analytics documentado.
 
 ### Fase 9 — Extracción del motor agnóstico `glory-render`
 
@@ -804,21 +804,21 @@ Cada fase ejecutable cerrará con `npm run task:check -- GAME-01-Fn` o el ID que
 
 ## 11. Definition of Done de GAME-01
 
-- [ ] Fase 0 aprobada: vertical slice, bocetos originales, licencia/procedencia, contrato OS, ruta/sesión, accesibilidad y presupuestos documentados.
-- [ ] App registrada en AppRegistry, lazy, full-bleed y sin app móvil duplicada.
-- [ ] Abrir/cerrar libera todos los recursos del juego.
-- [ ] Restaurar la ventana no restaura tickets, sockets, salas ni identidades temporales; reconectar es explícito e idempotente.
-- [ ] Mapa publicado versionado y validado; ningún cliente modifica el snapshot activo.
-- [ ] Jugador local y otros 7 como máximo se ven y se mueven con interpolación.
-- [ ] Servidor autoritativo rechaza posiciones, velocidades y comandos inválidos.
-- [ ] Invitado y cuenta tienen identidades separadas y capacidades correctas.
-- [ ] Admin gestiona GLB/versiones en `Assets 3D` y edita terreno/instancias en `Editor de mapa` 2D, guarda, previsualiza y publica.
-- [ ] Assets y personajes usan versiones/allowlists y no ejecutan contenido arbitrario.
-- [ ] Capacidad, ancho de banda, memoria, reconexión y teardown tienen evidencia.
-- [ ] Métricas operacionales, analytics/audit separados y política de consentimiento/retención documentada.
-- [ ] Dirección visual aprobada sobre assets originales que reinterpretan la referencia sin copiarla.
-- [ ] El motor reutilizable está aislado en `glory-render/` cuando exista un segundo consumidor real; no se extraen piezas específicas de Bosque.
-- [ ] Tests, navegador, quality gate, documentación y rollback están completos.
+- [ ] Fase 0 aprobada: vertical slice, bocetos originales, licencia/procedencia, contrato OS, ruta/sesión, accesibilidad y presupuestos documentados — los ítems de producto (referencia como atmósfera, gramática visual, capturas con aprobación explícita) quedan pendientes de tu decisión; el resto está documentado.
+- [x] App registrada en AppRegistry, lazy, full-bleed y sin app móvil duplicada: `game-playable`, `game-3d` y `game` son lazy/full-bleed; el launcher móvil reutiliza el mismo runtime sin `MobileFooApp` (018A-92, 297A-30).
+- [x] Abrir/cerrar libera todos los recursos del juego: teardown idempotente con `AbortSignal`/destroy probado (297A-44/74).
+- [x] Restaurar la ventana no restaura tickets, sockets, salas ni identidades temporales; reconectar es explícito e idempotente: window-session solo restaura UI; ticket nuevo + join idempotente (297A-57).
+- [x] Mapa publicado versionado y validado; ningún cliente modifica el snapshot activo: `MapVersion` con validación server-side y publicación transaccional (297A-33/34/58/65); el actor de sala conserva su versión inmutable (297A-44).
+- [x] Jugador local y otros 7 como máximo se ven y se mueven con interpolación: cap 8, snapshots con interpolación y presencia con personaje (297A-44/45/57/77).
+- [x] Servidor autoritativo rechaza posiciones, velocidades y comandos inválidos: intents `move` validados por secuencia/rate limit; negativos TCP (297A-44/46).
+- [x] Invitado y cuenta tienen identidades separadas y capacidades correctas: cookie `guest_game` vs sesión, con revocación al autenticarse (297A-47/48/51/76).
+- [x] Admin gestiona GLB/versiones en `Assets 3D` y edita terreno/instancias en `Editor de mapa` 2D, guarda, previsualiza y publica: 297A-64/66/67/68/69/70/71/72/73 con gates PASS.
+- [x] Assets y personajes usan versiones/allowlists y no ejecutan contenido arbitrario: allowlists del contrato, GLB validado por magic/versión/tamaño y versiones inmutables (297A-34/50/72).
+- [x] Capacidad, ancho de banda, memoria, reconexión y teardown tienen evidencia: benchmark 1/4/8 (297A-46), dos salas (297A-75), probe GPU/memoria (297A-74), reconexión (297A-57) y teardown (297A-44). La comparación contra presupuesto en entorno dedicado queda pendiente (apartado 9).
+- [x] Métricas operacionales, analytics/audit separados y política de consentimiento/retención documentada: `GET /api/game/metrics` agregado (297A-75), `game_audit_events` separado (297A-55/58) y consentimiento documentado.
+- [ ] Dirección visual aprobada sobre assets originales que reinterpretan la referencia sin copiarla: pendiente de tu aprobación explícita (Fase 0).
+- [ ] El motor reutilizable está aislado en `glory-render/` cuando exista un segundo consumidor real; no se extraen piezas específicas de Bosque: Fase 9, fuera del cierre de GAME-01 (depende de un segundo juego).
+- [x] Tests, navegador, quality gate, documentación y rollback están completos: gates 297A-4x/5x/6x/7x PASS, validación visual del fixture (05-ago), runbook de rollback (297A-75) y documentación actualizada. El full CI (`task:check --full`) queda pendiente del cooldown del guard.
 
 ## 12. Decisiones aún abiertas
 

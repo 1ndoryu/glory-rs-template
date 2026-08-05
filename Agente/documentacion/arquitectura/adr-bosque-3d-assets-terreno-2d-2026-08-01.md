@@ -1,7 +1,7 @@
 # ADR — Bosque 3D, assets externos y terreno editable en 2D
 
-> **Fecha:** 2026-08-01
-> **Estado:** aceptado; parámetros de relieve, cámara y presupuestos pendientes de medir/aprobar.
+> **Fecha:** 2026-08-01 (actualizado 2026-08-05)
+> **Estado:** aceptado; relieve con alturas discretas 0–4 y cámara isométrica limitada implementados; presupuestos con medición parcial local y pendiente de entorno dedicado/distribuido.
 > **Epic:** GAME-01
 > **Decisión del usuario:** se aprueba la dirección visual Three.js isométrica del segundo boceto.
 
@@ -102,7 +102,13 @@ El mapa nunca incrusta GLB ni permite código, shaders arbitrarios, URIs externa
 
 ## Decisiones todavía abiertas
 
-1. Relieve: plano, alturas discretas o colinas suaves. Recomendación inicial: alturas discretas con herramienta `elevar/bajar/alisar`, sin cuevas.
-2. Cámara jugable: libre como el boceto o isométrica limitada siguiendo al personaje. Recomendación: órbita limitada + recenter.
-3. Materiales: monocromo estricto o paleta muy restringida dentro del mundo 3D.
-4. Primera animación: personaje rígido/provisional o GLB con rig y clips `idle/walk`.
+1. Relieve: plano, alturas discretas o colinas suaves. **Resuelto (297A-67):** alturas discretas allowlisted 0–4 con pincel de vértices compartidos entre chunks; sin cuevas ni voladizos.
+2. Cámara jugable: libre como el boceto o isométrica limitada siguiendo al personaje. **Resuelto:** cámara isométrica limitada con órbita acotada + recenter (297A-30/70).
+3. Materiales: monocromo estricto o paleta muy restringida dentro del mundo 3D. **Pendiente de decisión de producto:** tinta monocroma base implementada; la paleta restringida está en `decisiones-pendientes-bosque-2026-08-05.md` (sección 5).
+4. Primera animación: personaje rígido/provisional o GLB con rig y clips `idle/walk`. **Pendiente:** avatar actual con `createFigure` (tono por personaje, 297A-77); rig/clips GLB futuros en Fase 9/Assets.
+
+## Presupuestos (estado al 2026-08-05)
+
+- **Definidos en plan (sección 8):** bundle lazy, descarga solo al abrir, tick 10 Hz, render ≤60 Hz, input ≤15 msg/s, cap 8 por sala, snapshots por radio de interés, límites de mapa/chunks/assets y objetivo de frame p95 ≤16,7 ms.
+- **Medición local existente:** benchmark 1/4/8 jugadores (297A-46), probe físico de GPU/memoria con frame GPU y bytes estimados (297A-74), culling por distancia y batching por materiales con draw calls medidos (297A-74), dos salas concurrentes (297A-75).
+- **Pendiente formal:** comparar bytes físicos de transporte, CPU/memoria/ancho de banda y frame p50/p95 contra el presupuesto en un **entorno dedicado o distribuido** (el benchmark local no lo sustituye); validación multi-viewport (1440×900, 1024×768, 390×844, 320px) y accesibilidad en navegador. Ver plan sección 9 y `decisiones-pendientes-bosque-2026-08-05.md`.
