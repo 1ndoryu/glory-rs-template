@@ -129,8 +129,8 @@ validaciones. El reporte del gate también expone `heavyOverride`/`OVERRIDE`
 (028A-16). Queda pendiente el detalle de timing en `metrics.json` por tarea
 (hoy vive en `latest.json`), TTL/cuota separadas para índices y CI histórico.
 
-- [x] Mostrar en el reporte si cada etapa fue `cache-hit`, incremental o full, cuántos archivos reutilizó y qué invalidó la caché. *(razón de invalidación por etapa + métricas de VarSense + p50/p95 vía `quality:profile`; `metrics.json` por tarea queda como refinamiento)*
-- [x] Mantener el stdout compacto; el detalle de timing vive en `.quality-reports/<task>/metrics.json`. *(compacto conserva el límite; p50/p95 por etapa en `quality:profile`)*
+- [x] Mostrar en el reporte si cada etapa fue `cache-hit`, incremental o full, cuántos archivos reutilizó y qué invalidó la caché. *(razón de invalidación por etapa + métricas de VarSense + p50/p95 vía `quality:profile`)*
+- [x] Mantener el stdout compacto; el detalle de timing vive en `.quality-reports/<task>/metrics.json`. *(nuevo `metrics.json` por tarea con duración/cache/invalidación/métricas del analizador, redactado; `quality:profile` lo consume junto a `latest.json`)*
 - [x] Añadir diagnóstico `sentinel profile <TareaId>` (alias temporal `npm run quality:profile`) que no ejecuta full: lee los últimos reportes y calcula p50/p95.
 - [ ] Aplicar TTL y cuota separadas para índices Sentinel/VarSense, sin mezclarlas con `C:\tmp\glory-target`.
 - [ ] Limpiar entradas huérfanas por `toolVersion/configHash` de forma acotada; nunca borrar una caché con lock activo.

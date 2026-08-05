@@ -75,6 +75,7 @@ function markdown(report) {
     for (const item of report.findings) lines.push(`- [${item.severity}] ${item.ruleId}: ${item.message}`);
   }
   lines.push('', '## Recordatorios', '', ...report.reminders.map(item => `- ${item}`), '');
+  lines.push('- Detalle de timing por etapa: `metrics.json` (duración, cache hit/miss, invalidación y métricas del analizador)');
   return lines.join('\n');
 }
 
@@ -128,9 +129,34 @@ export async function createReport(context, args, scope, stages, reminders, star
   });
   const jsonPath = path.join(context.reportRoot, 'latest.json');
   const markdownPath = path.join(context.reportRoot, 'latest.md');
+  const metricsPath = path.join(context.reportRoot, 'metrics.json');
   await writeAtomic(jsonPath, `${JSON.stringify(report, null, 2)}\n`);
   await writeAtomic(markdownPath, markdown(report));
-  return { report, jsonPath, markdownPath };
+  /* [028A-8 Fase 4] Detalle de timing por etapa en `metrics.json` aparte del
+   * reporte: durationMs, cache hit/miss, razón de invalidación y métricas del
+   * analizador (filesAnalyzed/filesReused/cacheHitRate/peakRssMb). Es la
+   * materia prima de `quality:profile`/`sentinel profile` y de la publicación
+   * histórica de CI, sin inflar latest.json ni el stdout. */
+  const metrics = sanitize({
+    schemaVersion: 1,
+    taskId: args.taskId,
+    generatedAt: report.generatedAt,
+    durationMs: report.durationMs,
+    mode: report.mode,
+    branch: context.branch ?? null,
+    stages: stages.map(stage => ({
+      stage: stage.stage,
+      status: stage.status,
+      state: stage.state ?? null,
+      durationMs: Number.isFinite(stage.durationMs) ? stage.durationMs : null,
+      cache: stage.cache ?? (stage.cached ? 'hit' : 'miss'),
+      cacheReason: stage.cacheReason ?? null,
+      summary: stage.summary ?? '',
+      metrics: stage.metrics && typeof stage.metrics === 'object' ? stage.metrics : null,
+    })),
+  });
+  await writeAtomic(metricsPath, `${JSON.stringify(metrics, null, 2)}\n`);
+  return { report, jsonPath, markdownPath, metricsPath };
 }
 
 /* [028A-8 Fase 0/4] Detalle por etapa en Markdown: razón de invalidación de

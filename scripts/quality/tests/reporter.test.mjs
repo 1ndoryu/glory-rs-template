@@ -101,6 +101,11 @@ test('el reporte JSON, Markdown y compacto no exponen secretos de findings ni re
       assert.doesNotMatch(compact.join('\n'), new RegExp(secret));
     }
     assert.match(JSON.stringify(json), /REDACTED/);
+    /* [028A-8 Fase 4] metrics.json acompaña a latest.json con el detalle de
+     * timing por etapa y también redacta secretos. */
+    const metrics = JSON.parse(await readFile(result.metricsPath, 'utf8'));
+    assert.doesNotMatch(JSON.stringify(metrics), new RegExp(secrets.join('|')));
+    assert.equal(metrics.stages[0].stage, 'sentinel');
   } finally {
     await rm(projectRoot, { recursive: true, force: true });
   }
@@ -170,6 +175,11 @@ test('el reporte expone OVERRIDE (concedida/denegada) y el detalle de etapa con 
     assert.match(markdown, /concedida/);
     assert.match(markdown, /reusados 364/);
     assert.match(markdown, /invalidación: fingerprint-mismatch/);
+    const metrics = JSON.parse(await readFile(result.metricsPath, 'utf8'));
+    assert.equal(metrics.stages[0].cache, 'miss');
+    assert.equal(metrics.stages[0].cacheReason, 'fingerprint-mismatch');
+    assert.equal(metrics.stages[0].metrics.filesReused, 364);
+    assert.equal(metrics.stages[0].durationMs, 1500);
   } finally {
     await rm(projectRoot, { recursive: true, force: true });
   }
