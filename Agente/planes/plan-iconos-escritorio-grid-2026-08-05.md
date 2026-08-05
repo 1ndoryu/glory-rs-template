@@ -79,21 +79,24 @@ real, y sin código de depuración visible para el usuario final.
 
 ## Fases
 
-### Fase 1 — Unificar la geometría del grid (columnaGapEffective)
+### Fase 1 — Unificar la geometría del grid (columnaGapEffective) ✅ cerrada (05-ago, commit)
 
-- [ ] Añadir `columnGapEffective` a `GridMetrics` replicando la distribución horizontal de
+- [x] Añadir `columnGapEffective` a `GridMetrics` replicando la distribución horizontal de
   `justify-content: space-between/around/evenly` (mismo patrón que `rowGapEffective`).
-- [ ] Medir `cellWidth` desde el track real: prioridad a `gridTemplateColumns` parseada
+- [x] Medir `cellWidth` desde el track real: prioridad a `gridTemplateColumns` parseada
   (auto-fill → derivar track de `(width - (columns-1)*gap)/columns`), fallback al primer item.
-- [ ] Extraer un helper único `cellOriginAt(col, row, metrics)` (LTR y RTL) y usarlo en
+- [x] Extraer un helper único `cellOriginAt(col, row, metrics)` (LTR y RTL) y usarlo en
   `getCellAt`, `positionCellHighlight` y `debugGridOverlay.render` (eliminar las tres fórmulas
   paralelas).
-- [ ] Tests DOM (jsdom): montar un grid real con `repeat(auto-fill, 88px)` + `space-between` + RTL,
+- [x] Tests DOM (jsdom): montar un grid real con `repeat(auto-fill, 88px)` + `space-between` + RTL,
   con y sin sobrante, y verificar que `getCellAt(celda real)` → `col,row` exacto y que
   `cellOriginAt` devuelve el origen del track (comparado con el rect del icono posicionado).
+  `icon-grid-dom.test.ts` (9 tests; el stub de layout es la verdad de referencia en jsdom).
+
+**Evidencia F1:** suite frontend completa 713/713, type-check limpio, reviewer sin bloqueantes.
 
 **Gate F1:** `cellOriginAt` es la única fuente de geometría; tests DOM verdes con sobrante
-horizontal y RTL.
+horizontal y RTL. — ✅ CUMPLIDO
 
 ### Fase 2 — Coherencia del placeholder de arrastre
 

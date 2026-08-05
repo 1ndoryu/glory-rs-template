@@ -21,11 +21,29 @@ export interface GridMetrics {
    * (space-between/around/evenly): el navegador reparte el sobrante vertical
    * entre filas; getCellAt lo usa para que el snap-grid siga siendo exacto. */
   readonly rowGapEffective: number;
+  /** [018A-97] Gap de columna efectivo con justify-content distribuido
+   * (space-between/around/evenly): el navegador reparte el sobrante horizontal
+   * entre columnas. Equivalente horizontal de rowGapEffective: sin esto la
+   * geometría usaba columnGap fijo y el highlight/rejilla quedaban desfasados
+   * del track real cuando sobraba espacio. */
+  readonly columnGapEffective: number;
   readonly left: number;
   readonly right: number;
   readonly top: number;
   /** Grid en direction: rtl (col 0 = columna derecha, crece hacia la izquierda). */
   readonly rtl: boolean;
+}
+
+/* [018A-97] Ancho del track declarado del grid: con repeat(auto-fill) el
+ * navegador resuelve gridTemplateColumns a longitudes ("88px 88px …"); el
+ * primer track es la celda real. Se acepta solo si es px: un template con
+ * minmax()/fr (o vacío en jsdom) devuelve 0 y el caller cae al primer item. */
+function parseTrackWidthPx(template: string): number {
+  if (!template || template === 'none') return 0;
+  const first = template.trim().split(/\s+/)[0];
+  if (!first?.endsWith('px')) return 0;
+  const px = parseFloat(first);
+  return Number.isFinite(px) && px > 0 ? px : 0;
 }
 
 /** Medir columnas, celdas y gaps del grid real (desktop/tablet). */
@@ -40,7 +58,12 @@ export function getGridMetrics(
   const template = cs.gridTemplateColumns;
   const declaredColumns = !template || template === 'none' ? 1 : template.split(' ').length;
   const first = gridEl.querySelector<HTMLElement>(itemSelector);
-  const cellWidth = first ? first.getBoundingClientRect().width : 0;
+  /* [018A-97] Medir la celda del TRACK real del CSS grid, no del primer item:
+   * el label puede cambiar el ancho del item (overflow, tema) y desacoplaba la
+   * geometría del snap-grid de los tracks reales. Fallback al item solo si el
+   * template no es parseable o el grid está vacío. */
+  const trackWidth = parseTrackWidthPx(cs.gridTemplateColumns);
+  const cellWidth = trackWidth > 0 ? trackWidth : (first ? first.getBoundingClientRect().width : 0);
   /* [297A-20] Altura de fila = grid-auto-rows (fijo) para que la geometría
    * coincida con el CSS grid real; fallback al alto del icono si no es fijo. */
   const autoRows = parseFloat(cs.gridAutoRows);
@@ -61,6 +84,15 @@ export function getGridMetrics(
   const used = rows * cellHeight + (rows - 1) * rowGap;
   const extra = Math.max(0, rect.height - used);
   const rowGapEffective = distribute && rows > 1 ? rowGap + extra / (rows - 1) : rowGap;
+  /* [018A-97] Distribución horizontal: mismo patrón que rowGapEffective pero
+   * con justify-content (eje inline). El sobrante horizontal se reparte entre
+   * columnas; la geometría (getCellAt/cellOriginAt) debe replicarlo. */
+  const justifyDistribute = /space-between|space-around|space-evenly/.test(cs.justifyContent);
+  const usedWidth = columns * cellWidth + (columns - 1) * columnGap;
+  const extraX = Math.max(0, rect.width - usedWidth);
+  const columnGapEffective = justifyDistribute && columns > 1
+    ? columnGap + extraX / (columns - 1)
+    : columnGap;
   return {
     columns,
     rows,
@@ -69,11 +101,31 @@ export function getGridMetrics(
     columnGap,
     rowGap,
     rowGapEffective,
+    columnGapEffective,
     left: rect.left,
     right: rect.right,
     top: rect.top,
     rtl: cs.direction === 'rtl',
   };
+}
+
+/** [018A-97] Origen (grid-local: relativo al borde superior-izquierdo del
+ * grid) de la celda (col,row), replicando la distribución real del CSS grid
+ * (justify-content/align-content space-between/around/evenly y direction
+ * rtl). Fuente ÚNICA de geometría de celdas: la usan getCellAt (inverso),
+ * positionCellHighlight y debugGridOverlay.render. Antes cada consumidor
+ * tenía su propia fórmula RTL y divergían del track real. */
+export function cellOriginAt(
+  col: number,
+  row: number,
+  metrics: GridMetrics,
+): { readonly left: number; readonly top: number } {
+  const gridWidth = metrics.right - metrics.left;
+  const left = metrics.rtl
+    ? gridWidth - (col + 1) * metrics.cellWidth - col * metrics.columnGapEffective
+    : col * (metrics.cellWidth + metrics.columnGapEffective);
+  const top = row * (metrics.cellHeight + metrics.rowGapEffective);
+  return { left, top };
 }
 
 /** Celda snap bajo unas coordenadas de viewport, o null si cae fuera del grid. */
@@ -82,11 +134,14 @@ export function getCellAt(
   y: number,
   metrics: GridMetrics,
 ): GridPosition | null {
-  const { left, right, top, cellWidth, cellHeight, columnGap, rowGap, rowGapEffective, columns, rows, rtl } = metrics;
+  const { left, right, top, cellWidth, cellHeight, rowGap, rowGapEffective, columnGapEffective, columns, rows, rtl } = metrics;
   if (cellWidth <= 0 || cellHeight <= 0) return null;
+  /* [018A-97] Gap de columna EFECTIVO (inverso de cellOriginAt): con
+   * justify-content space-between el sobrante se reparte y columnGap fijo
+   * mapeaba la columna equivocada. */
   const col = rtl
-    ? Math.floor((right - x + columnGap) / (cellWidth + columnGap))
-    : Math.floor((x - left + columnGap) / (cellWidth + columnGap));
+    ? Math.floor((right - x + columnGapEffective) / (cellWidth + columnGapEffective))
+    : Math.floor((x - left + columnGapEffective) / (cellWidth + columnGapEffective));
   /* [058A-1] Usar el gap de fila efectivo (distribuido) para que el mapeo
    * y→fila coincida con las filas reales cuando align-content reparte el
    * sobrante; sin esto el drop podía caer en la fila equivocada. */

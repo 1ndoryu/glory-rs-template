@@ -20,6 +20,8 @@ const metrics: GridMetrics = {
   rowGap: 24,
   /* [058A-1] Sin distribución: rowGap efectivo = rowGap declarado. */
   rowGapEffective: 24,
+  /* [018A-97] Sin distribución: columnGap efectivo = columnGap declarado. */
+  columnGapEffective: 12,
   left: 100,
   right: 100 + 4 * (88 + 12),
   top: 50,

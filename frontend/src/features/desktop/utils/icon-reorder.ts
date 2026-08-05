@@ -5,7 +5,7 @@
  */
 
 import { createEl } from '../../../utils/dom';
-import { getGridMetrics, getCellAt, type GridPosition, type GridMetrics } from './icon-grid';
+import { getGridMetrics, getCellAt, cellOriginAt, type GridPosition, type GridMetrics } from './icon-grid';
 
 /** Subset de sesión necesaria para reorder/highlight. */
 export interface HighlightSession {
@@ -77,21 +77,13 @@ export function positionCellHighlight(
     session.gridEl.appendChild(hl);
     session.highlightEl = hl;
   }
-  const gridRect = session.gridEl.getBoundingClientRect();
   const hl = session.highlightEl;
-  /* [297A-20] Geometría RTL real del CSS grid: la celda `col` empieza en
-   * right - (col+1)*cellWidth - col*columnGap (un gap por cada columna
-   * anterior, no por la actual). Antes se restaba (col+1)*(cellWidth+gap)
-   * y el highlight quedaba 16px*columna a la izquierda de la celda real. */
-  const cellLeft = metrics.rtl
-    ? metrics.right - gridRect.left - (cell.col + 1) * metrics.cellWidth - cell.col * metrics.columnGap
-    : metrics.left - gridRect.left + cell.col * (metrics.cellWidth + metrics.columnGap);
-  hl.style.left = `${cellLeft}px`;
-  /* [058A-2] Usar el gap de fila efectivo igual que getCellAt: con
-   * align-content space-between/around/evenly el sobrante vertical se
-   * reparte entre filas, y usar rowGap fijo dejaba el highlight desfasado
-   * respecto a la celda real (el cuadrado se veía corrido hacia arriba). */
-  hl.style.top = `${metrics.top - gridRect.top + cell.row * (metrics.cellHeight + metrics.rowGapEffective)}px`;
+  /* [018A-97] Geometría unificada: cellOriginAt es la fuente única (RTL +
+   * gaps efectivos distribuidos con space-between). Antes este cálculo era
+   * una fórmula paralela que divergía del track real cuando sobraba espacio. */
+  const origin = cellOriginAt(cell.col, cell.row, metrics);
+  hl.style.left = `${origin.left}px`;
+  hl.style.top = `${origin.top}px`;
   hl.style.width = `${metrics.cellWidth}px`;
   hl.style.height = `${metrics.cellHeight}px`;
 }

@@ -315,8 +315,9 @@ fórmulas paralelas de geometría (getCellAt / positionCellHighlight / debugGrid
 divergieron; `cellWidth` se mide del primer item, no del track; y la rejilla roja es depuración
 temporal (297A-20) que quedó en producción.
 
-- [ ] Unificar la geometría de celdas: `columnGapEffective` + `cellOriginAt(col,row,metrics)` único
-  (LTR/RTL) usado por getCellAt, highlight y debug; tests DOM sobre grid real con `space-between`+RTL.
+- [x] Unificar la geometría de celdas: `columnGapEffective` + `cellOriginAt(col,row,metrics)` único
+  (LTR/RTL) usado por getCellAt, highlight y debug; tests DOM sobre grid real con `space-between`+RTL
+  (F1 cerrada 05-ago: suite 713/713, `icon-grid-dom.test.ts`).
 - [ ] Placeholder de arrastre: verificar en navegador que cae exactamente sobre la celda destino
   (desktop ≥769 y tablet), ajustar transición y tests DOM del highlight.
 - [ ] Drag de grupo predecible: decidir el grupo por el gesto (pointerdown), arrastrar un icono no
