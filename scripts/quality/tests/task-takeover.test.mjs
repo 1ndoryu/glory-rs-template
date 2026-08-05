@@ -96,13 +96,15 @@ test('take: un marcado de más de 6 h se considera olvidado y se puede re-tomar'
   }
 });
 
-test('release: libera el autor, no libera el ajeno activo sin --force, y respeta el olvidado', async () => {
+test('release: solo el autor libera una toma activa, ni siquiera con --force', async () => {
   const root = await makeRoot();
   try {
     await takeTask(root, '297A-16', { by: 'buffy', nowMs });
-    /* Un agente ajeno activo no puede liberar sin --force. */
+    /* Un agente ajeno activo no puede liberar (releaseTask no tiene force). */
     const conflict = await releaseTask(root, '297A-16', { by: 'agente-2', nowMs: nowMs + 60_000 });
     assert.equal(conflict.status, 'conflict');
+    /* La toma sigue intacta. */
+    assert.equal((await readTakeover(root, '297A-16')).takenBy, 'buffy');
     /* El autor libera. */
     const released = await releaseTask(root, '297A-16', { by: 'buffy', nowMs: nowMs + 60_000 });
     assert.equal(released.status, 'released');
@@ -110,8 +112,14 @@ test('release: libera el autor, no libera el ajeno activo sin --force, y respeta
     /* Liberar lo no tomado es informativo, no error. */
     const notTaken = await releaseTask(root, '297A-16', { by: 'buffy' });
     assert.equal(notTaken.status, 'not-taken');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
-    /* Marcado olvidado (>6 h): otro agente puede liberarlo sin --force. */
+test('release: un marcado expirado (>6 h) sí lo libera cualquier agente', async () => {
+  const root = await makeRoot();
+  try {
     await takeTask(root, '028A-8', { by: 'agente-olvidadizo', nowMs });
     const stale = await releaseTask(root, '028A-8', { by: 'buffy', nowMs: nowMs + TAKEOVER_TTL_MS + 60_000 });
     assert.equal(stale.status, 'released-stale');
@@ -208,9 +216,11 @@ test('takeoverReminders cubre los cuatro estados del gate', () => {
   const theirs = takeoverReminders({ taskId: '297A-16', entry, agent: 'agente-2', nowMs });
   assert.match(theirs[0], /TAREA TOMADA/);
   assert.match(theirs[0], /buffy/);
-  /* Olvidada (>6 h) → re-tomar o liberar con --force. */
+  /* Olvidada (>6 h) → re-tomar (con --force) o liberar (un expirado sí lo
+   * libera cualquier agente; un activo solo su autor). */
   const stale = takeoverReminders({ taskId: '297A-16', entry, agent: 'agente-2', nowMs: nowMs + TAKEOVER_TTL_MS + 60_000 });
   assert.match(stale[0], /expiró/);
+  assert.match(stale[0], /task:release/);
 });
 
 test('readTakeover devuelve null ante un archivo corrupto o inexistente', async () => {

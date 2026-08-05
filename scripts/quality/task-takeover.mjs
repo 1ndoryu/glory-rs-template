@@ -10,6 +10,9 @@
  * - Una tarea tomada por OTRO agente activo no se puede tomar de nuevo.
  * - Un marcado que supera TAKEOVER_TTL_MS (6 h) sin liberarse se considera
  *   olvidado: cualquier agente puede re-tomarlo (con aviso) o liberarlo.
+ * - task:release SOLO libera la tarea del agente que la tomó (o un marcado
+ *   ya expirado); un agente NUNCA puede liberar la tarea activa de otro,
+ *   ni siquiera con --force (--force solo afecta a task:take).
  * - El registro vive en `.quality-reports/task-takeover/<taskId>.json`
  *   (ignorado por git): es coordinación local del checkout, no un contrato.
  * - `task:check` solo informa/recuerda; nunca toma ni libera por sorpresa.
@@ -190,17 +193,23 @@ async function writeEntry(target, taskId, by, nowMs) {
 }
 
 /* Libera la tarea. Devuelve:
- * - { status: 'released', entry }      liberada (autor o con --force)
- * - { status: 'released-stale', entry } marcado olvidado liberado por otro
+ * - { status: 'released', entry }       liberada por su autor
+ * - { status: 'released-stale', entry } marcado expirado liberado por otro
  * - { status: 'not-taken', entry: null } no estaba tomada
- * - { status: 'conflict', entry }      activa y de otro agente (sin --force) */
-export async function releaseTask(root, taskId, { by = defaultAgent(), force = false, nowMs = Date.now() } = {}) {
+ * - { status: 'conflict', entry }       activa y de otro agente (imposible
+ *   liberar, ni con --force: el autor debe liberarla o esperar la expiración)
+ *
+ * Sin parámetro force: el propietario libera su toma; un marcado expirado
+ * (>6 h, olvidado) puede liberarlo cualquier agente; un marcado ACTIVO de
+ * otro agente SIEMPRE devuelve conflicto. Así un agente no puede desmarcar
+ * la tarea que otro está trabajando. */
+export async function releaseTask(root, taskId, { by = defaultAgent(), nowMs = Date.now() } = {}) {
   sanitizeTaskId(taskId);
   const agent = sanitizeAgentName(by);
   const target = takeoverEntryPath(root, taskId);
   const existing = await readTakeover(root, taskId);
   if (!existing) return { status: 'not-taken', entry: null };
-  if (existing.takenBy !== agent && !isStale(existing, nowMs) && !force) {
+  if (existing.takenBy !== agent && !isStale(existing, nowMs)) {
     return { status: 'conflict', entry: existing };
   }
   await unlink(target).catch(error => {
@@ -221,7 +230,7 @@ export function takeoverReminders({ taskId, entry, agent = defaultAgent(), nowMs
   }
   if (stale) {
     return [
-      `El marcado de ${entry.takenBy} en ${taskId} expiró (olvidó liberarla): puedes re-tomarla con npm run task:take -- --task ${taskId} --by <agente> --force o liberarla con --force`,
+      `El marcado de ${entry.takenBy} en ${taskId} expiró (olvidó liberarla): puedes re-tomarla con npm run task:take -- --task ${taskId} --by <agente> --force, o liberarla con npm run task:release -- --task ${taskId} (un marcado expirado lo libera cualquier agente; uno activo solo su autor)`,
     ];
   }
   return [
@@ -256,11 +265,14 @@ async function main() {
     }
     const result = command === 'take'
       ? await takeTask(root, args.task, { by: args.by, force: args.force })
-      : await releaseTask(root, args.task, { by: args.by, force: args.force });
+      : await releaseTask(root, args.task, { by: args.by });
     const { entry } = result;
     if (result.status === 'conflict' && entry) {
       const stale = isStale(entry);
-      process.stderr.write(`[task-takeover] ${command.toUpperCase()} RECHAZADO — ${args.task} tomada por ${entry.takenBy} (${entry.id}) desde ${entry.takenAt}${stale ? ' (expirada)' : ''}\n`);
+      const hint = command === 'release'
+        ? ' — solo el autor libera su toma activa (o un marcado expirado)'
+        : '';
+      process.stderr.write(`[task-takeover] ${command.toUpperCase()} RECHAZADO — ${args.task} tomada por ${entry.takenBy} (${entry.id}) desde ${entry.takenAt}${stale ? ' (expirada)' : ''}${hint}\n`);
       process.stderr.write('[task-takeover] Next: npm run task:status\n');
       process.exitCode = 1;
       return;
@@ -293,7 +305,10 @@ async function main() {
     return;
   }
 
-  process.stderr.write(`[task-takeover] uso: take|release|status --task <ID> [--by <agente>] [--force] [--root <ruta>]\n`);
+  process.stderr.write(`[task-takeover] uso:\n`);
+  process.stderr.write(`  take    --task <ID> [--by <agente>] [--force]   (--force: re-tomar un marcado expirado)\n`);
+  process.stderr.write(`  release --task <ID> [--by <agente>]            (solo el autor, o un marcado expirado)\n`);
+  process.stderr.write(`  status  [--task <ID>] [--root <ruta>]\n`);
   process.exitCode = 2;
 }
 
