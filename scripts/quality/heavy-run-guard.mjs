@@ -1,8 +1,9 @@
-import { lstat, mkdir, readFile, realpath, rename, unlink, writeFile } from 'node:fs/promises';
+import { appendFile, lstat, mkdir, readFile, realpath, rename, unlink, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
+import { redact } from './redaction.mjs';
 
 const DEFAULT_COOLDOWN_MS = 3 * 60 * 60 * 1000;
 const DEFAULT_TARGET_BASE = process.platform === 'win32'
@@ -102,7 +103,53 @@ export function isHeavyOverride(options = {}) {
   );
 }
 
-export async function inspectHeavyRun({ projectRoot, targetBase = resolveTargetBase(), mode = 'full', allowHeavy = false, now = Date.now() }) {
+/* [028A-16] Fuente manual de la excepción del guard: flag, env o token. CI
+ * es un modo sancionado (no una excepción manual) y no entra aquí. */
+export function manualOverrideSource(options = {}) {
+  if (options.allowHeavy) return 'flag';
+  if (process.env.GLORY_QUALITY_ALLOW_HEAVY === '1') return 'env';
+  if (process.env.GLORY_HEAVY_RUN_TOKEN) return 'token';
+  return null;
+}
+
+/* [028A-16] El motivo de la excepción llega por flag o por env; si falta, la
+ * excepción se rechaza y el intento queda registrado en el log de auditoría. */
+export function overrideReason(options = {}) {
+  const flag = typeof options.heavyReason === 'string' ? options.heavyReason.trim() : '';
+  const env = typeof process.env.GLORY_HEAVY_RUN_REASON === 'string' ? process.env.GLORY_HEAVY_RUN_REASON.trim() : '';
+  return flag || env;
+}
+
+/* [028A-16] Auditoría persistente de excepciones del guard: cada activación
+ * de --allow-heavy / GLORY_QUALITY_ALLOW_HEAVY / GLORY_HEAVY_RUN_TOKEN queda
+ * en .quality-reports/heavy-overrides.log con timestamp, source, comando,
+ * cwd, PID y motivo. Nunca bloquea la decisión: un fallo de escritura solo se
+ * reporta a stderr. */
+export async function logHeavyOverride({ projectRoot, source, command, cwd, pid, reason, granted, taskId }) {
+  try {
+    const logDir = path.join(projectRoot, '.quality-reports');
+    await mkdir(logDir, { recursive: true });
+    /* [028A-16] El comando y el motivo se redactan igual que el resto del
+     * pipeline: un comando con un secreto incrustado (p. ej. una URL con
+     * credencial) no debe quedar en claro en el log de auditoría. */
+    const entry = {
+      version: 1,
+      timestamp: new Date().toISOString(),
+      source,
+      command: redact(String(command ?? '')),
+      cwd: cwd ?? process.cwd(),
+      pid: pid ?? process.pid,
+      reason: reason ? redact(String(reason)) : null,
+      granted: Boolean(granted),
+      taskId: taskId ?? null,
+    };
+    await appendFile(path.join(logDir, 'heavy-overrides.log'), `${JSON.stringify(entry)}\n`, 'utf8');
+  } catch (error) {
+    process.stderr.write(`[glory-quality] No se pudo escribir heavy-overrides.log: ${error.message}\n`);
+  }
+}
+
+export async function inspectHeavyRun({ projectRoot, targetBase = resolveTargetBase(), mode = 'full', allowHeavy = false, heavyReason, now = Date.now() }) {
   const config = await readProjectConfig(projectRoot);
   const cooldownMs = readCooldownMs(config);
   const state = await readJson(statePath(targetBase), { version: 1, projects: {} });
@@ -110,6 +157,21 @@ export async function inspectHeavyRun({ projectRoot, targetBase = resolveTargetB
   const lastHeavyAt = Number(entry?.lastHeavyAt || 0);
   const elapsed = lastHeavyAt > 0 ? now - lastHeavyAt : Number.POSITIVE_INFINITY;
   const remainingMs = Math.max(0, cooldownMs - elapsed);
+  const manualSource = manualOverrideSource({ allowHeavy });
+  const reason = overrideReason({ heavyReason });
+  /* [028A-16] Una excepción manual sin motivo se rechaza antes de consultar el
+   * cooldown: el motivo es requisito de la excepción, no del modo CI. */
+  if (manualSource && !reason) {
+    return {
+      allowed: false,
+      reason: 'heavy-reason-required',
+      message: 'La excepción del guard requiere motivo: usa --heavy-reason "<motivo>" (o GLORY_HEAVY_RUN_REASON).',
+      cooldownMs,
+      remainingMs: 0,
+      source: manualSource,
+      override: true,
+    };
+  }
   const override = isHeavyOverride({ allowHeavy, ci: mode === 'ci' });
   if (!override && remainingMs > 0) {
     return {
@@ -121,7 +183,7 @@ export async function inspectHeavyRun({ projectRoot, targetBase = resolveTargetB
       lastHeavyAt: new Date(lastHeavyAt).toISOString(),
     };
   }
-  return { allowed: true, cooldownMs, remainingMs: 0, override };
+  return { allowed: true, cooldownMs, remainingMs: 0, override, source: manualSource, reason };
 }
 
 async function clearStaleActiveLock(filePath, targetBase) {
@@ -139,8 +201,24 @@ export async function acquireHeavyRun({
   taskId = null,
   command = 'quality-full',
   allowHeavy = false,
+  heavyReason,
 }) {
-  const decision = await inspectHeavyRun({ projectRoot, targetBase, mode, allowHeavy });
+  const decision = await inspectHeavyRun({ projectRoot, targetBase, mode, allowHeavy, heavyReason });
+  /* [028A-16] Toda activación manual de la excepción queda en el log de
+   * auditoría, concedida o rechazada; el propio acquire lo registra para que
+   * el flag/env/token sea trazable aunque la entrada llegue por otro camino
+   * (run-with-db, cargo.cmd). */
+  const manualSource = manualOverrideSource({ allowHeavy });
+  if (manualSource) {
+    await logHeavyOverride({
+      projectRoot,
+      source: manualSource,
+      command,
+      reason: overrideReason({ heavyReason }),
+      granted: decision.allowed,
+      taskId,
+    });
+  }
   if (!decision.allowed) return decision;
 
   const guardRoot = resolveGuardRoot(targetBase);
@@ -210,9 +288,11 @@ async function executeCargo(argv) {
   const cargoArgs = separator === -1 ? [] : argv.slice(separator + 1);
   const projectIndex = options.indexOf('--project-root');
   const cargoIndex = options.indexOf('--cargo-path');
+  const reasonIndex = options.indexOf('--heavy-reason');
   const requestedRoot = projectIndex >= 0 ? path.resolve(options[projectIndex + 1]) : process.cwd();
   const projectRoot = await findQualityRoot(requestedRoot);
   const cargoPath = cargoIndex >= 0 ? options[cargoIndex + 1] : (process.platform === 'win32' ? 'cargo.exe' : 'cargo');
+  const heavyReason = reasonIndex >= 0 ? options[reasonIndex + 1] : undefined;
   if (!isHeavyCargoCommand(cargoArgs)) {
     const light = spawn(cargoPath, cargoArgs, { cwd: projectRoot, env: process.env, stdio: 'inherit', shell: false, windowsHide: true });
     light.on('error', error => {
@@ -227,6 +307,7 @@ async function executeCargo(argv) {
     mode: 'raw-cargo',
     command: `cargo ${cargoArgs.join(' ')}`,
     allowHeavy: options.includes('--allow-heavy'),
+    heavyReason,
   });
   if (!lease.allowed) {
     console.error(`[glory-quality] BLOQUEADO: ${formatHeavyGuardMessage(lease)}`);

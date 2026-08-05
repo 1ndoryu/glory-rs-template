@@ -21,3 +21,11 @@ test('parseArgs extrae perfiles repetidos y exige su valor', () => {
   assert.throws(() => parseArgs(['297A-6', '--profile']), /Falta valor para --profile/);
   assert.throws(() => parseArgs(['297A-6', '--profile', '--full']), /Falta valor para --profile/);
 });
+
+test('parseArgs acepta --heavy-reason y exige su valor (028A-16)', () => {
+  const args = parseArgs(['297A-6', '--allow-heavy', '--heavy-reason', 'validar clippy de fase']);
+  assert.equal(args.allowHeavy, true);
+  assert.equal(args.heavyReason, 'validar clippy de fase');
+  assert.throws(() => parseArgs(['297A-6', '--heavy-reason']), /Falta valor para --heavy-reason/);
+  assert.throws(() => parseArgs(['297A-6', '--heavy-reason', '--full']), /Falta valor para --heavy-reason/);
+});

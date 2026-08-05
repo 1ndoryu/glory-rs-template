@@ -137,6 +137,44 @@ test('el artifact conserva todos los hallazgos y los ordena de forma determinist
   }
 });
 
+test('el reporte expone OVERRIDE (concedida/denegada) y el detalle de etapa con métricas (028A-16/028A-8)', async () => {
+  const projectRoot = await mkdtemp(path.join(os.tmpdir(), 'quality-reporter-override-'));
+  try {
+    await mkdir(path.join(projectRoot, '.quality-reports', 'T-OVR'), { recursive: true });
+    const result = await createReport(
+      {
+        projectRoot,
+        reportRoot: path.join(projectRoot, '.quality-reports', 'T-OVR'),
+        qualityConfig: { maxFindings: 3, maxReminders: 4 },
+        tools: {},
+        heavyOverride: { source: 'flag', granted: true, reason: 'validar fase' },
+      },
+      { taskId: 'T-OVR', ci: false, full: false },
+      { base: 'HEAD', full: false, files: [], profiles: [] },
+      [{
+        stage: 'varsense', status: 'pass', cache: 'miss', cacheReason: 'fingerprint-mismatch', durationMs: 1500,
+        metrics: { filesAnalyzed: 16, filesReused: 364, cacheHitRate: 1, peakRssMb: 89.5 },
+        findings: [], summary: '0 errores',
+      }],
+      [],
+      Date.now(),
+    );
+    const json = JSON.parse(await readFile(result.jsonPath, 'utf8'));
+    assert.equal(json.heavyOverride.source, 'flag');
+    assert.equal(json.heavyOverride.granted, true);
+    assert.equal(json.heavyOverride.reason, 'validar fase');
+    assert.equal(json.stages[0].cacheReason, 'fingerprint-mismatch');
+    assert.equal(json.stages[0].metrics.filesReused, 364);
+    const markdown = await readFile(result.markdownPath, 'utf8');
+    assert.match(markdown, /OVERRIDE/);
+    assert.match(markdown, /concedida/);
+    assert.match(markdown, /reusados 364/);
+    assert.match(markdown, /invalidación: fingerprint-mismatch/);
+  } finally {
+    await rm(projectRoot, { recursive: true, force: true });
+  }
+});
+
 test('createReport representa cancelación con exit code 130', async () => {
   const projectRoot = await mkdtemp(path.join(os.tmpdir(), 'quality-reporter-cancelled-'));
   try {

@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { acquireHeavyRun, inspectHeavyRun, isHeavyCargoCommand } from '../heavy-run-guard.mjs';
+import { acquireHeavyRun, inspectHeavyRun, isHeavyCargoCommand, logHeavyOverride } from '../heavy-run-guard.mjs';
 
 test('el guard limita full a una ejecución cada tres horas y permite override explícito', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'glory-heavy-guard-'));
@@ -17,7 +17,7 @@ test('el guard limita full a una ejecución cada tres horas y permite override e
     const blocked = await inspectHeavyRun({ projectRoot: root, targetBase, mode: 'full' });
     assert.equal(blocked.allowed, false);
     assert.equal(blocked.reason, 'cooldown');
-    const override = await acquireHeavyRun({ projectRoot: root, targetBase, mode: 'full', allowHeavy: true });
+    const override = await acquireHeavyRun({ projectRoot: root, targetBase, mode: 'full', allowHeavy: true, heavyReason: 'test override explícito' });
     assert.equal(override.allowed, true);
     await override.release({ status: 'pass' });
   } finally {
@@ -30,8 +30,8 @@ test('el guard bloquea dos ejecuciones pesadas simultáneas', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'glory-heavy-active-'));
   const targetBase = path.join(root, 'target');
   try {
-    const first = await acquireHeavyRun({ projectRoot: root, targetBase, mode: 'full', allowHeavy: true });
-    const second = await acquireHeavyRun({ projectRoot: root, targetBase, mode: 'full', allowHeavy: true });
+    const first = await acquireHeavyRun({ projectRoot: root, targetBase, mode: 'full', allowHeavy: true, heavyReason: 'test simultáneo' });
+    const second = await acquireHeavyRun({ projectRoot: root, targetBase, mode: 'full', allowHeavy: true, heavyReason: 'test simultáneo' });
     assert.equal(first.allowed, true);
     assert.equal(second.allowed, false);
     assert.equal(second.reason, 'active');
@@ -81,6 +81,64 @@ test('solo test, clippy y bench son comandos Cargo pesados', () => {
   assert.equal(isHeavyCargoCommand(['--locked', 'clippy']), true);
   assert.equal(isHeavyCargoCommand(['check']), false);
   assert.equal(isHeavyCargoCommand(['fmt', '--check']), false);
+});
+
+test('un override sin motivo se rechaza y no concede la excepción (028A-16)', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'glory-heavy-reason-'));
+  const targetBase = path.join(root, 'target');
+  try {
+    await writeFile(path.join(root, 'quality.config.json'), JSON.stringify({ heavyRun: { cooldownMinutes: 180 } }), 'utf8');
+    const denied = await acquireHeavyRun({ projectRoot: root, targetBase, mode: 'full', allowHeavy: true, taskId: '028A-16' });
+    assert.equal(denied.allowed, false);
+    assert.equal(denied.reason, 'heavy-reason-required');
+    /* El intento denegado también queda en el log de auditoría. */
+    const logText = await readFile(path.join(root, '.quality-reports', 'heavy-overrides.log'), 'utf8');
+    const entry = JSON.parse(logText.trim().split(/\r?\n/).at(-1));
+    assert.equal(entry.granted, false);
+    assert.equal(entry.source, 'flag');
+    assert.equal(entry.reason, null);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(path.join(root, '..', 'glory-quality-guard'), { recursive: true, force: true });
+  }
+});
+
+test('un override con motivo se concede y queda registrado con el motivo (028A-16)', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'glory-heavy-reason-ok-'));
+  const targetBase = path.join(root, 'target');
+  try {
+    await writeFile(path.join(root, 'quality.config.json'), JSON.stringify({ heavyRun: { cooldownMinutes: 180 } }), 'utf8');
+    const granted = await acquireHeavyRun({
+      projectRoot: root, targetBase, mode: 'full', allowHeavy: true,
+      taskId: '028A-16', command: 'cargo test', heavyReason: 'validar fase antes de cerrar',
+    });
+    assert.equal(granted.allowed, true);
+    await granted.release({ status: 'pass' });
+    const logText = await readFile(path.join(root, '.quality-reports', 'heavy-overrides.log'), 'utf8');
+    const entry = JSON.parse(logText.trim().split(/\r?\n/).at(-1));
+    assert.equal(entry.granted, true);
+    assert.equal(entry.reason, 'validar fase antes de cerrar');
+    assert.equal(entry.taskId, '028A-16');
+    assert.equal(entry.command, 'cargo test');
+    assert.equal(typeof entry.timestamp, 'string');
+    assert.equal(typeof entry.pid, 'number');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(path.join(root, '..', 'glory-quality-guard'), { recursive: true, force: true });
+  }
+});
+
+test('logHeavyOverride no lanza aunque el directorio de reportes no exista', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'glory-heavy-log-'));
+  try {
+    await logHeavyOverride({ projectRoot: root, source: 'env', command: 'npm test', granted: false });
+    const logText = await readFile(path.join(root, '.quality-reports', 'heavy-overrides.log'), 'utf8');
+    const entry = JSON.parse(logText.trim());
+    assert.equal(entry.source, 'env');
+    assert.equal(entry.cwd, process.cwd());
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test('el cooldown de full no se comparte entre proyectos con el mismo targetBase', async () => {

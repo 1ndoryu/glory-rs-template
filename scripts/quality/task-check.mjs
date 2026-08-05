@@ -1,7 +1,7 @@
 import { parseArgs } from './args.mjs';
 import crypto from 'node:crypto';
-import { fingerprint, readCachedPass, writeCachedPass } from './cache.mjs';
-import { acquireHeavyRun, formatHeavyGuardMessage, inspectHeavyRun } from './heavy-run-guard.mjs';
+import { fingerprint, probeCachedPass, readCachedPass, writeCachedPass } from './cache.mjs';
+import { acquireHeavyRun, formatHeavyGuardMessage, inspectHeavyRun, logHeavyOverride, manualOverrideSource } from './heavy-run-guard.mjs';
 import { preflight, projectRoot } from './preflight.mjs';
 import { createReport, printCompact } from './reporter.mjs';
 import { selectReminders } from './reminders.mjs';
@@ -25,13 +25,19 @@ process.once('SIGTERM', () => handleInterruption('SIGTERM'));
 
 async function executeStage(context, scope, definition, options) {
   const stageFingerprint = await fingerprint(context, scope, definition.name);
+  let missReason = options.fresh ? 'fresh' : options.ci ? 'ci' : null;
   if (!options.fresh && !options.ci) {
     const cached = await readCachedPass(context, definition.name, stageFingerprint);
-    if (cached) return { ...cached, cache: 'hit' };
+    if (cached) return { ...cached, cache: 'hit', cacheReason: 'match' };
+    /* [028A-8 Fase 4] La razón de invalidación (no-entry, fingerprint-mismatch,
+     * not-pass) se captura ANTES de ejecutar: writeCachedPass solo escribe en
+     * PASS y con el fingerprint exacto, así que un probe posterior devolvería
+     * siempre 'match' y la razón real se perdería. */
+    missReason = (await probeCachedPass(context, definition.name, stageFingerprint)).reason;
   }
   const result = await definition.run();
   await writeCachedPass(context, definition.name, stageFingerprint, result);
-  return { ...result, cache: 'miss' };
+  return { ...result, cache: 'miss', cacheReason: missReason };
 }
 
 async function main() {
@@ -61,7 +67,24 @@ async function main() {
         projectRoot,
         mode: 'full',
         allowHeavy: args.allowHeavy,
+        heavyReason: args.heavyReason,
       });
+      /* [028A-16] Un override sin motivo también se registra en el log de
+       * auditoría (intento denegado): el flag ya llegó al gate, debe quedar
+       * trazado aunque no conceda la excepción. */
+      if (!heavyDecision.allowed && heavyDecision.reason === 'heavy-reason-required') {
+        /* [028A-16] Esta rama solo se alcanza cuando manualOverrideSource
+         * devolvió algo no nulo (la excepción es el motivo del rechazo), así
+         * que el source siempre está disponible; sin fallback a 'env'. */
+        await logHeavyOverride({
+          projectRoot,
+          source: manualOverrideSource({ allowHeavy: args.allowHeavy }),
+          command: `task:check ${args.taskId}`,
+          reason: null,
+          granted: false,
+          taskId: args.taskId,
+        });
+      }
       if (!heavyDecision.allowed) {
         args.full = false;
         args.heavyDeferred = heavyDecision;
@@ -95,6 +118,7 @@ async function main() {
           taskId: args.taskId,
           command: `task:check ${args.taskId} ${args.ci ? '--ci' : '--full'}`,
           allowHeavy: args.allowHeavy,
+          heavyReason: args.heavyReason,
         });
         if (!heavyLease.allowed) {
           args.full = false;
@@ -107,6 +131,14 @@ async function main() {
         }
       }
       if (heavyLease?.allowed) process.env.GLORY_HEAVY_RUN_TOKEN = heavyLease.token;
+      /* [028A-16] El reporte expone el override usado (concedido o denegado
+       * por falta de motivo) para que `latest.md` conserve la trazabilidad de
+       * la excepción junto con la fecha y el comando. */
+      context.heavyOverride = heavyLease?.allowed
+        ? { source: heavyLease.source ?? 'flag', granted: true, reason: args.heavyReason ?? heavyLease.reason ?? null }
+        : args.allowHeavy
+          ? { source: 'flag', granted: false, reason: null }
+          : null;
       /* [028A-6] Propaga la cancelación al contrato de adapters para que un
        * proceso terminado por SIGINT conserve el estado `cancelled` y no se
        * confunda con un error genérico de herramienta. */

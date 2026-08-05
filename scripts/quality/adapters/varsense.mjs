@@ -16,8 +16,13 @@ export async function runVarsense(context, scope) {
   const startedAt = Date.now();
   const current = await runCommand(context, scope);
   if (current.failure) return { ...current.failure, metadata: { varsenseScope: current.scope } };
+  /* [028A-8 Fase 0/4] Las métricas del CLI (filesDiscovered/analyzed/reused,
+   * cacheHitRate, peakRssMb) viajan en la etapa del reporte: el gate muestra
+   * cuántos archivos reutilizó y qué memoria consumió sin leer logs. */
+  const metrics = current.report?.metrics ?? null;
   return {
     ...resultFromFindings('varsense', normalizeEntries(current.report.entries), Date.now() - startedAt, current.logPath),
     metadata: { varsenseScope: current.scope },
+    metrics,
   };
 }

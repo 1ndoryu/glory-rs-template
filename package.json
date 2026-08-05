@@ -28,6 +28,7 @@
     "codegen:local": "node scripts/codegen-local.mjs",
     "test": "node scripts/run-with-db.mjs test",
     "roadmap": "node scripts/check-roadmap.mjs",
-    "roadmap:watch": "node scripts/check-roadmap.mjs --watch"
+    "roadmap:watch": "node scripts/check-roadmap.mjs --watch",
+    "quality:profile": "node scripts/quality/quality-profile.mjs"
   }
 }

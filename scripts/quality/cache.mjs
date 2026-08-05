@@ -41,13 +41,22 @@ function cachePath(context, stage) {
 }
 
 export async function readCachedPass(context, stage, expectedFingerprint) {
+  const probe = await probeCachedPass(context, stage, expectedFingerprint);
+  if (probe.hit) return { ...probe.result, cached: true };
+  return null;
+}
+
+/* [028A-8 Fase 4] Razón exacta por la que la caché de una etapa NO reutiliza:
+ * no hay entrada, el fingerprint cambió (contenido/config/modo/herramienta) o
+ * el resultado guardado no era PASS. El reporte la muestra para distinguir un
+ * cache frío de una invalidación real y auditar qué la provocó. */
+export async function probeCachedPass(context, stage, expectedFingerprint) {
   try {
     const cached = JSON.parse(await readFile(cachePath(context, stage), 'utf8'));
-    if (cached.fingerprint === expectedFingerprint && cached.result?.status === 'pass') {
-      return { ...cached.result, cached: true };
-    }
-  } catch { /* Cache ausente o inválida: ejecutar la etapa. */ }
-  return null;
+    if (cached.fingerprint !== expectedFingerprint) return { hit: false, reason: 'fingerprint-mismatch' };
+    if (cached.result?.status !== 'pass') return { hit: false, reason: 'not-pass' };
+    return { hit: true, reason: 'match', result: cached.result };
+  } catch { return { hit: false, reason: 'no-entry' }; }
 }
 
 export async function writeCachedPass(context, stage, stageFingerprint, result) {

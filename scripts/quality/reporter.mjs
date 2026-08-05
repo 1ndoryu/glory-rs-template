@@ -64,10 +64,11 @@ function markdown(report) {
     ...(report.targetMaintenance?.removed?.length ? [`- Targets: **${report.targetMaintenance.removed.length} podados** (${report.targetMaintenance.removed.map(item => `${item.name}:${item.reason}`).join(', ')}) — ${report.targetMaintenance.totalBytes} bytes restantes`] : []),
     ...(report.targetMaintenance?.skipped === 'cooldown' ? ['- Targets: supervisados hace menos de la ventana; pase completo con `npm run quality:cleanup`'] : []),
     ...(report.heavyGuard ? [`- Full diferido: **${report.heavyGuard.reason}** — ${report.heavyGuard.nextAllowedAt ?? report.heavyGuard.message ?? 'reintento bloqueado'}`] : []),
+    ...(report.heavyOverride ? [`- Excepción pesada: **OVERRIDE** — ${report.heavyOverride.granted ? 'concedida' : 'denegada'} · source ${report.heavyOverride.source}${report.heavyOverride.reason ? ` · motivo: ${report.heavyOverride.reason}` : ''}`] : []),
     '',
     '## Etapas',
     '',
-    ...report.stages.map(stage => `- **${stage.stage}:** ${stage.status}${stage.cached ? ' (cache)' : ''} — ${formatDuration(stage.durationMs)} — ${stage.summary}`),
+    ...report.stages.map(stage => `- **${stage.stage}:** ${stage.status}${stage.cached ? ' (cache)' : ''} — ${formatDuration(stage.durationMs)} — ${stage.summary}${formatStageDetail(stage)}`),
   ];
   if (report.findings.length > 0) {
     lines.push('', '## Hallazgos', '');
@@ -91,6 +92,7 @@ export async function createReport(context, args, scope, stages, reminders, star
     branch: context.branch ?? null,
     reportRetention: context.reportRetention ?? null,
     targetMaintenance: context.targetMaintenance ?? null,
+    heavyOverride: context.heavyOverride ?? null,
     policy: context.policyIdentity ?? {
       projectRoot: context.projectRoot,
       policyPath: null,
@@ -131,6 +133,22 @@ export async function createReport(context, args, scope, stages, reminders, star
   return { report, jsonPath, markdownPath };
 }
 
+/* [028A-8 Fase 0/4] Detalle por etapa en Markdown: razón de invalidación de
+ * caché y métricas del analizador (reusados/analizados, cache hit, RSS) sin
+ * repetir texto del summary. Nunca expone rutas absolutas ni secretos. */
+function formatStageDetail(stage) {
+  const parts = [];
+  if (stage.cache === 'miss' && stage.cacheReason && stage.cacheReason !== 'match') parts.push(`invalidación: ${stage.cacheReason}`);
+  const metrics = stage.metrics;
+  if (metrics && typeof metrics === 'object') {
+    if (Number.isInteger(metrics.filesReused)) parts.push(`reusados ${metrics.filesReused}`);
+    if (Number.isInteger(metrics.filesAnalyzed)) parts.push(`analizados ${metrics.filesAnalyzed}`);
+    if (typeof metrics.cacheHitRate === 'number') parts.push(`hit ${metrics.cacheHitRate.toFixed(2)}`);
+    if (typeof metrics.peakRssMb === 'number') parts.push(`rss ${Math.round(metrics.peakRssMb)}MB`);
+  }
+  return parts.length > 0 ? ` — ${parts.join(' · ')}` : '';
+}
+
 export function compactLines(reportResult, context) {
   const { report } = reportResult;
   const lines = [
@@ -138,7 +156,7 @@ export function compactLines(reportResult, context) {
     `[quality] Scope: ${formatScope(report.scope)} · ${report.scope.files.length} archivos`,
   ];
   for (const stage of report.stages) {
-    lines.push(`[quality] ${stage.stage.padEnd(9)} ${stage.status.toUpperCase()}${stage.cached ? ' (cached)' : ''} · ${formatDuration(stage.durationMs)} · ${stage.summary}`);
+    lines.push(`[quality] ${stage.stage.padEnd(9)} ${stage.status.toUpperCase()}${stage.cached ? ' (cached)' : ''} · ${formatDuration(stage.durationMs)} · ${stage.summary}${formatStageDetail(stage)}`);
   }
   for (const finding of report.findings.slice(0, context.qualityConfig.maxFindings)) {
     const location = finding.file ? `${finding.file}${finding.line ? `:${finding.line}` : ''} · ` : '';
@@ -150,6 +168,9 @@ export function compactLines(reportResult, context) {
    * completo conserva el detalle total. */
   for (const reminder of report.reminders.slice(0, context.qualityConfig.maxReminders)) {
     lines.push(`[quality] REMEMBER ${reminder}`);
+  }
+  if (report.heavyOverride) {
+    lines.push(`[quality] OVERRIDE ${report.heavyOverride.source} ${report.heavyOverride.granted ? 'concedida' : 'denegada'}${report.heavyOverride.reason ? ` motivo=${report.heavyOverride.reason}` : ''}`);
   }
   lines.push(`[quality] Report: ${path.relative(context.projectRoot, reportResult.markdownPath)}`);
   lines.push(`[quality] Next: ${report.nextCommand}`);
