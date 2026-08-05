@@ -29,6 +29,7 @@
 | ¿Cómo se extrae el motor agnóstico para futuros juegos? | `Agente/planes/plan-glory-render-motor-juegos-2026-08-01.md` |
 | ¿Cuál es la frontera del repositorio `glory-render`? | `Agente/documentacion/arquitectura/adr-glory-render-repositorio-agnostico-2026-08-01.md` |
 | ¿Qué decisiones de producto faltan aprobar del Bosque? | `Agente/documentacion/producto/decisiones-pendientes-bosque-2026-08-05.md` |
+| ¿Cómo migra el mundo del Bosque al publicar (decisión 8)? | `Agente/documentacion/arquitectura/adr-bosque-mundo-unico-reinicio-coordinado-2026-08-05.md` + `Agente/planes/plan-reinicio-coordinado-bosque-2026-08-05.md` |
 | ¿Cómo se paga la deuda SOLID del runtime de apps?       | `Agente/planes/plan-deuda-solid-runtime-2026-07-31.md`                             |
 | ¿Por qué se cierran ventanas al abrir otra y cómo se resuelve? | `Agente/planes/plan-cierre-automatico-ventanas-2026-07-31.md`                |
 | ¿Cómo se implementan los programas editoriales por vertical? | `Agente/planes/plan-programas-editoriales-2026-07-31.md`                       |

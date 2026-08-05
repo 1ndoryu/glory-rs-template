@@ -46,6 +46,49 @@
   text-align: center;
 }
 
+/* [Decisión 8] Aviso de reinicio coordinado (05-ago): banner monocromo del
+ * chrome (nunca sobre el canvas en color) con motivo y cuenta atrás; se
+ * retira al reconectar. Misma gramática que el estado: borde 1px, sin
+ * sombras ni radios. */
+.juegoFixture__reinicio {
+  position: absolute;
+  top: var(--espacio-sm);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  min-width: 220px;
+  max-width: 90%;
+  margin: 0;
+  padding: var(--espacio-xs) var(--espacio-sm);
+  border: var(--sistema-borde);
+  color: var(--sistema-texto);
+  background: var(--sistema-superficie);
+  font-family: var(--fuente-sistema);
+  text-align: center;
+}
+
+.juegoFixture__reinicio-titulo {
+  margin: 0;
+  font-weight: var(--peso-medio);
+  font-size: var(--tamano-pequeno);
+}
+
+.juegoFixture__reinicio-detalle {
+  margin: var(--espacio-xs) 0 0;
+  opacity: 0.75;
+  font-size: var(--tamano-pequeno);
+}
+
+.juegoFixture__reinicio-cuenta {
+  margin: var(--espacio-xs) 0 0;
+  font-size: var(--tamano-texto);
+}
+
+.juegoFixture__reinicio[data-state='expired'] .juegoFixture__reinicio-cuenta::after {
+  content: ' · reconectando…';
+  font-size: var(--tamano-pequeno);
+}
+
 /* [GAME-01-VIS] Controles táctiles SOLO en móvil (<768px): en desktop el
  * jugador usa teclado/ratón y el D-pad no debe aparecer (decisión 05-ago). */
 .juegoFixture__controles {

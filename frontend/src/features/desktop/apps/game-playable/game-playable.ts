@@ -21,6 +21,7 @@ import { evaluateGamePerformanceBudget } from './game-performance-budget';
 import { detectWebGL } from './game-webgl-capabilities';
 import { resolvePlayableMap, type PlayableMapResolution } from './game-map-source';
 import { createGameInput, type GameInputHandle } from './game-playable-input';
+import { createGameRestartNotice } from './game-restart-notice';
 import { mountGamePlayableScene, type GamePlayableSceneHandle } from './game-playable-scene';
 import {
   createGameRealtimeClient,
@@ -360,6 +361,9 @@ function mountGamePlayableRuntime(
   const frameMonitor = new FramePerformanceMonitor({ maxSamples: 120 });
   let frameCount = 0;
   let realtimeState: GameRealtimeConnectionState = 'idle';
+  /* [Decisión 8] Aviso de reinicio coordinado: el banner se muestra al
+   * recibir `server_restart` y se retira al reconectar (estado connected). */
+  const restartNotice = createGameRestartNotice(view.element);
   /* La identidad de juego puede ser cuenta o invitado temporal. `authStore`
    * sigue gobernando permisos del OS; no debe bloquear el loop realtime público. */
   const realtime = createGameRealtimeClient({
@@ -368,7 +372,11 @@ function mountGamePlayableRuntime(
     socketUrl: defaultGameSocketUrl(),
     onState: (next, message) => {
       realtimeState = next;
+      if (next === 'connected') restartNotice.hide();
       if (next === 'error') setStatus(message ?? 'realtime no disponible', true);
+    },
+    onServerRestart: (payload) => {
+      restartNotice.show({ reason: payload.reason, restartInSeconds: payload.restartInSeconds });
     },
   });
 
@@ -496,6 +504,7 @@ function mountGamePlayableRuntime(
     scene?.canvas.removeEventListener('webglcontextlost', onContextLost);
     resizeObserver.disconnect();
     input.destroy();
+    restartNotice.destroy();
     realtime?.destroy();
     scene?.destroy();
     scene = null;

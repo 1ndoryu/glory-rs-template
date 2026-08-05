@@ -12,14 +12,19 @@
 1. **Los snapshots publicados son inmutables.** Nunca se edita una versión
    activa en la base; el rollback es *publicar una versión anterior ya
    persistida* (o el borrador/fixture base), no mutar el historial.
-2. **Una sala conserva la versión con la que inició.** Publicar no muta
-   partidas en curso; las salas nuevas usan la versión nueva. Un rollback
-   afecta solo a salas que se creen después de la operación.
+2. **La publicación es una transición coordinada (decisión 8, 05-ago).** Al
+   publicar, el servidor difunde `server_restart` con cuenta atrás de 5 min;
+   tras ella el mundo migra a la versión nueva y los jugadores se reconectan
+   con un ticket nuevo. No se mantienen salas con snapshots antiguos; el
+   drenaje al expirar la cuenta recrea las salas con la versión nueva.
 3. **La versión activa es única.** `idx_game_map_versions_active` y la
    activación transaccional garantizan que activar v2 desactiva v1 y viceversa.
 4. **Los assets usan versiones inmutables content-addressed.** Revertir un
    asset = re-activar una versión anterior (`activate`); el archivo GLB por
    hash permanece intacto y las publicaciones antiguas no cambian.
+5. **Rollback = publicar la versión buena.** Como toda publicación, un rollback
+   dispara la transición coordinada: los jugadores reciben el aviso y migran
+   juntos, sin partidas a medias en la versión dañada.
 
 ## 2. Diagnóstico (antes de tocar nada)
 
@@ -34,8 +39,9 @@ curl -s -H "x-csrf-token: ..." -b session_id=... \
 
 Confirmar:
 
-- **Síntoma:** jugadores en salas nuevas ven contenido incorrecto; partidas en
-  curso no cambian (comportamiento esperado).
+- **Síntoma:** tras publicar (o tras el rollback), el contenido visible es
+  incorrecto o el mundo quedó en una versión rota. Las partidas en curso ya
+  no se conservan: la publicación migró a todos (decisión 8).
 - **Huérfanos:** ninguna versión nueva puede haber sido publicada *después* del
   incidente con datos del borrador corrupto; si existen, documentar antes de
   activar una versión anterior.
@@ -111,8 +117,9 @@ curl -s "http://localhost:3000/api/game/maps/{map_id}" | jq '{version, contentHa
   `game_asset_versions` activas: los triggers de inmutabilidad lo bloquean a
   propósito y saltarlos rompe la garantía de salas estables.
 - ❌ No activar dos versiones a la vez (índice único parcial lo impide).
-- ❌ No revertir mientras haya una sala activa con jugadores reales esperando
-  una transición explícita; documentar el impacto (las salas viejas no cambian).
+- ❌ No publicar/activar una versión dañada a sabiendas: la transición
+  coordinada migra a TODOS los jugadores (decisión 8), no solo a salas nuevas;
+  el impacto de una publicación mala es global e inmediato tras la cuenta atrás.
 - ❌ No eliminar el borrador dañino antes de extraer la causa raíz.
 - ❌ Deploy/restart vía SSH/Docker directo: solo `coolify-manager-rs` cuando se
   autorice.
@@ -154,7 +161,9 @@ vuelve a 0 cuando las salas drenan (TTL de sala vacía 300 s por defecto).
 ## 8. Definition of Done del runbook
 
 - [ ] La versión buena queda activa y verificada por `GET /api/game/maps/:id`.
-- [ ] Ninguna partida en curso cambió de contenido (salas conservan su versión).
+- [ ] Los jugadores conectados recibieron `server_restart` y migraron tras la
+  cuenta atrás (sin salas en la versión dañada; `rooms_created` sube al
+  recrearlas y `active_players` vuelve a estabilizarse).
 - [ ] El evento quedó auditado (`map.published` o `asset.version.activated`).
 - [ ] El borrador dañino se conserva documentado para análisis.
 - [ ] Las métricas agregadas confirman el estado operativo del realtime.

@@ -153,7 +153,14 @@ reales. Consecuencias:
   validación fail-closed en ambos stacks, tests en ambos lados y callback `onServerRestart`
   en `game-realtime-client.ts`.
 - [ ] Implementar la cuenta atrás de 5 min y la migración coordinada en el servidor al publicar.
-- [ ] Revisar el runbook de rollback (297A-75) con la nueva política.
+  → planificado como **297A-78** en `Agente/planes/plan-reinicio-coordinado-bosque-2026-08-05.md`
+  (Fases 1-3: broadcast, trigger+drenaje, verificación); la **UX del aviso en el cliente** quedó
+  implementada (banner de cuenta atrás `game-restart-notice.ts`, 6 tests, cableado a
+  `onServerRestart`).
+- [x] Revisar el runbook de rollback (297A-75) con la nueva política → `runbook-rollback-juego-2026-08-05.md`
+  actualizado: la publicación es una transición coordinada (aviso 5 min + migración), sin salas
+  con snapshots antiguos; el rollback también dispara la transición (impacto global tras la
+  cuenta atrás).
 
 ## 9. Escalado futuro
 
