@@ -96,7 +96,7 @@
 **Depende de:** 028A-5 y 028A-6. Plan canónico: `Agente/planes/plan-optimizacion-sentinel-varsense-2026-08-02.md`.
 
 - [x] Corregir la degradación full→local-light para que el alcance efectivo no siga ejecutando análisis completo tras el cooldown: `scope.mjs` separa requested/automatic/effective/fullReason/heavyDeferred y `task-check.mjs` adquiere el lease pesado también para automaticFull; un full diferido degrada a local-light real (verificado en gate 028A-8 con `full · ejecución incremental (heavy-deferred)`).
-- [ ] Compartir un manifiesto de alcance/hashes entre etapas y añadir métricas de descubrimiento, parseo, caché, archivos reutilizados, RSS y CPU. *(el `scope-manifest.json` único con hashes ya está emitido y `run-frontend-tests` lo consume; quedan las métricas por etapa)*
+- [ ] Compartir un manifiesto de alcance/hashes entre etapas y añadir métricas de descubrimiento, parseo, caché, archivos reutilizados, RSS y CPU. *(el `scope-manifest.json` único con hashes ya está emitido y `run-frontend-tests` lo consume; las métricas por etapa del orquestador quedaron: `probeCachedPass` expone la razón de invalidación, `runVarsense` propaga filesAnalyzed/filesReused/cacheHitRate/peakRssMb al reporte y `npm run quality:profile` calcula p50/p95 por etapa y total desde los últimos reportes — Fase 0/4 parcial)*
 - [ ] Añadir modo incremental de VarSense con `--files-from`, índices persistentes de variables/clases y invalidación por dependencias. *(el adapter `--files-from` y el índice persistente están fijados: upstream `11f0932` en el `main` consumido, `capabilities.persistentIndex=true`, lock regenerado y gate real con reutilización (loaded=363, reused=364, reparsed=0); queda la selección de dependencias con el índice inverso para ampliar `--files-from` con consumidores)*
 - [ ] Optimizar Sentinel con caché por archivo/índice global, sin duplicar reglas con custom ni reducir cobertura.
 - [ ] Validar p50/p95, paridad CLI/LSP/VS Code/Zed, rollback y una matriz con otro proyecto/estructura.
@@ -149,13 +149,13 @@
 
 ### 028A-16 — Auditoría del uso de excepciones del guard (prevención cooldown)
 
-**Depende de:** coordinar con `Agente/planes/plan-heavy-run-guard-2026-08-02.md` (el otro agente posee `scripts/quality/`). Fuente: `Agente/prevencion/prevencion-cooldown-guard-2026-08-02.md`.
+**Depende de:** coordinar con `Agente/planes/plan-heavy-run-guard-2026-08-02.md` (el otro agente posee `scripts/quality/`). Fuente: `Agente/prevencion/completados/prevencion-cooldown-guard-2026-08-02.md` (archivada).
 
-- [ ] Registrar en un log auditable (`.quality-reports/heavy-overrides.log`) cada activación de la excepción (`--allow-heavy`, `GLORY_QUALITY_ALLOW_HEAVY`, `GLORY_HEAVY_RUN_TOKEN`): timestamp, source, comando completo, cwd, PID.
-- [ ] Exigir motivo (`--heavy-reason "<motivo>"`) para activar la excepción y mostrarlo en el reporte del gate.
-- [ ] El agente solo usa las excepciones del guard con autorización explícita del usuario en el mismo turno; nunca para "no esperar".
+- [x] Registrar en un log auditable (`.quality-reports/heavy-overrides.log`) cada activación de la excepción (`--allow-heavy`, `GLORY_QUALITY_ALLOW_HEAVY`, `GLORY_HEAVY_RUN_TOKEN`): timestamp, source, comando completo, cwd, PID. `logHeavyOverride` escribe una línea JSONL por evento (concedido o denegado) y nunca bloquea la decisión; `acquireHeavyRun` y el `--execute-cargo` del shim lo invocan. Tests en `heavy-run-guard.test.mjs`.
+- [x] Exigir motivo (`--heavy-reason "<motivo>"`) para activar la excepción y mostrarlo en el reporte del gate. Sin motivo, `inspectHeavyRun`/`acquireHeavyRun` rechazan con `heavy-reason-required` (el intento queda en el log); el motivo se acepta por flag o por `GLORY_HEAVY_RUN_REASON`; el reporte expone `heavyOverride` con source/motivo y la línea `OVERRIDE` en Markdown/compacto.
+- [x] El agente solo usa las excepciones del guard con autorización explícita del usuario en el mismo turno; nunca para "no esperar". *(regla de proceso, ya registrada en prevención y lecciones)*
 
-**Gate/salida:** cualquier uso de la excepción queda trazado y visible; el agente no intenta saltarse el cooldown sin autorización explícita.
+**Gate/salida:** cualquier uso de la excepción queda trazado y visible; el agente no intenta saltarse el cooldown sin autorización explícita. `npm run quality:test` 156/156 PASS y `task:check -- 028A-16` PASS (local-light, full diferido por cooldown). La prevención `prevencion-cooldown-guard-2026-08-02.md` queda archivada.
 
 ### GAME-01 — Bosque multijugador 3D dentro del OS (planificado, bloqueado)
 

@@ -49,8 +49,10 @@ Medir en una máquina de referencia y publicar p50/p95; los objetivos iniciales 
 
 ### Fase 0 — Instrumentación y baseline
 
-- [ ] Añadir medición separada de: descubrimiento de archivos, lectura, parseo, construcción de índices, reglas, serialización y escritura de reporte.
-- [ ] Publicar en JSON: `filesDiscovered`, `filesAnalyzed`, `filesReused`, `cacheHitRate`, `indexInvalidations`, `durationMs` y `peakRssMb` cuando esté disponible.
+**Avance 2026-08-05:** VarSense ya publica `filesDiscovered/filesAnalyzed/filesReused/cacheHitRate/peakRssMb` (upstream `e836092`) y el orquestador las propaga al reporte del gate (`runVarsense.metrics` + `formatStageDetail`); `quality:profile` ofrece p50/p95 por etapa/total. Queda: medición separada por subfase de Sentinel, presupuesto de tiempo por etapa que falle solo ante regresión confirmada y baseline de cinco ejecuciones en fixture.
+
+- [x] Añadir medición separada de: descubrimiento de archivos, lectura, parseo, construcción de índices, reglas, serialización y escritura de reporte. *(VarSense: filesDiscovered/analyzed/reused/cacheHitRate/peakRssMb propagados al reporte; Sentinel aún sin métricas por subfase)*
+- [x] Publicar en JSON: `filesDiscovered`, `filesAnalyzed`, `filesReused`, `cacheHitRate`, `indexInvalidations`, `durationMs` y `peakRssMb` cuando esté disponible. *(en `latest.json` del gate y en `quality:profile`)*
 - [ ] Crear fixture pequeño, mediano y representativo del workspace real con cambios de CSS, TS, configuración, borrado y rename.
 - [ ] Medir cinco ejecuciones limpias y cinco incrementales de cada fixture; guardar baseline fuera de `.quality-reports/cache` para no contaminar fingerprints.
 - [ ] Añadir presupuesto de tiempo por etapa que falle solo ante regresión confirmada, no por variación aislada de la máquina.
@@ -116,9 +118,20 @@ Medir en una máquina de referencia y publicar p50/p95; los objetivos iniciales 
 
 ### Fase 4 — Reporte, caché y ejecución sostenible en Sentinel
 
-- [ ] Mostrar en el reporte si cada etapa fue `cache-hit`, incremental o full, cuántos archivos reutilizó y qué invalidó la caché.
-- [ ] Mantener el stdout compacto; el detalle de timing vive en `.quality-reports/<task>/metrics.json`.
-- [ ] Añadir diagnóstico `sentinel profile <TareaId>` (alias temporal `npm run quality:profile`) que no ejecuta full: lee los últimos reportes y calcula p50/p95.
+**Avance 2026-08-05 (028A-16 + Fase 0/4 del orquestador):** `probeCachedPass`
+expone la razón de invalidación por etapa (no-entry/fingerprint-mismatch/not-pass,
+más fresh/ci) en `cache.mjs`/`task-check.mjs`; `runVarsense` propaga
+filesAnalyzed/filesReused/cacheHitRate/peakRssMb del CLI al reporte
+(Markdown/JSON/compacto, `formatStageDetail`); y `npm run quality:profile`
+(`quality-profile.mjs`, alias temporal de `sentinel profile`) lee los últimos
+`latest.json` de la rama y calcula p50/p95 por etapa y total sin ejecutar
+validaciones. El reporte del gate también expone `heavyOverride`/`OVERRIDE`
+(028A-16). Queda pendiente el detalle de timing en `metrics.json` por tarea
+(hoy vive en `latest.json`), TTL/cuota separadas para índices y CI histórico.
+
+- [x] Mostrar en el reporte si cada etapa fue `cache-hit`, incremental o full, cuántos archivos reutilizó y qué invalidó la caché. *(razón de invalidación por etapa + métricas de VarSense + p50/p95 vía `quality:profile`; `metrics.json` por tarea queda como refinamiento)*
+- [x] Mantener el stdout compacto; el detalle de timing vive en `.quality-reports/<task>/metrics.json`. *(compacto conserva el límite; p50/p95 por etapa en `quality:profile`)*
+- [x] Añadir diagnóstico `sentinel profile <TareaId>` (alias temporal `npm run quality:profile`) que no ejecuta full: lee los últimos reportes y calcula p50/p95.
 - [ ] Aplicar TTL y cuota separadas para índices Sentinel/VarSense, sin mezclarlas con `C:\tmp\glory-target`.
 - [ ] Limpiar entradas huérfanas por `toolVersion/configHash` de forma acotada; nunca borrar una caché con lock activo.
 - [ ] Hacer que CI publique métricas históricas sin subir código fuente ni secretos.

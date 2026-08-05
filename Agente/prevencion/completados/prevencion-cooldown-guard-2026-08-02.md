@@ -22,6 +22,6 @@
 
 ## Estado
 
-- [ ] Pendiente de implementar en `scripts/quality/heavy-run-guard.mjs` (coordinar con el otro agente).
-- [ ] Pendiente de añadir al roadmap como `028A-16` (ya referenciada).
-- Al implementar y verificar (reproducir un override y confirmar el log), archivar este MD y marcar completada la tarea en el roadmap.
+- [x] Implementado en `scripts/quality/heavy-run-guard.mjs` (028A-16, cerrada el 2026-08-05): `logHeavyOverride` escribe `.quality-reports/heavy-overrides.log` por cada activación (`--allow-heavy`, `GLORY_QUALITY_ALLOW_HEAVY`, `GLORY_HEAVY_RUN_TOKEN`) con timestamp/source/comando/cwd/PID/motivo y estado concedido/denegado; la excepción exige `--heavy-reason "<motivo>"` (o `GLORY_HEAVY_RUN_REASON`) y el reporte del gate expone `OVERRIDE`.
+- [x] Añadida al roadmap como `028A-16` y cerrada con gate PASS (`quality:test` 156/156, `task:check -- 028A-16` local-light).
+- **Archivada** al implementar y verificar (reproducir un override y confirmar el log queda en los tests `heavy-run-guard.test.mjs`).
