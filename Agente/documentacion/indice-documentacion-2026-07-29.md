@@ -31,6 +31,7 @@
 | ¿Qué decisiones de producto faltan aprobar del Bosque? | `Agente/documentacion/producto/decisiones-pendientes-bosque-2026-08-05.md` |
 | ¿Cómo migra el mundo del Bosque al publicar (decisión 8)? | `Agente/documentacion/arquitectura/adr-bosque-mundo-unico-reinicio-coordinado-2026-08-05.md` + `Agente/planes/plan-reinicio-coordinado-bosque-2026-08-05.md` |
 | ¿Cuál es el inventario y frontera de `glory-render` (Fase 0)? | `Agente/documentacion/arquitectura/auditoria-glory-render-fase0-2026-08-05.md` |
+| ¿Cómo se integra y versiona `glory-render` (submódulo, SemVer, CI)? | `Agente/documentacion/arquitectura/estrategia-integracion-glory-render-2026-08-05.md` |
 | ¿Cómo se paga la deuda SOLID del runtime de apps?       | `Agente/planes/plan-deuda-solid-runtime-2026-07-31.md`                             |
 | ¿Por qué se cierran ventanas al abrir otra y cómo se resuelve? | `Agente/planes/plan-cierre-automatico-ventanas-2026-07-31.md`                |
 | ¿Cómo se implementan los programas editoriales por vertical? | `Agente/planes/plan-programas-editoriales-2026-07-31.md`                       |
@@ -62,7 +63,7 @@
 - Quality gate Sentinel/VarSense: implementado y archivado; CI y self-check usan el mismo core.
 - Plan móvil: activo y bloqueado por runtime/workspace; tablet conserva desktop.
 - Plan del bosque multijugador 3D: dirección Three.js aprobada; assets externos GLB y terreno finito editable en 2D quedan planificados, mientras gameplay/realtime siguen bloqueados por dependencias.
-- Plan `glory-render`: propuesto para después de GAME-01/Fase 8; `frontend/src/features/game-core/` es candidato provisional y no se extrae sin segundo consumidor real. La Fase 0 (inventario y frontera) quedó auditada el 05-ago en `auditoria-glory-render-fase0-2026-08-05.md`: 14 módulos CORE puros + `game-realtime` de frontera, sin dependencias de Three/DOM/red; falta decisión de integración (submódulo) y política de versionado antes de mover código.
+- Plan `glory-render`: propuesto para después de GAME-01/Fase 8; `frontend/src/features/game-core/` es candidato provisional y no se extrae sin segundo consumidor real. La Fase 0 quedó cerrada el 05-ago: auditoría (`auditoria-glory-render-fase0-2026-08-05.md` — 14 módulos CORE puros + `game-realtime` de frontera, sin dependencias de Three/DOM/red) y estrategia de integración/versionado (`estrategia-integracion-glory-render-2026-08-05.md` — submódulo fijado a etiqueta SemVer + dev local, política de licencias/CI/propietarios). Pendiente: aprobar la frontera con evidencia de segundo uso y abrir la Fase 1 (crear el repo).
 - Plan visual antiguo: referencia histórica del concepto aprobado.
 - Plan wandori.us original: superado; no es especificación activa.
 - Plan Sentinel/VarSense editor-agnóstico: trabajo histórico documentado en tareas completadas.

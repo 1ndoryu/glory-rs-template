@@ -22,8 +22,8 @@ Extraer la lógica realmente reutilizable del primer juego a `glory-render`, int
 - [x] Auditar `frontend/src/features/game-core/` y clasificar cada módulo: core agnóstico, adaptador Three, integración OS, dominio Bosque o backend — `Agente/documentacion/arquitectura/auditoria-glory-render-fase0-2026-08-05.md` (05-ago): 14 módulos CORE puros, `game-realtime.ts` como CORE de frontera (sin transporte), 0 dependencias de Three/DOM/red/backend en el paquete, sin ciclos de dependencias.
 - [x] Registrar API pública actual, invariantes, errores, límites y dependencias transitivas — inventario completo en la auditoría (re-exports de `index.ts`, cuotas, invariantes fail-closed, grafo de dependencias).
 - [x] Identificar duplicación probable en un segundo juego sin extraer abstracciones sin caso real — simulación/colisión/interpolación/streaming/presupuestos; criterio de no extracción sin segundo consumidor.
-- [ ] Elegir integración inicial: submódulo fijado por commit + dependencia local para desarrollo.
-- [ ] Definir política de licencias, versionado SemVer, changelog, CI, quality gate y propietarios.
+- [x] Elegir integración inicial: submódulo fijado por commit + dependencia local para desarrollo — `Agente/documentacion/arquitectura/estrategia-integracion-glory-render-2026-08-05.md` (05-ago): submódulo anclado a etiqueta SemVer en CI/producción, `file:`/workspace en desarrollo, carga lazy, procedimiento de actualización/rollback.
+- [x] Definir política de licencias, versionado SemVer, changelog, CI, quality gate y propietarios — misma estrategia (05-ago): `0.x` hasta dos consumidores, bump MAJOR/MINOR/PATCH por contrato, changelog + matriz de compatibilidad, gate propio del motor y propietario = quien ejecute GAME-02.
 
 **Auditoría de cierre — Fase 0:** SOLID verifica dependencias dirigidas y SRP; rendimiento mide el coste de la API; escalabilidad prueba un segundo caso hipotético; seguridad confirma que no hay identidad/secretos; observabilidad define métricas del motor y no eventos de wandori.us. Todo queda en el ADR/inventario.
 
