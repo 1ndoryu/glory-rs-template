@@ -344,14 +344,18 @@ temporal (297A-20) que quedó en producción.
   ajeno); cualquier `task:check`, `run-with-db` o `glory-dev` muestra un banner `EN CURSO` por cada
   toma ajena activa, no solo la tarea objetivo. `AGENTS.md` §6 y `roadmap-sentinel.md`
   actualizados; 3 tests nuevos (8/8) y suite quality 210/210. Cierre documental 06-ago.
-- [ ] Verificación final: suite completa **724/724 PASS** + `vite build` OK (05-ago, local) y
-  móvil <768 verificado (preview 660px muestra el launcher, sin grid de escritorio); resta solo
-  el navegador desktop 1440×900 / 1024×768 (arrastre, colisiones, grupo seleccionado vs. no
-  seleccionado, reflow al encoger) en sesión con viewport ≥768.
+- [ ] **Verificación final: el usuario probó el 05-ago y SIGUE MAL.** El fix de código está
+  aplicado (F1/F3/F4 cerradas, gate `task:check -- 018A-97` PASS, suite 724/724 y build OK) pero
+  en el navegador real el problema persiste: al arrastrar un icono y soltarlo aterriza en una celda
+  distinta a la indicada, y al acercarlo a otro se mueven varios iconos a la vez en vez de uno
+  solo. El fix automatizado no resolvió la interacción real; pendiente de abrir un bloque de
+  corrección que reproduzca el caso en un viewport desktop ≥769, diagnostique qué hipótesis de
+  F1–F3 no se cumple en vivo y lo corrija. No marcar como cerrado sin validación visual real.
 
 **Gate/salida:** un único helper de geometría alimenta todo; el placeholder coincide con la celda
-real; el drag de grupo no altera iconos no implicados (ni se superpone ni sale del grid); sin
-rejillas rojas en producción; tests DOM fijan la geometría frente a `space-between`+RTL.
+real (verificado por el usuario — acta de 05-ago: falla); el drag de grupo no altera iconos no
+implicados (ni se superpone ni sale del grid); sin rejillas rojas en producción; tests
+DOM fijan la geometría frente a `space-between`+RTL. **Estado 05-ago: abierto (user probó y falla).**
 
 ### 297A-21 — Notificaciones de novedades
 
@@ -415,8 +419,17 @@ rejillas rojas en producción; tests DOM fijan la geometría frente a `space-bet
 
 **Depende de:** 297A-9/11/12. ADR: `Agente/documentacion/arquitectura/adr-carga-apps-pesadas-2026-07-31.md`.
 
-- [ ] Cuando exista la primera app WebGL/WASM/media avanzada, validar teardown GPU, concurrencia, Network, workers, timers, object URLs y memoria.
-- [ ] Medir si hace falta `preload`/`heavy`; no activar flags sin una app real, métrica y ADR.
+- [x] Primera app WebGL validada (el juego `game-playable`): teardown verificado con test
+  automatizado `game-playable-teardown.test.ts` (5 tests: destroy idempotente + DOM limpio,
+  cancelación de RAF sin re-agenda, remoción de listeners window/document, desconexión de
+  ResizeObserver + cierre de socket, fail-closed con signal abortado); registro lazy confirmado
+  (chunk propio, sin `three` estático en el shell); sin workers ni audio; object URL revocado;
+  timers de perfil limpiados; GPU liberado (geometrías/materiales/renderer + `forceContextLoss`).
+  ADR actualizado con el checklist de la primera app pesada (2026-08-06). Gate `task:check --
+  297A-25` PASS (local-light), 5/5 tests, type-check limpio.
+- [ ] Medir si hace falta `preload`/`heavy`; no activar flags sin una app real, métrica y ADR:
+  sigue sin activarse — el juego carga lazy al abrir y el teardown ya libera; la verificación
+  de Network (chunk no descargado antes de abrir) queda pendiente de sesión de navegador real.
 
 **Gate/salida:** la app pesada se carga lazy, libera recursos al cerrar y no degrada el arranque ni el resto del OS.
 

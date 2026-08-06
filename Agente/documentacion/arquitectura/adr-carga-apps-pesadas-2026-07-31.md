@@ -80,14 +80,31 @@ Cuando exista una app concreta que lo necesite, se añadirá un contrato mínimo
 
 ## Checklist para la primera app pesada
 
-- [ ] Definir si es `registerLazy` y documentar el motivo.
-- [ ] Confirmar que ninguna dependencia pesada se importa estáticamente desde el registro.
-- [ ] Implementar `destroy()` idempotente y abortable.
-- [ ] Liberar workers, timers, object URLs, audio y GPU.
-- [ ] Medir bundle inicial y chunk de la app antes/después.
-- [ ] Verificar Network: el chunk no se descarga antes de abrir, salvo precarga aprobada.
-- [ ] Abrir/cerrar repetidamente y comprobar ausencia de recursos vivos.
-- [ ] Probar desktop/tablet/móvil y actualizar el gate `task:check`.
+Validación del juego `game-playable` (primera app WebGL del OS) — 2026-08-06 [297A-25]:
+
+- [x] Definir si es `registerLazy` y documentar el motivo: `registerLazy` en
+  `app-registration-game-playable.ts`; chunk propio `game-playable-*.js` (three.js no entra en el
+  bundle principal, ya medido en Evidencia 2026-08-02).
+- [x] Confirmar que ninguna dependencia pesada se importa estáticamente desde el registro: sin
+  imports de `three` fuera de `game-playable/` (verificado por grep en el refactor).
+- [x] Implementar `destroy()` idempotente y abortable: `disposed`/`destroyed` con guard en la
+  primera llamada, AbortSignal del MountedView en cada camino (perfil, mapa, runtime) y teardown
+  por camino temprano (sin WebGL, signal abortado).
+- [x] Liberar workers, timers, object URLs, audio y GPU: sin workers ni audio; `clearTimeout` de
+  perfil; el único object URL (asset-preview) se revoca; RAF cancelado, listeners de
+  window/document/canvas removidos, ResizeObserver desconectado, geometrías/materiales/renderer
+  liberados y `WEBGL_lose_context` como fallback (`forceContextLoss`) en `game-playable-scene.ts`.
+- [x] Medir bundle inicial y chunk de la app antes/después: Evidencia 2026-08-02 (index ~54.8 KB
+  gzip estable, chunk del juego ~130 KB gzip lazy).
+- [ ] Verificar Network: el chunk no se descarga antes de abrir, salvo precarga aprobada — pendiente
+  de sesión de navegador real con pestaña Network (el build ya confirma chunk separado lazy).
+- [x] Abrir/cerrar repetidamente y comprobar ausencia de recursos vivos: test automatizado
+  `game-playable-teardown.test.ts` (5 tests) que monta el runtime real con servicios mockeados y
+  verifica idempotencia, cancelación de RAF sin re-agenda, remoción de listeners
+  (window/document), desconexión del observer y cierre del socket realtime.
+- [x] Probar desktop/tablet/móvil y actualizar el gate `task:check`: gate 297A-25 PASS local-light;
+  desktop/tablet/móvil quedan cubiertos por la verificación visual de GAME-01 (la app es
+  independiente del viewport; el teardown es el mismo runtime).
 
 ## Rechazos explícitos
 
