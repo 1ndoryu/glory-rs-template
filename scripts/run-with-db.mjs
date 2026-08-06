@@ -9,6 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getBranchDbContext } from './branch-db.mjs';
 import { acquireHeavyRun, formatHeavyGuardMessage, isHeavyCargoCommand, isHeavyOverride } from './quality/heavy-run-guard.mjs';
+import { defaultAgent, listActiveForeignTakeovers } from './quality/task-takeover.mjs';
 
 function cargoCommand() {
   return process.platform === 'win32' ? 'cargo.exe' : 'cargo';
@@ -20,6 +21,19 @@ const cargoArgs = process.argv.slice(2);
 if (cargoArgs.length === 0) {
   console.error('Uso: node scripts/run-with-db.mjs <subcomando cargo> [...args]');
   process.exit(1);
+}
+
+/* [028A-17 Fase 2] Visibilidad temprana: si OTRO agente tiene tomas activas,
+ * se muestran antes de ejecutar el comando de cargo. El agente que trabaja su
+ * propia tarea debe saber que hay trabajo en paralelo sobre el mismo checkout
+ * aunque la suya no sea la tarea tomada. Nunca bloquea: es solo aviso. */
+try {
+  const foreignActive = await listActiveForeignTakeovers(projectRoot, defaultAgent());
+  for (const item of foreignActive) {
+    console.error(`[task-takeover] EN CURSO por ${item.entry.takenBy}: ${item.taskId} (${item.entry.id}) hasta ${item.entry.expiresAt}. No la trabajes en paralelo sin coordinar (npm run task:status).`);
+  }
+} catch {
+  /* Degrada a “sin información”: el banner nunca bloquea el comando. */
 }
 
 console.log('');

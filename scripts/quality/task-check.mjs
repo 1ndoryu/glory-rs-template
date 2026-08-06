@@ -14,7 +14,7 @@ import { runBoundedStages } from './stage-runner.mjs';
 import { runReportRetentionBestEffort } from './report-retention-stage.mjs';
 import { runTargetMaintenanceBestEffort } from './target-maintenance-stage.mjs';
 import { runIndexMaintenanceBestEffort } from './index-maintenance.mjs';
-import { defaultAgent, isStale, readTakeover, takeoverReminders } from './task-takeover.mjs';
+import { CORRUPT_TAKEOVER, defaultAgent, foreignTakeoverDecision, listActiveForeignTakeovers, readTakeover, takeoverReminders, touchTakeover } from './task-takeover.mjs';
 
 let interrupted = false;
 function handleInterruption(signal) {
@@ -105,20 +105,57 @@ async function main() {
       }
     }
     const context = await preflight(args);
-    /* [028A-17] Coordinación de tomas de tarea: el gate solo INFORMA. Si la
-     * tarea está tomada por otro agente activo, se avisa fuerte al inicio
-     * (el agente decide si es una validación legítima o un conflicto real).
-     * Al final, los reminders recuerdan liberar si la tomó este agente,
-     * re-tomarla si expiró, o marcarla si nadie la tomó. Un error de lectura
-     * del registro (permisos, archivo bloqueado en Windows) degrada a “sin
-     * información” y NUNCA convierte el gate en SETUP ERROR. */
+    /* [028A-17 Fase 2] Coordinación de tomas de tarea. Tres cosas:
+     *
+     * 1. BANNER GLOBAL: cualquier gate muestra las tomas activas de OTROS
+     *    agentes (no solo la tarea objetivo). El fallo detectado fue que un
+     *    agente trabajando su propia tarea nunca veía que otra tarea estaba
+     *    tomada: el aviso solo salía si el taskId coincidía. Ahora cualquier
+     *    comando de trabajo muestra "EN CURSO" por cada toma ajena activa.
+     *
+     * 2. HEARTBEAT: si esta tarea es MÍA, se renueva la expiración de la
+     *    toma (el TTL es un recordatorio de “olvidada”, no un plazo real de
+     *    trabajo). Un trabajo largo que pasa de 6 h ya no expira a mitad.
+     *
+     * 3. ENFORCEMENT: cerrar una tarea tomada por OTRO agente activo se
+     *    BLOQUEA (exit 78, error de coordinación) salvo que el agente declare
+     *    explícitamente `--allow-foreign` (validación legítima, p.ej. CI de
+     *    un commit ajeno). El aviso anterior era solo informativo: por eso
+     *    dos agentes pudieron trabajar en paralelo el mismo bloque. Un error
+     *    de lectura del registro degrada a “sin información” y NUNCA
+     *    convierte el gate en SETUP ERROR. */
+    let taskTakeover = null;
     try {
-      context.taskTakeover = await readTakeover(context.projectRoot, args.taskId);
+      taskTakeover = await readTakeover(context.projectRoot, args.taskId);
     } catch {
-      context.taskTakeover = null;
+      taskTakeover = null;
     }
-    if (context.taskTakeover && context.taskTakeover.takenBy !== defaultAgent() && !isStale(context.taskTakeover)) {
-      process.stderr.write(`[quality] TAREA TOMADA por ${context.taskTakeover.takenBy} (${context.taskTakeover.id}) desde ${context.taskTakeover.takenAt} — expira ${context.taskTakeover.expiresAt}. Si no es tuya, coordina antes de cerrarla (npm run task:status); si es tuya, ejecuta el gate con GLORY_AGENT_ID=<tu-agente>.\n`);
+    const agentName = defaultAgent();
+    try {
+      const foreignActive = await listActiveForeignTakeovers(context.projectRoot, agentName);
+      for (const item of foreignActive) {
+        process.stderr.write(`[quality] EN CURSO por ${item.entry.takenBy}: ${item.taskId} (${item.entry.id}) hasta ${item.entry.expiresAt}. No la trabajes en paralelo sin coordinar (npm run task:status).\n`);
+      }
+    } catch {
+      /* Degrada a “sin información”: el banner nunca bloquea el gate. */
+    }
+    if (taskTakeover && taskTakeover !== CORRUPT_TAKEOVER && taskTakeover.takenBy === agentName) {
+      try {
+        const touched = await touchTakeover(context.projectRoot, args.taskId, { by: agentName });
+        if (touched.status === 'touched') taskTakeover = touched.entry;
+      } catch {
+        /* Degrada: no renueva, pero no bloquea el gate. */
+      }
+    }
+    context.taskTakeover = taskTakeover;
+    const decision = foreignTakeoverDecision({ entry: taskTakeover, agent: agentName });
+    if (decision.blocked && !args.allowForeign) {
+      process.stderr.write(`[quality] COORDINACIÓN BLOQUEADA — ${args.taskId} está tomada por ${taskTakeover.takenBy} (${taskTakeover.id}) desde ${taskTakeover.takenAt}, expira ${taskTakeover.expiresAt}. No cierres la tarea de otro agente sin coordinar (npm run task:status; el autor debe liberarla con task:release). Si es TUYA, ejecuta el gate con GLORY_AGENT_ID=<tu-agente> (sin ese env el gate usa el hostname y no te reconoce). Si la validación es legítima (p.ej. CI de un commit ajeno), repite con --allow-foreign.\n`);
+      process.exitCode = 78;
+      return;
+    }
+    if (decision.blocked) {
+      process.stderr.write(`[quality] AVISO --allow-foreign: ${args.taskId} está tomada por ${taskTakeover.takenBy} (${taskTakeover.id}) hasta ${taskTakeover.expiresAt}. Validación permitida explícitamente; coordina el cierre con el autor.\n`);
     }
     /* [018A-4] Un agente no debe acumular procesos esperando el mismo gate.
      * La espera larga queda disponible para consumidores de la librería, pero

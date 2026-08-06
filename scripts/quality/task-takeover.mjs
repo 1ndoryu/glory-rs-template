@@ -225,6 +225,61 @@ async function writeEntry(target, taskId, by, nowMs) {
   return entry;
 }
 
+/* Heartbeat: renueva la expiración de la toma propia (el agente que la tomó
+ * sigue trabajando). Devuelve:
+ * - { status: 'touched', entry }    renovada (nuevo expiresAt)
+ * - { status: 'not-taken', entry: null }
+ * - { status: 'corrupt', entry }    ilegible (no se renueva)
+ * - { status: 'foreign', entry }    activa de otro agente (no se toca)
+ *
+ * El TTL es un recordatorio de “olvidada”, no un plazo real de trabajo: un
+ * trabajo largo no debe expirar a mitad solo porque superó 6 h. Cada gate
+ * del propio agente renueva su toma, de modo que un marcado activo con
+ * actividad reciente NUNCA puede ser re-tomado como “olvidado” por otro. */
+export async function touchTakeover(root, taskId, { by = defaultAgent(), nowMs = Date.now() } = {}) {
+  sanitizeTaskId(taskId);
+  const agent = sanitizeAgentName(by);
+  const existing = await readTakeover(root, taskId);
+  if (!existing) return { status: 'not-taken', entry: null };
+  if (existing === CORRUPT_TAKEOVER) return { status: 'corrupt', entry: existing };
+  if (existing.takenBy !== agent) return { status: 'foreign', entry: existing };
+  const target = takeoverEntryPath(root, taskId);
+  /* [018A-97] Compare-and-write: entre la lectura y la escritura otro agente
+   * pudo re-tomar la tarea (marcado expirado con --force o taken-over-stale).
+   * Sin esta re-verificación, el heartbeat pisaría la toma fresca ajena. Se
+   * vuelve a leer justo antes de escribir y se aborta si el marcado cambió de
+   * identidad (id) — el id es único por toma, así que compararlo por valor
+   * detecta el re-toma aunque el objeto JSON sea nuevo (mismo patrón que
+   * takeTask sobre stale). */
+  const current = await readTakeover(root, taskId);
+  if (!current || current === CORRUPT_TAKEOVER || current.id !== existing.id) {
+    return { status: 'foreign', entry: current ?? null };
+  }
+  const entry = buildEntry(taskId, agent, nowMs);
+  await writeAtomic(target, `${JSON.stringify(entry, null, 2)}\n`);
+  return { status: 'touched', entry };
+}
+
+/* Decisión de cumplimiento para el gate: ¿puede este agente cerrar la tarea?
+ * - 'active-foreign': tomada por otro agente activo → BLOQUEA
+ * - 'own' / 'none' / 'corrupt' / 'stale-foreign' → no bloquea */
+export function foreignTakeoverDecision({ entry, agent = defaultAgent(), nowMs = Date.now() } = {}) {
+  if (!entry || entry === CORRUPT_TAKEOVER) return { blocked: false, reason: 'none' };
+  if (entry.takenBy === agent) return { blocked: false, reason: 'own' };
+  if (isStale(entry, nowMs)) return { blocked: false, reason: 'stale-foreign' };
+  return { blocked: true, reason: 'active-foreign' };
+}
+
+/* Tomas activas de OTROS agentes (para banners de visibilidad temprana en
+ * cualquier comando de trabajo, no solo el gate de la tarea objetivo). */
+export async function listActiveForeignTakeovers(root, agent = defaultAgent(), nowMs = Date.now()) {
+  const entries = await listTakeovers(root, nowMs);
+  return entries.filter(item => item.entry
+    && item.entry !== CORRUPT_TAKEOVER
+    && !item.stale
+    && item.entry.takenBy !== agent);
+}
+
 /* Libera la tarea. Devuelve:
  * - { status: 'released', entry }       liberada por su autor
  * - { status: 'released-stale', entry } marcado expirado liberado por otro

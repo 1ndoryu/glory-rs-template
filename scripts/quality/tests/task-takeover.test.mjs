@@ -15,8 +15,11 @@ import {
   isStale,
   readTakeover,
   listTakeovers,
+  listActiveForeignTakeovers,
   takeTask,
   releaseTask,
+  touchTakeover,
+  foreignTakeoverDecision,
   takeoverReminders,
 } from '../task-takeover.mjs';
 
@@ -129,6 +132,64 @@ test('la toma del mismo agente renueva el marcado (refreshed)', async () => {
     assert.equal(second.status, 'refreshed');
     assert.notEqual(second.entry.id, first.entry.id);
     assert.equal(second.entry.takenAtMs, first.entry.takenAtMs + 5_000);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('touchTakeover renueva solo la toma propia y no toca la ajena', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'glory-takeover-'));
+  try {
+    const now = Date.now();
+    const taken = await takeTask(root, TASK, { by: 'buffy', nowMs: now });
+    const beforeExpiry = taken.entry.expiresAtMs;
+
+    /* Un agente ajeno NO renueva la toma activa de buffy. */
+    const foreign = await touchTakeover(root, TASK, { by: 'otro', nowMs: now + 60_000 });
+    assert.equal(foreign.status, 'foreign');
+    assert.equal((await readTakeover(root, TASK)).expiresAtMs, beforeExpiry);
+
+    /* La toma propia sí se renueva (heartbeat: trabajo largo no expira). */
+    const touched = await touchTakeover(root, TASK, { by: 'buffy', nowMs: now + 60_000 });
+    assert.equal(touched.status, 'touched');
+    assert.equal(touched.entry.takenBy, 'buffy');
+    assert.ok(touched.entry.expiresAtMs > beforeExpiry, 'el heartbeat debe extender la expiración');
+
+    /* Sin toma: not-taken; ilegible: corrupt. */
+    const none = await touchTakeover(root, `${TASK}-none`, { by: 'buffy' });
+    assert.equal(none.status, 'not-taken');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('foreignTakeoverDecision bloquea solo tomas activas ajenas', async () => {
+  const now = Date.now();
+  const fresh = { takenBy: 'otro', takenAtMs: now, expiresAtMs: now + 3_600_000 };
+  const mine = { takenBy: 'yo', takenAtMs: now, expiresAtMs: now + 3_600_000 };
+  const stale = staleEntry('x', 'fantasma');
+
+  assert.equal(foreignTakeoverDecision({ entry: fresh, agent: 'yo', nowMs: now }).blocked, true);
+  assert.equal(foreignTakeoverDecision({ entry: fresh, agent: 'yo', nowMs: now }).reason, 'active-foreign');
+  assert.equal(foreignTakeoverDecision({ entry: mine, agent: 'yo', nowMs: now }).blocked, false);
+  assert.equal(foreignTakeoverDecision({ entry: stale, agent: 'yo', nowMs: now }).blocked, false);
+  assert.equal(foreignTakeoverDecision({ entry: null, agent: 'yo', nowMs: now }).blocked, false);
+  assert.equal(foreignTakeoverDecision({ entry: CORRUPT_TAKEOVER, agent: 'yo', nowMs: now }).blocked, false);
+});
+
+test('listActiveForeignTakeovers filtra las propias y las expiradas', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'glory-takeover-'));
+  try {
+    await takeTask(root, TASK, { by: 'buffy', nowMs: Date.now() });
+    const otherTask = `${TASK}-otra`;
+    await takeTask(root, otherTask, { by: 'otro', nowMs: Date.now() });
+    const staleTask = `${TASK}-stale`;
+    await mkdir(path.dirname(registryPath(root, staleTask)), { recursive: true });
+    await writeFile(registryPath(root, staleTask), `${JSON.stringify(staleEntry(staleTask))}\n`, 'utf8');
+
+    const foreign = await listActiveForeignTakeovers(root, 'buffy');
+    assert.equal(foreign.length, 1);
+    assert.equal(foreign[0].taskId, otherTask);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
