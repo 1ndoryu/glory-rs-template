@@ -129,20 +129,26 @@ async function main() {
   }
 
   if (args.uninstall) {
-    /* [028A-6] Retirada de la integración del runtime: PATH y perfiles, sin
-     * reinstalar la versión (import directo de los módulos compilados). */
-    const [{ uninstallPathEntry }, { uninstallProfiles, defaultProfilePaths }] = await Promise.all([
-      import(pathToFileURL(path.join(repoRoot, 'tools', 'sentinel', 'out', 'core', 'interceptorShims.js'))),
-      import(pathToFileURL(path.join(repoRoot, 'tools', 'sentinel', 'out', 'core', 'interceptorShims.js'))),
+    /* [028A-6 Fase 5] Retirada de la integración global delegando en el
+     * comando del runtime `sentinel uninstall`: retira SOLO entradas
+     * administradas (PATH shims+bin, marcadores de perfiles nuevos/legacy y
+     * directorio de shims). Con --keep-runtime se conserva el runtime
+     * versionado (versions/current/bin) para reinstalar rápido; para
+     * retirar TODO lo administrado usar: sentinel uninstall --target-root
+     * <dir> (sin --keep-runtime). Exit != 0 si un paso falla. */
+    const { runCli } = await import(pathToFileURL(sentinelCli));
+    const exitCode = await runCli([
+      'uninstall',
+      '--target-root', targetRoot,
+      '--keep-runtime',
+      ...(args.dryRun ? ['--dry-run'] : []),
+      ...(args.dryRun ? ['--json'] : []),
     ]);
-    const pathResult = await uninstallPathEntry(targetRoot, { dryRun: args.dryRun });
-    const profilesResult = await uninstallProfiles({
-      shimDir,
-      profiles: defaultProfilePaths(),
-      dryRun: args.dryRun,
-    });
-    process.stdout.write(`${JSON.stringify({ uninstall: true, targetRoot, pathResult, profiles: profilesResult.profiles }, null, 2)}\n`);
-    process.stdout.write('[install-global-runtime] Retirada del PATH y perfiles completa (la versión instalada se conserva en el target).\n');
+    if (exitCode !== 0) {
+      throw new Error(`sentinel uninstall falló (exit ${exitCode}); la retirada quedó incompleta. Revisa la salida anterior.`);
+    }
+    process.stdout.write(`[install-global-runtime] Retirada de la integración completa (runtime conservado).\n`);
+    process.stdout.write(`[install-global-runtime] Para retirar también el runtime: sentinel uninstall --target-root ${targetRoot}\n`);
     return;
   }
 

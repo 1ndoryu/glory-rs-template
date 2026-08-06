@@ -52,6 +52,22 @@ jobs:
         run: npm run codegen:local
       - name: Ejecutar gate completo
         run: npm run task:check -- 297A-6 --ci
+      # [028A-6 Fase 4] Los artifacts se publican con branch-key + task +
+      # commit corto (contrato del plan): runners reutilizados nunca mezclan
+      # reportes de ramas distintas. resolveBranchIdentity usa GITHUB_HEAD_REF
+      # / GITHUB_REF_NAME (allowlisted) en CI. if: always() para que un gate
+      # fallido siga nombrando sus artifacts con la rama correcta (los pasos
+      # de publicación usan always() y no pueden quedarse con el nombre vacío).
+      - name: Resolver identidad de rama para artifacts
+        if: always()
+        id: identity
+        run: |
+          node --input-type=module -e "
+            import { resolveBranchIdentity } from './scripts/quality/branch-identity.mjs';
+            const id = await resolveBranchIdentity(process.cwd());
+            console.log('branchKey=' + id.branchKey);
+            console.log('shortCommit=' + id.shortCommit);
+          " >> "$GITHUB_OUTPUT"
       - name: Exportar métricas históricas
         if: always()
         run: node scripts/quality/export-ci-metrics.mjs
@@ -59,7 +75,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: quality-reports
+          name: quality-reports-${{ steps.identity.outputs.branchKey }}-297A-6-${{ steps.identity.outputs.shortCommit }}
           path: .quality-reports/
           if-no-files-found: warn
           retention-days: 14
@@ -69,7 +85,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: quality-metrics
+          name: quality-metrics-${{ steps.identity.outputs.branchKey }}-${{ steps.identity.outputs.shortCommit }}
           path: .quality-reports/ci-metrics.json
           if-no-files-found: warn
           retention-days: 30
