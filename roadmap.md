@@ -29,6 +29,7 @@
 - Optimización Sentinel/VarSense: `Agente/planes/plan-optimizacion-sentinel-varsense-2026-08-02.md`
 - Orquestación universal de tareas Sentinel: `Agente/planes/plan-sentinel-orquestacion-tareas-worktrees-2026-08-06.md`
 - Migración de scripts a Core/adapters: `Agente/planes/plan-migracion-scripts-adapters-sentinel-2026-08-06.md`
+- Inventario de scripts/adapters: `Agente/documentacion/herramientas/inventario-scripts-adapters-sentinel-2026-08-06.md`
 
 ## Cómo leer este archivo
 

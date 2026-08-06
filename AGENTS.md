@@ -29,6 +29,7 @@ applyTo: '**'
 - Prevención: `Agente/prevencion/prevencion-wandorius-sentinel-varsense-2026-07-29.md`.
 - Sentinel/VarSense: `roadmap-sentinel.md`, `Agente/planes/plan-global-quality-guard-agnostico-2026-08-02.md`, `Agente/planes/plan-optimizacion-sentinel-varsense-2026-08-02.md`.
 - Migración de scripts/adapters: `Agente/planes/plan-migracion-scripts-adapters-sentinel-2026-08-06.md`.
+- Inventario de scripts/adapters: `Agente/documentacion/herramientas/inventario-scripts-adapters-sentinel-2026-08-06.md`.
 - Índice documental: `Agente/documentacion/indice-documentacion-2026-07-29.md`.
 
 No dupliques decisiones: modifica primero la fuente canónica y enlaza desde el resto.

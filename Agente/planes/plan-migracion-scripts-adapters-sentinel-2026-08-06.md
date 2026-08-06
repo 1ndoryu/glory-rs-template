@@ -1,9 +1,9 @@
 # Plan — Migración de scripts a Sentinel Core y adapters por proyecto
 
-> **Fecha:** 2026-08-06  
-> **Estado:** propuesta de arquitectura y ejecución; no iniciar la retirada física hasta cerrar las fases de evidencia  
-> **Ámbito:** calidad, coordinación de tareas y wrappers de desarrollo; no modifica todavía la skill global ni elimina scripts  
-> **Relación:** complementa `Agente/planes/plan-global-quality-guard-agnostico-2026-08-02.md` y `Agente/planes/plan-sentinel-orquestacion-tareas-worktrees-2026-08-06.md`  
+> **Fecha:** 2026-08-06
+> **Estado:** Fase 0 cerrada como baseline técnico; retirada física bloqueada hasta cerrar las fases de evidencia
+> **Ámbito:** calidad, coordinación de tareas y wrappers de desarrollo; no modifica todavía la skill global ni elimina scripts
+> **Relación:** complementa `Agente/planes/plan-global-quality-guard-agnostico-2026-08-02.md` y `Agente/planes/plan-sentinel-orquestacion-tareas-worktrees-2026-08-06.md`
 > **Fuente canónica de esta iniciativa:** este documento
 
 ## 1. Decisión ejecutiva
@@ -245,25 +245,35 @@ nuevo adapter.
 
 **Dependencia:** terminar la integración operativa de `028A-18` y no tocar `tools/sentinel` en paralelo.
 Este plan no cambia la prioridad del bloque habilitado hasta que el consumidor autorice formalmente SNT-12.
+**Evidencia:** `Agente/documentacion/herramientas/inventario-scripts-adapters-sentinel-2026-08-06.md`.
+**ID de gate del consumidor:** usar un ID con formato de tarea del proyecto (por ejemplo `028A-20`) cuando
+se ejecute `npm run task:check`; `SNT-12` es el alias de planificación y coordinación, no un ID válido del
+parser legacy del gate.
 
 **Objetivo:** congelar evidencia antes de tocar la arquitectura y bloquear la propagación de secretos.
 
-- [ ] Registrar `git status`, rama, versión/commit/hash de Sentinel y estado de ambos submódulos.
-- [ ] Inventariar todos los scripts del root y `scripts/quality` con owner, referencias, frecuencia, secretos,
+- [x] Registrar `git status`, rama, versión/commit/hash de Sentinel y estado de ambos submódulos.
+- [x] Inventariar todos los scripts del root y `scripts/quality` con owner, referencias, frecuencia, secretos,
       dependencias, capacidades y destino propuesto.
-- [ ] Graficar referencias desde `package.json`, CI, README, AGENTS, planes y scripts.
-- [ ] Crear una tabla versionada con **cada archivo**: ruta, categoría, dueño, consumidores, último uso
+- [x] Graficar referencias desde `package.json`, CI, README, AGENTS, planes y scripts.
+- [x] Crear una tabla versionada con **cada archivo**: ruta, categoría, dueño, consumidores, último uso
       conocido, destino (`core`, `adapter`, `específico`, `legacy`, `retirar`), riesgo, criterio de salida,
       release objetivo y rollback. La clasificación narrativa de este plan no sustituye esa matriz.
-- [ ] Separar cambios preexistentes de esta iniciativa; no stagear ni editar WIP ajeno.
-- [ ] Ejecutar baseline no destructivo: `sentinel doctor --json`, `sentinel task status --json`,
+- [x] Separar cambios preexistentes de esta iniciativa; no stagear ni editar WIP ajeno.
+- [x] Ejecutar baseline no destructivo: `sentinel doctor --json`, `sentinel task status --json`,
       `npm run quality:test` y el gate mínimo solo cuando el ownership de la tarea esté tomado.
-- [ ] Auditar inmediatamente scripts con tokens, cookies, IPs, endpoints autenticados o credenciales.
+- [x] Auditar inmediatamente scripts con tokens, cookies, IPs, endpoints autenticados o credenciales.
       La exposición de un secreto es un bloqueo de seguridad: no se copia a la matriz ni a un adapter,
       se revoca por el procedimiento autorizado y se retira el archivo del template en una tarea separada.
 
 **Salida:** inventario versionado, baseline reproducible, lista de archivos con propiedad clara y cero
 secretos nuevos propagados. Hasta esta salida no se mueve ni elimina ningún script.
+
+**Resultado 2026-08-06:** baseline y matriz creados; `npm run quality:test` pasó 211/211 en la rama base;
+`sentinel doctor --json` reportó runtime 0.5.0 verificado; no se encontraron secretos literales en la
+búsqueda focalizada; `emit-openapi.ps1` quedó señalado porque referencia `clean-cargo-target.ps1`, ausente
+en el checkout actual. La ausencia de owners reales y de frecuencia histórica requiere revisión del equipo;
+no se inventan esos datos.
 
 ### Fase 1 — Contrato mínimo de adapter (ID: `SNT-13`)
 
