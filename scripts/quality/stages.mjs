@@ -1,83 +1,13 @@
 #!/usr/bin/env node
-/* [028A-6 Fase 3] Genera el JSON declarativo que `sentinel check <task>
- * --stages <json>` consume: convierte las etapas del orquestador (misma
- * selección por alcance que stageDefinitions) en procesos `stage-process.mjs`
- * con el contrato estructurado. Es la vía observe: el gate agnóstico ejecuta
- * exactamente la misma lógica que hoy corre dentro de task-check, pero con su
- * propio reporte/caché/exit code para comparar decisiones. */
+/* [SNT-12] El manifest del proyecto describe transporte y etapas; Sentinel
+ * sigue siendo dueño del scheduler, locks, reporte final y decisión. */
 import path from 'node:path';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
+import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { preflight, projectRoot } from './preflight.mjs';
 import { detectScope, manifestToScope } from './scope.mjs';
-import { isFullExecution } from './profile-contract.mjs';
-import { PROFILE_STAGE_RULES } from './profile-contract.mjs';
-import { readFile } from 'node:fs/promises';
-
-const STAGE_ORDER = ['sentinel', 'varsense', 'rust', 'frontend', 'docs', 'custom'];
-const STAGE_TIMEOUT_MS = {
-  sentinel: 180_000,
-  varsense: 300_000,
-  rust: 30 * 60_000,
-  frontend: 10 * 60_000,
-  docs: 60_000,
-  custom: 60_000,
-};
-
-function parseArgs(argv) {
-  const parsed = { taskId: null, output: null, full: false, ci: false, profile: null, reportRoot: null, scopeManifest: null };
-  for (let index = 0; index < argv.length; index++) {
-    const arg = argv[index];
-    if (arg === '--task-id') parsed.taskId = argv[++index] ?? null;
-    else if (arg === '--output') parsed.output = argv[++index] ?? null;
-    else if (arg === '--report-root') parsed.reportRoot = argv[++index] ?? null;
-    else if (arg === '--scope-manifest') parsed.scopeManifest = argv[++index] ?? null;
-    else if (arg === '--full') parsed.full = true;
-    else if (arg === '--ci') parsed.ci = true;
-    else if (arg === '--profile') parsed.profile = argv[++index] ?? null;
-  }
-  return parsed;
-}
-
-async function main() {
-  const args = parseArgs(process.argv.slice(2));
-  if (!args.taskId) {
-    process.stderr.write('[stages] requiere --task-id <id>\n');
-    process.exitCode = 2;
-    return;
-  }
-  const scopeArgs = { full: args.full, ci: args.ci, profiles: args.profile ? args.profile.split(',').map(item => item.trim()).filter(Boolean) : [] };
-  const context = await preflight({ taskId: args.taskId, cwd: projectRoot, ...scopeArgs });
-  let scope;
-  /* [028A-6 Fase 3] Vía observe: reutiliza el alcance que task:check ya
-   * decidió (incluido el diferimiento del guard de ejecuciones pesadas) para
-   * que ambos gates comparen el mismo conjunto de archivos y etapas. */
-  if (args.scopeManifest) {
-    const manifest = JSON.parse(await readFile(args.scopeManifest, 'utf8'));
-    scope = manifestToScope(manifest);
-  } else {
-    scope = await detectScope(context, scopeArgs);
-  }
-
-  const stageNames = isFullExecution(scope)
-    ? STAGE_ORDER
-    : ['sentinel', ...new Set([...scope.profiles].flatMap(profile => PROFILE_STAGE_RULES[profile] ?? []))];
-  const reportRoot = path.resolve(args.reportRoot ?? path.join(context.reportRoot, '..', 'check', 'stages'));
-  const wrapper = path.join(projectRoot, 'scripts', 'quality', 'stage-process.mjs');
-  const scopeArgsForStage = args.scopeManifest ? ['--scope-manifest', args.scopeManifest] : [];
-  const declarations = stageNames.map(name => ({
-    name,
-    executable: process.execPath,
-    args: [wrapper, '--stage', name, '--report', '{reportPath}', '--task-id', args.taskId, ...scopeArgsForStage],
-    expectedSchemaVersion: '1',
-    timeoutMs: STAGE_TIMEOUT_MS[name] ?? 120_000,
-    reportPath: path.join(reportRoot, `${name}.json`),
-  }));
-
-  const outputPath = path.resolve(args.output ?? path.join(reportRoot, 'stages.json'));
-  await mkdir(path.dirname(outputPath), { recursive: true });
-  await writeFile(outputPath, `${JSON.stringify(declarations, null, 2)}\n`, 'utf8');
-  process.stdout.write(`${outputPath}\n`);
-}
-
-await main();
+import { readAdapterManifest, adapterStageNames, adapterEnvironmentAllowlist, assertImplementedStages, assertStageParity, materializeTransportArguments, resolveWorkspacePath, assertTaskId } from './adapter-manifest.mjs';
+import { stageDefinitions } from './stage-definitions.mjs';
+import { DEFAULT_ENV_ALLOWLIST } from './runner.mjs';
+function parseArgs(argv) { const parsed = { taskId: null, output: null, full: false, ci: false, profile: null, reportRoot: null, scopeManifest: null }; for (let index = 0; index < argv.length; index++) { const arg = argv[index]; const argValue = argv[++index]; if (arg === '--task-id') parsed.taskId = argValue ?? null; else if (arg === '--output') parsed.output = argValue ?? null; else if (arg === '--report-root') parsed.reportRoot = argValue ?? null; else if (arg === '--scope-manifest') parsed.scopeManifest = argValue ?? null; else if (arg === '--full') { parsed.full = true; index -= 1; } else if (arg === '--ci') { parsed.ci = true; index -= 1; } else if (arg === '--profile') parsed.profile = argValue ?? null; else index -= 1; } return parsed; }
+async function main() { const args = parseArgs(process.argv.slice(2)); if (!args.taskId) { process.stderr.write('[stages] requiere --task-id seguro\n'); process.exitCode = 2; return; } assertTaskId(args.taskId); const adapter = await readAdapterManifest(projectRoot); const profiles = args.profile ? args.profile.split(',').map(item => item.trim()).filter(Boolean) : []; const scopeArgs = { full: args.full, ci: args.ci, profiles }; const context = await preflight({ taskId: args.taskId, cwd: projectRoot, ...scopeArgs }); context.adapterEnvironmentAllowlist = adapterEnvironmentAllowlist(adapter, DEFAULT_ENV_ALLOWLIST); const scopeManifestPath = args.scopeManifest ? resolveWorkspacePath(projectRoot, args.scopeManifest, '--scope-manifest', { allowReportRoot: true }) : null; const scope = scopeManifestPath ? manifestToScope(JSON.parse(await readFile(scopeManifestPath, 'utf8'))) : await detectScope(context, scopeArgs); const stageNames = adapterStageNames(adapter, [...scope.profiles], scope.executionFull ?? scope.full); const implementedNames = stageDefinitions(context, scope, args.taskId).map(item => item.name); assertImplementedStages(adapter, stageNames, implementedNames); assertStageParity(stageNames, implementedNames); const reportRoot = resolveWorkspacePath(projectRoot, args.reportRoot ?? path.join(context.reportRoot, '..', 'check', 'stages'), '--report-root', { allowReportRoot: true }); const wrapper = resolveWorkspacePath(projectRoot, adapter.transport.entrypoint, 'adapter.transport.entrypoint'); const scopeArgsForStage = scopeManifestPath ? ['--scope-manifest', scopeManifestPath] : []; const declarations = stageNames.map(name => { const reportPath = resolveWorkspacePath(projectRoot, path.join(reportRoot, `${name}.json`), `report ${name}`, { allowReportRoot: true }); const adapterArgs = materializeTransportArguments(adapter, { stage: name, reportPath, taskId: args.taskId }); return { name, executable: process.execPath, args: [wrapper, ...adapterArgs, ...scopeArgsForStage], expectedSchemaVersion: String(adapter.adapter.output.schemaVersion), timeoutMs: adapter.stages[name].timeoutMs, reportPath }; }); const outputPath = resolveWorkspacePath(projectRoot, args.output ?? path.join(reportRoot, 'stages.json'), '--output', { allowReportRoot: true }); await mkdir(path.dirname(outputPath), { recursive: true }); await writeFile(outputPath, `${JSON.stringify(declarations, null, 2)}\n`, 'utf8'); process.stdout.write(`${outputPath}\n`); }
+try { await main(); } catch (error) { process.stderr.write(`[stages] SETUP ERROR — ${error.message}\n`); process.exitCode = 2; }
