@@ -59,11 +59,16 @@
   gap: var(--espacio-xl) var(--espacio-md);
   /* [058A-1] Distribución del espacio libre y centrado del contenido de cada
    * celda (solicitado por el usuario). Con auto-fill el eje horizontal queda
-   * lleno; el vertical reparte el sobrante entre filas. getGridMetrics/
-   * getCellAt replican esta distribución (rowGap efectivo) para que el
-   * snap-grid y el highlight de arrastre sigan siendo exactos. */
+   * lleno y el sobrante se reparte entre columnas (columnGapEffectivo).
+   * [018A-97 F6] El VERTICAL ya NO reparte el sobrante: con align-content:
+   * space-between el navegador reparte entre las filas MATERIALIZADAS por el
+   * contenido (cambian en cada drop) y la geometría JS (que asume filas fijas
+   * por altura) divergía ~675px — el icono aterrizaba lejos del highlight y
+   * desplazaba ocupantes al caer en celdas equivocadas. Con `start` las filas
+   * son deterministas desde arriba (row * (fila + gap)) y coinciden 1:1 con
+   * getGridMetrics/getCellAt; es el mismo criterio que el Finder (018A-93). */
   justify-content: space-between;
-  align-content: space-between;
+  align-content: start;
   align-items: center;
   justify-items: center;
 }

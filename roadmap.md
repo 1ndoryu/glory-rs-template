@@ -344,13 +344,14 @@ temporal (297A-20) que quedó en producción.
   ajeno); cualquier `task:check`, `run-with-db` o `glory-dev` muestra un banner `EN CURSO` por cada
   toma ajena activa, no solo la tarea objetivo. `AGENTS.md` §6 y `roadmap-sentinel.md`
   actualizados; 3 tests nuevos (8/8) y suite quality 210/210. Cierre documental 06-ago.
-- [ ] **Verificación final: el usuario probó el 05-ago y SIGUE MAL.** El fix de código está
-  aplicado (F1/F3/F4 cerradas, gate `task:check -- 018A-97` PASS, suite 724/724 y build OK) pero
-  en el navegador real el problema persiste: al arrastrar un icono y soltarlo aterriza en una celda
-  distinta a la indicada, y al acercarlo a otro se mueven varios iconos a la vez en vez de uno
-  solo. El fix automatizado no resolvió la interacción real; pendiente de abrir un bloque de
-  corrección que reproduzca el caso en un viewport desktop ≥769, diagnostique qué hipótesis de
-  F1–F3 no se cumple en vivo y lo corrija. No marcar como cerrado sin validación visual real.
+- [ ] **Verificación final: el usuario probó el 05-ago y SIGUE MAL; causa raíz encontrada y
+  corregida el 06-ago (F6).** El desfase real era el eje VERTICAL: `align-content: space-between`
+  reparte el sobrante entre las filas que el CONTENIDO materializa (2 filas → fila 2 en top 772px)
+  mientras la geometría JS asumía las 9 filas que caben por altura (fila 2 en 96.5px) — desfase
+  ~675px que hacía aterrizar el icono lejos del highlight (y al caer sobre ocupantes, desplazar
+  varios). Fix: `align-content: start` (filas deterministas desde arriba, mismo criterio que el
+  Finder 018A-93), verificado en navegador real a 1440px con reflow forzado (26 items → filas 0/96,
+  no 0/772). Falta validación visual final del usuario en su sesión real.
 
 **Gate/salida:** un único helper de geometría alimenta todo; el placeholder coincide con la celda
 real (verificado por el usuario — acta de 05-ago: falla); el drag de grupo no altera iconos no

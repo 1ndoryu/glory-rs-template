@@ -1,6 +1,6 @@
 # Plan — Iconos del escritorio: grid, placeholder y rejilla de debug coherentes
 
-> **Fecha:** 2026-08-05 · **Estado:** planificado
+> **Fecha:** 2026-08-05 · **Estado:** en curso — el usuario probó el 05-ago y **falla**; corrección pendiente (Fase 5.5)
 > **Fuentes:** `frontend/src/features/desktop/workspace-icon-grid.ts`, `frontend/src/features/desktop/utils/icon-grid.ts`,
 > `frontend/src/features/desktop/utils/icon-reorder.ts`, `frontend/src/features/desktop/utils/icon-drag.ts`,
 > `frontend/src/features/desktop/utils/debug-grid-overlay.ts`, `frontend/src/styles/desktop/desktop-shell.css`,
@@ -169,6 +169,67 @@ en producción.
 
 **Gate F5 / DoD:** grid coherente en desktop/tablet, placeholder exacto, drag de grupo predecible
 (sin alterar iconos no implicados), sin rejillas rojas en producción, suite + navegador verdes.
+
+### Fase 5.5 — Prueba real del usuario (05-ago) 🔴 NO corregido → bloque de corrección
+
+Estado abierto el mismo 05-ago: **el usuario probó en el navegador real con el fix aplicado y el
+problema persiste.** Registro textual del usuario: "lo suelto en un lugar y aparece en otro; al
+acercarlo a otro se mueven varios iconos en vez de 1". El fix automatizado (F1–F4) no resolvió la
+interacción real.
+
+- [ ] Reproducir el caso reportado en un viewport desktop ≥769 (1440×900 / 1024×768): (a) arrastrar
+  un icono y soltarlo para comprobar la celda final vs. el highlight; (b) acercar un icono a otro
+  (o arrastrar con selección residual) y comprobar que solo se mueve el que se arrastra, sin
+  reordenar varios iconos a la vez.
+- [ ] Diagnosticar en vivo qué hipótesis de F1–F3 no se cumple: medición del grid real
+  (`gridTemplateColumns`/sobrante de `space-between`), `cellOriginAt` vs rect de la celda destino,
+  y la captura del grupo en `pointerdown` (`getGroupIds`) en el flujo real del escritorio.
+- [ ] Corregir el desfase detectado y cerrar con validación visual real del usuario (checks finales
+  del DoD). No marcar el gate como cerrado sin esa validación.
+
+**Gotcha registrado:** el preview anterior quedó anclado a 660px (presentación móvil), por lo que la
+geometría RTL/`space-between` de escritorio nunca se validó en vivo; los tests DOM, aunque verdes,
+usan un stub de layout (jsdom) que puede no reflejar el layout real del grid.
+
+### Fase 6 — Causa raíz real: distribución VERTICAL por contenido 🔴 → ✅ corregida (06-ago)
+
+**Diagnóstico en navegador real (06-ago, reflow forzado en 1440×900):** el fix de F1–F4 dejó el
+síntoma porque la geometría seguía desfasada en el eje VERTICAL, y eso explica los DOS síntomas del
+usuario:
+
+- `.desktop-icon-grid { align-content: space-between }` reparte el sobrante vertical entre las
+  filas que el CONTENIDO materializa (con `grid-auto-rows` + `grid-auto-flow: dense`), NO entre las
+  que caben por altura. Medido: grid de 836px de alto con 2 filas de iconos (26 items) → el
+  navegador coloca la fila 2 en **top 772px** (reparte los 676px de sobrante entre la única pareja
+  de filas existente); `getGridMetrics` asumía `rows = floor((836+32)/(64+32)) = 9` y repartía el
+  sobrante entre 8 gaps → predecía la fila 2 en **top 96.5px**. Desfase real: **~675px**.
+- Con ese desfase, `getCellAt` mapeaba el cursor a una fila incorrecta al soltar: el icono
+  "aparecía en otro lugar" (síntoma 1) y, al caer sobre la celda de un icono existente,
+  `planPlacement` desplazaba al ocupante y al siguiente → "se mueven varios iconos en vez de 1"
+  (síntoma 2). La regla de grupo de F3 era correcta; el desplazamiento en cadena venía de drops en
+  celdas ocupadas por la geometría errónea.
+- El gotcha del preview a 660px era real: con 1 fila o el layout móvil el desfase vertical no se
+  manifiesta; solo aparece con ≥2 filas en desktop.
+
+**Fix aplicado (06-ago):** `align-content: space-between` → `align-content: start` en
+`desktop-shell.css`. Con `start` las filas arrancan deterministas desde arriba: la fila `r` está en
+`r * (64 + 32)` y coincide 1:1 con la fórmula de `getGridMetrics`/`cellOriginAt` (verificado en
+navegador: 26 items → filas en 0 y 96, no 0 y 772). Es el mismo criterio que el Finder (018A-93:
+alinea al inicio). El eje horizontal conserva `space-between` + `columnGapEffective` (medido: la
+fórmula coincide con el navegador, gaps efectivos 20.67). La distribución vertical por contenido era
+inherentemente impredecible (cada drop que materializa una fila nueva redistribuye todo el grid) y
+por eso ningún cálculo JS podía replicarla.
+
+- [x] CSS: `align-content: start` con comentario que explica por qué (desfase vertical real).
+- [x] Test DOM: stub de `alignContent` actualizado a `start` + test nuevo "con sobrante VERTICAL y
+  align-content: start, rowGapEffective = rowGap (filas deterministas)".
+- [x] Comentarios en `icon-grid.ts` (`rowGapEffective`) actualizados: en producción == rowGap.
+- [x] Validación en navegador real: harness con el CSS exacto del grid a 1440px, reflow forzado,
+  13 y 26 items — actual (space-between) vs. fix (start); fix coincide con la fórmula.
+
+**Gate F6 / DoD:** filas deterministas desde arriba; el highlight coincide con la celda real en
+desktop con ≥2 filas (verificado en navegador por geometría); la validación visual final del
+usuario queda pendiente de su sesión real.
 
 ## Pruebas obligatorias
 

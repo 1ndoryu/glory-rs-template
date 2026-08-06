@@ -63,7 +63,10 @@ function mountGrid(width: number, height: number, opts: Partial<StubCss> = {}, i
     rowGap: `${ROW_GAP}px`,
     gridTemplateColumns: `${CELL}px ${CELL}px ${CELL}px ${CELL}px`,
     gridAutoRows: `${CELL_H}px`,
-    alignContent: 'space-between',
+    /* [018A-97 F6] El CSS real usa align-content: start (filas deterministas
+     * desde arriba): con space-between el navegador reparte el sobrante entre
+     * las filas materializadas por el CONTENIDO y la geometría JS divergía. */
+    alignContent: 'start',
     justifyContent: 'space-between',
     direction: 'ltr',
     ...opts,
@@ -101,6 +104,17 @@ describe('getGridMetrics — track real y columnGapEffective', () => {
     const metrics = getGridMetrics(grid);
     expect(metrics.columns).toBe(4);
     expect(metrics.columnGapEffective).toBe(GAP + 8);
+  });
+
+  it('[018A-97 F6] con sobrante VERTICAL y align-content: start, rowGapEffective = rowGap (filas deterministas)', () => {
+    /* Antes (space-between) el navegador repartía el sobrante vertical entre
+     * las filas materializadas por el contenido (cambian en cada drop) y la
+     * fila real quedaba hasta ~675px de donde predecía la geometría. Con start
+     * las filas arrancan desde arriba: row * (cellHeight + rowGap). */
+    const grid = mountGrid(4 * CELL + 3 * GAP, 3 * CELL_H + 2 * ROW_GAP + 400);
+    const metrics = getGridMetrics(grid);
+    expect(metrics.rowGapEffective).toBe(ROW_GAP);
+    expect(cellOriginAt(0, 2, metrics).top).toBe(2 * (CELL_H + ROW_GAP));
   });
 });
 

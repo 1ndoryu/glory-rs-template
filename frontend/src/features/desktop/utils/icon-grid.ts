@@ -19,7 +19,12 @@ export interface GridMetrics {
   readonly rowGap: number;
   /** [058A-1] Gap de fila efectivo con align-content distribuido
    * (space-between/around/evenly): el navegador reparte el sobrante vertical
-   * entre filas; getCellAt lo usa para que el snap-grid siga siendo exacto. */
+   * entre filas; getCellAt lo usa para que el snap-grid siga siendo exacto.
+   * [018A-97 F6] El CSS real del escritorio usa align-content: START (filas
+   * deterministas desde arriba): con space-between el navegador reparte entre
+   * las filas MATERIALIZADAS por el contenido (cambian en cada drop) y la
+   * geometría divergía. Con start este valor siempre == rowGap, pero se
+   * conserva por si otro grid vuelve a distribuir. */
   readonly rowGapEffective: number;
   /** [018A-97] Gap de columna efectivo con justify-content distribuido
    * (space-between/around/evenly): el navegador reparte el sobrante horizontal
@@ -79,7 +84,9 @@ export function getGridMetrics(
     : declaredColumns;
   const rows = Math.max(1, Math.floor((rect.height + rowGap) / (cellHeight + rowGap)));
   /* [058A-1] rowGap efectivo: con align-content space-between/around/evenly el
-   * sobrante vertical se reparte entre filas; el snap-grid debe replicarlo. */
+   * sobrante vertical se reparte entre filas; el snap-grid debe replicarlo.
+   * [018A-97 F6] El escritorio usa align-content: start (no distribuye), así
+   * que en producción rowGapEffective == rowGap y las filas son deterministas. */
   const distribute = /space-between|space-around|space-evenly/.test(cs.alignContent);
   const used = rows * cellHeight + (rows - 1) * rowGap;
   const extra = Math.max(0, rect.height - used);
