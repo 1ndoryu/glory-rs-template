@@ -327,6 +327,12 @@ temporal (297A-20) que quedó en producción.
   `reflowPositions` solo toca nodos que cambian. Gate `task:check -- 018A-97` PASS (local-light).
 - [x] Rejilla de debug retirada: `debug-grid-overlay.ts` fuera (F1), atajo Ctrl+Shift+G eliminado y
   CSS `--depurar`/`__debug*` retirado en este bloque; VarSense sin huérfanas.
+- [x] **Enforcement de tomas de tarea (05-ago, commit `ea675ffd`):** `task:check -- {ID}` BLOQUEA
+  (exit 78) el cierre de una tarea tomada por otro agente activo salvo `--allow-foreign` explícito;
+  la toma propia se renueva en cada gate (heartbeat con compare-and-write para no pisar un re-toma
+  ajeno); cualquier `task:check`, `run-with-db` o `glory-dev` muestra un banner `EN CURSO` por cada
+  toma ajena activa, no solo la tarea objetivo. `AGENTS.md` §6 y `roadmap-sentinel.md`
+  actualizados; 3 tests nuevos (8/8) y suite quality 210/210. Cierre documental 06-ago.
 - [ ] Verificación final: suite completa **724/724 PASS** + `vite build` OK (05-ago, local) y
   móvil <768 verificado (preview 660px muestra el launcher, sin grid de escritorio); resta solo
   el navegador desktop 1440×900 / 1024×768 (arrastre, colisiones, grupo seleccionado vs. no
