@@ -1,3 +1,10 @@
+<#
+[028A-6 Fase 5] LEGACY — instalador del guard del repo, reemplazado por
+    scripts/quality/install-global-runtime.mjs (sentinel install: runtime
+    versionado + shims + perfiles + PATH de usuario). Se conserva SOLO para
+    ramas antiguas y se retirará tras dos releases con rollback probado (plan
+    028A-6 Fase 5). No usar en instalaciones nuevas.
+#>
 param(
     [switch]$Uninstall,
     [switch]$InstallProfile

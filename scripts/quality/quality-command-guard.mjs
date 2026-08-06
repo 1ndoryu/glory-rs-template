@@ -1,3 +1,9 @@
+/* [028A-6 Fase 5] LEGACY — adaptador de migración del guard. El runtime
+ * global de Sentinel (sentinel install, %LOCALAPPDATA%\GlorySentinel) ya
+ * decide política y comandos directos (sentinel guard); este módulo del repo
+ * se conserva SOLO para ramas antiguas y se retirará tras dos releases con
+ * rollback probado (plan 028A-6 Fase 5). No modificar su lógica sin razón: la
+ * fuente canónica es el runtime. */
 import path from 'node:path';
 import { existsSync, lstatSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';

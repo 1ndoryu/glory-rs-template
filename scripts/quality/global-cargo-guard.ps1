@@ -1,4 +1,10 @@
 <#
+[028A-6 Fase 5] LEGACY — adaptador de migración del guard. El runtime global
+    de Sentinel (sentinel install, %LOCALAPPDATA%\GlorySentinel) ya genera su
+    propio guard de PowerShell; este archivo del repo se conserva SOLO para
+    ramas antiguas y se retirará tras dos releases con rollback probado (plan
+    028A-6 Fase 5). No modificar su lógica: la fuente canónica es el runtime.
+
 .SYNOPSIS
     PowerShell interceptor for expensive Cargo commands.
 

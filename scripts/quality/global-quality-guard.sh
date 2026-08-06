@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# [028A-6 Fase 5] LEGACY — adaptador de migración del guard. El runtime global
+# de Sentinel (sentinel install, %LOCALAPPDATA%\GlorySentinel) ya genera su
+# propio guard de bash; este archivo del repo se conserva SOLO para ramas
+# antiguas y se retirará tras dos releases con rollback probado (plan 028A-6
+# Fase 5). No modificar su lógica: la fuente canónica es el runtime.
 # [028A-9] Bash/Git Bash companion to global-cargo-guard.ps1.
 # The PowerShell profile cannot intercept commands launched by Bash. This
 # file is sourced by .bashrc/.bash_profile and BASH_ENV so interactive and

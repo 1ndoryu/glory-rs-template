@@ -1,4 +1,12 @@
 @echo off
+rem ============================================================
+rem [028A-6 Fase 5] LEGACY — adaptador de migración del guard.
+rem El runtime global de Sentinel (sentinel install, %LOCALAPPDATA%\GlorySentinel)
+rem ya genera sus propios shims; este shim del repo se conserva SOLO para
+rem ramas antiguas y se retirará tras dos releases con rollback probado
+rem (plan 028A-6 Fase 5). No modificar su lógica: la fuente canónica es el
+rem runtime. Reemplazo canónico: sentinel guard / sentinel check.
+rem ============================================================
 setlocal
 set "GLORY_GUARD_ROOT=%~dp0"
 set "GLORY_REAL_CARGO=%GLORY_REAL_CARGO%"
