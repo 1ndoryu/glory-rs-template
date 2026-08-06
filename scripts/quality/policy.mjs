@@ -9,7 +9,8 @@ const POLICY_FILE = 'sentinel.config.json';
 const MAX_STRING_LENGTH = 160;
 const NAME_PATTERN = /^[A-Za-z0-9:_*.-]+$/u;
 const MODES = new Set(['enforce', 'observe', 'pass-through']);
-const ROOT_KEYS = new Set(['schemaVersion', 'mode', 'gate', 'guard', 'runtime', 'analyzers']);
+const ROOT_KEYS = new Set(['schemaVersion', 'mode', 'project', 'gate', 'guard', 'runtime', 'analyzers']);
+const PROJECT_KEYS = new Set(['primaryBranch']);
 const ANALYZER_KEYS = new Set(['enabled', 'profile', 'config']);
 const RUNTIME_KEYS = new Set(['minimumVersion', 'protocolVersion', 'lockFile']);
 const GATE_KEYS = new Set(['command', 'taskIdRequired']);
@@ -182,6 +183,23 @@ function validateRelativePath(value, label) {
   if (normalized.split('/').includes('..')) fail(`${label}: no puede salir del workspace`);
 }
 
+function validateProject(value) {
+  if (!isRecord(value)) fail('project debe ser un objeto');
+  validateKeys(value, PROJECT_KEYS, 'project');
+  if (typeof value.primaryBranch !== 'string' || value.primaryBranch.length === 0 || value.primaryBranch.length > 127 || /[\u0000-\u001f\u007f\s]/u.test(value.primaryBranch)) {
+    fail('project.primaryBranch: nombre inválido');
+  }
+  const branch = value.primaryBranch;
+  const invalidBranch = branch.includes('..')
+    || branch.includes('@{')
+    || /[~^:?*\[\]\\]/u.test(branch)
+    || branch.includes('//')
+    || branch.endsWith('/')
+    || branch.endsWith('.')
+    || branch.split('/').some(component => component.length === 0 || component.startsWith('.') || component.endsWith('.') || component.toLowerCase().endsWith('.lock'));
+  if (invalidBranch) fail('project.primaryBranch debe ser un nombre de rama Git válido');
+}
+
 function validateAnalyzer(value, label) {
   if (!isRecord(value)) fail(`${label}: debe ser un objeto`);
   validateKeys(value, ANALYZER_KEYS, label);
@@ -198,6 +216,7 @@ export function validatePolicy(policy) {
   validateKeys(policy, ROOT_KEYS, 'raíz');
   if (policy.schemaVersion !== 2) fail('schemaVersion debe ser 2');
   if (typeof policy.mode !== 'string' || !MODES.has(policy.mode)) fail('mode inválido');
+  if (policy.project !== undefined) validateProject(policy.project);
 
   if (!isRecord(policy.gate)) fail('gate debe ser un objeto');
   validateKeys(policy.gate, GATE_KEYS, 'gate');

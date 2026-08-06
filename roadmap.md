@@ -28,6 +28,7 @@
 - Sentinel global agnóstico por proyecto/rama (incluye guard/orquestación; VarSense como analizador): `Agente/planes/plan-global-quality-guard-agnostico-2026-08-02.md`
 - Optimización Sentinel/VarSense: `Agente/planes/plan-optimizacion-sentinel-varsense-2026-08-02.md`
 - Orquestación universal de tareas Sentinel: `Agente/planes/plan-sentinel-orquestacion-tareas-worktrees-2026-08-06.md`
+- Migración de scripts a Core/adapters: `Agente/planes/plan-migracion-scripts-adapters-sentinel-2026-08-06.md`
 
 ## Cómo leer este archivo
 
@@ -54,7 +55,11 @@
 
 ## Siguiente bloque habilitado
 
-**028A-18 — Orquestación universal de tareas con Sentinel (en curso).** El plan canónico define una
+**028A-18 — Orquestación universal de tareas con Sentinel (en curso).** El siguiente bloque de tooling permanece serializado hasta completar su integración, gate y cleanup. La iniciativa SNT-12 queda registrada como plan dependiente/aprobable, no como tarea paralela habilitada.
+
+**SNT-12 — Migración de scripts a Core y adapters por proyecto (planificación aprobable).** El plan canónico es `Agente/planes/plan-migracion-scripts-adapters-sentinel-2026-08-06.md`. Primero se debe inventariar y clasificar `scripts/` y `scripts/quality/`; no se elimina ni se mueve código todavía. La decisión base es: Sentinel posee coordinación, scheduler, scope, caché, runner y reporter; el proyecto conserva adapters de Rust/PostgreSQL, frontend/Vite, docs, custom, codegen y operaciones específicas. La skill global se revisa únicamente al final, si la evidencia produce una regla agnóstica. Depende de cerrar 028A-18 y de serializar cambios del submódulo `tools/sentinel`.
+
+**Detalle de 028A-18 — Orquestación universal de tareas con Sentinel (en curso).** El plan canónico define una
 unidad de paralelismo por tarea (`claim → worktree/rama → gate → integración ff-only → cleanup`),
 ownership atómico, detección de carreras, takeover explícito y diagnóstico de basura. Sentinel 0.5.0
 está publicado en `origin/main` y `v0.5.0`; este consumidor fija `tools/sentinel` en `20c13a2` y

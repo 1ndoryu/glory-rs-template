@@ -33,6 +33,18 @@ test('valida una política v2 y rechaza claves desconocidas o rutas inseguras', 
   assert.throws(() => validatePolicy({ ...validPolicy(), mode: 'invalid' }), /mode inválido/);
 });
 
+test('valida la rama principal declarada sin asumir main', () => {
+  assert.doesNotThrow(() => validatePolicy({ ...validPolicy(), project: { primaryBranch: 'wandorius' } }));
+  assert.doesNotThrow(() => validatePolicy({ ...validPolicy(), project: { primaryBranch: 'sites/client-a' } }));
+  for (const primaryBranch of ['main branch', '../escape', 'feature//broken', 'release.lock', 'feature/@{bad}']) {
+    assert.throws(
+      () => validatePolicy({ ...validPolicy(), project: { primaryBranch } }),
+      /project\.primaryBranch debe ser un nombre de rama Git válido|project\.primaryBranch: nombre inválido/,
+      primaryBranch,
+    );
+  }
+});
+
 test('mapea la configuración legacy a una política v2 sin perder el analizador v1', () => {
   const migrated = migrateLegacyConfig({
     sentinelConfig: { includePatterns: ['**/*.ts'], rules: { 'catch-vacio': { severidad: 'error' } } },

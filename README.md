@@ -2,7 +2,7 @@
 
 Template y aplicación web con **Rust (Axum) + PostgreSQL + Vanilla TypeScript/Vite + OpenAPI** en un solo repositorio.
 
-Pensado para velocidad de desarrollo, seguridad por defecto y calidad reproducible. El quality gate unificado usa `scripts/quality/task-check.mjs` como orquestador de transición, Sentinel como etapa/analyzer y VarSense como analizador especializado; el runtime global de Sentinel aún no forma parte de este checkout.
+Pensado para velocidad de desarrollo, seguridad por defecto y calidad reproducible. Sentinel es el plano universal de coordinación y calidad; este checkout conserva `scripts/quality` únicamente como adapter/orquestador de transición hasta completar la migración documentada en `Agente/planes/plan-migracion-scripts-adapters-sentinel-2026-08-06.md`. VarSense es un analizador especializado invocado por Sentinel. No se deben copiar estos scripts a otros proyectos.
 
 ## Stack
 
@@ -184,7 +184,10 @@ coordinado se instala aparte desde un artefacto publicado y verificable.
 Los wrappers de desarrollo (`npm run check:back`, `npm run check:front`,
 `npm run fmt:check` y `npm test`) siguen disponibles para trabajo específico,
 pero no sustituyen el reporte ni el control del gate. Para una validación que
-pueda cerrar una tarea, usa `task:check` desde la raíz del repositorio.
+pueda cerrar una tarea, usa `task:check` desde la raíz del repositorio. Los
+scripts de `scripts/quality` no son una API para copiar: los adapters de este
+proyecto se reducirán gradualmente y las capacidades universales deben vivir en
+Sentinel Core.
 
 ### Desarrollo
 

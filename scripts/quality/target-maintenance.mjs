@@ -1,24 +1,25 @@
-import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { resolveTargetBase } from './heavy-run-guard.mjs';
 
 const execFileAsync = promisify(execFile);
 
 const DEFAULT_MAX_BYTES = 15 * 1024 ** 3;
 const DEFAULT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
-/* [028A-6] La supervisión automática del gate no debe caminar 15 GB de
- * artefactos en cada ejecución: una vez por ventana es suficiente y el
- * comando manual (quality:cleanup) siempre fuerza el pase completo. */
+/* [028A-6] La cuota se comprueba en cada gate. El intervalo solo conserva
+ * la retención por edad para consumidores que explícitamente la soliciten;
+ * no puede retrasar el control del límite físico. */
 const DEFAULT_MAINTENANCE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 /* [028A-6] Presupuesto del pase automático: si excede, se informa
  * `truncated` y el gate nunca se cuelga en el mantenimiento. */
 export const DEFAULT_MAINTENANCE_BUDGET_MS = 60_000;
 /* [028A-6] Escritura reciente: un target que cargo/rustc está recompilando
  * ahora no se protege por ruta de ejecutable (cargo.exe vive en .rustup),
- * solo por mtime. La poda por cuota nunca toca targets con escritura en la
- * última media hora; la poda por edad sigue su criterio de días. */
+ * solo por mtime. Se preserva durante la ventana de seguridad y se informa
+ * como activo si impide cumplir la cuota. */
 export const RECENT_WRITE_MS = 30 * 60 * 1000;
 
 async function readJson(filePath, fallback) {
@@ -61,22 +62,27 @@ async function runningProcessPaths() {
 
 async function pathSize(root, budgetDeadlineMs = Infinity) {
   let total = 0;
+  let latestMs = 0;
   let entries;
   try { entries = await readdir(root, { withFileTypes: true }); }
-  catch { return total; }
+  catch { return { size: total, latestMs, truncated: false }; }
   for (const entry of entries) {
-    if (Date.now() > budgetDeadlineMs) return { size: total, truncated: true };
+    if (Date.now() > budgetDeadlineMs) return { size: total, latestMs, truncated: true };
     const target = path.join(root, entry.name);
     if (entry.isDirectory()) {
       const nested = await pathSize(target, budgetDeadlineMs);
       total += nested.size;
-      if (nested.truncated) return { size: total, truncated: true };
+      latestMs = Math.max(latestMs, nested.latestMs);
+      if (nested.truncated) return { size: total, latestMs, truncated: true };
     } else {
-      try { total += (await stat(target)).size; }
-      catch { /* Archivo concurrente: se medirá en la siguiente ejecución. */ }
+      try {
+        const details = await stat(target);
+        total += details.size;
+        latestMs = Math.max(latestMs, details.mtimeMs);
+      } catch { /* Archivo concurrente: se medirá en la siguiente ejecución. */ }
     }
   }
-  return { size: total, truncated: false };
+  return { size: total, latestMs, truncated: false };
 }
 
 function pidAlive(pid) {
@@ -132,7 +138,7 @@ export async function markMaintenanceRun(targetRoot = resolveTargetBase(), now =
   await writeFile(path.join(targetRoot, '.glory-target-maintenance.json'), `${JSON.stringify({ lastRunAt: now }, null, 2)}\n`, 'utf8');
 }
 
-export async function cleanupTargets({
+async function cleanupTargetsUnlocked({
   projectRoot = process.cwd(),
   targetRoot = resolveTargetBase(),
   now = Date.now(),
@@ -158,6 +164,7 @@ export async function cleanupTargets({
   const entries = await readdir(safeRoot, { withFileTypes: true });
   const candidates = [];
   let truncated = false;
+  const failed = [];
   for (const entry of entries.filter(item => item.isDirectory())) {
     const fullPath = path.join(safeRoot, entry.name);
     const details = await stat(fullPath).catch(() => null);
@@ -165,12 +172,21 @@ export async function cleanupTargets({
     const measurement = await pathSize(fullPath, budgetDeadline);
     if (measurement.truncated) { truncated = true; break; }
     const runningFrom = [...liveProcesses].some(executable => executable.startsWith(normalizePath(fullPath) + '/'));
+    const lastWriteMs = Math.max(details.mtimeMs, measurement.latestMs);
+    const recentlyWritten = now - lastWriteMs < RECENT_WRITE_MS;
     candidates.push({
       name: entry.name,
       path: fullPath,
       bytes: measurement.size,
-      lastWriteMs: details.mtimeMs,
-      active: activeFromMarkers.has(entry.name) || runningFrom,
+      lastWriteMs,
+      active: activeFromMarkers.has(entry.name) || runningFrom || recentlyWritten,
+      activeReason: activeFromMarkers.has(entry.name)
+        ? 'marker'
+        : runningFrom
+          ? 'process'
+          : recentlyWritten
+            ? 'recent-write'
+            : null,
     });
   }
   let totalBytes = candidates.reduce((sum, item) => sum + item.bytes, 0);
@@ -180,34 +196,88 @@ export async function cleanupTargets({
     .sort((left, right) => left.lastWriteMs - right.lastWriteMs)) {
     if (Date.now() > budgetDeadline) { truncated = true; break; }
     const tooOld = now - candidate.lastWriteMs > policy.maxAgeMs;
-    /* [028A-6] Un target recién escrito está siendo usado aunque cargo/rustc
-     * no cuelguen de él por ruta: la cuota no lo toca, la edad sí. */
-    const recentlyWritten = now - candidate.lastWriteMs < RECENT_WRITE_MS;
-    const overQuota = totalBytes > policy.maxTargetBytes && !recentlyWritten;
+    const overQuota = totalBytes > policy.maxTargetBytes;
     if (!tooOld && !overQuota) continue;
-    removed.push({ name: candidate.name, bytes: candidate.bytes, reason: tooOld ? 'age' : 'quota' });
-    totalBytes -= candidate.bytes;
-    if (!dryRun) await rm(candidate.path, { recursive: true, force: true });
+    if (dryRun) {
+      removed.push({ name: candidate.name, bytes: candidate.bytes, reason: tooOld ? 'age' : 'quota' });
+      totalBytes -= candidate.bytes;
+      continue;
+    }
+    try {
+      await rm(candidate.path, { recursive: true, force: true });
+      removed.push({ name: candidate.name, bytes: candidate.bytes, reason: tooOld ? 'age' : 'quota' });
+      totalBytes -= candidate.bytes;
+    } catch (error) {
+      failed.push({ name: candidate.name, bytes: candidate.bytes, reason: tooOld ? 'age' : 'quota', message: error instanceof Error ? error.message : String(error) });
+    }
   }
   return {
     targetRoot: safeRoot,
     maxTargetBytes: policy.maxTargetBytes,
     totalBytes,
-    active: [...activeFromMarkers, ...candidates.filter(item => item.active).map(item => item.name)],
+    active: [...new Set(candidates.filter(item => item.active).map(item => item.name))],
+    activeDetails: candidates.filter(item => item.active).map(item => ({ name: item.name, reason: item.activeReason })),
     removed,
+    failed,
     dryRun,
     truncated,
+    scanIncomplete: truncated,
+    quotaExceeded: truncated || totalBytes > policy.maxTargetBytes,
   };
+}
+
+const MAINTENANCE_LOCK_TTL_MS = 10 * 60 * 1000;
+
+async function acquireMaintenanceLock(targetRoot) {
+  const lockRoot = path.join(path.dirname(targetRoot), 'glory-quality-guard');
+  const lockPath = path.join(lockRoot, 'target-maintenance.lock');
+  await mkdir(lockRoot, { recursive: true });
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const token = crypto.randomUUID();
+    try {
+      await mkdir(lockPath);
+      await writeFile(path.join(lockPath, 'owner.json'), `${JSON.stringify({ token, pid: process.pid, startedAt: Date.now() })}\n`, 'utf8');
+      return async () => {
+        const owner = await readJson(path.join(lockPath, 'owner.json'), null);
+        if (owner?.token === token) await rm(lockPath, { recursive: true, force: true }).catch(() => {});
+      };
+    } catch (error) {
+      if (error?.code !== 'EEXIST') throw error;
+      const owner = await readJson(path.join(lockPath, 'owner.json'), null);
+      const age = Date.now() - Number(owner?.startedAt || 0);
+      if (owner && pidAlive(Number(owner.pid)) && age <= MAINTENANCE_LOCK_TTL_MS) {
+        throw new Error(`mantenimiento de targets concurrente (PID ${owner.pid})`);
+      }
+      const stalePath = `${lockPath}.stale-${process.pid}-${Date.now()}`;
+      try {
+        await rename(lockPath, stalePath);
+        await rm(stalePath, { recursive: true, force: true });
+      } catch (takeoverError) {
+        if (takeoverError?.code !== 'ENOENT') throw takeoverError;
+      }
+    }
+  }
+  throw new Error('no se pudo adquirir el lock de mantenimiento de targets');
+}
+
+export async function cleanupTargets(options = {}) {
+  const targetRoot = assertSafeTargetRoot(options.targetRoot ?? resolveTargetBase());
+  const release = await acquireMaintenanceLock(targetRoot);
+  try {
+    return await cleanupTargetsUnlocked({ ...options, targetRoot });
+  } finally {
+    await release();
+  }
 }
 
 const argv = process.argv.slice(2);
 if (argv.includes('--cleanup') || argv.includes('--dry-run')) {
-  /* [028A-6] El comando manual siempre fuerza el pase completo (sin throttle
-   * ni presupuesto): el usuario pidió una revisión explícita. Un pase real
-   * también marca el throttle para que el gate no vuelva a caminar el target
-   * dentro de la ventana. */
+  /* [028A-6] El comando manual fuerza el pase completo y sin presupuesto;
+   * el gate usa presupuesto para no quedar bloqueado inspeccionando artefactos
+   * enormes. */
   const dryRun = argv.includes('--dry-run') && !argv.includes('--cleanup');
   const result = await cleanupTargets({ dryRun });
   if (!dryRun) await markMaintenanceRun(result.targetRoot);
   console.log(JSON.stringify(result, null, 2));
+  if (!dryRun && (result.quotaExceeded || result.failed?.length > 0)) process.exitCode = 75;
 }

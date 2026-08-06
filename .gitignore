@@ -28,6 +28,7 @@ desktop.ini
 
 # Local runtime scratch space
 /temp/
+/.sentinel/
 
 # Python local envs / caches
 **/.venv/

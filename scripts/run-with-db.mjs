@@ -9,6 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getBranchDbContext } from './branch-db.mjs';
 import { acquireHeavyRun, formatHeavyGuardMessage, isHeavyCargoCommand, isHeavyOverride } from './quality/heavy-run-guard.mjs';
+import { cleanupTargets } from './quality/target-maintenance.mjs';
 import { defaultAgent, listActiveForeignTakeovers } from './quality/task-takeover.mjs';
 
 function cargoCommand() {
@@ -59,6 +60,15 @@ catch (error) {
   throw error;
 }
 const { dbUrl, cargoTargetDir } = dbContext;
+if (isHeavyCargoCommand(cargoArgs)) {
+  const maintenance = await cleanupTargets({ projectRoot, dryRun: false, budgetMs: 60_000 });
+  if (maintenance.quotaExceeded || maintenance.failed?.length) {
+    if (heavyLease?.allowed) await heavyLease.release({ status: 'target-quota-exceeded' });
+    console.error('[run-with-db] BLOQUEADO: C:\\tmp\\glory-target sigue sobre la cuota; detén o coordina los procesos activos antes de compilar.');
+    process.exitCode = 75;
+    process.exit();
+  }
+}
 console.log('');
 
 const activityMarker = path.join(cargoTargetDir, `.glory-cargo-active-${process.pid}.json`);
