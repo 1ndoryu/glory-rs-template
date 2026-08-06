@@ -1,8 +1,8 @@
 # Plan — Migración de scripts a Sentinel Core y adapters por proyecto
 
 > **Fecha:** 2026-08-06
-> **Estado:** Fase 2 local cerrada como transición; Fase 3 (reducción del adapter) bloqueada hasta schema upstream, fixtures multi-proyecto, paridad, rollback y releases consecutivos
-> **Ámbito:** calidad, coordinación de tareas y wrappers de desarrollo; no modifica todavía la skill global ni elimina scripts
+> **Estado:** SNT-16 upstream implementado localmente sobre Sentinel 0.5.0, pendiente commit/publicación/fijación y fixtures multi-proyecto; no se retiran scripts ni se actualiza la skill global
+> **Ámbito:** calidad, coordinación de tareas y wrappers de desarrollo; migración reversible y por evidencia
 > **Relación:** complementa `Agente/planes/plan-global-quality-guard-agnostico-2026-08-02.md` y `Agente/planes/plan-sentinel-orquestacion-tareas-worktrees-2026-08-06.md`
 > **Fuente canónica de esta iniciativa:** este documento
 
@@ -16,7 +16,7 @@ No se copia `scripts/quality` a otros repositorios ni se elimina mientras no exi
 
 ## 2. Evidencia de la situación actual
 
-Sentinel `0.5.0` (`20c13a216e879303fcf5be7469a2821391b2ec0d`) expone `check --stages`, contratos de etapas y coordinación de tareas. El consumidor conserva `scripts/quality` como implementación probada y frontera de transición; GC, runbook multi-OS, schema upstream y adopción multi-proyecto siguen pendientes.
+Sentinel `0.5.0` (`20c13a216e879303fcf5be7469a2821391b2ec0d`) expone `check --stages`, contratos de etapas y coordinación de tareas. El consumidor conserva `scripts/quality` como implementación probada y frontera de transición; SNT-16 añade el contrato upstream local, pero aún no es una release adoptable.
 
 ## 3. Modelo objetivo
 
@@ -35,47 +35,44 @@ Inventario versionado, baseline de Sentinel/VarSense, separación de cambios aje
 
 ### Fase 1 — Contrato mínimo de adapter (`SNT-13`) — transición local cerrada
 
-`quality-adapter.json` define versión/protocolo, capabilities, transporte argv, stages, perfiles, timeouts, environment allowlist, output schema y exit-code mapping. `adapter-manifest.mjs` valida strict keys, placeholders, task IDs, paths dentro de workspace/report root, symlink/junction ancestors y entrypoint regular. La salida de `stage-process` es JSON schema v1.
+`quality-adapter.json` define versión/protocolo, capabilities, transporte argv, stages, profiles, timeouts, environment allowlist, output schema y exit-code mapping. `adapter-manifest.mjs` valida strict keys, placeholders, task IDs, paths dentro de workspace/report root, symlink/junction ancestors y entrypoint regular. La salida de `stage-process` es JSON schema v1.
 
 ### Fase 2 — Core/adapter slice (`SNT-14`) — cerrada en transición local
 
-- el manifest es dueño de los nombres y perfiles de stages; la selección full/perfil y la implementación se comparan fail-closed;
-- `stage-definitions`, `stages` y `stage-process` consumen el manifest; el camino legacy sigue explícito y probado solo como compatibilidad temporal;
-- `runner.mjs` hereda únicamente una allowlist base no sensible; el manifest también rechaza variables sensibles (`DATABASE_URL`, tokens, keys, passwords y equivalentes), por lo que no se transportan credenciales por declaración implícita;
-- frontend y Rust reciben la misma política declarativa de entorno; transportes conservan argv y `shell:false` salvo el shim CMD/BAT existente;
-- `task-check` sigue siendo el orquestador de transición y carga el manifest mediante `stageDefinitions`; no se afirma todavía delegación completa a `sentinel check`.
-
-**Evidencia SNT-14 (2026-08-06):** suite dirigida = **19 tests, 18 PASS, 1 skip, 0 fail**; el skip corresponde al observe end-to-end sin CLI Sentinel provisionado/limpio. `node --check` y `git diff --check` PASS. El gate consumidor fue limitado por la ausencia de `.env`/`DATABASE_URL` y `frontend/node_modules`; no se copian secretos ni se falsea el resultado.
+El manifest local es dueño de nombres/perfiles de stages; `task-check` sigue siendo el orquestador de transición y el camino legacy está explícito y probado solo como compatibilidad temporal. Se mantienen allowlists no sensibles, argv y shell false, y no se declaran secretos por manifest.
 
 ### Fase 2b — Endurecimiento del slice (`SNT-15`) — cerrado localmente
 
-**Implementado en el adapter del consumidor, sin tocar Sentinel upstream ni retirar scripts:**
+Se añadieron schema estricto del adapter, selección/paridad real desde disco, protección física contra symlink/junction y rechazo de allowlists sensibles. Suite focalizada **18/18 PASS**, `node --check` y `git diff --check` PASS. Gate completo limitado por entorno ausente (BD/.env, frontend dependencies, VarSense CLI compilado).
 
-- `manifestStageNames`, `adapterStageNames` y `assertImplementedStages` validan el manifest completo antes de leer stages o perfiles;
-- cada definición de stage acepta únicamente `timeoutMs`, evitando claves silenciosas/typos;
-- `readAdapterManifest` valida que `quality-adapter.json` y su entrypoint sean archivos regulares contenidos físicamente en el workspace, rechazando symlink/junction escape;
-- la allowlist efectiva normaliza duplicados case-insensitive para Windows (`PATH`/`Path`) y rechaza nombres sensibles también en la base heredada;
-- `stageDefinitions` usa el manifest como fuente única de selección/paridad en el camino real; el fallback legacy solo queda disponible sin `projectRoot` para tests/compatibilidad explícita;
-- se añadieron fixtures de manifest enlazado, schema estricto, allowlist base, selección real desde disco, manifest inválido y stage sin factory.
+### Fase 3a — Contrato upstream de stages (`SNT-16`) — implementación local pendiente publicación
 
-**Evidencia SNT-15 (2026-08-06):** `node --check` de los dos módulos editados PASS; suite focalizada **18/18 PASS**; `git diff --check` PASS. No se declara gate completo ni observe end-to-end: faltan artefactos/entorno del consumidor en el worktree (CLI VarSense compilado, `.env`/BD y `frontend/node_modules`).
+- [x] Añadir `tools/sentinel/src/core/stageManifest.ts` con envelope `schemaVersion: 1` y compatibilidad explícita con lista legacy.
+- [x] Reutilizar el tipo `StructuredToolDefinition` para evitar divergencia de contrato.
+- [x] Validar claves estrictas, nombres únicos, timeout máximo, argv strings y report schema esperado.
+- [x] Resolver `--stages`/`cwd` contra workspace y `reportPath` contra reportRoot.
+- [x] Rechazar traversal, symlink/junction escape en manifest, reportRoot, reportes y cwd; permitir reportRoot aún no creado mediante ancestor existente.
+- [x] Integrar el loader en el camino real `runCheck`, antes de ejecutar etapas.
+- [x] Añadir fixtures unitarias e integración real de envelope, legacy, paths externos y symlink.
+- [x] Documentar compatibilidad y rollback en el inventario del consumidor.
+- [ ] Compilar y ejecutar suite upstream desde un checkout limpio con dependencias provisionadas.
+- [ ] Revisar y committear el submódulo upstream en una rama propia; publicar el commit/tag antes de consumirlo.
 
-### Fase 3 — Reducir el adapter de wandori.us (`SNT-16`)
+**Evidencia local SNT-16:** `git diff --check` PASS. El gate directo impidió `npx tsc` por el guard (exit 78), y el worktree no tiene `node_modules` ni el helper `quality-command-guard.mjs`; por tanto no se declara compile/suite PASS. La modificación del submódulo está aislada en el worktree SNT-16 y el consumidor continúa fijando `20c13a2`.
 
-- [ ] Convertir las etapas de Rust, frontend, docs, custom y VarSense a manifest + adapters delgados.
-- [ ] Reemplazar `task-check.mjs` por delegación a `sentinel check`, conservando el alias npm.
-- [ ] Hacer que `run-with-db` solo resuelva DB/target y ejecute el comando permitido; el lease/guard universal debe venir de Sentinel.
-- [ ] Retirar imports locales de cooldown, report, cache y takeover del adapter del consumidor.
-- [ ] Mantener únicamente comandos públicos mínimos.
+### Fase 3b — Fixtures multi-proyecto y paridad (`SNT-16b`) — bloqueada por publicación
 
-**Bloqueo actual:** Sentinel `0.5.0` tiene `check --stages`, pero no existe aún un schema upstream versionado para `quality-adapter.json` ni fixtures externos suficientes para justificar retirar el orquestador local.
+- [ ] Crear dos fixtures de proyecto sin rutas `wandorius` ni reglas de dominio.
+- [ ] Ejecutar `sentinel check` con envelope y lista legacy; comparar decisión, estado, severidad, ruleId, file, line y message.
+- [ ] Verificar CLI/core/LSP donde aplique y multi-shell en CI.
+- [ ] Fijar commit, capacidades y hash en `quality-tools.json`/`sentinel.lock.json` solo después de release.
 
-### Fase 4 — Retirada controlada y simplificación (`SNT-17`)
+### Fase 4 — Reducción y retirada controlada (`SNT-17`)
 
 - [ ] Dos releases consecutivos multi-shell/CI.
 - [ ] GC/runbook y rollback reproducible.
 - [ ] Retirar físicamente solo archivos sin referencias y con rollback documentado.
-- [ ] Actualizar la skill global únicamente al final, con evidencia, versión, fixture y confirmación en sesión nueva.
+- [ ] Actualizar la skill global únicamente al final, con copia, diff, versión/fecha, suite, publicación/fijación y confirmación en sesión nueva.
 
 ## 5. Política de permanencia para scripts
 
@@ -83,7 +80,7 @@ Conservar scripts que encapsulen dominio/proveedor, adapter externo estable, exp
 
 ## 6. Seguridad y no-sorpresas
 
-No shell concatenado en manifests; paths contenidos y sin symlink/junction escapes; errores de herramienta fail-closed; no borrar `scripts/quality`; no desplegar ni ejecutar rescates/producción. El allowlist base no expone credenciales y el schema local rechaza cualquier variable sensible; un futuro transporte de secretos requerirá un contrato upstream explícito, capacidad auditable y revisión separada.
+No shell concatenado en manifests; paths contenidos y sin symlink/junction escapes; errores de herramienta fail-closed; no borrar `scripts/quality`; no desplegar ni ejecutar rescates/producción. El allowlist base no expone credenciales y el schema local rechaza variables sensibles; un futuro transporte de secretos requerirá un contrato upstream explícito, capacidad auditable y revisión separada.
 
 ## 7. Definition of Done global
 
@@ -95,10 +92,10 @@ No shell concatenado en manifests; paths contenidos y sin symlink/junction escap
 - [ ] cinco gates con paridad exacta y errores fail-closed;
 - [ ] dos releases consecutivos multi-shell/CI;
 - [ ] rollback y cleanup/GC probados;
-- [x] documentación local refleja el estado real de Fase 1/Fase 2/SNT-15;
+- [x] documentación local refleja el estado real de SNT-12–SNT-16;
 - [ ] skill global actualizada solo al final, si la evidencia lo justifica;
 - [ ] cero secretos/procesos/locks/worktrees/ramas propias pendientes.
 
 ## 8. Cierre de la skill global
 
-La skill global no se modifica durante Fases 0–3. Si una regla resulta generalizable, primero se crea prevención/fixture y se actualiza solo durante Fase 4 con copia, diff, versión/fecha, suite, publicación/fijación cuando aplique y confirmación en una sesión nueva.
+La skill global no se modifica durante Fases 0–3. La política generalizable identificada es “manifest versionado, paths físicos contenidos y fallos fail-closed”, pero no se propaga a la skill hasta que Sentinel publique el contrato, el consumidor lo fije y una sesión nueva confirme fixtures y gate.
