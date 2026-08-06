@@ -242,11 +242,22 @@ quality) y gate PASS.
 
 **Depende de:** revisión visual de páginas públicas y del sistema de recetas.
 
-- [ ] Dividir `components.css` (supera 600 líneas) por dominio/receta sin cambiar contratos visuales.
-- [ ] Mover el bloque de botones a `Button.css` y migrar consumidores a la receta compartida.
-- [ ] Quitar border/padding locales de `.notificaciones__item` y `.notificacionesAdmin__item`; consumir recetas base.
-- [ ] Sustituir `.comercio__producto h3` por `modalTitulo` o el token equivalente.
-- [ ] Ejecutar VarSense/Sentinel y verificar que no se introduzcan clases huérfanas ni especificaciones duplicadas.
+- [x] Dividir `components.css` (910 → índice de 21 líneas) en 8 módulos por dominio en
+  `frontend/src/styles/components/` (Button/Form/Modal/Overlay/Commerce/Notifications/Analytics/Misc),
+  cada uno con su propio `@layer components`; 146 clases originales = 146 en módulos (verificado),
+  módulos máximos 175 líneas (<300). Gate `task:check -- 018A-73` PASS (local-light), suite 724/724
+  y `vite build` OK.
+- [x] Botones a `Button.css` (`.boton`, superficie OS, `.boton-con-icono`, `.boton-icono`, tabs).
+- [x] `.notificaciones__item`/`.notificacionesAdmin__item` ya no existen en ningún CSS (renombradas
+  a `notificacionesPopover__item` en 028A-5): el ítem quedó satisfecho de facto, sin border/padding
+  locales pendientes.
+- [x] `.comercio__producto h3` → clase `comercio__productoTitulo` (store-view.ts + Commerce.css).
+  **Desviación documentada:** se eligió clase propia y no `modalTitulo` porque esta última impone
+  fuente/tamaño/peso de modal y cambiaría la tipografía de la tarjeta; el contrato original solo
+  reseteaba `margin`.
+- [x] VarSense/Sentinel PASS: sin clases huérfanas NUEVAS (los 6 `claseHuerfana` de clases usadas
+  dinámicamente en TS son preexistentes: 028A-17 ya reportaba 50 con el archivo único) ni
+  duplicadas (146=146).
 
 **Gate/salida:** `components.css` queda bajo el límite acordado o dividido por responsabilidad, sin lints bloqueantes.
 

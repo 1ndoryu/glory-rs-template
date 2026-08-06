@@ -35,7 +35,7 @@ function createProductCard(product: Product): HTMLElement {
       });
   });
   return createEl('article', { className: 'comercio__producto' },
-    createEl('h3', { textContent: product.name }),
+    createEl('h3', { className: 'comercio__productoTitulo', textContent: product.name }),
     createEl('p', { textContent: product.description || 'Producto digital.' }),
     createEl('strong', { textContent: formatPrice(product) }),
     email, buy, status);
