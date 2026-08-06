@@ -2,16 +2,17 @@
   "schemaVersion": 1,
   "adapter": {
     "id": "wandorius-quality",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "protocolVersion": 1,
     "capabilities": [
       "structured-stage-process",
       "argv-only",
-      "fail-closed"
+      "fail-closed",
+      "manifest-owned-stages"
     ],
     "environment": {
       "mode": "runner-default",
-      "allowlisted": ["CI", "DATABASE_URL", "CARGO_TARGET_DIR_BASE"]
+      "allowlisted": ["CARGO_TARGET_DIR_BASE"]
     },
     "output": {
       "schemaVersion": "1",

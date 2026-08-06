@@ -13,10 +13,7 @@ async function runCommand(context, name, executable, args, timeoutMs) {
 
 async function runStep(context, name, script) {
   const npm = npmInvocation(['--prefix', 'frontend', 'run', script]);
-  return runCommand(context, name, npm.executable, npm.args,
-    name === 'test-full' || name === 'build'
-      ? context.qualityConfig.timeoutsMs.frontendTest
-      : context.qualityConfig.timeoutsMs.frontend);
+  return runCommand(context, name, npm.executable, npm.args, name === 'test-full' || name === 'build' ? context.qualityConfig.timeoutsMs.frontendTest : context.qualityConfig.timeoutsMs.frontend);
 }
 
 export async function runFrontend(context) {
@@ -32,12 +29,5 @@ export async function runFrontend(context) {
   const log = steps.map(step => `## ${step.name}\n${step.execution.stdout}\n${step.execution.stderr}`).join('\n');
   const logPath = await writeStageLog(context, 'frontend', log);
   const failed = steps.filter(step => step.execution.code !== 0 || step.execution.timedOut);
-  return {
-    stage: 'frontend',
-    status: failed.some(step => step.execution.timedOut || step.execution.code === 2 || step.execution.signal) ? 'error' : failed.length > 0 ? 'fail' : 'pass',
-    durationMs: steps.reduce((total, step) => total + step.execution.durationMs, 0),
-    findings: failed.map(step => ({ ruleId: step.execution.timedOut ? 'quality-timeout' : `frontend-${step.name}`, severity: 'error', message: conciseFailure(`${step.execution.stdout}\n${step.execution.stderr}`, `${step.name} falló`) })),
-    summary: failed.length > 0 ? `${failed.length} validaciones frontend fallaron` : context.ci ? 'type-check + suite + build + budgets pasaron' : 'type-check pasó',
-    logPath,
-  };
+  return { stage: 'frontend', status: failed.some(step => step.execution.timedOut || step.execution.code === 2 || step.execution.signal) ? 'error' : failed.length > 0 ? 'fail' : 'pass', durationMs: steps.reduce((total, step) => total + step.execution.durationMs, 0), findings: failed.map(step => ({ ruleId: step.execution.timedOut ? 'quality-timeout' : `frontend-${step.name}`, severity: 'error', message: conciseFailure(`${step.execution.stdout}\n${step.execution.stderr}`, `${step.name} falló`) })), summary: failed.length > 0 ? `${failed.length} validaciones frontend fallaron` : context.ci ? 'type-check + suite + build + budgets pasaron' : 'type-check pasó', logPath };
 }
