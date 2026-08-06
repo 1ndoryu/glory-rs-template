@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtemp, mkdir, rm, symlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { readAdapterManifest, validateAdapterManifest, adapterStageNames, materializeTransportArguments, resolveWorkspacePath, adapterEnvironmentAllowlist, assertTaskId, assertImplementedStages, manifestStageNames } from '../adapter-manifest.mjs';
@@ -30,6 +30,7 @@ test('rechaza placeholders, estados de salida, perfiles y etapas desconocidas', 
   assert.throws(() => validateAdapterManifest({ ...manifest, adapter: { ...manifest.adapter, output: { ...manifest.adapter.output, exitCodes: { ...manifest.adapter.output.exitCodes, pass: 1 } } } }), /exitCodes.pass/);
   assert.throws(() => adapterStageNames(manifest, ['missing'], false), /Perfil de adapter desconocido/);
   assert.throws(() => validateAdapterManifest({ ...manifest, profiles: { frontend: ['unknown'] } }), /etapa desconocida/);
+  assert.throws(() => validateAdapterManifest({ ...manifest, stages: { ...manifest.stages, docs: { timeoutMs: 1000, typo: true } } }), /claves desconocidas/);
 });
 
 test('rechaza rutas y task IDs fuera del contrato', () => {
@@ -40,10 +41,12 @@ test('rechaza rutas y task IDs fuera del contrato', () => {
   assert.equal(assertTaskId('SNT-12'), 'SNT-12');
 });
 
-test('rejects sensitive environment names and preserves the explicit non-sensitive baseline', () => {
+test('rechaza nombres sensibles y normaliza el allowlist efectivo', () => {
   assert.deepEqual(adapterEnvironmentAllowlist(manifest), ['CI']);
   assert.deepEqual(adapterEnvironmentAllowlist(manifest, ['PATH']), ['PATH', 'CI']);
+  assert.deepEqual(adapterEnvironmentAllowlist({ ...manifest, adapter: { ...manifest.adapter, environment: { mode: 'runner-default', allowlisted: ['ci', 'PATH'] } } }, ['Path']), ['Path', 'ci']);
   assert.throws(() => validateAdapterManifest({ ...manifest, adapter: { ...manifest.adapter, environment: { mode: 'runner-default', allowlisted: ['DATABASE_URL'] } } }), /variables sensibles/);
+  assert.throws(() => adapterEnvironmentAllowlist(manifest, ['API_TOKEN']), /variables sensibles/);
   assert.throws(() => adapterEnvironmentAllowlist({ ...manifest, adapter: { ...manifest.adapter, environment: { mode: 'invalid', allowlisted: ['CI'] } } }), /environment.mode/);
 });
 
@@ -52,20 +55,28 @@ test('el allowlist del manifest es efectivo y las etapas declaradas deben estar 
   assert.throws(() => assertImplementedStages(manifest, ['sentinel', 'rust'], ['sentinel']), /sin implementación/);
 });
 
+test('manifestStageNames valida el contrato antes de leer stages', () => {
+  assert.throws(() => manifestStageNames({ stages: { sentinel: {} } }), /schemaVersion/);
+});
+
+test('readAdapterManifest rechaza un manifest enlazado fuera del workspace', async t => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'adapter-root-'));
+  const outside = await mkdtemp(path.join(os.tmpdir(), 'adapter-outside-'));
+  try {
+    await writeFile(path.join(outside, 'quality-adapter.json'), '{}');
+    try { await symlink(path.join(outside, 'quality-adapter.json'), path.join(root, 'quality-adapter.json'), process.platform === 'win32' ? 'file' : undefined); }
+    catch (error) { t.skip(`symlink fixture unavailable: ${error.message}`); return; }
+    await assert.rejects(() => readAdapterManifest(root), /symlink|ruta real fuera|quality-adapter/);
+  } finally { await rm(root, { recursive: true, force: true }); await rm(outside, { recursive: true, force: true }); }
+});
+
 test('rechaza un symlink existente que escapa del workspace', async t => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'adapter-root-'));
   const outside = await mkdtemp(path.join(os.tmpdir(), 'adapter-outside-'));
   try {
     await mkdir(path.join(root, '.quality-reports'), { recursive: true });
-    try {
-      await symlink(outside, path.join(root, '.quality-reports', 'escape'), process.platform === 'win32' ? 'junction' : 'dir');
-    } catch (error) {
-      t.skip(`symlink fixture unavailable: ${error.message}`);
-      return;
-    }
+    try { await symlink(outside, path.join(root, '.quality-reports', 'escape'), process.platform === 'win32' ? 'junction' : 'dir'); }
+    catch (error) { t.skip(`symlink fixture unavailable: ${error.message}`); return; }
     assert.throws(() => resolveWorkspacePath(root, '.quality-reports/escape/report.json', 'report', { allowReportRoot: true }), /symlink|ruta real fuera/);
-  } finally {
-    await rm(root, { recursive: true, force: true });
-    await rm(outside, { recursive: true, force: true });
-  }
+  } finally { await rm(root, { recursive: true, force: true }); await rm(outside, { recursive: true, force: true }); }
 });
