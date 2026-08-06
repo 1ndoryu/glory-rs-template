@@ -115,13 +115,30 @@ El template incluye un CRUD de notas con autenticación:
 
 ## Ramas por sitio
 
-Este template está diseñado para usar **una rama por sitio/proyecto**:
+Este template está diseñado para usar **una rama principal por sitio/proyecto**. La rama puede tener
+cualquier nombre y se declara en `sentinel.config.json` como `project.primaryBranch`; no se debe asumir
+que sea `main`. En este checkout el proyecto es `wandorius`, por eso la rama operativa es `wandorius`;
+`main` contiene únicamente el template vacío.
+
+```json
+{
+  "project": {
+    "primaryBranch": "wandorius"
+  }
+}
+```
+
+Las tareas paralelas usan ramas `task/<project-identity>/<id>` y worktrees aislados dentro de
+`<repo>/.sentinel/worktrees/`; nunca salen de `glory-rust-template` ni de la raíz del repositorio
+consumidor. Resuelven sus conflictos contra la rama principal declarada y, antes de cerrarse, integran
+obligatoriamente en esa rama. Después eliminan el worktree, la rama de tarea y la metadata de coordinación
+que vive en `<repo>/.sentinel/coordination/`.
 
 ```bash
-git checkout -b mi-sitio-web
-# Desarrollar en la rama
+git switch wandorius
+# Desarrollar en la rama del sitio
 # Cambiar a otro sitio:
-git checkout otro-sitio
+git switch otro-sitio
 ```
 
 La estructura es idéntica en cada rama. Solo cambia el contenido específico del sitio.
@@ -148,25 +165,21 @@ npm run quality:reports:cleanup:dry
 ```
 
 `sentinel.lock.json` fija las versiones, commits, capacidades, protocolos y
-hashes de los analizadores. El gate consume los `main` externos mediante las
-variables `GLORY_SENTINEL_SOURCE_PATH` y `GLORY_VARSENSE_SOURCE_PATH`; no guarda
-rutas absolutas en el repositorio. En la transición actual el runtime se declara
-`project-adapter` y `artifactSha256: null`; no se instala un runtime global ni se
-ejecuta código arbitrario desde la política del proyecto.
+hashes de los analizadores. El gate consume los checkouts internos fijados en `quality-tools.json` mediante sus
+`sourcePath` relativos. Sentinel está fijado al commit coordinador publicado
+`20c13a216e879303fcf5be7469a2821391b2ec0d` (tag `v0.5.0`) y VarSense al commit declarado en el
+mismo archivo; `sentinel.lock.json` repite esos commits y hashes. `quality:setup`
+puede inicializar los submódulos y compilar sus CLIs en un clon limpio; no se
+requieren rutas absolutas ni variables `GLORY_*_SOURCE_PATH` para este consumidor.
+`quality:lock --check` verifica que configuración, gitlink y lock coincidan. Si el
+commit fijado de un submódulo no está disponible en el remoto configurado, el clon
+debe corregir primero el remoto/fork o publicar ese objeto; no se sustituye por un
+checkout local distinto ni se continúa con una copia modificada.
 
-Antes de `quality:lock` o del gate, define las rutas locales a los checkouts
-publicados y limpios:
-
-```bash
-export GLORY_SENTINEL_SOURCE_PATH=/ruta/al/glory-sentinel
-export GLORY_VARSENSE_SOURCE_PATH=/ruta/al/varsense
-npm run quality:lock -- --check
-```
-
-En PowerShell usa `$env:GLORY_SENTINEL_SOURCE_PATH` y
-`$env:GLORY_VARSENSE_SOURCE_PATH`. El preflight comprueba `realpath`, Git, CLI,
-versión, commit, hash de archive y que el `realpath` resuelto siga
-apuntando al checkout actual sin persistir esa ruta en el lock.
+El runtime del gate se mantiene como `project-adapter` y
+`artifactSha256: null`; el análisis se ejecuta desde el submódulo fijado y no
+se ejecuta código arbitrario desde la política del proyecto. El runtime global
+coordinado se instala aparte desde un artefacto publicado y verificable.
 
 Los wrappers de desarrollo (`npm run check:back`, `npm run check:front`,
 `npm run fmt:check` y `npm test`) siguen disponibles para trabajo específico,

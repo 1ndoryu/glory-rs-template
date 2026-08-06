@@ -45,5 +45,5 @@ Los commits fijados en `quality-tools.json` identifican los checkouts `main` ext
 
 - Benchmark small/medium/full con memoria RSS comparable en Windows/Linux CI.
 - Paridad visual del panel VS Code frente a CLI/LSP para los nuevos metadatos.
-- Publicar releases upstream en sus repositorios remotos; el sync de `main` con las features fijadas se completó el 2026-08-04 (038A-5); la publicación de tags/releases formales queda pendiente.
+- Publicar releases upstream en sus repositorios remotos; Sentinel 0.5.0 ya está integrado en `main` y etiquetado como `v0.5.0` (commit `20c13a2`); la publicación formal de VarSense queda pendiente si aplica a ese consumidor.
 - Instalar el runtime global, exigir `artifactSha256` real y ejecutar la matriz multi-shell/multi-proyecto; estas capacidades no se declaran implementadas en este repositorio.

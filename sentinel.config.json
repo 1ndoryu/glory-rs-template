@@ -1,6 +1,9 @@
 {
   "schemaVersion": 2,
   "mode": "enforce",
+  "project": {
+    "primaryBranch": "wandorius"
+  },
   "gate": {
     "command": ["sentinel", "check", "--"],
     "taskIdRequired": true
@@ -14,7 +17,7 @@
     }
   },
   "runtime": {
-    "minimumVersion": "0.4.0",
+    "minimumVersion": "0.5.0",
     "protocolVersion": 1,
     "lockFile": "sentinel.lock.json"
   },
