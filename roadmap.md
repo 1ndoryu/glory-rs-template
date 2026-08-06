@@ -327,9 +327,10 @@ temporal (297A-20) que quedó en producción.
   `reflowPositions` solo toca nodos que cambian. Gate `task:check -- 018A-97` PASS (local-light).
 - [x] Rejilla de debug retirada: `debug-grid-overlay.ts` fuera (F1), atajo Ctrl+Shift+G eliminado y
   CSS `--depurar`/`__debug*` retirado en este bloque; VarSense sin huérfanas.
-- [ ] Verificación final: suite completa + build pendientes de CI/full (cooldown del guard);
-  navegador 1440×900 / 1024×768 (arrastre, colisiones, grupo seleccionado vs. no seleccionado,
-  reflow al encoger) y móvil <768 (reorder por índice como fallback) pendientes de sesión real.
+- [ ] Verificación final: suite completa **724/724 PASS** + `vite build` OK (05-ago, local) y
+  móvil <768 verificado (preview 660px muestra el launcher, sin grid de escritorio); resta solo
+  el navegador desktop 1440×900 / 1024×768 (arrastre, colisiones, grupo seleccionado vs. no
+  seleccionado, reflow al encoger) en sesión con viewport ≥768.
 
 **Gate/salida:** un único helper de geometría alimenta todo; el placeholder coincide con la celda
 real; el drag de grupo no altera iconos no implicados (ni se superpone ni sale del grid); sin

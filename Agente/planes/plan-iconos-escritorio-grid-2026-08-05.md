@@ -157,12 +157,15 @@ en producción.
 ### Fase 5 — Verificación final (parcial; pendientes de navegador/CI)
 
 - [x] Type-check + gate `task:check -- 018A-97` PASS (local-light: sentinel/varsense/type-check).
-- [ ] Suite frontend completa + build: pendiente de CI o `--full` tras el cooldown del guard (la
-  selección incremental del selector se ejecuta en CI; F1 ya validó 713/713 antes de estos cambios).
-- [ ] Navegador real: 1440×900 y 1024×768 — arrastrar iconos, soltar en celdas libres y ocupadas
-  (resolución de colisión), reflow al encoger/agrandar ventana (iconos no desaparecen ni se
-  superponen), y el placeholder cae sobre la celda marcada (pendiente de sesión/navegador real).
-- [ ] Móvil (<768): sin posicionamiento libre (el reorder por índice sigue siendo el fallback).
+- [x] Suite frontend completa + build: **724/724 PASS** (96 archivos) y `vite build` de producción
+  OK el 05-ago (verificado localmente con `vitest run` + `vite preview` sobre el dist).
+- [ ] Navegador real desktop 1440×900 y 1024×768: arrastrar iconos, soltar en celdas libres y
+  ocupadas (resolución de colisión), reflow al encoger/agrandar ventana, y el placeholder cae
+  sobre la celda marcada. Pendiente de sesión con viewport ≥768 (el preview de la app quedó
+  fijado en 660px; la geometría ya está cubierta por los tests DOM de F1/F2).
+- [x] Móvil (<768): verificado el 05-ago — el preview (660px) muestra el launcher móvil
+  (región "Sistema móvil" + lista de apps), sin grid de escritorio: sin posicionamiento libre
+  (el reorder por índice sigue siendo el fallback).
 
 **Gate F5 / DoD:** grid coherente en desktop/tablet, placeholder exacto, drag de grupo predecible
 (sin alterar iconos no implicados), sin rejillas rojas en producción, suite + navegador verdes.
