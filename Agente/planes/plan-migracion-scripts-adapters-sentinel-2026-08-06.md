@@ -1,7 +1,7 @@
 # Plan — Migración de scripts a Sentinel Core y adapters por proyecto
 
 > **Fecha:** 2026-08-06
-> **Estado:** Fase 0 cerrada como baseline técnico; retirada física bloqueada hasta cerrar las fases de evidencia
+> **Estado:** Fase 1 local de transición implementada; schema upstream, fixtures multi-proyecto y retirada física siguen pendientes
 > **Ámbito:** calidad, coordinación de tareas y wrappers de desarrollo; no modifica todavía la skill global ni elimina scripts
 > **Relación:** complementa `Agente/planes/plan-global-quality-guard-agnostico-2026-08-02.md` y `Agente/planes/plan-sentinel-orquestacion-tareas-worktrees-2026-08-06.md`
 > **Fuente canónica de esta iniciativa:** este documento
@@ -279,16 +279,19 @@ no se inventan esos datos.
 
 **Objetivo:** hacer que un proyecto nuevo necesite configuración, no una copia de `scripts/quality`.
 
-- [ ] Cerrar dónde vive el manifest (recomendación: dentro de `sentinel.config.json`, con una sección
-      `adapter`; un archivo separado solo se acepta si resuelve una limitación real de versionado).
+**Resultado local 2026-08-06:** `quality-adapter.json` y `adapter-manifest.mjs` implementan el contrato de transición; `stages.mjs`/`stage-process.mjs` usan argv estructurado, validan paths/task IDs y generan salida versionada. El runner aplica allowlist mínima no sensible más variables declaradas por el manifest; `observe-compare` usa `--run-id`, conserva reportes canónicos y exige metadata fresca. Evidencia: suite completa del adapter **217/217 PASS**, incluyendo 12 pruebas nuevas/dirigidas, `node --check`, gate `028A-18` PASS local-light (full diferido por cooldown) y `git diff --check` PASS. No se afirma publicación upstream ni paridad multi-proyecto.
+
+- [x] Cerrar dónde vive el manifest de transición local (`quality-adapter.json`); el contrato final upstream queda pendiente.
 - [ ] Diseñar y publicar en Sentinel el schema de `project adapter manifest`.
 - [ ] Implementar un adapter de referencia Node/Vite y otro Rust/PostgreSQL en fixtures pequeñas.
-- [ ] Definir versión, hash, capabilities, timeout, env allowlist, output schema y exit-code mapping.
-- [ ] Definir que los comandos usan argv estructurado, sin shell concatenado, y que el adapter no puede
+- [x] Definir versión, hash, capabilities, timeout, env allowlist, output schema y exit-code mapping en el manifest local.
+- [x] Definir que los comandos usan argv estructurado, sin shell concatenado, y que el adapter no puede
       crear scheduler, cooldown, claim, worktree o reporter final.
-- [ ] Crear fixtures PASS, findings, timeout, malformed JSON, cancellation y missing tool.
-- [ ] Mantener `sentinel check --stages` como transporte de transición si todavía no existe `check --project`.
+- [x] Crear fixtures locales PASS/findings y regresiones de timeout, cancellation, paths inseguros, malformed transport y missing tool.
+- [x] Mantener `sentinel check --stages` como transporte de transición.
 - [ ] Documentar una guía de cinco minutos para añadir un tercer proyecto sin copiar scripts.
+
+**Pendiente upstream:** schema publicado/fijado, fixtures multi-proyecto Node/Vite + Rust/PostgreSQL, paridad CLI/LSP/editor, rollback y dos releases consecutivos.
 
 **Gate:** dos fixtures de stacks distintos usan el mismo core; ningún adapter implementa scheduler/reporter
 propio; CLI/LSP/editor siguen funcionando; la matriz de contratos y códigos de salida está versionada.

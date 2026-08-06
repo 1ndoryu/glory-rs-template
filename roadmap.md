@@ -58,7 +58,7 @@
 
 **028A-18 — Orquestación universal de tareas con Sentinel (en curso).** El siguiente bloque de tooling permanece serializado hasta completar su integración, gate y cleanup. La iniciativa SNT-12 queda registrada como plan dependiente/aprobable, no como tarea paralela habilitada.
 
-**SNT-12 — Migración de scripts a Core y adapters por proyecto (planificación aprobable).** El plan canónico es `Agente/planes/plan-migracion-scripts-adapters-sentinel-2026-08-06.md`. Primero se debe inventariar y clasificar `scripts/` y `scripts/quality/`; no se elimina ni se mueve código todavía. La decisión base es: Sentinel posee coordinación, scheduler, scope, caché, runner y reporter; el proyecto conserva adapters de Rust/PostgreSQL, frontend/Vite, docs, custom, codegen y operaciones específicas. La skill global se revisa únicamente al final, si la evidencia produce una regla agnóstica. Depende de cerrar 028A-18 y de serializar cambios del submódulo `tools/sentinel`.
+**SNT-12/SNT-13 — Migración de scripts a Core y adapters por proyecto.** El inventario está cerrado y la primera transición local quedó integrada en `1a1ed870`: `quality-adapter.json`, runner fail-closed, transporte argv y observe con reportes frescos. No se eliminan scripts ni se modifica la skill global. Pendiente: schema/fixtures upstream, paridad multi-proyecto, rollback y dos releases antes de retirar duplicaciones. El plan canónico es `Agente/planes/plan-migracion-scripts-adapters-sentinel-2026-08-06.md`; depende de serializar cambios de `tools/sentinel`.
 
 **Detalle de 028A-18 — Orquestación universal de tareas con Sentinel (en curso).** El plan canónico define una
 unidad de paralelismo por tarea (`claim → worktree/rama → gate → integración ff-only → cleanup`),

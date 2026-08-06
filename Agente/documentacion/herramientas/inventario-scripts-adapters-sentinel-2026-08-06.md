@@ -3,7 +3,7 @@
 > **Fecha de corte:** 2026-08-06  
 > **Tarea:** SNT-12  
 > **Workspace inventariado:** worktree Sentinel `task/157fb8a2b2a4e1dc/SNT-12`  
-> **Estado:** Fase 0 — baseline e inventario  
+> **Estado:** Fase 0 cerrada; Fase 1 local de contrato ejecutada en transición
 > **Fuente canónica:** `Agente/planes/plan-migracion-scripts-adapters-sentinel-2026-08-06.md`
 
 ## 1. Alcance y evidencia
@@ -209,7 +209,13 @@ scripts/quality/task-check.mjs
  └─ reporter + adapters/*
 ```
 
-## 8. Criterio de cierre de este inventario
+## 8. Evidencia de Fase 1 local (SNT-13)
+
+La transición local añadió `quality-adapter.json` y `scripts/quality/adapter-manifest.mjs`. `stages.mjs` genera argv estructurado para `sentinel check --stages`; `stage-process.mjs` emite contrato JSON versionado; el runner aplica una allowlist mínima no sensible más variables declaradas por el manifest; y `observe-compare.mjs` usa `--run-id`, conserva el namespace canónico y exige metadata fresca.
+
+Evidencia reproducible integrada en `1a1ed870`: suite completa `node --test scripts/quality/tests/*.test.mjs` = **217/217 PASS**; `node --check` de módulos migrados; `git diff --check`; gate `028A-18` PASS local-light (full diferido por cooldown). Esto no equivale todavía a schema publicado en Sentinel ni a paridad multi-proyecto.
+
+## 9. Criterio de cierre de este inventario
 
 - [x] Todos los archivos versionados bajo `scripts/` tienen una clasificación o grupo explícito.
 - [x] Los consumers directos de `package.json`, frontend y CI están identificados.
