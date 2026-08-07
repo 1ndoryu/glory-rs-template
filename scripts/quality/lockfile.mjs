@@ -143,6 +143,12 @@ export function validateLock(lock, manifest) {
     if (!isRecord(entry)) fail(`analyzers.${name} debe ser un objeto`);
     validateKeys(entry, new Set(['version', 'protocolVersion', 'commit', 'sha256', 'patchSha256', 'capabilities', 'sourcePathEnv', 'sourcePathRealpath']), `analyzers.${name}`);
     validateText(entry.version, `analyzers.${name}.version`);
+    if (expected.requiredCapabilities !== undefined) {
+      if (!Array.isArray(expected.requiredCapabilities) || expected.requiredCapabilities.some(capability => typeof capability !== 'string' || capability.length === 0)) fail(`quality-tools.json.tools.${name}.requiredCapabilities inválido`);
+    }
+    if (expected.releaseRefs !== undefined) {
+      if (!Array.isArray(expected.releaseRefs) || expected.releaseRefs.some(ref => typeof ref !== 'string' || ref.length === 0)) fail(`quality-tools.json.tools.${name}.releaseRefs inválido`);
+    }
     validateCapabilities(expected.capabilities, `quality-tools.json.tools.${name}.capabilities`);
     validateCapabilities(entry.capabilities, `analyzers.${name}.capabilities`);
     const expectedSourcePathEnv = expected.sourcePathEnv;
@@ -270,6 +276,17 @@ async function gitStatusPorcelain(toolRoot) {
   });
 }
 
+async function parentGitlinkCommit(workspaceRoot, configuredSourcePath) {
+  const rootReal = await realpath(workspaceRoot);
+  const sourceReal = await realpath(configuredSourcePath);
+  const relative = path.relative(rootReal, sourceReal).replace(/\\/g, '/');
+  if (!relative || relative.startsWith('../') || path.isAbsolute(relative)) return null;
+  const result = await runProcess('git', ['-C', rootReal, 'ls-tree', 'HEAD', '--', relative], { cwd: rootReal, timeoutMs: 10_000 });
+  if (result.code !== 0) throw new Error(`no se pudo leer el gitlink de ${relative}`);
+  const match = /^160000\s+commit\s+([a-f0-9]{40})\s+/mu.exec(result.stdout);
+  return match?.[1] ?? null;
+}
+
 async function patchFileSha256(workspaceRoot, patchPath) {
   if (typeof patchPath !== 'string' || path.isAbsolute(patchPath) || patchPath.replace(/\\/g, '/').split('/').includes('..')) {
     throw new Error('quality-tools.patch.path debe ser una ruta relativa dentro del workspace');
@@ -351,6 +368,12 @@ export async function inspectInstalledAnalyzers(workspaceRoot, manifest) {
     }
     if (configuredSourcePath !== null && revision.stdout.trim() !== config.commit) {
       throw new Error(`${name}: sourcePath externo no coincide con el commit fijado`);
+    }
+    if (configuredSourcePath !== null) {
+      const gitlink = await parentGitlinkCommit(workspaceRoot, configuredSourcePath);
+      if (!gitlink) throw new Error(`${name}: sourcePath interno no está representado por un gitlink inicializado`);
+      if (gitlink !== revision.stdout.trim()) throw new Error(`${name}: gitlink del workspace no coincide con el checkout instalado`);
+      if (gitlink !== config.commit) throw new Error(`${name}: gitlink no coincide con quality-tools.json`);
     }
     results[name] = {
       version: version.stdout.trim(),

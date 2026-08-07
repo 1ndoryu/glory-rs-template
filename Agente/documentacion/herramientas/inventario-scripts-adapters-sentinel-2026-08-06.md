@@ -11,9 +11,9 @@ El plano universal debe vivir en Sentinel Core. El consumidor conserva únicamen
 
 | Capa | Ubicación | Estado | Decisión |
 |---|---|---|---|
-| Core universal | upstream Sentinel | SNT-16c/SNT-16d implementado en commits `88e8ac7`, `e1493c3`, `ff0649c`; aún sin release estable nueva | No reemplazar automáticamente el plano local hasta publicar release/tag y validar clon limpio. |
-| Preflight/doctor | upstream Sentinel `src/core/diagnose.ts` | SNT-16d verificado | Diagnostica sourcePath/sourcePathEnv, CLI y `--version`, checkout Git dirty, gitlink, commits/versiones configurados y lock. El gate real falla cerrado antes de las etapas. |
-| Recuperación | upstream Sentinel `src/core/taskRecovery.ts` y CLI | SNT-16d verificado | `task recover --dry-run` exige tarea expirada, PID muerto, namespace, heads consistentes y worktree limpio; la recuperación real escribe auditoría. |
+| Core universal | upstream Sentinel | SNT-16c/SNT-16d implementado en commits locales no publicados `88e8ac7`, `e1493c3`, `ff0649c`; aún sin release estable nueva | No reemplazar automáticamente el plano local hasta publicar release/tag y validar clon limpio. |
+| Preflight/doctor | upstream Sentinel `src/core/diagnose.ts` | SNT-16f local verificado | Diagnostica submódulo/gitlink, CLI y `--version`, package metadata/dependencias/scripts, capacidades ausentes, symlink escapes, checkout/package-lock dirty, commits/versiones y lock. El gate real falla cerrado antes de las etapas. |
+| Recuperación | upstream Sentinel `src/core/taskRecovery.ts` y CLI | SNT-16f local verificado | `task status` deriva expiración/PID/limpieza; `task recover --dry-run/real` exige tarea expirada, PID muerto, namespace, snapshots de metadata/HEAD y worktree limpio; la recuperación real escribe auditoría. |
 | Manifest de stages | upstream Sentinel `src/core/` | SNT-16c validado | Envelope schema 1, legacy compatible, paths físicos contenidos y exit no cero fail-closed. |
 | Adapter del consumidor | `scripts/quality/adapter-manifest.mjs`, adapters | SNT-15 cerrado | Sigue como frontera local. |
 | Gate transitorio | `scripts/quality/task-check.mjs` | Se conserva | No se reemplaza por `sentinel check` hasta release y paridad real. |
@@ -22,10 +22,10 @@ El plano universal debe vivir en Sentinel Core. El consumidor conserva únicamen
 
 ## Evidencia
 
-- Sentinel SNT-16c/SNT-16d: `tsc` sin errores y suite upstream **499 passing, 1 pending** en el worktree de tarea.
-- Doctor, recovery y contrato CLI focalizados: PASS; el caso de proceso vivo se bloquea y el dry-run de una toma expirada pasa.
-- `node scripts/quality/lock-generator.mjs --write --json` y posteriormente `--check --json`: PASS en el worktree de tarea; `quality-tools.json` y `sentinel.lock.json` coinciden con el commit probado `ff0649c7a1b88596d42921f865a6e6871acfe0db`.
-- El consumidor de la tarea fija el gitlink a `ff0649c`; el consumidor primario todavía no se integra porque falta publicación upstream estable.
+- Sentinel SNT-16c/SNT-16d: `tsc` sin errores y suite upstream **499 passing, 1 pending** en el checkout local del submódulo.
+- Doctor, recovery, capacidades, symlink escape, metadata estricta y contrato CLI focalizados: PASS; el caso de proceso vivo se bloquea y el dry-run de una toma expirada pasa en la evidencia local conservada.
+- `node scripts/quality/lock-generator.mjs --write --json` y posteriormente `--check --json`: PASS en el checkout consumidor integrado; `quality-tools.json` y `sentinel.lock.json` coinciden con el commit probado `ff0649c7a1b88596d42921f865a6e6871acfe0db`.
+- El checkout consumidor integrado fija temporalmente el gitlink a `ff0649c`; ese pin local es coherente con el lock, pero no es una release estable. La release pública/rollback permanece en `20c13a2`/`0.5.0` hasta completar publicación upstream y validación limpia.
 - El guard auxiliar esperado por `npm run compile` dentro del submódulo no forma parte de ese checkout; la compilación directa con `tsc` y las suites ejecutadas sí pasan. Esto queda como limitación de provisionamiento, no como PASS del script wrapper.
 
 ## Política de permanencia para scripts

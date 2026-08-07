@@ -5,10 +5,13 @@
     "sentinel": {
       "repository": "https://github.com/1ndoryu/glory-sentinel.git",
       "sourcePath": "tools/sentinel",
-      "commit": "ff0649c7a1b88596d42921f865a6e6871acfe0db",
+      "commit": "8583b41a041a909e659de015c6777705060c41a8",
       "version": "0.5.0",
       "outputSchemaVersion": "1",
       "buildScript": "compile",
+      "testScript": "test:unit",
+      "requiredCapabilities": ["guard", "doctor", "task", "recover"],
+      "releaseRefs": ["refs/remotes/origin/main", "refs/tags/v*"],
       "cli": "out/cli/index.js"
     },
     "varsense": {
@@ -20,6 +23,7 @@
       "buildScript": "compile",
       "cli": "dist/cli/index.js",
       "testScript": "test",
+      "releaseRefs": ["refs/remotes/origin/main", "refs/tags/v*"],
       "capabilities": {
         "filesFrom": true,
         "persistentIndex": true

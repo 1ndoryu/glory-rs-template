@@ -1,7 +1,7 @@
 # Plan — Migración de scripts a Sentinel Core y adapters por proyecto
 
 > **Fecha:** 2026-08-06
-> **Estado:** SNT-16c/SNT-16d están implementados y verificados en la rama de tarea upstream (`e1493c3`, `ff0649c`) y el worktree consumidor fija temporalmente el gitlink/lock al commit probado; adopción estable aún bloqueada por publicación/release upstream, clon limpio y paridad multi-proyecto. No se retiran scripts. La skill global existente se conserva sin sustituir hasta la release y una sesión nueva.
+> **Estado:** SNT-16c/SNT-16d están implementados y verificados en la rama de tarea upstream (`e1493c3`, `ff0649c`). Este checkout consumidor fija temporalmente el gitlink/lock al commit probado `ff0649c`, que aún no es una release publicada; la release pública/rollback permanece en `20c13a2`/`0.5.0`. La adopción estable sigue bloqueada por publicación/release upstream, clon limpio y paridad multi-proyecto. No se retiran scripts. La skill global existente se conserva sin sustituir hasta la release y una sesión nueva.
 > **Ámbito:** calidad, coordinación de tareas y wrappers de desarrollo; migración reversible y por evidencia
 > **Relación:** complementa `Agente/planes/plan-global-quality-guard-agnostico-2026-08-02.md`, `Agente/planes/plan-sentinel-orquestacion-tareas-worktrees-2026-08-06.md` y `Agente/planes/plan-preflight-recuperacion-sentinel-2026-08-07.md`
 > **Fuente canónica de esta iniciativa:** este documento
@@ -14,11 +14,16 @@ No se copia `scripts/quality` a otros repositorios ni se elimina mientras no exi
 
 ## 2. Situación verificable
 
-- Consumidor primario sigue fijado en Sentinel `20c13a216e879303fcf5be7469a2821391b2ec0d` / `0.5.0`.
-- SNT-16c está publicado como rama de trabajo `028A-6/stage-manifest-contract`; SNT-16d está en commits locales de tarea `e1493c3`/`ff0649c`, aún no integrados en `origin/main` ni etiquetados como release.
-- La compilación TypeScript directa y la suite upstream disponible pasan en el worktree: `499 passing, 1 pending`. El wrapper `npm run compile` está condicionado por el guard auxiliar externo ausente en ese checkout; no se declara PASS del wrapper.
+### SNT-16f incorporado localmente
+
+El doctor de Sentinel ahora expone capacidades ausentes antes del gate, valida checkout/package-lock dirty, symlink escapes, dependencias/scripts, gitlink y coherencia config/lock/checkout. `task status` deriva expiración/PID/limpieza y recover conserva snapshots antes de cleanup. `quality:setup` construye un CLI faltante en staging temporal; no ejecuta `npm ci` dentro del submódulo versionado. Estas mejoras siguen siendo locales/no publicadas y no cambian la release estable.
+
+
+- La release pública y rollback del consumidor primario siguen siendo Sentinel `20c13a216e879303fcf5be7469a2821391b2ec0d` / `0.5.0`; este checkout integrado fija temporalmente el gitlink/lock al commit local no publicado `ff0649c7a1b88596d42921f865a6e6871acfe0db` para conservar la evidencia de SNT-16d.
+- SNT-16c está disponible en la rama remota de trabajo `028A-6/stage-manifest-contract`; SNT-16d está en commits locales no publicados `e1493c3`/`ff0649c`, aún no integrados en `origin/main` ni etiquetados como release.
+- La compilación TypeScript directa y la suite upstream disponible pasan en el checkout local del submódulo: `499 passing, 1 pending`. El wrapper `npm run compile` está condicionado por el guard auxiliar externo ausente en ese checkout; no se declara PASS del wrapper.
 - SNT-16d añade diagnóstico read-only completo y lo conecta al gate real; `task recover --dry-run/real` valida expiración, PID, namespace, heads y worktree limpio.
-- El worktree de tarea fija `quality-tools.json`, `sentinel.lock.json` y el gitlink a `ff0649c`; el consumidor primario conserva `20c13a2` hasta release y hash reproducible.
+- El checkout integrado fija `quality-tools.json`, `sentinel.lock.json` y el gitlink a `ff0649c`; ese pin es coherente localmente, pero no implica adopción estable. `20c13a2` se conserva como release pública/rollback hasta publicar y validar un nuevo release con hash reproducible.
 - La skill global no se reemplaza antes de publicación y sesión nueva; no se eliminan scripts públicos.
 
 ## 3. Modelo objetivo

@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { access, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { access, cp, mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inspectInstalledAnalyzers } from './lockfile.mjs';
@@ -8,7 +9,34 @@ import { resolveConfiguredSourcePath } from './source-path.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const manifestPath = path.join(projectRoot, 'quality-tools.json');
-const npmCliPath = process.env.npm_execpath;
+const realNodeDir = path.dirname(process.execPath);
+const npmCliPath = path.join(realNodeDir, 'node_modules', 'npm', 'bin', 'npm-cli.js');
+
+function isolatedNpmEnvironment() {
+  const pathKey = process.platform === 'win32' ? 'Path' : 'PATH';
+  const currentPath = process.env[pathKey] ?? process.env.PATH ?? '';
+  const safePath = currentPath
+    .split(path.delimiter)
+    .filter(entry => !/[\\/]Owner[\\/]bin(?:[\\/]|$)/iu.test(entry))
+    .filter(entry => !/[\\/]GlorySentinel[\\/](?:shims|bin)(?:[\\/]|$)/iu.test(entry))
+    .filter(entry => !/[\\/]scripts[\\/]quality(?:[\\/]|$)/iu.test(entry));
+  const safePathValue = [realNodeDir, ...safePath].join(path.delimiter);
+  const environment = {
+    ...process.env,
+    npm_execpath: npmCliPath,
+    npm_config_script_shell: process.platform === 'win32' ? 'C:\\Windows\\System32\\cmd.exe' : '/bin/sh',
+    PATH: safePathValue,
+    ...(process.platform === 'win32' ? { Path: safePathValue } : {}),
+  };
+  for (const key of Object.keys(environment)) {
+    if (/^GLORY_(?:REAL_|GUARD_|QUALITY_)/u.test(key)) delete environment[key];
+  }
+  delete environment.npm_config_userconfig;
+  delete environment.NPM_CONFIG_USERCONFIG;
+  delete environment.BASH_ENV;
+  delete environment.ENV;
+  return environment;
+}
 
 async function exists(target) {
   try {
@@ -26,6 +54,7 @@ function run(executable, args, options = {}) {
       shell: false,
       stdio: options.capture ? ['ignore', 'pipe', 'pipe'] : 'inherit',
       windowsHide: true,
+      ...(options.env ? { env: options.env } : {}),
     });
     let stdout = '';
     let stderr = '';
@@ -74,6 +103,7 @@ function captureBinary(executable, args, options = {}) {
       shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
+      ...(options.env ? { env: options.env } : {}),
     });
     const stdout = [];
     let stderr = '';
@@ -176,6 +206,65 @@ async function applyDeclaredPatch(name, config, toolRoot) {
   );
 }
 
+async function writeReleaseEvidence(name, config, commit) {
+  const evidenceRoot = path.join(projectRoot, '.sentinel', 'release-evidence');
+  await mkdir(evidenceRoot, { recursive: true });
+  await writeFile(path.join(evidenceRoot, `${name}.json`), `${JSON.stringify({
+    schemaVersion: 1,
+    tool: name,
+    commit,
+    compile: 'passed',
+    suite: config.testScript ? 'passed' : 'not-configured',
+    cleanStaging: true,
+    at: new Date().toISOString(),
+  }, null, 2)}\n`, 'utf8');
+}
+
+async function stageSourcePathBuild(name, config, toolRoot) {
+  const currentCommit = await run('git', ['rev-parse', 'HEAD'], { cwd: toolRoot, capture: true });
+  if (currentCommit !== config.commit) {
+    throw new Error(`${name}: sourcePath está en ${currentCommit}; se esperaba ${config.commit}`);
+  }
+  const beforeStatus = await run('git', ['status', '--porcelain=v1', '--untracked-files=all'], { cwd: toolRoot, capture: true });
+  const stagingRoot = await mkdtemp(path.join(os.tmpdir(), `glory-quality-${name}-`));
+  const treeArchive = path.join(os.tmpdir(), `glory-quality-${name}-${process.pid}.tar`);
+  try {
+    /* [SNT-16f] El staging se materializa desde `git archive HEAD`: solo el
+     * árbol commiteado (sin cambios sin commitear ni artefactos locales), de
+     * modo que compile + suite certifican exactamente el commit fijado. */
+    await writeFile(treeArchive, await captureBinary('git', ['archive', '--format=tar', 'HEAD'], { cwd: toolRoot }));
+    /* Windows bsdtar interpreta `C:\...` como host remoto; rutas en forward-slash
+     * y `--force-local` fuerzan interpretación local en todas las plataformas. */
+    const tarPath = target => target.replace(/\\/g, '/');
+    await run('tar', ['-xf', tarPath(treeArchive), '-C', tarPath(stagingRoot), '--force-local']);
+    const env = isolatedNpmEnvironment();
+    env.GLORY_QUALITY_SETUP = '1';
+    await run(process.execPath, [npmCliPath, 'ci', '--ignore-scripts'], { cwd: stagingRoot, env });
+    await run(process.execPath, [npmCliPath, 'run', config.buildScript], { cwd: stagingRoot, env });
+    if (config.testScript) {
+      const testArgs = [npmCliPath, 'run', config.testScript];
+      await run(process.execPath, testArgs, { cwd: stagingRoot, env });
+    }
+
+    /* Solo se materializan artefactos generados/ignorados. La instalación y
+     * compilación nunca ejecutan npm dentro del checkout versionado. */
+    await rm(path.join(toolRoot, 'node_modules'), { recursive: true, force: true });
+    await cp(path.join(stagingRoot, 'node_modules'), path.join(toolRoot, 'node_modules'), { recursive: true });
+    const artifactRoot = String(config.cli).split(/[\\/]/u)[0];
+    await rm(path.join(toolRoot, artifactRoot), { recursive: true, force: true });
+    await cp(path.join(stagingRoot, artifactRoot), path.join(toolRoot, artifactRoot), { recursive: true });
+    const afterStatus = await run('git', ['status', '--porcelain=v1', '--untracked-files=all'], { cwd: toolRoot, capture: true });
+    if (afterStatus !== beforeStatus) {
+      throw new Error(`${name}: el provisioning aislado modificó archivos versionados del submódulo`);
+    }
+    const commit = await run('git', ['rev-parse', 'HEAD'], { cwd: toolRoot, capture: true });
+    await writeReleaseEvidence(name, config, commit);
+  } finally {
+    await rm(stagingRoot, { recursive: true, force: true });
+    await rm(treeArchive, { force: true }).catch(() => undefined);
+  }
+}
+
 async function ensureSourcePathReady(name, config) {
   const configuredSourcePath = resolveConfiguredSourcePath(config, `quality-tools.json.tools.${name}`, { baseDir: projectRoot });
   const toolRoot = path.resolve(configuredSourcePath);
@@ -189,18 +278,13 @@ async function ensureSourcePathReady(name, config) {
     process.stdout.write(`[quality:setup] ${name}: inicializando submódulo ${relativeFromRoot}\n`);
     await run('git', ['submodule', 'update', '--init', '--', relativeFromRoot.replace(/\\/g, '/')], { cwd: projectRoot });
   }
-  if (!await exists(path.join(toolRoot, config.cli))) {
-    if (!isInsideWorkspace) throw new Error(`${name}: sourcePath no contiene un CLI válido; compílalo manualmente en ${toolRoot}`);
-    /* [028A-8] Clon limpio: el CLI del submódulo aún no está compilado. */
-    process.stdout.write(`[quality:setup] ${name}: compilando CLI del submódulo ${relativeFromRoot}\n`);
-    if (!npmCliPath) {
-      throw new Error('npm_execpath no está disponible; ejecuta este setup mediante npm run quality:setup');
-    }
-    await run(process.execPath, [npmCliPath, 'ci', '--ignore-scripts'], { cwd: toolRoot });
-    await run(process.execPath, [npmCliPath, 'run', config.buildScript], { cwd: toolRoot });
-    if (config.testScript) {
-      await run(process.execPath, [npmCliPath, 'run', config.testScript], { cwd: toolRoot });
-    }
+  if (isInsideWorkspace) {
+
+    /* [SNT-16f] Cada setup interno recompila y prueba en staging aislado. */
+    process.stdout.write(`[quality:setup] ${name}: compile + suite en staging aislado ${relativeFromRoot}\n`);
+    await stageSourcePathBuild(name, config, toolRoot);
+  } else if (!await exists(path.join(toolRoot, config.cli))) {
+    throw new Error(`${name}: sourcePath no contiene un CLI válido; compílalo manualmente en ${toolRoot}`);
   }
   const currentCommit = await run('git', ['rev-parse', 'HEAD'], { cwd: toolRoot, capture: true });
   if (currentCommit !== config.commit) {
@@ -266,9 +350,6 @@ async function installTool(name, config, installRoot) {
     }
   }
 
-  if (!npmCliPath) {
-    throw new Error('npm_execpath no está disponible; ejecuta este setup mediante npm run quality:setup');
-  }
   await run(process.execPath, [npmCliPath, 'ci', '--ignore-scripts'], { cwd: toolRoot });
   await run(process.execPath, [npmCliPath, 'run', config.buildScript], { cwd: toolRoot });
   if (config.testScript) {

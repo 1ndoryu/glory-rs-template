@@ -1,7 +1,7 @@
 # Plan — Preflight reproducible y recuperación segura de Sentinel
 
 > **Fecha:** 2026-08-07
-> **Estado:** implementación local/upstream verificada; adopción estable pendiente de release upstream y clon limpio
+> **Estado:** SNT-16f implementado localmente y validado en el checkout compartido; adopción estable sigue pendiente de release upstream, clon limpio y matriz multi-proyecto
 > **Dependencia:** SNT-16c (manifest versionado y compatibilidad legacy)
 
 ## Problema
@@ -29,7 +29,17 @@ Bloquear antes de ejecutar cuando el entorno no es reproducible y ofrecer recupe
 - [x] `recover --dry-run` solo inspecciona; la recuperación real valida antes de delegar el cleanup existente.
 - [x] Nunca borra recursos ajenos, worktrees vivos, ramas divergentes ni cambios no commiteados.
 - [x] La recuperación real escribe auditoría JSON con agente, tarea, estado anterior, timestamp, staleForMs y resultado bajo `.sentinel/recovery/`.
-- [ ] Ampliar `task status` con estado derivado `expired/processAlive/worktreeClean` para observabilidad directa (siguiente bloque, no necesario para el guard fail-closed).
+- [x] Ampliar `task status` con estado derivado `expired/processAlive/worktreeClean` para observabilidad directa.
+- [x] Revalidar snapshots de metadata (`updatedAtMs`, PID y HEAD) antes de cleanup para evitar una carrera entre diagnóstico y recuperación.
+
+### SNT-16f — Preflight estricto, release y provisionamiento — implementado localmente
+
+- [x] `doctor --json` inspecciona submódulo/gitlink, CLI y `--version`, `package.json`, `package-lock.json`, dependencias declaradas, scripts requeridos y capacidades CLI.
+- [x] La capacidad ausente se reporta como `tool-capability-missing` antes del gate; no se copia `quality-command-guard.mjs` al submódulo.
+- [x] Se rechazan checkout/package-lock dirty, symlink/junction que escapa del workspace y gitlink ausente para un `sourcePath` interno.
+- [x] Se valida que el commit esté publicado/alcanzable por `origin/main` o un tag `v*`; el commit local `ff0649c` permanece bloqueado como release no publicada.
+- [x] `task status` expone `expired`, `processAlive` y `worktreeClean`; recover conserva auditoría y valida snapshots antes de cleanup.
+- [x] El setup interno ejecuta compile + suite en staging temporal, materializa únicamente artefactos generados/ignorados y verifica que el estado versionado del submódulo no cambió; la evidencia queda ligada al commit y al script de suite. La validación desde clon limpio y la publicación upstream siguen siendo bloqueadores de adopción estable.
 
 ## Evidencia
 
@@ -39,6 +49,9 @@ Bloquear antes de ejecutar cuando el entorno no es reproducible y ofrecer recupe
 - Focalizados doctor/recovery/CLI: PASS.
 - Generador de lock: `--write` y después `--check --json`: PASS; configured/checkout/lock usan `ff0649c7a1b88596d42921f865a6e6871acfe0db`.
 - Limitación real: el wrapper `npm run compile` intenta cargar un `quality-command-guard.mjs` que no existe en el checkout upstream. La compilación directa y la suite sí fueron ejecutadas; no se declara PASS del wrapper ausente.
+- La suite `npm run quality:test` sigue bloqueando los escenarios de integración que exigen checkout Sentinel limpio mientras los cambios SNT-16f permanezcan sin commit; los fallos son de preflight, no findings ocultos.
+- `quality:setup` final (SNT-16f): compile + suite en staging aislado PASS para **sentinel (502 passing, 1 pending)** y **varsense (60 passing)**; la evidencia `.sentinel/release-evidence/{sentinel,varsense}.json` queda ligada al commit y es validada por el doctor (`releaseEvidencePresent: true`).
+- Doctor final: 7/7 capacidades detectadas en sentinel (`missing: []`), gitlink/lock coherentes; issues residuales solo `tool-checkout-dirty` (cambios sin commitear del checkout compartido) y `tool-release-unpublished` (ff0649c no publicado). `quality:lock --check` falla cerrado por el mismo checkout sucio; ambos son el fail-closed esperado, no hallazgos ocultos.
 
 ## Bloqueadores de adopción estable
 

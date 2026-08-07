@@ -20,7 +20,7 @@ const LEGACY_SENTINEL_KEYS = new Set(['includePatterns', 'excludePatterns', 'dir
 const LEGACY_QUALITY_KEYS = new Set(['schemaVersion', 'maxFindings', 'maxReminders', 'maxTerminalLines', 'lockWaitMs', 'maxConcurrentStages', 'timeoutsMs', 'performanceBudgets', 'heavyRun', 'reportRetention', 'fullPatterns', 'profiles', 'stageTimeBudgets', 'indexRetention', 'roadmapMaxLines']);
 const LEGACY_VARSENSE_KEYS = new Set(['variableFiles', 'includePatterns', 'excludePatterns', 'scanAllFiles', 'hardcodedDetection', 'inlineDetection', 'tokenDetection', 'bannedProperties', 'orphanClassDetection']);
 const LEGACY_TOOL_MANIFEST_KEYS = new Set(['schemaVersion', 'installRoot', 'tools']);
-const LEGACY_TOOL_KEYS = new Set(['repository', 'commit', 'version', 'outputSchemaVersion', 'buildScript', 'cli', 'testScript', 'patch', 'capabilities', 'sourcePath', 'sourcePathEnv']);
+const LEGACY_TOOL_KEYS = new Set(['repository', 'commit', 'version', 'outputSchemaVersion', 'buildScript', 'cli', 'testScript', 'patch', 'capabilities', 'requiredCapabilities', 'releaseRefs', 'sourcePath', 'sourcePathEnv']);
 
 function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
@@ -127,6 +127,16 @@ function validateLegacyContracts({ sentinelConfig, qualityConfig, varsenseConfig
       throw new Error(`${label}: sourcePath y sourcePathEnv son mutuamente excluyentes`);
     }
     if (tool.sourcePathEnv !== undefined) validateSourcePathEnv(tool.sourcePathEnv, `${label}.sourcePathEnv`);
+    if (tool.requiredCapabilities !== undefined) {
+      if (!Array.isArray(tool.requiredCapabilities) || tool.requiredCapabilities.some(capability => typeof capability !== 'string' || capability.length === 0)) {
+        throw new Error(`${label}.requiredCapabilities: debe ser una lista de nombres`);
+      }
+    }
+    if (tool.releaseRefs !== undefined) {
+      if (!Array.isArray(tool.releaseRefs) || tool.releaseRefs.some(ref => typeof ref !== 'string' || ref.length === 0 || ref.length > MAX_STRING_LENGTH)) {
+        throw new Error(`${label}.releaseRefs: debe ser una lista de refs`);
+      }
+    }
     if (tool.capabilities !== undefined) {
       validateLegacyKeys(tool.capabilities, new Set(['filesFrom', 'persistentIndex']), `${label}.capabilities`);
       if (tool.capabilities.filesFrom !== undefined && typeof tool.capabilities.filesFrom !== 'boolean') {

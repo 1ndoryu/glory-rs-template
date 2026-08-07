@@ -169,9 +169,13 @@ hashes de los analizadores. El gate consume los checkouts internos fijados en `q
 `sourcePath` relativos. Sentinel está fijado al commit coordinador publicado
 `20c13a216e879303fcf5be7469a2821391b2ec0d` (tag `v0.5.0`) y VarSense al commit declarado en el
 mismo archivo; `sentinel.lock.json` repite esos commits y hashes. `quality:setup`
-puede inicializar los submódulos y compilar sus CLIs en un clon limpio; no se
-requieren rutas absolutas ni variables `GLORY_*_SOURCE_PATH` para este consumidor.
-`quality:lock --check` verifica que configuración, gitlink y lock coincidan. Si el
+puede inicializar los submódulos y compilar sus CLIs en un clon limpio; cuando falta un CLI,
+`npm ci` y la suite de la herramienta se ejecutan en un staging temporal fuera del checkout
+Git y solo se copian artefactos generados/ignorados (`node_modules`/`out`) al submódulo. Si el
+checkout contiene `package-lock.json` o archivos internos modificados, el doctor falla cerrado;
+no se deben instalar dependencias manualmente dentro del submódulo versionado. No se requieren
+rutas absolutas ni variables `GLORY_*_SOURCE_PATH` para este consumidor.
+`quality:lock --check` verifica que configuración, gitlink y lock coincidan, y rechaza un sourcePath interno sin gitlink o con gitlink divergente. `quality:setup` deja evidencia local de compile + suite en staging ligada al commit; esa evidencia no convierte por sí sola un commit local en release estable. Si el
 commit fijado de un submódulo no está disponible en el remoto configurado, el clon
 debe corregir primero el remoto/fork o publicar ese objeto; no se sustituye por un
 checkout local distinto ni se continúa con una copia modificada.
