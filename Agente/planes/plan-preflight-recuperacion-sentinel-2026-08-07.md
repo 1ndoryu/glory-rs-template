@@ -43,15 +43,13 @@ Bloquear antes de ejecutar cuando el entorno no es reproducible y ofrecer recupe
 
 ## Evidencia
 
-- Commits upstream de tarea: `e1493c3` (gate/recovery), `ff0649c` (doctor reforzado); el worktree consumidor fija el gitlink a `ff0649c`.
-- `tsc` sin errores.
-- Suite upstream: **499 passing, 1 pending**.
-- Focalizados doctor/recovery/CLI: PASS.
-- Generador de lock: `--write` y después `--check --json`: PASS; configured/checkout/lock usan `ff0649c7a1b88596d42921f865a6e6871acfe0db`.
+- Commits upstream de tarea: `e1493c3` (gate/recovery), `ff0649c` (doctor reforzado), `8583b41` (hardening SNT-16f completo, commiteado en el submódulo).
+- `tsc` sin errores; suites focalizadas doctor/recovery/CLI: PASS (**502 passing, 1 pending** en el submódulo).
+- Generador de lock: `--write` y después `--check --json`: PASS; configured/checkout/lock usan `8583b41a041a909e659de015c6777705060c41a8` y gitlink coherente.
 - Limitación real: el wrapper `npm run compile` intenta cargar un `quality-command-guard.mjs` que no existe en el checkout upstream. La compilación directa y la suite sí fueron ejecutadas; no se declara PASS del wrapper ausente.
-- La suite `npm run quality:test` sigue bloqueando los escenarios de integración que exigen checkout Sentinel limpio mientras los cambios SNT-16f permanezcan sin commit; los fallos son de preflight, no findings ocultos.
-- `quality:setup` final (SNT-16f): compile + suite en staging aislado PASS para **sentinel (502 passing, 1 pending)** y **varsense (60 passing)**; la evidencia `.sentinel/release-evidence/{sentinel,varsense}.json` queda ligada al commit y es validada por el doctor (`releaseEvidencePresent: true`).
-- Doctor final: 7/7 capacidades detectadas en sentinel (`missing: []`), gitlink/lock coherentes; issues residuales solo `tool-checkout-dirty` (cambios sin commitear del checkout compartido) y `tool-release-unpublished` (ff0649c no publicado). `quality:lock --check` falla cerrado por el mismo checkout sucio; ambos son el fail-closed esperado, no hallazgos ocultos.
+- `quality:setup` final (SNT-16f): compile + suite en staging aislado PASS para **sentinel (502 passing, 1 pending)** y **varsense (60 passing)**; la evidencia `.sentinel/release-evidence/{sentinel,varsense}.json` queda ligada al commit `8583b41` y es validada por el doctor (`releaseEvidencePresent: true`, `cleanStaging: true`).
+- Doctor final: 7/7 capacidades detectadas en sentinel (`missing: []`), gitlink/lock coherentes, checkouts limpios; issue residual único `tool-release-unpublished` (`8583b41` no alcanzable desde `origin/main`/tag `v*`). `quality:lock --check`: **PASS**. `quality:test` del consumidor: **228 passing, 0 fail, 1 skipped** (incluye la integración real `varsense-parity.mjs` sobre tarea).
+- Commits del consumidor: `4782c37c` (pin gitlink/config/scripts/docs) y `32a1b0f4` (lock alineado). Sin push.
 
 ## Bloqueadores de adopción estable
 
