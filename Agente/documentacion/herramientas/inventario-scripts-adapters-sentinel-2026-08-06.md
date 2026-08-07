@@ -1,7 +1,7 @@
 # Inventario de scripts y adapters frente a Sentinel
 
 > Fecha de corte: 2026-08-07
-> Iniciativa canónica: `Agente/planes/plan-migracion-scripts-adapters-sentinel-2026-08-06.md`
+> Iniciativas canónicas: `Agente/planes/plan-migracion-scripts-adapters-sentinel-2026-08-06.md` y `Agente/planes/plan-preflight-recuperacion-sentinel-2026-08-07.md`
 
 ## Decisión
 
@@ -11,50 +11,30 @@ El plano universal debe vivir en Sentinel Core. El consumidor conserva únicamen
 
 | Capa | Ubicación | Estado | Decisión |
 |---|---|---|---|
-| Core universal | upstream Sentinel | Contrato SNT-16 no publicado desde este checkout | No fijar ni prometer capacidades ausentes en el gitlink. |
-| Manifest de stages | `tools/sentinel/src/core/` | Consumidor sigue en `20c13a2` limpio | El diseño upstream queda pendiente de commit/release recuperable. |
+| Core universal | upstream Sentinel | SNT-16c preparado en `88e8ac7`, rama remota de trabajo; falta release estable | No fijar `main` ni prometer adopción hasta release/tag y lock reproducible. |
+| Preflight/doctor | upstream Sentinel `src/core/diagnose.ts` | SNT-16d inicial | Diagnostica sourcePath, CLI, checkout dirty, gitlink y lock; falta conectarlo al gate y cubrir recovery. |
+| Manifest de stages | upstream Sentinel `src/core/` | SNT-16c validado | Envelope schema 1, legacy compatible, paths físicos contenidos y exit no cero fail-closed. |
 | Adapter del consumidor | `scripts/quality/adapter-manifest.mjs`, adapters | SNT-15 cerrado | Sigue como frontera local. |
 | Gate transitorio | `scripts/quality/task-check.mjs` | Se conserva | No se reemplaza por `sentinel check` hasta release y paridad real. |
 | Scripts de dominio | `scripts/run-with-db.mjs`, codegen, preparación DB | Se conservan | Encapsulan Rust/PostgreSQL y no entran al core universal. |
 | Analyzers | Sentinel + VarSense | Se conservan separados | VarSense es analyzer, no gate ni reporter paralelo. |
-| Fixtures SNT-16b | `scripts/quality/tests/fixtures/`, `snt-16b-parity.test.mjs` | Local, 2/2 PASS | Solo contrato/normalización; no sustituye dos proyectos ejecutados por Sentinel. |
 
-## Contrato objetivo upstream
+## Evidencia
 
-```json
-{
-  "schemaVersion": 1,
-  "stages": [
-    {
-      "name": "frontend",
-      "executable": "node",
-      "args": ["scripts/check.mjs", "{reportPath}"],
-      "reportPath": "frontend.json",
-      "expectedSchemaVersion": "1",
-      "timeoutMs": 120000,
-      "cwd": "."
-    }
-  ]
-}
-```
+- Sentinel SNT-16c: compilación TypeScript y suite disponible **497 PASS, 1 pending** en el worktree de tarea.
+- Doctor SNT-16d focalizado: detecta source/CLI ausentes y lock divergente; **3 PASS** junto con CLI/task coordinator.
+- El consumidor primario sigue en `20c13a2` / `0.5.0`; el worktree de tarea apunta provisionalmente a `88e8ac7` y no se ha fijado el lock primario.
+- La instalación de VarSense dejó una modificación accidental de `package-lock.json`; fue restaurada en el worktree de tarea. No quedan cambios en ese submódulo.
+- `npm run quality:lock --check` aún no es demostrable en el worktree porque el CLI VarSense no está compilado y el entorno no incluye el guard auxiliar esperado.
 
-La lista legacy debe mantenerse temporalmente. La validación objetivo es estricta, fail-closed, con argv estructurado, timeouts acotados y contención física de manifest, reportRoot, reportes y cwd. `reportPath` relativo se resuelve contra `reportRoot`; `cwd` contra workspace.
+## Política de permanencia
 
-## Evidencia y límites actuales
-
-- Consumidor y submódulo Sentinel limpios; Sentinel fijado en `20c13a216e879303fcf5be7469a2821391b2ec0d` (`0.5.0`).
-- `ef9c751` no está en refs ni objetos recuperables del submódulo; no se cambia el gitlink ni se inventa un hash.
-- Fixture dirigida SNT-16b: **2 PASS, 0 FAIL**. Comprueba normalización y que severidad/mensaje forman parte de la identidad.
-- Suite consumidor: **223 PASS, 3 FAIL de entorno, 1 skip**. Los fallos requieren CLI Sentinel/VarSense y configuración local provisionada.
-- No hay evidencia de compilación upstream en esta sesión: el guard intenta cargar `quality-command-guard.mjs` ausente desde el worktree.
-
-## Rollback y permanencia
-
-Rollback inmediato: conservar gitlink `20c13a2`, `task-check` y adapter SNT-15. No borrar scripts ni modificar la skill global. La retirada exige un release upstream publicado, clon limpio compilable, al menos dos proyectos reales, cinco gates comparables, matriz multi-shell/CI, dos releases consecutivos y rollback/GC probado.
+Conservar scripts de dominio/proveedor, adapters externos estables, experiencia humana/IDE, bootstrap reproducible o un segundo consumidor real. Migrar solo capacidades universales con más de un caso o claramente agnósticas. No migrar ni copiar scripts históricos o de producción ajena.
 
 ## Siguiente bloque
 
-1. Obtener/publicar el cambio upstream en el repositorio autorizado.
-2. Compilar y ejecutar suite desde clon limpio.
-3. Ejecutar fixtures Node/Rust con envelope y legacy mediante el CLI real y comparar decisión, estado, severidad, `ruleId`, file, line y message.
-4. Fijar commit/capabilities/hash en `quality-tools.json` y `sentinel.lock.json`, repetir gate y solo entonces evaluar adelgazar `task-check`.
+1. Conectar `assertWorkspaceReady` al gate y definir la excepción explícita para proyectos sin `quality-tools` durante transición.
+2. Implementar `task recover --dry-run/real` con PID, TTL, namespace y worktree limpio.
+3. Publicar release Sentinel SNT-16c/SNT-16d, compilar desde clon limpio y regenerar/verificar locks.
+4. Ejecutar fixtures Node/Rust con envelope y legacy mediante CLI real y comparar paridad multi-shell/editor.
+5. Solo después evaluar adelgazar `task-check`; no retirar scripts antes de dos releases.

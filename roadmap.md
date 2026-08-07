@@ -29,6 +29,7 @@
 - Optimización Sentinel/VarSense: `Agente/planes/plan-optimizacion-sentinel-varsense-2026-08-02.md`
 - Orquestación universal de tareas Sentinel: `Agente/planes/plan-sentinel-orquestacion-tareas-worktrees-2026-08-06.md`
 - Migración de scripts a Core/adapters: `Agente/planes/plan-migracion-scripts-adapters-sentinel-2026-08-06.md`
+- Preflight y recuperación Sentinel: `Agente/planes/plan-preflight-recuperacion-sentinel-2026-08-07.md`
 - Inventario de scripts/adapters: `Agente/documentacion/herramientas/inventario-scripts-adapters-sentinel-2026-08-06.md`
 
 ## Cómo leer este archivo
@@ -58,7 +59,9 @@
 
 **028A-18 — Orquestación universal de tareas con Sentinel (en curso).** El siguiente bloque de tooling permanece serializado hasta completar su integración, gate y cleanup. La iniciativa SNT-12 queda registrada como plan dependiente/aprobable, no como tarea paralela habilitada.
 
-**SNT-12/SNT-13/SNT-16b — Migración de scripts a Core y adapters por proyecto.** La transición local está integrada (`1a1ed870`, `791fa8ad`): `quality-adapter.json`, runner fail-closed, transporte argv, observe y fixtures agnósticas Node/Rust con comparación completa de decisión, severidad, `ruleId`, archivo, línea y mensaje (2/2 PASS). No se eliminan scripts ni se modifica la skill global. Sigue bloqueado el contrato upstream: Sentinel continúa fijado en `20c13a2`, el commit explorado no es recuperable/publicado, y faltan compilación upstream desde clon limpio, ejecución real envelope/legacy en dos proyectos, paridad CLI/LSP/editor, multi-shell/CI, rollback y dos releases antes de retirar duplicaciones. El plan canónico es `Agente/planes/plan-migracion-scripts-adapters-sentinel-2026-08-06.md`; el siguiente paso requiere publicación upstream autorizada.
+**SNT-12/SNT-13/SNT-16b/SNT-16c/SNT-16d — Migración de scripts a Core y adapters por proyecto.** La transición local permanece integrada: `quality-adapter.json`, runner fail-closed, transporte argv, observe y fixtures Node/Rust (2/2 PASS). Sentinel upstream tiene el contrato SNT-16c en `88e8ac7` y el diagnóstico SNT-16d focalizado pasa junto con la suite disponible (`497 PASS, 1 pending`), pero el consumidor estable sigue fijado en `20c13a2`: falta integrar en `origin/main`, release/tag, clon limpio y lock reproducible. No se eliminan scripts ni se modifica la skill global. El plan canónico es `Agente/planes/plan-migracion-scripts-adapters-sentinel-2026-08-06.md`; el hardening adicional vive en `Agente/planes/plan-preflight-recuperacion-sentinel-2026-08-07.md`.
+
+**Detalle de SNT-16d — Preflight y recuperación segura.** `sentinel doctor` debe detectar antes del gate sourcePath ausente, CLI no compilado/no respondiente, checkout sucio, gitlink divergente y lock inconsistente. Falta completar la conexión al gate y `task recover`, que exigirá TTL expirado, PID muerto, namespace válido y worktree limpio; nunca se limpiará automáticamente un proceso vivo o cambios no commiteados.
 
 **Detalle de 028A-18 — Orquestación universal de tareas con Sentinel (en curso).** El plan canónico define una
 unidad de paralelismo por tarea (`claim → worktree/rama → gate → integración ff-only → cleanup`),
