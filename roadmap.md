@@ -29,6 +29,7 @@
 - Optimización Sentinel/VarSense: `Agente/planes/plan-optimizacion-sentinel-varsense-2026-08-02.md`
 - Orquestación universal de tareas Sentinel: `Agente/planes/plan-sentinel-orquestacion-tareas-worktrees-2026-08-06.md`
 - Migración de scripts a Core/adapters: `Agente/planes/plan-migracion-scripts-adapters-sentinel-2026-08-06.md`
+- Preflight y recuperación Sentinel: `Agente/planes/plan-preflight-recuperacion-sentinel-2026-08-07.md`
 - Inventario de scripts/adapters: `Agente/documentacion/herramientas/inventario-scripts-adapters-sentinel-2026-08-06.md`
 
 ## Cómo leer este archivo
@@ -58,14 +59,17 @@
 
 **028A-18 — Orquestación universal de tareas con Sentinel (en curso).** El siguiente bloque de tooling permanece serializado hasta completar su integración, gate y cleanup. La iniciativa SNT-12 queda registrada como plan dependiente/aprobable, no como tarea paralela habilitada.
 
-**SNT-12/SNT-13/SNT-16b — Migración de scripts a Core y adapters por proyecto.** La transición local está integrada (`1a1ed870`, `791fa8ad`): `quality-adapter.json`, runner fail-closed, transporte argv, observe y fixtures agnósticas Node/Rust con comparación completa de decisión, severidad, `ruleId`, archivo, línea y mensaje (2/2 PASS). No se eliminan scripts ni se modifica la skill global. Sigue bloqueado el contrato upstream: Sentinel continúa fijado en `20c13a2`, el commit explorado no es recuperable/publicado, y faltan compilación upstream desde clon limpio, ejecución real envelope/legacy en dos proyectos, paridad CLI/LSP/editor, multi-shell/CI, rollback y dos releases antes de retirar duplicaciones. El plan canónico es `Agente/planes/plan-migracion-scripts-adapters-sentinel-2026-08-06.md`; el siguiente paso requiere publicación upstream autorizada.
+**SNT-12/SNT-13/SNT-16b/SNT-16c/SNT-16d — Migración de scripts a Core y adapters por proyecto.** La transición local permanece integrada: `quality-adapter.json`, runner fail-closed, transporte argv, observe y fixtures Node/Rust (2/2 PASS). Sentinel upstream tiene SNT-16c + SNT-16d verificados en los commits de tarea `e1493c3`/`ff0649c` y suite disponible de **499 PASS, 1 pending**; el worktree de tarea fija gitlink y lock al commit probado. El consumidor estable sigue fijado en `20c13a2`: faltan publicar upstream, release/tag, clon limpio, dos consumidores independientes y adopción del lock primario. No se eliminan scripts ni se modifica la skill global antes de esa evidencia. El plan canónico es `Agente/planes/plan-migracion-scripts-adapters-sentinel-2026-08-06.md`; el hardening adicional vive en `Agente/planes/plan-preflight-recuperacion-sentinel-2026-08-07.md`.
+
+**Detalle de SNT-16d — Preflight y recuperación segura.** Implementado en el worktree upstream: `sentinel doctor` detecta sourcePath/sourcePathEnv, CLI y `--version`, checkout sucio, gitlink, commits/versiones y lock; el gate real falla cerrado y `task recover --dry-run/real` exige TTL expirado, PID muerto, namespace, heads consistentes y worktree limpio. La auditoría de recuperación queda en `.sentinel/recovery/`. Pendientes: ampliar `task status`, publicar/release, clon limpio y paridad multi-proyecto; no se borran scripts.
 
 **Detalle de 028A-18 — Orquestación universal de tareas con Sentinel (en curso).** El plan canónico define una
 unidad de paralelismo por tarea (`claim → worktree/rama → gate → integración ff-only → cleanup`),
 ownership atómico, detección de carreras, takeover explícito y diagnóstico de basura. Sentinel 0.5.0
-está publicado en `origin/main` y `v0.5.0`; este consumidor fija `tools/sentinel` en `20c13a2` y
-`quality:lock --check` PASS. Quedan GC/runbook multi-OS y la verificación final del gate del consumidor.
-No se debe iniciar otra tarea de tooling sobre el mismo submódulo hasta integrar este bloque.
+está publicado en `origin/main` y `v0.5.0`; este consumidor conserva `tools/sentinel` en `20c13a2` mientras
+SNT-16d se publica y valida como release. Quedan GC/runbook multi-OS, publicación del upstream y la
+verificación final del gate del consumidor. No se debe iniciar otra tarea de tooling sobre el mismo
+submódulo hasta integrar este bloque.
 
 **018A-66 — Separar overlay personal de la sesión admin.** El código está cerrado (`52bf6e0c`): `overlay-sync` corta la sincronización con capacidad admin (clearOverlaySync) y la UI de conflicto cierra el modal en `render` si la sesión pasa a admin (guardia anti-flash ante órdenes de notificación distintos). Se añadió cobertura de la guardia UI (`overlay-conflict-ui.test.ts`): admin + estado conflict → sin modal; cuenta normal + conflict → modal abierto y se cierra al pasar a admin vía clearOverlaySync; sin conflict → sin modal. 89/89 tests del workspace y type-check PASS. **Pendiente de validación en navegador** (requiere sesión admin real del usuario): login, logout y recarga con admin sin modal de conflicto ni aviso `workspace actualizado`; con cuenta no-admin el conflicto solo aparece ante revisiones local/remota incompatibles. Después se continúa con hardening/E2E.
 

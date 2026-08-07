@@ -1,7 +1,7 @@
 # Inventario de scripts y adapters frente a Sentinel
 
 > Fecha de corte: 2026-08-07
-> Iniciativa canónica: `Agente/planes/plan-migracion-scripts-adapters-sentinel-2026-08-06.md`
+> Iniciativas canónicas: `Agente/planes/plan-migracion-scripts-adapters-sentinel-2026-08-06.md` y `Agente/planes/plan-preflight-recuperacion-sentinel-2026-08-07.md`
 
 ## Decisión
 
@@ -11,50 +11,31 @@ El plano universal debe vivir en Sentinel Core. El consumidor conserva únicamen
 
 | Capa | Ubicación | Estado | Decisión |
 |---|---|---|---|
-| Core universal | upstream Sentinel | Contrato SNT-16 no publicado desde este checkout | No fijar ni prometer capacidades ausentes en el gitlink. |
-| Manifest de stages | `tools/sentinel/src/core/` | Consumidor sigue en `20c13a2` limpio | El diseño upstream queda pendiente de commit/release recuperable. |
+| Core universal | upstream Sentinel | SNT-16c/SNT-16d implementado en commits `88e8ac7`, `e1493c3`, `ff0649c`; aún sin release estable nueva | No reemplazar automáticamente el plano local hasta publicar release/tag y validar clon limpio. |
+| Preflight/doctor | upstream Sentinel `src/core/diagnose.ts` | SNT-16d verificado | Diagnostica sourcePath/sourcePathEnv, CLI y `--version`, checkout Git dirty, gitlink, commits/versiones configurados y lock. El gate real falla cerrado antes de las etapas. |
+| Recuperación | upstream Sentinel `src/core/taskRecovery.ts` y CLI | SNT-16d verificado | `task recover --dry-run` exige tarea expirada, PID muerto, namespace, heads consistentes y worktree limpio; la recuperación real escribe auditoría. |
+| Manifest de stages | upstream Sentinel `src/core/` | SNT-16c validado | Envelope schema 1, legacy compatible, paths físicos contenidos y exit no cero fail-closed. |
 | Adapter del consumidor | `scripts/quality/adapter-manifest.mjs`, adapters | SNT-15 cerrado | Sigue como frontera local. |
 | Gate transitorio | `scripts/quality/task-check.mjs` | Se conserva | No se reemplaza por `sentinel check` hasta release y paridad real. |
 | Scripts de dominio | `scripts/run-with-db.mjs`, codegen, preparación DB | Se conservan | Encapsulan Rust/PostgreSQL y no entran al core universal. |
 | Analyzers | Sentinel + VarSense | Se conservan separados | VarSense es analyzer, no gate ni reporter paralelo. |
-| Fixtures SNT-16b | `scripts/quality/tests/fixtures/`, `snt-16b-parity.test.mjs` | Local, 2/2 PASS | Solo contrato/normalización; no sustituye dos proyectos ejecutados por Sentinel. |
 
-## Contrato objetivo upstream
+## Evidencia
 
-```json
-{
-  "schemaVersion": 1,
-  "stages": [
-    {
-      "name": "frontend",
-      "executable": "node",
-      "args": ["scripts/check.mjs", "{reportPath}"],
-      "reportPath": "frontend.json",
-      "expectedSchemaVersion": "1",
-      "timeoutMs": 120000,
-      "cwd": "."
-    }
-  ]
-}
-```
+- Sentinel SNT-16c/SNT-16d: `tsc` sin errores y suite upstream **499 passing, 1 pending** en el worktree de tarea.
+- Doctor, recovery y contrato CLI focalizados: PASS; el caso de proceso vivo se bloquea y el dry-run de una toma expirada pasa.
+- `node scripts/quality/lock-generator.mjs --write --json` y posteriormente `--check --json`: PASS en el worktree de tarea; `quality-tools.json` y `sentinel.lock.json` coinciden con el commit probado `ff0649c7a1b88596d42921f865a6e6871acfe0db`.
+- El consumidor de la tarea fija el gitlink a `ff0649c`; el consumidor primario todavía no se integra porque falta publicación upstream estable.
+- El guard auxiliar esperado por `npm run compile` dentro del submódulo no forma parte de ese checkout; la compilación directa con `tsc` y las suites ejecutadas sí pasan. Esto queda como limitación de provisionamiento, no como PASS del script wrapper.
 
-La lista legacy debe mantenerse temporalmente. La validación objetivo es estricta, fail-closed, con argv estructurado, timeouts acotados y contención física de manifest, reportRoot, reportes y cwd. `reportPath` relativo se resuelve contra `reportRoot`; `cwd` contra workspace.
+## Política de permanencia para scripts
 
-## Evidencia y límites actuales
-
-- Consumidor y submódulo Sentinel limpios; Sentinel fijado en `20c13a216e879303fcf5be7469a2821391b2ec0d` (`0.5.0`).
-- `ef9c751` no está en refs ni objetos recuperables del submódulo; no se cambia el gitlink ni se inventa un hash.
-- Fixture dirigida SNT-16b: **2 PASS, 0 FAIL**. Comprueba normalización y que severidad/mensaje forman parte de la identidad.
-- Suite consumidor: **223 PASS, 3 FAIL de entorno, 1 skip**. Los fallos requieren CLI Sentinel/VarSense y configuración local provisionada.
-- No hay evidencia de compilación upstream en esta sesión: el guard intenta cargar `quality-command-guard.mjs` ausente desde el worktree.
-
-## Rollback y permanencia
-
-Rollback inmediato: conservar gitlink `20c13a2`, `task-check` y adapter SNT-15. No borrar scripts ni modificar la skill global. La retirada exige un release upstream publicado, clon limpio compilable, al menos dos proyectos reales, cinco gates comparables, matriz multi-shell/CI, dos releases consecutivos y rollback/GC probado.
+Conservar scripts de dominio/proveedor, adapters externos estables, experiencia humana/IDE, bootstrap reproducible o un segundo consumidor real. Migrar solo capacidades universales con más de un caso o claramente agnósticas. No migrar ni copiar scripts históricos o de producción ajena.
 
 ## Siguiente bloque
 
-1. Obtener/publicar el cambio upstream en el repositorio autorizado.
-2. Compilar y ejecutar suite desde clon limpio.
-3. Ejecutar fixtures Node/Rust con envelope y legacy mediante el CLI real y comparar decisión, estado, severidad, `ruleId`, file, line y message.
-4. Fijar commit/capabilities/hash en `quality-tools.json` y `sentinel.lock.json`, repetir gate y solo entonces evaluar adelgazar `task-check`.
+1. Publicar `ff0649c` en upstream y crear release/tag compatible; no afirmar adopción estable antes de ello.
+2. Validar clon limpio, CLI real, dos proyectos consumidores y paridad envelope/legacy.
+3. Actualizar el lock del consumidor primario solo con artefacto/release verificables.
+4. Mantener scripts locales hasta dos releases consecutivas verdes; después medir y retirar solo archivos sin referencias.
+5. Actualizar la skill global únicamente cuando la release, lock, gate y una sesión nueva aporten evidencia.
