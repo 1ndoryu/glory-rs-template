@@ -167,8 +167,9 @@ npm run quality:reports:cleanup:dry
 `sentinel.lock.json` fija las versiones, commits, capacidades, protocolos y
 hashes de los analizadores. El gate consume los checkouts internos fijados en `quality-tools.json` mediante sus
 `sourcePath` relativos. Sentinel está fijado al commit coordinador publicado
-`20c13a216e879303fcf5be7469a2821391b2ec0d` (tag `v0.5.0`) y VarSense al commit declarado en el
-mismo archivo; `sentinel.lock.json` repite esos commits y hashes. `quality:setup`
+`44dc8fa00c9ac498e64cad0d6a4edd16afa752d8` (release `0.6.0`, tag `v0.6.0`) y VarSense al commit declarado en el
+mismo archivo; `sentinel.lock.json` repite esos commits y hashes. La release anterior `20c13a2`/`v0.5.0`
+queda disponible como rollback. `quality:setup`
 puede inicializar los submódulos y compilar sus CLIs en un clon limpio; cuando falta un CLI,
 `npm ci` y la suite de la herramienta se ejecutan en un staging temporal fuera del checkout
 Git y solo se copian artefactos generados/ignorados (`node_modules`/`out`) al submódulo. Si el
