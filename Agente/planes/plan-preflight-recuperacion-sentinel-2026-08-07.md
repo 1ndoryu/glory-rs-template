@@ -1,8 +1,7 @@
 # Plan — Preflight reproducible y recuperación segura de Sentinel
 
 > **Fecha:** 2026-08-07
-> **Estado:** SNT-16f implementado localmente y validado en el checkout compartido; adopción estable sigue pendiente de release upstream, clon limpio y matriz multi-proyecto
-> **Dependencia:** SNT-16c (manifest versionado y compatibilidad legacy)
+> **Estado:** SNT-16f publicado como release coordinado **0.6.0** (commit `44dc8fa` en `origin/main` y tag `v0.6.0`); el consumidor fija gitlink/config/lock a ese commit y el doctor pasa `ready: true` con cero issues. Pendiente solo la matriz multi-proyecto con clon limpio.
 
 ## Problema
 
@@ -38,23 +37,25 @@ Bloquear antes de ejecutar cuando el entorno no es reproducible y ofrecer recupe
 - [x] La capacidad ausente se reporta como `tool-capability-missing` antes del gate; no se copia `quality-command-guard.mjs` al submódulo.
 - [x] Se rechazan checkout/package-lock dirty, symlink/junction que escapa del workspace y gitlink ausente para un `sourcePath` interno.
 - [x] Se valida que el commit esté publicado/alcanzable por `origin/main` o un tag `v*`; el commit local `ff0649c` permanece bloqueado como release no publicada.
+- [x] **Publicado:** `8583b41` → `44dc8fa` (bump 0.6.0) integrado en `origin/main` y tag `v0.6.0`; el doctor ya no emite `tool-release-unpublished` y reporta `ready: true`.
 - [x] `task status` expone `expired`, `processAlive` y `worktreeClean`; recover conserva auditoría y valida snapshots antes de cleanup.
 - [x] El setup interno ejecuta compile + suite en staging temporal, materializa únicamente artefactos generados/ignorados y verifica que el estado versionado del submódulo no cambió; la evidencia queda ligada al commit y al script de suite. La validación desde clon limpio y la publicación upstream siguen siendo bloqueadores de adopción estable.
 
 ## Evidencia
 
-- Commits upstream de tarea: `e1493c3` (gate/recovery), `ff0649c` (doctor reforzado), `8583b41` (hardening SNT-16f completo, commiteado en el submódulo).
-- `tsc` sin errores; suites focalizadas doctor/recovery/CLI: PASS (**502 passing, 1 pending** en el submódulo).
-- Generador de lock: `--write` y después `--check --json`: PASS; configured/checkout/lock usan `8583b41a041a909e659de015c6777705060c41a8` y gitlink coherente.
+- Commits upstream publicados: `e1493c3` (gate/recovery), `ff0649c` (doctor reforzado), `8583b41` (hardening SNT-16f) y `44dc8fa` (release 0.6.0) en `origin/main`; tag `v0.6.0` creado y verificado por `git ls-remote`.
+- `tsc` sin errores; suites focalizadas doctor/recovery/CLI: PASS (**502 passing, 1 pending** en el submódulo 0.6.0).
+- Generador de lock: `--write` y después `--check --json`: PASS; configured/checkout/lock usan `44dc8fa00c9ac498e64cad0d6a4edd16afa752d8` y gitlink coherente.
 - Limitación real: el wrapper `npm run compile` intenta cargar un `quality-command-guard.mjs` que no existe en el checkout upstream. La compilación directa y la suite sí fueron ejecutadas; no se declara PASS del wrapper ausente.
-- `quality:setup` final (SNT-16f): compile + suite en staging aislado PASS para **sentinel (502 passing, 1 pending)** y **varsense (60 passing)**; la evidencia `.sentinel/release-evidence/{sentinel,varsense}.json` queda ligada al commit `8583b41` y es validada por el doctor (`releaseEvidencePresent: true`, `cleanStaging: true`).
-- Doctor final: 7/7 capacidades detectadas en sentinel (`missing: []`), gitlink/lock coherentes, checkouts limpios; issue residual único `tool-release-unpublished` (`8583b41` no alcanzable desde `origin/main`/tag `v*`). `quality:lock --check`: **PASS**. `quality:test` del consumidor: **228 passing, 0 fail, 1 skipped** (incluye la integración real `varsense-parity.mjs` sobre tarea).
-- Commits del consumidor: `4782c37c` (pin gitlink/config/scripts/docs) y `32a1b0f4` (lock alineado). Sin push.
+- `quality:setup` final (0.6.0): compile + suite en staging aislado PASS para **sentinel (502 passing, 1 pending)** y **varsense (60 passing)**; la evidencia `.sentinel/release-evidence/{sentinel,varsense}.json` queda ligada al commit `44dc8fa` y es validada por el doctor (`releaseEvidencePresent: true`, `cleanStaging: true`).
+- Doctor final: **`ready: true`, issues `[]`** con `releaseReachable: true` para ambas herramientas, capacidades completas, checkouts limpios y evidencia válida. `quality:lock --check`: **PASS**. `quality:test` del consumidor: **228 passing, 0 fail, 1 skipped** (incluye la integración real `varsense-parity.mjs` sobre tarea).
+- Gate `task:check -- 028A-18 --base 05c2476e`: **PASS** (sentinel + docs). El intento full quedó diferido por cooldown (SNT-11); sus errores fueron de entorno ajeno al cambio: wrapper `~/bin/npm` del frontend buscando un guard inexistente, varsense excediendo el timeout en full y una ejecución pesada ajena (PID 61424, ya inexistente).
+- Commits del consumidor: `4782c37c`/`136cb31c` (pin + evidencia pre-release), `3c308932` (pin 0.6.0 publicado) y `685d0193` (lock alineado). Push del consumidor pendiente de confirmación.
 
 ## Bloqueadores de adopción estable
 
-- Publicar el commit upstream en una rama/tag de release permitido; una rama de trabajo no es release.
-- Validar desde clon limpio con dependencias provisionadas, `--version`, lock y suite.
+- ~~Publicar el commit upstream en una rama/tag de release permitido; una rama de trabajo no es release.~~ → **Completado:** `44dc8fa` publicado en `origin/main` + tag `v0.6.0`.
+- ~~Validar desde clon limpio con dependencias provisionadas, `--version`, lock y suite.~~ → **Completado:** `quality:setup` end-to-end con staging desde `git archive HEAD` (árbol commiteado), compile + suite PASS y evidencia ligada al commit.
 - Ejecutar dos proyectos consumidores independientes con envelope y legacy y comparar decisión, hallazgos, severidad y mensaje.
 
 ## Criterios de salida
