@@ -1,7 +1,7 @@
 # Plan — Migración de scripts a Sentinel Core y adapters por proyecto
 
 > **Fecha:** 2026-08-06
-> **Estado:** SNT-16c upstream preparado en rama publicada `028A-6/stage-manifest-contract`, con contrato versionado, compatibilidad legacy y hardening físico; adopción estable aún bloqueada por falta de release/tag en `origin/main`, lock reproducible del consumidor y validación desde clon limpio. SNT-16d añade preflight fail-closed y diagnóstico de capacidades; no se retiran scripts ni se actualiza la skill global todavía.
+> **Estado:** SNT-16c/SNT-16d están implementados y verificados en la rama de tarea upstream (`e1493c3`, `ff0649c`) y el worktree consumidor fija temporalmente el gitlink/lock al commit probado; adopción estable aún bloqueada por publicación/release upstream, clon limpio y paridad multi-proyecto. No se retiran scripts. La skill global existente se conserva sin sustituir hasta la release y una sesión nueva.
 > **Ámbito:** calidad, coordinación de tareas y wrappers de desarrollo; migración reversible y por evidencia
 > **Relación:** complementa `Agente/planes/plan-global-quality-guard-agnostico-2026-08-02.md`, `Agente/planes/plan-sentinel-orquestacion-tareas-worktrees-2026-08-06.md` y `Agente/planes/plan-preflight-recuperacion-sentinel-2026-08-07.md`
 > **Fuente canónica de esta iniciativa:** este documento
@@ -15,11 +15,11 @@ No se copia `scripts/quality` a otros repositorios ni se elimina mientras no exi
 ## 2. Situación verificable
 
 - Consumidor primario sigue fijado en Sentinel `20c13a216e879303fcf5be7469a2821391b2ec0d` / `0.5.0`.
-- SNT-16c existe como commit recuperable `88e8ac7a4b92ba7a31eb44a85bd87802f47d15c3` y rama remota `028A-6/stage-manifest-contract`, pero no está integrado en `origin/main` ni etiquetado como release.
-- La compilación TypeScript y la suite upstream disponible pasan en el worktree de tarea: `497 passing, 1 pending`. El script `npm run test:unit` completo está condicionado por el guard auxiliar externo ausente en ese checkout.
-- SNT-16d añade diagnóstico read-only en `src/core/diagnose.ts` de sourcePath, gitlink, checkout dirty, CLI compilado/respondiente y commits configurados/lock; falta conectarlo al gate real y cubrir recovery.
-- El worktree de tarea apuntó provisionalmente `quality-tools.json` a `88e8ac7`; el consumidor primario no cambia gitlink ni lock hasta release y hash reproducible.
-- No se modifica la skill global ni se eliminan scripts públicos.
+- SNT-16c está publicado como rama de trabajo `028A-6/stage-manifest-contract`; SNT-16d está en commits locales de tarea `e1493c3`/`ff0649c`, aún no integrados en `origin/main` ni etiquetados como release.
+- La compilación TypeScript directa y la suite upstream disponible pasan en el worktree: `499 passing, 1 pending`. El wrapper `npm run compile` está condicionado por el guard auxiliar externo ausente en ese checkout; no se declara PASS del wrapper.
+- SNT-16d añade diagnóstico read-only completo y lo conecta al gate real; `task recover --dry-run/real` valida expiración, PID, namespace, heads y worktree limpio.
+- El worktree de tarea fija `quality-tools.json`, `sentinel.lock.json` y el gitlink a `ff0649c`; el consumidor primario conserva `20c13a2` hasta release y hash reproducible.
+- La skill global no se reemplaza antes de publicación y sesión nueva; no se eliminan scripts públicos.
 
 ## 3. Modelo objetivo
 
@@ -62,14 +62,14 @@ Schema estricto, selección/paridad desde disco, contención física y rechazo d
 
 **Evidencia SNT-16b:** fixture local dirigida **2/2 PASS**. El upstream añade ejecución real envelope/legacy en sus fixtures, pero aún faltan dos proyectos consumidores independientes y paridad CLI/LSP/editor/multi-shell en CI.
 
-### Fase 3c — Preflight y recuperación (`SNT-16d`) — implementación inicial
-- [x] Diagnóstico read-only `sentinel doctor` expone `ready`, códigos accionables y comprobación de sourcePath, gitlink, checkout dirty, CLI compilado/respondiente y commits del lock.
-- [ ] Conectar `assertWorkspaceReady` al gate real sin romper fixtures de no-policy ni el modo de transición local.
-- [ ] Añadir recuperación explícita de tareas expiradas: `status` diagnostica; `recover` valida PID muerto, estado stale, worktree limpio y namespace antes de cleanup.
-- [ ] Añadir fixtures de instalación incompleta, lock divergente, CLI ausente, checkout modificado y reinicio del agente.
-- [ ] Validar clon limpio y documentar rollback.
+### Fase 3c — Preflight y recuperación (`SNT-16d`) — implementación upstream verificada
+- [x] Diagnóstico read-only `sentinel doctor` expone `ready`, códigos accionables y comprobación de sourcePath/sourcePathEnv, gitlink, checkout dirty, CLI/`--version`, commits/versiones del lock.
+- [x] Conectar `assertWorkspaceReady` al gate real sin romper dry-run/no-policy.
+- [x] Añadir recuperación explícita de tareas expiradas: `status` diagnostica; `recover` valida PID muerto, estado stale, heads, worktree limpio y namespace antes de cleanup.
+- [x] Añadir fixtures de instalación incompleta, lock divergente, CLI ausente, proceso vivo y reinicio del agente; focalizados PASS.
+- [ ] Ampliar `task status` con estado derivado y validar clon limpio/release upstream.
 
-**Gate SNT-16d:** doctor JSON bloquea con evidencia antes de compilar/ejecutar; ningún cleanup automático toca un proceso vivo, worktree sucio o path ajeno.
+**Gate SNT-16d:** doctor bloquea con evidencia antes de ejecutar; ningún cleanup automático toca un proceso vivo, worktree sucio, rama divergente o path ajeno.
 
 ### Fase 4 — Reducción y retirada controlada (`SNT-17`)
 - [ ] Dos releases consecutivos multi-shell/CI.

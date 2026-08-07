@@ -11,8 +11,9 @@ El plano universal debe vivir en Sentinel Core. El consumidor conserva únicamen
 
 | Capa | Ubicación | Estado | Decisión |
 |---|---|---|---|
-| Core universal | upstream Sentinel | SNT-16c preparado en `88e8ac7`, rama remota de trabajo; falta release estable | No fijar `main` ni prometer adopción hasta release/tag y lock reproducible. |
-| Preflight/doctor | upstream Sentinel `src/core/diagnose.ts` | SNT-16d inicial | Diagnostica sourcePath, CLI, checkout dirty, gitlink y lock; falta conectarlo al gate y cubrir recovery. |
+| Core universal | upstream Sentinel | SNT-16c/SNT-16d implementado en commits `88e8ac7`, `e1493c3`, `ff0649c`; aún sin release estable nueva | No reemplazar automáticamente el plano local hasta publicar release/tag y validar clon limpio. |
+| Preflight/doctor | upstream Sentinel `src/core/diagnose.ts` | SNT-16d verificado | Diagnostica sourcePath/sourcePathEnv, CLI y `--version`, checkout Git dirty, gitlink, commits/versiones configurados y lock. El gate real falla cerrado antes de las etapas. |
+| Recuperación | upstream Sentinel `src/core/taskRecovery.ts` y CLI | SNT-16d verificado | `task recover --dry-run` exige tarea expirada, PID muerto, namespace, heads consistentes y worktree limpio; la recuperación real escribe auditoría. |
 | Manifest de stages | upstream Sentinel `src/core/` | SNT-16c validado | Envelope schema 1, legacy compatible, paths físicos contenidos y exit no cero fail-closed. |
 | Adapter del consumidor | `scripts/quality/adapter-manifest.mjs`, adapters | SNT-15 cerrado | Sigue como frontera local. |
 | Gate transitorio | `scripts/quality/task-check.mjs` | Se conserva | No se reemplaza por `sentinel check` hasta release y paridad real. |
@@ -21,20 +22,20 @@ El plano universal debe vivir en Sentinel Core. El consumidor conserva únicamen
 
 ## Evidencia
 
-- Sentinel SNT-16c: compilación TypeScript y suite disponible **497 PASS, 1 pending** en el worktree de tarea.
-- Doctor SNT-16d focalizado: detecta source/CLI ausentes y lock divergente; **3 PASS** junto con CLI/task coordinator.
-- El consumidor primario sigue en `20c13a2` / `0.5.0`; el worktree de tarea apunta provisionalmente a `88e8ac7` y no se ha fijado el lock primario.
-- La instalación de VarSense dejó una modificación accidental de `package-lock.json`; fue restaurada en el worktree de tarea. No quedan cambios en ese submódulo.
-- `npm run quality:lock --check` aún no es demostrable en el worktree porque el CLI VarSense no está compilado y el entorno no incluye el guard auxiliar esperado.
+- Sentinel SNT-16c/SNT-16d: `tsc` sin errores y suite upstream **499 passing, 1 pending** en el worktree de tarea.
+- Doctor, recovery y contrato CLI focalizados: PASS; el caso de proceso vivo se bloquea y el dry-run de una toma expirada pasa.
+- `node scripts/quality/lock-generator.mjs --write --json` y posteriormente `--check --json`: PASS en el worktree de tarea; `quality-tools.json` y `sentinel.lock.json` coinciden con el commit probado `ff0649c7a1b88596d42921f865a6e6871acfe0db`.
+- El consumidor de la tarea fija el gitlink a `ff0649c`; el consumidor primario todavía no se integra porque falta publicación upstream estable.
+- El guard auxiliar esperado por `npm run compile` dentro del submódulo no forma parte de ese checkout; la compilación directa con `tsc` y las suites ejecutadas sí pasan. Esto queda como limitación de provisionamiento, no como PASS del script wrapper.
 
-## Política de permanencia
+## Política de permanencia para scripts
 
 Conservar scripts de dominio/proveedor, adapters externos estables, experiencia humana/IDE, bootstrap reproducible o un segundo consumidor real. Migrar solo capacidades universales con más de un caso o claramente agnósticas. No migrar ni copiar scripts históricos o de producción ajena.
 
 ## Siguiente bloque
 
-1. Conectar `assertWorkspaceReady` al gate y definir la excepción explícita para proyectos sin `quality-tools` durante transición.
-2. Implementar `task recover --dry-run/real` con PID, TTL, namespace y worktree limpio.
-3. Publicar release Sentinel SNT-16c/SNT-16d, compilar desde clon limpio y regenerar/verificar locks.
-4. Ejecutar fixtures Node/Rust con envelope y legacy mediante CLI real y comparar paridad multi-shell/editor.
-5. Solo después evaluar adelgazar `task-check`; no retirar scripts antes de dos releases.
+1. Publicar `ff0649c` en upstream y crear release/tag compatible; no afirmar adopción estable antes de ello.
+2. Validar clon limpio, CLI real, dos proyectos consumidores y paridad envelope/legacy.
+3. Actualizar el lock del consumidor primario solo con artefacto/release verificables.
+4. Mantener scripts locales hasta dos releases consecutivas verdes; después medir y retirar solo archivos sin referencias.
+5. Actualizar la skill global únicamente cuando la release, lock, gate y una sesión nueva aporten evidencia.
