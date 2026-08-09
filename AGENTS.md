@@ -118,8 +118,8 @@ Los comandos directos pesados no sustituyen el gate.
 - `sentinel.lock.json`: commits, hashes, protocolos y capacidades realmente instalados.
 - `scripts/quality/`: adapter/orquestador de transición temporal; no se debe ampliar como segundo core. La migración y clasificación canónica viven en `Agente/planes/plan-migracion-scripts-adapters-sentinel-2026-08-06.md`.
 
-Sentinel está fijado en el submódulo `tools/sentinel`, release publicado `0.5.0`, commit
-`20c13a216e879303fcf5be7469a2821391b2ec0d`, disponible en `origin/main` y tag `v0.5.0`.
+Sentinel está fijado en el submódulo `tools/sentinel`, release publicado `0.6.0`, commit
+`44dc8fa00c9ac498e64cad0d6a4edd16afa752d8`, disponible en `origin/main` y tag `v0.6.0`.
 VarSense está fijado en `tools/varsense`, versión `2.2.0`, commit
 `e8360927ee92c4067f1f501dd77b951c8bc4f61d`, HEAD de `origin/main`. `quality-tools.json` y
 `sentinel.lock.json` deben coincidir con los gitlinks. Tras cambiar un submódulo: publicar primero,
