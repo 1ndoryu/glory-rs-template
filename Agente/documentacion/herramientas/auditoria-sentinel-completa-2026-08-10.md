@@ -1160,46 +1160,46 @@ avanzar.
 
 #### Checklist de migración
 
-- [ ] Fijar localmente el nuevo release/artifacts en un worktree exclusivo del consumidor.
-- [ ] Regenerar lock por el comando oficial; no editarlo a mano.
-- [ ] Mapear stages actuales a plugins/adapters declarativos.
-- [ ] Clasificar cada archivo y regla del inventario legacy con la tabla de ownership; ningún “custom” queda
-      como categoría residual sin explicación.
-- [ ] Para Wandorius, verificar individualmente las 15 reglas marcadas `MIGRATED_TO_SENTINEL` y decidir el
-      destino de `async-without-abort` y `subscription-without-dispose` con fixtures y evidencia.
-- [ ] Poner reglas migradas en observe-only sin duplicar findings; eliminarlas del scanner local tras paridad.
+- [x] Fijar localmente el nuevo release/artifacts en un worktree exclusivo del consumidor. *(F5, worktree `f5/consumer-migrate`; release 0.7.0 integrada en wandorius con `gate:check`)*
+- [x] Regenerar lock por el comando oficial; no editarlo a mano. *(`quality:lock --write` en ambos consumidores)*
+- [x] Mapear stages actuales a plugins/adapters declarativos. *(`quality-adapter.json` + `stage-process.mjs` + `stages.mjs`)*
+- [x] Clasificar cada archivo y regla del inventario legacy con la tabla de ownership; ningún “custom” queda
+      como categoría residual sin explicación. *(F5; `custom` retirado en ambos consumidores)*
+- [x] Para Wandorius, verificar individualmente las 15 reglas marcadas `MIGRATED_TO_SENTINEL` y decidir el
+      destino de `async-without-abort` y `subscription-without-dispose` con fixtures y evidencia. *(F5: 15 migradas verificadas; las 2 restantes son P1 con destino declarado en roadmap-sentinel)*
+- [x] Poner reglas migradas en observe-only sin duplicar findings; eliminarlas del scanner local tras paridad. *(scanner `custom` eliminado en wandorius `2244eee7` y glory-rs-rest `f13d0e16`)*
 - [ ] Mantener una comprobación específica solo si demuestra dominio/stack propio y cumple el contrato de
-      admisión; si es genérica, migrarla upstream o a plugin.
-- [ ] Retirar el stage `custom` cuando llegue a cero reglas únicas; un stage vacío no se conserva por
-      compatibilidad indefinida.
-- [ ] Mover scope, cache, budgets, scheduler, reporter, fast path y cierre al Core.
-- [ ] Convertir `npm run task:check -- <ID>` en alias de una línea a `sentinel check <ID>`.
-- [ ] Eliminar del alias toda lógica de preflight, selección, cache y reportes.
-- [ ] Implementar `sentinel task close` solo después de probar gate/integrate/cleanup/release.
-- [ ] Comparar invariantes de `task:take` vs `sentinel task`.
-- [ ] Migrar takeover únicamente cuando claim/TTL/heartbeat/ownership/recovery tengan paridad.
-- [ ] Mantener `task:take` como compatibilidad temporal si falta una invariante.
+      admisión; si es genérica, migrarla upstream o a plugin. *(las 2 P1 quedan como propuesta en roadmap-sentinel; el contrato de admisión sigue en extensionRegistry)*
+- [x] Retirar el stage `custom` cuando llegue a cero reglas únicas; un stage vacío no se conserva por
+      compatibilidad indefinida. *(retirado en ambos consumidores con suites verdes)*
+- [ ] Mover scope, cache, budgets, scheduler, reporter, fast path y cierre al Core. *(el Core ya posee scope/cache/scheduler/reporter/runner; la evaluación canónica de budgets y el cierre de la capa B quedan en el gate SNT-10)*
+- [ ] Convertir `npm run task:check -- <ID>` en alias de una línea a `sentinel check <ID>`. *(2026-08-10: `gate:check` es el gate canónico y CI lo ejecuta; `task:check` aún no es alias fino — pendiente de la capa B)*
+- [ ] Eliminar del alias toda lógica de preflight, selección, cache y reportes. *(pendiente con la capa B)*
+- [ ] Implementar `sentinel task close` solo después de probar gate/integrate/cleanup/release. *(pendiente, planificado)*
+- [ ] Comparar invariantes de `task:take` vs `sentinel task`. *(pendiente)*
+- [ ] Migrar takeover únicamente cuando claim/TTL/heartbeat/ownership/recovery tengan paridad. *(pendiente)*
+- [ ] Mantener `task:take` como compatibilidad temporal si falta una invariante. *(vigente)*
 
 #### Doble vía controlada
 
-- [ ] Ejecutar legacy y Core sobre el mismo scope-manifest sin duplicar análisis externo.
-- [ ] Comparar decisión, findings, líneas, severidad, estado y exit code.
-- [ ] Completar cinco tareas reales: docs, frontend, Rust, mixta y error de herramienta.
-- [ ] No activar enforce si hay divergencia no explicada.
-- [ ] Registrar duración de ambas vías por separado.
+- [x] Ejecutar legacy y Core sobre el mismo scope-manifest sin duplicar análisis externo. *(F5 + 2026-08-10: `observe-compare` con scope-manifest compartido)*
+- [x] Comparar decisión, findings, líneas, severidad, estado y exit code. *(108A-1 y 297A-78: decisión y hallazgos idénticos)*
+- [x] Completar cinco tareas reales: docs, frontend, Rust, mixta y error de herramienta. *(F5: 5 tareas reales; + 2 de paridad el 10-ago)*
+- [x] No activar enforce si hay divergencia no explicada. *(paridad sin divergencia; enforce activo)*
+- [x] Registrar duración de ambas vías por separado. *(metrics.json por vía)*
 
 #### Segundo consumidor
 
-- [ ] Adoptar el mismo release en un consumidor Node o Rust independiente.
-- [ ] Confirmar que no copia scripts ni reglas de wandori.us.
-- [ ] Confirmar rollback por pin y doctor/check después del rollback.
+- [x] Adoptar el mismo release en un consumidor Node o Rust independiente. *(glory-rs-rest, pin `a804c0d`/0.7.0)*
+- [x] Confirmar que no copia scripts ni reglas de wandori.us. *(glory-rs-rest mantiene su propio adapter y config; stage `custom` retirado)*
+- [x] Confirmar rollback por pin y doctor/check después del rollback. *(repin + lock + doctor PASS en ambos)*
 
 #### Gate de fase
 
-- [ ] `sentinel check` produce el único reporte canónico.
-- [ ] Alias npm tiene paridad exacta y overhead despreciable.
-- [ ] Dos consumidores independientes pasan fixtures.
-- [ ] Lock/doctor/capabilities alineados.
+- [x] `sentinel check` produce el único reporte canónico. *(2026-08-10: `gate:check` → `sentinel check --stages`; reportes en `.quality-reports/check/`)*
+- [ ] Alias npm tiene paridad exacta y overhead despreciable. *(paridad demostrada; `task:check` aún no es alias fino)*
+- [x] Dos consumidores independientes pasan fixtures. *(wandorius y glory-rs-rest en 0.7.0)*
+- [x] Lock/doctor/capabilities alineados. *(`quality:lock --check` pass y doctor PASS en ambos)*
 
 **Criterio de cierre:** un solo core y un solo gate en operación; legacy permanece solo como rollback.
 
@@ -1331,42 +1331,42 @@ avanzar.
 
 #### Checklist de adopción
 
-- [ ] Verificar que commit/tag/artifact estén publicados y alcanzables.
-- [ ] Actualizar pin/lock del consumidor por el comando oficial.
-- [ ] Actualizar runtime global y verificar `--version`, help, doctor y hash.
-- [ ] Ejecutar cinco gates reales dentro de presupuesto.
-- [ ] Mantener observe/alias legacy durante la ventana acordada.
-- [ ] Probar rollback real a la versión anterior.
-- [ ] Repetir el ciclo en un segundo release consecutivo.
+- [x] Verificar que commit/tag/artifact estén publicados y alcanzables. *(2026-08-10, 108A-6: release **0.7.0** (`a804c0d`) publicada en `origin/main` + tag `v0.7.0`, alcanzable desde las refs de release; el pin previo `c1f8f1f` solo vivía en la rama de feature y bloqueaba el preflight del Core)*
+- [x] Actualizar pin/lock del consumidor por el comando oficial. *(wandorius `79ca6507` y glory-rs-rest `5b542161`/`01e10d14`: gitlink + `quality-tools.json` a `a804c0d`/0.7.0, lock regenerado con `quality:lock --write`, `--check` pass, doctor PASS)*
+- [ ] Actualizar runtime global y verificar `--version`, help, doctor y hash. *(el runtime global local sigue en 0.6.4; los consumidores usan el CLI fijado del pin — la actualización del runtime global queda como opcional)*
+- [x] Ejecutar cinco gates reales dentro de presupuesto. *(F5: 5 tareas reales con doble vía 1:1; 2026-08-10: `observe-compare` en 108A-1 y 297A-78 con decisión y hallazgos idénticos)*
+- [x] Mantener observe/alias legacy durante la ventana acordada. *(`task:check` se conserva como compatibilidad; `gate:check` es el gate canónico)*
+- [x] Probar rollback real a la versión anterior. *(demo 14/14 de `rollbackRuntime` con `artifactSha256` verificado y perfiles restaurados byte a byte)*
+- [ ] Repetir el ciclo en un segundo release consecutivo. *(la release 0.7.0 es la primera; falta la segunda para cumplir el criterio de retirada del runbook §3)*
 
 #### Checklist de retirada
 
-- [ ] Retirar `scripts/quality` solo cuando no tenga referencias productivas.
-- [ ] Antes de borrar una carpeta personalizada, demostrar cero entrypoints/imports/CI/config, paridad de
-      findings y exit codes, rollback por commit y ausencia de reglas únicas sin destino.
-- [ ] Eliminar por commits pequeños y reversibles: primero referencias, luego código muerto, luego tests
-      exclusivos del legado; conservar fixtures que protejan la capacidad migrada.
+- [ ] Retirar `scripts/quality` solo cuando no tenga referencias productivas. *(capa B del runbook: `task:check` todavía la referencia; se retira en el gate SNT-10 tras dos releases)*
+- [x] Antes de borrar una carpeta personalizada, demostrar cero entrypoints/imports/CI/config, paridad de
+      findings y exit codes, rollback por commit y ausencia de reglas únicas sin destino. *(stage `custom` retirado en wandorius `2244eee7` y glory-rs-rest `f13d0e16`: cero referencias en code/CI/config, 15 reglas migradas al Core, 2 observe-only P1 con destino declarado, rollback por commit)*
+- [x] Eliminar por commits pequeños y reversibles: primero referencias, luego código muerto, luego tests
+      exclusivos del legado; conservar fixtures que protejan la capacidad migrada. *(retirada del stage `custom` en dos commits, uno por consumidor, con tests actualizados y suites verdes: 240 y 231 pass)*
 - [ ] No trasladar carpetas personales completas a una nueva ruta: extraer únicamente extensiones aprobadas
-      al namespace project-owned declarado.
-- [ ] Retirar `quality.config.json`, `quality-tools.json` y adapter legacy solo tras migración.
-- [ ] Retirar submódulos Sentinel/VarSense del consumidor.
-- [ ] Retirar `.quality-tools` y dependencias duplicadas mediante cleanup seguro.
-- [ ] Retirar `task:take` solo con paridad de invariantes.
-- [ ] Retirar shims legacy solo tras dos releases y uninstall/rollback probado.
-- [ ] Conservar lectura temporal de reportes legacy según tabla de deprecación.
+      al namespace project-owned declarado. *(sin carpetas personales en los consumidores; el adapter declarativo `quality-adapter.json` + `stage-process.mjs` es el namespace project-owned)*
+- [ ] Retirar `quality.config.json`, `quality-tools.json` y adapter legacy solo tras migración. *(siguen como fuente de transición del Core — 108A-6 registrado)*
+- [ ] Retirar submódulos Sentinel/VarSense del consumidor. *(pendiente de la retirada física)*
+- [ ] Retirar `.quality-tools` y dependencias duplicadas mediante cleanup seguro. *(pendiente de la retirada física)*
+- [ ] Retirar `task:take` solo con paridad de invariantes. *(pendiente de comparar invariantes con `sentinel task`)*
+- [ ] Retirar shims legacy solo tras dos releases y uninstall/rollback probado. *(capa A del runbook; la 0.7.0 es la primera release; `sentinel uninstall` ya está probado)*
+- [x] Conservar lectura temporal de reportes legacy según tabla de deprecación. *(`report-reader.mjs` read-only con metadata exacta de rama, sin escritura de aliases — SNT-16c)*
 
 #### Gate de fase
 
-- [ ] Release publicado verificable.
-- [ ] Dos consumidores adoptados.
-- [ ] Dos releases consecutivos con rollback.
-- [ ] Cero referencias productivas a legacy retirado.
-- [ ] Doctor/check PASS después de cleanup.
+- [x] Release publicado verificable. *(0.7.0 en `origin/main` + tag `v0.7.0`, compile + suite desde staging: 557 passing upstream)*
+- [x] Dos consumidores adoptados. *(wandorius y glory-rs-rest, ambos con pin `a804c0d`/0.7.0, lock y doctor PASS)*
+- [ ] Dos releases consecutivos con rollback. *(falta la segunda release en verde)*
+- [x] Cero referencias productivas a legacy retirado. *(stage `custom`: grep sin referencias en ambos consumidores)*
+- [x] Doctor/check PASS después de cleanup. *(`quality:lock --check` pass, doctor PASS y gate `gate:check` PASS tras la retirada)*
 
 **Criterio de cierre:** instalación por artifacts, adopción reproducible y duplicación retirada sin pérdida de
 rollback.
 
-**Estado: COMPLETADA** (branch `f1/cli-contracts` y `f3/varsense-perf` publicados en origin; checkout principal wandorius pin actualizado a `c1f8f1f`, lock regenerado, doctor PASS, gate definitivo PASS). Push autorizado por el usuario (2026-08-10).
+**Estado: COMPLETADA** (branch `f1/cli-contracts` y `f3/varsense-perf` publicados en origin; checkout principal wandorius pin actualizado a `c1f8f1f`, lock regenerado, doctor PASS, gate definitivo PASS). Push autorizado por el usuario (2026-08-10). **Actualización 108A-6 (2026-08-10):** la release se publicó correctamente como **0.7.0** (`a804c0d`, merge de la auditoría sobre `main` 0.6.4) en `origin/main` + tag `v0.7.0`; ambos consumidores (wandorius y glory-rs-rest) re-pinados a `a804c0d`/0.7.0 con lock y doctor PASS; gate canónico `gate:check` (`sentinel check --stages`) integrado en CI con paridad real en 108A-1 y 297A-78; stage `custom` retirado en ambos consumidores. Quedan condicionados a la segunda release en verde: retirada física de capa A (shims) y capa B (`scripts/quality`), `task:take`, `quality.config.json`/`quality-tools.json`/adapter legacy y submódulos/.quality-tools.
 
 ### Fase 9 — Verificación final, cierre documental y prevención
 
@@ -1376,16 +1376,16 @@ rollback.
 
 #### Checklist funcional
 
-- [ ] `sentinel init` funciona en las cuatro fixtures.
-- [ ] `sentinel doctor` diferencia analyze/gate readiness.
-- [ ] `sentinel check` es el único gate y produce JSON/Markdown válidos.
-- [ ] `task:check` es alias fino o ya fue retirado por deprecación.
-- [ ] VarSense cumple p95 ≤6 s.
-- [ ] Warm incremental <2 s y docs frío <5 s.
-- [ ] Unitarias <60 s; integración pesada separada y acotada.
-- [ ] Shims opcionales cumplen presupuesto o fueron retirados.
-- [ ] Coordinación local 1–4 agentes pasa sin residuos.
-- [ ] Rollback recupera una versión anterior funcional.
+- [x] `sentinel init` funciona en las cuatro fixtures. *(tests `projectInit.test.ts` del upstream 0.7.0)*
+- [x] `sentinel doctor` diferencia analyze/gate readiness. *(F1, `cliProcess.test.ts`)*
+- [x] `sentinel check` es el único gate y produce JSON/Markdown válidos. *(2026-08-10: `gate:check` genera el manifest y delega en `sentinel check --stages`; CI ejecuta `gate:check --ci`; paridad real en 108A-1 y 297A-78)*
+- [ ] `task:check` es alias fino o ya fue retirado por deprecación. *(sigue siendo el orquestador legacy completo; el alias fino se materializa con la retirada de la capa B en el gate SNT-10)*
+- [x] VarSense cumple p95 ≤6 s. *(bench warm-scoped p95 ~305 ms, presupuesto 6 s)*
+- [x] Warm incremental <2 s y docs frío <5 s. *(bench F3)*
+- [ ] Unitarias <60 s; integración pesada separada y acotada. *(la suite unit del upstream tarda ~2 min en conjunto; la separación de integración pesada sigue en curso)*
+- [ ] Shims opcionales cumplen presupuesto o fueron retirados. *(bench-shims p95 291–769 ms > 50 ms; la retirada de shims legacy queda tras dos releases — capa A)*
+- [x] Coordinación local 1–4 agentes pasa sin residuos. *(tests de concurrencia F6: `concurrency.test.ts`)*
+- [x] Rollback recupera una versión anterior funcional. *(demo 14/14 + `rollbackRuntime` en la suite upstream)*
 
 #### Checklist de trazabilidad
 
@@ -1411,29 +1411,31 @@ rollback.
 
 **Estado: COMPLETADA.** Auditoría completada el 2026-08-10. Todas las fases F0–F9 ejecutadas en orden. Release de Sentinel publicado en `github.com/1ndoryu/glory-sentinel.git` (branch `f1/cli-contracts`, commit `c1f8f1f`). Release de VarSense publicado en `github.com/1ndoryu/varsense.git` (branch `f3/varsense-perf`, commit `998505c`). Consumidor wandorius adoptado con pin `c1f8f1f`, lock regenerado y doctor PASS. Gate full ejecutado (028A-16 autorizado). Suite upstream: 536 passing, 1 pending. Suite consumidor: 244 pass, 1 skip, 0 fail.
 
+**Actualización 108A-6 (2026-08-10):** la release se publicó correctamente como **0.7.0** (`a804c0d`) en `origin/main` + tag `v0.7.0` (suite upstream 557 passing); ambos consumidores re-pinados a 0.7.0; gate canónico `gate:check` integrado en CI; paridad real en 108A-1 y 297A-78; stage `custom` retirado en ambos consumidores (suites 240 y 231 pass). Pendientes condicionados a la segunda release en verde: retirada física capa A (shims) y capa B (`scripts/quality`), `task:take`, config/adapter legacy y submódulos/.quality-tools.
+
 
 evidenciados; ninguna limitación se presenta como PASS.
 
 ### 14.5 Definition of Done global
 
-- [ ] Un proyecto nuevo llega a gate funcional en tres comandos o menos.
-- [ ] `sentinel check` es el único dueño de scope, cache, stages, budgets y reporte.
-- [ ] `doctor` no confunde analyzer listo con gate listo.
-- [ ] JSON stdout siempre parsea y los logs viven en stderr.
-- [ ] VarSense y el gate cumplen presupuestos frío/warm.
-- [ ] El consumidor no compila analyzers ni copia `scripts/quality`.
-- [ ] No existen carpetas personales ni código de quality ejecutable no declarado en los consumidores.
-- [ ] Toda extensión local restante tiene owner del proyecto, justificación, fixtures, presupuesto y sunset.
-- [ ] Ninguna regla/capability tiene más de un dueño productivo.
-- [ ] Sentinel/VarSense se distribuyen por artifacts fijados y verificables.
-- [ ] El adapter contiene solo integración real del stack.
-- [ ] `task` y shims son opcionales; el gate funciona sin ellos.
-- [ ] El modelo local y sus límites están documentados y probados.
-- [ ] Dos consumidores independientes adoptan el mismo release.
-- [ ] Dos releases consecutivos prueban rollback antes de retirar legacy.
-- [ ] Documentación operativa consolidada y versionada.
-- [ ] Todos los hallazgos de 14.4 tienen evidencia de resolución.
-- [ ] Gate final y supervisores aprueban el estado posterior al último cambio.
+- [x] Un proyecto nuevo llega a gate funcional en tres comandos o menos. *(`sentinel init` → `doctor` → `check`; presets node/rust/python/mixed en el upstream 0.7.0)*
+- [ ] `sentinel check` es el único dueño de scope, cache, stages, budgets y reporte. *(es la autoridad de cierre vía `gate:check` desde 2026-08-10; la evaluación canónica de budgets y la consolidación física de la capa B quedan para el gate SNT-10)*
+- [x] `doctor` no confunde analyzer listo con gate listo. *(F1: `readyForAnalyze` vs `readyForGate`)*
+- [x] JSON stdout siempre parsea y los logs viven en stderr. *(F1, `cliProcess.test.ts`)*
+- [x] VarSense y el gate cumplen presupuestos frío/warm. *(bench F3: warm-scoped p95 ~305 ms)*
+- [ ] El consumidor no compila analyzers ni copia `scripts/quality`. *(hasta la retirada física de la capa B)*
+- [x] No existen carpetas personales ni código de quality ejecutable no declarado en los consumidores. *(inventario F0 + adapter declarativo; stage `custom` retirado en ambos)*
+- [x] Toda extensión local restante tiene owner del proyecto, justificación, fixtures, presupuesto y sunset. *(extensionRegistry + `quality-adapter.json`)*
+- [x] Ninguna regla/capability tiene más de un dueño productivo. *(extensionRegistry rechaza colisiones)*
+- [x] Sentinel/VarSense se distribuyen por artifacts fijados y verificables. *(pins + hashes en `quality-tools.json`/lock; release 0.7.0)*
+- [x] El adapter contiene solo integración real del stack. *(stage-process/adapters del proyecto)*
+- [x] `task` y shims son opcionales; el gate funciona sin ellos. *(capabilities opcionales; `check` independiente de shims/perfiles)*
+- [x] El modelo local y sus límites están documentados y probados. *(ADR 0001 + alcance local F6)*
+- [x] Dos consumidores independientes adoptan el mismo release. *(wandorius y glory-rs-rest, ambos en 0.7.0 `a804c0d`)*
+- [ ] Dos releases consecutivos prueban rollback antes de retirar legacy. *(falta la segunda release)*
+- [x] Documentación operativa consolidada y versionada. *(F7 + runbook + roadmap-sentinel)*
+- [x] Todos los hallazgos de 14.4 tienen evidencia de resolución. *(14.4 RESUELTO)*
+- [ ] Gate final y supervisores aprueban el estado posterior al último cambio. *(gate final PASS; `sentinel_inspector`/`supervisor_reviewer` no disponibles en este entorno — pendiente de registrar)*
 
 ### 14.6 Riesgos, mitigaciones y decisiones de avance
 
