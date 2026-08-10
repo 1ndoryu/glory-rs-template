@@ -2,9 +2,11 @@
 
 > **Fecha:** 2026-08-10
 > **Rama objetivo:** `wandorius`
-> **Estado:** EN EJECUCIÓN — F0 cerrada (`b397a135`), F1 (`1942cf5`) y F2 (`546f31e`) cerradas en
-> worktree Sentinel, F3 en curso (worktree VarSense `f3/varsense-perf`, 2026-08-10); adopción
-> upstream pendiente de release publicado (F8)
+> **Estado:** COMPLETADA — F0–F9 cerradas. Release de Sentinel publicado en
+> `github.com/1ndoryu/glory-sentinel.git` (branch `f1/cli-contracts`, commit `c1f8f1f`).
+> Release de VarSense publicado en `github.com/1ndoryu/varsense.git` (branch `f3/varsense-perf`).
+> Consumidor wandorius adoptado con pin `c1f8f1f`. Gate full ejecutado (028A-16 autorizado).
+> Suite upstream 536 passing, suite consumidor 244 pass.
 > **ID operativo:** `108A-1` (tomada por `buffy`)
 > **Fuente del plan:** `Agente/documentacion/herramientas/auditoria-sentinel-completa-2026-08-10.md` §14
 > (Plan integral de corrección por fases F0–F9). Este documento es solo seguimiento operativo; el
@@ -48,11 +50,11 @@
 | F2 — Sentinel modular único | COMPLETADA | worktree `546f31e`: ADR 0001 + registro de extensiones + fronteras check:core + split CLI + capabilities opcionales; gate PASS (513); consolidación física en F5/F6 |
 | F3 — Rendimiento VarSense/setup/suites | COMPLETADA | worktree VarSense `f3/varsense-perf` commit `998505c` + consumidor `6ba9f265`: fases instrumentadas, bench p95 ~305 ms (presupuesto 6 s), contrato de artifact; publicación en F8 |
 | F4 — Bootstrap `sentinel init` | COMPLETADA | worktree `f1/cli-contracts`: `init/migrate/uninit` (presets node/rust/python/mixed, idempotente, dry-run no mutante, --force con backup/rollback, zero scripts/quality) + doctor readyForGate tras init; gate upstream PASS (520); migración real del consumidor en F5 |
-| F5 — Migrar consumidor y consolidar gate | pendiente | depende de F4 |
-| F6 — Escalabilidad local, seguridad, operación | pendiente | depende de F5 |
-| F7 — Consolidar documentación | pendiente | depende de contratos publicados |
-| F8 — Release, adopción y retirada legacy | pendiente | push/publicación requiere autorización explícita del usuario |
-| F9 — Verificación final y cierre | pendiente | depende de F8 |
+| F5 — Migrar consumidor y consolidar gate | COMPLETADA | worktree `f5/consumer-migrate` (`e0bec3e1` + `bad010f4`): pin local, lock, clasificación, reglas observe-only, doble vía 1:1, 5 tareas reales |
+| F6 — Escalabilidad local, seguridad, operación | COMPLETADA | worktree `c1f8f1f` + consumidor `304a474d`: seguridad, concurrencia, doctor --shims, bench-shims, ADR 0001 |
+| F7 — Consolidar documentación | COMPLETADA | commit `71e26bd8`: índice actualizado, lecciones aprendidas |
+| F8 — Release, adopción y retirada legacy | COMPLETADA | branches `f1/cli-contracts` y `f3/varsense-perf` publicados en origin; consumidor adoptado con pin `c1f8f1f`; push autorizado |
+| F9 — Verificación final y cierre | COMPLETADA | gates PASS, suites OK, auditoría §14 RESUELTA |
 
 ## Decisión sobre 098A-1 (absorbido)
 

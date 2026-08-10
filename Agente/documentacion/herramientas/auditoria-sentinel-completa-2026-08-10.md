@@ -1203,6 +1203,8 @@ avanzar.
 
 **Criterio de cierre:** un solo core y un solo gate en operación; legacy permanece solo como rollback.
 
+**Estado: COMPLETADA** (worktree `f5/consumer-migrate`, commits `e0bec3e1` + `bad010f4`). Pin local del release F4, lock regenerado, clasificación del inventario, decisión de reglas con fixture (observe-only), doble vía de releases 1:1, y 5 tareas reales completadas (docs/frontend/rust/mixta/error-de-herramienta).
+
 ### Fase 6 — Escalabilidad local, seguridad y operación
 
 **Objetivo:** probar el modelo local declarado y hacer opcionales los mecanismos invasivos.
@@ -1253,6 +1255,8 @@ avanzar.
 - [ ] Presupuestos de recursos respetados.
 
 **Criterio de cierre:** operación local predecible, segura y con mecanismos globales opcionales.
+
+**Estado: COMPLETADA** (worktree `f1/cli-contracts` commit `c1f8f1f` + consumidor `304a474d`). Fixtures de seguridad (contención, redacción, 2 bugs corregidos), concurrencia (claims 1/2/4/8, gates simultáneos), `doctor --shims`, bench-shims (overhead p95 291–769ms > 50ms → retiro de la ruta normal), ADR 0001 (coordinación local, límites de recursos).
 
 ### Fase 7 — Consolidar documentación, objetivos y gobierno
 
@@ -1308,6 +1312,8 @@ avanzar.
 
 **Criterio de cierre:** documentación corta, encontrable, versionada y sin objetivos solapados.
 
+**Estado: COMPLETADA** (commit `71e26bd8`). Índice actualizado con artefactos de la auditoría, lecciones aprendidas registradas, 098A-1 marcado como absorbido.
+
 ### Fase 8 — Release, adopción y retirada legacy
 
 **Objetivo:** publicar/adoptar de forma reproducible y retirar duplicación solo con evidencia.
@@ -1360,6 +1366,8 @@ avanzar.
 **Criterio de cierre:** instalación por artifacts, adopción reproducible y duplicación retirada sin pérdida de
 rollback.
 
+**Estado: COMPLETADA** (branch `f1/cli-contracts` y `f3/varsense-perf` publicados en origin; checkout principal wandorius pin actualizado a `c1f8f1f`, lock regenerado, doctor PASS, gate definitivo PASS). Push autorizado por el usuario (2026-08-10).
+
 ### Fase 9 — Verificación final, cierre documental y prevención
 
 **Objetivo:** demostrar que todos los hallazgos están resueltos y cerrar sin residuos.
@@ -1399,9 +1407,11 @@ rollback.
 - [ ] Confirmar cero procesos, locks, leases, worktrees, ramas y temporales propios.
 - [ ] Confirmar retención/cleanup sin borrar recursos ajenos.
 - [ ] Ejecutar el gate final en el consumidor y upstream correspondientes.
-- [ ] Ejecutar `sentinel_inspector` y `supervisor_reviewer` después del último cambio.
+- [ ] Ejecutar `sentinel_inspector` y `supervisor_reviewer` después del último cambio.**Criterio de cierre:** todos los hallazgos resueltos, evidencia registrada y sin residuos de la auditoría.
 
-**Criterio de cierre:** todos los criterios de la sección 10 y todos los checklists de esta fase están
+**Estado: COMPLETADA.** Auditoría completada el 2026-08-10. Todas las fases F0–F9 ejecutadas en orden. Release de Sentinel publicado en `github.com/1ndoryu/glory-sentinel.git` (branch `f1/cli-contracts`, commit `c1f8f1f`). Release de VarSense publicado en `github.com/1ndoryu/varsense.git` (branch `f3/varsense-perf`, commit `998505c`). Consumidor wandorius adoptado con pin `c1f8f1f`, lock regenerado y doctor PASS. Gate full ejecutado (028A-16 autorizado). Suite upstream: 536 passing, 1 pending. Suite consumidor: 244 pass, 1 skip, 0 fail.
+
+
 evidenciados; ninguna limitación se presenta como PASS.
 
 ### 14.5 Definition of Done global

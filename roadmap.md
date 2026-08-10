@@ -122,8 +122,40 @@ tras init completo (issue `tools-manifest-missing` eliminado: el contrato se red
 config+lock). Handlers en `src/cli/bootstrapCommands.ts` (commands.ts dentro del budget del
 ADR 0001). Gate upstream PASS: compile + lint (0 errores, 12 warnings de deuda) + check:core
 OK + test:unit **520 passing, 1 pending** (9 tests nuevos: presets v2, idempotencia,
-conflictos/backup, migrate no destructivo, uninit acotado, E2E CLI). Matriz de adopción
-multi-OS/CI y check completo de fixtures en F5.
+conflictos/backup, migrate no destructivo, uninit acotado, E2E CLI).
+
+**Fase 5 (COMPLETADA en worktree `f5/consumer-migrate`, commits `e0bec3e1` + `bad010f4`):**
+migración del consumidor y consolidación del gate. Pin local del release F4, lock
+regenerado, clasificación del inventario con tabla de ownership, decisión de
+`async-without-abort` y `subscription-without-dispose` (observe-only con fixture: 50% FP,
+sin core equivalente), doble vía de releases 1:1 (10 archivos mixtos), y cinco tareas
+reales completadas (docs PASS, frontend PASS, rust PASS, mixed PASS, error de herramienta
+= rust-test FAIL). El cierre del alias `task:check` → `sentinel check` y la retirada de
+`custom` quedan habilitados tras la adopción F8.
+
+**Fase 6 (COMPLETADA en worktree `f1/cli-contracts` commit `c1f8f1f` + consumidor
+`304a474d`):** escalabilidad local, seguridad y operación. Fixtures de seguridad
+(contención de paths con symlink/junction real, redacción con 2 bugs corregidos:
+`Authorization: Bearer <token>` expuesto y backtracking catastrófico de URL_CREDENTIALS
+60s→50ms; escritura atómica; lock corrupto). Concurrencia: claims 1/2/4/8 en el mismo
+workspace y 2/4 gates simultáneos (JSON íntegro, decisión idéntica). `doctor --shims`
+(`src/core/shimDiagnostics.ts`): lista el ganador real de PATH (cargo → GlorySentinel
+gana). Bench-shims: overhead p95 291–769ms > presupuesto 50ms → los shims legacy deben
+salir de la ruta normal (reemplazo canónico `sentinel guard`/`check`). ADR 0001 (F6):
+coordinación local por workspace/clon, límites de recursos. Gate upstream: 536 passing.
+
+**Fase 7 (COMPLETADA commit `71e26bd8`):** documentación consolidada. Índice documental
+actualizado con artefactos de la auditoría; lecciones aprendidas de F0–F6 registradas
+(bugs de redacción, overhead de shims, logging a stderr, regex FP, idempotencia de init,
+worktrees para cambios upstream).
+
+**Fase 8 (COMPLETADA):** release y adopción. Branch `f1/cli-contracts` (Sentinel) y
+`f3/varsense-perf` (VarSense) publicados en origin. Checkout principal wandorius adoptado
+con pin `c1f8f1f`, lock regenerado por el comando oficial, doctor PASS, gate definitivo
+PASS. Push autorizado por el usuario (2026-08-10).
+
+**Fase 9 (COMPLETADA):** verificación final y cierre. Auditoría §14 RESUELTA. Suite
+upstream: 536 passing, 1 pending. Suite consumidor: 244 pass, 1 skip, 0 fail.
 
 **098A-1 — Agilizar la ceremonia de cierre de calidad (ABSORBIDO por 108A-1, 10-08; aprobado
 09-08).** Conservado como historia. Plan original:
