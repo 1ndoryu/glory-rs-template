@@ -4,7 +4,7 @@
  * no presentar una ejecución de Sentinel como cobertura de otra etapa. */
 export const PROFILE_STAGE_RULES = Object.freeze({
   css: Object.freeze(['varsense']),
-  frontend: Object.freeze(['varsense', 'frontend', 'custom']),
+  frontend: Object.freeze(['varsense', 'frontend']),
   rust: Object.freeze(['rust']),
   docs: Object.freeze(['docs']),
 });

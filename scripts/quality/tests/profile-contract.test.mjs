@@ -4,7 +4,7 @@ import { EXECUTABLE_PROFILES, isFullExecution, PROFILE_STAGE_RULES, validateExec
 
 test('el contrato expone solo perfiles con etapas ejecutables', () => {
   assert.deepEqual([...EXECUTABLE_PROFILES], ['css', 'frontend', 'rust', 'docs']);
-  assert.deepEqual(PROFILE_STAGE_RULES.frontend, ['varsense', 'frontend', 'custom']);
+  assert.deepEqual(PROFILE_STAGE_RULES.frontend, ['varsense', 'frontend']);
   assert.doesNotThrow(() => validateExecutableProfiles(['docs', 'frontend']));
   assert.throws(() => validateExecutableProfiles(['workspace']), /Perfil sin etapa ejecutable/);
 });

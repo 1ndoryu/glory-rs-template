@@ -36,10 +36,10 @@ test('evaluateStageBudgets solo declara regresión con muestras y p95 suficiente
     stages: [
       { stage: 'varsense', samples: 8, p50: 9000, p95: 12000 },
       { stage: 'sentinel', samples: 2, p95: 5000 },
-      { stage: 'custom', samples: 6, p95: 10 },
+      { stage: 'docs', samples: 6, p95: 10 },
     ],
   };
-  const budgets = { varsense: 10000, sentinel: 3000, custom: 100 };
+  const budgets = { varsense: 10000, sentinel: 3000, docs: 100 };
   const violations = evaluateStageBudgets(profile, budgets, 5);
   assert.deepEqual(violations, [{ stage: 'varsense', budgetMs: 10000, p95: 12000, samples: 8 }]);
   assert.equal(evaluateStageBudgets(profile, {}, 5).length, 0, 'sin presupuestos no hay regresión');

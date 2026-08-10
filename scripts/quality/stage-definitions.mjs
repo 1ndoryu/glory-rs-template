@@ -4,7 +4,6 @@ import { runFrontend } from './adapters/frontend.mjs';
 import { runRust } from './adapters/rust.mjs';
 import { runSentinel } from './adapters/sentinel.mjs';
 import { runVarsense } from './adapters/varsense.mjs';
-import { runCustom } from './adapters/custom.mjs';
 import { adapterEnvironmentAllowlist, adapterStageNames, assertImplementedStages, assertStageParity, readAdapterManifest, resolveWorkspacePath, validateAdapterManifest } from './adapter-manifest.mjs';
 import { DEFAULT_ENV_ALLOWLIST } from './runner.mjs';
 import { isFullExecution, PROFILE_STAGE_RULES } from './profile-contract.mjs';
@@ -15,12 +14,11 @@ const STAGE_FACTORIES = {
   rust: (context, scope) => ({ name: 'rust', run: () => runRust(context, scope) }),
   frontend: context => ({ name: 'frontend', run: () => runFrontend(context) }),
   docs: (context, _scope, taskId) => ({ name: 'docs', run: () => runDocs(context, taskId) }),
-  custom: (context, scope) => ({ name: 'custom', run: () => runCustom({ ...context, scope }) }),
 };
 
 function legacyStageNames(scope) {
   const selected = isFullExecution(scope)
-    ? ['varsense', 'rust', 'frontend', 'docs', 'custom']
+    ? ['varsense', 'rust', 'frontend', 'docs']
     : [...scope.profiles].flatMap(profile => PROFILE_STAGE_RULES[profile] ?? []);
   return [...new Set(['sentinel', ...selected])];
 }

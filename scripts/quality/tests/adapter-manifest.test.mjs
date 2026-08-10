@@ -9,15 +9,15 @@ const manifest = {
   schemaVersion: 1,
   adapter: { id: 'fixture', version: '0.1.0', protocolVersion: 1, capabilities: ['structured-stage-process'], environment: { mode: 'runner-default', allowlisted: ['CI'] }, output: { schemaVersion: '1', exitCodes: { pass: 0, findings: 1, toolError: 2, cancelled: 130 } } },
   transport: { executable: 'node', entrypoint: 'scripts/quality/stage-process.mjs', arguments: ['--stage', '{stage}', '--report', '{reportPath}', '--task-id', '{taskId}'] },
-  stages: { sentinel: { timeoutMs: 1000 }, varsense: { timeoutMs: 1000 }, rust: { timeoutMs: 1000 }, frontend: { timeoutMs: 1000 }, docs: { timeoutMs: 1000 }, custom: { timeoutMs: 1000 } },
-  profiles: { frontend: ['varsense', 'frontend', 'custom'] },
+  stages: { sentinel: { timeoutMs: 1000 }, varsense: { timeoutMs: 1000 }, rust: { timeoutMs: 1000 }, frontend: { timeoutMs: 1000 }, docs: { timeoutMs: 1000 } },
+  profiles: { frontend: ['varsense', 'frontend'] },
 };
 
 test('lee y valida el manifest del adapter del proyecto', async () => {
   const loaded = await readAdapterManifest(process.cwd());
   assert.equal(loaded.adapter.id, 'wandorius-quality');
-  assert.deepEqual(manifestStageNames(loaded), ['sentinel', 'varsense', 'rust', 'frontend', 'docs', 'custom']);
-  assert.deepEqual(adapterStageNames(loaded, ['frontend'], false), ['sentinel', 'varsense', 'frontend', 'custom']);
+  assert.deepEqual(manifestStageNames(loaded), ['sentinel', 'varsense', 'rust', 'frontend', 'docs']);
+  assert.deepEqual(adapterStageNames(loaded, ['frontend'], false), ['sentinel', 'varsense', 'frontend']);
 });
 
 test('materializa argv sin shell y conserva placeholders conocidos', () => {

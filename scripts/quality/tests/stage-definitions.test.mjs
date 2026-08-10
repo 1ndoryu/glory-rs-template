@@ -10,8 +10,8 @@ const adapter = {
   schemaVersion: 1,
   adapter: { id: 'fixture', version: '0.1.0', protocolVersion: 1, capabilities: [], environment: { mode: 'runner-default', allowlisted: ['CI'] }, output: { schemaVersion: '1', exitCodes: { pass: 0, findings: 1, toolError: 2, cancelled: 130 } } },
   transport: { executable: 'node', entrypoint: 'scripts/quality/stage-process.mjs', arguments: ['--stage', '{stage}', '--report', '{reportPath}', '--task-id', '{taskId}'] },
-  stages: { sentinel: {}, varsense: {}, rust: {}, frontend: {}, docs: {}, custom: {} },
-  profiles: { css: ['varsense'], frontend: ['varsense', 'frontend', 'custom'], rust: ['rust'], docs: ['docs'] },
+  stages: { sentinel: {}, varsense: {}, rust: {}, frontend: {}, docs: {} },
+  profiles: { css: ['varsense'], frontend: ['varsense', 'frontend'], rust: ['rust'], docs: ['docs'] },
 };
 for (const definition of Object.values(adapter.stages)) definition.timeoutMs = 1000;
 
@@ -22,12 +22,12 @@ test('perfil explícito restringe etapas aunque el alcance sea full', () => {
 
 test('sin perfil explícito, full conserva todas las etapas', () => {
   const names = stageDefinitions(context, { full: true, executionFull: true, profileOverride: false, profiles: new Set() }, '028A-6', adapter).map(stage => stage.name);
-  assert.deepEqual(names, ['sentinel', 'varsense', 'rust', 'frontend', 'docs', 'custom']);
+  assert.deepEqual(names, ['sentinel', 'varsense', 'rust', 'frontend', 'docs']);
 });
 
-test('un perfil frontend incluye varsense y custom, pero no rust/docs', () => {
+test('un perfil frontend incluye varsense, pero no rust/docs', () => {
   const names = stageDefinitions(context, { full: false, profileOverride: true, profiles: new Set(['frontend']) }, '028A-6', adapter).map(stage => stage.name);
-  assert.deepEqual(names, ['sentinel', 'varsense', 'frontend', 'custom']);
+  assert.deepEqual(names, ['sentinel', 'varsense', 'frontend']);
 });
 
 test('el camino legacy sigue siendo compatible mientras migra', () => {

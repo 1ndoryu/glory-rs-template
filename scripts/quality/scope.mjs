@@ -259,8 +259,7 @@ export async function detectScope(context, args) {
   const changedFilesPath = path.join(context.reportRoot, 'changed-files.txt');
   await writeFile(changedFilesPath, `${transportFiles.join('\n')}\n`, 'utf8');
   /* [028A-8] Manifiesto único de alcance: archivos cambiados/eliminados, hashes
-   * de contenido, perfiles, dependencias locales y decisión full. Sentinel,
-   * VarSense, custom y la selección de tests pueden consumirlo sin repetir
+   * de contenido, perfiles, dependencias locales y decisión full. Sentinel,    * VarSense y la selección de tests pueden consumirlo sin repetir
    * descubrimientos Git/glob. changed-files.txt se conserva como transporte
    * plano compatible con el contrato `--files-from` de los analizadores. */
   const manifestPath = path.join(context.reportRoot, 'scope-manifest.json');

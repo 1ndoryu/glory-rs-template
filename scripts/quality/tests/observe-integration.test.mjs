@@ -41,13 +41,13 @@ test('stages.mjs genera el contrato declarativo con las etapas del manifest', as
 });
 
 test('stage-process.mjs escribe el contrato estructurado y replica el exit code', async () => {
-  const report = path.join(REPORT_FIXTURES, 'wrapper', 'custom.json');
+  const report = path.join(REPORT_FIXTURES, 'wrapper', 'docs.json');
   try {
-    const spawned = requireProcessResult(await execFileAsync(process.execPath, [path.join(SCRIPTS, 'stage-process.mjs'), '--stage', 'custom', '--report', report, '--task-id', '028A-6'], { cwd: process.cwd(), timeout: 120_000 }).catch(error => error), 'stage-process', [0, 1]);
+    const spawned = requireProcessResult(await execFileAsync(process.execPath, [path.join(SCRIPTS, 'stage-process.mjs'), '--stage', 'docs', '--report', report, '--task-id', '028A-6'], { cwd: process.cwd(), timeout: 120_000 }).catch(error => error), 'stage-process', [0, 1]);
     const parsed = JSON.parse(await readFile(report, 'utf8'));
     assert.equal(parsed.schemaVersion, '1');
     assert.ok(Array.isArray(parsed.entries), 'entries presente');
-    assert.equal(parsed.stage, 'custom');
+    assert.equal(parsed.stage, 'docs');
     assert.ok(Number.isFinite(Number(parsed.durationMs)));
     assert.ok([0, 1].includes(spawned.code));
   } finally { await rm(REPORT_FIXTURES, { recursive: true, force: true }); }

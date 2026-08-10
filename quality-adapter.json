@@ -41,12 +41,11 @@
     "varsense": { "timeoutMs": 300000 },
     "rust": { "timeoutMs": 1800000 },
     "frontend": { "timeoutMs": 600000 },
-    "docs": { "timeoutMs": 60000 },
-    "custom": { "timeoutMs": 60000 }
+    "docs": { "timeoutMs": 60000 }
   },
   "profiles": {
     "css": ["varsense"],
-    "frontend": ["varsense", "frontend", "custom"],
+    "frontend": ["varsense", "frontend"],
     "rust": ["rust"],
     "docs": ["docs"]
   }
