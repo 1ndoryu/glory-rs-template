@@ -11,12 +11,17 @@
 > **Fecha:** 2026-08-10  
 > **Alcance:** Sentinel Core/CLI, gate del consumidor `wandorius`, instalación en un proyecto nuevo,
 > rendimiento, escalabilidad, operación, contratos y documentación Markdown.  
-> **Modalidad:** auditoría de solo lectura. No se corrigió código, configuración, locks, dependencias ni
-> documentación existente. Este informe es el único entregable intencional.  
+> **Modalidad:** la auditoría base fue de solo lectura. El cierre posterior actualizó únicamente documentación
+> operativa, README y la skill de bootstrap; no se corrigió código, configuración, locks ni dependencias en
+> este bloque.
 > **Checkout auditado:** `glory-rust-template`, rama operativa `wandorius`.  
-> **Sentinel fijado por el consumidor:** 0.6.0, commit `44dc8fa00c9ac498e64cad0d6a4edd16afa752d8`.  
+> **Sentinel fijado por el consumidor al cierre:** 0.7.0, commit `a804c0d8bb55b2f44406aab4112d528150df05aa`.
 > **Runtime global activo observado:** 0.6.4.  
-> **Inspector independiente:** `sentinel_inspector` — `VEREDICTO: DEFECTO DETECTADO`.
+> **Inspector independiente de la auditoría base:** `sentinel_inspector` — `VEREDICTO: DEFECTO DETECTADO`.
+> **Estado documental actual:** RESUELTA CON PENDIENTES CONDICIONADOS. El gate canónico ya delega en
+> `sentinel check` mediante `gate:check`, el stage `custom` fue retirado de los dos consumidores y la skill
+> de bootstrap ya no recomienda copiar `scripts/quality`. La retirada física de la capa legacy espera una
+> segunda release verde con rollback.
 
 ## 1. Veredicto ejecutivo
 
@@ -668,14 +673,15 @@ proceso fue `RECHAZADO` por dos condiciones que esta auditoría no puede resolve
 2. el informe no fue añadido al índice documental canónico porque el usuario autorizó crear este Markdown,
    pero pidió no modificar código, configuración ni otros documentos todavía.
 
-Por ello, **la auditoría y su informe están completos como diagnóstico, pero el checkout no tiene cierre formal
-aprobado por el gate**. La corrección del gate y la indexación deben realizarse después, en una tarea de
-implementación autorizada y con ownership de los archivos preexistentes.
+Por ello, **el diagnóstico inicial quedó cerrado y la implementación posterior se documentó por separado**.
+El checkout actual tiene doctor/lock alineados y el gate canónico `gate:check` delega en `sentinel check`; la
+retirada física de la capa legacy sigue condicionada a una segunda release verde, rollback y verificación de
+ownership.
 
 ## 14. Plan integral de corrección por fases
 
-> **Estado:** EN EJECUCIÓN — Fase 0 iniciada el 2026-08-10 (tarea `108A-1`, autorizada por el
-> usuario: "ejecutar todas las tareas en orden"). El seguimiento operativo vive en
+> **Estado:** COMPLETADA CON PENDIENTES CONDICIONADOS — Fases F0–F9 ejecutadas y documentadas; la retirada
+> física de capas legacy espera una segunda release verde con rollback. El seguimiento operativo vive en
 > `Agente/planes/plan-ejecucion-auditoria-sentinel-2026-08-10.md`; el roadmap marca 098A-1 como
 > absorbido.  
 > **Fuente del plan:** hallazgos y evidencia de esta auditoría.  
@@ -1477,14 +1483,36 @@ Decisiones de avance:
 
 ### 14.7 Siguiente acción verificable
 
-Cuando se autorice iniciar implementación, el primer bloque será exclusivamente la **Fase 0**:
+El siguiente bloque ya no es la implementación inicial: es la **segunda release consecutiva en verde**.
 
-1. resolver ownership del cambio preexistente;
-2. crear/asignar el ID operativo;
-3. corregir el `ReferenceError` mínimo;
-4. añadir la prueba de proceso;
-5. ejecutar doctor, lock-check y un gate real;
-6. guardar la línea base segmentada.
+1. publicar/adoptar la segunda release de Sentinel con el mismo lock y capabilities verificables;
+2. ejecutar rollback real y repetir doctor, `quality:lock -- --check` y `gate:check` en ambos consumidores;
+3. confirmar cero referencias productivas a wrappers, `task:take`, `quality.config.json`, `quality-tools.json`,
+   adapter legacy, submódulos y `.quality-tools` antes de retirarlos;
+4. retirar por commits reversibles la capa A/B únicamente si todos los criterios del runbook se cumplen;
+5. ejecutar revisión documental final y actualizar el estado a `RESUELTA` solo con esa evidencia.
 
-No se inicia `sentinel init`, refactor Core, optimización VarSense ni retirada documental hasta que ese gate
-vuelva a producir evidencia confiable.
+Mientras falte esa segunda release, no se debe presentar la retirada física legacy como completada ni crear
+nuevos scripts de quality en ningún consumidor.
+
+### 14.8 Cierre documental de README y manuales
+
+**Estado:** COMPLETADO como bloque documental; publicación del submódulo pendiente de autorización/mecanismo
+de release.
+
+- [x] Reducir `tools/sentinel/README.md` de 542 a 125 líneas, dejando solo propuesta, quickstart, comandos,
+      compatibilidad y enlaces.
+- [x] Crear `tools/sentinel/docs/concepts.md`, `configuration.md`, `operations.md` y `migration.md`.
+- [x] Actualizar el README raíz con Sentinel 0.7.0, `gate:check`, bootstrap nuevo y migración legacy.
+- [x] Actualizar `AGENTS.md`, `roadmap.md`, `roadmap-sentinel.md`, el índice y los planes Sentinel para que
+      distingan estado vigente de snapshots históricos.
+- [x] Actualizar `quality-gate-setup` a v1.2.0 con clasificación Core/plugin/config/adapter/test/delete/
+      unknown, regla-un dueño, no borrado automático y rollback.
+- [x] Verificar que el CLI fijado 0.7.0 expone `init`, `migrate` y `uninit` en `--help`.
+- [x] Verificar `git diff --check` y ausencia de archivos documentales requeridos faltantes.
+- [ ] Publicar/repinear el submódulo después de revisar estos cambios; mientras esté sucio, `quality:lock
+      -- --check` y `sentinel doctor --json` deben fallar cerrado con `tool-checkout-dirty`.
+
+Esta última casilla no es un defecto del README: evita que cambios locales no publicados se presenten como
+el release fijado por el consumidor. Requiere un commit/release del submódulo y el mecanismo de publicación
+correspondiente; no se resuelve editando el lock a mano.

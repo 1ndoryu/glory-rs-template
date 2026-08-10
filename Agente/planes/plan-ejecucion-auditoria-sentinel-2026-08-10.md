@@ -2,11 +2,11 @@
 
 > **Fecha:** 2026-08-10
 > **Rama objetivo:** `wandorius`
-> **Estado:** COMPLETADA — F0–F9 cerradas. Release de Sentinel publicado en
-> `github.com/1ndoryu/glory-sentinel.git` (branch `f1/cli-contracts`, commit `c1f8f1f`).
-> Release de VarSense publicado en `github.com/1ndoryu/varsense.git` (branch `f3/varsense-perf`).
-> Consumidor wandorius adoptado con pin `c1f8f1f`. Gate full ejecutado (028A-16 autorizado).
-> Suite upstream 536 passing, suite consumidor 244 pass.
+> **Estado:** COMPLETADA CON PENDIENTES CONDICIONADOS — F0–F9 cerradas. Sentinel 0.7.0 está publicado en
+> `origin/main` + tag `v0.7.0`, commit `a804c0d8bb55b2f44406aab4112d528150df05aa`; ambos consumidores
+> están re-pinados a ese commit con lock/doctor PASS. El gate canónico es `gate:check` → `sentinel check`.
+> El stage `custom` fue retirado en ambos consumidores. La retirada física de capas legacy queda condicionada
+> a una segunda release verde con rollback.
 > **ID operativo:** `108A-1` (tomada por `buffy`)
 > **Fuente del plan:** `Agente/documentacion/herramientas/auditoria-sentinel-completa-2026-08-10.md` §14
 > (Plan integral de corrección por fases F0–F9). Este documento es solo seguimiento operativo; el
@@ -27,7 +27,7 @@
 
 - **Rama:** `wandorius` (checkout `glory-rust-template`), `ahead 1` de `origin/wandorius`; no se
   hace push.
-- **Pins:** Sentinel `v0.6.0` / `44dc8fa00c9ac498e64cad0d6a4edd16afa752d8` (submódulo
+- **Pins históricos:** Sentinel `v0.6.0` / `44dc8fa00c9ac498e64cad0d6a4edd16afa752d8` (submódulo
   `tools/sentinel`); VarSense `e8360927ee92c4067f1f501dd77b951c8bc4f61d` (submódulo
   `tools/varsense`); glory-rs `ec33d5200ff587543ae1611971ca196b50f2b17a`.
 - **Cambios preexistentes ajenos (preservados, ownership resuelto por esta tarea):**
@@ -53,7 +53,7 @@
 | F5 — Migrar consumidor y consolidar gate | COMPLETADA | worktree `f5/consumer-migrate` (`e0bec3e1` + `bad010f4`): pin local, lock, clasificación, reglas observe-only, doble vía 1:1, 5 tareas reales |
 | F6 — Escalabilidad local, seguridad, operación | COMPLETADA | worktree `c1f8f1f` + consumidor `304a474d`: seguridad, concurrencia, doctor --shims, bench-shims, ADR 0001 |
 | F7 — Consolidar documentación | COMPLETADA | commit `71e26bd8`: índice actualizado, lecciones aprendidas |
-| F8 — Release, adopción y retirada legacy | COMPLETADA | branches `f1/cli-contracts` y `f3/varsense-perf` publicados en origin; consumidor adoptado con pin `c1f8f1f`; push autorizado |
+| F8 — Release, adopción y retirada legacy | COMPLETADA CON PENDIENTE | release `0.7.0` (`a804c0d`) publicada y ambos consumidores adoptados; retirada física espera la segunda release verde con rollback |
 | F9 — Verificación final y cierre | COMPLETADA | gates PASS, suites OK, auditoría §14 RESUELTA |
 
 ## Seguimiento Retirada Legacy (108A-6, 2026-08-10)

@@ -2,7 +2,7 @@
 
 Template y aplicación web con **Rust (Axum) + PostgreSQL + Vanilla TypeScript/Vite + OpenAPI** en un solo repositorio.
 
-Pensado para velocidad de desarrollo, seguridad por defecto y calidad reproducible. Sentinel es el plano universal de coordinación y calidad; este checkout conserva `scripts/quality` únicamente como adapter/orquestador de transición hasta completar la migración documentada en `Agente/planes/plan-migracion-scripts-adapters-sentinel-2026-08-06.md`. VarSense es un analizador especializado invocado por Sentinel. No se deben copiar estos scripts a otros proyectos.
+Pensado para velocidad de desarrollo, seguridad por defecto y calidad reproducible. Sentinel es el plano universal de coordinación y calidad; este checkout conserva `scripts/quality` únicamente como adapter/orquestador de transición hasta completar la retirada física condicionada a dos releases verdes y rollback probado. VarSense es un analizador especializado invocado por Sentinel. No se deben copiar estos scripts a otros proyectos: los proyectos nuevos usan `sentinel init` y los proyectos legacy pasan por inventario y clasificación.
 
 ## Stack
 
@@ -150,12 +150,15 @@ archivos modificados, conserva los resultados por rama y escribe el detalle en
 `.quality-reports/branches/<branch-key>/<task-id>/`.
 
 ```bash
-# Gate local incremental; el ID debe existir en roadmap/planes/completados
-npm run task:check -- 028A-6
+# Gate local incremental canónico; el ID debe existir en roadmap/planes/completados
+npm run gate:check -- 028A-6
 
 # Gate completo para cierre de fase o CI (no repetir durante el cooldown)
-npm run task:check -- 028A-6 --full
-npm run task:check -- 028A-6 --ci
+npm run gate:check -- 028A-6 --full
+npm run gate:check -- 028A-6 --ci
+
+# Compatibilidad temporal; conserva la ruta legacy durante la ventana de migración
+npm run task:check -- 028A-6
 
 # Contratos y diagnóstico del stack de calidad
 npm run quality:test
@@ -165,9 +168,10 @@ npm run quality:reports:cleanup:dry
 ```
 
 `sentinel.lock.json` fija las versiones, commits, capacidades, protocolos y
-hashes de los analizadores. El gate consume los checkouts internos fijados en `quality-tools.json` mediante sus
-`sourcePath` relativos. Sentinel está fijado al commit coordinador publicado
-`44dc8fa00c9ac498e64cad0d6a4edd16afa752d8` (release `0.6.0`, tag `v0.6.0`) y VarSense al commit declarado en el
+hashes de los analizadores. El gate canónico `gate:check` genera el manifest declarativo y delega la decisión
+en `sentinel check`; `task:check` queda como alias de compatibilidad temporal. El gate consume los checkouts
+internos fijados en `quality-tools.json` mediante sus `sourcePath` relativos. Sentinel está fijado al commit
+coordinador publicado `a804c0d8bb55b2f44406aab4112d528150df05aa` (release `0.7.0`, tag `v0.7.0`) y VarSense al commit declarado en el
 mismo archivo; `sentinel.lock.json` repite esos commits y hashes. La release anterior `20c13a2`/`v0.5.0`
 queda disponible como rollback. `quality:setup`
 puede inicializar los submódulos y compilar sus CLIs en un clon limpio; cuando falta un CLI,
@@ -189,10 +193,33 @@ coordinado se instala aparte desde un artefacto publicado y verificable.
 Los wrappers de desarrollo (`npm run check:back`, `npm run check:front`,
 `npm run fmt:check` y `npm test`) siguen disponibles para trabajo específico,
 pero no sustituyen el reporte ni el control del gate. Para una validación que
-pueda cerrar una tarea, usa `task:check` desde la raíz del repositorio. Los
+pueda cerrar una tarea, usa `gate:check` desde la raíz del repositorio. `task:check`
+se conserva como compatibilidad temporal. Los
 scripts de `scripts/quality` no son una API para copiar: los adapters de este
 proyecto se reducirán gradualmente y las capacidades universales deben vivir en
 Sentinel Core.
+
+### Bootstrap y migración de proyectos
+
+Un proyecto nuevo debe usar el binario fijado de Sentinel 0.7.0 o una release posterior que exponga las
+capacidades requeridas:
+
+```bash
+sentinel --help
+sentinel init --preset mixed --project-root . --primary-branch <rama-real>
+sentinel doctor --json --workspace .
+npm run gate:check -- BOOTSTRAP-01
+```
+
+`init` es idempotente y no copia `scripts/quality`. Para un proyecto antiguo, ejecutar primero
+`sentinel migrate --project-root . --json` solo si `sentinel --help` ofrece ese comando; de lo contrario,
+seguir el inventario read-only de `quality-gate-setup`. Clasificar cada regla como Core, plugin,
+configuración, adapter específico, test, duplicado u origen desconocido antes de borrar o mover cualquier
+carpeta. Un origen desconocido bloquea la migración.
+
+La instalación global activa puede ser anterior al pin del consumidor. Si `sentinel --help` no muestra
+`init`, `migrate`, `check` o `task`, no se debe interpretar `doctor` como gate listo: actualizar el runtime
+desde un artefacto publicado, regenerar shims y repetir `--version`, `--help` y `doctor --json`.
 
 ### Desarrollo
 
@@ -210,4 +237,4 @@ El proyecto tiene configurado clippy en modo estricto (`[lints.clippy]` en Cargo
 - `clippy::all` → **deny** (error en cualquier warning estándar)
 - `clippy::pedantic` → **warn** (warnings extra para código idiomático)
 
-Antes de cerrar una tarea: `npm run task:check -- <ID>`; para una fase o publicación, repetir con `--full` o `--ci`. El gate deriva la base de datos/contexto por rama cuando una etapa Rust lo necesita.
+Antes de cerrar una tarea: `npm run gate:check -- <ID>`; para una fase o publicación, repetir con `--full` o `--ci`. El gate deriva la base de datos/contexto por rama cuando una etapa Rust lo necesita.

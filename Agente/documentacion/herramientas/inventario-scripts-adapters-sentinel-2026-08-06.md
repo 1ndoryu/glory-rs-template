@@ -3,11 +3,18 @@
 > Fecha de corte: 2026-08-07
 > Iniciativas canónicas: `Agente/planes/plan-migracion-scripts-adapters-sentinel-2026-08-06.md` y `Agente/planes/plan-preflight-recuperacion-sentinel-2026-08-07.md`
 
+> **Actualización de cierre 2026-08-10 (108A-6):** este inventario conserva abajo la fotografía histórica
+> de la transición 0.6.0. El estado operativo actual es Sentinel 0.7.0 (`a804c0d`) en wandorius y
+> glory-rs-rest, con lock/doctor alineados, `gate:check` delegando en `sentinel check` y stage `custom`
+> retirado en ambos consumidores. La retirada física de la capa B (`scripts/quality`) y de la capa A
+> (shims/wrappers) queda condicionada a una segunda release verde con rollback; no se deben crear nuevas
+> reglas ni copiar esta carpeta a otros proyectos.
+
 ## Decisión
 
-El plano universal debe vivir en Sentinel Core. El consumidor conserva únicamente un adapter pequeño y scripts que encapsulan dominio, proveedor, base de datos, generación o rescate operacional. No se copia `scripts/quality` a otros proyectos y no se retiran wrappers por estética.
+El plano universal debe vivir en Sentinel Core. El consumidor conserva únicamente un adapter pequeño y scripts que encapsulan dominio, proveedor, base de datos, generación o rescate operacional. No se copia `scripts/quality` a otros proyectos y no se retiran wrappers por estética; la retirada física se decide por release, paridad y rollback.
 
-## Estado por capa
+## Estado por capa (snapshot histórico 0.6.0)
 
 | Capa | Ubicación | Estado | Decisión |
 |---|---|---|---|
@@ -19,6 +26,16 @@ El plano universal debe vivir en Sentinel Core. El consumidor conserva únicamen
 | Gate transitorio | `scripts/quality/task-check.mjs` | Se conserva | No se reemplaza por `sentinel check` hasta release y paridad real. |
 | Scripts de dominio | `scripts/run-with-db.mjs`, codegen, preparación DB | Se conservan | Encapsulan Rust/PostgreSQL y no entran al core universal. |
 | Analyzers | Sentinel + VarSense | Se conservan separados | VarSense es analyzer, no gate ni reporter paralelo. |
+
+### Estado operativo vigente (release 0.7.0)
+
+| Superficie | Estado vigente | Próximo criterio |
+| --- | --- | --- |
+| Sentinel Core/CLI | `a804c0d` / 0.7.0, fijado en ambos consumidores | mantener lock, capabilities y release refs alineados |
+| Gate | `gate:check` → `sentinel check --stages` | `task:check` solo compatibilidad hasta la retirada de capa B |
+| Stage `custom` | retirado en wandorius y glory-rs-rest | no reintroducirlo sin contrato project-owned y justificación específica |
+| `scripts/quality` | transición legacy sin expansión | retirar tras segunda release verde y rollback |
+| VarSense | analyzer/plugin 2.2.0, no decide el cierre | conservar como etapa del reporte combinado |
 
 ## Evidencia
 

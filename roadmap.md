@@ -13,7 +13,7 @@
 - Identidad: `Agente/documentacion/design-system/manual-identidad-visual-os-2026-07-29.md`
 - Plan maestro: `Agente/planes/plan-escritorio-persistente-cuentas-admin-apps-2026-07-29.md`
 - Plan móvil: `Agente/planes/plan-experiencia-movil-launcher-2026-07-29.md`
-- Quality gate: `Agente/planes/completados/plan-escalabilidad-sentinel-wandorius-2026-07-29.md`
+- Quality gate: `Agente/documentacion/herramientas/auditoria-sentinel-completa-2026-08-10.md` + `roadmap-sentinel.md`
 - Prevención: `Agente/prevencion/prevencion-wandorius-sentinel-varsense-2026-07-29.md`
 - Tema claro/oscuro: `Agente/planes/plan-modo-oscuro-os-2026-07-31.md`
 - Juego bosque multijugador 3D: `Agente/planes/plan-juego-bosque-multijugador-2026-08-01.md`
@@ -38,7 +38,7 @@
 - El estado base implementado se resume abajo para conservar contexto sin convertir el roadmap en un historial.
 - El detalle de cada entrega terminada vive en `Agente/completados/` y en los planes archivados.
 - Una tarea solo se marca cuando tiene evidencia de código, pruebas, quality gate y, si es UI, navegador.
-- El cierre normal usa `npm run task:check -- {ID}` y `npm run self-check -- -TareaId {ID}`.
+- El cierre normal usa `npm run gate:check -- {ID}`; `task:check` y `self-check` son compatibilidad temporal.
 
 ## Estado base implementado (resumen operativo)
 
@@ -75,8 +75,10 @@ retirada física de la capa A (shims del repo + `quality-command-guard`) y de la
 (`preflightStartedAt` sin declarar → ReferenceError), `phaseDurationMs` en `metrics.json`,
 contención de analizadores (`**/.sentinel/**`, `**/.vscode-test/**`, `**/tools/**` en VarSense;
 `**/.sentinel/**` en Sentinel), herencia de tokens de sanción a etapas, inventario de
-`scripts/quality` con congelación de features, skill `quality-gate-setup` v1.1.0 corregida,
-suite `quality:test` 237/238 PASS y gate real estructurado. Pendiente único: gate **full**
+`scripts/quality` con congelación de features, skill `quality-gate-setup` v1.2.0 corregida,
+suite `quality:test` 237/238 PASS y gate real estructurado. El gate canónico vigente es `gate:check`;
+la retirada física legacy queda condicionada a una segunda release verde y rollback.
+Pendiente histórico: gate **full**
 definitivo (cooldown 180 min o `--allow-heavy` con autorización explícita, regla 028A-16).
 Baseline: `Agente/prevencion/bench-ceremonia-2026-08-09.md`.
 
@@ -156,13 +158,12 @@ actualizado con artefactos de la auditoría; lecciones aprendidas de F0–F6 reg
 (bugs de redacción, overhead de shims, logging a stderr, regex FP, idempotencia de init,
 worktrees para cambios upstream).
 
-**Fase 8 (COMPLETADA):** release y adopción. Branch `f1/cli-contracts` (Sentinel) y
-`f3/varsense-perf` (VarSense) publicados en origin. Checkout principal wandorius adoptado
-con pin `c1f8f1f`, lock regenerado por el comando oficial, doctor PASS, gate definitivo
-PASS. Push autorizado por el usuario (2026-08-10).
+**Fase 8 (COMPLETADA):** release y adopción. Sentinel 0.7.0 (`a804c0d`) y VarSense 2.2.0
+publicados en origin; wandorius y glory-rs-rest adoptaron el mismo pin, lock y doctor PASS.
+`gate:check` delega en `sentinel check`; push autorizado por el usuario (2026-08-10).
 
-**Fase 9 (COMPLETADA):** verificación final y cierre. Auditoría §14 RESUELTA. Suite
-upstream: 536 passing, 1 pending. Suite consumidor: 244 pass, 1 skip, 0 fail.
+**Fase 9 (COMPLETADA CON PENDIENTES CONDICIONADOS):** verificación final y cierre documental.
+La retirada física de capas A/B espera una segunda release verde con rollback.
 
 **098A-1 — Agilizar la ceremonia de cierre de calidad (ABSORBIDO por 108A-1, 10-08; aprobado
 09-08).** Conservado como historia. Plan original:
@@ -170,18 +171,16 @@ upstream: 536 passing, 1 pending. Suite consumidor: 244 pass, 1 skip, 0 fail.
 
 **028A-18 — Orquestación universal de tareas con Sentinel (en curso).** El siguiente bloque de tooling permanece serializado hasta completar su integración, gate y cleanup. La iniciativa SNT-12 queda registrada como plan dependiente/aprobable, no como tarea paralela habilitada.
 
-**SNT-12/SNT-13/SNT-16b/SNT-16c/SNT-16d/SNT-16f — Migración de scripts a Core y adapters por proyecto.** La transición local permanece integrada: `quality-adapter.json`, runner fail-closed, transporte argv, observe y fixtures Node/Rust (2/2 PASS). Sentinel publicó el release coordinado **0.6.0** (`44dc8fa` en `origin/main` + tag `v0.6.0`), que incorpora SNT-16c/16d/16f con suite de **502 PASS, 1 pending**; el checkout consumidor fija gitlink, config y lock a `44dc8fa` y el doctor pasa `ready: true` con cero issues. La release pública anterior `20c13a2`/`0.5.0` queda como rollback disponible. Pendiente: matriz multi-proyecto con clon limpio (dos consumidores independientes). No se eliminan scripts ni se modifica la skill global antes de esa evidencia. El plan canónico es `Agente/planes/plan-migracion-scripts-adapters-sentinel-2026-08-06.md`; el hardening adicional vive en `Agente/planes/plan-preflight-recuperacion-sentinel-2026-08-07.md`.
+**SNT-12/SNT-13/SNT-16b/SNT-16c/SNT-16d/SNT-16f — Migración de scripts a Core y adapters por proyecto (snapshot histórico 0.6.0).** La evidencia inicial de 0.6.0 queda conservada para trazabilidad. El estado vigente es 0.7.0 (`a804c0d`) en dos consumidores, con `gate:check` → `sentinel check`, stage `custom` retirado y skill v1.2.0 actualizada. Solo queda la segunda release verde con rollback antes de retirar físicamente las capas legacy.
 
-**Detalle de SNT-16d/SNT-16f — Preflight, capacidades y recuperación segura.** Publicado en el release coordinado **0.6.0** (`44dc8fa` en `origin/main` + tag `v0.6.0`): `sentinel doctor --json` detecta sourcePath/sourcePathEnv, CLI y `--version`, package metadata/dependencias/scripts, capacidades ausentes, symlink escapes, checkout/package-lock dirty, gitlink, commits/versiones, refs de release y evidencia de staging; el gate real falla cerrado y `task status` expone `expired/processAlive/worktreeClean`. `task recover --dry-run/real` exige TTL expirado, PID muerto, namespace, snapshots de metadata/HEAD y worktree limpio, con auditoría JSON. `quality:setup` usa staging temporal (`git archive HEAD` + entorno npm aislado) para construir CLIs faltantes y deja evidencia de compile+suite ligada al commit. Pendientes: matriz multi-proyecto con clon limpio; no se borran scripts.
+**Detalle de SNT-16d/SNT-16f — Preflight, capacidades y recuperación segura (snapshot histórico 0.6.0).** Los contratos se conservaron y fueron re-adoptados en 0.7.0; `doctor`, `task status`, `task recover` y `quality:setup` siguen sujetos al commit/lock fijado. No se debe usar este bloque histórico para bootstrap nuevo.
 
 **Detalle de 028A-18 — Orquestación universal de tareas con Sentinel (en curso).** El plan canónico define una
 unidad de paralelismo por tarea (`claim → worktree/rama → gate → integración ff-only → cleanup`),
-ownership atómico, detección de carreras, takeover explícito y diagnóstico de basura. Sentinel 0.5.0
-está publicado en `origin/main` y `v0.5.0`; la release pública/rollback permanece en `20c13a2`, mientras este
-checkout consumidor fija `tools/sentinel` en el release publicado `44dc8fa` (`v0.6.0`) para
-conservar la evidencia del hardening. Quedan GC/runbook multi-OS, publicación del upstream, clon limpio,
-la adopción estable y la verificación final del gate del consumidor. No se debe iniciar otra tarea de tooling
-sobre el mismo submódulo hasta integrar este bloque.
+ownership atómico, detección de carreras, takeover explícito y diagnóstico de basura. Sentinel 0.7.0
+está publicado en `origin/main` y `v0.7.0`; la release anterior permanece como rollback, mientras ambos
+consumidores fijan `tools/sentinel` en `a804c0d`. Este bloque queda histórico; la retirada física de capas
+legacy solo se ejecuta tras la segunda release verde y rollback.
 
 **018A-66 — Separar overlay personal de la sesión admin.** El código está cerrado (`52bf6e0c`): `overlay-sync` corta la sincronización con capacidad admin (clearOverlaySync) y la UI de conflicto cierra el modal en `render` si la sesión pasa a admin (guardia anti-flash ante órdenes de notificación distintos). Se añadió cobertura de la guardia UI (`overlay-conflict-ui.test.ts`): admin + estado conflict → sin modal; cuenta normal + conflict → modal abierto y se cierra al pasar a admin vía clearOverlaySync; sin conflict → sin modal. 89/89 tests del workspace y type-check PASS. **Pendiente de validación en navegador** (requiere sesión admin real del usuario): login, logout y recarga con admin sin modal de conflicto ni aviso `workspace actualizado`; con cuenta no-admin el conflicto solo aparece ante revisiones local/remota incompatibles. Después se continúa con hardening/E2E.
 

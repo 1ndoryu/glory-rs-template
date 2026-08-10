@@ -1,7 +1,13 @@
 # Plan — Migración de scripts a Sentinel Core y adapters por proyecto
 
 > **Fecha:** 2026-08-06
-> **Estado:** SNT-16c/SNT-16d/SNT-16f publicados en la release coordinada **0.6.0** (`44dc8fa` en `origin/main` + tag `v0.6.0`). El consumidor fija gitlink/lock al commit publicado y el doctor pasa `ready: true`. La release anterior `20c13a2`/`0.5.0` queda como rollback disponible. La adopción estable queda pendiente solo de la paridad multi-proyecto con clon limpio. No se retiran scripts. La skill global existente se conserva sin sustituir hasta la matriz y una sesión nueva.
+> **Estado histórico:** SNT-16c/SNT-16d/SNT-16f se cerraron inicialmente en 0.6.0 (`44dc8fa`). Este plan
+> quedó absorbido por la auditoría 108A-1/108A-6 y no es la fuente operativa actual.
+> **Cierre vigente (2026-08-10):** release coordinada **0.7.0** (`a804c0d`) publicada en `origin/main` +
+> tag `v0.7.0`; wandorius y glory-rs-rest están re-pinados con lock/doctor PASS, el stage `custom` fue
+> retirado y la skill `quality-gate-setup` está en v1.2.0. Solo queda la retirada física de capas legacy
+> después de una segunda release verde con rollback. Las secciones inferiores conservan evidencia histórica
+> de la transición 0.6.0 y no deben usarse para bootstrap nuevo.
 > **Ámbito:** calidad, coordinación de tareas y wrappers de desarrollo; migración reversible y por evidencia
 > **Relación:** complementa `Agente/planes/plan-global-quality-guard-agnostico-2026-08-02.md`, `Agente/planes/plan-sentinel-orquestacion-tareas-worktrees-2026-08-06.md` y `Agente/planes/plan-preflight-recuperacion-sentinel-2026-08-07.md`
 > **Fuente canónica de esta iniciativa:** este documento
@@ -108,4 +114,8 @@ No shell concatenado en manifests; paths contenidos y sin symlink/junction escap
 
 ## 8. Cierre de la skill global
 
-La skill global no se modifica antes de que Sentinel publique el contrato en una release, el consumidor lo fije y una sesión nueva confirme fixtures y gate. La política candidata es manifest versionado, paths físicos contenidos, errores fail-closed, preflight de capacidades y recuperación segura; por ahora queda documentada, no propagada.
+La skill global ya fue actualizada tras la publicación y fijación de 0.7.0. `quality-gate-setup` v1.2.0
+prohíbe copiar `scripts/quality`, exige inventario/clasificación de legacy, aplica una regla-un dueño,
+impide borrar ownership desconocido y documenta rollback, fixtures, presupuesto y sunset para adapters
+project-owned. Las casillas históricas de esta sección quedan superadas por la actualización verificable de
+la skill; la retirada física del código legacy sigue el runbook de dos releases.

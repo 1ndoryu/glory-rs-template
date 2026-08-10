@@ -1,6 +1,6 @@
 # Índice canónico de documentación de wandori.us
 
-> **Fecha:** 2026-07-29  
+> **Fecha de actualización:** 2026-08-10
 > **Objetivo:** indicar qué documento decide cada aspecto y evitar duplicación.
 
 ## Fuentes de verdad
@@ -12,7 +12,7 @@
 | ¿Cómo se separan módulos, datos, seguridad y contratos? | `Agente/documentacion/arquitectura/manual-arquitectura-wandorius-2026-07-29.md` |
 | ¿Cómo debe verse y comportarse visualmente el OS?       | `Agente/documentacion/design-system/manual-identidad-visual-os-2026-07-29.md`   |
 | ¿Cómo funciona el OS en teléfonos sin duplicar apps?    | `Agente/planes/plan-experiencia-movil-launcher-2026-07-29.md`                  |
-| ¿Cómo funciona el quality gate?                        | `Agente/planes/completados/plan-escalabilidad-sentinel-wandorius-2026-07-29.md` |
+| ¿Cómo funciona el quality gate?                        | `Agente/documentacion/herramientas/auditoria-sentinel-completa-2026-08-10.md` + `roadmap-sentinel.md` |
 | ¿Cómo funcionan comandos, menús, drag y estadísticas?  | `Agente/planes/plan-contratos-interaccion-comandos-medicion-2026-07-29.md`      |
 | ¿Qué reglas automáticas faltan?                         | `Agente/prevencion/prevencion-wandorius-sentinel-varsense-2026-07-29.md`        |
 | ¿Cómo está la salud arquitectónica del frontend (v1)?   | `Agente/documentacion/arquitectura/auditoria-arquitectura-frontend-2026-07-30.md` |
@@ -34,7 +34,10 @@
 | ¿Cómo se integra y versiona `glory-render` (submódulo, SemVer, CI)? | `Agente/documentacion/arquitectura/estrategia-integracion-glory-render-2026-08-05.md` |
 | ¿Cómo se ejecuta la auditoría y corrección de Sentinel y el quality gate? | `Agente/documentacion/herramientas/auditoria-sentinel-completa-2026-08-10.md` (plan: `Agente/planes/plan-ejecucion-auditoria-sentinel-2026-08-10.md`) |
 | ¿Qué decisión arquitectónica rige el producto único Sentinel? | `tools/sentinel/docs/adr/0001-producto-unico-sentinel.md` |
+| ¿Cuáles son los conceptos, configuración y operación vigentes de Sentinel? | `tools/sentinel/docs/concepts.md`, `tools/sentinel/docs/configuration.md`, `tools/sentinel/docs/operations.md` |
+| ¿Cómo se migra un gate legacy sin copiar carpetas ni conservar duplicados? | `tools/sentinel/docs/migration.md` + skill `quality-gate-setup` |
 | ¿Cómo se hace bootstrap de un proyecto nuevo con Sentinel? | `sentinel init --preset <node|rust|python|mixed>` (docs en ADR 0001 y auditoría §14 F4) |
+| ¿Cómo se migra o retira un gate legacy sin copiar scripts? | `C:\Users\Owner\.agents\skills\quality-gate-setup\SKILL.md` + auditoría §14.2 |
 | ¿Cómo se diagnostican shims y ejecutables del guard? | `sentinel doctor --shims` (`src/core/shimDiagnostics.ts`) |
 | ¿Cómo se paga la deuda SOLID del runtime de apps?       | `Agente/planes/plan-deuda-solid-runtime-2026-07-31.md`                             |
 | ¿Cómo se arregla el grid/placeholder/debug de iconos del escritorio? | `Agente/planes/plan-iconos-escritorio-grid-2026-08-05.md` |
@@ -66,7 +69,7 @@
 - Manual visual: creado a partir del concepto aprobado y la interfaz real.
 - Plan maestro: activo; debe ejecutarse por checklist.
 - Contratos de interacción y medición: activos; se cierran dentro de las tareas dueñas 297A-9–17.
-- Quality gate Sentinel/VarSense: implementado y archivado; CI y self-check usan el mismo core.
+- Quality gate Sentinel/VarSense: release 0.7.0 adoptada por wandorius y glory-rs-rest; `gate:check` delega en `sentinel check`; retirada física legacy condicionada a una segunda release verde con rollback.
 - Plan móvil: activo y bloqueado por runtime/workspace; tablet conserva desktop.
 - Plan del bosque multijugador 3D: dirección Three.js aprobada; assets externos GLB y terreno finito editable en 2D quedan planificados, mientras gameplay/realtime siguen bloqueados por dependencias.
 - Plan `glory-render`: propuesto para después de GAME-01/Fase 8; `frontend/src/features/game-core/` es candidato provisional y no se extrae sin segundo consumidor real. La Fase 0 quedó cerrada el 05-ago: auditoría (`auditoria-glory-render-fase0-2026-08-05.md` — 14 módulos CORE puros + `game-realtime` de frontera, sin dependencias de Three/DOM/red) y estrategia de integración/versionado (`estrategia-integracion-glory-render-2026-08-05.md` — submódulo fijado a etiqueta SemVer + dev local, política de licencias/CI/propietarios). Pendiente: aprobar la frontera con evidencia de segundo uso y abrir la Fase 1 (crear el repo).
@@ -74,7 +77,7 @@
 - Plan wandori.us original: superado; no es especificación activa.
 - Plan Sentinel/VarSense editor-agnóstico: trabajo histórico documentado en tareas completadas.
 - Matriz Sentinel/VarSense: actualizada con contrato de findings, comando combinado `all`, commits fijados, lockfile, branch-key y límites de runtime global.
-- Migración global 028A-6: tramo documental local actualizado; instalación del runtime global, sincronización upstream y matriz multi-shell permanecen pendientes explícitos.
+- Migración global 028A-6/108A-6: release 0.7.0, lock/doctor y matriz de consumidores verificadas; pendientes únicamente la segunda release verde y retirada física de capas legacy.
 - Auditoría arquitectónica frontend v1: activa; plan de refactorización parcialmente ejecutado.
 - Auditoría arquitectónica frontend v2: activa; 3 críticos, 5 altos, 8 medios identificados.
 - Plan refactorización arquitectura: activo; runtime móvil 297A-12 implementado parcialmente con `mobile-shell.ts`/`mobile-stack.ts`; revisar gate de transición antes de avanzar.

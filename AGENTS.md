@@ -12,7 +12,8 @@ applyTo: '**'
 ## 1. Prioridad del proyecto
 
 1. Leer `roadmap.md` completo y revisar los planes activos de `Agente/planes/`; ejecutar solo el siguiente bloque habilitado.
-2. Usar el gate unificado antes de cerrar cualquier tarea: `npm run task:check -- <ID>`.
+2. Usar el gate unificado antes de cerrar cualquier tarea: `npm run gate:check -- <ID>`; `task:check` solo
+   permanece como compatibilidad legacy.
 3. No iniciar seguridad, runtime, workspace, móvil, programas, juegos o comercio si su dependencia documental/técnica está abierta.
 4. Cambios visuales materiales requieren actualizar el manual aplicable y validación real en navegador.
 5. Deploy está fuera de alcance salvo instrucción explícita del usuario; producción usa exclusivamente Coolify Manager.
@@ -84,10 +85,11 @@ La rama primaria de este consumidor es `wandorius`; no asumir `main`. Está decl
 
 ## 6. Gate del proyecto
 
-El único cierre normal es:
+El único cierre normal es `gate:check`, que genera el manifest declarativo y delega la decisión en
+`sentinel check`:
 
 ```text
-npm run task:check -- <ID>
+npm run gate:check -- <ID>
 ```
 
 Orden del gate: preflight → Sentinel → VarSense → stack afectado → reporte Markdown/JSON. El detalle
@@ -98,7 +100,8 @@ el cooldown de 180 minutos. Las excepciones `--allow-heavy` requieren motivo y q
 Comandos del consumidor:
 
 ```text
-npm run task:check -- <ID>
+npm run gate:check -- <ID>
+npm run task:check -- <ID>       # compatibilidad temporal; no añadir lógica nueva aquí
 npm run quality:test
 npm run quality:doctor
 npm run quality:lock -- --check
@@ -116,10 +119,13 @@ Los comandos directos pesados no sustituyen el gate.
 - `quality.config.json`: alcance, perfiles, tiempos, cachés, retención y guard de transición.
 - `quality-tools.json`: repositorios, commits, versiones, capacidades, CLIs y source paths.
 - `sentinel.lock.json`: commits, hashes, protocolos y capacidades realmente instalados.
-- `scripts/quality/`: adapter/orquestador de transición temporal; no se debe ampliar como segundo core. La migración y clasificación canónica viven en `Agente/planes/plan-migracion-scripts-adapters-sentinel-2026-08-06.md`.
+- `scripts/quality/`: adapter/orquestador de transición temporal; no se debe ampliar como segundo core ni copiar a otro proyecto. La migración y clasificación canónica viven en `Agente/documentacion/herramientas/auditoria-sentinel-completa-2026-08-10.md` §14 y en la skill `quality-gate-setup`.
+- Los agentes no crean carpetas personales, analyzers ni reglas de quality sin declaración project-owned,
+  fixtures, presupuesto, owner único y sunset. Una finalidad desconocida bloquea la migración; no se borra
+  por el nombre de la carpeta.
 
-Sentinel está fijado en el submódulo `tools/sentinel`, release publicado `0.6.0`, commit
-`44dc8fa00c9ac498e64cad0d6a4edd16afa752d8`, disponible en `origin/main` y tag `v0.6.0`.
+Sentinel está fijado en el submódulo `tools/sentinel`, release publicado `0.7.0`, commit
+`a804c0d8bb55b2f44406aab4112d528150df05aa`, disponible en `origin/main` y tag `v0.7.0`.
 VarSense está fijado en `tools/varsense`, versión `2.2.0`, commit
 `e8360927ee92c4067f1f501dd77b951c8bc4f61d`, HEAD de `origin/main`. `quality-tools.json` y
 `sentinel.lock.json` deben coincidir con los gitlinks. Tras cambiar un submódulo: publicar primero,

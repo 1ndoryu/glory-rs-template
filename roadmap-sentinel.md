@@ -7,6 +7,13 @@
 
 > **Estado (018A-43):** mínimo operativo cerrado y verificado; el roadmap principal queda desbloqueado. El commit no es requisito universal: el reporte recuerda cuándo conviene hacer staging/commit/push y cuándo documentar trabajo intermedio o compartido. El gate sí exige prueba y reporte reproducibles.
 
+> **Estado vigente (108A-6, 2026-08-10):** Sentinel 0.7.0 (`a804c0d`) está publicado y fijado en
+> wandorius y glory-rs-rest. `gate:check` genera el manifest y delega la decisión en `sentinel check`;
+> `task:check` queda como compatibilidad temporal. El stage `custom` fue retirado de ambos consumidores.
+> La skill `quality-gate-setup` v1.2.0 ya prohíbe copiar `scripts/quality` y documenta la migración de
+> carpetas legacy. Solo permanece pendiente la retirada física de las capas A/B tras una segunda release
+> verde con rollback. Las secciones históricas inferiores conservan evidencia de la transición.
+
 > **Toma de tareas (028A-17, 2026-08-05; enforcement 018A-97):** los agentes marcan la tarea que empiezan y la liberan al terminar. `npm run task:take -- --task <ID> --by <agente>` crea un marcado en `.quality-reports/task-takeover/<taskId>.json` (ignorado por git) cuyo identificador `T-<epochMs>-<hex8>` codifica el instante exacto de la toma; `npm run task:status` lista tomas y expiraciones; `npm run task:release -- --task <ID>` libera. Reglas: una tarea tomada por otro agente activo se rechaza (exit 1); un marcado que supera 6 h sin liberarse se considera olvidado y cualquier agente puede re-tomarlo (`--force`, con aviso) o liberarlo. **Enforcement:** `task:check -- <ID>` **bloquea (exit 78)** el cierre de una tarea tomada por otro agente activo salvo `--allow-foreign` explícito (validación legítima tipo CI); la toma propia se renueva en cada gate (heartbeat, trabajo largo no expira a mitad); y cualquier `task:check`/`run-with-db`/`glory-dev` muestra un banner `EN CURSO` por cada toma ajena activa, no solo la tarea objetivo. El reporte expone `taskTakeover`. Verificado: `quality:test` 210/210 y flujo real take/status/conflicto/check-bloqueado(78)/check-allow-foreign/heartbeat/release en vivo. Regla documentada en `AGENTS.md` §6.
 
 > **Decisión de alcance:** las fases SNT-02 a SNT-10 que siguen con casillas abiertas son backlog diferido. No se ejecutan como requisito de una tarea del producto mientras el gate mínimo pase, no haya regresión de rendimiento y no aparezca un finding bloqueante real. Las extensiones de reglas, paridad de adapters, benchmarks y publicación upstream quedan para una iteración específica de tooling.
@@ -31,16 +38,18 @@ Con este checklist cerrado, las mejoras restantes de este documento son backlog 
 - Reglas de seguridad y arquitectura de baja frecuencia (MFA, permisos client-only, webhooks, rollback optimista).
 - Perfiles de tema, referencias circulares y precisión avanzada de VarSense.
 - Publicación upstream, reinstalación `.vsix`, changelog, ADR y guía de migración.
-- Consolidación de Sentinel como plano único (`SNT-10`), incluida la migración reversible de configuración y la retirada del scheduler duplicado.
+- Retirada física de la capa A/B (`SNT-10`): la autoridad ya es `sentinel check`; quedan dos releases verdes,
+  rollback y cero referencias productivas antes de eliminar wrappers, `task:take`, configs/adapters legacy,
+  submódulos y `.quality-tools`.
 
 ## Cómo usar este roadmap
 
 - Los IDs `SNT-*` son identificadores internos de este roadmap; al ejecutar una tarea se les asignará el task ID diario exigido por `AGENTS.md`.
 - Una casilla solo se marca con evidencia: fixture, prueba CLI/LSP/VS Code equivalente, reporte y quality gate.
 - El core de Sentinel/VarSense no recibe reglas, rutas, nombres de clases, idiomas ni decisiones de wandori.us.
-- **Estado actual:** el proyecto todavía separa `sentinel.config.json`, `varsense.config.json`, `quality.config.json` y `quality-tools.json`; son contratos de transición.
+- **Estado actual:** el proyecto todavía conserva `sentinel.config.json`, `varsense.config.json`, `quality.config.json` y `quality-tools.json`; los dos últimos son contratos de transición y no deben copiarse a proyectos nuevos.
 - **Destino:** `sentinel.config.json` v2 contiene política, gate, guard, runtime y analyzers; `sentinel.lock.json` fija versiones/hashes. VarSense no crea gate, cooldown ni reporte de cierre propio.
-- Mientras exista una regla en scripts locales, el adaptador debe marcarla como puente temporal y registrar su paridad con el core.
+- Mientras exista una regla en scripts locales, el adaptador debe marcarla como puente temporal y registrar su paridad con el core; no se crean nuevas reglas ni carpetas personales de agentes.
 - Cada fase termina con revisión SOLID, rendimiento, falsos positivos, seguridad de paths/secretos y compatibilidad Windows/Linux/macOS.
 
 ## Estado 028A-8 (tramos 1–5) y 028A-6 (SNT-10 — Fase 1 cerrada)
