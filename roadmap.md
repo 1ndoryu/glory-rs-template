@@ -84,16 +84,29 @@ absorbidos) y gate upstream PASS (compile + lint + test:unit 506/506). Los ítem
 restantes (perfil segmentado y presupuestos en `sentinel check`) caen con la consolidación
 F4/F5.
 
-**Fase 2 (cerrada en worktree `f1/cli-contracts`, adopción en F8):** Sentinel delimitado como
-producto único. ADR 0001 (`docs/adr/0001-producto-unico-sentinel.md`: gate = `sentinel check`,
-módulos `analysis`/`gate`/`runtime`/`task`/`editor`, una regla un dueño, budgets de tamaño);
-registro de extensiones (`extensionRegistry.ts` — colisiones de rule IDs contra el núcleo y
-entre extensiones, ejecutables no declarados); fronteras en `check:core` (cli sin `vscode`,
-DIP sin módulos del editor ni `scripts/quality`, `check` independiente de shims/perfiles/
-worktrees, budgets por módulo); CLI dividido en `args.ts` + `commands.ts` + barril; `task`/
-`recover`/shims como capabilities opcionales del doctor. Gate upstream PASS: compile + lint
-(0 errores) + test:unit **513 passing, 1 pending** (7 tests nuevos) + check:core OK. La
-consolidación física de archivos en los módulos queda en F5/F6.
+**Fase 2 (cerrada en worktree `f1/cli-contracts` `546f31e`, adopción en F8):** Sentinel
+delimitado como producto único. ADR 0001 (`docs/adr/0001-producto-unico-sentinel.md`: gate =
+`sentinel check`, módulos `analysis`/`gate`/`runtime`/`task`/`editor`, una regla un dueño,
+budgets de tamaño); registro de extensiones (`extensionRegistry.ts` — colisiones de rule IDs
+contra el núcleo y entre extensiones, ejecutables no declarados); fronteras en `check:core`
+(cli sin `vscode`, DIP sin módulos del editor ni `scripts/quality`, `check` independiente de
+shims/perfiles/worktrees, budgets por módulo); CLI dividido en `args.ts` + `commands.ts` +
+barril; `task`/`recover`/shims como capabilities opcionales del doctor. Gate upstream PASS:
+compile + lint (0 errores) + test:unit **513 passing, 1 pending** (7 tests nuevos) + check:core
+OK. La consolidación física de archivos en los módulos queda en F5/F6.
+
+**Fase 3 (en curso, worktree VarSense `f3/varsense-perf`; adopción en F8):** rendimiento de
+VarSense, setup y suites. CLI de VarSense instrumentado con `phaseDurationMs` (config, índices
+de variables/clases, discovery, análisis, token-rules, orphan, agrupado, save) + `metrics`
+también en `scan`. Bench `scripts/quality/bench-varsense.mjs`: fixture determinista (2/12/120),
+modos cold/warm × scoped/full, benchmark JSON versionado con p50/p95 por fase y métrica,
+presupuesto efectivo (6.000 ms) sobre warm-scoped con exit 1 ante regresión confirmada.
+Medición: **warm-scoped p95 ~305 ms** (120 archivos) — ~20× bajo el presupuesto; cuello =
+`classIndexMs` (verificación SHA-256); el fast-path mtime se rechaza por tradeoff de
+invalidación (índice incremental en F5). Contrato de artifact publicado de VarSense
+(`docs/artifact-contract.md`: manifest version/commit/protocol/capabilities/SHA-256);
+publicación de artifacts en F8. Gate worktree VarSense PASS: lint 0 errores, check:core OK,
+smokes OK. Suite consumidor con 4 tests nuevos del bench.
 
 **098A-1 — Agilizar la ceremonia de cierre de calidad (ABSORBIDO por 108A-1, 10-08; aprobado
 09-08).** Conservado como historia. Plan original:

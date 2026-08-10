@@ -2,8 +2,9 @@
 
 > **Fecha:** 2026-08-10
 > **Rama objetivo:** `wandorius`
-> **Estado:** EN EJECUCIÓN — F0 cerrada (`b397a135`), F1 cerrada en worktree (`1942cf5`),
-> F2 cerrada en worktree (2026-08-10); adopción upstream pendiente de release publicado (F8)
+> **Estado:** EN EJECUCIÓN — F0 cerrada (`b397a135`), F1 (`1942cf5`) y F2 (`546f31e`) cerradas en
+> worktree Sentinel, F3 en curso (worktree VarSense `f3/varsense-perf`, 2026-08-10); adopción
+> upstream pendiente de release publicado (F8)
 > **ID operativo:** `108A-1` (tomada por `buffy`)
 > **Fuente del plan:** `Agente/documentacion/herramientas/auditoria-sentinel-completa-2026-08-10.md` §14
 > (Plan integral de corrección por fases F0–F9). Este documento es solo seguimiento operativo; el
@@ -44,9 +45,8 @@
 | --- | --- | --- |
 | F0 — Contención urgente y baseline confiable | COMPLETADA | commit `b397a135`; el gate **full** definitivo queda pendiente de decisión 028A-16 (cooldown o `--allow-heavy` autorizado) |
 | F1 — Corregir contratos de Sentinel | COMPLETADA | worktree `f1/cli-contracts` commit `1942cf5` (stdout/stderr, doctor, dry-run, budgets) + gate upstream PASS; adopción tras release publicado (F8) |
-| F2 — Sentinel modular único | EN CURSO | ADR 0001 + registro de extensiones + fronteras check:core + split CLI + capabilities opcionales; gate upstream PASS (513/506+7); consolidación de archivos en F5/F6 |
-| F2 — Sentinel modular único | pendiente | depende de F1 |
-| F3 — Rendimiento VarSense/setup/suites | pendiente | depende de F2 |
+| F2 — Sentinel modular único | COMPLETADA | worktree `546f31e`: ADR 0001 + registro de extensiones + fronteras check:core + split CLI + capabilities opcionales; gate PASS (513); consolidación física en F5/F6 |
+| F3 — Rendimiento VarSense/setup/suites | EN CURSO | worktree VarSense `f3/varsense-perf`: instrumentación de fases + bench versionado con presupuesto + contrato de artifact; publicación de artifacts en F8 |
 | F4 — Bootstrap `sentinel init` | pendiente | depende de F1–F3 (artifacts) |
 | F5 — Migrar consumidor y consolidar gate | pendiente | depende de F4 |
 | F6 — Escalabilidad local, seguridad, operación | pendiente | depende de F5 |
@@ -144,11 +144,36 @@
 - [ ] Consolidación física de archivos en módulos `analysis`/`gate`/`runtime`/`task`/`editor`
       — planificada en F5/F6 (el ADR fija la frontera y los budgets desde ya).
 
+## Checklist Fase 3 (seguimiento de ejecución — worktree VarSense `f3/varsense-perf`)
+
+- [x] Instrumentar fases del CLI de VarSense (`phaseDurationMs` en JSON): config, índice de
+      variables, índice de clases, discovery, análisis, token-rules, orphan, agrupado y save;
+      `metrics` (RSS, archivos descubiertos/analizados/reutilizados, hit rate) también en `scan`.
+- [x] Fixture determinista del bench (2/12/120 archivos) + modos cold/warm × scoped/full con
+      `--index-dir`/`--files-from`; benchmark JSON versionado (schemaVersion, estado, muestras,
+      p50/p95 por modo, fase y métrica) en `.quality-bench/varsense/benchmark.json`.
+- [x] Presupuesto efectivo (stageTimeBudgets.varsense, 6.000 ms) sobre el modo del gate
+      (warm-scoped): exit 1 + reporte estructurado ante regresión confirmada (minSamples 5),
+      evidencia insuficiente visible; 4 tests (unit + E2E de proceso).
+- [x] Medición: warm-scoped p95 **~305 ms** (fixture 120 archivos) — ~20× bajo el presupuesto;
+      cuello dominante = `classIndexMs` (~34 %, verificación SHA-256 por archivo para
+      reutilización). El fast-path mtime implicaría un tradeoff de invalidación por contenido
+      que el margen no justifica: queda como palanca documentada (índice de clases incremental,
+      F5). La contención de F0 (exclusión de `.vscode-test`/`tools`) fue el fix del coste real.
+- [x] Contrato de artifact publicado de VarSense (`docs/artifact-contract.md`): runtime deps
+      mínimas, manifest con version/commit/protocol/capabilities/SHA-256, build desde source
+      solo como dev, retención y rollback sin editar locks; publicación en F8.
+- [x] Gate worktree VarSense PASS: lint (0 errores) · check:core OK · smoke:lsp OK ·
+      smoke:persistent-index OK (la integración VS Code `npm test` requiere host VS Code:
+      se ejecuta en la adopción F8).
+- [ ] Artifacts publicados (Sentinel + VarSense) con manifest firmado — Fase 8 (requiere push).
+- [ ] Retag de suites de integración (WMI/disco/shells/Electron) y duración por archivo/suite:
+      se completa con la suite del consumidor en F5/F6 (el bench ya publica duraciones).
+
 ## Siguiente paso verificable
 
-1. **Fase 0:** queda únicamente el gate **full** definitivo (cooldown o `--allow-heavy` con
-   autorización explícita, regla 028A-16) — decisión del usuario pendiente.
-2. **Fase 1 y 2:** commits del worktree `f1/cli-contracts` (`1942cf5` y el de F2) + docs del
-   consumidor (plan/roadmap/auditoría §14).
-3. **Fase 3 — Rendimiento VarSense/setup/suites:** depende de los puertos de plugins/procesos
-   definidos en F2; fixture del timeout de 120 s, instrumentación de fases y VarSense p95 ≤6 s.
+1. **Fase 0:** gate **full** definitivo del consumidor (cooldown o `--allow-heavy` autorizado,
+   regla 028A-16) — decisión del usuario pendiente.
+2. **Fase 3:** commit del worktree VarSense + docs del consumidor.
+3. **Fase 4 — Bootstrap reproducible (`sentinel init`):** depende de F1–F3 (artifacts); el
+   worktree Sentinel sigue siendo el vehículo.

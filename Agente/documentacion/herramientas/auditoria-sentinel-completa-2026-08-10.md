@@ -1020,48 +1020,84 @@ avanzar.
 
 **Depende de:** puertos de plugins/procesos definidos en Fase 2.
 
+> **Estado (108A-1, 2026-08-10):** implementado en worktree exclusivo VarSense
+> `f3/varsense-perf` (`area-trabajo/.varsense-upstream-f3`, checkout consumidor intacto) +
+> bench en `scripts/quality/bench-varsense.mjs`. La publicación de artifacts (F8) es lo único
+> que queda para cerrar el setup por artifacts; el retag de suites de integración se completa
+> con la consolidación F5/F6.
+
 #### Checklist de perfil VarSense
 
-- [ ] Crear fixture que reproduzca el timeout de 120.571 ms.
-- [ ] Instrumentar descubrimiento, lectura, parseo, indexado, análisis, serialización y teardown.
-- [ ] Medir cold/warm, 2 archivos, 12 archivos y workspace completo.
-- [ ] Medir RSS pico, archivos descubiertos/analizados/reutilizados y cache hit real.
-- [ ] Determinar si el coste es arranque, scan global, invalidación o serialización.
-- [ ] Optimizar primero el cuello dominante con prueba de regresión.
-- [ ] Evaluar proceso persistente solo si las métricas prueban que el arranque domina.
-- [ ] Invalidar cache/índice por contenido, config, versión, plataforma y dependencias.
-- [ ] Alcanzar VarSense scoped p95 ≤6 s en la máquina de referencia.
+- [~] Crear fixture que reproduzca el timeout de 120.571 ms (causa real reproducida y contenida
+      en F0: 1 GB de artifacts VS Code en `.vscode-test` sin excluir → `Invalid string length`;
+      el bench usa un fixture determinista controlado, no un vendored gigante).
+- [x] Instrumentar descubrimiento, lectura, parseo, indexado, análisis, serialización y teardown
+      (`phaseDurationMs` del CLI: config, variableIndex, classIndex, discovery, analyze,
+      tokenRules, orphan, group, save).
+- [x] Medir cold/warm, 2 archivos, 12 archivos y workspace completo (modos cold/warm ×
+      scoped/full, fixtures tiny=2/small=12/full=120 + workspace real medido en F0).
+- [x] Medir RSS pico, archivos descubiertos/analizados/reutilizados y cache hit real (`metrics`
+      del CLI, también en `scan`).
+- [x] Determinar si el coste es arranque, scan global, invalidación o serialización (cuello =
+      `classIndexMs` ~34 %: verificación SHA-256 por archivo para reutilización; el scan global
+      sin exclusión fue la causa del timeout histórico).
+- [~] Optimizar primero el cuello dominante con prueba de regresión (el margen es ~20× bajo el
+      presupuesto: warm-scoped p95 ~305 ms vs 6.000 ms; el fast-path mtime implicaría un
+      tradeoff de invalidación por contenido que no se justifica; índice de clases incremental
+      queda como palanca en F5. El fix real del coste fue la contención de F0. El bench es la
+      prueba de regresión).
+- [x] Evaluar proceso persistente solo si las métricas prueban que el arranque domina (no
+      procede: el arranque no domina — configMs ~28 ms; no se introduce proceso persistente).
+- [x] Invalidar cache/índice por contenido, config, versión, plataforma y dependencias
+      (identidad = toolVersion + config + parser; SHA-256 por archivo).
+- [x] Alcanzar VarSense scoped p95 ≤6 s en la máquina de referencia (warm-scoped p95 ~305 ms en
+      fixture de 120 archivos; el workspace real tras la contención completa sin timeout).
 
 #### Checklist de setup/distribución
 
-- [ ] Definir artifact publicado de Sentinel con runtime dependencies mínimas.
-- [ ] Definir artifact/plugin publicado de VarSense.
-- [ ] Firmar/fijar versión, commit, protocolo, capabilities y SHA-256.
-- [ ] Sustituir `npm ci + compile + suite` por descarga/verificación en consumidores.
-- [ ] Mantener build desde source solo como modo de desarrollo explícito.
-- [ ] Añadir retención de versiones runtime y limpieza segura.
-- [ ] Confirmar rollback a artifact previo sin editar locks manualmente.
+- [~] Definir artifact publicado de Sentinel con runtime dependencies mínimas (el install ya
+      incluye dependencias; contrato en `docs/adr/0001` + publicación en F8).
+- [x] Definir artifact/plugin publicado de VarSense (`docs/artifact-contract.md`: runtime deps
+      mínimas, manifest version/commit/protocol/capabilities/SHA-256).
+- [x] Firmar/fijar versión, commit, protocolo, capabilities y SHA-256 (manifest del contrato;
+      SHA-256 ya verificado en `quality:setup`).
+- [ ] Sustituir `npm ci + compile + suite` por descarga/verificación en consumidores (F8,
+      requiere artifact publicado).
+- [x] Mantener build desde source solo como modo de desarrollo explícito (contrato).
+- [~] Añadir retención de versiones runtime y limpieza segura (runtime con versiones en
+      targetRoot; política de retención/limpieza pendiente de afinarse con la adopción F8).
+- [ ] Confirmar rollback a artifact previo sin editar locks manualmente (F8, requiere artifact
+      previo publicado).
 
 #### Checklist de tests
 
-- [ ] Separar unitarias de filesystem simulado y procesos falsos.
-- [ ] Mover WMI, disco, shells y Electron a suites de integración etiquetadas.
-- [ ] Publicar duración por archivo/suite y top de tests lentos.
-- [ ] Unitarias del gate <60 s.
-- [ ] Integración con timeout propio, cleanup garantizado y cero procesos huérfanos.
-- [ ] No contar cobertura cancelada como PASS.
+- [~] Separar unitarias de filesystem simulado y procesos falsos (bench/tests del consumidor
+      usan fixtures reales y procesos; la separación formal es parte de la consolidación F5/F6).
+- [ ] Mover WMI, disco, shells y Electron a suites de integración etiquetadas (la integración
+      VS Code de VarSense requiere host; se etiqueta en la adopción F8).
+- [~] Publicar duración por archivo/suite y top de tests lentos (el bench publica duraciones y
+      fases; top de tests lentos con la suite consolidada F5/F6).
+- [x] Unitarias del gate <60 s (suite consumidor 46–55 s; tests del bench ~10 s).
+- [x] Integración con timeout propio, cleanup garantizado y cero procesos huérfanos (E2E con
+      timeout + `finally rm`; `runOnce` con timeoutMs 120 s).
+- [x] No contar cobertura cancelada como PASS (estados timeout/cancelled/invalid-output
+      distintos desde F1; cancelAll en SIGINT/SIGTERM).
 
 #### Gate de rendimiento
 
-- [ ] Benchmark JSON versionado con estado y número de muestras.
-- [ ] p50/p95 separados por modo/cache/fixture.
-- [ ] Presupuestos hacen fallar la regresión confirmada.
-- [ ] Comparativa antes/después adjunta al release.
+- [x] Benchmark JSON versionado con estado y número de muestras (`benchmark.json` con
+      schemaVersion, fixture hash, samples y modos).
+- [x] p50/p95 separados por modo/cache/fixture.
+- [x] Presupuestos hacen fallar la regresión confirmada (exit 1 + reporte estructurado;
+      minSamples 5; evidencia insuficiente visible).
+- [ ] Comparativa antes/después adjunta al release (F8).
 
 #### Rollback
 
-- [ ] Feature flag/version pin para volver al plugin anterior.
-- [ ] Índices versionados y descartables; nunca migración destructiva silenciosa.
+- [x] Feature flag/version pin para volver al plugin anterior (pins existentes; rollback
+      documentado).
+- [x] Índices versionados y descartables; nunca migración destructiva silenciosa (identidad +
+      snapshots descartables).
 
 **Criterio de cierre:** VarSense dentro de presupuesto, setup por artifacts y unitarias rápidas.
 
