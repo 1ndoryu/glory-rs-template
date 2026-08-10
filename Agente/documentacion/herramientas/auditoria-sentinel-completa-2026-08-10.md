@@ -879,47 +879,64 @@ avanzar.
 
 **Depende de:** Fase 0 cerrada y worktree upstream exclusivo de Sentinel.
 
+> **Estado (108A-1, 2026-08-10):** implementado en worktree exclusivo `f1/cli-contracts`
+> (`area-trabajo/.sentinel-upstream-f1`); gate upstream PASS (compile, lint 0 errores,
+> test:unit 506/506). La adopción del release queda en Fase 8 (repin consumidor, requiere push
+> autorizado). El checklist se actualiza con lo cerrado; los ítems abiertos restantes dependen de
+> la consolidación canónica (F4/F5).
+
 #### Checklist de stdout y errores
 
-- [ ] Inyectar un logger CLI separado del Output Channel de editor.
-- [ ] Reservar stdout exclusivamente al documento solicitado en modos JSON.
-- [ ] Enviar INFO/WARN/diagnóstico a stderr.
-- [ ] Añadir test de proceso que parsee stdout completo como un único JSON.
-- [ ] Añadir fixtures con warnings de GloryAnalyzer y JSON válido.
-- [ ] Confirmar que `--output` y stdout producen el mismo schema.
-- [ ] Mantener códigos distintos para findings, error de herramienta, timeout y cancelación.
+- [x] Inyectar un logger CLI separado del Output Channel de editor.
+- [x] Reservar stdout exclusivamente al documento solicitado en modos JSON.
+- [x] Enviar INFO/WARN/diagnóstico a stderr.
+- [x] Añadir test de proceso que parsee stdout completo como un único JSON.
+- [x] Añadir fixtures con warnings de GloryAnalyzer y JSON válido.
+- [x] Confirmar que `--output` y stdout producen el mismo schema.
+- [x] Mantener códigos distintos para findings, error de herramienta, timeout y cancelación
+      (findings=1 vía decisión, error CLI=2; timeout/cancelled/invalid-output/tool-error como
+      estados y ruleIds distintos en `structuredTool.ts`).
 
 #### Checklist de budgets y perfil
 
-- [ ] Hacer que `--budgets` sin valor cargue la configuración efectiva.
-- [ ] Definir sintaxis inequívoca para override explícito (`--budgets-json` o archivo).
+- [x] Hacer que `--budgets` sin valor cargue la configuración efectiva.
+- [x] Definir sintaxis inequívoca para override explícito (`--budgets-json` o archivo).
 - [ ] Mover evaluación de presupuestos a `sentinel check` como fuente canónica.
-- [ ] Segmentar perfil por modo, estado, cache, fixture y versión de plugin.
-- [ ] Rechazar percentiles con muestras insuficientes sin ocultar el estado “sin evidencia”.
-- [ ] Emitir exit no cero ante regresión confirmada y reporte estructurado del presupuesto.
+- [ ] Segmentar perfil por modo, estado, cache, fixture y versión de plugin (cache hit/miss ya
+      segmentado; el resto cae con el perfil canónico de `sentinel check` en F4/F5).
+- [x] Rechazar percentiles con muestras insuficientes sin ocultar el estado “sin evidencia”
+      (`budget.insufficient` en el reporte estructurado).
+- [x] Emitir exit no cero ante regresión confirmada y reporte estructurado del presupuesto.
 
 #### Checklist de readiness y dry-run
 
-- [ ] Separar `readyForAnalyze` de `readyForGate` en doctor JSON y salida humana.
-- [ ] Hacer que un proyecto `no-policy` nunca declare gate listo.
-- [ ] Validar runtime global y pin consumidor como identidades distintas.
-- [ ] Hacer `check --dry-run` estrictamente no mutante.
-- [ ] Si se necesita persistencia, renombrar la operación y documentarla como tal.
-- [ ] Añadir fixtures no-policy, analyzer-only, gate-ready y lock divergente.
+- [x] Separar `readyForAnalyze` de `readyForGate` en doctor JSON y salida humana.
+- [x] Hacer que un proyecto `no-policy` nunca declare gate listo.
+- [x] Validar runtime global y pin consumidor como identidades distintas (doctor ya distingue
+      runtime global y diagnostics de pin: gitlink/lock/checkout mismatch).
+- [x] Hacer `check --dry-run` estrictamente no mutante.
+- [x] Si se necesita persistencia, renombrar la operación y documentarla como tal (dry-run ya no
+      persiste nada; no aplica).
+- [~] Añadir fixtures no-policy, analyzer-only, gate-ready y lock divergente (no-policy y
+      analyzer-only cubiertos en `cliProcess.test.ts`; gate-ready y lock divergente pendientes de
+      F4 cuando exista el runtime global).
 
 #### Gate upstream
 
-- [ ] `npm run compile` PASS.
-- [ ] `npm run lint` PASS.
-- [ ] `npm run test:unit` PASS.
-- [ ] Tests CLI focalizados JSON/doctor/dry-run PASS.
-- [ ] `sentinel analyze --format json | parser` PASS sin prefijos.
-- [ ] `sentinel doctor --json` refleja ambas readiness correctamente.
+- [x] `npm run compile` PASS.
+- [x] `npm run lint` PASS (absorbidos 9 errores preexistentes mecánicos; quedan 12 warnings de
+      deuda preexistente).
+- [x] `npm run test:unit` PASS (506 passing, 1 pending).
+- [x] Tests CLI focalizados JSON/doctor/dry-run PASS (`cliProcess.test.ts`).
+- [x] `sentinel analyze --format json | parser` PASS sin prefijos.
+- [x] `sentinel doctor --json` refleja ambas readiness correctamente.
 
 #### Rollback
 
-- [ ] Mantener el schema anterior durante una ventana versionada o publicar migración explícita.
-- [ ] No cambiar exit codes existentes sin versión de protocolo.
+- [x] Mantener el schema anterior durante una ventana versionada o publicar migración explícita
+      (sin cambios de schema: `analyze` conserva `schemaVersion`; doctor solo añade campos
+      aditivos `readyForAnalyze`/`readyForGate`).
+- [x] No cambiar exit codes existentes sin versión de protocolo (exit codes intactos).
 
 **Criterio de cierre:** interfaces automatizables, budgets efectivos y diagnóstico no ambiguo.
 

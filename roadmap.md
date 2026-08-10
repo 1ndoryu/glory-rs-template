@@ -59,11 +59,29 @@
 
 **108A-1 — Ejecutar la corrección de la auditoría completa de Glory Sentinel y el quality gate
 (en curso, 10-08-2026).** Implementa en orden las fases F0→F9 del plan integral de la auditoría
-`Agente/documentacion/herramientas/auditoria-sentinel-completa-2026-08-10.md` (§14), comenzando
-por la Fase 0 (recuperar un gate ejecutable y baseline confiable). Plan de seguimiento:
-`Agente/planes/plan-ejecucion-auditoria-sentinel-2026-08-10.md`. **Absorbe 098A-1** (su F0 se
-completa dentro de la Fase 0; F1–F6 se reubican a Core/CLI en fases posteriores, no a
+`Agente/documentacion/herramientas/auditoria-sentinel-completa-2026-08-10.md` (§14). Plan de
+seguimiento: `Agente/planes/plan-ejecucion-auditoria-sentinel-2026-08-10.md`. **Absorbe 098A-1**
+(su F0 se completa dentro de la Fase 0; F1–F6 se reubican a Core/CLI en fases posteriores, no a
 `scripts/quality`). Push/publicación remota (Fase 8) requieren autorización explícita adicional.
+
+**Fase 0 (cerrada, commit `b397a135`):** gate ejecutable y baseline confiable. Hotfix P0
+(`preflightStartedAt` sin declarar → ReferenceError), `phaseDurationMs` en `metrics.json`,
+contención de analizadores (`**/.sentinel/**`, `**/.vscode-test/**`, `**/tools/**` en VarSense;
+`**/.sentinel/**` en Sentinel), herencia de tokens de sanción a etapas, inventario de
+`scripts/quality` con congelación de features, skill `quality-gate-setup` v1.1.0 corregida,
+suite `quality:test` 237/238 PASS y gate real estructurado. Pendiente único: gate **full**
+definitivo (cooldown 180 min o `--allow-heavy` con autorización explícita, regla 028A-16).
+Baseline: `Agente/prevencion/bench-ceremonia-2026-08-09.md`.
+
+**Fase 1 (cerrada en worktree `f1/cli-contracts`, adopción en F8):** contratos CLI de Sentinel
+corregidos en worktree exclusivo (`area-trabajo/.sentinel-upstream-f1`), checkout consumidor
+intacto. Logger → stderr (stdout JSON puro), doctor separa `readyForAnalyze`/`readyForGate`
+(no-policy nunca gate-ready), `check --dry-run` estrictamente no mutante, presupuestos
+conectados en `quality:profile` (`--budgets` → config efectiva, `--budgets-json`/`--budgets=`
+override, exit 1 + reporte estructurado + evidencia insuficiente visible), tests de proceso
+CLI (`cliProcess.test.ts`), lint 0 errores (9 preexistentes absorbidos) y gate upstream PASS
+(compile + lint + test:unit 506/506). Los ítems canónicos restantes (perfil segmentado y
+presupuestos en `sentinel check`) caen con la consolidación F4/F5.
 
 **098A-1 — Agilizar la ceremonia de cierre de calidad (ABSORBIDO por 108A-1, 10-08; aprobado
 09-08).** Conservado como historia. Plan original:

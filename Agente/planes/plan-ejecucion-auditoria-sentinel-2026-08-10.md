@@ -2,7 +2,8 @@
 
 > **Fecha:** 2026-08-10
 > **Rama objetivo:** `wandorius`
-> **Estado:** EN EJECUCIÓN — Fase 0 iniciada (2026-08-10)
+> **Estado:** EN EJECUCIÓN — Fase 0 cerrada (commit `b397a135`); Fase 1 cerrada en worktree
+> `f1/cli-contracts` (2026-08-10); adopción upstream pendiente de release publicado (F8)
 > **ID operativo:** `108A-1` (tomada por `buffy`)
 > **Fuente del plan:** `Agente/documentacion/herramientas/auditoria-sentinel-completa-2026-08-10.md` §14
 > (Plan integral de corrección por fases F0–F9). Este documento es solo seguimiento operativo; el
@@ -41,8 +42,8 @@
 
 | Fase | Estado | Nota |
 | --- | --- | --- |
-| F0 — Contención urgente y baseline confiable | EN CURSO | hotfix P0 + phaseDurationMs + tests + doctor/lock + gate real + baseline |
-| F1 — Corregir contratos de Sentinel | pendiente | requiere worktree upstream exclusivo de `tools/sentinel` y release publicado |
+| F0 — Contención urgente y baseline confiable | COMPLETADA | commit `b397a135`; el gate **full** definitivo queda pendiente de decisión 028A-16 (cooldown o `--allow-heavy` autorizado) |
+| F1 — Corregir contratos de Sentinel | EN CURSO | worktree `f1/cli-contracts` corregido (stdout/stderr, doctor, dry-run, budgets) + gate upstream PASS; adopción tras release publicado (F8) |
 | F2 — Sentinel modular único | pendiente | depende de F1 |
 | F3 — Rendimiento VarSense/setup/suites | pendiente | depende de F2 |
 | F4 — Bootstrap `sentinel init` | pendiente | depende de F1–F3 (artifacts) |
@@ -86,11 +87,46 @@
 - [ ] Gate **full** definitivo tras cooldown (~11:23Z) o con `--allow-heavy --heavy-reason`
       (requiere autorización explícita del usuario en el mismo turno, regla 028A-16).
 - [x] Actualizar `roadmap.md` (098A-1 absorbido por 108A-1) y estado §14 de la auditoría.
-- [ ] Commit coherente del bloque Fase 0 y `task:release`.
+- [x] Commit coherente del bloque Fase 0 (`b397a135`, 13 archivos, árbol limpio) y `task:release`.
+
+## Checklist Fase 1 (seguimiento de ejecución — worktree exclusivo `f1/cli-contracts`)
+
+- [x] Worktree upstream exclusivo creado (rama `f1/cli-contracts` en
+      `area-trabajo/.sentinel-upstream-f1`, fuera del checkout del consumidor); consumidor y
+      submódulo `tools/sentinel` intactos (gitlink `44dc8fa`).
+- [x] Logger CLI separado del Output Channel: sin canal, INFO/WARN/ERROR van SIEMPRE a stderr
+      (`src/utils/logger.ts`); stdout queda reservado al documento JSON solicitado.
+- [x] Test de proceso que parsee stdout completo como un único JSON con warnings reales de
+      GloryAnalyzer (`src/test/suite/cliProcess.test.ts`): `analyze --format json` → stdout JSON
+      puro + diagnósticos en stderr; `--output` == stdout (mismo schema).
+- [x] Doctor separa `readyForAnalyze` de `readyForGate` en JSON y salida humana; no-policy nunca
+      gate-ready (fixture no-policy: analyze listo, gate no listo, exit 0).
+- [x] `check --dry-run` estrictamente no mutante: sin `.quality-reports/`, sin
+      `changed-files.txt`/`scope-manifest.json`, sin lease en el runtime (fixture repo Git).
+- [x] Budgets conectados al comando (P1 de la auditoría) en `quality:profile`:
+      `--budgets` sin valor carga `quality.config.json → stageTimeBudgets`; override explícito
+      `--budgets-json <json>`/`--budgets=<json>`; `--project-root <dir>` para perfilar otro
+      checkout; exit 1 + reporte estructurado (`budget.violations`) ante regresión confirmada;
+      `budget.insufficient` expone evidencia insuficiente sin ocultarla. E2E de proceso hermético
+      (10→11 tests PASS).
+- [x] Lint upstream PASS: absorbidos 9 errores preexistentes mecánicos (escapes de regex,
+      `Boolean()` redundantes, `while(true)` intencionales con disable razonado, `throw` en finally
+      documentado); quedan 12 warnings preexistentes (deuda registrada, no bloqueante).
+- [x] Gate upstream `f1/cli-contracts`: `npm run compile` PASS · `npm run lint` 0 errores ·
+      `npm run test:unit` PASS (506 passing, 1 pending, exit 0).
+- [ ] Adopción del release upstream (repin consumidor) — Fase 8, requiere release publicado y
+      autorización explícita de push.
+- [ ] Fixtures gate-ready y lock-divergente del checklist de readiness — se cubren en F4 cuando
+      exista el runtime global (el fixture no-policy ya existe en `cliProcess.test.ts`).
+- [ ] Segmentar perfil por modo/estado/fixture/versión de plugin y mover la evaluación canónica de
+      presupuestos a `sentinel check` — milestone canónico del perfil en F4/F5 (cache hit/miss ya
+      está segmentado hoy).
 
 ## Siguiente paso verificable
 
-1. Inventario + skill `quality-gate-setup` + roadmap + estado §14 auditoría.
-2. Gate real `task:check -- 108A-1` PASS frío y warm; baseline en
-   `Agente/prevencion/bench-ceremonia-2026-08-09.md`.
-3. Commit coherente y `task:release`.
+1. **Fase 0:** queda únicamente el gate **full** definitivo (cooldown o `--allow-heavy` con
+   autorización explícita, regla 028A-16) — decisión del usuario pendiente.
+2. **Fase 1:** commit del worktree `f1/cli-contracts` (branch aislada) + docs del consumidor
+   (plan/roadmap/auditoría §14).
+3. **Fase 2 — Sentinel modular único:** depende de contratos F1 estabilizados; el worktree sigue
+   siendo el vehículo de los cambios upstream.

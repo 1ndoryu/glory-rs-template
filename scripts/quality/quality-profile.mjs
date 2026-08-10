@@ -3,7 +3,19 @@
  * gate (latest.json por tarea en la rama actual) y calcula p50/p95 de duración
  * por etapa y del total, sin ejecutar ninguna validación pesada. Es el alias
  * temporal de `sentinel profile <TareaId>` mientras no exista el runtime
- * global; la decisión de gate nunca pasa por aquí. */
+ * global; la decisión de gate nunca pasa por aquí.
+ *
+ * [028A-8 Fase 1] Presupuestos conectados al comando (P1 de la auditoría):
+ *   --budgets           sin valor → carga la config efectiva del proyecto
+ *                       (quality.config.json → stageTimeBudgets)
+ *   --budgets-json <j>  override explícito e inequívoco
+ *   --budgets=<j>       idem, sintaxis compacta
+ * La invocación natural `--budgets` ya no termina en silencio con exit 0:
+ * ante regresión confirmada (muestras suficientes y p95 > presupuesto) emite
+ * exit 1 y un reporte estructurado en el JSON del perfil.
+ *
+ * [028A-8 Fase 1] --project-root <dir> perfila otro checkout (worktree/CI)
+ * sin depender del cwd; también se usa como base de la config efectiva. */
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,15 +47,53 @@ export function summarize(values) {
 }
 
 function parseArgs(argv) {
-  const parsed = { taskId: null, limit: 20, json: null, budgets: null };
+  const parsed = { taskId: null, limit: 20, json: null, budgets: null, budgetsJson: null, projectRoot: null };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === '--task-id') parsed.taskId = argv[++index] ?? null;
     else if (arg === '--limit') parsed.limit = Number(argv[++index]) || 20;
     else if (arg === '--json') parsed.json = argv[++index] ?? null;
-    else if (arg === '--budgets') parsed.budgets = argv[++index] ?? null;
+    else if (arg === '--project-root') parsed.projectRoot = argv[++index] ?? null;
+    else if (arg === '--budgets') parsed.budgets = 'effective';
+    else if (arg === '--budgets-json') parsed.budgetsJson = argv[++index] ?? null;
+    else if (arg.startsWith('--budgets=')) parsed.budgetsJson = arg.slice('--budgets='.length);
+    else throw new Error(`Opción no reconocida: ${arg}`);
   }
   return parsed;
+}
+
+/* [028A-8 Fase 1] Etapas con presupuesto declarado pero evidencia insuficiente
+ * (0 < muestras < minSamples): el perfil NO declara regresión, pero tampoco
+ * oculta la falta de evidencia. Muestra el estado “sin evidencia” en el
+ * reporte estructurado en vez de descartarlo en silencio. */
+export function insufficientBudgetStages(profile, budgets, minSamples = 5) {
+  if (!budgets || typeof budgets !== 'object') return [];
+  const insufficient = [];
+  for (const [stage, budgetMs] of Object.entries(budgets)) {
+    if (!Number.isInteger(budgetMs) || budgetMs < 1) continue;
+    const found = profile.stages.find(item => item.stage === stage);
+    if (!found || found.samples === 0 || found.samples >= minSamples) continue;
+    insufficient.push({ stage, budgetMs, samples: found.samples, p95: found.p95 });
+  }
+  return insufficient;
+}
+
+/* [028A-8 Fase 1] Presupuestos efectivos declarados en quality.config.json
+ * → stageTimeBudgets (p. ej. varsense: 6000). Sin la sección o sin valores
+ * enteros positivos no hay presupuesto efectivo y el perfil no declara
+ * regresión (muestras insuficientes tampoco: ver evaluateStageBudgets). */
+export async function readEffectiveBudgets(root) {
+  try {
+    const raw = JSON.parse(await readFile(path.join(root, 'quality.config.json'), 'utf8'));
+    const budgets = raw?.stageTimeBudgets;
+    if (!budgets || typeof budgets !== 'object') return null;
+    const effective = Object.fromEntries(
+      Object.entries(budgets).filter(([, ms]) => Number.isInteger(ms) && ms >= 1),
+    );
+    return Object.keys(effective).length > 0 ? effective : null;
+  } catch {
+    return null;
+  }
 }
 
 /* [028A-8 Fase 0] Presupuesto de tiempo por etapa que falla SOLO ante
@@ -113,13 +163,18 @@ function renderCompact(profile) {
   for (const stage of profile.stages) {
     lines.push(`[profile] ${stage.stage.padEnd(9)} p50 ${stage.p50}ms · p95 ${stage.p95}ms · hit ${stage.cacheHits}/${stage.samples}`);
   }
+  if (profile.budget?.active) {
+    const source = profile.budget.source === 'override' ? 'override explícito' : 'config efectiva';
+    lines.push(`[profile] Presupuestos: ${source} · ${profile.budget.violations.length} regresión(es)`);
+  }
   return lines;
 }
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const identity = await resolveBranchIdentity(projectRoot);
-  const branchRoot = branchReportRoot(projectRoot, identity);
+  const root = path.resolve(args.projectRoot ?? projectRoot);
+  const identity = await resolveBranchIdentity(root);
+  const branchRoot = branchReportRoot(root, identity);
   const entries = await collectReports(branchRoot, args.taskId, args.limit);
   if (entries.length === 0) {
     process.stderr.write(`[profile] Sin reportes en ${branchRoot}${args.taskId ? `/${args.taskId}` : ''}. Ejecuta primero el gate con una tarea.\n`);
@@ -127,23 +182,51 @@ async function main() {
     return;
   }
   const profile = buildProfile(entries);
+  /* [028A-8 Fase 1] Presupuestos efectivos: `--budgets` (sin valor) carga la
+   * config del proyecto; el override explícito e inequívoco va por
+   * `--budgets-json <json>` o `--budgets=<json>`. La invocación natural
+   * `--budgets` ya no deja budgets=null y termina exit 0 en silencio. */
+  let budgets = null;
+  if (args.budgetsJson !== null) {
+    try { budgets = JSON.parse(args.budgetsJson); }
+    catch {
+      process.stderr.write('[profile] --budgets-json no contiene JSON válido; presupuestos ignorados\n');
+      process.exitCode = 2;
+      return;
+    }
+  } else if (args.budgets === 'effective') {
+    budgets = await readEffectiveBudgets(root);
+  }
+  if (budgets) {
+    profile.budget = {
+      source: args.budgetsJson !== null ? 'override' : 'config-efectiva',
+      active: true,
+      violations: evaluateStageBudgets(profile, budgets),
+      /* [028A-8 Fase 1] Sin ocultar la falta de evidencia: etapas presupuestadas
+       * con muestras insuficientes se listan aquí en vez de descartarse en
+       * silencio; no declaran regresión. */
+      insufficient: insufficientBudgetStages(profile, budgets),
+    };
+  }
   const outputPath = path.resolve(args.json ?? path.join(branchRoot, 'profile', 'latest.json'));
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(profile, null, 2)}\n`, 'utf8');
   for (const line of renderCompact(profile)) console.log(line);
-  process.stdout.write(`[profile] Detalle: ${path.relative(projectRoot, outputPath)}\n`);
   /* [028A-8 Fase 0] Regresión confirmada: solo con muestras suficientes y p95
-   * por encima del presupuesto. Exit 1 informa, no bloquea el gate. */
-  if (args.budgets) {
-    let budgets;
-    try { budgets = JSON.parse(args.budgets); }
-    catch { budgets = null; }
-    const violations = evaluateStageBudgets(profile, budgets);
-    for (const violation of violations) {
+   * por encima del presupuesto. Exit 1 informa, no bloquea el gate. El reporte
+   * estructurado del presupuesto queda en el JSON del perfil (budget). */
+  if (profile.budget?.violations.length > 0) {
+    for (const violation of profile.budget.violations) {
       process.stderr.write(`[profile] REGRESIÓN ${violation.stage}: p95 ${violation.p95}ms > presupuesto ${violation.budgetMs}ms (${violation.samples} muestras)\n`);
     }
-    if (violations.length > 0) process.exitCode = 1;
+    process.exitCode = 1;
   }
+  if (profile.budget?.insufficient.length > 0) {
+    for (const item of profile.budget.insufficient) {
+      process.stderr.write(`[profile] SIN EVIDENCIA ${item.stage}: ${item.samples} muestra(s), se requieren 5; sin regresión declarada\n`);
+    }
+  }
+  process.stdout.write(`[profile] Detalle: ${path.relative(root, outputPath)}\n`);
 }
 
 /* [028A-8] Guarda de entrada: importar las funciones puras desde un test no
