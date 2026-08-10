@@ -1,5 +1,13 @@
 # Auditoría completa de Glory Sentinel y el quality gate
 
+> **Cómo leer las casillas (2026-08-10, tras la Retirada Legacy 108A-6):** las fases F0–F9 se cerraron
+> con evidencia en su línea `**Estado: COMPLETADA**`; dentro de cada checklist quedan casillas sin marcar
+> que son (a) ítems históricos ya cubiertos por la evidencia del cierre, (b) ítems condicionados a la
+> segunda release consecutiva en verde (retirada física capa A/B, `task:take`, config/adapter legacy,
+> submódulos/.quality-tools) o (c) verificación con supervisores no disponibles en este entorno
+> (`sentinel_inspector`/`supervisor_reviewer`). Las secciones F5/F8/F9 y el DoD 14.5 se actualizaron con
+> marcas de evidencia; los pendientes condicionados llevan nota explícita.
+
 > **Fecha:** 2026-08-10  
 > **Alcance:** Sentinel Core/CLI, gate del consumidor `wandorius`, instalación en un proyecto nuevo,
 > rendimiento, escalabilidad, operación, contratos y documentación Markdown.  
