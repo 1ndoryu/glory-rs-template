@@ -58,11 +58,18 @@
 ## Siguiente bloque habilitado
 
 **108A-1 — Ejecutar la corrección de la auditoría completa de Glory Sentinel y el quality gate
-(en curso, 10-08-2026).** Implementa en orden las fases F0→F9 del plan integral de la auditoría
-`Agente/documentacion/herramientas/auditoria-sentinel-completa-2026-08-10.md` (§14). Plan de
-seguimiento: `Agente/planes/plan-ejecucion-auditoria-sentinel-2026-08-10.md`. **Absorbe 098A-1**
-(su F0 se completa dentro de la Fase 0; F1–F6 se reubican a Core/CLI en fases posteriores, no a
-`scripts/quality`). Push/publicación remota (Fase 8) requieren autorización explícita adicional.
+(completada, 10-08-2026).** F0–F9 ejecutadas en orden; release publicado y consumidor adoptado;
+push autorizado por el usuario. Plan de seguimiento: `Agente/planes/plan-ejecucion-auditoria-sentinel-2026-08-10.md`.
+
+**108A-6 — Retirada Legacy (en curso, 10-08-2026).** Continúa la adopción posterior a la auditoría:
+stage `custom` retirado (commit `2244eee7`), segundo consumidor adoptado, y la release **0.7.0** de
+Sentinel publicada en `main` + tag `v0.7.0` (merge de la auditoría sobre 0.6.4; el pin anterior
+`c1f8f1f` era una rama sin publicar y bloqueaba el preflight del Core). Doble vía real:
+`observe-compare` en 108A-1 y 297A-78 con decisión y hallazgos idénticos; gate canónico `gate:check`
+(`sentinel check --stages`) integrado en CI y en `export-ci-metrics`. **Pendiente condicionado:**
+retirada física de la capa A (shims del repo + `quality-command-guard`) y de la capa B
+(orquestador local) cuando dos releases consecutivas en verde permitan rollback (runbook
+2026-08-05 §3); la release 0.7.0 es la primera.
 
 **Fase 0 (cerrada, commit `b397a135`):** gate ejecutable y baseline confiable. Hotfix P0
 (`preflightStartedAt` sin declarar → ReferenceError), `phaseDurationMs` en `metrics.json`,

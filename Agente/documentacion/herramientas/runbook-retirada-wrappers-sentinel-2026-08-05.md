@@ -3,6 +3,7 @@
 > **Fecha:** 2026-08-05
 > **Plan canónico:** `Agente/planes/plan-global-quality-guard-agnostico-2026-08-02.md` (Fase 5).
 > **Criterio:** este runbook NO se ejecuta hoy; se ejecuta cuando dos releases consecutivas hayan pasado la matriz en verde (ver §3). Sirve para que esa ejecución sea mecánica, verificada y reversible.
+> **Estado (2026-08-10):** la release **0.7.0** (merge de la auditoría 108A-1 sobre `main` 0.6.4, publicada en `main` + tag `v0.7.0`) es la **primera** release con el gate canónico (`sentinel check --stages` vía `gate:check`, paridad real en 108A-1 y 297A-78) y **ambos consumidores adoptados** (wandorius y glory-rs-rest con pin `a804c0d`). La retirada física de la capa A queda condicionada a la **segunda** release consecutiva en verde con rollback probado (§3).
 
 ## 1. Objetivo y contexto
 

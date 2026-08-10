@@ -50,8 +50,15 @@ export function buildExportPayload(runs, exportedAt = new Date().toISOString()) 
 }
 
 async function main() {
+  /* [108A-6] El gate canónico (`sentinel check --stages` vía gate:check)
+   * publica en `.quality-reports/check/<taskId>/`; el legacy
+   * (`task:check`) en `.quality-reports/branches/`. Se agregan ambos
+   * namespaces para que la métrica histórica de CI sobreviva la
+   * transición (deduplicando por taskId + generatedAt). */
   const branchesRoot = path.join(projectRoot, '.quality-reports', 'branches');
-  const runs = await collectMetrics(branchesRoot);
+  const checkRoot = path.join(projectRoot, '.quality-reports', 'check');
+  const runs = [...await collectMetrics(branchesRoot), ...await collectMetrics(checkRoot)]
+    .filter((run, index, all) => all.findIndex(other => other.taskId === run.taskId && other.generatedAt === run.generatedAt) === index);
   const payload = buildExportPayload(runs);
   const outputPath = path.join(projectRoot, '.quality-reports', 'ci-metrics.json');
   await writeAtomic(outputPath, `${JSON.stringify(payload, null, 2)}\n`);

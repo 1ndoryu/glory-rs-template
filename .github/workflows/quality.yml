@@ -50,8 +50,11 @@ jobs:
         run: node scripts/prepare-ci-db.mjs
       - name: Regenerar cliente OpenAPI
         run: npm run codegen:local
+      # [108A-6] Gate canónico: `sentinel check --stages` es la única autoridad
+      # de cierre (ADR 0001, gate SNT-10). `task:check` queda como alias
+      # temporal de compatibilidad hasta la retirada física de scripts/quality.
       - name: Ejecutar gate completo
-        run: npm run task:check -- 297A-6 --ci
+        run: npm run gate:check -- 297A-6 --ci
       # [028A-6 Fase 4] Los artifacts se publican con branch-key + task +
       # commit corto (contrato del plan): runners reutilizados nunca mezclan
       # reportes de ramas distintas. resolveBranchIdentity usa GITHUB_HEAD_REF
