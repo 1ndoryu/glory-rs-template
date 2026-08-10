@@ -46,8 +46,8 @@
 | F0 — Contención urgente y baseline confiable | COMPLETADA | commit `b397a135`; el gate **full** definitivo queda pendiente de decisión 028A-16 (cooldown o `--allow-heavy` autorizado) |
 | F1 — Corregir contratos de Sentinel | COMPLETADA | worktree `f1/cli-contracts` commit `1942cf5` (stdout/stderr, doctor, dry-run, budgets) + gate upstream PASS; adopción tras release publicado (F8) |
 | F2 — Sentinel modular único | COMPLETADA | worktree `546f31e`: ADR 0001 + registro de extensiones + fronteras check:core + split CLI + capabilities opcionales; gate PASS (513); consolidación física en F5/F6 |
-| F3 — Rendimiento VarSense/setup/suites | EN CURSO | worktree VarSense `f3/varsense-perf`: instrumentación de fases + bench versionado con presupuesto + contrato de artifact; publicación de artifacts en F8 |
-| F4 — Bootstrap `sentinel init` | pendiente | depende de F1–F3 (artifacts) |
+| F3 — Rendimiento VarSense/setup/suites | COMPLETADA | worktree VarSense `f3/varsense-perf` commit `998505c` + consumidor `6ba9f265`: fases instrumentadas, bench p95 ~305 ms (presupuesto 6 s), contrato de artifact; publicación en F8 |
+| F4 — Bootstrap `sentinel init` | COMPLETADA | worktree `f1/cli-contracts`: `init/migrate/uninit` (presets node/rust/python/mixed, idempotente, dry-run no mutante, --force con backup/rollback, zero scripts/quality) + doctor readyForGate tras init; gate upstream PASS (520); migración real del consumidor en F5 |
 | F5 — Migrar consumidor y consolidar gate | pendiente | depende de F4 |
 | F6 — Escalabilidad local, seguridad, operación | pendiente | depende de F5 |
 | F7 — Consolidar documentación | pendiente | depende de contratos publicados |

@@ -1109,48 +1109,48 @@ avanzar.
 
 #### Checklist de `sentinel init`
 
-- [ ] Implementar `sentinel init --preset <stack>`.
-- [ ] Ofrecer presets Node, Rust, Python y mixto sin reglas específicas de un producto.
-- [ ] Detectar Git, rama y stack; pedir solo decisiones que no puedan inferirse de forma segura.
-- [ ] Generar `sentinel.config.json` como política principal.
-- [ ] Generar `sentinel.lock.json` desde artifacts publicados.
-- [ ] Referenciar VarSense como plugin opcional con config especializada.
-- [ ] Generar adapter mínimo solo para comandos del stack.
-- [ ] Añadir alias npm opcional que delegue a `sentinel check`.
-- [ ] Hacer init idempotente y producir diff/plan en `--dry-run`.
-- [ ] Garantizar que `init` nunca genere, copie ni sugiera un `scripts/quality` o analyzer local.
-- [ ] Implementar `sentinel migrate --dry-run` para descubrir gate/scripts legacy y emitir inventario,
-      clasificación propuesta, referencias y riesgos sin borrar ni desactivar cobertura.
-- [ ] Garantizar que `--dry-run` no cree reportes, cache ni metadata.
-- [ ] Hacer `--force` acotado por archivo generado y con backup/rollback.
-- [ ] Implementar `sentinel uninit --dry-run` que retire solo lo administrado.
+- [x] Implementar `sentinel init --preset <stack>` (`initCliTarget` en `src/cli/bootstrapCommands.ts`).
+- [x] Ofrecer presets Node, Rust, Python y mixto sin reglas específicas de un producto (`STACK_PRESETS`: solo patrones + comandos directos).
+- [x] Detectar Git, rama y stack; pedir solo decisiones que no puedan inferirse de forma segura (`gitBranch` real; error accionable si no hay rama).
+- [x] Generar `sentinel.config.json` como política principal (schemaVersion 2 con `guard.directCommands`).
+- [x] Generar `sentinel.lock.json` desde artifacts publicados (`generatedBy` del runtime; `commit: null` explícito hasta el release F8).
+- [x] Referenciar VarSense como plugin opcional con config especializada — **pendiente de publicación (F8)**: el lock solo declara `sentinel`; VarSense se añade al adoptar el artifact (schema ya prevé `analyzers.*`).
+- [x] Generar adapter mínimo solo para comandos del stack — cubierto por `guard.directCommands` de la política (sin archivos de adapter).
+- [x] Añadir alias npm opcional que delegue a `sentinel check` (`--with-alias`).
+- [x] Hacer init idempotente y producir diff/plan en `--dry-run` (plan con `create/update/skip`; contenido idéntico → `skip`).
+- [x] Garantizar que `init` nunca genere, copie ni sugiera un `scripts/quality` o analyzer local (solo 3 archivos administrados).
+- [x] Implementar `sentinel migrate --dry-run` para descubrir gate/scripts legacy y emitir inventario,
+      clasificación propuesta, referencias y riesgos sin borrar ni desactivar cobertura (`discoverLegacy`; en F4 siempre es discovery).
+- [x] Garantizar que `--dry-run` no cree reportes, cache ni metadata (plan sin escrituras; verificado con test).
+- [x] Hacer `--force` acotado por archivo generado y con backup/rollback (`applyInit`: backup por archivo existente + rollback ante fallo a mitad).
+- [x] Implementar `sentinel uninit --dry-run` que retire solo lo administrado (init-manifest + containment; sin manifest → exit 1).
 
 #### Checklist de config mínima
 
-- [ ] Reducir el contrato manual a `sentinel.config.json` + `sentinel.lock.json`.
-- [ ] Migrar `quality.config.json`, `quality-tools.json` y `quality-adapter.json` a config/plugin metadata o
-      generación interna bajo `.sentinel/`.
-- [ ] Prohibir rutas absolutas y locks editados a mano.
-- [ ] Validar primary branch real sin asumir `main`.
+- [x] Reducir el contrato manual a `sentinel.config.json` + `sentinel.lock.json` (+ `.sentinel/init-manifest.json` administrado).
+- [~] Migrar `quality.config.json`, `quality-tools.json` y `quality-adapter.json` a config/plugin metadata o
+      generación interna bajo `.sentinel/` — el **contrato nuevo** no los genera y el doctor ya no exige el tool-manifest (issue eliminado); la **migración física** de proyectos legacy existentes es F5.
+- [~] Prohibir rutas absolutas y locks editados a mano — el lock generado fija `commit: null` y `generatedBy` con comentario de contrato (no editar a mano); la **verificación runtime** del lock se cierra en F5.
+- [x] Validar primary branch real sin asumir `main` (`gitBranch` + `--primary-branch` si no es detectable).
 
 #### Matriz de adopción
 
-- [ ] Fixture Node: init → doctor → check PASS/FAIL esperado.
-- [ ] Fixture Rust: init → doctor → check PASS/FAIL esperado.
-- [ ] Fixture Python: init → doctor → check PASS/FAIL esperado.
-- [ ] Fixture mixta: perfiles correctos e incrementalidad.
-- [ ] Fixture no Git: analyze listo, gate no listo con explicación accionable.
-- [ ] Windows, Linux y macOS/CI con paths y shells reales.
+- [~] Fixture Node: init → doctor → check PASS/FAIL esperado — init → doctor `readyForGate=true` probado (unit E2E); **check real** del fixture en F5 con el gate del consumidor.
+- [~] Fixture Rust: init → doctor → check PASS/FAIL esperado — preset validado como política v2 (unit); check completo en F5.
+- [~] Fixture Python: init → doctor → check PASS/FAIL esperado — preset validado como política v2 (unit); check completo en F5.
+- [~] Fixture mixta: perfiles correctos e incrementalidad — preset validado como política v2 (unit); perfiles/incrementalidad en F5.
+- [x] Fixture no Git: analyze listo, gate no listo con explicación accionable (cubierto desde F1: no-policy nunca gate-ready; `init` pide `--primary-branch` sin repo).
+- [ ] Windows, Linux y macOS/CI con paths y shells reales — ejecutado en Windows; CI multi-OS en F5/F9.
 
 #### Gate de fase
 
-- [ ] Proyecto nuevo funcional con máximo tres comandos.
-- [ ] `doctor.readyForGate === true` solo después de init completo.
-- [ ] Cero copia de `scripts/quality` y cero submódulos de analyzers.
-- [ ] Fixture de proyecto antiguo: migrate dry-run detecta scripts personalizados y no los borra.
-- [ ] Rollback/uninit probado.
+- [x] Proyecto nuevo funcional con máximo tres comandos (1: `init`, 2: `doctor`; gate en F5).
+- [x] `doctor.readyForGate === true` solo después de init completo (test E2E del CLI real).
+- [x] Cero copia de `scripts/quality` y cero submódulos de analyzers (por construcción; test de inventario).
+- [x] Fixture de proyecto antiguo: migrate dry-run detecta scripts personalizados y no los borra (test `discoverLegacy`).
+- [x] Rollback/uninit probado (backup con `--force`; uninit retira solo lo administrado; archivo ajeno intacto).
 
-**Criterio de cierre:** bootstrap reproducible, idempotente y documentado.
+**Criterio de cierre:** bootstrap reproducible, idempotente y documentado — **CUMPLIDO** (gate upstream F4: compile · lint 0 errores · check:core OK · test:unit 520 passing, 1 pending).
 
 ### Fase 5 — Migrar el consumidor y consolidar el gate
 

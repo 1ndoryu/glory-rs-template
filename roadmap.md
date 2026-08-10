@@ -95,7 +95,8 @@ barril; `task`/`recover`/shims como capabilities opcionales del doctor. Gate ups
 compile + lint (0 errores) + test:unit **513 passing, 1 pending** (7 tests nuevos) + check:core
 OK. La consolidación física de archivos en los módulos queda en F5/F6.
 
-**Fase 3 (en curso, worktree VarSense `f3/varsense-perf`; adopción en F8):** rendimiento de
+**Fase 3 (cerrada, worktree VarSense `f3/varsense-perf` commit `998505c` + consumidor `6ba9f265`;
+adopción en F8):** rendimiento de
 VarSense, setup y suites. CLI de VarSense instrumentado con `phaseDurationMs` (config, índices
 de variables/clases, discovery, análisis, token-rules, orphan, agrupado, save) + `metrics`
 también en `scan`. Bench `scripts/quality/bench-varsense.mjs`: fixture determinista (2/12/120),
@@ -107,6 +108,22 @@ invalidación (índice incremental en F5). Contrato de artifact publicado de Var
 (`docs/artifact-contract.md`: manifest version/commit/protocol/capabilities/SHA-256);
 publicación de artifacts en F8. Gate worktree VarSense PASS: lint 0 errores, check:core OK,
 smokes OK. Suite consumidor con 4 tests nuevos del bench.
+
+**Fase 4 (cerrada en worktree `f1/cli-contracts`, adopción en F8):** bootstrap reproducible
+`sentinel init`/`migrate`/`uninit`. `init --preset <node|rust|python|mixed>` genera solo el
+contrato mínimo (`sentinel.config.json` v2 + `sentinel.lock.json` + `.sentinel/init-manifest.json`)
+sin `scripts/quality` ni submódulos: presets agnósticos (patrones + `guard.directCommands`),
+rama real detectada sin asumir `main`, idempotente (contenido idéntico → `skip`), `--dry-run`
+no mutante, `--force` con backup/rollback por archivo, alias npm opcional
+(`--with-alias` → `sentinel check`); `migrate` descubre gate/scripts legacy y emite inventario
++ riesgos sin borrar ni desactivar cobertura (aplicación real en F5); `uninit` retira solo lo
+administrado (init-manifest, containment; sin manifest → exit 1). Doctor: `readyForGate=true`
+tras init completo (issue `tools-manifest-missing` eliminado: el contrato se reduce a
+config+lock). Handlers en `src/cli/bootstrapCommands.ts` (commands.ts dentro del budget del
+ADR 0001). Gate upstream PASS: compile + lint (0 errores, 12 warnings de deuda) + check:core
+OK + test:unit **520 passing, 1 pending** (9 tests nuevos: presets v2, idempotencia,
+conflictos/backup, migrate no destructivo, uninit acotado, E2E CLI). Matriz de adopción
+multi-OS/CI y check completo de fixtures en F5.
 
 **098A-1 — Agilizar la ceremonia de cierre de calidad (ABSORBIDO por 108A-1, 10-08; aprobado
 09-08).** Conservado como historia. Plan original:
