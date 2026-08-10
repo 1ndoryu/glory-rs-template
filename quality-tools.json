@@ -5,8 +5,8 @@
     "sentinel": {
       "repository": "https://github.com/1ndoryu/glory-sentinel.git",
       "sourcePath": "tools/sentinel",
-      "commit": "c1f8f1f4375fa145acffa14e98d81fa13d94c984",
-      "version": "0.6.0",
+      "commit": "a804c0d8bb55b2f44406aab4112d528150df05aa",
+      "version": "0.7.0",
       "outputSchemaVersion": "1",
       "buildScript": "compile",
       "testScript": "test:unit",
