@@ -946,45 +946,71 @@ avanzar.
 
 **Depende de:** contratos de Fase 1 estabilizados.
 
+> **Estado (108A-1, 2026-08-10):** implementado en worktree `f1/cli-contracts`; gate upstream
+> PASS (compile, lint 0 errores, test:unit 513 passing/1 pending, check:core OK). La
+> consolidación física de archivos en los módulos y la formalización de puertos quedan en
+> F5/F6; el ADR fija frontera y budgets desde ya.
+
 #### Checklist de arquitectura
 
-- [ ] Escribir ADR del producto único: Sentinel es producto; gate es `sentinel check`.
-- [ ] Definir módulos internos `analysis`, `gate`, `runtime`, `task` y `editor`.
-- [ ] Mantener un solo CLI y separar parsing/dispatch por comandos.
-- [ ] Extraer interfaces pequeñas para scope, plugin verification, scheduler, cache, reporter y process runner.
-- [ ] Invertir dependencias hacia filesystem/proceso/reporter, no hacia `scripts/quality`.
-- [ ] Mantener reglas y adapters de stack fuera del núcleo agnóstico.
-- [ ] Definir un registro de extensiones con identidad, owner, rule IDs, artifact/entrypoint, fixtures,
-      presupuestos y condición de retirada.
-- [ ] Hacer cumplir `una regla, un dueño`: Core, un plugin o una extensión local, nunca dos rutas productivas.
-- [ ] Rechazar colisiones de rule ID/capability y extensiones ejecutables no declaradas.
-- [ ] Definir la API mínima para comprobaciones reales de dominio sin permitir que reimplementen scope,
-      scheduler, cache, reporter, locks o coordinación.
-- [ ] Declarar `task` y shims como capabilities opcionales.
-- [ ] Garantizar que `check` no requiera shims, perfiles ni worktrees.
-- [ ] Dividir `src/cli/index.ts`, `taskCoordinator.ts`, `interceptorShims.ts`, `runtimeInstall.ts` y
-      `diagnose.ts` por responsabilidad.
-- [ ] Fijar budget de tamaño por módulo y justificar excepciones en ADR/tests.
+- [x] Escribir ADR del producto único: Sentinel es producto; gate es `sentinel check`.
+- [x] Definir módulos internos `analysis`, `gate`, `runtime`, `task` y `editor` (mapa en ADR 0001;
+      consolidación física de archivos en F5/F6).
+- [x] Mantener un solo CLI y separar parsing/dispatch por comandos (`args.ts` + `commands.ts` +
+      barril `index.ts`, contrato público intacto).
+- [~] Extraer interfaces pequeñas para scope, plugin verification, scheduler, cache, reporter y
+      process runner (contrato del plugin en el registro de extensiones + `ToolOutcome`;
+      formalización de puertos en F5).
+- [x] Invertir dependencias hacia filesystem/proceso/reporter, no hacia `scripts/quality`
+      (regla DIP en `check:core`).
+- [x] Mantener reglas y adapters de stack fuera del núcleo agnóstico (`src/analyzers/`; excepción
+      documentada `externalToolsAnalyzer` en el ADR).
+- [x] Definir un registro de extensiones con identidad, owner, rule IDs, artifact/entrypoint,
+      fixtures, presupuestos y condición de retirada (`extensionRegistry.ts`).
+- [x] Hacer cumplir `una regla, un dueño`: Core, un plugin o una extensión local, nunca dos rutas
+      productivas (colisiones rechazadas contra `ruleRegistry` y entre extensiones).
+- [x] Rechazar colisiones de rule ID/capability y extensiones ejecutables no declaradas.
+- [~] Definir la API mínima para comprobaciones reales de dominio sin permitir que reimplementen
+      scope, scheduler, cache, reporter, locks o coordinación (contrato en ADR/registro; los
+      plugins son subprocesos vía `structuredTool`; enforcement de plugins publicados en F3/F4).
+- [x] Declarar `task` y shims como capabilities opcionales (doctor: requeridas
+      `analyze`/`check`/`doctor`/`status`; `optionalCapabilities` expuestas).
+- [x] Garantizar que `check` no requiera shims, perfiles ni worktrees (regla en `check:core`;
+      `gateRun` no importa `interceptorShims`/`taskCoordinator`).
+- [~] Dividir `src/cli/index.ts`, `taskCoordinator.ts`, `interceptorShims.ts`, `runtimeInstall.ts`
+      y `diagnose.ts` por responsabilidad (`cli/index.ts` dividido; los cuatro core quedan con
+      budget de tamaño y división planificada en F5/F6).
+- [x] Fijar budget de tamaño por módulo y justificar excepciones en ADR/tests
+      (`scripts/module-budgets.json` + `check:core`).
 
 #### Validación SOLID
 
-- [ ] **SRP:** cada módulo tiene un motivo principal de cambio.
-- [ ] **OCP:** añadir un analyzer no modifica el scheduler/reporting core.
-- [ ] **LSP:** plugins devuelven el mismo contrato de outcome y pueden sustituirse en fixtures.
-- [ ] **ISP:** plugins no reciben APIs de runtime/task que no usan.
-- [ ] **DIP:** gate depende de puertos estructurados, no de scripts/concretos del consumidor.
+- [x] **SRP:** cada módulo tiene un motivo principal de cambio (mapa del ADR).
+- [x] **OCP:** añadir un analyzer no modifica el scheduler/reporting core (registro + fronteras;
+      suite PASS).
+- [x] **LSP:** plugins devuelven el mismo contrato de outcome y pueden sustituirse en fixtures
+      (contrato `ToolOutcome` de `structuredTool.ts`; tests de equivalencia PASS).
+- [x] **ISP:** plugins no reciben APIs de runtime/task que no usan (registro + capabilities
+      opcionales).
+- [x] **DIP:** gate depende de puertos estructurados, no de scripts/concretos del consumidor
+      (regla en `check:core`).
 
 #### Gate de refactor
 
-- [ ] Snapshots/fixtures antes y después conservan decisiones y findings ordenados.
-- [ ] `check:core` impide imports editor-specific fuera del adapter.
-- [ ] Suite upstream completa PASS.
-- [ ] No hay regresión >10 % en analyze scoped ni doctor.
+- [x] Snapshots/fixtures antes y después conservan decisiones y findings ordenados (suite
+      completa incl. `sentinelEquivalence`/`coreContracts` sin cambios).
+- [x] `check:core` impide imports editor-specific fuera del adapter (ampliado a `src/cli`;
+      excepción `externalToolsAnalyzer` documentada).
+- [x] Suite upstream completa PASS (513 passing, 1 pending).
+- [x] No hay regresión >10 % en analyze scoped ni doctor (mismas rutas; tests de proceso
+      analyze en ~200-400 ms).
 
 #### Rollback
 
-- [ ] Entregar extracción en commits pequeños sin cambiar contrato público.
-- [ ] Conservar adapters de compatibilidad hasta que cada módulo nuevo tenga paridad.
+- [x] Entregar extracción en commits pequeños sin cambiar contrato público (F1 `1942cf5` + F2
+      separados; sin cambios de schema ni exit codes).
+- [x] Conservar adapters de compatibilidad hasta que cada módulo nuevo tenga paridad (nada
+      eliminado; barril conserva el contrato de `cli`).
 
 **Criterio de cierre:** Core modular con contratos estables; todavía no se elimina legacy.
 

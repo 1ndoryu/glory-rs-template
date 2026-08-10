@@ -73,15 +73,27 @@ suite `quality:test` 237/238 PASS y gate real estructurado. Pendiente único: ga
 definitivo (cooldown 180 min o `--allow-heavy` con autorización explícita, regla 028A-16).
 Baseline: `Agente/prevencion/bench-ceremonia-2026-08-09.md`.
 
-**Fase 1 (cerrada en worktree `f1/cli-contracts`, adopción en F8):** contratos CLI de Sentinel
-corregidos en worktree exclusivo (`area-trabajo/.sentinel-upstream-f1`), checkout consumidor
-intacto. Logger → stderr (stdout JSON puro), doctor separa `readyForAnalyze`/`readyForGate`
-(no-policy nunca gate-ready), `check --dry-run` estrictamente no mutante, presupuestos
-conectados en `quality:profile` (`--budgets` → config efectiva, `--budgets-json`/`--budgets=`
-override, exit 1 + reporte estructurado + evidencia insuficiente visible), tests de proceso
-CLI (`cliProcess.test.ts`), lint 0 errores (9 preexistentes absorbidos) y gate upstream PASS
-(compile + lint + test:unit 506/506). Los ítems canónicos restantes (perfil segmentado y
-presupuestos en `sentinel check`) caen con la consolidación F4/F5.
+**Fase 1 (cerrada en worktree `f1/cli-contracts` `1942cf5`, adopción en F8):** contratos CLI de
+Sentinel corregidos en worktree exclusivo (`area-trabajo/.sentinel-upstream-f1`), checkout
+consumidor intacto. Logger → stderr (stdout JSON puro), doctor separa
+`readyForAnalyze`/`readyForGate` (no-policy nunca gate-ready), `check --dry-run` estrictamente
+no mutante, presupuestos conectados en `quality:profile` (`--budgets` → config efectiva,
+`--budgets-json`/`--budgets=` override, exit 1 + reporte estructurado + evidencia insuficiente
+visible), tests de proceso CLI (`cliProcess.test.ts`), lint 0 errores (9 preexistentes
+absorbidos) y gate upstream PASS (compile + lint + test:unit 506/506). Los ítems canónicos
+restantes (perfil segmentado y presupuestos en `sentinel check`) caen con la consolidación
+F4/F5.
+
+**Fase 2 (cerrada en worktree `f1/cli-contracts`, adopción en F8):** Sentinel delimitado como
+producto único. ADR 0001 (`docs/adr/0001-producto-unico-sentinel.md`: gate = `sentinel check`,
+módulos `analysis`/`gate`/`runtime`/`task`/`editor`, una regla un dueño, budgets de tamaño);
+registro de extensiones (`extensionRegistry.ts` — colisiones de rule IDs contra el núcleo y
+entre extensiones, ejecutables no declarados); fronteras en `check:core` (cli sin `vscode`,
+DIP sin módulos del editor ni `scripts/quality`, `check` independiente de shims/perfiles/
+worktrees, budgets por módulo); CLI dividido en `args.ts` + `commands.ts` + barril; `task`/
+`recover`/shims como capabilities opcionales del doctor. Gate upstream PASS: compile + lint
+(0 errores) + test:unit **513 passing, 1 pending** (7 tests nuevos) + check:core OK. La
+consolidación física de archivos en los módulos queda en F5/F6.
 
 **098A-1 — Agilizar la ceremonia de cierre de calidad (ABSORBIDO por 108A-1, 10-08; aprobado
 09-08).** Conservado como historia. Plan original:

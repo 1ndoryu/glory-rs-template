@@ -2,8 +2,8 @@
 
 > **Fecha:** 2026-08-10
 > **Rama objetivo:** `wandorius`
-> **Estado:** EN EJECUCIÓN — Fase 0 cerrada (commit `b397a135`); Fase 1 cerrada en worktree
-> `f1/cli-contracts` (2026-08-10); adopción upstream pendiente de release publicado (F8)
+> **Estado:** EN EJECUCIÓN — F0 cerrada (`b397a135`), F1 cerrada en worktree (`1942cf5`),
+> F2 cerrada en worktree (2026-08-10); adopción upstream pendiente de release publicado (F8)
 > **ID operativo:** `108A-1` (tomada por `buffy`)
 > **Fuente del plan:** `Agente/documentacion/herramientas/auditoria-sentinel-completa-2026-08-10.md` §14
 > (Plan integral de corrección por fases F0–F9). Este documento es solo seguimiento operativo; el
@@ -43,7 +43,8 @@
 | Fase | Estado | Nota |
 | --- | --- | --- |
 | F0 — Contención urgente y baseline confiable | COMPLETADA | commit `b397a135`; el gate **full** definitivo queda pendiente de decisión 028A-16 (cooldown o `--allow-heavy` autorizado) |
-| F1 — Corregir contratos de Sentinel | EN CURSO | worktree `f1/cli-contracts` corregido (stdout/stderr, doctor, dry-run, budgets) + gate upstream PASS; adopción tras release publicado (F8) |
+| F1 — Corregir contratos de Sentinel | COMPLETADA | worktree `f1/cli-contracts` commit `1942cf5` (stdout/stderr, doctor, dry-run, budgets) + gate upstream PASS; adopción tras release publicado (F8) |
+| F2 — Sentinel modular único | EN CURSO | ADR 0001 + registro de extensiones + fronteras check:core + split CLI + capabilities opcionales; gate upstream PASS (513/506+7); consolidación de archivos en F5/F6 |
 | F2 — Sentinel modular único | pendiente | depende de F1 |
 | F3 — Rendimiento VarSense/setup/suites | pendiente | depende de F2 |
 | F4 — Bootstrap `sentinel init` | pendiente | depende de F1–F3 (artifacts) |
@@ -122,11 +123,32 @@
       presupuestos a `sentinel check` — milestone canónico del perfil en F4/F5 (cache hit/miss ya
       está segmentado hoy).
 
+## Checklist Fase 2 (seguimiento de ejecución — worktree `f1/cli-contracts`)
+
+- [x] ADR 0001 `docs/adr/0001-producto-unico-sentinel.md`: producto único, gate = `sentinel
+      check`, módulos `analysis`/`gate`/`runtime`/`task`/`editor` (+ `cli` y transversales),
+      una regla un dueño, presupuestos de tamaño, rollback en commits pequeños.
+- [x] Registro de extensiones `src/core/extensionRegistry.ts` (identidad/owner/rule IDs/
+      entrypoint/fixtures/budgets/retirada) + rechazo de colisiones con el núcleo
+      (`ruleRegistry`) y entre extensiones + rechazo de ejecutables no declarados; 7 tests.
+- [x] Fronteras en `check:core`: `src/cli` protegido de imports `vscode`; DIP (core/cli/analyzers
+      no importan módulos del editor ni `scripts/quality`); `gateRun` no importa
+      `interceptorShims`/`taskCoordinator` (`check` independiente de shims/perfiles/worktrees);
+      budgets de tamaño por módulo (`scripts/module-budgets.json`, top-10 de visibilidad).
+- [x] CLI dividido: `src/cli/args.ts` (parsing) + `src/cli/commands.ts` (handlers/dispatch) +
+      `src/cli/index.ts` (barril + entry). Contrato público intacto (tests cli PASS, bin ok).
+- [x] `task`/`recover`/shims como capabilities OPCIONALES del doctor (requeridas:
+      `analyze`/`check`/`doctor`/`status`); `optionalCapabilities` en el diagnóstico + test.
+- [x] Gate upstream F2 PASS: compile · lint (0 errores) · test:unit **513 passing, 1 pending** ·
+      check:core OK · paridad de decisiones (tests analyze/equivalence/cliProcess sin cambios).
+- [ ] Consolidación física de archivos en módulos `analysis`/`gate`/`runtime`/`task`/`editor`
+      — planificada en F5/F6 (el ADR fija la frontera y los budgets desde ya).
+
 ## Siguiente paso verificable
 
 1. **Fase 0:** queda únicamente el gate **full** definitivo (cooldown o `--allow-heavy` con
    autorización explícita, regla 028A-16) — decisión del usuario pendiente.
-2. **Fase 1:** commit del worktree `f1/cli-contracts` (branch aislada) + docs del consumidor
-   (plan/roadmap/auditoría §14).
-3. **Fase 2 — Sentinel modular único:** depende de contratos F1 estabilizados; el worktree sigue
-   siendo el vehículo de los cambios upstream.
+2. **Fase 1 y 2:** commits del worktree `f1/cli-contracts` (`1942cf5` y el de F2) + docs del
+   consumidor (plan/roadmap/auditoría §14).
+3. **Fase 3 — Rendimiento VarSense/setup/suites:** depende de los puertos de plugins/procesos
+   definidos en F2; fixture del timeout de 120 s, instrumentación de fases y VarSense p95 ≤6 s.
