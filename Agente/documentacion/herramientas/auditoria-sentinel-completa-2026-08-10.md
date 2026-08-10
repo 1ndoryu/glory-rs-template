@@ -1497,8 +1497,7 @@ nuevos scripts de quality en ningún consumidor.
 
 ### 14.8 Cierre documental de README y manuales
 
-**Estado:** COMPLETADO como bloque documental; publicación del submódulo pendiente de autorización/mecanismo
-de release.
+**Estado:** COMPLETADO como bloque documental y publicado en el submódulo Sentinel.
 
 - [x] Reducir `tools/sentinel/README.md` de 542 a 125 líneas, dejando solo propuesta, quickstart, comandos,
       compatibilidad y enlaces.
@@ -1510,9 +1509,14 @@ de release.
       unknown, regla-un dueño, no borrado automático y rollback.
 - [x] Verificar que el CLI fijado 0.7.0 expone `init`, `migrate` y `uninit` en `--help`.
 - [x] Verificar `git diff --check` y ausencia de archivos documentales requeridos faltantes.
-- [ ] Publicar/repinear el submódulo después de revisar estos cambios; mientras esté sucio, `quality:lock
-      -- --check` y `sentinel doctor --json` deben fallar cerrado con `tool-checkout-dirty`.
+- [x] Publicar/repinear el submódulo al commit `3fa8062` en `origin/main`, actualizar `quality-tools.json`
+      y regenerar `sentinel.lock.json`.
+- [x] Confirmar `npm run quality:lock -- --check` en el consumidor (`pass: match`).
+- [ ] Completar la evidencia de release exigida por `sentinel doctor`: `npm run quality:setup` queda bloqueado
+      en Windows porque el `tar` disponible no admite `--force-local`; no se debe fabricar evidencia manual.
+- [ ] Repetir `sentinel doctor --json` y `npm run gate:check -- <ID>` tras corregir ese problema de setup;
+      en esta sesión ambos quedan bloqueados de forma cerrada por `tool-release-evidence-missing`.
 
-Esta última casilla no es un defecto del README: evita que cambios locales no publicados se presenten como
-el release fijado por el consumidor. Requiere un commit/release del submódulo y el mecanismo de publicación
-correspondiente; no se resuelve editando el lock a mano.
+La última casilla no es un defecto del README: evita que un checkout publicado pero no certificado desde
+staging se presente como release listo para gate. Requiere corregir el setup multiplataforma y repetir la
+evidencia real; no se resuelve editando el lock ni el JSON de evidencia a mano.
