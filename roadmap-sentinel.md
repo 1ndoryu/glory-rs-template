@@ -7,8 +7,9 @@
 
 > **Estado (018A-43):** mínimo operativo cerrado y verificado; el roadmap principal queda desbloqueado. El commit no es requisito universal: el reporte recuerda cuándo conviene hacer staging/commit/push y cuándo documentar trabajo intermedio o compartido. El gate sí exige prueba y reporte reproducibles.
 
-> **Estado vigente (108A-6, 2026-08-10):** Sentinel 0.7.0 (`a804c0d`) está publicado y fijado en
-> wandorius y glory-rs-rest. `gate:check` genera el manifest y delega la decisión en `sentinel check`;
+> **Estado vigente (108A-6, 2026-08-10):** Sentinel 0.7.0 (`a804c0d`) está publicado; el consumidor
+> wandorius fija el commit documental `ea8f47e` y glory-rs-rest conserva el pin de release. `gate:check`
+> genera el manifest y delega la decisión en `sentinel check`;
 > `task:check` queda como compatibilidad temporal. El stage `custom` fue retirado de ambos consumidores.
 > La skill `quality-gate-setup` v1.2.0 ya prohíbe copiar `scripts/quality` y documenta la migración de
 > carpetas legacy. Solo permanece pendiente la retirada física de las capas A/B tras una segunda release

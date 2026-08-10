@@ -3,7 +3,8 @@
 > **Fecha:** 2026-08-10
 > **Rama objetivo:** `wandorius`
 > **Estado:** COMPLETADA CON PENDIENTES CONDICIONADOS — F0–F9 cerradas. Sentinel 0.7.0 está publicado en
-> `origin/main` + tag `v0.7.0`, commit `a804c0d8bb55b2f44406aab4112d528150df05aa`; ambos consumidores
+> `origin/main` + tag `v0.7.0` en `a804c0d8bb55b2f44406aab4112d528150df05aa`; wandorius incorpora el
+> commit documental `ea8f47e55ead6f5dca4429fab0b06247fd85b5e8` y ambos consumidores
 > están re-pinados a ese commit con lock/doctor PASS. El gate canónico es `gate:check` → `sentinel check`.
 > El stage `custom` fue retirado en ambos consumidores. La retirada física de capas legacy queda condicionada
 > a una segunda release verde con rollback.
@@ -53,7 +54,7 @@
 | F5 — Migrar consumidor y consolidar gate | COMPLETADA | worktree `f5/consumer-migrate` (`e0bec3e1` + `bad010f4`): pin local, lock, clasificación, reglas observe-only, doble vía 1:1, 5 tareas reales |
 | F6 — Escalabilidad local, seguridad, operación | COMPLETADA | worktree `c1f8f1f` + consumidor `304a474d`: seguridad, concurrencia, doctor --shims, bench-shims, ADR 0001 |
 | F7 — Consolidar documentación | COMPLETADA | commit `71e26bd8`: índice actualizado, lecciones aprendidas |
-| F8 — Release, adopción y retirada legacy | COMPLETADA CON PENDIENTE | release `0.7.0` (`a804c0d`) publicada y ambos consumidores adoptados; retirada física espera la segunda release verde con rollback |
+| F8 — Release, adopción y retirada legacy | COMPLETADA CON PENDIENTE | release `0.7.0` (`a804c0d`) publicada; wandorius añade pin documental `ea8f47e`; retirada física espera la segunda release verde con rollback |
 | F9 — Verificación final y cierre | COMPLETADA | gates PASS, suites OK, auditoría §14 RESUELTA |
 
 ## Seguimiento Retirada Legacy (108A-6, 2026-08-10)

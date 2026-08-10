@@ -15,7 +15,7 @@
 > operativa, README y la skill de bootstrap; no se corrigió código, configuración, locks ni dependencias en
 > este bloque.
 > **Checkout auditado:** `glory-rust-template`, rama operativa `wandorius`.  
-> **Sentinel fijado por el consumidor al cierre:** 0.7.0, commit `a804c0d8bb55b2f44406aab4112d528150df05aa`.
+> **Sentinel fijado por el consumidor al cierre:** 0.7.0, commit `ea8f47e55ead6f5dca4429fab0b06247fd85b5e8`.
 > **Runtime global activo observado:** 0.6.4.  
 > **Inspector independiente de la auditoría base:** `sentinel_inspector` — `VEREDICTO: DEFECTO DETECTADO`.
 > **Estado documental actual:** RESUELTA CON PENDIENTES CONDICIONADOS. El gate canónico ya delega en
@@ -1509,7 +1509,7 @@ nuevos scripts de quality en ningún consumidor.
       unknown, regla-un dueño, no borrado automático y rollback.
 - [x] Verificar que el CLI fijado 0.7.0 expone `init`, `migrate` y `uninit` en `--help`.
 - [x] Verificar `git diff --check` y ausencia de archivos documentales requeridos faltantes.
-- [x] Publicar/repinear el submódulo al commit `3fa8062` en `origin/main`, actualizar `quality-tools.json`
+- [x] Publicar/repinear el submódulo al commit `ea8f47e` en `origin/main`, actualizar `quality-tools.json`
       y regenerar `sentinel.lock.json`.
 - [x] Confirmar `npm run quality:lock -- --check` en el consumidor (`pass: match`).
 - [ ] Completar la evidencia de release exigida por `sentinel doctor`: `npm run quality:setup` queda bloqueado

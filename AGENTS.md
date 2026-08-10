@@ -124,8 +124,9 @@ Los comandos directos pesados no sustituyen el gate.
   fixtures, presupuesto, owner único y sunset. Una finalidad desconocida bloquea la migración; no se borra
   por el nombre de la carpeta.
 
-Sentinel está fijado en el submódulo `tools/sentinel`, release publicado `0.7.0`, commit
-`a804c0d8bb55b2f44406aab4112d528150df05aa`, disponible en `origin/main` y tag `v0.7.0`.
+Sentinel está fijado en el submódulo `tools/sentinel`, release publicado `0.7.0` (tag `v0.7.0` en
+`a804c0d8`) más el commit documental `ea8f47e55ead6f5dca4429fab0b06247fd85b5e8`, disponible en
+`origin/main`.
 VarSense está fijado en `tools/varsense`, versión `2.2.0`, commit
 `e8360927ee92c4067f1f501dd77b951c8bc4f61d`, HEAD de `origin/main`. `quality-tools.json` y
 `sentinel.lock.json` deben coincidir con los gitlinks. Tras cambiar un submódulo: publicar primero,

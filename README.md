@@ -171,7 +171,7 @@ npm run quality:reports:cleanup:dry
 hashes de los analizadores. El gate canónico `gate:check` genera el manifest declarativo y delega la decisión
 en `sentinel check`; `task:check` queda como alias de compatibilidad temporal. El gate consume los checkouts
 internos fijados en `quality-tools.json` mediante sus `sourcePath` relativos. Sentinel está fijado al commit
-coordinador publicado `a804c0d8bb55b2f44406aab4112d528150df05aa` (release `0.7.0`, tag `v0.7.0`) y VarSense al commit declarado en el
+coordinador publicado en `origin/main` (release base `0.7.0`, tag `v0.7.0` en `a804c0d8`); este consumidor fija además el commit documental `ea8f47e55ead6f5dca4429fab0b06247fd85b5e8`. VarSense queda fijado al commit declarado en el
 mismo archivo; `sentinel.lock.json` repite esos commits y hashes. La release anterior `20c13a2`/`v0.5.0`
 queda disponible como rollback. `quality:setup`
 puede inicializar los submódulos y compilar sus CLIs en un clon limpio; cuando falta un CLI,

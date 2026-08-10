@@ -160,7 +160,8 @@ worktrees para cambios upstream).
 
 **Fase 8 (COMPLETADA):** release y adopción. Sentinel 0.7.0 (`a804c0d`) y VarSense 2.2.0
 publicados en origin; wandorius y glory-rs-rest adoptaron el mismo pin, lock y doctor PASS.
-`gate:check` delega en `sentinel check`; push autorizado por el usuario (2026-08-10).
+El consumidor actual incorpora el commit documental `ea8f47e`; `gate:check` delega en `sentinel check`;
+push autorizado por el usuario (2026-08-10).
 
 **Fase 9 (COMPLETADA CON PENDIENTES CONDICIONADOS):** verificación final y cierre documental.
 La retirada física de capas A/B espera una segunda release verde con rollback.
@@ -171,7 +172,7 @@ La retirada física de capas A/B espera una segunda release verde con rollback.
 
 **028A-18 — Orquestación universal de tareas con Sentinel (en curso).** El siguiente bloque de tooling permanece serializado hasta completar su integración, gate y cleanup. La iniciativa SNT-12 queda registrada como plan dependiente/aprobable, no como tarea paralela habilitada.
 
-**SNT-12/SNT-13/SNT-16b/SNT-16c/SNT-16d/SNT-16f — Migración de scripts a Core y adapters por proyecto (snapshot histórico 0.6.0).** La evidencia inicial de 0.6.0 queda conservada para trazabilidad. El estado vigente es 0.7.0 (`a804c0d`) en dos consumidores, con `gate:check` → `sentinel check`, stage `custom` retirado y skill v1.2.0 actualizada. Solo queda la segunda release verde con rollback antes de retirar físicamente las capas legacy.
+**SNT-12/SNT-13/SNT-16b/SNT-16c/SNT-16d/SNT-16f — Migración de scripts a Core y adapters por proyecto (snapshot histórico 0.6.0).** La evidencia inicial de 0.6.0 queda conservada para trazabilidad. El estado vigente es el release 0.7.0 (`a804c0d`) con el pin documental `ea8f47e` en el consumidor, `gate:check` → `sentinel check`, stage `custom` retirado y skill v1.2.0 actualizada. Solo queda la segunda release verde con rollback antes de retirar físicamente las capas legacy.
 
 **Detalle de SNT-16d/SNT-16f — Preflight, capacidades y recuperación segura (snapshot histórico 0.6.0).** Los contratos se conservaron y fueron re-adoptados en 0.7.0; `doctor`, `task status`, `task recover` y `quality:setup` siguen sujetos al commit/lock fijado. No se debe usar este bloque histórico para bootstrap nuevo.
 
@@ -179,7 +180,7 @@ La retirada física de capas A/B espera una segunda release verde con rollback.
 unidad de paralelismo por tarea (`claim → worktree/rama → gate → integración ff-only → cleanup`),
 ownership atómico, detección de carreras, takeover explícito y diagnóstico de basura. Sentinel 0.7.0
 está publicado en `origin/main` y `v0.7.0`; la release anterior permanece como rollback, mientras ambos
-consumidores fijan `tools/sentinel` en `a804c0d`. Este bloque queda histórico; la retirada física de capas
+consumidores fijan `tools/sentinel` en `ea8f47e`. Este bloque queda histórico; la retirada física de capas
 legacy solo se ejecuta tras la segunda release verde y rollback.
 
 **018A-66 — Separar overlay personal de la sesión admin.** El código está cerrado (`52bf6e0c`): `overlay-sync` corta la sincronización con capacidad admin (clearOverlaySync) y la UI de conflicto cierra el modal en `render` si la sesión pasa a admin (guardia anti-flash ante órdenes de notificación distintos). Se añadió cobertura de la guardia UI (`overlay-conflict-ui.test.ts`): admin + estado conflict → sin modal; cuenta normal + conflict → modal abierto y se cierra al pasar a admin vía clearOverlaySync; sin conflict → sin modal. 89/89 tests del workspace y type-check PASS. **Pendiente de validación en navegador** (requiere sesión admin real del usuario): login, logout y recarga con admin sin modal de conflicto ni aviso `workspace actualizado`; con cuenta no-admin el conflicto solo aparece ante revisiones local/remota incompatibles. Después se continúa con hardening/E2E.
