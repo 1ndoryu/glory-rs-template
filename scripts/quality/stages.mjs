@@ -44,10 +44,18 @@ async function main() {
   const reportRoot = resolveWorkspacePath(projectRoot, args.reportRoot ?? path.join(context.reportRoot, '..', 'check', 'stages'), '--report-root', { allowReportRoot: true });
   const wrapper = resolveWorkspacePath(projectRoot, adapter.transport.entrypoint, 'adapter.transport.entrypoint');
   const scopeArgsForStage = scopeManifestPath ? ['--scope-manifest', scopeManifestPath] : [];
+  /* [108A-6] El contrato del Core (stageManifest.ts) acepta únicamente
+   * name/executable/args/reportPath/expectedSchemaVersion/timeoutMs/cwd y
+   * aplica su propia allowlist fija de entorno (toolRunner ENV_ALLOWLIST),
+   * que ya cubre la allowlist declarada del adapter (CARGO_TARGET_DIR_BASE)
+   * y los tokens de sanción del gate. Se omite envAllowlist para que el
+   * manifest generado sea aceptado por `sentinel check --stages`; si el
+   * adapter declara variables fuera de la allowlist del Core, registrarlas
+   * como contrato del manifest es una extensión del Core (seguimiento). */
   const declarations = stageNames.map(name => {
     const reportPath = resolveWorkspacePath(projectRoot, path.join(reportRoot, `${name}.json`), `report ${name}`, { allowReportRoot: true });
     const adapterArgs = materializeTransportArguments(adapter, { stage: name, reportPath, taskId: args.taskId });
-    return { name, executable: process.execPath, args: [wrapper, ...adapterArgs, ...scopeArgsForStage], expectedSchemaVersion: String(adapter.adapter.output.schemaVersion), timeoutMs: adapter.stages[name].timeoutMs, envAllowlist: context.adapterEnvironmentAllowlist, reportPath };
+    return { name, executable: process.execPath, args: [wrapper, ...adapterArgs, ...scopeArgsForStage], expectedSchemaVersion: String(adapter.adapter.output.schemaVersion), timeoutMs: adapter.stages[name].timeoutMs, reportPath };
   });
   const outputPath = resolveWorkspacePath(projectRoot, args.output ?? path.join(reportRoot, 'stages.json'), '--output', { allowReportRoot: true });
   await mkdir(path.dirname(outputPath), { recursive: true });
