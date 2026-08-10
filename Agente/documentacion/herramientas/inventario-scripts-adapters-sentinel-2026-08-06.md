@@ -38,4 +38,75 @@ Conservar scripts de dominio/proveedor, adapters externos estables, experiencia 
 2. Validar clon limpio, CLI real, dos proyectos consumidores y paridad envelope/legacy.
 3. Actualizar el lock del consumidor primario solo con artefacto/release verificables.
 4. Mantener scripts locales hasta dos releases consecutivas verdes; después medir y retirar solo archivos sin referencias.
+
+---
+
+## Inventario 108A-1 — Fase 0 (corte 2026-08-10)
+
+> Generado sin modificar conducta, como línea base de la auditoría
+> `Agente/documentacion/herramientas/auditoria-sentinel-completa-2026-08-10.md` (Fase 0).
+
+### Volumen
+
+- `scripts/quality/`: **103 archivos `.mjs`** — 56 productivos y 47 de tests (13.553 líneas
+  totales según la auditoría; el inventario de archivos/líneas detallado vive en el informe §3).
+
+### Entrypoints públicos (package.json)
+
+- `task:check` → `node scripts/quality/task-check.mjs` (gate; marcado **compatibilidad
+  temporal**, sin nuevas features — ver congelación abajo).
+- `quality:setup` → `setup.mjs` · `quality:test` → suite `node --test` · `quality:doctor` →
+  `sentinel-doctor.mjs` · `quality:lock` → `lock-generator.mjs` · `quality:guard` →
+  `heavy-run-guard.mjs --status` · `quality:cleanup[:dry]` → `target-maintenance.mjs` ·
+  `quality:reports:cleanup[:dry]` → `report-cleanup.mjs` · `quality:profile` →
+  `quality-profile.mjs` · `quality:bench` → `bench-baseline.mjs` · `quality:install-guard` /
+  `quality:uninstall-guard` → `install-global-runtime.mjs`.
+- Toma de tarea: `task:take` / `task:release` / `task:status` → `task-takeover.mjs`.
+
+### Módulos raíz (46) — agrupación funcional
+
+- **Orquestación:** `task-check.mjs` (entry), `stage-definitions.mjs`, `stage-runner.mjs`,
+  `stages.mjs`, `stage-process.mjs`, `scope.mjs`, `args.mjs`.
+- **Preflight/lock/tools:** `preflight.mjs`, `lockfile.mjs`, `lock.mjs`, `lock-generator.mjs`,
+  `source-path.mjs`, `policy.mjs`, `policy-defaults.mjs`, `policy-decision.mjs`,
+  `adapter-manifest.mjs`.
+- **Reporte/métricas:** `reporter.mjs`, `redaction.mjs`, `quality-profile.mjs`,
+  `export-ci-metrics.mjs`, `performance-budget.mjs`, `report-reader.mjs`, `report-cleanup.mjs`,
+  `report-retention.mjs`, `report-retention-stage.mjs`.
+- **Runner/seguridad:** `runner.mjs`, `atomic-file.mjs`, `branch-identity.mjs`, `cache.mjs`,
+  `quality-command-guard.mjs`, `heavy-run-guard.mjs`, `target-maintenance.mjs`,
+  `target-maintenance-stage.mjs`, `index-maintenance.mjs`, `task-takeover.mjs`,
+  `install-global-runtime.mjs`.
+- **Analizadores/adapters:** `custom-rules.mjs`, `run-frontend-tests.mjs`,
+  `frontend-test-selection.mjs`, `reminders.mjs`, `varsense-parity.mjs`, `observe-compare.mjs`,
+  `bench-baseline.mjs`, `bench-fixtures.mjs`, `sentinel-doctor.mjs`, `setup.mjs`.
+
+### Reglas del analyzer local `custom-rules.mjs` (17)
+
+14 checks regex + `file-size-budget` + `singleton-mutable-state` + `large-interface-isp`.
+`adapters/custom.mjs` marca **15 como `MIGRATED_TO_SENTINEL`** (se filtran del reporte, pero el
+scanner sigue ejecutándose y conserva resultados para comparación):
+`dom-access-outside-platform`, `window-reference-outside-platform`, `unsafe-any`,
+`default-export`, `console-production`, `api-call-outside-service`, `catch-vacio`,
+`unsafe-process-shell`, `hardcoded-secret-context`, `open-redirect`, `innerhtml-variable`,
+`singleton-mutable-state`, `large-interface-isp`, `mixed-barrel-logic`, `file-size-budget`.
+
+**Sin clasificar (no marcadas):** `async-without-abort` y `subscription-without-dispose` — no se
+borran ni se declaran migradas; requieren clasificación con fixtures (Fase 5 de la auditoría).
+
+### Etapas del adapter (`quality-adapter.json`)
+
+`sentinel` (180 s) · `varsense` (300 s) · `rust` (1800 s) · `frontend` (600 s) · `docs` (60 s) ·
+`custom` (60 s). Perfiles: `css→[varsense]`, `frontend→[varsense,frontend,custom]`,
+`rust→[rust]`, `docs→[docs]`.
+
+### Congelación de `scripts/quality` (Fase 0 de la auditoría)
+
+- `task:check` queda como **compatibilidad temporal** del gate: sin nuevas features, fast paths,
+  cache compartida ni cierre consolidado (no-goals de la auditoría §14.1). Solo se permiten
+  correcciones acotadas que recuperen un gate ejecutable y su evidencia.
+- **Congeladas las nuevas reglas y nuevos archivos productivos** en `scripts/quality` salvo el
+  hotfix acotado de esta fase.
+- Las capacidades universales (fast path, cache root, `task:close`, evidencia común) se
+  reubican en Sentinel Core/CLI en fases posteriores, no aquí.
 5. Actualizar la skill global únicamente cuando la release, lock, gate y una sesión nueva aporten evidencia.

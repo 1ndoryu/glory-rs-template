@@ -57,6 +57,18 @@
 
 ## Siguiente bloque habilitado
 
+**108A-1 — Ejecutar la corrección de la auditoría completa de Glory Sentinel y el quality gate
+(en curso, 10-08-2026).** Implementa en orden las fases F0→F9 del plan integral de la auditoría
+`Agente/documentacion/herramientas/auditoria-sentinel-completa-2026-08-10.md` (§14), comenzando
+por la Fase 0 (recuperar un gate ejecutable y baseline confiable). Plan de seguimiento:
+`Agente/planes/plan-ejecucion-auditoria-sentinel-2026-08-10.md`. **Absorbe 098A-1** (su F0 se
+completa dentro de la Fase 0; F1–F6 se reubican a Core/CLI en fases posteriores, no a
+`scripts/quality`). Push/publicación remota (Fase 8) requieren autorización explícita adicional.
+
+**098A-1 — Agilizar la ceremonia de cierre de calidad (ABSORBIDO por 108A-1, 10-08; aprobado
+09-08).** Conservado como historia. Plan original:
+`Agente/planes/plan-agilizar-ceremonia-cierre-calidad-2026-08-09.md`.
+
 **028A-18 — Orquestación universal de tareas con Sentinel (en curso).** El siguiente bloque de tooling permanece serializado hasta completar su integración, gate y cleanup. La iniciativa SNT-12 queda registrada como plan dependiente/aprobable, no como tarea paralela habilitada.
 
 **SNT-12/SNT-13/SNT-16b/SNT-16c/SNT-16d/SNT-16f — Migración de scripts a Core y adapters por proyecto.** La transición local permanece integrada: `quality-adapter.json`, runner fail-closed, transporte argv, observe y fixtures Node/Rust (2/2 PASS). Sentinel publicó el release coordinado **0.6.0** (`44dc8fa` en `origin/main` + tag `v0.6.0`), que incorpora SNT-16c/16d/16f con suite de **502 PASS, 1 pending**; el checkout consumidor fija gitlink, config y lock a `44dc8fa` y el doctor pasa `ready: true` con cero issues. La release pública anterior `20c13a2`/`0.5.0` queda como rollback disponible. Pendiente: matriz multi-proyecto con clon limpio (dos consumidores independientes). No se eliminan scripts ni se modifica la skill global antes de esa evidencia. El plan canónico es `Agente/planes/plan-migracion-scripts-adapters-sentinel-2026-08-06.md`; el hardening adicional vive en `Agente/planes/plan-preflight-recuperacion-sentinel-2026-08-07.md`.
@@ -196,6 +208,48 @@ quality) y gate PASS.
 - [x] El agente solo usa las excepciones del guard con autorización explícita del usuario en el mismo turno; nunca para "no esperar". *(regla de proceso, ya registrada en prevención y lecciones)*
 
 **Gate/salida:** cualquier uso de la excepción queda trazado y visible; el agente no intenta saltarse el cooldown sin autorización explícita. `npm run quality:test` 156/156 PASS y `task:check -- 028A-16` PASS (local-light, full diferido por cooldown). La prevención `prevencion-cooldown-guard-2026-08-02.md` queda archivada.
+
+### 098A-1 — Agilizar la ceremonia de cierre de calidad (ABSORBIDO por 108A-1, 10-08)
+
+> **10-08-2026:** este bloque queda absorbido por `108A-1` (auditoría §14). Su F0 se completó
+> dentro de la Fase 0 de 108A-1 (`phaseDurationMs` instrumentado y baseline guardado); F1–F6 no
+> se implementan en `scripts/quality` (no-goal de la auditoría) sino en fases posteriores
+> (Core/CLI/planner). El checklist siguiente se conserva como historia.
+
+**Aprobado por el usuario (OK 09-08-2026).** Plan canónico:
+`Agente/planes/plan-agilizar-ceremonia-cierre-calidad-2026-08-09.md` (veredicto thinker
+"VIABLE CON RESERVAS", P1 aplicadas). Ataca el overhead de cierre: preflight/mantenimiento
+incondicionales, evidencia no visible desde worktrees, ceremonia pesada por tarea y caché fría.
+**No toca el submódulo `tools/sentinel`** ni releases upstream (solo `scripts/quality/`,
+`quality.config.json`, `AGENTS.md` del consumidor), por lo que no rompe la serialización de
+028A-18. Cambios a `scripts/quality/` se cierran con gate completo (automaticFull), nunca docs-fast.
+
+- [ ] **F0** — Medición y trazabilidad base (sin cambiar el flujo): `phaseDurationMs`
+      (`preflightMs`, `maintenanceBeforeMs`, `maintenanceAfterMs`, `stageMs`, `reportWriteMs`)
+      en `metrics.json`; `task:check` real sobre cambio documental (caché fría/tibia) y código
+      local-light; verificar reuso de setup/evidencia en worktree; línea base en
+      `Agente/prevencion/bench-ceremonia-2026-08-09.md`.
+- [ ] **F1 (PRIORIDAD)** — Evidencia y raíz común: worktrees nuevos ven
+      `.sentinel/release-evidence/` (git common dir o `releaseEvidenceRoot` alistado); el doctor
+      pasa sin `tool-release-evidence-missing` en un worktree recién creado.
+- [ ] **F2** — Fast path documental: módulo puro `fast-path.mjs` (SRP), `verifyLight`
+      (sin `git archive`/`git diff`), secuencia `preflight(verifyLight) → sentinel → docs`,
+      nunca `custom`; reporte con `mode:'docs-fast'` + `fastPath:true` + `reason`; target-
+      maintenance con `quotaCheckAt` (vigencia 24 h) en vez de retención bloqueante.
+- [ ] **F3** — Reuso de setup y caché entre tareas: `cacheRoot`/`releaseEvidenceTtlHours`
+      alistados; `setup.mjs` salta compile+suite si evidencia fresca para el commit fijado
+      (`reuse:true`); doctor añade `releaseEvidenceReused`; lock de caché por rama.
+- [ ] **F4** — Cierre consolidado: `task:close <ID>` con `--root` explícito; gate PASS →
+      integrate/cleanup/release; FAIL → no libera claims; política de agentes de cierre y
+      checklist compacto en `AGENTS.md` (docs-fast sin reviewer/inspector).
+- [ ] **F5** — Eficiencia operativa: batch de comandos Git, `rg` dirigido con exclusiones,
+      pre-aprobación de prefijos seguros.
+- [ ] **F6** — Verificación final y adopción: `quality:test` PASS (228+), `quality:lock --
+      --check` y doctor PASS, bench contra F0 (docs-fast ≤20-30 s; código <10 min), 3 tareas
+      reales, modelo de carga nominal, self-gate full del plan, roadmap/prevención actualizados.
+
+**Gate/salida:** cada fase del plan se cierra con su propio `task:check -- 098A-1` (o el ID de
+fase que declare), con DoD observable según el plan (7 criterios).
 
 ### GAME-01 — Bosque multijugador 3D dentro del OS (planificado, bloqueado)
 

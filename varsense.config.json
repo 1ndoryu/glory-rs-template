@@ -12,6 +12,9 @@
     "**/build/**",
     "**/.quality-tools/**",
     "**/.quality-reports/**",
+    "**/.sentinel/**",
+    "**/.vscode-test/**",
+    "**/tools/**",
     "frontend/src/api/generated/**"
   ],
   "scanAllFiles": false,

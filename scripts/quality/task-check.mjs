@@ -104,14 +104,24 @@ async function main() {
         process.stderr.write('[quality] Se ejecutará el modo local-light para no bloquear el equipo.\n');
       }
     }
+    /* [108A-1 Fase 0][098A-1 F0] Medición de fases: el preflight (verificación
+     * completa de analizadores + lock) es una fase propia del reporte. El
+     * fragmento previo de 098A-1 F0 cronometraba con preflightStartedAt sin
+     * declararlo (ReferenceError en todo task:check); se inicializa aquí,
+     * inmediatamente antes del preflight. La métrica solo se cronometra y se
+     * expone en metrics.json; no cambia la decisión del gate. */
+    const preflightStartedAt = Date.now();
     const context = await preflight(args);
+    const preflightMs = Date.now() - preflightStartedAt;
     /* [028A-6] Limpieza preventiva: debe ocurrir antes de calcular el scope y
      * antes de ejecutar cualquier etapa Rust. Si se deja para el final, Cargo
      * puede llenar C:\\tmp durante la validación y el siguiente agente hereda
      * el exceso. La pasada posterior conserva la limpieza de históricos. */
+    const maintenanceBeforeStartedAt = Date.now();
     context.targetMaintenance = await runTargetMaintenanceBestEffort({
       projectRoot: context.projectRoot,
     });
+    const maintenanceBeforeMs = Date.now() - maintenanceBeforeStartedAt;
     if (context.targetMaintenance.status === 'error') {
       process.stderr.write(`[quality] TARGET MAINTENANCE ERROR — ${context.targetMaintenance.message ?? 'cuota no satisfecha'}\n`);
       process.exitCode = 75;
@@ -230,11 +240,13 @@ async function main() {
       const definitions = stageDefinitions(context, scope, args.taskId);
       let finalStatus = 'error';
       try {
+        const stagesStartedAt = Date.now();
         const stages = await runBoundedStages(
           definitions,
           definition => executeStage(context, scope, definition, args),
           { maxConcurrency: context.qualityConfig.maxConcurrentStages ?? 1, isCancelled: () => interrupted },
         );
+        const stageMs = Date.now() - stagesStartedAt;
         /* [028A-17] Recordatorios de toma de tarea ANTEPUESTOS: compactLines
          * recorta a maxReminders (4 por defecto), así que si se añadieran al
          * final, el recordatorio de liberar se perdería en la salida de
@@ -259,6 +271,10 @@ async function main() {
         /* [028A-6] targetRoot por defecto: C:\tmp\glory-target (o
          * CARGO_TARGET_DIR_BASE). La política de cuota/edad viene de
          * quality.config.json heavyRun; no hay clave targetRoot en la config. */
+        /* [108A-1 Fase 0] Mantenimiento posterior a las etapas: targets de
+         * cargo (segunda pasada) e índices de analizadores. Se cronometra como
+         * una sola fase de cierre, separada de las etapas y del reporte. */
+        const maintenanceAfterStartedAt = Date.now();
         /* [028A-6] Segunda pasada: poda históricos elegibles tras terminar
          * Cargo; procesos persistentes siguen protegidos por WMI. */
         const postTargetMaintenance = await runTargetMaintenanceBestEffort({
@@ -279,6 +295,11 @@ async function main() {
           currentBranchKey: context.branch.branchKey,
           config: context.qualityConfig.indexRetention,
         });
+        const maintenanceAfterMs = Date.now() - maintenanceAfterStartedAt;
+        /* [108A-1 Fase 0] Fases del cierre expuestas en metrics.json
+         * (phaseDurationMs). reportWriteMs lo mide el reporter en la escritura
+         * de reportes; el resto se mide aquí. Nunca influye en la decisión. */
+        context.phaseDurationMs = { preflightMs, maintenanceBeforeMs, maintenanceAfterMs, stageMs };
         const report = await createReport(context, args, scope, stages, reminders, startedAt);
         printCompact(report, context);
         finalStatus = interrupted ? 'cancelled' : report.report.decision.label;

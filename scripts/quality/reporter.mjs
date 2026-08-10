@@ -116,6 +116,10 @@ function markdown(report) {
 }
 
 export async function createReport(context, args, scope, stages, reminders, startedAt) {
+  /* [108A-1 Fase 0][098A-1 F0] Fase de escritura del reporte: se cronometra
+   * desde el inicio de createReport hasta terminar de escribir metrics.json
+   * (JSON + Markdown + métricas). Es medición pura; no afecta la decisión. */
+  const reportStartedAt = Date.now();
   const decision = finalDecision(stages);
   const findings = stages.flatMap(stage => stage.findings).sort(compareFindings);
   const deferred = context.heavyDeferred ?? null;
@@ -175,6 +179,11 @@ export async function createReport(context, args, scope, stages, reminders, star
    * analizador (filesAnalyzed/filesReused/cacheHitRate/peakRssMb). Es la
    * materia prima de `quality:profile`/`sentinel profile` y de la publicación
    * histórica de CI, sin inflar latest.json ni el stdout. */
+  /* [108A-1 Fase 0][098A-1 F0] phaseDurationMs separa las fases del cierre
+   * que no son etapas: preflight, mantenimiento previo/posterior, etapas y
+   * escritura de reportes. preflightMs/maintenanceBeforeMs/maintenanceAfterMs/
+   * stageMs los mide task-check.mjs; reportWriteMs se mide aquí. Solo se
+   * cronometra: no cambia PASS/FAIL/ERROR ni el exit code. */
   const metrics = sanitize({
     schemaVersion: 1,
     taskId: args.taskId,
@@ -182,6 +191,10 @@ export async function createReport(context, args, scope, stages, reminders, star
     durationMs: report.durationMs,
     mode: report.mode,
     branch: context.branch ?? null,
+    phaseDurationMs: {
+      ...(context.phaseDurationMs ?? {}),
+      reportWriteMs: Date.now() - reportStartedAt,
+    },
     stages: stages.map(stage => ({
       stage: stage.stage,
       status: stage.status,

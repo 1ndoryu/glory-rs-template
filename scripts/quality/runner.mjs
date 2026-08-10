@@ -5,7 +5,22 @@ export const DEFAULT_ENV_ALLOWLIST = Object.freeze([
   'PATH', 'Path', 'PATHEXT', 'SystemRoot', 'WINDIR', 'COMSPEC', 'TEMP', 'TMP',
   'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'PROGRAMFILES', 'PROGRAMFILES(X86)',
   'NUMBER_OF_PROCESSORS', 'CI', 'NO_COLOR', 'TERM', 'npm_execpath',
+  /* [108A-1 Fase 0] Los tokens de sanción del gate NO van en el allowlist:
+   * adapter-manifest rechaza nombres tipo TOKEN/KEY/SECRET por redacción.
+   * Se heredan por el árbol de procesos en safeEnvironment (ver abajo). */
 ]);
+
+/* [108A-1 Fase 0] Tokens de sanción del gate que el runner hereda SIEMPRE a
+ * los procesos hijos cuando existen en process.env, aunque no estén en el
+ * allowlist: GLORY_QUALITY_GATE_TOKEN (task-check.mjs lo genera al arrancar) y
+ * GLORY_HEAVY_RUN_TOKEN (al adquirir el lease pesado). El contrato de
+ * quality-command-guard dice que el token "se hereda únicamente por su árbol
+ * de procesos; fuera de él, el token no existe". Sin esta herencia, los shims
+ * globales bloqueaban las validaciones internas del gate (cargo fmt) y
+ * run-with-db chocaba con el lease pesado del propio gate (clippy/test). Estos
+ * marcadores no contienen secretos: solo identifican una ejecución sancionada
+ * por el gate; si el proceso padre no es el gate, no existen. */
+const GATE_SANCTION_ENV = Object.freeze(['GLORY_QUALITY_GATE_TOKEN', 'GLORY_HEAVY_RUN_TOKEN']);
 const MAX_CAPTURE_BYTES = 64 * 1024;
 const activeChildren = new Set();
 
@@ -21,6 +36,8 @@ function outputText(capture) { return capture.truncated ? `${capture.text}\n...[
 
 export function safeEnvironment(extra = {}, allowlist = DEFAULT_ENV_ALLOWLIST) {
   const permitted = new Set(allowlist ?? DEFAULT_ENV_ALLOWLIST);
+  /* [108A-1 Fase 0] Heredar los tokens de sanción del gate (ver arriba). */
+  for (const key of GATE_SANCTION_ENV) if (process.env[key] !== undefined) permitted.add(key);
   const env = {};
   for (const key of permitted) if (process.env[key] !== undefined) env[key] = process.env[key];
   for (const [key, value] of Object.entries(extra ?? {})) if (permitted.has(key) && value !== undefined) env[key] = value;
