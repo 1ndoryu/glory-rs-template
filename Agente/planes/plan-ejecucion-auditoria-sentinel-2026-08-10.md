@@ -58,7 +58,7 @@
 
 ## Seguimiento Retirada Legacy (108A-6, 2026-08-10)
 
-- [x] Stage `custom` retirado (commit `2244eee7`): `custom-rules.mjs`, `adapters/custom.mjs` y su test eliminados; `profile-contract.mjs`, `stage-definitions.mjs` y `quality-adapter.json` sin referencias.
+- [x] Stage `custom` retirado en ambos consumidores: wandorius (commit `2244eee7`) y glory-rs-rest (commit `f13d0e16`). `custom-rules.mjs`, `adapters/custom.mjs` y su test eliminados; `profile-contract.mjs`, `stage-definitions.mjs` y `quality-adapter.json` sin referencias. Suites: 240 y 231 pass.
 - [x] Segundo consumidor adoptado en la release anterior (glory-rs-rest, pin `c1f8f1f`) y **re-pinado a la release 0.7.0** (`a804c0d`) con lock y doctor PASS.
 - [x] Release **0.7.0** publicada correctamente en `main` + tag `v0.7.0` (merge de `f1/cli-contracts` sobre main 0.6.4; el pin anterior `c1f8f1f` era una rama de feature sin publicar, lo que bloqueaba el preflight de release del Core). Suite upstream 557 passing, lint 0 errores, check:core OK.
 - [x] Doble vía real: `observe-compare` en 108A-1 y 297A-78 — decisión y hallazgos idénticos entre `task:check` y `sentinel check --stages`.
