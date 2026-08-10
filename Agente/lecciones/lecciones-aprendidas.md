@@ -425,3 +425,32 @@ Un analizador instalado dentro del workspace puede terminar analizándose a sí 
 
 - El dark mode solo redefine `--color-*` a blanco dentro de `.desktop-window`/`.movilApp`/`.movilLauncher`; cualquier superficie `--sistema-*` que viva FUERA de esos contenedores (p. ej. el banner de consentimiento anclado al shell) conserva `--color-texto` negro en `:root`. Un componente compartido como `.boton` que usa `--color-texto` queda invisible sobre esa superficie en dark mode.
 - Regla reutilizable: dentro de una superficie del sistema, los componentes consumen `--sistema-*` (que se auto-invierte), no `--color-*`. Antes de usar `.boton` (o cualquier receta compartida) en una superficie OS, verificar qué token de color consume y dónde vive el contenedor respecto al override del dark mode.
+
+## 108A-1 — Auditoría de Sentinel y quality gate (F0–F6, 2026-08-10)
+
+### Redacción de secretos: dos bugs de seguridad encontrados por los fixtures
+
+- **`Authorization: Bearer <token>` dejaba el token expuesto:** el regex `ASSIGNMENT` consumía "Bearer" como valor del campo `Authorization:`, y el token real quedaba sin redactar en la salida (`Authorization: [REDACTED] eyJhbGci...token`). La corrección: añadir `(?:Bearer\s+)?` como prefijo opcional del valor en el ASSIGNMENT, para que Bearer+token sean redactados como una unidad. Mismo patrón en `core/redaction.ts` y `scripts/quality/redaction.mjs` (transferido de la fuente original).
+- **Backtracking catastrófico de `URL_CREDENTIALS`:** el regex `([a-z][a-z0-9+.-]*:\/\/)[^\s:@/]+:[^\s@/]+@` degeneraba a O(n²) sobre líneas largas sin `://` (60 s en 300 KiB). Causa: el esquema `[a-z0-9+.-]*` greedy seguido de `://` obligatorio en una corrida de 300k x's, y el `[^\s:@/]+` sin acotar. Corrección: esquema acotado `{0,32}` y credenciales acotadas `{1,256}` en ambos lados del `:` → 50 ms. Aplicado en core y consumidor.
+- **Lección general:** los fixtures de seguridad deben probar la redacción con entradas largas SIN secretos (p.ej. `data=` + 300k x's) para detectar backtracking catastrófico. Probar también `Authorization: Bearer <token>` como entrada unitaria, no solo `Bearer <token>` suelto.
+
+### Shims del guard: overhead medido y retiro de la ruta normal
+
+- El presupuesto de overhead de shims del checklist F6 es p95 < 50 ms. La medición real (bench-shims, pareado shim vs directo con `--version`, 10 muestras) dio: node p95 ~291 ms, npm ~769 ms, cargo ~391 ms. **NO se alcanza el presupuesto.** El coste viene del `where` del shim + arranque de Node del guard + lógica del guard. Conclusión: los shims legacy deben salir de la ruta normal, y el reemplazo canónico es `sentinel guard` / `sentinel check` (retiro ya marcado en la cabecera de los shims).
+- `doctor --shims` (nuevo `src/core/shimDiagnostics.ts`) lista qué ejecutable gana realmente en PATH y marca si el shim gana: verificado en vivo — cargo lo gana el shim de GlorySentinel, node/npm/npx ganan el real.
+
+### Logging a stderr: stdout debe ser JSON puro
+
+- El fallback del logger sin canal (`console.log` en vez de `console.error`) contaminaba stdout con prefijos `[INFO]`/`[WARN]` antes del JSON solicitado, rompiendo `sentinel analyze --format json | parser`. Corregido en F1: toda salida de diagnóstico (INFO/WARN/ERROR) va a stderr. Verificación: `analyze --format json` → stdout es un único JSON parseable, con diagnósticos del analyzer en stderr.
+
+### Reglas regex locales: 50% de falsos positivos
+
+- Las reglas `async-without-abort` (`/\bfetch\s*\(/g`) y `subscription-without-dispose` (`/\.subscribe\s*\(/g`) marcan también los casos correctos (fetch con AbortSignal y subscribe con unsubscribe). Fixture `f5-abort-dispose.fixture.ts` lo confirmó: 4 findings, 2 falsos positivos. El core de Sentinel no tiene regla equivalente (`fetch-sin-timeout` es timeout, `listen-sin-cleanup` es listen/addEventListener). Decisión: observe-only (no bloquean el gate, se conservan en el log como telemetría) hasta que exista una regla semántica (una regla un dueño, ADR 0001).
+
+### Worktrees para cambios upstream sin contaminar el checkout consumidor
+
+- Los cambios en `tools/sentinel` (upstream) no se hacen en el checkout del consumidor: se rechazan por el lock del submódulo y contaminarían el gitlink. En su lugar, se crea un worktree exclusivo del repo del submódulo (`git -C tools/sentinel worktree add`), se trabaja allí, y la adopción se hace en F8 mediante la actualización del gitlink + `quality-tools.json` + regeneración del lock. El mismo patrón se usó para VarSense.
+
+### Idempotencia de `sentinel init`
+
+- La implementación inicial de `planInit` trataba cualquier archivo existente sin `--force` como conflicto, incluso si el contenido era idéntico. La corrección: leer el contenido actual, comparar, y marcar `skip` para contenido idéntico (idempotencia). Si el contenido difiere y no hay `--force`, conflicto. Si difiere con `--force`, `update` con backup. Esto evita que el segundo `init` sobre un proyecto ya configurado falle o sobrescriba innecesariamente.

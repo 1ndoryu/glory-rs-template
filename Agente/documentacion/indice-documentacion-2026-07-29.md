@@ -32,6 +32,10 @@
 | ¿Cómo migra el mundo del Bosque al publicar (decisión 8)? | `Agente/documentacion/arquitectura/adr-bosque-mundo-unico-reinicio-coordinado-2026-08-05.md` + `Agente/planes/plan-reinicio-coordinado-bosque-2026-08-05.md` |
 | ¿Cuál es el inventario y frontera de `glory-render` (Fase 0)? | `Agente/documentacion/arquitectura/auditoria-glory-render-fase0-2026-08-05.md` |
 | ¿Cómo se integra y versiona `glory-render` (submódulo, SemVer, CI)? | `Agente/documentacion/arquitectura/estrategia-integracion-glory-render-2026-08-05.md` |
+| ¿Cómo se ejecuta la auditoría y corrección de Sentinel y el quality gate? | `Agente/documentacion/herramientas/auditoria-sentinel-completa-2026-08-10.md` (plan: `Agente/planes/plan-ejecucion-auditoria-sentinel-2026-08-10.md`) |
+| ¿Qué decisión arquitectónica rige el producto único Sentinel? | `tools/sentinel/docs/adr/0001-producto-unico-sentinel.md` |
+| ¿Cómo se hace bootstrap de un proyecto nuevo con Sentinel? | `sentinel init --preset <node|rust|python|mixed>` (docs en ADR 0001 y auditoría §14 F4) |
+| ¿Cómo se diagnostican shims y ejecutables del guard? | `sentinel doctor --shims` (`src/core/shimDiagnostics.ts`) |
 | ¿Cómo se paga la deuda SOLID del runtime de apps?       | `Agente/planes/plan-deuda-solid-runtime-2026-07-31.md`                             |
 | ¿Cómo se arregla el grid/placeholder/debug de iconos del escritorio? | `Agente/planes/plan-iconos-escritorio-grid-2026-08-05.md` |
 | ¿Por qué se cierran ventanas al abrir otra y cómo se resuelve? | `Agente/planes/plan-cierre-automatico-ventanas-2026-07-31.md`                |
