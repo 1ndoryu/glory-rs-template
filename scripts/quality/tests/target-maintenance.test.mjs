@@ -15,6 +15,11 @@ import { runTargetMaintenanceBestEffort } from '../target-maintenance-stage.mjs'
  * Ruta única por test: node --test ejecuta los tests del archivo en paralelo
  * y una base compartida haría que un test borrara el árbol de otro. */
 let testSerial = 0;
+/* Las cuotas se prueban con relaciones entre tamaños, no con capacidad real
+ * de disco. Mantener cada fixture en megabytes evita que los tests paralelos
+ * consuman varios GB y conviertan ENOSPC en un falso fallo del gate. */
+const MB = 1024 ** 2;
+
 function makeTargetRoot() {
   testSerial += 1;
   const base = path.join(os.tmpdir(), `glory-target-test-${process.pid}-${testSerial}`);
@@ -36,7 +41,7 @@ async function seedCandidate(targetRoot, name, { sizeBytes = 0, ageMs = 0, now =
 
 async function projectConfig(projectRoot) {
   await writeFile(path.join(projectRoot, 'quality.config.json'), JSON.stringify({
-    heavyRun: { maxTargetGb: 1, maxTargetAgeDays: 30 },
+    heavyRun: { maxTargetGb: 0.01, maxTargetAgeDays: 30 },
   }), 'utf8');
 }
 
@@ -49,8 +54,8 @@ test('poda por cuota los targets más viejos', async () => {
     /* [028A-6] a con 1 día (dentro de maxTargetAgeDays=30, poda por cuota),
      * b reciente: la cuota sigue pudiendo podar el más antiguo aunque ambos
      * hayan sido escritos recientemente, siempre que no estén activos. */
-    await seedCandidate(targetRoot, 'a', { sizeBytes: 0.6 * 1024 ** 3, ageMs: 24 * 60 * 60 * 1000, now });
-    await seedCandidate(targetRoot, 'b', { sizeBytes: 0.6 * 1024 ** 3, now });
+    await seedCandidate(targetRoot, 'a', { sizeBytes: 6 * MB, ageMs: 24 * 60 * 60 * 1000, now });
+    await seedCandidate(targetRoot, 'b', { sizeBytes: 6 * MB, now });
     const result = await cleanupTargets({ projectRoot, targetRoot, now, dryRun: false, processPaths: new Set() });
     assert.equal(result.dryRun, false);
     assert.equal(result.quotaExceeded, false);
@@ -70,8 +75,8 @@ test('protege el target del que corre un ejecutable vivo (sin marcador)', async 
   const now = Date.now();
   try {
     await projectConfig(projectRoot);
-    const runningDir = await seedCandidate(targetRoot, 'debug', { sizeBytes: 0.9 * 1024 ** 3, ageMs: 40 * 24 * 60 * 60 * 1000, now });
-    await seedCandidate(targetRoot, 'old', { sizeBytes: 0.1 * 1024 ** 3, ageMs: 45 * 24 * 60 * 60 * 1000, now });
+    const runningDir = await seedCandidate(targetRoot, 'debug', { sizeBytes: 9 * MB, ageMs: 40 * 24 * 60 * 60 * 1000, now });
+    await seedCandidate(targetRoot, 'old', { sizeBytes: 1 * MB, ageMs: 45 * 24 * 60 * 60 * 1000, now });
     /* [028A-6] Simula `glory-backend.exe` corriendo desde debug/: la ruta del
      * ejecutable es prefijo del target → nunca se poda por edad ni cuota. */
     const processPaths = new Set([`${path.join(runningDir, 'glory-backend.exe').replace(/\\/g, '/').toLowerCase()}`]);
@@ -94,8 +99,8 @@ test('la cuota protege targets con escritura reciente mientras podrían estar co
     await projectConfig(projectRoot);
     /* La escritura reciente los trata como activos durante la ventana de
      * seguridad; otro target viejo queda disponible para poda. */
-    await seedCandidate(targetRoot, 'building', { sizeBytes: 0.9 * 1024 ** 3, now });
-    await seedCandidate(targetRoot, 'old', { sizeBytes: 0.6 * 1024 ** 3, ageMs: 45 * 24 * 60 * 60 * 1000, now });
+    await seedCandidate(targetRoot, 'building', { sizeBytes: 9 * MB, now });
+    await seedCandidate(targetRoot, 'old', { sizeBytes: 6 * MB, ageMs: 45 * 24 * 60 * 60 * 1000, now });
     const result = await cleanupTargets({ projectRoot, targetRoot, now, dryRun: false, processPaths: new Set() });
     assert.ok(await stat(path.join(targetRoot, 'building')), 'el target con escritura reciente se conserva');
     assert.ok(result.removed.some(item => item.name === 'old'), 'el target viejo se poda por edad');
@@ -112,8 +117,8 @@ test('dry-run informa sin borrar nada', async () => {
   const now = Date.now();
   try {
     await projectConfig(projectRoot);
-    await seedCandidate(targetRoot, 'a', { sizeBytes: 0.9 * 1024 ** 3, ageMs: 24 * 60 * 60 * 1000, now });
-    await seedCandidate(targetRoot, 'b', { sizeBytes: 0.9 * 1024 ** 3, now });
+    await seedCandidate(targetRoot, 'a', { sizeBytes: 9 * MB, ageMs: 24 * 60 * 60 * 1000, now });
+    await seedCandidate(targetRoot, 'b', { sizeBytes: 9 * MB, now });
     const result = await cleanupTargets({ projectRoot, targetRoot, now, dryRun: true, processPaths: new Set() });
     assert.equal(result.dryRun, true);
     assert.ok(result.removed.length >= 1);

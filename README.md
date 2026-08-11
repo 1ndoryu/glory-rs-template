@@ -185,6 +185,11 @@ commit fijado de un submódulo no está disponible en el remoto configurado, el 
 debe corregir primero el remoto/fork o publicar ese objeto; no se sustituye por un
 checkout local distinto ni se continúa con una copia modificada.
 
+`npm run quality:doctor` delega al doctor del CLI fijado y muestra el readiness real del proyecto
+(`ready`, `readyForAnalyze`, `readyForGate`, lock, gitlinks, capabilities y release evidence). Los modos
+`npm run quality:doctor -- --migrate --dry-run` y `npm run quality:doctor -- --lock` siguen siendo
+diagnósticos de compatibilidad del consumidor; no sustituyen al doctor canónico.
+
 El runtime del gate se mantiene como `project-adapter` y
 `artifactSha256: null`; el análisis se ejecuta desde el submódulo fijado y no
 se ejecuta código arbitrario desde la política del proyecto. El runtime global

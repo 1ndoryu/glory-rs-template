@@ -233,10 +233,12 @@ async function stageSourcePathBuild(name, config, toolRoot) {
      * árbol commiteado (sin cambios sin commitear ni artefactos locales), de
      * modo que compile + suite certifican exactamente el commit fijado. */
     await writeFile(treeArchive, await captureBinary('git', ['archive', '--format=tar', 'HEAD'], { cwd: toolRoot }));
-    /* Windows bsdtar interpreta `C:\...` como host remoto; rutas en forward-slash
-     * y `--force-local` fuerzan interpretación local en todas las plataformas. */
+    /* Windows bsdtar puede interpretar `C:\...` como host remoto. Las rutas en
+     * forward-slash evitan esa ambigüedad y son aceptadas tanto por bsdtar como
+     * por GNU tar; no añadimos `--force-local` porque no existe en todas las
+     * implementaciones de tar presentes en Windows. */
     const tarPath = target => target.replace(/\\/g, '/');
-    await run('tar', ['-xf', tarPath(treeArchive), '-C', tarPath(stagingRoot), '--force-local']);
+    await run('tar', ['-xf', tarPath(treeArchive), '-C', tarPath(stagingRoot)]);
     const env = isolatedNpmEnvironment();
     env.GLORY_QUALITY_SETUP = '1';
     await run(process.execPath, [npmCliPath, 'ci', '--ignore-scripts'], { cwd: stagingRoot, env });

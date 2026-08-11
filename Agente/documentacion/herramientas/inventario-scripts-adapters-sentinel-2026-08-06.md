@@ -38,6 +38,34 @@ El plano universal debe vivir en Sentinel Core. El consumidor conserva únicamen
 | `scripts/quality` | transición legacy sin expansión | retirar tras segunda release verde y rollback |
 | VarSense | analyzer/plugin 2.2.0, no decide el cierre | conservar como etapa del reporte combinado |
 
+### Estado operativo verificado el 2026-08-11
+
+El adapter vigente ya no declara una etapa `custom`: los perfiles ejecutables son `css`, `frontend`,
+`rust` y `docs`, y la decisión la toma `sentinel check`. Los 17 scripts npm que `sentinel migrate`
+detecta no tienen todos el mismo destino; esta tabla evita conservarlos o borrarlos por el nombre de la
+carpeta.
+
+| Script | Owner actual | Destino | Estado |
+|---|---|---|---|
+| `quality:setup` | consumidor / bootstrap | setup oficial + evidencia del release | conservar como alias de bootstrap |
+| `quality:test` | consumidor / tests del adapter | suite del consumidor | conservar; 240 PASS, 1 omitido |
+| `quality:guard` | transición del guard | `sentinel guard` + estado del runtime | alias temporal; retirar con segunda release |
+| `quality:doctor` | consumidor | `sentinel doctor`; `--migrate`/`--lock` compatibilidad | **delegación canónica completada** |
+| `quality:lock` | consumidor / lock de sourcePath | contrato de setup/doctor | conservar hasta que el bootstrap oficial genere el lock |
+| `quality:cleanup[:dry]` | consumidor / targets Cargo | mantenimiento específico de targets | conservar; no es gate |
+| `quality:reports:cleanup[:dry]` | consumidor / retención | retención del reporte del adapter | conservar hasta paridad de retención en Core |
+| `quality:reports:read` | consumidor / lectura | lector de artefactos del consumidor | conservar; no decide el gate |
+| `quality:install-guard` / `quality:uninstall-guard` | consumidor / instalación | `sentinel install/update/uninstall` | alias temporal; retirar tras smoke test de shims |
+| `task:check` | compatibilidad legacy | `gate:check` → `sentinel check` | no añadir lógica; retirar tras segunda release |
+| `check:back` | producto wandorius | adapter Rust/PostgreSQL | project-owned; no migrar al Core |
+| `check:front` | producto wandorius | adapter frontend/Vite | project-owned; no migrar al Core |
+| `quality:profile` | medición del consumidor | perfilador de reportes | conservar hasta baseline SLO suficiente |
+| `quality:bench` | medición VarSense | fixture/benchmark del consumidor | conservar; no decide el cierre |
+
+No se encontró una regla `custom` conectada al adapter actual. Los scripts auxiliares restantes se
+mantienen únicamente si una referencia productiva, test o alias de esta tabla los consume; una finalidad
+desconocida sigue siendo bloqueo y no se elimina automáticamente.
+
 ## Evidencia
 
 - Sentinel SNT-16c/SNT-16d/SNT-16f: `tsc` sin errores y suite upstream **502 passing, 1 pending**; release **0.6.0** (`44dc8fa`) publicada en `origin/main` + tag `v0.6.0`.

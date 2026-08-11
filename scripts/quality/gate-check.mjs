@@ -13,6 +13,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { loadPolicy, policyIdentity } from './policy.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const execFileAsync = promisify(execFile);
@@ -71,6 +72,36 @@ async function resolveSentinelCli() {
   return path.join(projectRoot, 'tools', 'sentinel', 'out', 'cli', 'index.js');
 }
 
+/* [108A-6] Sentinel 0.7.0 puede ejecutar correctamente las etapas pero dejar
+ * la identidad de política vacía en el reporte combinado porque su runner
+ * interno aún no recibe el contexto del adapter. El wrapper no inventa una
+ * política: la carga desde la fuente canónica local y la adjunta al artefacto.
+ * Si esa fuente es inválida, el gate queda en error aunque las etapas hayan
+ * terminado PASS; cerrar con `policy: unavailable` sería una falsa confianza. */
+export function needsPolicyIdentity(report) {
+  return !report?.policy
+    || !report.policy.policyHash
+    || report.policy.policyHash === 'unavailable'
+    || report?.policy?.decision?.action === 'error'
+    || report?.policy?.decision?.status === 'invalid-policy';
+}
+
+export function applyPolicyIdentity(report, identity) {
+  const policyError = identity?.decision?.action === 'error';
+  const invalidDecision = policyError && report?.decision?.exitCode === 0
+    ? { ...report.decision, exitCode: 2, label: 'SETUP ERROR' }
+    : report?.decision;
+  if (!needsPolicyIdentity(report) && !policyError) return { report, changed: false };
+  return { report: { ...report, policy: identity, decision: invalidDecision }, changed: true };
+}
+
+export function renderPolicyIdentity(markdown, identity) {
+  const line = `- Política: ${identity.policyHash} · ${identity.decision?.action ?? 'unknown'} · ${identity.reason}`;
+  return /^- Política: .*$/mu.test(markdown)
+    ? markdown.replace(/^- Política: .*$/mu, line)
+    : `${markdown.trimEnd()}\n${line}\n`;
+}
+
 async function writeMetrics(parsed, report) {
   const reportRoot = path.join(projectRoot, '.quality-reports', 'check', parsed.taskId);
   const metrics = {
@@ -112,12 +143,28 @@ async function main() {
     ).catch(error => error);
     process.stdout.write(result.stdout ?? '');
     process.stderr.write(result.stderr ?? '');
+    let exitCode = typeof result.code === 'number' ? result.code : 0;
     const reportPath = path.join(projectRoot, '.quality-reports', 'check', parsed.taskId, 'latest.json');
     try {
       const report = JSON.parse(await readFile(reportPath, 'utf8'));
-      await writeMetrics(parsed, report);
+      const manifest = JSON.parse(await readFile(path.join(projectRoot, 'quality-tools.json'), 'utf8'));
+      const configuredVersion = manifest?.tools?.sentinel?.version ?? null;
+      const identity = policyIdentity(await loadPolicy(projectRoot), configuredVersion);
+      const normalized = applyPolicyIdentity(report, identity);
+      if (normalized.changed) {
+        await writeFile(reportPath, `${JSON.stringify(normalized.report, null, 2)}\n`, 'utf8');
+        const markdownPath = path.join(projectRoot, '.quality-reports', 'check', parsed.taskId, 'latest.md');
+        const markdown = await readFile(markdownPath, 'utf8');
+        await writeFile(markdownPath, renderPolicyIdentity(markdown, identity), 'utf8');
+      }
+      if (identity.decision?.action === 'error' && exitCode === 0) {
+        process.stderr.write('[gate:check] SETUP ERROR — identidad de política inválida\n');
+        exitCode = 2;
+      }
+      await writeMetrics(parsed, normalized.report);
     } catch (error) {
       process.stderr.write(`[gate:check] aviso: no se pudo emitir metrics.json (${error instanceof Error ? error.message : String(error)})\n`);
+      if (exitCode === 0) exitCode = 2;
     }
     if (!parsed.keepStages) {
       try { await import('node:fs/promises').then(({ rm }) => rm(stagesJson, { force: true })); } catch { /* best-effort */ }
@@ -125,11 +172,15 @@ async function main() {
     /* execFile resuelve sin `.code` cuando el proceso termina en 0; el
      * catch de error lo expone en `error.code`. Cualquier otro valor se
      * considera error de transporte. */
-    process.exitCode = typeof result.code === 'number' ? result.code : 0;
+    process.exitCode = exitCode;
   } catch (error) {
     process.stderr.write(`[gate:check] SETUP ERROR — ${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 2;
   }
 }
 
-try { await main(); } catch (error) { process.stderr.write(`[gate:check] ERROR — ${error instanceof Error ? error.message : String(error)}\n`); process.exitCode = 2; }
+const isEntryPoint = typeof process.argv[1] === 'string'
+  && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isEntryPoint) {
+  try { await main(); } catch (error) { process.stderr.write(`[gate:check] ERROR — ${error instanceof Error ? error.message : String(error)}\n`); process.exitCode = 2; }
+}

@@ -1,10 +1,13 @@
-import { lstat, readFile, realpath } from 'node:fs/promises';
+import { access, lstat, readFile, realpath } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { migrateLegacyConfig, loadPolicy, policyIdentity } from './policy.mjs';
 import { checkLock, writeLock } from './lock-generator.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const execFileAsync = promisify(execFile);
 
 async function readJson(projectRoot, relativePath) {
   const filePath = path.join(projectRoot, relativePath);
@@ -47,6 +50,44 @@ function parseArgs(argv) {
   return options;
 }
 
+async function resolveSentinelCli(projectRoot) {
+  const manifest = await readJson(projectRoot, 'quality-tools.json');
+  const tool = manifest?.tools?.sentinel;
+  if (!tool?.cli) throw new Error('quality-tools.json no declara el CLI de Sentinel');
+  const candidates = [];
+  if (tool.provisionPath) candidates.push(path.resolve(projectRoot, tool.provisionPath, tool.cli));
+  if (tool.sourcePath) candidates.push(path.resolve(projectRoot, tool.sourcePath, tool.cli));
+  if (manifest.installRoot) candidates.push(path.resolve(projectRoot, manifest.installRoot, 'sentinel', tool.cli));
+  for (const candidate of candidates) {
+    try {
+      await access(candidate);
+      return candidate;
+    } catch {
+      /* Probar la siguiente ubicación declarada. */
+    }
+  }
+  throw new Error('No se encontró el CLI fijado de Sentinel; ejecuta npm run quality:setup');
+}
+
+async function runCanonicalDoctor(projectRoot, json) {
+  const cli = await resolveSentinelCli(projectRoot);
+  const args = [cli, 'doctor', '--workspace', projectRoot];
+  if (json) args.push('--json');
+  try {
+    const result = await execFileAsync(process.execPath, args, {
+      cwd: projectRoot,
+      windowsHide: true,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+    process.stdout.write(result.stdout ?? '');
+    process.stderr.write(result.stderr ?? '');
+  } catch (error) {
+    process.stdout.write(error?.stdout ?? '');
+    process.stderr.write(error?.stderr ?? '');
+    process.exitCode = typeof error?.code === 'number' ? error.code : 2;
+  }
+}
+
 async function main(argv = process.argv.slice(2)) {
   const options = parseArgs(argv);
   if (options.lock) {
@@ -66,6 +107,10 @@ async function main(argv = process.argv.slice(2)) {
     else process.stdout.write(`[sentinel doctor] lock ${lockOutput.status}: ${lockOutput.reason}\\n`);
     if (!options.write && !lockResult.ok) process.exitCode = 1;
     return lockResult;
+  }
+  if (!options.migrate) {
+    await runCanonicalDoctor(path.resolve(options.cwd), options.json);
+    return;
   }
   const discovered = await loadPolicy(options.cwd);
   const result = {
@@ -111,4 +156,4 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   });
 }
 
-export { main, parseArgs };
+export { main, parseArgs, resolveSentinelCli };
