@@ -11,6 +11,11 @@
 > (shims/wrappers) queda condicionada a una segunda release verde con rollback; no se deben crear nuevas
 > reglas ni copiar esta carpeta a otros proyectos.
 
+> **Seguimiento 2026-08-11:** la segunda release correctiva está preparada pero aún no adoptada:
+> Sentinel `b22c848`/0.7.1 corrige `init --json`; VarSense `88f281f`/2.2.1 elimina recorridos repetidos
+> del workspace y mide cold ~3.3 s. La matriz de scripts no cambia por una mejora upstream: cada retiro
+> sigue requiriendo referencias productivas ausentes, paridad y rollback.
+
 ## Decisión
 
 El plano universal debe vivir en Sentinel Core. El consumidor conserva únicamente un adapter pequeño y scripts que encapsulan dominio, proveedor, base de datos, generación o rescate operacional. No se copia `scripts/quality` a otros proyectos y no se retiran wrappers por estética; la retirada física se decide por release, paridad y rollback.

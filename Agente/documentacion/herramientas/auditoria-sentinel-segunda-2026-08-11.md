@@ -9,7 +9,7 @@ en el consumidor; el fix upstream quedó en un commit separado y no se repineó 
 
 ## Veredicto
 
-**El consumidor queda operativo para el pin vigente `0.7.0 @ ea8f47e`: readiness, lock, gate, suite y VSIX están verificados.** La auditoría todavía conserva dos pendientes explícitos que no deben ocultarse: publicar/adoptar el fix nuevo de `sentinel init --json` (commit local `0dd9c21`) y retirar físicamente las capas legacy solo después de una segunda release publicada con rollback probado. Ninguno se resuelve fingiendo una ref remota o borrando `scripts/quality` a ciegas.
+**El consumidor queda operativo para el pin vigente `0.7.0 @ ea8f47e`: readiness, lock, gate, suite y VSIX están verificados.** En esta continuación se prepararon y probaron dos releases correctivas, todavía no adoptadas mientras no estén publicadas: Sentinel `0.7.1 @ b22c848` y VarSense `2.2.1 @ 88f281f`. La retirada física de capas legacy sigue condicionada a publicar/adoptar la segunda release, ejecutar rollback y conservar evidencia multi-consumidor; no se resuelve fingiendo una ref remota ni borrando `scripts/quality` a ciegas.
 
 El fix de bootstrap se detectó durante la comprobación de instalación limpia: antes, `init --json` devolvía un plan pero no escribía los tres archivos. Se corrigió y se cubrió con prueba upstream; queda pendiente publicarlo y repinear el consumidor mediante el procedimiento de release.
 
@@ -30,7 +30,8 @@ Se usó el CLI fijado en `tools/sentinel/out/cli/index.js` y se respetó la rama
 | `node --test scripts/quality/tests/target-maintenance.test.mjs` | PASS | 5/5 en 272 ms. |
 | `node --test scripts/quality/tests/sentinel-doctor.test.mjs scripts/quality/tests/gate-check-policy.test.mjs` | PASS | 8/8; cubre CLI fijado resuelto/ausente/error, propagación de exit code, política omitida/inválida y gate fail-closed. |
 | `sentinel init --dry-run` en proyecto temporal | PASS | Solo planifica `sentinel.config.json`, `sentinel.lock.json` y `.sentinel/init-manifest.json`; no crea carpetas privadas ni scripts. |
-| `sentinel init --json` + prueba upstream | PASS tras fix local | 8 pruebas bootstrap PASS; el fix está en `tools/sentinel@0dd9c21`, todavía no publicado/adoptado. |
+| `sentinel init --json` + prueba upstream | PASS en release preparada | 8 pruebas bootstrap PASS; corregido en `tools/sentinel@b22c848` (release preparada `0.7.1`), pendiente de publicación/adopción. |
+| VarSense cold instrumentado sobre workspace real | PASS de rendimiento | Causa aislada: recorridos repetidos de workspace en `classIndex`; el fix `tools/varsense@88f281f` baja cold a ~3.3 s y warm a ~2.8 s, por debajo del presupuesto de 6 s; pendiente de publicación/adopción. |
 | VSIX smoke test | PASS | Instalación en perfil VS Code aislado; extensión `1ndoryu.glory-sentinel` instalada correctamente. |
 | `sentinel migrate --project-root . --json` | PASS diagnóstico | Detecta 17 scripts; todos quedaron clasificados en el inventario y los retiros siguen condicionados a release/rollback. |
 
@@ -91,11 +92,11 @@ La política correcta no es borrar toda carpeta personalizada ni conservarla por
 
 ### 3.4 Rendimiento y escalabilidad
 
-La línea base persistida del 2026-08-05 contiene 9 muestras: total p50 4.434 s y p95 26.395 s; VarSense p50 13.044 s y p95 15.984 s; frontend p95 6.881 s; rust p95 7.811 s. Esto sigue por encima del presupuesto configurado de 6 s para VarSense y no constituye una SLO cumplida.
+La línea base persistida del 2026-08-05 contiene 9 muestras: total p50 4.434 s y p95 26.395 s; VarSense p50 13.044 s y p95 15.984 s; frontend p95 6.881 s; rust p95 7.811 s. Esa medición motivó el fix upstream. La instrumentación sobre el workspace real aisló `classIndexMs` como cuello: el provider recorría el árbol repetidamente para cada patrón. Tras consolidar los patrones en un recorrido y cachear el snapshot por exclusiones, el release preparado `2.2.1 @ 88f281f` midió cold ~3.3 s y warm ~2.8 s (tres ejecuciones, sin cambio de hallazgos), por debajo del presupuesto de 6 s. El SLO solo se podrá declarar adoptado después de publicar, repinear y repetir el gate del consumidor.
 
-Existe una baseline en `.quality-bench/varsense/benchmark.json` (120 archivos, 4 modos, 2 muestras, ~61 MB RSS). Además, una medición reproducible del consumidor con fixture pequeño (`.quality-bench/baseline-small.json`) dio: clean total 24.831 s, VarSense 12.665 s; incremental total 5.257 s, VarSense 1 ms. Esto confirma la preocupación original: la caché incremental es rápida, pero el cold path de VarSense incumple el presupuesto de 6 s. El SLO no se declara resuelto; queda como trabajo de optimización medible, no como fallo de readiness.
+Existe una baseline en `.quality-bench/varsense/benchmark.json` (120 archivos, 4 modos, 2 muestras, ~61 MB RSS). Además, una medición reproducible del consumidor con fixture pequeño (`.quality-bench/baseline-small.json`) dio: clean total 24.831 s, VarSense 12.665 s; incremental total 5.257 s, VarSense 1 ms. El fix preparado conserva la cobertura y elimina la causa (recorridos repetidos); la adopción debe repetir esta medición con el pin publicado.
 
-La suite del consumidor cerró en 39.0 s (249 tests: 248 PASS, 1 omitido). Sigue siendo pesada para un ciclo interactivo, pero ya no está bloqueada por ENOSPC ni por el timeout ambiental anterior.
+La suite del consumidor cerró en 39.0 s (249 tests: 248 PASS, 1 omitido). Sigue siendo pesada para un ciclo interactivo, pero ya no está bloqueada por ENOSPC ni por el timeout ambiental anterior. La suite upstream de VarSense pasó 61 pruebas tras la optimización; Sentinel pasó 8 pruebas focalizadas de bootstrap más compile/check-core/smoke.
 
 ### 3.5 Documentación y VSIX
 
@@ -111,10 +112,10 @@ El VSIX está empaquetado e instalado en una instancia aislada de VS Code. El ar
 | Bootstrap de proyecto nuevo sin copiar `scripts/quality` | **Demostrado para el plan y el dry-run:** `sentinel init` solo administra tres archivos; el flujo real JSON fue corregido y tiene prueba, pendiente de publicarse en una segunda release. |
 | `doctor` diferenciando análisis y gate | **Completado:** CLI y `npm run quality:doctor` devuelven `readyForAnalyze` y `readyForGate`. |
 | Release evidence del pin actual | **Completado:** evidencia compile + suite + staging limpio para `ea8f47e`. |
-| Segunda release verde + rollback | **Pendiente:** no hay evidencia presentada en el checkout. |
+| Segunda release verde + rollback | **En preparación:** Sentinel `b22c848`/0.7.1 y VarSense `88f281f`/2.2.1 están compilados y probados en worktrees aislados; falta publicación, adopción y rollback. |
 | Retirada física de capas A/B | **Pendiente condicionado:** la propia documentación de `Agente/calidad-tooling/` lo mantiene en curso. |
 | Inventario/ownership de scripts personalizados | **Completado para el estado actual:** los 17 scripts tienen owner, destino y condición de retiro en el inventario; no hay etapa `custom` conectada al adapter vigente. |
-| Presupuesto de rendimiento | **No cumplido, medido:** cold VarSense 12.665 s en fixture pequeño; incremental 1 ms. Requiere optimización, no ocultación del dato. |
+| Presupuesto de rendimiento | **Fix preparado, adopción pendiente:** VarSense actual medía 12.665 s; `88f281f` mide cold ~3.3 s/warm ~2.8 s sobre el workspace real. |
 | Suite completa de calidad | **Completada:** 249 tests, 248 PASS, 1 omitido, 0 fallos, 39.0 s; los fixtures de cuota ya no consumen GB reales. |
 | VSIX instalable y probado | **Completado:** instalación aislada y extensión visible. |
 
@@ -148,7 +149,7 @@ reales; no se marcan como cerradas por documentación o por un PASS histórico.
 
 ### F3 — Segunda release y rollback (pendiente externo)
 
-- [ ] Publicar una segunda release verificable de Sentinel que incluya `0dd9c21` y el fix de `init --json`.
+- [ ] Publicar una segunda release verificable de Sentinel (`b22c848`, `0.7.1`) que incluya `0dd9c21` y el fix de `init --json`.
 - [ ] Adoptarla en dos consumidores independientes sin copiar `scripts/quality`.
 - [ ] Ejecutar doctor, lock, gate y una tarea coordinada en ambos consumidores.
 - [ ] Probar rollback al release anterior y recuperación de lock/worktree.
@@ -169,8 +170,9 @@ reales; no se marcan como cerradas por documentación o por un PASS histórico.
 - [x] Regenerar `.quality-bench` con fixtures pequeños y alcance representativo; conservar la medición fallida como cobertura no válida.
 - [x] Corregir el falso ENOSPC de `target-maintenance.test.mjs` (fixtures de MB, no GB) y cerrar `quality:test`.
 - [x] Medir al menos clean/incremental y registrar p50/p95 por etapa en `.quality-bench/baseline-small.json`.
-- [x] Declarar explícitamente que el cold path de VarSense (12.665 s) está fuera del presupuesto de 6 s.
-- [ ] Repetir con muestras suficientes y carga real antes de fijar un SLO definitivo.
+- [x] Declarar explícitamente que el cold path histórico de VarSense (12.665 s) estaba fuera del presupuesto de 6 s.
+- [x] Repetir con muestras suficientes y carga real para validar la corrección: 3 ejecuciones instrumentadas, cold ~3.3 s y warm ~2.8 s.
+- [ ] Publicar/adoptar `88f281f`, repetir gate y conservar p50/p95 del pin consumido.
 - [ ] Evaluar paralelismo seguro de etapas sin romper locks, disco ni determinismo.
 
 ### F6 — Documentación y VS Code
@@ -189,7 +191,7 @@ reales; no se marcan como cerradas por documentación o por un PASS histórico.
       no la aplicación; conflictos conservan exit 1.
 - [x] Añadir prueba `init --json` que verifica config, lock y manifest.
 - [x] Ejecutar compile y prueba bootstrap: 8/8 PASS con `--ui tdd --timeout 10000`.
-- [ ] Publicar/adoptar `tools/sentinel@0dd9c21`, regenerar VSIX/evidence/lock y repetir doctor/gate.
+- [ ] Publicar/adoptar `tools/sentinel@b22c848` (`0.7.1`), regenerar VSIX/evidence/lock y repetir doctor/gate.
 
 ## 6. Criterio de cierre de la próxima revisión
 
@@ -204,4 +206,4 @@ La auditoría podrá marcarse como cerrada solo si se cumplen simultáneamente:
 - README, skill, manuales, VSIX y roadmap describen el mismo flujo;
 - no quedan carpetas privadas creadas por agentes fuera del ownership declarado.
 
-**Conclusión:** el estado vigente del consumidor es cerrable para Sentinel `0.7.0 @ ea8f47e`: doctor, lock, gate, suite, inventario, README y VSIX tienen evidencia. El siguiente bloque no es una limpieza cosmética: requiere publicar el fix `0dd9c21` como segunda release, adoptarlo y probar rollback; solo entonces se puede retirar físicamente `task:check`, guards y wrappers legacy. La optimización de VarSense queda abierta porque el cold path medido incumple 6 s. No se debe borrar `scripts/quality` ni copiarla a proyectos nuevos antes de cerrar F3/F5.
+**Conclusión:** el estado vigente del consumidor sigue cerrable para Sentinel `0.7.0 @ ea8f47e`: doctor, lock, gate, suite, inventario, README y VSIX tienen evidencia. La corrección técnica de los dos defectos restantes ya está preparada y probada en upstream (`b22c848`/0.7.1 y `88f281f`/2.2.1): bootstrap JSON correcto y VarSense cold bajo 6 s. El cierre total requiere publicar ambos tags, repinear dos consumidores, probar rollback y repetir doctor/lock/gate; solo entonces se puede retirar físicamente `task:check`, guards y wrappers legacy. No se debe borrar `scripts/quality` ni copiarla a proyectos nuevos antes de completar esa adopción.

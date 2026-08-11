@@ -17,11 +17,11 @@ seguimiento por fases y no se duplican sus findings.
   perfil aislado de VS Code.
 - **Correcciones locales adoptadas:** setup Windows sin `tar --force-local`, fixtures de mantenimiento
   en MB para evitar ENOSPC, `quality:doctor` delegado al CLI canónico e inventario de los 17 scripts.
-- **Fix preparado upstream:** `tools/sentinel@0dd9c21` corrige `sentinel init --json` y añade regresión
-  (8/8 bootstrap PASS). Sigue sin publicarse/adoptarse; no se debe marcar F3 como cerrada ni retirar
-  capas legacy hasta tener segunda release y rollback.
-- **Rendimiento:** baseline pequeña: clean 24.831 s / VarSense 12.665 s; incremental 5.257 s / 1 ms.
-  VarSense cold continúa fuera del presupuesto de 6 s y requiere trabajo separado.
+- **Fixes upstream preparados:** Sentinel `b22c848` (`0.7.1`) corrige `sentinel init --json` y añade
+  regresión (8/8 bootstrap PASS); VarSense `88f281f` (`2.2.1`) consolida el descubrimiento del
+  workspace (61 pruebas PASS). Ambos están en worktrees aislados y aún requieren publicación/adopción.
+- **Rendimiento:** baseline pequeña: clean 24.831 s / VarSense 12.665 s; el fix de VarSense midió sobre
+  el workspace real cold ~3.3 s y warm ~2.8 s en tres ejecuciones. Falta repetir con el pin publicado.
 
 ### Seguimiento actual de la migración
 
@@ -30,9 +30,10 @@ seguimiento por fases y no se duplican sus findings.
 - [x] El adapter vigente no declara `custom`; `gate:check` delega la decisión en `sentinel check`.
 - [x] `AGENTS.md` y la skill `quality-gate-setup` prohíben carpetas personales/analyzers/reglas sin
       project-owner, fixture, presupuesto, owner único y sunset; el alias no canónico quedó solo como redirect.
-- [ ] Publicar/adoptar `tools/sentinel@0dd9c21`, probar rollback en dos consumidores y, solo después,
+- [ ] Publicar/adoptar `tools/sentinel@b22c848` y `tools/varsense@88f281f`, probar rollback en dos consumidores y, solo después,
       retirar wrappers duplicados y `scripts/quality` legacy.
-- [ ] Optimizar y volver a medir VarSense cold con muestras suficientes y carga real antes de fijar el SLO.
+- [x] Optimizar y medir VarSense cold con carga real; el resultado preparado está bajo 6 s.
+- [ ] Publicar/adoptar el fix y repetir la medición con el pin consumido.
 
 ## Pendientes de calidad/tooling movidos
 
