@@ -40,6 +40,44 @@ test('stages.mjs genera el contrato declarativo con las etapas del manifest', as
   } finally { await rm(REPORT_FIXTURES, { recursive: true, force: true }); }
 });
 
+test('stages.mjs conserva el perfil explícito para el proceso hijo', async () => {
+  const reportRoot = path.join(REPORT_FIXTURES, 'profile-forwarding');
+  try {
+    const output = path.join(reportRoot, 'stages.json');
+    const result = requireProcessResult(await execFileAsync(process.execPath, [
+      path.join(SCRIPTS, 'stages.mjs'),
+      '--task-id', '028A-6',
+      '--profile', 'docs',
+      '--output', output,
+      '--report-root', reportRoot,
+    ], { cwd: process.cwd(), timeout: 60_000 }).catch(error => error), 'stages profile', [0]);
+    assert.equal(result.code, 0, 'stages profile debe terminar en 0');
+    const declarations = JSON.parse(await readFile(output, 'utf8'));
+    assert.ok(declarations.length > 0);
+    assert.ok(declarations.every(item => item.args.includes('--profile') && item.args.includes('docs')));
+  } finally { await rm(reportRoot, { recursive: true, force: true }); }
+});
+
+test('stages.mjs conserva los selectores full y CI para el proceso hijo', async () => {
+  for (const selector of ['--full', '--ci']) {
+    const reportRoot = path.join(REPORT_FIXTURES, `selector-${selector.slice(2)}`);
+    try {
+      const output = path.join(reportRoot, 'stages.json');
+      const result = requireProcessResult(await execFileAsync(process.execPath, [
+        path.join(SCRIPTS, 'stages.mjs'),
+        '--task-id', '028A-6',
+        selector,
+        '--output', output,
+        '--report-root', reportRoot,
+      ], { cwd: process.cwd(), timeout: 60_000 }).catch(error => error), `stages ${selector}`, [0]);
+      assert.equal(result.code, 0, `stages ${selector} debe terminar en 0`);
+      const declarations = JSON.parse(await readFile(output, 'utf8'));
+      assert.ok(declarations.length > 0);
+      assert.ok(declarations.every(item => item.args.includes(selector)));
+    } finally { await rm(reportRoot, { recursive: true, force: true }); }
+  }
+});
+
 test('stage-process.mjs escribe el contrato estructurado y replica el exit code', async () => {
   const report = path.join(REPORT_FIXTURES, 'wrapper', 'docs.json');
   try {

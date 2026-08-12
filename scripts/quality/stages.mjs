@@ -43,7 +43,16 @@ async function main() {
   assertStageParity(stageNames, implementedNames);
   const reportRoot = resolveWorkspacePath(projectRoot, args.reportRoot ?? path.join(context.reportRoot, '..', 'check', 'stages'), '--report-root', { allowReportRoot: true });
   const wrapper = resolveWorkspacePath(projectRoot, adapter.transport.entrypoint, 'adapter.transport.entrypoint');
-  const scopeArgsForStage = scopeManifestPath ? ['--scope-manifest', scopeManifestPath] : [];
+  /* The child adapter must receive the same explicit execution selector as
+   * the planner. Without forwarding --profile/--full/--ci, an incremental
+   * change outside the requested profile can make stage-process rediscover a
+   * narrower scope and report "stage not implemented" (SETUP ERROR). */
+  const scopeArgsForStage = [
+    ...(scopeManifestPath ? ['--scope-manifest', scopeManifestPath] : []),
+    ...(args.profile ? ['--profile', args.profile] : []),
+    ...(args.full ? ['--full'] : []),
+    ...(args.ci ? ['--ci'] : []),
+  ];
   /* [108A-6] El contrato del Core (stageManifest.ts) acepta únicamente
    * name/executable/args/reportPath/expectedSchemaVersion/timeoutMs/cwd y
    * aplica su propia allowlist fija de entorno (toolRunner ENV_ALLOWLIST),

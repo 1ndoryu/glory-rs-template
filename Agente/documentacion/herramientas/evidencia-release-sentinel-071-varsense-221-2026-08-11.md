@@ -4,11 +4,11 @@
 > aislados; después los commits se publicaron y adoptaron en wandorius y glory-rs-rest. Este documento no
 > sustituye `doctor`, `quality:lock` ni el gate posterior a la adopción.
 
-> **Addendum 2026-08-12:** la reauditoría publicó Sentinel `0.7.3` en `ea88d111` con la corrección de
-> portabilidad de PATH de la matriz de shells, sobre el hardening de dependencias de `0.7.2`. La CI
-> upstream #41 y #42 aún falla en `test:unit` con exit code 5; los logs no son accesibles sin autenticación.
-> El VSIX actual es `glory-sentinel-0.7.3.vsix` (950288 bytes, SHA-256
-> `F933E16C81F3C0EFD2294D403A361D78BAC5C3F5819DB4C3EB2E5AE984998CFE`). Los artefactos `0.7.1` de este
+> **Addendum 2026-08-12, corte actual:** Sentinel `0.7.4` (`0349485c`, tag `v0.7.4`) incorpora la
+> corrección POSIX de la matriz, resolución portable de PowerShell y diagnósticos de CI sobre el hardening
+> de `0.7.2`/`0.7.3`. Las CI upstream #45 y #46 pasan consecutivamente. El VSIX actual es
+> `glory-sentinel-0.7.4.vsix` (951778 bytes, SHA-256
+> `BF01826858219A6A97CB42DB6A55FC6CE08696E3C1B9BE295DB18B6CD7B76BE5`). Los artefactos `0.7.1` de este
 > archivo son evidencia histórica de rollback y adopción.
 
 ## Identidad de los artefactos
@@ -17,6 +17,13 @@
 | --- | --- | --- | --- | --- |
 | Sentinel | 0.7.1, tag `v0.7.1` | `b22c8484fd2334f19a88f930c494091d02942e39` | `0dd9c2130d5aebeff384d1448218cf660e4aef6c` | publicado en `release/0.7.1` + tag |
 | VarSense | 2.2.1, tag `v2.2.1` | `88f281f94e6febd02a386b7ed03d30d285eb82e1` | `998505c734c0cb040b2b7c53bfefadadb03b025f` | publicado en `release/2.2.1` + tag |
+
+### Pin vigente tras la reauditoría
+
+| Herramienta | Release | Commit | Estado remoto |
+| --- | --- | --- |
+| Sentinel | 0.7.4, tag `v0.7.4` | `0349485c121784513c7ecef8a8de1535e841a5ae` | publicado en `main` + tag; CI #45/#46 verdes |
+| VarSense | 2.2.1, tag `v2.2.1` | `88f281f94e6febd02a386b7ed03d30d285eb82e1` | publicado en `release/2.2.1` + tag |
 
 La identidad se comprobó con `git show refs/heads/release/<versión>` y
 `git show refs/tags/v<versión>` en cada submódulo. No se usó una versión global para
@@ -82,7 +89,18 @@ conservada como evidencia histórica: VarSense cold 12.665 s e incremental 1 ms.
 No se reemplaza esa medición; se añade esta muestra del commit correctivo para que el gate
 posterior a la adopción vuelva a comprobar el SLO de 6 s.
 
-## Qué queda abierto
+## Estado actual y pendientes reales
+
+- `quality:setup`, doctor, lock y gates pasan con Sentinel 0.7.4 en wandorius y en el worktree
+  aislado de glory-rs-rest; la suite del segundo consumidor cerró 232/233 (1 omitida).
+- La suite upstream 0.7.4 cerró 558 passing/1 pending; lint 0 errores/12 warnings; `npm audit --omit=dev`
+  queda en 0. El audit completo mantiene 1 high + 1 moderate de Mocha como deuda separada.
+- La corrección del transporte de perfiles explícitos evita `SETUP ERROR` cuando el cambio no pertenece
+  al perfil solicitado; está cubierta por `observe-integration.test.mjs` y publicada en `glory-rs-rest@3cd9e655`.
+- Pendiente antes de retirar capa A: PATH completo/sin runtime de desarrollo, smoke de enforcement y rollback
+  de salida según el runbook. La capa B no se elimina por ese mismo cambio.
+
+## Histórico de lo que quedó abierto en 0.7.1/0.7.3
 
 - La CI de `main` del upstream aún no cumple el criterio de dos ejecuciones consecutivas verdes: VarSense
   [#8 pasó](https://github.com/1ndoryu/varsense/actions/runs/31551341521), pero Sentinel

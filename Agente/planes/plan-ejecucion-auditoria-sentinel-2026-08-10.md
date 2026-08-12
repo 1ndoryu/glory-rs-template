@@ -3,10 +3,10 @@
 > **Fecha:** 2026-08-10
 > **Rama objetivo:** `wandorius`
 > **Estado:** COMPLETADA CON PENDIENTES CONDICIONADOS — F0–F9 cerradas y segunda auditoría adoptada.
-> Sentinel 0.7.1 (`b22c8484`) y VarSense 2.2.1 (`88f281f9`) están publicados y ambos consumidores
+> Sentinel 0.7.4 (`0349485c`) y VarSense 2.2.1 (`88f281f9`) están publicados y ambos consumidores
 > tienen lock/doctor/setup verificados. El gate canónico es `gate:check` → `sentinel check`; el stage
-> `custom` fue retirado. La retirada física de capas legacy queda condicionada a dos CI consecutivos,
-> matriz multi-shell y gates verdes; glory-rs-rest conserva un baseline de producto documentado.
+> `custom` fue retirado. Las CI #45/#46 y la matriz focal pasan; la retirada de capa A queda condicionada
+> a PATH sin runtime de desarrollo, enforcement y rollback de salida. La capa B espera SNT-10.
 > **ID operativo:** `108A-1` (tomada por `buffy`)
 > **Fuente del plan:** `Agente/documentacion/herramientas/auditoria-sentinel-completa-2026-08-10.md` §14
 > (Plan integral de corrección por fases F0–F9). Este documento es solo seguimiento operativo; el
@@ -59,11 +59,11 @@
 ## Seguimiento Retirada Legacy (108A-6, 2026-08-10)
 
 - [x] Stage `custom` retirado en ambos consumidores: wandorius (commit `2244eee7`) y glory-rs-rest (commit `f13d0e16`). `custom-rules.mjs`, `adapters/custom.mjs` y su test eliminados; `profile-contract.mjs`, `stage-definitions.mjs` y `quality-adapter.json` sin referencias. Suites: 240 y 231 pass.
-- [x] Segundo consumidor adoptado en la release anterior y **re-pinado a Sentinel 0.7.1** (`b22c848`) y VarSense 2.2.1 (`88f281f`) con lock y doctor PASS.
-- [x] Releases **0.7.1/2.2.1** publicadas en refs verificables; Sentinel 558 pruebas y VarSense 61 pruebas PASS en staging limpio.
+- [x] Segundo consumidor adoptado y **re-pinado a Sentinel 0.7.4** (`0349485c`) y VarSense 2.2.1 (`88f281f`) con lock y doctor PASS.
+- [x] Releases **0.7.4/2.2.1** publicadas en refs verificables; Sentinel 558 pruebas y VarSense 61 pruebas PASS en staging limpio.
 - [x] Doble vía real: `observe-compare` en 108A-1 y 297A-78 — decisión y hallazgos idénticos entre `task:check` y `sentinel check --stages`.
 - [x] Gate canónico integrado: `gate:check` (wrapper) genera el manifest declarativo y delega en `sentinel check`; CI (quality.yml) ejecuta `gate:check --ci`; `export-ci-metrics.mjs` agrega `check/`.
-- [ ] Retirada física de la capa A (shims del repo + `quality-command-guard`) y de la capa B (orquestador local) — condicionada a dos CI consecutivos, matriz multi-shell, gates verdes y rollback (runbook 2026-08-05 §3). El rollback 0.7.1 ↔ 0.7.0 ya está probado; no se borran wrappers mientras glory-rs-rest conserve el baseline rojo.
+- [ ] Retirada física de la capa A (shims del repo + `quality-command-guard`) — quedan PATH sin runtime de desarrollo, enforcement y rollback de salida (runbook 2026-08-05 §3). La capa B (orquestador local) espera SNT-10; no se borra junto con A. El rollback 0.7.1 ↔ 0.7.0 ya está probado; el baseline visible de glory-rs-rest sigue siendo deuda de producto, no bloqueo del gate.
 
 ## Decisión sobre 098A-1 (absorbido)
 

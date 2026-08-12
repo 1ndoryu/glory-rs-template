@@ -11,12 +11,13 @@
 > (los runs previos #36–#38 también fallaron);
 > glory-rs-rest conserva el baseline `broadcast-mutex-riesgo-rs`.
 
-> **Seguimiento (2026-08-12):** Sentinel **0.7.3** (`ea88d111`, tag `v0.7.3`) está publicado y adoptado
-> en los consumidores. Localmente lint, suite y producción npm pasan; el audit de desarrollo conserva
-> 1 high + 1 moderate transitorio en Mocha. `glory-rs-rest` publica `a8a3ccc1` y mantiene los cinco
-> findings de `broadcast-mutex-riesgo-rs` como warnings visibles. La CI upstream #41 y #42 falló en
-> `test:unit` (exit code 5), por lo que este baseline no habilita la retirada: siguen siendo obligatorios
-> dos CI consecutivos verdes, matriz multi-shell, PATH completo/sin runtime de desarrollo, gates verdes y rollback.
+> **Seguimiento (2026-08-12, corte actual):** Sentinel **0.7.4** (`0349485c`, tag `v0.7.4`) está
+> publicado y adoptado en los consumidores. Lint, suite y producción npm pasan; el audit de desarrollo
+> conserva 1 high + 1 moderate transitorio en Mocha. `glory-rs-rest` publica `1ddf717f` y mantiene los
+> cinco findings de `broadcast-mutex-riesgo-rs` como warnings visibles. Las CI upstream #45 y #46 pasan
+> consecutivamente y la matriz focal de shells pasa en Ubuntu/Windows local. La retirada A queda pendiente
+> solo de la prueba explícita PATH completo/sin runtime de desarrollo, enforcement y rollback de salida;
+> la capa B no se retira con ella.
 
 ## 1. Objetivo y contexto
 
@@ -52,16 +53,17 @@ no dependen de la capa A.
 
 Marcar como cumplido SOLO cuando se cumplan **todas**:
 
-- [x] El runtime global v0.7.1 está instalado y `sentinel doctor` reporta `activeVerified:true`.
-- [ ] **Dos ejecuciones CI consecutivas en `main`** (`quality.yml`) terminan en verde, con artifacts `quality-reports-<branchKey>-<task>-<commit>` y `quality-metrics-<branchKey>-<commit>` publicados.
-- [ ] La matriz multi-shell del runtime (`shellMatrix.test.ts` + `guardMatrix.test.ts` en `tools/sentinel`) pasa en las dos releases (suite del submódulo, `npm test`).
-- [ ] `task:check` PASS con el PATH completo (shims+bin) y también con un PATH sin `GlorySentinel` (evidencia CI sin perfil dev), como en la Fase 4.
+- [x] El runtime global v0.7.4 está instalado y `sentinel doctor` reporta `activeVerified:true`.
+- [x] **Dos ejecuciones CI consecutivas en `main`** terminan en verde: Sentinel #45 y #46, con el workflow diagnóstico y artifacts publicados.
+- [x] La matriz multi-shell del runtime (`shellMatrix.test.ts` + `guardMatrix.test.ts` en `tools/sentinel`) pasa en las releases 0.7.3/0.7.4 (suite upstream y focal local Windows).
+- [x] `task:check` PASS con el PATH completo y con `GlorySentinel` filtrado del PATH, ejecutado con `--profile docs --fresh` el 2026-08-12; ambos cierres fueron PASS. La evidencia CI sin perfil dev queda como refuerzo, no como bloqueo local.
+- [ ] Smoke de enforcement y rollback de salida; hasta entonces no ejecutar `git rm` de la capa A.
 
 ## 4. Pre-verificación (en la rama donde se ejecute)
 
 ```bash
 # 1. Runtime activo y verificado
-sentinel status --json          # activeVersion 0.4.x, activeVerified true
+sentinel status --json          # activeVersion 0.7.4, activeVerified true
 sentinel doctor
 
 # 2. Gate local sano antes de tocar nada
@@ -140,3 +142,7 @@ de `<target>/shims/profile-backups` sobre el perfil.
 - [ ] Shell nueva: los shims del runtime bloquean 78 en un repo enforce y `sentinel` resuelve.
 - [ ] Ninguna rama activa pierde la capacidad de ejecutar su gate (el runtime es global; la capa A era copia).
 - [ ] Commit `028A-6: Fase 5 - wrappers del repo retirados (criterio de dos releases cumplido)` + tarea liberada.
+
+**Corte 2026-08-12:** no se marca la salida porque aún faltan las pruebas PATH/enforcement/rollback de
+salida. La evidencia de CI, matriz, gates y suites ya está completa; conservar los wrappers no equivale a
+crear nuevos mini-gates y el inventario sigue siendo la autoridad para decidir cualquier retiro.

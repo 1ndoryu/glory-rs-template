@@ -4,18 +4,18 @@
 > Iniciativas canónicas: `Agente/planes/plan-migracion-scripts-adapters-sentinel-2026-08-06.md` y `Agente/planes/plan-preflight-recuperacion-sentinel-2026-08-07.md`
 
 > **Actualización de seguimiento 2026-08-12:** este inventario conserva abajo la fotografía histórica
-> de la transición 0.6.0. El estado operativo actual es Sentinel 0.7.3 (`ea88d111`) y VarSense 2.2.1
+> de la transición 0.6.0. El estado operativo actual es Sentinel 0.7.4 (`0349485c`) y VarSense 2.2.1
 > (`88f281f`) en wandorius y
 > glory-rs-rest, con lock/doctor alineados, `gate:check` delegando en `sentinel check` y stage `custom`
 > retirado en ambos consumidores. La retirada física de la capa B (`scripts/quality`) y de la capa A
 > (shims/wrappers) queda condicionada a dos CI consecutivos verdes, matriz multi-shell y gates verdes en
 > ambos consumidores; no se deben crear nuevas reglas ni copiar esta carpeta a otros proyectos.
 
-> **Seguimiento de cierre 2026-08-12:** Sentinel `ea88d111`/0.7.3 añade la corrección de portabilidad de
-> PATH sobre el hardening de `a3bdb92e`/0.7.2; VarSense `88f281f`/2.2.1 elimina recorridos repetidos del
-> workspace y queda bajo el presupuesto del gate frontend. La CI upstream #41/#42 aún falla en
-> `test:unit`, así que la matriz de scripts no cambia por una mejora upstream: cada retiro sigue
-> requiriendo referencias productivas ausentes, paridad, CI y rollback.
+> **Seguimiento de cierre 2026-08-12:** Sentinel `0349485c`/0.7.4 añade la corrección POSIX de la
+> matriz, resolución portable PowerShell y diagnósticos de CI sobre el hardening de 0.7.2/0.7.3; VarSense
+> `88f281f`/2.2.1 elimina recorridos repetidos del workspace y queda bajo el presupuesto del gate frontend.
+> La CI upstream #45/#46 pasa consecutivamente y el transporte de perfiles explícitos del adapter ya tiene
+> regresión. Cada retiro sigue requiriendo referencias productivas ausentes, paridad, PATH sin runtime y rollback.
 
 ## Decisión
 
@@ -34,14 +34,14 @@ El plano universal debe vivir en Sentinel Core. El consumidor conserva únicamen
 | Scripts de dominio | `scripts/run-with-db.mjs`, codegen, preparación DB | Se conservan | Encapsulan Rust/PostgreSQL y no entran al core universal. |
 | Analyzers | Sentinel + VarSense | Se conservan separados | VarSense es analyzer, no gate ni reporter paralelo. |
 
-### Estado operativo vigente (release 0.7.3 / VarSense 2.2.1)
+### Estado operativo vigente (release 0.7.4 / VarSense 2.2.1)
 
 | Superficie | Estado vigente | Próximo criterio |
 | --- | --- | --- |
-| Sentinel Core/CLI | release `ea88d111` / 0.7.3; ambos consumidores adoptados | mantener lock, capabilities y release refs alineados |
+| Sentinel Core/CLI | release `0349485c` / 0.7.4; ambos consumidores adoptados | mantener lock, capabilities y release refs alineados |
 | Gate | `gate:check` → `sentinel check --stages` | `task:check` solo compatibilidad hasta la retirada de capa B |
 | Stage `custom` | retirado en wandorius y glory-rs-rest | no reintroducirlo sin contrato project-owned y justificación específica |
-| `scripts/quality` | transición legacy sin expansión | retirar solo cuando se cumpla el criterio único del runbook §3: dos CI consecutivos, matriz multi-shell, PATH completo/sin runtime de desarrollo, gates verdes en todos los consumidores y rollback |
+| `scripts/quality` | transición legacy sin expansión; transporte de perfiles corregido | retirar solo cuando se cumpla el criterio único del runbook §3: dos CI consecutivos, matriz multi-shell, PATH completo/sin runtime de desarrollo, gates verdes en todos los consumidores y rollback |
 | VarSense | analyzer/plugin 2.2.1, no decide el cierre | conservar como etapa del reporte combinado |
 
 ### Estado operativo verificado el 2026-08-11
