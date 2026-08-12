@@ -13,7 +13,7 @@
 
 > **Seguimiento (corte final):** Sentinel **0.7.4** (`0349485c`, tag `v0.7.4`) está
 > publicado y adoptado en los consumidores. Lint, suite y producción npm pasan; el audit de desarrollo
-> conserva 1 high + 1 moderate transitorio en Mocha. `glory-rs-rest` publica `1ddf717f` y mantiene los
+> conserva 1 high + 1 moderate transitorio en Mocha. `glory-rs-rest` publica `3cd9e655` y mantiene los
 > cinco findings de `broadcast-mutex-riesgo-rs` como warnings visibles. Las CI upstream #45 y #46 pasan
 > consecutivamente y la matriz focal de shells pasa en Ubuntu/Windows local. La retirada A quedó completada
 > después de la prueba explícita de PATH completo, enforcement y rollback de salida; la capa B no se retira
