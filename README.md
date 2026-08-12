@@ -2,7 +2,7 @@
 
 Template y aplicación web con **Rust (Axum) + PostgreSQL + Vanilla TypeScript/Vite + OpenAPI** en un solo repositorio.
 
-Pensado para velocidad de desarrollo, seguridad por defecto y calidad reproducible. Sentinel es el plano universal de coordinación y calidad; este checkout conserva `scripts/quality` únicamente como adapter/orquestador de transición hasta completar la retirada física condicionada a dos releases verdes y rollback probado. VarSense es un analizador especializado invocado por Sentinel. No se deben copiar estos scripts a otros proyectos: los proyectos nuevos usan `sentinel init` y los proyectos legacy pasan por inventario y clasificación.
+Pensado para velocidad de desarrollo, seguridad por defecto y calidad reproducible. Sentinel es el plano universal de coordinación y calidad. Este checkout conserva `scripts/quality` únicamente como adapter/orquestador de transición (capa B); los shims y guards duplicados del repositorio ya fueron retirados y el runtime global de Sentinel es la única fuente de interceptores. VarSense es un analizador especializado invocado por Sentinel. No se deben copiar estos scripts a otros proyectos: los proyectos nuevos usan `sentinel init` y los proyectos legacy pasan por inventario y clasificación.
 
 ## Stack
 
@@ -157,7 +157,7 @@ npm run gate:check -- 028A-6
 npm run gate:check -- 028A-6 --full
 npm run gate:check -- 028A-6 --ci
 
-# Compatibilidad temporal; conserva la ruta legacy durante la ventana de migración
+# Compatibilidad temporal del adapter (capa B); no es la autoridad de decisión
 npm run task:check -- 028A-6
 
 # Contratos y diagnóstico del stack de calidad
@@ -199,8 +199,8 @@ pero no sustituyen el reporte ni el control del gate. Para una validación que
 pueda cerrar una tarea, usa `gate:check` desde la raíz del repositorio. `task:check`
 se conserva como compatibilidad temporal. Los
 scripts de `scripts/quality` no son una API para copiar: los adapters de este
-proyecto se reducirán gradualmente y las capacidades universales deben vivir en
-Sentinel Core.
+proyecto solo transportan stages y adapters específicos de este consumidor; las capacidades universales y
+la decisión de cierre viven en Sentinel Core.
 
 ### Bootstrap y migración de proyectos
 

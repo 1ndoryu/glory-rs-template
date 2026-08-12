@@ -62,8 +62,8 @@
 > 038A-4, SNT-11, 028A-16) tiene su plan canónico en
 > [`Agente/planes/plan-calidad-tooling-2026-08-11.md`](Agente/planes/plan-calidad-tooling-2026-08-11.md).
 > El alias histórico bajo `Agente/calidad-tooling/` solo redirige a ese plan; no es fuente de backlog.
-> La retirada física de la capa A (shims duplicados) queda condicionada a PATH sin runtime de desarrollo,
-> enforcement y rollback de salida; Sentinel 0.7.4 ya tiene CI #45/#46 verdes y la capa B espera SNT-10.
+> La capa A (shims/guards duplicados del repositorio) fue retirada tras verificar PATH, enforcement y rollback;
+> Sentinel 0.7.4 tiene CI #45/#46 verdes. La capa B (adapter/orquestador) permanece hasta SNT-10.
 
 ## Pendientes ordenados
 

@@ -13,9 +13,9 @@ export const DEFAULT_ENV_ALLOWLIST = Object.freeze([
 /* [108A-1 Fase 0] Tokens de sanción del gate que el runner hereda SIEMPRE a
  * los procesos hijos cuando existen en process.env, aunque no estén en el
  * allowlist: GLORY_QUALITY_GATE_TOKEN (task-check.mjs lo genera al arrancar) y
- * GLORY_HEAVY_RUN_TOKEN (al adquirir el lease pesado). El contrato de
- * quality-command-guard dice que el token "se hereda únicamente por su árbol
- * de procesos; fuera de él, el token no existe". Sin esta herencia, los shims
+ * GLORY_HEAVY_RUN_TOKEN (al adquirir el lease pesado). El contrato del guard
+ * del runtime dice que el token "se hereda únicamente por su árbol de procesos;
+ * fuera de él, el token no existe". Sin esta herencia, los shims
  * globales bloqueaban las validaciones internas del gate (cargo fmt) y
  * run-with-db chocaba con el lease pesado del propio gate (clippy/test). Estos
  * marcadores no contienen secretos: solo identifican una ejecución sancionada

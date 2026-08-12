@@ -119,7 +119,7 @@ Los comandos directos pesados no sustituyen el gate.
 - `quality.config.json`: alcance, perfiles, tiempos, cachés, retención y guard de transición.
 - `quality-tools.json`: repositorios, commits, versiones, capacidades, CLIs y source paths.
 - `sentinel.lock.json`: commits, hashes, protocolos y capacidades realmente instalados.
-- `scripts/quality/`: adapter/orquestador de transición temporal; no se debe ampliar como segundo core ni copiar a otro proyecto. La migración y clasificación canónica viven en `Agente/documentacion/herramientas/auditoria-sentinel-completa-2026-08-10.md` §14 y en la skill `quality-gate-setup`.
+- `scripts/quality/`: solo adapter/orquestador de transición (capa B); los shims/guards duplicados de la capa A fueron retirados. No se debe ampliar como segundo core ni copiar a otro proyecto. La migración y clasificación canónica viven en `Agente/documentacion/herramientas/auditoria-sentinel-completa-2026-08-10.md` §14 y en la skill `quality-gate-setup`.
 - Los agentes no crean carpetas personales, analyzers ni reglas de quality sin declaración project-owned,
   fixtures, presupuesto, owner único y sunset. Una finalidad desconocida bloquea la migración; no se borra
   por el nombre de la carpeta.

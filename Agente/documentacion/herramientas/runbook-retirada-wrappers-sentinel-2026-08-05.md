@@ -2,7 +2,7 @@
 
 > **Fecha:** 2026-08-05
 > **Plan canónico:** `Agente/planes/plan-global-quality-guard-agnostico-2026-08-02.md` (Fase 5).
-> **Criterio:** este runbook NO se ejecuta hoy; se ejecuta cuando dos releases consecutivas hayan pasado la matriz en verde (ver §3). Sirve para que esa ejecución sea mecánica, verificada y reversible.
+> **Criterio:** este runbook se ejecutó de forma mecánica, verificada y reversible después de dos releases consecutivas con la matriz en verde.
 > **Estado (2026-08-11):** Sentinel **0.7.1** (`b22c848`, tag `v0.7.1`) y VarSense **2.2.1** (`88f281f`,
 > tag `v2.2.1`) son la segunda release adoptada por wandorius y glory-rs-rest. Setup, lock, doctor y
 > suites pasan; el rollback real `0.7.1 → 0.7.0 → 0.7.1` quedó verificado. La retirada física de la
@@ -11,21 +11,22 @@
 > (los runs previos #36–#38 también fallaron);
 > glory-rs-rest conserva el baseline `broadcast-mutex-riesgo-rs`.
 
-> **Seguimiento (2026-08-12, corte actual):** Sentinel **0.7.4** (`0349485c`, tag `v0.7.4`) está
+> **Seguimiento (corte final):** Sentinel **0.7.4** (`0349485c`, tag `v0.7.4`) está
 > publicado y adoptado en los consumidores. Lint, suite y producción npm pasan; el audit de desarrollo
 > conserva 1 high + 1 moderate transitorio en Mocha. `glory-rs-rest` publica `1ddf717f` y mantiene los
 > cinco findings de `broadcast-mutex-riesgo-rs` como warnings visibles. Las CI upstream #45 y #46 pasan
-> consecutivamente y la matriz focal de shells pasa en Ubuntu/Windows local. La retirada A queda pendiente
-> solo de la prueba explícita PATH completo/sin runtime de desarrollo, enforcement y rollback de salida;
-> la capa B no se retira con ella.
+> consecutivamente y la matriz focal de shells pasa en Ubuntu/Windows local. La retirada A quedó completada
+> después de la prueba explícita de PATH completo, enforcement y rollback de salida; la capa B no se retira
+> con ella.
 
 ## 1. Objetivo y contexto
 
 El runtime global de Sentinel (`%LOCALAPPDATA%\GlorySentinel`, `sentinel install`) ya es la
 **única fuente** de shims/guards: genera `npm/npx/cargo/node.cmd` + guards de bash/PowerShell en
 `<target>/shims` y los expone en PATH (`shims;bin`) y perfiles. Los wrappers del repositorio
-(`scripts/quality/*.cmd`, `global-cargo-guard.ps1`, `global-quality-guard.sh`) quedaron
-**marcados como LEGACY** (banners `[028A-6 Fase 5]`) y solo se conservan para ramas antiguas.
+(`scripts/quality/*.cmd`, `global-cargo-guard.ps1`, `global-quality-guard.sh`) fueron retirados en la
+ejecución de este runbook. Las ramas antiguas deben actualizar Sentinel o conservarse en su commit
+histórico; no se reintroducen copias en la rama vigente.
 
 Esta retirada elimina esa copia duplicada del repo. **No** elimina el orquestador local
 (`task:check` + `heavy-run-guard.mjs` + adapters): ese es la capa B y se retira en el gate SNT-10
@@ -57,7 +58,9 @@ Marcar como cumplido SOLO cuando se cumplan **todas**:
 - [x] **Dos ejecuciones CI consecutivas en `main`** terminan en verde: Sentinel #45 y #46, con el workflow diagnóstico y artifacts publicados.
 - [x] La matriz multi-shell del runtime (`shellMatrix.test.ts` + `guardMatrix.test.ts` en `tools/sentinel`) pasa en las releases 0.7.3/0.7.4 (suite upstream y focal local Windows).
 - [x] `task:check` PASS con el PATH completo y con `GlorySentinel` filtrado del PATH, ejecutado con `--profile docs --fresh` el 2026-08-12; ambos cierres fueron PASS. La evidencia CI sin perfil dev queda como refuerzo, no como bloqueo local.
-- [ ] Smoke de enforcement y rollback de salida; hasta entonces no ejecutar `git rm` de la capa A.
+- [x] Smoke de enforcement y rollback de salida: el runtime global resolvió `npm` y `sentinel`; `npm run test`
+      fue bloqueado con exit 78 y una restauración aislada desde el commit padre recuperó los diez archivos
+      de la capa A, con `node --check`/`bash -n` correctos.
 
 ## 4. Pre-verificación (en la rama donde se ejecute)
 
@@ -97,14 +100,17 @@ git rm scripts/quality/npm.cmd \
 runtime y retira la entrada legacy del PATH por nombre, no por archivo).
 
 Ajustes posteriores obligatorios:
-- [ ] `scripts/self-check.ps1` y cualquier documento que cite `quality-command-guard` como comando: apuntar a `sentinel guard`.
-- [ ] `AGENTS.md` §11 (herramientas obligatorias): quitar la mención a los shims del repo si existe; el guard vive en el runtime.
-- [ ] Plan 028A-6 Fase 5 y `roadmap-sentinel.md` SNT-10: marcar "Eliminar shims duplicados" con el commit de retirada y esta verificación.
+- [x] `scripts/self-check.ps1` y cualquier documento operativo que cite `quality-command-guard` como comando:
+      apuntar a `sentinel guard` o conservar la referencia solo como historia.
+- [x] `AGENTS.md` §11 (herramientas obligatorias): la documentación vigente indica que el guard vive en el runtime
+      y que la capa A del repositorio fue retirada.
+- [x] Plan 028A-6 Fase 5 y `roadmap-sentinel.md` SNT-10: marcar la retirada de la capa A con el commit
+      `a463ba92` y esta verificación; la capa B queda separada.
 
 ## 6. Verificación post-retirada
 
 ```bash
-npm run quality:test                    # 210/210 esperado (sin el test retirado: n-1)
+npm run quality:test                    # 232 PASS / 1 omitido (233 tests; sin el test de la capa A)
 npm run task:check -- <task-id>         # PASS (el gate local NO usa la capa A)
 cmd //c "npm.cmd --version"             # debe resolver el npm real de Windows (no el shim del repo)
 powershell -NoProfile -c "npm --version"   # sin interceptor del repo; el runtime sigue en el PATH/perfiles
@@ -113,15 +119,15 @@ cd tools/sentinel && npm test && npm run check:core && cd ../..
 ```
 
 El enforcement sigue activo vía el runtime: en un repo con `sentinel.config.json` `enforce`,
-`npm run test` desde una shell normal debe seguir bloqueando con 78 (los shims globales del runtime
+`npm run test` desde una shell normal bloquea con 78 (los shims globales del runtime
 interceptan). Si NO bloquea, el PATH/perfiles no tienen los shims del runtime: abortar y revisar
 `sentinel doctor` antes de continuar.
 
 ## 7. Rollback
 
 ```bash
-# 1. Restaurar los archivos desde git (sin tocar el runtime instalado)
-git checkout HEAD~1 -- scripts/quality/       # o: git restore --source=<commit-anterior> scripts/quality
+# 1. En un worktree desechable, restaurar los archivos desde el commit padre (sin tocar el runtime instalado)
+git restore --source=<commit-retirada>^ -- scripts/quality/<archivo-de-capa-A>
 
 # 2. Reinstalar el runtime por si acaso (idempotente; nunca rompe la rama)
 node scripts/quality/install-global-runtime.mjs --dry-run   # revisar
@@ -137,12 +143,13 @@ de `<target>/shims/profile-backups` sobre el perfil.
 
 ## 8. Criterio de salida (todo junto)
 
-- [ ] `git rm` aplicado solo a la capa A; `git status` sin archivos ajenos.
-- [ ] Gate local PASS, suite del orquestador verde, matriz del submódulo verde.
-- [ ] Shell nueva: los shims del runtime bloquean 78 en un repo enforce y `sentinel` resuelve.
-- [ ] Ninguna rama activa pierde la capacidad de ejecutar su gate (el runtime es global; la capa A era copia).
-- [ ] Commit `028A-6: Fase 5 - wrappers del repo retirados (criterio de dos releases cumplido)` + tarea liberada.
+- [x] `git rm` aplicado solo a la capa A; `git status` quedó sin archivos ajenos antes del commit.
+- [x] Gate local PASS, suite del orquestador verde, matriz del submódulo verde.
+- [x] Shell nueva: los shims del runtime bloquean 78 en un repo enforce y `sentinel` resuelve.
+- [x] Ninguna rama activa pierde la capacidad de ejecutar su gate (el runtime es global; la capa A era copia).
+- [x] Commit `a463ba92`: wrappers del repo retirados con el criterio de dos releases cumplido; no había tarea activa que liberar.
 
-**Corte 2026-08-12:** no se marca la salida porque aún faltan enforcement y rollback de salida. PATH,
-CI, matriz, gates y suites ya tienen evidencia completa; conservar los wrappers no equivale a
-crear nuevos mini-gates y el inventario sigue siendo la autoridad para decidir cualquier retiro.
+**Corte final:** la capa A está retirada. El runtime 0.7.4 gana en PATH, el enforcement real bloquea
+con exit 78, el gate y la suite del consumidor siguen PASS y el rollback aislado recupera la copia histórica.
+La capa B (`task:check`, stages, adapters, reportería y mantenimiento) permanece como compatibilidad
+project-owned hasta SNT-10; su existencia no autoriza copiarla a proyectos nuevos ni crear mini-gates.

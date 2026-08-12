@@ -19,12 +19,13 @@ El audit de desarrollo conserva 1 high + 1 moderate en Mocha; producción queda 
 pasan. Los cinco findings `broadcast-mutex-riesgo-rs` siguen visibles como warning explícito de
 política del producto.
 
-**Criterio único de retirada:** se aplica `Agente/documentacion/herramientas/runbook-retirada-wrappers-sentinel-2026-08-05.md` §3;
-una segunda release y un rollback no autorizan por sí solos a borrar capas A/B.
+**Criterio único de retirada:** se aplicó `Agente/documentacion/herramientas/runbook-retirada-wrappers-sentinel-2026-08-05.md` §3.
+La capa A fue retirada después de verificar releases, matriz, PATH, enforcement y rollback; una carpeta
+personalizada no se borra por nombre. La capa B permanece como adapter project-owned hasta SNT-10.
 
 - **Consumidor vigente:** Sentinel `0.7.4 @ 0349485c` y VarSense `2.2.1 @ 88f281f9`; `doctor`, lock,
   runtime y suites pasan. `quality:setup` termina con evidencia de staging; el ruido de VS Code no deja
-  divergencia. Wandorius tiene `gate:check` docs PASS y `quality:test` 250 PASS/1 omitido; glory-rs-rest ejecuta el
+  divergencia. Wandorius tiene `gate:check` docs PASS y `quality:test` 232 PASS/1 omitido; glory-rs-rest ejecuta el
   gate canónico y conserva cinco findings de producto `broadcast-mutex-riesgo-rs`.
 - **Correcciones locales adoptadas:** setup Windows sin `tar --force-local`, fixtures de mantenimiento
   en MB para evitar ENOSPC, `quality:doctor` delegado al CLI canónico e inventario de los 17 scripts.
@@ -34,14 +35,14 @@ una segunda release y un rollback no autorizan por sí solos a borrar capas A/B.
 - **Rendimiento:** el histórico clean 24.831 s / VarSense 12.665 s queda conservado; con el pin publicado
   VarSense midió 5.913 s en el gate frontend y cold ~3.3 s/warm ~2.8 s instrumentado.
 - **CI/retirada:** Sentinel `main` #45 y #46 pasan consecutivamente. La matriz focal de portabilidad
-  pasa en Windows local y Ubuntu CI. La retirada física de capas A/B sigue condicionada a completar la
-  evidencia PATH sin runtime de desarrollo y rollback de salida; no se borra la carpeta por estética.
+  pasa en Windows local y Ubuntu CI. La capa A ya fue retirada con evidencia PATH, enforcement y rollback;
+  la capa B permanece hasta SNT-10 y no se copia a proyectos nuevos.
 - **Seguridad upstream:** `npm audit --json` sobre Sentinel 0.7.1 reportó 10 vulnerabilidades high y 1
   moderate en dependencias de desarrollo; la actualización mayor queda separada de esta adopción.
 
 ### Seguimiento actual de la migración
 
-### F10 — Reauditoría 2026-08-12 (cierre técnico, retirada controlada pendiente)
+### F10 — Reauditoría (cierre técnico, capa A retirada; capa B pendiente por diseño)
 
 - [x] Publicar Sentinel `0.7.2` (`a3bdb92e`), `0.7.3` (`ea88d111`) y `0.7.4` (`0349485c`, `main` + `v0.7.4`).
 - [x] Actualizar dependencias de desarrollo sin `audit fix --force`; `diff` queda fijado por override.
@@ -53,7 +54,7 @@ una segunda release y un rollback no autorizan por sí solos a borrar capas A/B.
 - [x] Repinar y publicar `glory-rs-rest@3cd9e655`; mantener cinco findings broadcast visibles como warning de política.
 - [x] Corregir transporte de perfiles explícitos en `scripts/quality/stages.mjs`; añadir regresión y repetir gate docs con cambio fuera del perfil.
 - [x] Conseguir dos CI Ubuntu consecutivas verdes: Sentinel #45 y #46; la matriz focal de shells pasa en Ubuntu/Windows.
-- [ ] Ejecutar la pre-verificación final de §3 del runbook (PATH completo/sin runtime de desarrollo, smoke de enforcement y rollback documentado) y retirar solo la capa A si todas las casillas quedan demostradas.
+- [x] Ejecutar la pre-verificación final de §3 del runbook (PATH completo/sin runtime de desarrollo, smoke de enforcement y rollback documentado) y retirar solo la capa A; evidencia: exit 78 del shim global y rollback aislado.
 - [ ] Mantener la capa B (`task:check`, adapters, reportería) hasta SNT-10: delegación completa y paridad comprobada; no eliminarla junto con los shims.
 
 - [x] Los 17 scripts detectados por `sentinel migrate` tienen owner, propósito, consumidor, sustituto y
@@ -73,7 +74,7 @@ una segunda release y un rollback no autorizan por sí solos a borrar capas A/B.
 Los siguientes bloques y casillas fueron movidos aquí desde roadmap.md:
 
 - 108A-1 — Auditoría completa de Glory Sentinel y quality gate (completada 10-08).
-- 108A-6 — Retirada Legacy (en curso; pendiente condicionado por el criterio único del runbook §3: dos CI consecutivos, matriz multi-shell, gates verdes en todos los consumidores, PATH completo/sin runtime de desarrollo y rollback).
+- 108A-6 — Retirada Legacy (capa A completada; capa B separada en SNT-10).
 - Fases 0-9 de la auditoría 108A-1.
 - 098A-1 — Agilizar la ceremonia de cierre de calidad (absorbido por 108A-1).
 - 028A-18 — Orquestación universal de tareas con Sentinel.
@@ -92,7 +93,7 @@ Los siguientes bloques y casillas fueron movidos aquí desde roadmap.md:
 (completada, 10-08-2026).** F0–F9 ejecutadas en orden; release publicado y consumidor adoptado;
 push autorizado por el usuario. Plan de seguimiento: `Agente/planes/plan-ejecucion-auditoria-sentinel-2026-08-10.md`.
 
-**108A-6 — Retirada Legacy (en curso, 10-08-2026).** Continúa la adopción posterior a la auditoría:
+**108A-6 — Retirada Legacy (capa A completada).** Continúa la adopción posterior a la auditoría:
 stage `custom` retirado (commit `2244eee7`), segundo consumidor adoptado, y la release **0.7.0** de
 Sentinel publicada en `main` + tag `v0.7.0` (merge de la auditoría sobre 0.6.4; el pin anterior
 `c1f8f1f` era una rama sin publicar y bloqueaba el preflight del Core). Doble vía real:
@@ -108,7 +109,8 @@ contención de analizadores (`**/.sentinel/**`, `**/.vscode-test/**`, `**/tools/
 `**/.sentinel/**` en Sentinel), herencia de tokens de sanción a etapas, inventario de
 `scripts/quality` con congelación de features, skill `quality-gate-setup` v1.2.0 corregida,
 suite `quality:test` 237/238 PASS y gate real estructurado. El gate canónico vigente es `gate:check`;
-la retirada física legacy queda condicionada a una segunda release verde y rollback.
+la capa A ya fue retirada con dos releases verdes, matriz focal, enforcement y rollback; la capa B queda
+separada en SNT-10.
 Pendiente histórico: gate **full**
 definitivo (cooldown 180 min o `--allow-heavy` con autorización explícita, regla 028A-16).
 Baseline: `Agente/prevencion/bench-ceremonia-2026-08-09.md`.

@@ -7,18 +7,17 @@
 
 > **Estado (018A-43):** mínimo operativo cerrado y verificado; el roadmap principal queda desbloqueado. El commit no es requisito universal: el reporte recuerda cuándo conviene hacer staging/commit/push y cuándo documentar trabajo intermedio o compartido. El gate sí exige prueba y reporte reproducibles.
 
-> **Estado vigente (segunda auditoría, 2026-08-11):** Sentinel 0.7.1 (`b22c848`) y VarSense 2.2.1
+> **Estado vigente (segunda auditoría, corte final):** Sentinel 0.7.4 (`0349485c`) y VarSense 2.2.1
 > (`88f281f`) están publicados y adoptados por wandorius y glory-rs-rest con lock/doctor alineados.
 > `gate:check`
 > genera el manifest y delega la decisión en `sentinel check`;
 > `task:check` queda como compatibilidad temporal. El stage `custom` fue retirado de ambos consumidores.
 > La skill `quality-gate-setup` v1.2.0 ya prohíbe copiar `scripts/quality` y documenta la migración de
 > carpetas legacy. El rollback 0.7.1 ↔ 0.7.0 se probó en el runtime local y quedó restaurado en 0.7.1.
-> La retirada física de capas A/B sigue pendiente porque el runbook exige dos CI consecutivos verdes,
-> matriz multi-shell y un gate verde en cada consumidor; los últimos runs upstream de `main` (#36–#38)
-> están fallidos; glory-rs-rest conserva un baseline de producto
-> `broadcast-mutex-riesgo-rs` que debe resolverse por separado. Las secciones históricas inferiores
-> conservan evidencia de la transición.
+> La capa A (shims/guards duplicados del repositorio) ya fue retirada con paridad, enforcement y rollback
+> verificados. La capa B (`task:check` y adapters) permanece como compatibilidad hasta SNT-10; no se copia
+> a proyectos nuevos. glory-rs-rest conserva un baseline de producto `broadcast-mutex-riesgo-rs` que debe
+> resolverse por separado. Las secciones históricas inferiores conservan evidencia de la transición.
 
 > **Toma de tareas (028A-17, 2026-08-05; enforcement 018A-97):** los agentes marcan la tarea que empiezan y la liberan al terminar. `npm run task:take -- --task <ID> --by <agente>` crea un marcado en `.quality-reports/task-takeover/<taskId>.json` (ignorado por git) cuyo identificador `T-<epochMs>-<hex8>` codifica el instante exacto de la toma; `npm run task:status` lista tomas y expiraciones; `npm run task:release -- --task <ID>` libera. Reglas: una tarea tomada por otro agente activo se rechaza (exit 1); un marcado que supera 6 h sin liberarse se considera olvidado y cualquier agente puede re-tomarlo (`--force`, con aviso) o liberarlo. **Enforcement:** `task:check -- <ID>` **bloquea (exit 78)** el cierre de una tarea tomada por otro agente activo salvo `--allow-foreign` explícito (validación legítima tipo CI); la toma propia se renueva en cada gate (heartbeat, trabajo largo no expira a mitad); y cualquier `task:check`/`run-with-db`/`glory-dev` muestra un banner `EN CURSO` por cada toma ajena activa, no solo la tarea objetivo. El reporte expone `taskTakeover`. Verificado: `quality:test` 210/210 y flujo real take/status/conflicto/check-bloqueado(78)/check-allow-foreign/heartbeat/release en vivo. Regla documentada en `AGENTS.md` §6.
 
@@ -44,9 +43,9 @@ Con este checklist cerrado, las mejoras restantes de este documento son backlog 
 - Reglas de seguridad y arquitectura de baja frecuencia (MFA, permisos client-only, webhooks, rollback optimista).
 - Perfiles de tema, referencias circulares y precisión avanzada de VarSense.
 - Publicación upstream, reinstalación `.vsix`, changelog, ADR y guía de migración.
-- Retirada física de la capa A/B (`SNT-10`): la autoridad ya es `sentinel check`; quedan dos releases verdes,
-  rollback y cero referencias productivas antes de eliminar wrappers, `task:take`, configs/adapters legacy,
-  submódulos y `.quality-tools`.
+- Retirada de la capa A completada; la capa B (`task:check`/adapters) queda como compatibilidad hasta SNT-10.
+  SNT-10 debe retirar solo la lógica que Sentinel Core ya cubra, con paridad y rollback; no implica borrar
+  carpetas por nombre ni copiar adapters entre proyectos.
 
 ## Cómo usar este roadmap
 
@@ -372,7 +371,7 @@ no describe como pendientes los contratos ya activos en `scripts/quality`.
 - [x] Publicar artifacts CI con branch-key + task + commit corto, sin mezclar ramas en runners reutilizados. *(cerrado 2026-08-05, Fase 4 residual/028A-6: `quality.yml` resuelve la identidad con `resolveBranchIdentity` (refs CI allowlisted) y nombra `quality-reports-<branchKey>-297A-6-<shortCommit>` / `quality-metrics-<branchKey>-<shortCommit>`)*
 - [x] Mantener un comando de desinstalación que quite solo entradas administradas por Sentinel. *(2026-08-05, Fase 5/028A-6: `sentinel uninstall` retira PATH (shims+bin), marcadores de perfiles nuevos/legacy y el directorio de shims; con `--keep-runtime` conserva versions/current/bin (el comando `sentinel` sigue resolviendo) y sin él retira todo lo administrado excepto la raíz; dry-run sin mutación, `--json` y exit != 0 ante error; `quality:uninstall-guard` delega en él. Upstream `785301b`, 475 tests + check:core)*
 - [x] Marcar el guard actual como legacy y conservar un periodo de compatibilidad para ramas antiguas. *(2026-08-05: banners LEGACY en los wrappers del repo — `quality-command-guard.mjs`, `global-cargo-guard.ps1`, `global-quality-guard.sh`, `npm/npx/cargo/node.cmd`, `install-global-guard.ps1` — sin cambiar comportamiento (verificado: shim reenvía, `bash -n`/`node --check` OK); las ramas antiguas sin runtime siguen usando estos wrappers. Rollback probado en vivo en target aislado: dos versiones → `rollbackRuntime` restaura con `artifactSha256` verificado → `current.json` apunta a la versión restaurada; perfil con backup → `uninstallProfiles` restaura **byte a byte** y el backup es idéntico al original. 14/14 PASS)*
-- [ ] Retirar gradualmente `quality-command-guard`, `global-cargo-guard`, wrappers y scripts duplicados cuando el runbook permita hacerlo. *(la segunda release 0.7.1/2.2.1 ya está publicada/adoptada y el rollback 0.7.1 ↔ 0.7.0 está probado; quedan dos CI consecutivos, matriz multi-shell y gates verdes en ambos consumidores. glory-rs-rest conserva el baseline `broadcast-mutex-riesgo-rs`; no se borra la capa A/B ni se copia `scripts/quality` mientras siga abierto)*
+- [x] Retirar gradualmente `quality-command-guard`, `global-cargo-guard`, wrappers y scripts duplicados cuando el runbook lo permita. *(Capa A retirada tras Sentinel #45/#46, matriz focal, gate, enforcement exit 78 y rollback reversible; la capa B queda separada en SNT-10.)*
 
 **Gate SNT-10:** `sentinel check` es la única autoridad de cierre; VarSense aparece como etapa/analyzer dentro del reporte combinado; ningún proyecto sin política queda bloqueado; la migración de configuración es reversible y la matriz multi-shell/multi-proyecto pasa.
 

@@ -2,11 +2,11 @@
 
 > **Fecha:** 2026-08-10
 > **Rama objetivo:** `wandorius`
-> **Estado:** COMPLETADA CON PENDIENTES CONDICIONADOS — F0–F9 cerradas y segunda auditoría adoptada.
+> **Estado:** COMPLETADA — F0–F9 cerradas y capa A de la segunda auditoría retirada; la capa B queda como evolución separada SNT-10.
 > Sentinel 0.7.4 (`0349485c`) y VarSense 2.2.1 (`88f281f9`) están publicados y ambos consumidores
 > tienen lock/doctor/setup verificados. El gate canónico es `gate:check` → `sentinel check`; el stage
-> `custom` fue retirado. Las CI #45/#46 y la matriz focal pasan; la retirada de capa A queda condicionada
-> a PATH sin runtime de desarrollo, enforcement y rollback de salida. La capa B espera SNT-10.
+> `custom` fue retirado. Las CI #45/#46 y la matriz focal pasan; la capa A fue retirada tras verificar
+> PATH sin runtime de desarrollo, enforcement y rollback de salida. La capa B espera SNT-10.
 > **ID operativo:** `108A-1` (tomada por `buffy`)
 > **Fuente del plan:** `Agente/documentacion/herramientas/auditoria-sentinel-completa-2026-08-10.md` §14
 > (Plan integral de corrección por fases F0–F9). Este documento es solo seguimiento operativo; el
@@ -53,7 +53,7 @@
 | F5 — Migrar consumidor y consolidar gate | COMPLETADA | worktree `f5/consumer-migrate` (`e0bec3e1` + `bad010f4`): pin local, lock, clasificación, reglas observe-only, doble vía 1:1, 5 tareas reales |
 | F6 — Escalabilidad local, seguridad, operación | COMPLETADA | worktree `c1f8f1f` + consumidor `304a474d`: seguridad, concurrencia, doctor --shims, bench-shims, ADR 0001 |
 | F7 — Consolidar documentación | COMPLETADA | commit `71e26bd8`: índice actualizado, lecciones aprendidas |
-| F8 — Release, adopción y retirada legacy | COMPLETADA CON PENDIENTE | releases `0.7.1`/`2.2.1` publicadas y adoptadas; rollback 0.7.1 ↔ 0.7.0 probado; retirada física aún espera CI/matriz multi-shell y gates verdes |
+| F8 — Release, adopción y retirada legacy | COMPLETADA | releases `0.7.4`/`2.2.1` publicadas y adoptadas; rollback histórico y de salida probado; capa A retirada, capa B separada en SNT-10 |
 | F9 — Verificación final y cierre | COMPLETADA | gates PASS, suites OK, auditoría §14 RESUELTA |
 
 ## Seguimiento Retirada Legacy (108A-6, 2026-08-10)
@@ -63,7 +63,9 @@
 - [x] Releases **0.7.4/2.2.1** publicadas en refs verificables; Sentinel 558 pruebas y VarSense 61 pruebas PASS en staging limpio.
 - [x] Doble vía real: `observe-compare` en 108A-1 y 297A-78 — decisión y hallazgos idénticos entre `task:check` y `sentinel check --stages`.
 - [x] Gate canónico integrado: `gate:check` (wrapper) genera el manifest declarativo y delega en `sentinel check`; CI (quality.yml) ejecuta `gate:check --ci`; `export-ci-metrics.mjs` agrega `check/`.
-- [ ] Retirada física de la capa A (shims del repo + `quality-command-guard`) — quedan PATH sin runtime de desarrollo, enforcement y rollback de salida (runbook 2026-08-05 §3). La capa B (orquestador local) espera SNT-10; no se borra junto con A. El rollback 0.7.1 ↔ 0.7.0 ya está probado; el baseline visible de glory-rs-rest sigue siendo deuda de producto, no bloqueo del gate.
+- [x] Retirada física de la capa A (shims del repo + `quality-command-guard`) — PATH sin runtime de desarrollo,
+      enforcement exit 78 y rollback de salida verificados; la capa B (orquestador local) espera SNT-10 y no se
+      borra junto con A. El baseline visible de glory-rs-rest sigue siendo deuda de producto, no bloqueo del gate.
 
 ## Decisión sobre 098A-1 (absorbido)
 

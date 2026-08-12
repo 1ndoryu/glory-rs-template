@@ -45,7 +45,7 @@ test('safeEnvironment hereda los tokens de sanción del gate desde process.env (
   /* Regresión 108A-1: safeEnvironment eliminaba GLORY_QUALITY_GATE_TOKEN y
    * GLORY_HEAVY_RUN_TOKEN del entorno de las etapas hijas, así que los shims
    * globales bloqueaban cargo fmt y run-with-db chocaba con el lease pesado
-   * del propio gate. El contrato (quality-command-guard) dice que el token se
+   * del propio gate. El contrato del guard del runtime dice que el token se
    * hereda por el árbol de procesos del gate; safeEnvironment debe propagarlo
    * desde process.env, sin incluirlo en el allowlist (que rechaza nombres
    * tipo TOKEN por redacción). Fuera del gate no existe y no se propaga. */

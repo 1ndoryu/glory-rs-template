@@ -4,7 +4,7 @@
 > aislados; después los commits se publicaron y adoptaron en wandorius y glory-rs-rest. Este documento no
 > sustituye `doctor`, `quality:lock` ni el gate posterior a la adopción.
 
-> **Addendum 2026-08-12, corte actual:** Sentinel `0.7.4` (`0349485c`, tag `v0.7.4`) incorpora la
+> **Addendum, corte final:** Sentinel `0.7.4` (`0349485c`, tag `v0.7.4`) incorpora la
 > corrección POSIX de la matriz, resolución portable de PowerShell y diagnósticos de CI sobre el hardening
 > de `0.7.2`/`0.7.3`. Las CI upstream #45 y #46 pasan consecutivamente. El VSIX actual es
 > `glory-sentinel-0.7.4.vsix` (951778 bytes, SHA-256
@@ -97,8 +97,8 @@ posterior a la adopción vuelva a comprobar el SLO de 6 s.
   queda en 0. El audit completo mantiene 1 high + 1 moderate de Mocha como deuda separada.
 - La corrección del transporte de perfiles explícitos evita `SETUP ERROR` cuando el cambio no pertenece
   al perfil solicitado; está cubierta por `observe-integration.test.mjs` y publicada en `glory-rs-rest@3cd9e655`.
-- Pendiente antes de retirar capa A: PATH completo/sin runtime de desarrollo, smoke de enforcement y rollback
-  de salida según el runbook. La capa B no se elimina por ese mismo cambio.
+- Capa A retirada después de verificar PATH completo/sin runtime de desarrollo, smoke de enforcement (exit 78)
+  y rollback de salida según el runbook. La capa B no se elimina por ese mismo cambio.
 
 ## Histórico de lo que quedó abierto en 0.7.1/0.7.3
 
