@@ -33,11 +33,11 @@ El plano universal debe vivir en Sentinel Core. El consumidor conserva únicamen
 | Scripts de dominio | `scripts/run-with-db.mjs`, codegen, preparación DB | Se conservan | Encapsulan Rust/PostgreSQL y no entran al core universal. |
 | Analyzers | Sentinel + VarSense | Se conservan separados | VarSense es analyzer, no gate ni reporter paralelo. |
 
-### Estado operativo vigente (release 0.7.1 / VarSense 2.2.1)
+### Estado operativo vigente (release 0.7.3 / VarSense 2.2.1)
 
 | Superficie | Estado vigente | Próximo criterio |
 | --- | --- | --- |
-| Sentinel Core/CLI | release `b22c848` / 0.7.1; ambos consumidores adoptados | mantener lock, capabilities y release refs alineados |
+| Sentinel Core/CLI | release `ea88d111` / 0.7.3; ambos consumidores adoptados | mantener lock, capabilities y release refs alineados |
 | Gate | `gate:check` → `sentinel check --stages` | `task:check` solo compatibilidad hasta la retirada de capa B |
 | Stage `custom` | retirado en wandorius y glory-rs-rest | no reintroducirlo sin contrato project-owned y justificación específica |
 | `scripts/quality` | transición legacy sin expansión | retirar solo cuando se cumpla el criterio único del runbook §3: dos CI consecutivos, matriz multi-shell, PATH completo/sin runtime de desarrollo, gates verdes en todos los consumidores y rollback |

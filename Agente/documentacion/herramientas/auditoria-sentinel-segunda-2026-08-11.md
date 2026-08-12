@@ -26,7 +26,7 @@ las releases correctivas y se repinearon ambos consumidores sin copiar `scripts/
 
 ## Veredicto
 
-**La instalación y operación quedan corregidas para Sentinel `0.7.1` y VarSense `2.2.1` en los dos consumidores auditados.** Doctor, lock, release evidence, setup y suites pasan en ambos; wandorius tiene gate docs/frontend PASS y glory-rs-rest ejecuta el gate canónico pero conserva cinco findings de producto `broadcast-mutex-riesgo-rs`, ya documentados como baseline ajeno a la instalación. El rollback real `0.7.1 → 0.7.0 → 0.7.1` pasó y el runtime quedó restaurado. La retirada física de wrappers permanece condicionada por el runbook: faltan dos CI consecutivos verdes con matriz multi-shell y un gate plenamente verde en glory-rs-rest.
+**La instalación y operación local quedan corregidas para Sentinel `0.7.3` y VarSense `2.2.1` en los dos consumidores auditados.** Doctor, lock, gates y suites pasan; glory-rs-rest conserva cinco findings de producto `broadcast-mutex-riesgo-rs` como warnings explícitos y visibles. El rollback real `0.7.1 → 0.7.0 → 0.7.1` pasó y el runtime quedó restaurado. La retirada física de wrappers permanece condicionada: la CI #41 falló por portabilidad de PATH, `0.7.3` corrige ese defecto y todavía faltan dos CI consecutivos verdes con matriz multi-shell y un gate plenamente verde en glory-rs-rest.
 
 El fix de bootstrap se detectó durante la comprobación de instalación limpia: antes, `init --json` devolvía un plan pero no escribía los tres archivos. Se corrigió, se cubrió con prueba upstream y se publicó en `v0.7.1`; ambos consumidores ya apuntan a ese release.
 
