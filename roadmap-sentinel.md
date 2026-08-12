@@ -15,7 +15,8 @@
 > La skill `quality-gate-setup` v1.2.0 ya prohíbe copiar `scripts/quality` y documenta la migración de
 > carpetas legacy. El rollback 0.7.1 ↔ 0.7.0 se probó en el runtime local y quedó restaurado en 0.7.1.
 > La retirada física de capas A/B sigue pendiente porque el runbook exige dos CI consecutivos verdes,
-> matriz multi-shell y un gate verde en cada consumidor; glory-rs-rest conserva un baseline de producto
+> matriz multi-shell y un gate verde en cada consumidor; los últimos runs upstream de `main` (#36–#38)
+> están fallidos; glory-rs-rest conserva un baseline de producto
 > `broadcast-mutex-riesgo-rs` que debe resolverse por separado. Las secciones históricas inferiores
 > conservan evidencia de la transición.
 

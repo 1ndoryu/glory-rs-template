@@ -68,6 +68,12 @@ El bloqueo de readiness quedó resuelto para los dos releases publicados: `quali
 compile + suite en staging limpio, `quality:lock --check` pasó y `doctor` devolvió `ready:true`,
 `readyForAnalyze:true`, `readyForGate:true` e `issues:[]` en ambos consumidores.
 
+La evidencia local no equivale a CI verde. La consulta de Actions del upstream muestra `main` en fallo en
+los tres runs consecutivos más recientes: [#36](https://github.com/1ndoryu/glory-sentinel/actions/runs/31372934670),
+[#37](https://github.com/1ndoryu/glory-sentinel/actions/runs/31379295222) y
+[#38](https://github.com/1ndoryu/glory-sentinel/actions/runs/31380898957). Por eso el criterio de retirada
+no se marca como cumplido, aunque los releases publicados pasen compile/suite en staging local.
+
 ### 3.2 Gate frente a Sentinel
 
 No deben ser dos productos. La distinción operativa correcta es:

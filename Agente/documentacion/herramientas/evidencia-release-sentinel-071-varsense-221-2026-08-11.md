@@ -77,6 +77,10 @@ posterior a la adopción vuelva a comprobar el SLO de 6 s.
 
 ## Qué queda abierto
 
+- La CI de `main` del upstream aún no cumple el criterio de dos ejecuciones consecutivas verdes: los runs
+  [#36](https://github.com/1ndoryu/glory-sentinel/actions/runs/31372934670),
+  [#37](https://github.com/1ndoryu/glory-sentinel/actions/runs/31379295222) y
+  [#38](https://github.com/1ndoryu/glory-sentinel/actions/runs/31380898957) terminaron en failure.
 - Completar las dos ejecuciones CI consecutivas y la matriz multi-shell exigidas por el runbook antes de
   retirar la capa A.
 - Resolver por separado el baseline `broadcast-mutex-riesgo-rs` de glory-rs-rest; no es un defecto de
