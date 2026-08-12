@@ -28,6 +28,8 @@ una segunda release y un rollback no autorizan por sí solos a borrar capas A/B.
 - **CI/retirada:** VarSense `main` #8 pasó, pero Sentinel `main` #39 falló (los runs #36–#38 también fallaron).
   No hay dos CI consecutivos verdes; la retirada de capas A/B permanece bloqueada aunque la evidencia local
   de staging sea PASS.
+- **Seguridad upstream:** `npm audit --json` sobre Sentinel 0.7.1 reportó 10 vulnerabilidades high y 1
+  moderate en dependencias de desarrollo; la actualización mayor queda separada de esta adopción.
 
 ### Seguimiento actual de la migración
 

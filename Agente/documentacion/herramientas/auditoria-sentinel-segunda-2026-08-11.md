@@ -117,6 +117,14 @@ El README y el VSIX ya son más accesibles que en la auditoría anterior. El REA
 
 El VSIX 0.7.0 está instalado en una instancia aislada y el 0.7.1 fue generado desde el commit publicado. La extensión de VS Code y el runtime del gate son artefactos distintos; ninguno sustituye silenciosamente el pin del otro.
 
+### 3.6 Dependencias del upstream
+
+`npm audit --json` sobre Sentinel 0.7.1 reportó 11 vulnerabilidades en dependencias de desarrollo (10
+high, 1 moderate, 0 critical); GitHub además mostró 12 alertas en el push a `main` (9 high, 3 moderate).
+La mayoría afecta ESLint/TypeScript, minimatch, picomatch, js-yaml y Mocha. No se aplicó un upgrade mayor
+automático porque puede cambiar el contrato de lint/test; queda como tarea upstream separada con staging,
+suite y revisión de compatibilidad antes de publicar otra release.
+
 ## 4. Estado de la auditoría anterior
 
 | Compromiso | Estado en esta segunda auditoría |

@@ -87,4 +87,6 @@ posterior a la adopción vuelva a comprobar el SLO de 6 s.
   retirar la capa A.
 - Resolver por separado el baseline `broadcast-mutex-riesgo-rs` de glory-rs-rest; no es un defecto de
   instalación de Sentinel y no debe ocultarse degradando el gate.
+- Resolver la deuda de dependencias del upstream: `npm audit --json` local reportó 10 high y 1 moderate
+  en Sentinel 0.7.1; GitHub mostró 12 alertas en el push de `main`.
 - Repinear, regenerar lock, doctor, gate y rollback ya están completados y registrados en la auditoría.
