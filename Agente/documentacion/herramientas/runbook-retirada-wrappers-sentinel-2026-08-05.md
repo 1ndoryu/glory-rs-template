@@ -59,7 +59,7 @@ Marcar como cumplido SOLO cuando se cumplan **todas**:
 - [x] La matriz multi-shell del runtime (`shellMatrix.test.ts` + `guardMatrix.test.ts` en `tools/sentinel`) pasa en las releases 0.7.3/0.7.4 (suite upstream y focal local Windows).
 - [x] `task:check` PASS con el PATH completo y con `GlorySentinel` filtrado del PATH, ejecutado con `--profile docs --fresh` el 2026-08-12; ambos cierres fueron PASS. La evidencia CI sin perfil dev queda como refuerzo, no como bloqueo local.
 - [x] Smoke de enforcement y rollback de salida: el runtime global resolvió `npm` y `sentinel`; `npm run test`
-      fue bloqueado con exit 78 y una restauración aislada desde el commit padre recuperó los diez archivos
+      fue bloqueado con exit 78 y una restauración aislada desde el commit padre recuperó los nueve archivos
       de la capa A, con `node --check`/`bash -n` correctos.
 
 ## 4. Pre-verificación (en la rama donde se ejecute)
