@@ -25,8 +25,9 @@ una segunda release y un rollback no autorizan por sí solos a borrar capas A/B.
   workspace (61 pruebas PASS). Ambos están fijados por gitlink, lock y release evidence en dos consumidores.
 - **Rendimiento:** el histórico clean 24.831 s / VarSense 12.665 s queda conservado; con el pin publicado
   VarSense midió 5.913 s en el gate frontend y cold ~3.3 s/warm ~2.8 s instrumentado.
-- **CI/retirada:** no hay dos CI consecutivos verdes del upstream; `main` tiene fallidos los runs #36, #37
-  y #38. La retirada de capas A/B permanece bloqueada aunque la evidencia local de staging sea PASS.
+- **CI/retirada:** VarSense `main` #8 pasó, pero Sentinel `main` #39 falló (los runs #36–#38 también fallaron).
+  No hay dos CI consecutivos verdes; la retirada de capas A/B permanece bloqueada aunque la evidencia local
+  de staging sea PASS.
 
 ### Seguimiento actual de la migración
 

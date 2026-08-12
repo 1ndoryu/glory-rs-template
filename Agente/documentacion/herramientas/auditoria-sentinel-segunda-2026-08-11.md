@@ -68,11 +68,15 @@ El bloqueo de readiness quedó resuelto para los dos releases publicados: `quali
 compile + suite en staging limpio, `quality:lock --check` pasó y `doctor` devolvió `ready:true`,
 `readyForAnalyze:true`, `readyForGate:true` e `issues:[]` en ambos consumidores.
 
-La evidencia local no equivale a CI verde. La consulta de Actions del upstream muestra `main` en fallo en
-los tres runs consecutivos más recientes: [#36](https://github.com/1ndoryu/glory-sentinel/actions/runs/31372934670),
+La evidencia local no equivale a CI verde. Tras fast-forwardear ambos `main` a los commits publicados,
+VarSense terminó su run [#8 en success](https://github.com/1ndoryu/varsense/actions/runs/31551341521),
+pero Sentinel terminó el [#39 en failure](https://github.com/1ndoryu/glory-sentinel/actions/runs/31551339627).
+La consulta histórica de Actions también muestra `main` en fallo en los tres runs anteriores:
+[#36](https://github.com/1ndoryu/glory-sentinel/actions/runs/31372934670),
 [#37](https://github.com/1ndoryu/glory-sentinel/actions/runs/31379295222) y
 [#38](https://github.com/1ndoryu/glory-sentinel/actions/runs/31380898957). Por eso el criterio de retirada
-no se marca como cumplido, aunque los releases publicados pasen compile/suite en staging local.
+no se marca como cumplido; las pruebas locales pasan, pero no se puede declarar CI verde ni diagnosticar el
+fallo remoto sin permisos de logs.
 
 ### 3.2 Gate frente a Sentinel
 

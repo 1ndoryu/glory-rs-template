@@ -77,7 +77,9 @@ posterior a la adopción vuelva a comprobar el SLO de 6 s.
 
 ## Qué queda abierto
 
-- La CI de `main` del upstream aún no cumple el criterio de dos ejecuciones consecutivas verdes: los runs
+- La CI de `main` del upstream aún no cumple el criterio de dos ejecuciones consecutivas verdes: VarSense
+  [#8 pasó](https://github.com/1ndoryu/varsense/actions/runs/31551341521), pero Sentinel
+  [#39 falló](https://github.com/1ndoryu/glory-sentinel/actions/runs/31551339627); además, los runs
   [#36](https://github.com/1ndoryu/glory-sentinel/actions/runs/31372934670),
   [#37](https://github.com/1ndoryu/glory-sentinel/actions/runs/31379295222) y
   [#38](https://github.com/1ndoryu/glory-sentinel/actions/runs/31380898957) terminaron en failure.
