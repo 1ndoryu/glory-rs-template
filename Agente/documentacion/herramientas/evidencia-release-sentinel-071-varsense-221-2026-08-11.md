@@ -4,9 +4,12 @@
 > aislados; después los commits se publicaron y adoptaron en wandorius y glory-rs-rest. Este documento no
 > sustituye `doctor`, `quality:lock` ni el gate posterior a la adopción.
 
-> **Addendum 2026-08-12:** la reauditoría publicó Sentinel `0.7.2` en `a3bdb92e` con lint y dependencias
-> endurecidos. La evidencia detallada de esa release (CI #41, audit npm y VSIX) se conserva en la auditoría
-> de seguimiento; los artefactos `0.7.1` de este archivo son la evidencia histórica de rollback y adopción.
+> **Addendum 2026-08-12:** la reauditoría publicó Sentinel `0.7.3` en `ea88d111` con la corrección de
+> portabilidad de PATH de la matriz de shells, sobre el hardening de dependencias de `0.7.2`. La CI
+> upstream #41 y #42 aún falla en `test:unit` con exit code 5; los logs no son accesibles sin autenticación.
+> El VSIX actual es `glory-sentinel-0.7.3.vsix` (950288 bytes, SHA-256
+> `F933E16C81F3C0EFD2294D403A361D78BAC5C3F5819DB4C3EB2E5AE984998CFE`). Los artefactos `0.7.1` de este
+> archivo son evidencia histórica de rollback y adopción.
 
 ## Identidad de los artefactos
 

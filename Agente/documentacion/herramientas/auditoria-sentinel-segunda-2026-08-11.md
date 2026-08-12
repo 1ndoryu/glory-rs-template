@@ -7,47 +7,50 @@
 **Tipo:** auditoría con remediación local y trazable. Se corrigieron los defectos evidenciados, se publicaron
 las releases correctivas y se repinearon ambos consumidores sin copiar `scripts/quality`.
 
-> **Reauditoría de seguimiento — 2026-08-12:** se repitió el preflight y el gate en un worktree limpio
-> de `glory-rs-rest`. Sentinel `0.7.3` (`ea88d111`) incorpora la corrección de portabilidad de la matriz
+> **Reauditoría de seguimiento — 2026-08-12:** se repitió el preflight, el gate y la comprobación de
+> runtime en un worktree limpio de `glory-rs-rest`. Sentinel `0.7.3` (`ea88d111`) incorpora la corrección de portabilidad de la matriz
 > de shells sobre el hardening de dependencias de `0.7.2` (`a3bdb92e`),
 > el override seguro de `diff` y la corrección de tres imports dinámicos que el lint nuevo detectaba.
 > `npm run lint` queda en 0 errores/12 warnings, `npm run test:unit` en 558 passing/1 pending y
 > `npm audit --omit=dev` en 0 vulnerabilidades. El audit completo conserva 1 high y 1 moderate únicamente
 > en la cadena de pruebas de Mocha (`serialize-javascript`/su compatibilidad CJS); no afecta al runtime
-> publicado y queda registrado como deuda de actualización mayor. La CI Ubuntu de `main` #41 estaba en
-> progreso al redactar esta nota; no se marca verde hasta ver el resultado remoto.
+> publicado y queda registrado como deuda de actualización mayor. La CI Ubuntu de `main` #41 y #42 termina
+> en `failure` durante `test:unit` (la página pública solo expone exit code 5 y no entrega los logs sin
+> autenticación). La corrección local de PATH está verificada, pero la CI remota sigue siendo un bloqueo
+> no diagnosticable desde este entorno; no se cuenta como verde.
 
-> En `glory-rs-rest`, `gate:check -- 1e --profile docs` pasó en 57.9 s con 0 errores, 318 warnings y
+> En `glory-rs-rest`, `gate:check -- 1e --profile docs` pasó (cacheado: Sentinel 4.4 s, docs 2.5 s)
+> con 0 errores, 318 warnings y
 > 33 informativos. Los cinco hallazgos `broadcast-mutex-riesgo-rs` siguen presentes en Markdown/JSON y
 > ahora tienen severidad `warning` declarada: es una excepción de política del producto para su fanout SSE,
 > no una regla borrada ni una cobertura desactivada. La suite del adapter pasó 231/231 pruebas ejecutables
-> (1 omitida). La adopción se publicó en `origin/glory-rs-rest` como `c099c987` sin tocar el worktree real
-> sucio del usuario.
+> (1 omitida). La suite repetida tras adoptar 0.7.3 pasó 231/231 en 35.2 s. La adopción vigente se
+> publicó como `a8a3ccc1` (gitlink y lock de Sentinel 0.7.3), sin tocar el worktree real sucio del usuario.
 
 ## Veredicto
 
-**La instalación y operación local quedan corregidas para Sentinel `0.7.3` y VarSense `2.2.1` en los dos consumidores auditados.** Doctor, lock, gates y suites pasan; glory-rs-rest conserva cinco findings de producto `broadcast-mutex-riesgo-rs` como warnings explícitos y visibles. El rollback real `0.7.1 → 0.7.0 → 0.7.1` pasó y el runtime quedó restaurado. La retirada física de wrappers permanece condicionada: la CI #41 falló por portabilidad de PATH, `0.7.3` corrige ese defecto y todavía faltan dos CI consecutivos verdes con matriz multi-shell y un gate plenamente verde en glory-rs-rest.
+**La instalación y operación local quedan corregidas para Sentinel `0.7.3` y VarSense `2.2.1` en los dos consumidores auditados.** Doctor, lock, gates y suites pasan; glory-rs-rest conserva cinco findings de producto `broadcast-mutex-riesgo-rs` como warnings explícitos y visibles. El rollback real `0.7.1 → 0.7.0 → 0.7.1` pasó y el runtime quedó restaurado en `0.7.3`. La retirada física de wrappers permanece condicionada: la corrección de PATH de `0.7.3` está publicada, pero la CI Ubuntu #41 y #42 siguen fallando en `test:unit` con exit code 5, por lo que aún faltan dos CI consecutivos verdes, matriz multi-shell y un gate plenamente verde en glory-rs-rest.
 
-El fix de bootstrap se detectó durante la comprobación de instalación limpia: antes, `init --json` devolvía un plan pero no escribía los tres archivos. Se corrigió, se cubrió con prueba upstream y se publicó en `v0.7.1`; ambos consumidores ya apuntan a ese release.
+El fix de bootstrap se detectó durante la comprobación de instalación limpia: antes, `init --json` devolvía un plan pero no escribía los tres archivos. Se corrigió, se cubrió con prueba upstream y se publicó en `v0.7.1`; Sentinel `0.7.3` lo conserva y ambos consumidores ya apuntan a la release vigente.
 
 ## Reauditoría 2026-08-12 — corte actual
 
-**Veredicto provisional:** `OK CON OBSERVACIONES`. El contrato local está listo y reproducible con Sentinel
-`0.7.3`, pero no se cierra la retirada física de wrappers hasta que termine la CI Ubuntu nueva y se cumpla
+**Veredicto provisional:** `OK CON BLOQUEO REMOTO`. El contrato local está listo y reproducible con Sentinel
+`0.7.3`, pero no se cierra la retirada física de wrappers hasta que la CI Ubuntu deje de fallar y se cumpla
 la matriz de dos CI consecutivos del runbook. La diferencia entre gate y Sentinel queda cerrada: el gate es
 la ejecución/decisión; Sentinel es el motor y autoridad que la produce.
 
 | Área | Evidencia fresca | Estado |
 | --- | --- | --- |
 | Release upstream | `ea88d111`, `main`, `release/0.7.3`, `v0.7.3` | Publicado |
-| Setup/readiness wandorius | setup exitoso; doctor `ready:true`, `readyForAnalyze:true`, `readyForGate:true`, `issues:[]`; lock match | PASS |
-| Gate canónico wandorius | `npm run gate:check -- 108A-6 --profile docs`: PASS, Sentinel 2.0 s + docs 1.8 s, 0 errores | PASS |
-| Suite adapter wandorius | `quality:test`: 249 tests, 248 PASS, 1 omitido, 0 fallos, 26.2 s | PASS |
+| Setup/readiness wandorius | runtime activo `0.7.3` (SHA-256 `6b113162…937f`), doctor `ready:true`, `readyForAnalyze:true`, `readyForGate:true`, `issues:[]`; lock match | PASS |
+| Gate canónico wandorius | `npm run gate:check -- 108A-6 --profile docs`: PASS, Sentinel 1.6 s + docs 1.4 s, 0 errores | PASS |
+| Suite adapter wandorius | `quality:test`: 249 tests, 248 PASS, 1 omitido, 0 fallos, 20.7 s | PASS |
 | Upstream Sentinel | lint 0 errores/12 warnings; compile + `test:unit`: 558 passing, 1 pending | PASS local |
 | Seguridad | `npm audit --omit=dev`: 0; audit completo: 1 high + 1 moderate solo en dependencias de Mocha | Observación upstream |
-| VSIX | `glory-sentinel-0.7.2.vsix`, 950281 bytes, SHA-256 `37EF47AE6D1D21120E9CE5B696762FAB9CE9682B7A87C7C289D82E5907E8B10B` | Generado |
-| Segundo consumidor | `glory-rs-rest@c099c987`: gate docs PASS en 57.9 s; 5 findings broadcast visibles como warnings; suite 231/231 + 1 omitida | PASS con policy explícita |
-| CI remoto | Sentinel Actions #41 sobre `a3bdb92e` falló en `test:unit` por delimitador PATH; fix publicado como `ea88d111` | Pendiente run nuevo; no contar #41 como verde |
+| VSIX | `glory-sentinel-0.7.3.vsix`, 950288 bytes, SHA-256 `F933E16C81F3C0EFD2294D403A361D78BAC5C3F5819DB4C3EB2E5AE984998CFE` | Generado |
+| Segundo consumidor | `glory-rs-rest@a8a3ccc1`: lock/doctor PASS, gate docs PASS (cacheado 4.4 s + 2.5 s), suite 232 tests: 231 PASS/1 omitida; 5 findings broadcast visibles como warnings | PASS con policy explícita |
+| CI remoto | Sentinel Actions #41 (`a3bdb92e`) y #42 (`ea88d111`) fallan en `test:unit` con exit code 5; #42 conserva 0 errores de lint y 11 warnings | Bloqueo remoto; no contar como verde |
 
 La política `broadcast-mutex-riesgo-rs: warning` no elimina la regla ni oculta hallazgos: conserva los
 cinco findings en los reportes y documenta que `tokio::sync::broadcast` es la abstracción intencional para

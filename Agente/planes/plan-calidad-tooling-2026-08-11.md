@@ -14,15 +14,18 @@ seguimiento por fases y no se duplican sus findings.
 
 **Reauditoría 2026-08-12:** Sentinel `0.7.3 @ ea88d111` está publicado en `main`, `release/0.7.3` y
 `v0.7.3`. Localmente compile/lint/suite pasan; producción queda sin vulnerabilidades npm. El audit de
-desarrollo aún deja 1 high + 1 moderate en Mocha, y la CI Ubuntu #41 debe observarse antes de cerrar la
-retirada. El consumidor `glory-rs-rest` publicó `c099c987`: su gate docs PASS con cinco findings de
+desarrollo aún deja 1 high + 1 moderate en Mocha. Las CI Ubuntu #41 y #42 fallaron en `test:unit` con
+exit code 5, sin logs accesibles desde este entorno; no se consideran verdes. El consumidor
+`glory-rs-rest` publicó `a8a3ccc1`: su gate docs PASS con cinco findings de
 `broadcast-mutex-riesgo-rs` visibles como warning explícito.
 
 **Criterio único de retirada:** se aplica `Agente/documentacion/herramientas/runbook-retirada-wrappers-sentinel-2026-08-05.md` §3;
 una segunda release y un rollback no autorizan por sí solos a borrar capas A/B.
 
 - **Consumidor vigente:** Sentinel `0.7.3 @ ea88d111` y VarSense `2.2.1 @ 88f281f9`; `doctor`, lock,
-  setup y suites pasan. Wandorius tiene `gate:check` docs/frontend PASS; glory-rs-rest ejecuta el gate
+  runtime y suites pasan. El `quality:setup` completo volvió a exceder el timeout de 304 s durante la
+  fase de VS Code, pero no dejó divergencia: los artefactos provisionados y el doctor son PASS. Wandorius
+  tiene `gate:check` docs/frontend PASS; glory-rs-rest ejecuta el gate
   canónico y conserva cinco findings de producto `broadcast-mutex-riesgo-rs`.
 - **Correcciones locales adoptadas:** setup Windows sin `tar --force-local`, fixtures de mantenimiento
   en MB para evitar ENOSPC, `quality:doctor` delegado al CLI canónico e inventario de los 17 scripts.
@@ -31,7 +34,7 @@ una segunda release y un rollback no autorizan por sí solos a borrar capas A/B.
   workspace (61 pruebas PASS). Ambos están fijados por gitlink, lock y release evidence en dos consumidores.
 - **Rendimiento:** el histórico clean 24.831 s / VarSense 12.665 s queda conservado; con el pin publicado
   VarSense midió 5.913 s en el gate frontend y cold ~3.3 s/warm ~2.8 s instrumentado.
-- **CI/retirada:** VarSense `main` #8 pasó, pero Sentinel `main` #39 falló (los runs #36–#38 también fallaron).
+- **CI/retirada:** VarSense `main` #8 pasó, pero Sentinel `main` #39, #41 y #42 fallaron (los runs #36–#38 también fallaron).
   No hay dos CI consecutivos verdes; la retirada de capas A/B permanece bloqueada aunque la evidencia local
   de staging sea PASS.
 - **Seguridad upstream:** `npm audit --json` sobre Sentinel 0.7.1 reportó 10 vulnerabilidades high y 1
@@ -46,10 +49,10 @@ una segunda release y un rollback no autorizan por sí solos a borrar capas A/B.
 - [x] Corregir los tres `require()` que el lint nuevo convirtió en errores, conservando la carga dinámica de VS Code.
 - [x] Verificar `npm run lint` (0 errores/12 warnings), `npm run test:unit` (558 passing/1 pending) y setup aislado.
 - [x] Verificar `npm audit --omit=dev` (0); registrar 1 high + 1 moderate restantes solo en la cadena de pruebas Mocha.
-- [x] Generar VSIX 0.7.2: `950281` bytes, SHA-256 `37EF47AE6D1D21120E9CE5B696762FAB9CE9682B7A87C7C289D82E5907E8B10B`.
-- [x] Repinar wandorius a `a3bdb92e`, regenerar lock, actualizar runtime global a 0.7.2, doctor PASS y gate docs PASS.
-- [x] Publicar `glory-rs-rest@c099c987`; mantener cinco findings broadcast visibles como warning de política.
-- [ ] Confirmar una CI Ubuntu verde para `0.7.3`; #41 queda clasificada como fallo de portabilidad ya corregido.
+- [x] Generar VSIX 0.7.3: `950288` bytes, SHA-256 `F933E16C81F3C0EFD2294D403A361D78BAC5C3F5819DB4C3EB2E5AE984998CFE`.
+- [x] Repinar wandorius a `ea88d111`, regenerar lock, actualizar runtime global a 0.7.3, doctor PASS y gate docs PASS.
+- [x] Publicar `glory-rs-rest@a8a3ccc1`; mantener cinco findings broadcast visibles como warning de política.
+- [ ] Diagnosticar y conseguir una CI Ubuntu verde para `0.7.3`; #42 conserva exit code 5 en `test:unit` y no expone logs sin autenticación.
 - [ ] Repetir una segunda CI verde, matriz multi-shell y solo entonces retirar capas A/B según el runbook.
 
 - [x] Los 17 scripts detectados por `sentinel migrate` tienen owner, propósito, consumidor, sustituto y

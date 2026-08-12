@@ -11,10 +11,11 @@
 > (shims/wrappers) queda condicionada a dos CI consecutivos verdes, matriz multi-shell y gates verdes en
 > ambos consumidores; no se deben crear nuevas reglas ni copiar esta carpeta a otros proyectos.
 
-> **Seguimiento de cierre 2026-08-12:** la release de hardening está publicada:
-> Sentinel `a3bdb92e`/0.7.2 conserva `init --json` y sanea dependencias/lint; VarSense `88f281f`/2.2.1 elimina recorridos repetidos
-> del workspace y queda bajo el presupuesto del gate frontend. La matriz de scripts no cambia por una
-> mejora upstream: cada retiro sigue requiriendo referencias productivas ausentes, paridad, CI y rollback.
+> **Seguimiento de cierre 2026-08-12:** Sentinel `ea88d111`/0.7.3 añade la corrección de portabilidad de
+> PATH sobre el hardening de `a3bdb92e`/0.7.2; VarSense `88f281f`/2.2.1 elimina recorridos repetidos del
+> workspace y queda bajo el presupuesto del gate frontend. La CI upstream #41/#42 aún falla en
+> `test:unit`, así que la matriz de scripts no cambia por una mejora upstream: cada retiro sigue
+> requiriendo referencias productivas ausentes, paridad, CI y rollback.
 
 ## Decisión
 
