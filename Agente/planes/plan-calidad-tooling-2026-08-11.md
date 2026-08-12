@@ -12,16 +12,16 @@ La auditoría detallada y su evidencia viven en
 `Agente/documentacion/herramientas/auditoria-sentinel-segunda-2026-08-11.md`; aquí se conserva el
 seguimiento por fases y no se duplican sus findings.
 
-- **Consumidor vigente:** Sentinel `0.7.0 @ ea8f47e` y VarSense `2.2.0 @ e8360927`; `doctor`, lock,
-  `gate:check -- 108A-6 --profile docs` y `quality:test` pasan. El VSIX `0.7.0` se instaló en un
-  perfil aislado de VS Code.
+- **Consumidor vigente:** Sentinel `0.7.1 @ b22c8484` y VarSense `2.2.1 @ 88f281f9`; `doctor`, lock,
+  setup y suites pasan. Wandorius tiene `gate:check` docs/frontend PASS; glory-rs-rest ejecuta el gate
+  canónico y conserva cinco findings de producto `broadcast-mutex-riesgo-rs`.
 - **Correcciones locales adoptadas:** setup Windows sin `tar --force-local`, fixtures de mantenimiento
   en MB para evitar ENOSPC, `quality:doctor` delegado al CLI canónico e inventario de los 17 scripts.
-- **Fixes upstream preparados:** Sentinel `b22c848` (`0.7.1`) corrige `sentinel init --json` y añade
-  regresión (8/8 bootstrap PASS); VarSense `88f281f` (`2.2.1`) consolida el descubrimiento del
-  workspace (61 pruebas PASS). Ambos están en worktrees aislados y aún requieren publicación/adopción.
-- **Rendimiento:** baseline pequeña: clean 24.831 s / VarSense 12.665 s; el fix de VarSense midió sobre
-  el workspace real cold ~3.3 s y warm ~2.8 s en tres ejecuciones. Falta repetir con el pin publicado.
+- **Fixes upstream publicados/adoptados:** Sentinel `b22c848` (`0.7.1`) corrige `sentinel init --json`
+  y añade regresión (8/8 bootstrap PASS); VarSense `88f281f` (`2.2.1`) consolida el descubrimiento del
+  workspace (61 pruebas PASS). Ambos están fijados por gitlink, lock y release evidence en dos consumidores.
+- **Rendimiento:** el histórico clean 24.831 s / VarSense 12.665 s queda conservado; con el pin publicado
+  VarSense midió 5.913 s en el gate frontend y cold ~3.3 s/warm ~2.8 s instrumentado.
 
 ### Seguimiento actual de la migración
 
@@ -30,10 +30,12 @@ seguimiento por fases y no se duplican sus findings.
 - [x] El adapter vigente no declara `custom`; `gate:check` delega la decisión en `sentinel check`.
 - [x] `AGENTS.md` y la skill `quality-gate-setup` prohíben carpetas personales/analyzers/reglas sin
       project-owner, fixture, presupuesto, owner único y sunset; el alias no canónico quedó solo como redirect.
-- [ ] Publicar/adoptar `tools/sentinel@b22c848` y `tools/varsense@88f281f`, probar rollback en dos consumidores y, solo después,
-      retirar wrappers duplicados y `scripts/quality` legacy.
+- [x] Publicar/adoptar `tools/sentinel@b22c848` y `tools/varsense@88f281f`, probar rollback y verificar
+      doctor/lock/gate en dos consumidores. La retirada de wrappers sigue condicionada a CI/matriz multi-shell
+      y al baseline de producto documentado de glory-rs-rest.
 - [x] Optimizar y medir VarSense cold con carga real; el resultado preparado está bajo 6 s.
-- [ ] Publicar/adoptar el fix y repetir la medición con el pin consumido.
+- [x] Publicar/adoptar el fix y repetir la medición con el pin consumido (VarSense 5.913 s en gate frontend;
+      cold/warm instrumentado bajo 6 s).
 
 ## Pendientes de calidad/tooling movidos
 

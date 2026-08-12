@@ -2,12 +2,11 @@
 
 > **Fecha:** 2026-08-10
 > **Rama objetivo:** `wandorius`
-> **Estado:** COMPLETADA CON PENDIENTES CONDICIONADOS — F0–F9 cerradas. Sentinel 0.7.0 está publicado en
-> `origin/main` + tag `v0.7.0` en `a804c0d8bb55b2f44406aab4112d528150df05aa`; wandorius incorpora el
-> commit documental `ea8f47e55ead6f5dca4429fab0b06247fd85b5e8` y ambos consumidores
-> están re-pinados a ese commit con lock/doctor PASS. El gate canónico es `gate:check` → `sentinel check`.
-> El stage `custom` fue retirado en ambos consumidores. La retirada física de capas legacy queda condicionada
-> a una segunda release verde con rollback.
+> **Estado:** COMPLETADA CON PENDIENTES CONDICIONADOS — F0–F9 cerradas y segunda auditoría adoptada.
+> Sentinel 0.7.1 (`b22c8484`) y VarSense 2.2.1 (`88f281f9`) están publicados y ambos consumidores
+> tienen lock/doctor/setup verificados. El gate canónico es `gate:check` → `sentinel check`; el stage
+> `custom` fue retirado. La retirada física de capas legacy queda condicionada a dos CI consecutivos,
+> matriz multi-shell y gates verdes; glory-rs-rest conserva un baseline de producto documentado.
 > **ID operativo:** `108A-1` (tomada por `buffy`)
 > **Fuente del plan:** `Agente/documentacion/herramientas/auditoria-sentinel-completa-2026-08-10.md` §14
 > (Plan integral de corrección por fases F0–F9). Este documento es solo seguimiento operativo; el
@@ -54,17 +53,17 @@
 | F5 — Migrar consumidor y consolidar gate | COMPLETADA | worktree `f5/consumer-migrate` (`e0bec3e1` + `bad010f4`): pin local, lock, clasificación, reglas observe-only, doble vía 1:1, 5 tareas reales |
 | F6 — Escalabilidad local, seguridad, operación | COMPLETADA | worktree `c1f8f1f` + consumidor `304a474d`: seguridad, concurrencia, doctor --shims, bench-shims, ADR 0001 |
 | F7 — Consolidar documentación | COMPLETADA | commit `71e26bd8`: índice actualizado, lecciones aprendidas |
-| F8 — Release, adopción y retirada legacy | COMPLETADA CON PENDIENTE | release `0.7.0` (`a804c0d`) publicada; wandorius añade pin documental `ea8f47e`; retirada física espera la segunda release verde con rollback |
+| F8 — Release, adopción y retirada legacy | COMPLETADA CON PENDIENTE | releases `0.7.1`/`2.2.1` publicadas y adoptadas; rollback 0.7.1 ↔ 0.7.0 probado; retirada física aún espera CI/matriz multi-shell y gates verdes |
 | F9 — Verificación final y cierre | COMPLETADA | gates PASS, suites OK, auditoría §14 RESUELTA |
 
 ## Seguimiento Retirada Legacy (108A-6, 2026-08-10)
 
 - [x] Stage `custom` retirado en ambos consumidores: wandorius (commit `2244eee7`) y glory-rs-rest (commit `f13d0e16`). `custom-rules.mjs`, `adapters/custom.mjs` y su test eliminados; `profile-contract.mjs`, `stage-definitions.mjs` y `quality-adapter.json` sin referencias. Suites: 240 y 231 pass.
-- [x] Segundo consumidor adoptado en la release anterior (glory-rs-rest, pin `c1f8f1f`) y **re-pinado a la release 0.7.0** (`a804c0d`) con lock y doctor PASS.
-- [x] Release **0.7.0** publicada correctamente en `main` + tag `v0.7.0` (merge de `f1/cli-contracts` sobre main 0.6.4; el pin anterior `c1f8f1f` era una rama de feature sin publicar, lo que bloqueaba el preflight de release del Core). Suite upstream 557 passing, lint 0 errores, check:core OK.
+- [x] Segundo consumidor adoptado en la release anterior y **re-pinado a Sentinel 0.7.1** (`b22c848`) y VarSense 2.2.1 (`88f281f`) con lock y doctor PASS.
+- [x] Releases **0.7.1/2.2.1** publicadas en refs verificables; Sentinel 558 pruebas y VarSense 61 pruebas PASS en staging limpio.
 - [x] Doble vía real: `observe-compare` en 108A-1 y 297A-78 — decisión y hallazgos idénticos entre `task:check` y `sentinel check --stages`.
 - [x] Gate canónico integrado: `gate:check` (wrapper) genera el manifest declarativo y delega en `sentinel check`; CI (quality.yml) ejecuta `gate:check --ci`; `export-ci-metrics.mjs` agrega `check/`.
-- [ ] Retirada física de la capa A (shims del repo + `quality-command-guard`) y de la capa B (orquestador local) — condicionada a dos releases consecutivas en verde con rollback (runbook 2026-08-05 §3). La release 0.7.0 es la primera.
+- [ ] Retirada física de la capa A (shims del repo + `quality-command-guard`) y de la capa B (orquestador local) — condicionada a dos CI consecutivos, matriz multi-shell, gates verdes y rollback (runbook 2026-08-05 §3). El rollback 0.7.1 ↔ 0.7.0 ya está probado; no se borran wrappers mientras glory-rs-rest conserve el baseline rojo.
 
 ## Decisión sobre 098A-1 (absorbido)
 

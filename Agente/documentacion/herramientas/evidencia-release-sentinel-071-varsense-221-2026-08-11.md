@@ -1,13 +1,15 @@
 # Evidencia de la segunda release de Sentinel y VarSense
 
-> Registro reproducible de la auditoría 2026-08-11. Los resultados se obtuvieron en worktrees aislados; los commits todavía no están publicados ni adoptados por el consumidor. Este documento no sustituye `doctor`, `quality:lock` ni el gate posterior a la adopción.
+> Registro reproducible de la auditoría 2026-08-11. Los resultados iniciales se obtuvieron en worktrees
+> aislados; después los commits se publicaron y adoptaron en wandorius y glory-rs-rest. Este documento no
+> sustituye `doctor`, `quality:lock` ni el gate posterior a la adopción.
 
 ## Identidad de los artefactos
 
 | Herramienta | Release preparada | Commit completo | Padre | Estado remoto |
 | --- | --- | --- | --- | --- |
-| Sentinel | 0.7.1, tag local `v0.7.1` | `b22c8484fd2334f19a88f930c494091d02942e39` | `0dd9c2130d5aebeff384d1448218cf660e4aef6c` | pendiente de publicación |
-| VarSense | 2.2.1, tag local `v2.2.1` | `88f281f94e6febd02a386b7ed03d30d285eb82e1` | `998505c734c0cb040b2b7c53bfefadadb03b025f` | pendiente de publicación |
+| Sentinel | 0.7.1, tag `v0.7.1` | `b22c8484fd2334f19a88f930c494091d02942e39` | `0dd9c2130d5aebeff384d1448218cf660e4aef6c` | publicado en `release/0.7.1` + tag |
+| VarSense | 2.2.1, tag `v2.2.1` | `88f281f94e6febd02a386b7ed03d30d285eb82e1` | `998505c734c0cb040b2b7c53bfefadadb03b025f` | publicado en `release/2.2.1` + tag |
 
 La identidad se comprobó con `git show refs/heads/release/<versión>` y
 `git show refs/tags/v<versión>` en cada submódulo. No se usó una versión global para
@@ -72,11 +74,10 @@ conservada como evidencia histórica: VarSense cold 12.665 s e incremental 1 ms.
 No se reemplaza esa medición; se añade esta muestra del commit correctivo para que el gate
 posterior a la adopción vuelva a comprobar el SLO de 6 s.
 
-## Qué falta para cerrar
+## Qué queda abierto
 
-- Publicar exactamente `b22c8484fd2334f19a88f930c494091d02942e39` como
-  `release/0.7.1` y `v0.7.1` en `github.com/1ndoryu/glory-sentinel`.
-- Publicar exactamente `88f281f94e6febd02a386b7ed03d30d285eb82e1` como
-  `release/2.2.1` y `v2.2.1` en `github.com/1ndoryu/varsense`.
-- Repinear los dos consumidores, regenerar lock, ejecutar `doctor`, gate y rollback, y
-  solo después actualizar la documentación de estado y decidir la retirada de wrappers.
+- Completar las dos ejecuciones CI consecutivas y la matriz multi-shell exigidas por el runbook antes de
+  retirar la capa A.
+- Resolver por separado el baseline `broadcast-mutex-riesgo-rs` de glory-rs-rest; no es un defecto de
+  instalación de Sentinel y no debe ocultarse degradando el gate.
+- Repinear, regenerar lock, doctor, gate y rollback ya están completados y registrados en la auditoría.

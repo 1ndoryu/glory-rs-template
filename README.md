@@ -171,9 +171,7 @@ npm run quality:reports:cleanup:dry
 hashes de los analizadores. El gate canónico `gate:check` genera el manifest declarativo y delega la decisión
 en `sentinel check`; `task:check` queda como alias de compatibilidad temporal. El gate consume los checkouts
 internos fijados en `quality-tools.json` mediante sus `sourcePath` relativos. Sentinel está fijado al commit
-coordinador publicado en `origin/main` (release base `0.7.0`, tag `v0.7.0` en `a804c0d8`); este consumidor fija además el commit documental `ea8f47e55ead6f5dca4429fab0b06247fd85b5e8`. VarSense queda fijado al commit declarado en el
-mismo archivo; `sentinel.lock.json` repite esos commits y hashes. La release anterior `20c13a2`/`v0.5.0`
-queda disponible como rollback. `quality:setup`
+coordinador publicado en `origin/main` (release `0.7.1`, tag `v0.7.1` en `b22c8484fd2334f19a88f930c494091d02942e39`). VarSense está fijado a la release `2.2.1` (`88f281f94e6febd02a386b7ed03d30d285eb82e1`); `sentinel.lock.json` repite esos commits y hashes. Las releases anteriores quedan disponibles como rollback. `quality:setup`
 puede inicializar los submódulos y compilar sus CLIs en un clon limpio; cuando falta un CLI,
 `npm ci` y la suite de la herramienta se ejecutan en un staging temporal fuera del checkout
 Git y solo se copian artefactos generados/ignorados (`node_modules`/`out`) al submódulo. Si el
@@ -206,7 +204,7 @@ Sentinel Core.
 
 ### Bootstrap y migración de proyectos
 
-Un proyecto nuevo debe usar el binario fijado de Sentinel 0.7.0 o una release posterior que exponga las
+Un proyecto nuevo debe usar el binario fijado de Sentinel 0.7.1 o una release posterior que exponga las
 capacidades requeridas:
 
 ```bash

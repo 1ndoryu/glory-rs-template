@@ -3,7 +3,11 @@
 > **Fecha:** 2026-08-05
 > **Plan canónico:** `Agente/planes/plan-global-quality-guard-agnostico-2026-08-02.md` (Fase 5).
 > **Criterio:** este runbook NO se ejecuta hoy; se ejecuta cuando dos releases consecutivas hayan pasado la matriz en verde (ver §3). Sirve para que esa ejecución sea mecánica, verificada y reversible.
-> **Estado (2026-08-10):** la release **0.7.0** (merge de la auditoría 108A-1 sobre `main` 0.6.4, publicada en `main` + tag `v0.7.0`) es la **primera** release con el gate canónico (`sentinel check --stages` vía `gate:check`, paridad real en 108A-1 y 297A-78) y **ambos consumidores adoptados** (wandorius y glory-rs-rest con pin `a804c0d`). La retirada física de la capa A queda condicionada a la **segunda** release consecutiva en verde con rollback probado (§3).
+> **Estado (2026-08-11):** Sentinel **0.7.1** (`b22c848`, tag `v0.7.1`) y VarSense **2.2.1** (`88f281f`,
+> tag `v2.2.1`) son la segunda release adoptada por wandorius y glory-rs-rest. Setup, lock, doctor y
+> suites pasan; el rollback real `0.7.1 → 0.7.0 → 0.7.1` quedó verificado. La retirada física de la
+> capa A todavía no se ejecuta porque §3 exige además dos CI consecutivos verdes, matriz multi-shell y
+> gate verde en cada consumidor; glory-rs-rest conserva el baseline `broadcast-mutex-riesgo-rs`.
 
 ## 1. Objetivo y contexto
 
@@ -34,7 +38,7 @@ no dependen de la capa A.
 
 Marcar como cumplido SOLO cuando se cumplan **todas**:
 
-- [ ] El runtime global v0.4.x está instalado y `sentinel doctor` reporta `runtime activa` + hash verificado.
+- [x] El runtime global v0.7.1 está instalado y `sentinel doctor` reporta `activeVerified:true`.
 - [ ] **Dos ejecuciones CI consecutivas en `main`** (`quality.yml`) terminan en verde, con artifacts `quality-reports-<branchKey>-<task>-<commit>` y `quality-metrics-<branchKey>-<commit>` publicados.
 - [ ] La matriz multi-shell del runtime (`shellMatrix.test.ts` + `guardMatrix.test.ts` en `tools/sentinel`) pasa en las dos releases (suite del submódulo, `npm test`).
 - [ ] `task:check` PASS con el PATH completo (shims+bin) y también con un PATH sin `GlorySentinel` (evidencia CI sin perfil dev), como en la Fase 4.

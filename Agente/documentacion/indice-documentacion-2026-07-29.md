@@ -69,7 +69,7 @@
 - Manual visual: creado a partir del concepto aprobado y la interfaz real.
 - Plan maestro: activo; debe ejecutarse por checklist.
 - Contratos de interacción y medición: activos; se cierran dentro de las tareas dueñas 297A-9–17.
-- Quality gate Sentinel/VarSense: release 0.7.0 adoptada por wandorius y glory-rs-rest; `gate:check` delega en `sentinel check`; retirada física legacy condicionada a una segunda release verde con rollback.
+- Quality gate Sentinel/VarSense: releases 0.7.1/2.2.1 adoptadas por wandorius y glory-rs-rest; `gate:check` delega en `sentinel check`; rollback 0.7.1 ↔ 0.7.0 verificado; retirada física legacy condicionada a dos CI consecutivos, matriz multi-shell y gates verdes.
 - Plan móvil: activo y bloqueado por runtime/workspace; tablet conserva desktop.
 - Plan del bosque multijugador 3D: dirección Three.js aprobada; assets externos GLB y terreno finito editable en 2D quedan planificados, mientras gameplay/realtime siguen bloqueados por dependencias.
 - Plan `glory-render`: propuesto para después de GAME-01/Fase 8; `frontend/src/features/game-core/` es candidato provisional y no se extrae sin segundo consumidor real. La Fase 0 quedó cerrada el 05-ago: auditoría (`auditoria-glory-render-fase0-2026-08-05.md` — 14 módulos CORE puros + `game-realtime` de frontera, sin dependencias de Three/DOM/red) y estrategia de integración/versionado (`estrategia-integracion-glory-render-2026-08-05.md` — submódulo fijado a etiqueta SemVer + dev local, política de licencias/CI/propietarios). Pendiente: aprobar la frontera con evidencia de segundo uso y abrir la Fase 1 (crear el repo).
@@ -77,7 +77,7 @@
 - Plan wandori.us original: superado; no es especificación activa.
 - Plan Sentinel/VarSense editor-agnóstico: trabajo histórico documentado en tareas completadas.
 - Matriz Sentinel/VarSense: actualizada con contrato de findings, comando combinado `all`, commits fijados, lockfile, branch-key y límites de runtime global.
-- Migración global 028A-6/108A-6: release 0.7.0, lock/doctor y matriz de consumidores verificadas; pendientes únicamente la segunda release verde y retirada física de capas legacy.
+- Migración global 028A-6/108A-6: releases 0.7.1/2.2.1, lock/doctor y adopción de consumidores verificadas; pendiente solo la retirada física condicionada y el baseline de producto `broadcast-mutex-riesgo-rs` de glory-rs-rest.
 - Auditoría arquitectónica frontend v1: activa; plan de refactorización parcialmente ejecutado.
 - Auditoría arquitectónica frontend v2: activa; 3 críticos, 5 altos, 8 medios identificados.
 - Plan refactorización arquitectura: activo; runtime móvil 297A-12 implementado parcialmente con `mobile-shell.ts`/`mobile-stack.ts`; revisar gate de transición antes de avanzar.
