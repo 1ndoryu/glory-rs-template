@@ -36,6 +36,11 @@ no dependen de la capa A.
 
 ## 3. Criterio de las dos releases (operativo)
 
+> **Criterio único de retirada (fuente canónica):** no se retira la capa A ni la capa B hasta tener
+> dos CI consecutivos verdes en `main`, matriz multi-shell verde en las releases, `task:check` PASS
+> con PATH completo y sin runtime de desarrollo, gates verdes en todos los consumidores y rollback
+> verificable. Inventario y planes enlazan esta sección; una segunda release publicada por sí sola no basta.
+
 Marcar como cumplido SOLO cuando se cumplan **todas**:
 
 - [x] El runtime global v0.7.1 está instalado y `sentinel doctor` reporta `activeVerified:true`.

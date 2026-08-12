@@ -12,6 +12,9 @@ La auditoría detallada y su evidencia viven en
 `Agente/documentacion/herramientas/auditoria-sentinel-segunda-2026-08-11.md`; aquí se conserva el
 seguimiento por fases y no se duplican sus findings.
 
+**Criterio único de retirada:** se aplica `Agente/documentacion/herramientas/runbook-retirada-wrappers-sentinel-2026-08-05.md` §3;
+una segunda release y un rollback no autorizan por sí solos a borrar capas A/B.
+
 - **Consumidor vigente:** Sentinel `0.7.1 @ b22c8484` y VarSense `2.2.1 @ 88f281f9`; `doctor`, lock,
   setup y suites pasan. Wandorius tiene `gate:check` docs/frontend PASS; glory-rs-rest ejecuta el gate
   canónico y conserva cinco findings de producto `broadcast-mutex-riesgo-rs`.
@@ -42,7 +45,7 @@ seguimiento por fases y no se duplican sus findings.
 Los siguientes bloques y casillas fueron movidos aquí desde roadmap.md:
 
 - 108A-1 — Auditoría completa de Glory Sentinel y quality gate (completada 10-08).
-- 108A-6 — Retirada Legacy (en curso; pendiente condicionado: retirada física capas A/B tras segunda release verde con rollback).
+- 108A-6 — Retirada Legacy (en curso; pendiente condicionado por el criterio único del runbook §3: dos CI consecutivos, matriz multi-shell, gates verdes en todos los consumidores, PATH completo/sin runtime de desarrollo y rollback).
 - Fases 0-9 de la auditoría 108A-1.
 - 098A-1 — Agilizar la ceremonia de cierre de calidad (absorbido por 108A-1).
 - 028A-18 — Orquestación universal de tareas con Sentinel.

@@ -40,7 +40,7 @@ El plano universal debe vivir en Sentinel Core. El consumidor conserva únicamen
 | Sentinel Core/CLI | release `b22c848` / 0.7.1; ambos consumidores adoptados | mantener lock, capabilities y release refs alineados |
 | Gate | `gate:check` → `sentinel check --stages` | `task:check` solo compatibilidad hasta la retirada de capa B |
 | Stage `custom` | retirado en wandorius y glory-rs-rest | no reintroducirlo sin contrato project-owned y justificación específica |
-| `scripts/quality` | transición legacy sin expansión | retirar tras segunda release verde y rollback |
+| `scripts/quality` | transición legacy sin expansión | retirar solo cuando se cumpla el criterio único del runbook §3: dos CI consecutivos, matriz multi-shell, PATH completo/sin runtime de desarrollo, gates verdes en todos los consumidores y rollback |
 | VarSense | analyzer/plugin 2.2.1, no decide el cierre | conservar como etapa del reporte combinado |
 
 ### Estado operativo verificado el 2026-08-11
@@ -61,7 +61,7 @@ carpeta.
 | `quality:reports:cleanup[:dry]` | consumidor / retención | retención del reporte del adapter | conservar hasta paridad de retención en Core |
 | `quality:reports:read` | consumidor / lectura | lector de artefactos del consumidor | conservar; no decide el gate |
 | `quality:install-guard` / `quality:uninstall-guard` | consumidor / instalación | `sentinel install/update/uninstall` | alias temporal; retirar tras smoke test de shims |
-| `task:check` | compatibilidad legacy | `gate:check` → `sentinel check` | no añadir lógica; retirar tras segunda release |
+| `task:check` | compatibilidad legacy | `gate:check` → `sentinel check` | no añadir lógica; retirar solo con el criterio único del runbook §3 |
 | `check:back` | producto wandorius | adapter Rust/PostgreSQL | project-owned; no migrar al Core |
 | `check:front` | producto wandorius | adapter frontend/Vite | project-owned; no migrar al Core |
 | `quality:profile` | medición del consumidor | perfilador de reportes | conservar hasta baseline SLO suficiente |

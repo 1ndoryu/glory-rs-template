@@ -197,14 +197,16 @@ reales; no se marcan como cerradas por documentación o por un PASS histórico.
 - [x] Ejecutar compile y prueba bootstrap: 8/8 PASS con `--ui tdd --timeout 10000`.
 - [x] Publicar/adoptar `tools/sentinel@b22c848` (`0.7.1`), regenerar evidence/lock y repetir doctor/gate. El VSIX histórico 0.7.0 sigue siendo válido como artefacto anterior; su regeneración queda separada de la instalación del gate.
 
-## 6. Criterio de cierre de la próxima revisión
+## 6. Criterio de retirada pendiente / próxima revisión
 
-La auditoría podrá marcarse como cerrada solo si se cumplen simultáneamente:
+La adopción y la corrección de instalación ya están cerradas. La retirada física de capas A/B solo podrá
+marcarse como cerrada cuando se cumpla el criterio único del runbook §3:
 
 - `sentinel doctor` devuelve las tres banderas de readiness en `true` para los pins actuales;
 - lock, gitlink, checkout, release refs y release evidence apuntan al mismo commit;
 - el gate canónico se ejecuta en un checkout limpio y produce decisión estructurada;
-- existe evidencia de segunda release verde y rollback (pendiente F3);
+- existe evidencia de segunda release y rollback (F3 completada); queda pendiente la CI/matriz/gates verdes
+  adicionales exigidos por el runbook;
 - cada script personalizado tiene owner y destino; los duplicados retirados tienen paridad y rollback;
 - la suite completa y los benchmarks tienen límites medidos, incluyendo la excepción cold de VarSense;
 - README, skill, manuales, VSIX y roadmap describen el mismo flujo;

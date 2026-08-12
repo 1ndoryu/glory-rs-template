@@ -34,8 +34,9 @@ La prueba focalizada cubre las cuatro variantes de `sentinel init --json`: escri
 configuración, lock y manifest, y no crea una carpeta privada ni scripts del consumidor.
 El cambio corrige el defecto de `0dd9c21` y conserva la cobertura en la release `b22c848`.
 
-El VSIX generado desde este commit fue `glory-sentinel-0.7.1.vsix`, 949876 bytes,
-SHA-256 `4A7134E1FF1ABA295E270679FC9A66E96D20C0683A159D50A2346D1EDC2C10AF`.
+El VSIX generado desde este commit con `npx --yes @vscode/vsce package --no-dependencies` es
+`glory-sentinel-0.7.1.vsix`, 949807 bytes, SHA-256
+`806B81240E0CDF3787E417056361E6AD6D4593D433A54741E0671EDEA988EF43`.
 
 ## VarSense 2.2.1
 
