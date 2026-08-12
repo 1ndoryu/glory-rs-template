@@ -8,7 +8,7 @@
 > suites pasan; el rollback real `0.7.1 → 0.7.0 → 0.7.1` quedó verificado. La retirada física de la
 > capa A todavía no se ejecuta porque §3 exige además dos CI consecutivos verdes, matriz multi-shell y
 > gate verde en cada consumidor. VarSense `main` #8 terminó success, pero Sentinel `main` #39 terminó failure
-> (los runs previos #36–#38 también fallaron); 
+> (los runs previos #36–#38 también fallaron);
 > glory-rs-rest conserva el baseline `broadcast-mutex-riesgo-rs`.
 
 ## 1. Objetivo y contexto
