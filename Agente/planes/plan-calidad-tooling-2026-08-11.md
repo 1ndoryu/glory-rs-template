@@ -5,22 +5,28 @@
 > referencia en roadmap.md para que el gate docs-task-missing/assertTaskExists siga resolviéndolos.
 > Regla de proceso: no cerrar tareas de calidad/tooling desde este backlog sin gate y evidencia.
 
-## Estado verificado el 2026-08-11
+## Estado verificado el 2026-08-12
 
 Este documento reemplaza al alias histórico `Agente/calidad-tooling/roadmap-calidad-tooling.md`.
 La auditoría detallada y su evidencia viven en
 `Agente/documentacion/herramientas/auditoria-sentinel-segunda-2026-08-11.md`; aquí se conserva el
 seguimiento por fases y no se duplican sus findings.
 
+**Reauditoría 2026-08-12:** Sentinel `0.7.3 @ ea88d111` está publicado en `main`, `release/0.7.3` y
+`v0.7.3`. Localmente compile/lint/suite pasan; producción queda sin vulnerabilidades npm. El audit de
+desarrollo aún deja 1 high + 1 moderate en Mocha, y la CI Ubuntu #41 debe observarse antes de cerrar la
+retirada. El consumidor `glory-rs-rest` publicó `c099c987`: su gate docs PASS con cinco findings de
+`broadcast-mutex-riesgo-rs` visibles como warning explícito.
+
 **Criterio único de retirada:** se aplica `Agente/documentacion/herramientas/runbook-retirada-wrappers-sentinel-2026-08-05.md` §3;
 una segunda release y un rollback no autorizan por sí solos a borrar capas A/B.
 
-- **Consumidor vigente:** Sentinel `0.7.1 @ b22c8484` y VarSense `2.2.1 @ 88f281f9`; `doctor`, lock,
+- **Consumidor vigente:** Sentinel `0.7.3 @ ea88d111` y VarSense `2.2.1 @ 88f281f9`; `doctor`, lock,
   setup y suites pasan. Wandorius tiene `gate:check` docs/frontend PASS; glory-rs-rest ejecuta el gate
   canónico y conserva cinco findings de producto `broadcast-mutex-riesgo-rs`.
 - **Correcciones locales adoptadas:** setup Windows sin `tar --force-local`, fixtures de mantenimiento
   en MB para evitar ENOSPC, `quality:doctor` delegado al CLI canónico e inventario de los 17 scripts.
-- **Fixes upstream publicados/adoptados:** Sentinel `b22c848` (`0.7.1`) corrige `sentinel init --json`
+- **Fixes upstream publicados/adoptados:** Sentinel `a3bdb92e` (`0.7.2`) conserva la corrección de `sentinel init --json`
   y añade regresión (8/8 bootstrap PASS); VarSense `88f281f` (`2.2.1`) consolida el descubrimiento del
   workspace (61 pruebas PASS). Ambos están fijados por gitlink, lock y release evidence en dos consumidores.
 - **Rendimiento:** el histórico clean 24.831 s / VarSense 12.665 s queda conservado; con el pin publicado
@@ -32,6 +38,19 @@ una segunda release y un rollback no autorizan por sí solos a borrar capas A/B.
   moderate en dependencias de desarrollo; la actualización mayor queda separada de esta adopción.
 
 ### Seguimiento actual de la migración
+
+### F10 — Reauditoría 2026-08-12 (en curso hasta CI remota)
+
+- [x] Publicar Sentinel `0.7.2` (`a3bdb92e`) y `0.7.3` (`ea88d111`, `main` + `release/0.7.3` + `v0.7.3`).
+- [x] Actualizar dependencias de desarrollo sin `audit fix --force`; `diff` queda fijado por override.
+- [x] Corregir los tres `require()` que el lint nuevo convirtió en errores, conservando la carga dinámica de VS Code.
+- [x] Verificar `npm run lint` (0 errores/12 warnings), `npm run test:unit` (558 passing/1 pending) y setup aislado.
+- [x] Verificar `npm audit --omit=dev` (0); registrar 1 high + 1 moderate restantes solo en la cadena de pruebas Mocha.
+- [x] Generar VSIX 0.7.2: `950281` bytes, SHA-256 `37EF47AE6D1D21120E9CE5B696762FAB9CE9682B7A87C7C289D82E5907E8B10B`.
+- [x] Repinar wandorius a `a3bdb92e`, regenerar lock, actualizar runtime global a 0.7.2, doctor PASS y gate docs PASS.
+- [x] Publicar `glory-rs-rest@c099c987`; mantener cinco findings broadcast visibles como warning de política.
+- [ ] Confirmar una CI Ubuntu verde para `0.7.3`; #41 queda clasificada como fallo de portabilidad ya corregido.
+- [ ] Repetir una segunda CI verde, matriz multi-shell y solo entonces retirar capas A/B según el runbook.
 
 - [x] Los 17 scripts detectados por `sentinel migrate` tienen owner, propósito, consumidor, sustituto y
       condición de retiro en `Agente/documentacion/herramientas/inventario-scripts-adapters-sentinel-2026-08-06.md`.

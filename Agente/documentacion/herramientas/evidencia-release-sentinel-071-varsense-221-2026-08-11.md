@@ -4,6 +4,10 @@
 > aislados; después los commits se publicaron y adoptaron en wandorius y glory-rs-rest. Este documento no
 > sustituye `doctor`, `quality:lock` ni el gate posterior a la adopción.
 
+> **Addendum 2026-08-12:** la reauditoría publicó Sentinel `0.7.2` en `a3bdb92e` con lint y dependencias
+> endurecidos. La evidencia detallada de esa release (CI #41, audit npm y VSIX) se conserva en la auditoría
+> de seguimiento; los artefactos `0.7.1` de este archivo son la evidencia histórica de rollback y adopción.
+
 ## Identidad de los artefactos
 
 | Herramienta | Release preparada | Commit completo | Padre | Estado remoto |

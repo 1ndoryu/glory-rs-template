@@ -3,16 +3,16 @@
 > Fecha de corte: 2026-08-07
 > Iniciativas canónicas: `Agente/planes/plan-migracion-scripts-adapters-sentinel-2026-08-06.md` y `Agente/planes/plan-preflight-recuperacion-sentinel-2026-08-07.md`
 
-> **Actualización de cierre 2026-08-11 (segunda auditoría):** este inventario conserva abajo la fotografía histórica
-> de la transición 0.6.0. El estado operativo actual es Sentinel 0.7.1 (`b22c848`) y VarSense 2.2.1
+> **Actualización de seguimiento 2026-08-12:** este inventario conserva abajo la fotografía histórica
+> de la transición 0.6.0. El estado operativo actual es Sentinel 0.7.3 (`ea88d111`) y VarSense 2.2.1
 > (`88f281f`) en wandorius y
 > glory-rs-rest, con lock/doctor alineados, `gate:check` delegando en `sentinel check` y stage `custom`
 > retirado en ambos consumidores. La retirada física de la capa B (`scripts/quality`) y de la capa A
 > (shims/wrappers) queda condicionada a dos CI consecutivos verdes, matriz multi-shell y gates verdes en
 > ambos consumidores; no se deben crear nuevas reglas ni copiar esta carpeta a otros proyectos.
 
-> **Seguimiento de cierre 2026-08-11:** la segunda release correctiva está publicada y adoptada:
-> Sentinel `b22c848`/0.7.1 corrige `init --json`; VarSense `88f281f`/2.2.1 elimina recorridos repetidos
+> **Seguimiento de cierre 2026-08-12:** la release de hardening está publicada:
+> Sentinel `a3bdb92e`/0.7.2 conserva `init --json` y sanea dependencias/lint; VarSense `88f281f`/2.2.1 elimina recorridos repetidos
 > del workspace y queda bajo el presupuesto del gate frontend. La matriz de scripts no cambia por una
 > mejora upstream: cada retiro sigue requiriendo referencias productivas ausentes, paridad, CI y rollback.
 

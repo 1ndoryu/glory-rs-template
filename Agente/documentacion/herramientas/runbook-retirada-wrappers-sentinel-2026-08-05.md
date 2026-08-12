@@ -11,6 +11,13 @@
 > (los runs previos #36–#38 también fallaron);
 > glory-rs-rest conserva el baseline `broadcast-mutex-riesgo-rs`.
 
+> **Seguimiento (2026-08-12):** Sentinel **0.7.3** (`ea88d111`, tag `v0.7.3`) está publicado y pendiente
+> de adopción/CI remota en los consumidores. Localmente lint, suite y producción npm pasan; el audit de
+> desarrollo conserva 1 high + 1 moderate transitorio en Mocha. `glory-rs-rest` publica `c099c987` y
+> mantiene los cinco findings de `broadcast-mutex-riesgo-rs` como warnings visibles. Este baseline no
+> habilita la retirada: siguen siendo obligatorios dos CI consecutivos verdes, matriz multi-shell, PATH
+> completo/sin runtime de desarrollo, gates verdes y rollback.
+
 ## 1. Objetivo y contexto
 
 El runtime global de Sentinel (`%LOCALAPPDATA%\GlorySentinel`, `sentinel install`) ya es la
