@@ -143,6 +143,6 @@ de `<target>/shims/profile-backups` sobre el perfil.
 - [ ] Ninguna rama activa pierde la capacidad de ejecutar su gate (el runtime es global; la capa A era copia).
 - [ ] Commit `028A-6: Fase 5 - wrappers del repo retirados (criterio de dos releases cumplido)` + tarea liberada.
 
-**Corte 2026-08-12:** no se marca la salida porque aún faltan las pruebas PATH/enforcement/rollback de
-salida. La evidencia de CI, matriz, gates y suites ya está completa; conservar los wrappers no equivale a
+**Corte 2026-08-12:** no se marca la salida porque aún faltan enforcement y rollback de salida. PATH,
+CI, matriz, gates y suites ya tienen evidencia completa; conservar los wrappers no equivale a
 crear nuevos mini-gates y el inventario sigue siendo la autoridad para decidir cualquier retiro.
