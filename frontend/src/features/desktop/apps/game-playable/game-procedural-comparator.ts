@@ -295,7 +295,9 @@ function toIndexedGeometry(data: {
   g.setAttribute('normal', new THREE.Float32BufferAttribute(data.normals, 3));
   if (data.uvs) g.setAttribute('uv', new THREE.Float32BufferAttribute(data.uvs, 2));
   g.setAttribute('color', new THREE.Float32BufferAttribute(data.colors, 3));
-  g.setIndex(new THREE.BufferAttribute(data.indices as Uint32Array, 1));
+  /* El toolkit suave entrega índices como number[] (datos puros); Three exige
+   * TypedArray en BufferAttribute, así que se normalizan aquí en el adaptador. */
+  g.setIndex(new THREE.BufferAttribute(new Uint32Array(data.indices), 1));
   return g;
 }
 

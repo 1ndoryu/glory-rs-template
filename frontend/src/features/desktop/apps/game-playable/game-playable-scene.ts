@@ -11,7 +11,19 @@ import {
   type WorldMap,
   type WorldSnapshot,
 } from '../../../game-core';
-import { createFigure, type ForestMaterials } from '../game-shared/forest-models';
+import {
+  createCurvedFigure,
+  createCurvedFigureMaterials,
+  type ForestMaterials,
+} from '../game-shared/forest-models';
+import { createWorldBend } from './game-world-bend';
+import { mountCurvedIsland, type BlockPick } from './game-curved-island';
+import { mountCurvedIslandPanel } from './game-curved-island-panel';
+import {
+  mountProceduralComparator,
+  type ProceduralTerrainMode,
+  type TerrainPick,
+} from './game-procedural-comparator';
 import { FIXTURE_PROPS } from './game-fixture-map';
 import { createGamePlayableVisualCache } from './game-playable-visual-cache';
 import {
@@ -48,6 +60,8 @@ export interface GamePlayableSceneHandle {
   /* [GAME-01-VIS] Azimuth orbital actual para que el runtime convierta el
    * input relativo a cámara en dirección de mundo (teclas tipo Genshin). */
   readonly getCameraAzimuth: () => number;
+  /* [128A-1] Follow de cámara conmutable desde el panel temporal. */
+  readonly setCameraFollow: (follow: boolean) => void;
   readonly streamingStats: () => GamePlayableStreamingStats;
   readonly rendererMetrics: () => GameRendererMetrics;
   readonly batchStats: () => GamePlayableBatchStats;
@@ -89,8 +103,8 @@ export function mountGamePlayableScene(
    * cielo despejado (referencia de estilo tipo Genshin). El contrato de mapa
    * no cambia; solo renderer, paleta y cámara. */
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x87ceeb);
-  const fog = new THREE.Fog(0x87ceeb, CAMERA_DISTANCE + FOG_NEAR_MARGIN, CAMERA_DISTANCE + FOG_FAR_OFFSET);
+  scene.background = new THREE.Color(0xaecfc4);
+  const fog = new THREE.Fog(0xaecfc4, CAMERA_DISTANCE + FOG_NEAR_MARGIN, CAMERA_DISTANCE + FOG_FAR_OFFSET);
   scene.fog = fog;
 
   /* [GAME-01-VIS] Cámara libre orbital tipo Genshin: el jugador arrastra
@@ -102,25 +116,77 @@ export function mountGamePlayableScene(
   renderer.domElement.setAttribute('aria-label', 'Bosque jugable offline');
   host.appendChild(renderer.domElement);
 
-  /* Paleta verde stylized: ink = verde profundo (troncos/contorno), middle y
-   * paper = follaje en dos verdes, pale = verde claro, water = azul stylized.
-   * El contorno se mantiene verde oscuro para no romper la lectura low poly. */
+  /* Paleta "Curved Island" (referencia visual): arena, roca hueso, agua teal,
+   * cielo overcast y toon ramp de 4 bandas. El bending se aplica a todos los
+   * materiales para la curva de mundo. */
+  const bend = createWorldBend();
+  const toonRamp = createToonRamp();
+  const curved = (color: number): THREE.MeshToonMaterial => bend.apply(
+    new THREE.MeshToonMaterial({ color, gradientMap: toonRamp }),
+  );
   const materials: ForestMaterials = {
-    ink: new THREE.MeshToonMaterial({ color: 0x2f6b2f }),
-    paper: new THREE.MeshToonMaterial({ color: 0x7fbf4f }),
-    pale: new THREE.MeshToonMaterial({ color: 0xa8d98a }),
-    middle: new THREE.MeshToonMaterial({ color: 0x5a9e4b }),
-    water: new THREE.MeshToonMaterial({ color: 0x3d8bcd }),
-    lines: new THREE.LineBasicMaterial({ color: 0x1e4620 }),
+    ink: curved(0xcb9a63),    /* troncos */
+    paper: curved(0x93d268),  /* follaje */
+    pale: curved(0xf7b845),   /* arena / suelo */
+    middle: curved(0xdccfba), /* roca / camino */
+    water: curved(0x36a79e),  /* agua profunda */
+    lines: new THREE.LineBasicMaterial({ color: 0x2f5d43 }),
   };
 
-  scene.add(new THREE.GridHelper(20, 20, 0x6f9e3f, 0xb9d99a));
+  const figureMaterials = createCurvedFigureMaterials();
+  for (const material of Object.values(figureMaterials)) {
+    bend.apply(material);
+    if (material instanceof THREE.MeshToonMaterial) material.gradientMap = toonRamp;
+  }
 
-  scene.add(new THREE.HemisphereLight(0xfff7e0, 0x3a6b35, 1.6));
-  const sun = new THREE.DirectionalLight(0xfff2c8, 2.4);
-  sun.position.set(-8, 18, 10);
-  sun.castShadow = true;
+  scene.add(new THREE.HemisphereLight(0xdcefe8, 0xffcf8a, 1.0));
+  const sun = new THREE.DirectionalLight(0xfff6e6, 1.2);
+  sun.position.set(6, 10, 4);
   scene.add(sun);
+  const rim = new THREE.DirectionalLight(0xcfe6ff, 0.4);
+  rim.position.set(-6, 4, -5);
+  scene.add(rim);
+
+  /* [CURVED-ISLAND] Override temporal del terreno: la isla de la referencia
+   * sustituye visualmente los chunks del fixture (sin tocar colisión). Se
+   * centra en el punto medio de los bounds del mapa para que la zona jugable
+   * quede siempre sobre tierra y no sobre el agua. */
+  const islandCenterX = (map.bounds.minX + map.bounds.maxX) / 2;
+  const islandCenterZ = (map.bounds.minZ + map.bounds.maxZ) / 2;
+  const curvedIsland = mountCurvedIsland(scene, bend, toonRamp, 1337, islandCenterX, islandCenterZ);
+
+  /* [138A-1] Comparador visual del toolkit procedural: montado oculto; el
+   * panel lo activa para probar el mismo seed en bloques vs suave. */
+  const proceduralComparator = mountProceduralComparator(scene, bend, toonRamp, 1337, islandCenterX, islandCenterZ);
+  proceduralComparator.setVisible(false);
+  let comparatorVisible = false;
+  let comparatorMode: ProceduralTerrainMode = 'bloques';
+
+  /* [128A-1] Follow de cámara conmutable desde el panel temporal. */
+  let followPlayer = true;
+  const panel = mountCurvedIslandPanel(host, {
+    setCurvature: (down, pull) => bend.setCurvature(down, pull),
+    setRain: (amount) => curvedIsland.setRain(amount),
+    setPropsVisible: (visible) => {
+      curvedIsland.setPropsVisible(visible);
+      proceduralComparator.setPropsVisible(visible);
+    },
+    setCameraFollow: (follow) => { followPlayer = follow; },
+    regenerate: () => {
+      const newSeed = Math.floor(Math.random() * 99999);
+      curvedIsland.regenerate(newSeed);
+      proceduralComparator.regenerate(newSeed);
+    },
+    setTerrainMode: (terrainMode) => {
+      const showComparator = terrainMode !== 'actual';
+      if (showComparator) comparatorMode = terrainMode;
+      comparatorVisible = showComparator;
+      curvedIsland.setVisible(!showComparator);
+      proceduralComparator.setVisible(showComparator);
+      if (showComparator) proceduralComparator.setMode(comparatorMode);
+      applyPick(null);
+    },
+  });
 
   const chunkCache = new MapChunkCache(mapVersion);
   const visualCache = createGamePlayableVisualCache({
@@ -128,6 +194,7 @@ export function mountGamePlayableScene(
     materials,
     map: mapVersion,
     props: new Map(FIXTURE_PROPS.map(prop => [prop.id, prop])),
+    hideTerrain: true,
   });
 
   /* Probe físico de GPU: identidad, tiempo de frame y memoria estimada. El
@@ -169,8 +236,11 @@ export function mountGamePlayableScene(
 
   const entities = new Map<string, THREE.Group>();
   let currentPlayer = { x: 0, z: -0.5 };
+  let currentPlayerY = 0;
   let cameraTarget = new THREE.Vector3(currentPlayer.x, 0, currentPlayer.z);
   let lastCameraTime = performance.now();
+  let lastRenderTime = performance.now();
+  let waterTimeSeconds = 0;
   /* [GAME-01-VIS] Estado orbital: distancia y ángulos que el jugador controla
    * con arrastre (azimuth/polar) y rueda o pellizco (distancia). */
   let orbit = { distance: CAMERA_DISTANCE, azimuth: Math.PI / 4, polar: 0.85 };
@@ -182,7 +252,7 @@ export function mountGamePlayableScene(
     const margin = 4;
     return new THREE.Vector3(
       THREE.MathUtils.clamp(target.x, map.bounds.minX + margin, map.bounds.maxX - margin),
-      0,
+      target.y,
       THREE.MathUtils.clamp(target.z, map.bounds.minZ + margin, map.bounds.maxZ - margin),
     );
   };
@@ -193,8 +263,10 @@ export function mountGamePlayableScene(
     const now = performance.now();
     const dt = Math.min(Math.max((now - lastCameraTime) / 1000, 0), 0.1);
     lastCameraTime = now;
-    const desired = clampTarget(new THREE.Vector3(currentPlayer.x, 0, currentPlayer.z));
-    cameraTarget.lerp(desired, 1 - Math.exp(-CAMERA_FOLLOW_RATE * dt));
+    if (followPlayer) {
+      const desired = clampTarget(new THREE.Vector3(currentPlayer.x, currentPlayerY + 0.8, currentPlayer.z));
+      cameraTarget.lerp(desired, 1 - Math.exp(-CAMERA_FOLLOW_RATE * dt));
+    }
     const sinPolar = Math.sin(orbit.polar);
     const offset = new THREE.Vector3(
       orbit.distance * sinPolar * Math.sin(orbit.azimuth),
@@ -211,6 +283,48 @@ export function mountGamePlayableScene(
 
   /* Arrastre para orbitar: un solo puntero gira; dos dedos (móvil) hacen
    * pinch para zoom. La cámara nunca decide estado de juego. */
+  /* [128A-1] Bloque seleccionable: raycast al terreno/props en hover (sin
+   * interferir con el arrastre de órbita) y highlight del bloque apuntado. */
+  const raycaster = new THREE.Raycaster();
+  const pointerNdc = new THREE.Vector2();
+  /* [138A-1] Normaliza el pick de la isla (BlockPick) y del comparador
+   * (TerrainPick) a un mismo contrato de panel; el highlight de bloques solo
+   * aplica a la isla 128A-1 visible. */
+  const applyPick = (pick: TerrainPick | BlockPick | null): void => {
+    if (!pick) {
+      curvedIsland.setHighlight(null);
+      panel.setPick(null);
+      return;
+    }
+    if (!comparatorVisible && pick.level !== null) {
+      curvedIsland.setHighlight(pick as BlockPick);
+    } else {
+      curvedIsland.setHighlight(null);
+    }
+    panel.setPick({ i: pick.i, j: pick.j, level: pick.level });
+  };
+  const updatePick = (clientX: number, clientY: number): void => {
+    const rect = host.getBoundingClientRect();
+    pointerNdc.set(
+      ((clientX - rect.left) / Math.max(rect.width, 1)) * 2 - 1,
+      -((clientY - rect.top) / Math.max(rect.height, 1)) * 2 + 1,
+    );
+    raycaster.setFromCamera(pointerNdc, camera);
+    const activeGroup = comparatorVisible ? proceduralComparator.raycastGroup : curvedIsland.raycastGroup;
+    const hits = raycaster.intersectObject(activeGroup, true);
+    const hit = hits[0];
+    applyPick(hit
+      ? comparatorVisible
+        ? proceduralComparator.pickTerrain(hit.point.x, hit.point.y, hit.point.z)
+        : curvedIsland.pickBlock(hit.point.x, hit.point.y, hit.point.z)
+      : null);
+  };
+
+  const groundHeightAt = (x: number, z: number): number =>
+    comparatorVisible
+      ? proceduralComparator.groundHeightAt(x, z)
+      : curvedIsland.groundHeightAt(x, z);
+
   const onOrbitStart = (event: PointerEvent): void => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     dragging = true;
@@ -218,16 +332,22 @@ export function mountGamePlayableScene(
     host.setPointerCapture?.(event.pointerId);
   };
   const onOrbitMove = (event: PointerEvent): void => {
-    if (!dragging || !lastPointer) return;
-    const dx = event.clientX - lastPointer.x;
-    const dy = event.clientY - lastPointer.y;
-    lastPointer = { x: event.clientX, y: event.clientY };
-    orbit.azimuth -= dx * 0.008;
-    orbit.polar = THREE.MathUtils.clamp(orbit.polar + dy * 0.008, CAMERA_MIN_POLAR, CAMERA_MAX_POLAR);
+    if (dragging && lastPointer) {
+      const dx = event.clientX - lastPointer.x;
+      const dy = event.clientY - lastPointer.y;
+      lastPointer = { x: event.clientX, y: event.clientY };
+      orbit.azimuth -= dx * 0.008;
+      orbit.polar = THREE.MathUtils.clamp(orbit.polar + dy * 0.008, CAMERA_MIN_POLAR, CAMERA_MAX_POLAR);
+      return;
+    }
+    updatePick(event.clientX, event.clientY);
   };
   const onOrbitEnd = (): void => {
     dragging = false;
     lastPointer = null;
+  };
+  const onPointerLeave = (): void => {
+    applyPick(null);
   };
   const onWheel = (event: WheelEvent): void => {
     event.preventDefault();
@@ -241,6 +361,7 @@ export function mountGamePlayableScene(
   host.addEventListener('pointermove', onOrbitMove);
   host.addEventListener('pointerup', onOrbitEnd);
   host.addEventListener('pointercancel', onOrbitEnd);
+  host.addEventListener('pointerleave', onPointerLeave);
   host.addEventListener('wheel', onWheel, { passive: false });
 
   const createEntity = (id: string, characterId: string, localEntityId = 'local'): THREE.Group => {
@@ -248,7 +369,7 @@ export function mountGamePlayableScene(
     /* [297A-77] Cada entidad lleva su personaje del catálogo: el tono se
      * aplica en la figura (material compartido) para que los remotos se vean
      * distintos y el local refleje su elección. */
-    const figure = createFigure(materials, remote, characterId);
+    const figure = createCurvedFigure(figureMaterials, remote, characterId);
     figure.userData.entityId = id;
     figure.userData.characterId = characterId;
     scene.add(figure);
@@ -266,9 +387,24 @@ export function mountGamePlayableScene(
       const object = existing && existing.userData.characterId === entity.characterId
         ? existing
         : recreateEntity(entity.id, entity.characterId, existing, localEntityId);
-      object.position.set(entity.position.x, 0.2, entity.position.z);
+      const groundY = groundHeightAt(entity.position.x, entity.position.z);
+      object.position.set(entity.position.x, groundY + 0.2, entity.position.z);
+      /* [CURVED-ISLAND] El personaje mira hacia su dirección de movimiento
+       * (el runtime ya la expresa en espacio mundo, relativa a cámara). */
+      if (Math.hypot(entity.velocity.x, entity.velocity.z) > 0.001) {
+        const target = Math.atan2(entity.velocity.x, entity.velocity.z);
+        const current = typeof object.userData.yaw === 'number' ? object.userData.yaw : target;
+        let diff = target - current;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        object.userData.yaw = current + diff * 0.6;
+        object.rotation.y = object.userData.yaw;
+      }
       activeIds.add(entity.id);
-      if (entity.id === localEntityId) currentPlayer = entity.position;
+      if (entity.id === localEntityId) {
+        currentPlayer = entity.position;
+        currentPlayerY = groundY;
+      }
     }
     for (const [id, object] of entities) {
       if (activeIds.has(id)) continue;
@@ -277,6 +413,7 @@ export function mountGamePlayableScene(
       entities.delete(id);
     }
     streamProps(currentPlayer);
+    bend.setOrigin(currentPlayer.x, currentPlayerY, currentPlayer.z);
     updateCamera();
   };
 
@@ -306,12 +443,27 @@ export function mountGamePlayableScene(
 
   const render = (): void => {
     if (destroyed) return;
+    const now = performance.now();
+    const frameDt = Math.min((now - lastRenderTime) / 1000, 0.1);
+    lastRenderTime = now;
+    waterTimeSeconds += frameDt;
+    curvedIsland.update(waterTimeSeconds, currentPlayer.x, currentPlayerY, currentPlayer.z);
+    proceduralComparator.update(waterTimeSeconds, currentPlayer.x, currentPlayerY, currentPlayer.z);
+    bend.setOrigin(currentPlayer.x, currentPlayerY, currentPlayer.z);
     gpuFrameProbe.beginFrame();
     renderer.render(scene, camera);
     gpuFrameProbe.endFrame();
     const frameMs = gpuFrameProbe.readFrameMs();
     if (frameMs !== null) lastGpuFrameMs = frameMs;
     currentRendererMetrics = readRendererMetrics(renderer.info, readAvailableHeapMemory());
+    if (comparatorVisible) {
+      const stats = proceduralComparator.terrainStats();
+      const frameText = lastGpuFrameMs !== null ? `${lastGpuFrameMs.toFixed(1)}ms` : '—';
+      panel.setTerrainMetrics(
+        `${stats.mode} · tris ${stats.triangles} · vértices ${stats.vertices} · props ${stats.propCount}`
+        + ` · draw calls ${currentRendererMetrics.drawCalls} · frame ${frameText}`,
+      );
+    }
   };
 
   const estimateGpuSceneMemory = (): GpuMemoryEstimate => {
@@ -357,6 +509,7 @@ export function mountGamePlayableScene(
     resize,
     render,
     getCameraAzimuth: () => orbit.azimuth,
+    setCameraFollow: (follow: boolean): void => { followPlayer = follow; },
     streamingStats: () => currentStreamingStats,
     rendererMetrics: () => currentRendererMetrics,
     batchStats: () => ({
@@ -373,16 +526,43 @@ export function mountGamePlayableScene(
       host.removeEventListener('pointermove', onOrbitMove);
       host.removeEventListener('pointerup', onOrbitEnd);
       host.removeEventListener('pointercancel', onOrbitEnd);
+      host.removeEventListener('pointerleave', onPointerLeave);
       host.removeEventListener('wheel', onWheel);
+      panel.destroy();
       gpuFrameProbe.dispose();
       visualCache.destroy();
-      disposeScene(scene, materials);
+      proceduralComparator.dispose();
+      curvedIsland.dispose();
+      disposeScene(scene, materials, Object.values(figureMaterials));
+      toonRamp.dispose();
       renderer.dispose();
       renderer.forceContextLoss();
       renderer.domElement.remove();
       entities.clear();
     },
   };
+}
+
+/* Rampa toon de 4 bandas compartida por todos los materiales lit (arena,
+ * roca, agua, follaje y figura). El dato vive en espacio lineal: no debe
+ * pasar por gestión de color. */
+function createToonRamp(): THREE.DataTexture {
+  const steps = [0.58, 0.75, 0.89, 1.0];
+  const data = new Uint8Array(steps.length * 4);
+  steps.forEach((value, index) => {
+    const band = Math.round(value * 255);
+    data[index * 4] = band;
+    data[index * 4 + 1] = band;
+    data[index * 4 + 2] = band;
+    data[index * 4 + 3] = 255;
+  });
+  const texture = new THREE.DataTexture(data, steps.length, 1, THREE.RGBAFormat);
+  texture.minFilter = THREE.NearestFilter;
+  texture.magFilter = THREE.NearestFilter;
+  texture.generateMipmaps = false;
+  texture.colorSpace = THREE.NoColorSpace;
+  texture.needsUpdate = true;
+  return texture;
 }
 
 function disposeObjectGeometries(object: THREE.Object3D): void {
@@ -393,9 +573,13 @@ function disposeObjectGeometries(object: THREE.Object3D): void {
   });
 }
 
-function disposeScene(scene: THREE.Scene, sharedMaterials: ForestMaterials): void {
+function disposeScene(
+  scene: THREE.Scene,
+  sharedMaterials: ForestMaterials,
+  extraMaterials: readonly THREE.Material[] = [],
+): void {
   const geometries = new Set<THREE.BufferGeometry>();
-  const materials = new Set<THREE.Material>(Object.values(sharedMaterials));
+  const materials = new Set<THREE.Material>([...Object.values(sharedMaterials), ...extraMaterials]);
   scene.traverse((object) => {
     if (object instanceof THREE.Mesh || object instanceof THREE.LineSegments) {
       geometries.add(object.geometry);

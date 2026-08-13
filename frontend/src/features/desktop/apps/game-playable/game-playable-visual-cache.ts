@@ -12,10 +12,9 @@ import {
   type VisibleMapContent,
 } from '../../../game-core';
 import {
-  createBroadleaf,
-  createConifer,
-  createPond,
-  createRock,
+  createCurvedPond,
+  createCurvedRock,
+  createCurvedTree,
   type ForestMaterials,
 } from '../game-shared/forest-models';
 import type { FixtureProp } from './game-fixture-map';
@@ -30,6 +29,9 @@ export interface GamePlayableVisualCacheOptions {
   readonly materials: ForestMaterials;
   readonly map: MapVersion;
   readonly props: ReadonlyMap<string, FixtureProp>;
+  /* [CURVED-ISLAND] Override temporal: oculta los chunks del fixture para
+   * dejar sitio a la isla de la referencia. Solo afecta a la presentación. */
+  readonly hideTerrain?: boolean;
 }
 
 interface VisibleProp {
@@ -191,6 +193,7 @@ export class GamePlayableVisualCache {
     geometry.computeVertexNormals();
     const material = [this.options.materials.pale, this.options.materials.water, this.options.materials.middle];
     const terrain = new THREE.Mesh(geometry, material);
+    terrain.visible = !this.options.hideTerrain;
     terrain.receiveShadow = true;
     terrain.userData.chunkKey = key;
     this.terrainObjects.set(key, terrain);
@@ -318,13 +321,11 @@ export class GamePlayableVisualCache {
 
   private createPrototype(kind: FixtureProp['kind']): THREE.Group {
     const { materials } = this.options;
-    return kind === 'conifer'
-      ? createConifer(materials)
-      : kind === 'broadleaf'
-        ? createBroadleaf(materials)
-        : kind === 'rock'
-          ? createRock(materials)
-          : createPond(materials, 1, 1);
+    return kind === 'conifer' || kind === 'broadleaf'
+      ? createCurvedTree(materials)
+      : kind === 'rock'
+        ? createCurvedRock(materials)
+        : createCurvedPond(materials);
   }
 
 }

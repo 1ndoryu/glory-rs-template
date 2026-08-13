@@ -160,8 +160,10 @@ describe('GamePlayableVisualCache', () => {
     expect(position.z).toBeCloseTo(-1.25);
     const scale = new THREE.Vector3();
     matrix.decompose(new THREE.Vector3(), new THREE.Quaternion(), scale);
-    expect(scale.x).toBeCloseTo(2.125);
-    expect(scale.y).toBeCloseTo(1.105);
+    /* El prop curved-rock es uniforme (sin la escala no uniforme del boceto
+     * anterior): la escala del AssetInstance (1.7) se aplica en los tres ejes. */
+    expect(scale.x).toBeCloseTo(1.7);
+    expect(scale.y).toBeCloseTo(1.7);
     expect(scale.z).toBeCloseTo(1.7);
 
     const outline = scene.children.find(

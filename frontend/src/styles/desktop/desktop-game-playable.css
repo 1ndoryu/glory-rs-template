@@ -266,6 +266,155 @@
   }
 }
 
+/* [128A-1] Panel temporal de configuración del terreno (Minecraft). Vive
+ * dentro de la ventana del Bosque, usa los tokens B&W del OS y es colapsable.
+ * Solo controla la presentación (curva, lluvia, props, follow, regenerar). */
+.juegoPanelTerreno {
+  position: absolute;
+  top: var(--espacio-sm);
+  right: var(--espacio-sm);
+  z-index: 4;
+  width: 220px;
+  max-height: calc(100% - var(--espacio-lg));
+  overflow-y: auto;
+  border: var(--sistema-borde);
+  color: var(--sistema-texto);
+  background: var(--sistema-superficie);
+}
+
+.juegoPanelTerreno__cabecera {
+  display: flex;
+  align-items: center;
+  padding: var(--espacio-xs) var(--espacio-sm);
+  cursor: pointer;
+}
+
+.juegoPanelTerreno__titulo {
+  flex: 1;
+  font-weight: var(--peso-medio);
+  font-size: var(--tamano-pequeno);
+}
+
+.juegoPanelTerreno__cuerpo {
+  padding: 0 var(--espacio-sm) var(--espacio-sm);
+}
+
+.juegoPanelTerreno--cerrado .juegoPanelTerreno__cuerpo {
+  display: none;
+}
+
+.juegoPanelTerreno__grupo {
+  margin-top: var(--espacio-sm);
+}
+
+.juegoPanelTerreno__tituloGrupo {
+  margin: 0 0 var(--espacio-xs);
+  font-size: var(--tamano-pequeno);
+  font-weight: var(--peso-medio);
+  opacity: 0.75;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.juegoPanelTerreno__fila {
+  margin-bottom: var(--espacio-xs);
+}
+
+.juegoPanelTerreno__rangoLabel {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--tamano-pequeno);
+}
+
+.juegoPanelTerreno__rangoValor {
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}
+
+.juegoPanelTerreno__rango {
+  width: 100%;
+  accent-color: var(--sistema-texto);
+}
+
+.juegoPanelTerreno__segmentos {
+  display: flex;
+  gap: 2px;
+  border: var(--sistema-borde);
+  padding: 2px;
+}
+
+.juegoPanelTerreno__segmento {
+  flex: 1;
+  padding: 2px 4px;
+  border: 0;
+  color: var(--sistema-texto);
+  background: transparent;
+  font: inherit;
+  font-size: var(--tamano-pequeno);
+  cursor: pointer;
+}
+
+.juegoPanelTerreno__segmento--activo {
+  color: var(--sistema-superficie);
+  background: var(--sistema-texto);
+}
+
+.juegoPanelTerreno__check {
+  display: flex;
+  align-items: center;
+  gap: var(--espacio-xs);
+  margin-bottom: var(--espacio-xs);
+  font-size: var(--tamano-pequeno);
+  cursor: pointer;
+}
+
+.juegoPanelTerreno__check input {
+  accent-color: var(--sistema-texto);
+}
+
+.juegoPanelTerreno__boton {
+  width: 100%;
+  padding: var(--espacio-xs);
+  border: var(--sistema-borde);
+  color: var(--sistema-texto);
+  background: var(--sistema-superficie);
+  font: inherit;
+  font-size: var(--tamano-pequeno);
+  cursor: pointer;
+}
+
+.juegoPanelTerreno__boton:hover,
+.juegoPanelTerreno__boton:focus-visible {
+  color: var(--sistema-superficie);
+  background: var(--sistema-texto);
+}
+
+.juegoPanelTerreno__stats {
+  position: absolute;
+  left: var(--espacio-sm);
+  bottom: var(--espacio-sm);
+  z-index: 4;
+  pointer-events: none;
+  margin: 0;
+  padding: 2px var(--espacio-xs);
+  border: var(--sistema-borde);
+  color: var(--sistema-texto);
+  background: var(--sistema-superficie);
+  font-size: var(--tamano-pequeno);
+  font-variant-numeric: tabular-nums;
+}
+
+.juegoPanelTerreno__stats:empty {
+  display: none;
+}
+
+.juegoPanelTerreno__statsLine {
+  margin: 0 0 var(--espacio-xs);
+  font-size: var(--tamano-pequeno);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
 /* [297A-73] Panel de versiones de Assets 3D: preview aislado monocromo con
  * grid y caja envolvente, dentro del modal del OS. */
 .asset-preview-host {
