@@ -30,6 +30,16 @@ test('un perfil frontend incluye varsense, pero no rust/docs', () => {
   assert.deepEqual(names, ['sentinel', 'varsense', 'frontend']);
 });
 
+test('[138A-1] los perfiles de clasificación no seleccionan etapas ni rompen el transporte', () => {
+  const names = stageDefinitions(
+    context,
+    { full: false, executionFull: false, profileOverride: false, profiles: new Set(['frontend', 'desktop', 'docs']) },
+    '138A-1',
+    adapter,
+  ).map(stage => stage.name);
+  assert.deepEqual(names, ['sentinel', 'varsense', 'frontend', 'docs']);
+});
+
 test('el camino legacy sigue siendo compatible mientras migra', () => {
   const names = stageDefinitions(context, { full: false, profileOverride: true, profiles: new Set(['docs']) }, '028A-6').map(stage => stage.name);
   assert.deepEqual(names, ['sentinel', 'docs']);

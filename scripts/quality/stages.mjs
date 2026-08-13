@@ -8,6 +8,7 @@ import { detectScope, manifestToScope } from './scope.mjs';
 import { readAdapterManifest, adapterStageNames, adapterEnvironmentAllowlist, assertImplementedStages, assertStageParity, materializeTransportArguments, resolveWorkspacePath, assertTaskId } from './adapter-manifest.mjs';
 import { stageDefinitions } from './stage-definitions.mjs';
 import { DEFAULT_ENV_ALLOWLIST } from './runner.mjs';
+import { EXECUTABLE_PROFILES } from './profile-contract.mjs';
 
 function parseArgs(argv) {
   const parsed = { taskId: null, output: null, full: false, ci: false, profile: null, reportRoot: null, scopeManifest: null };
@@ -37,7 +38,12 @@ async function main() {
   context.adapterEnvironmentAllowlist = adapterEnvironmentAllowlist(adapter, DEFAULT_ENV_ALLOWLIST);
   const scopeManifestPath = args.scopeManifest ? resolveWorkspacePath(projectRoot, args.scopeManifest, '--scope-manifest', { allowReportRoot: true }) : null;
   const scope = scopeManifestPath ? manifestToScope(JSON.parse(await readFile(scopeManifestPath, 'utf8'))) : await detectScope(context, scopeArgs);
-  const stageNames = adapterStageNames(adapter, [...scope.profiles], scope.executionFull ?? scope.full);
+  /* [138A-1] Los perfiles de clasificación (desktop/mobile/workspace/auth/
+   * commerce) solo activan recordatorios; no seleccionan etapas. El adapter
+   * falla fail-closed ante perfiles no declarados, así que se filtran aquí
+   * antes del transporte, conservando el contrato para errores reales. */
+  const stageProfiles = [...scope.profiles].filter(profile => EXECUTABLE_PROFILES.has(profile));
+  const stageNames = adapterStageNames(adapter, stageProfiles, scope.executionFull ?? scope.full);
   const implementedNames = stageDefinitions(context, scope, args.taskId, adapter).map(item => item.name);
   assertImplementedStages(adapter, stageNames, implementedNames);
   assertStageParity(stageNames, implementedNames);

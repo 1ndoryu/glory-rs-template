@@ -1,0 +1,307 @@
+/* GAME-01 — Comparador visual del toolkit procedural (138A-1).
+ * Monta el MISMO seed con dos estilos derivados de la misma base de altura:
+ * 'bloques' reutiliza el mesher del experimento 128A-1 vía adaptador de
+ * cuantización, y 'suave' usa el heightfield-mesh + vegetación del toolkit.
+ * Solo presentación y métricas estructurales para que el usuario decida el
+ * estilo con evidencia; el agua es un plano toon simple porque aquí se
+ * compara el terreno/props, no el shader de costa del 128A-1. */
+
+import * as THREE from 'three';
+import {
+  buildHeightfieldMeshData,
+  buildVegetationMeshData,
+  generateIslandHeightfield,
+  placeVegetation,
+  type IslandHeightfield,
+} from '../../../game-core';
+import {
+  buildBlockPropsMeshData,
+  buildBlockTerrainMeshData,
+  placeBlockProps,
+  type BlockMeshData,
+} from './game-block-mesher';
+import { BLOCK_COLORS } from './game-block-palette';
+import { buildBlockHeightmapFromIsland } from './game-procedural-blocks';
+
+/* Misma rejilla que la isla 128A-1 para que el comparador sea 1:1. */
+const WIDTH = 48;
+const DEPTH = 32;
+const MAX_LEVEL = 4;
+const WATER_Y = -0.12;
+const PROP_COUNT = 60;
+
+export type ProceduralTerrainMode = 'bloques' | 'suave';
+
+export interface ProceduralTerrainStats {
+  readonly mode: ProceduralTerrainMode;
+  readonly vertices: number;
+  readonly triangles: number;
+  readonly propCount: number;
+}
+
+export interface TerrainPick {
+  readonly i: number;
+  readonly j: number;
+  /** Nivel de bloque; null en modo suave (no hay bloques que mostrar). */
+  readonly level: number | null;
+  readonly worldX: number;
+  readonly worldZ: number;
+  readonly height: number;
+}
+
+export interface ProceduralComparator {
+  readonly setMode: (mode: ProceduralTerrainMode) => void;
+  readonly mode: () => ProceduralTerrainMode;
+  readonly setVisible: (visible: boolean) => void;
+  readonly regenerate: (seed: number) => void;
+  readonly groundHeightAt: (x: number, z: number) => number;
+  readonly raycastGroup: THREE.Object3D;
+  readonly pickTerrain: (x: number, y: number, z: number) => TerrainPick | null;
+  readonly setPropsVisible: (visible: boolean) => void;
+  readonly terrainStats: () => ProceduralTerrainStats;
+  readonly update: (timeSeconds: number, anchorX: number, anchorY: number, anchorZ: number) => void;
+  readonly dispose: () => void;
+}
+
+interface BuiltMode {
+  readonly group: THREE.Group;
+  readonly stats: ProceduralTerrainStats;
+}
+
+export function mountProceduralComparator(
+  scene: THREE.Scene,
+  bend: WorldBendLike,
+  toonRamp: THREE.Texture,
+  seed = 1337,
+  centerX = 0,
+  centerZ = 0,
+): ProceduralComparator {
+  let currentSeed = seed;
+  let currentHeightfield: IslandHeightfield;
+  let currentBlockLevels: Int8Array;
+  let mode: ProceduralTerrainMode = 'bloques';
+  let propsVisible = true;
+
+  const world = new THREE.Group();
+  const material = bend.apply(new THREE.MeshToonMaterial({ gradientMap: toonRamp, vertexColors: true }));
+  const waterMaterial = bend.apply(new THREE.MeshToonMaterial({ color: BLOCK_COLORS.waterShallow, gradientMap: toonRamp }));
+  const waterGeometry = new THREE.PlaneGeometry(WIDTH * 2.4, DEPTH * 2.4, 1, 1);
+  waterGeometry.rotateX(-Math.PI / 2);
+  const water = new THREE.Mesh(waterGeometry, waterMaterial);
+  water.position.y = WATER_Y;
+  world.add(water);
+
+  let blocks: BuiltMode | null = null;
+  let smooth: BuiltMode | null = null;
+  let raycastGroup: THREE.Object3D = water;
+
+  const buildBlocks = (): BuiltMode => {
+    currentHeightfield = generateIslandHeightfield({
+      seed: currentSeed,
+      width: WIDTH,
+      depth: DEPTH,
+      maxHeight: MAX_LEVEL,
+    });
+    const blockH = buildBlockHeightmapFromIsland(currentHeightfield, MAX_LEVEL);
+    currentBlockLevels = blockH.levels;
+    const terrainData = buildBlockTerrainMeshData(blockH, currentSeed);
+    const placements = placeBlockProps(blockH, currentSeed, PROP_COUNT);
+    const propsData = buildBlockPropsMeshData(placements);
+    const group = new THREE.Group();
+    const terrain = new THREE.Mesh(toGeometry(terrainData), material);
+    const props = new THREE.Mesh(toGeometry(propsData), material);
+    props.visible = propsVisible;
+    group.add(terrain, props);
+    return {
+      group,
+      stats: {
+        mode: 'bloques',
+        vertices: terrainData.positions.length / 3,
+        triangles: terrainData.positions.length / 9,
+        propCount: placements.length,
+      },
+    };
+  };
+
+  const buildSmooth = (): BuiltMode => {
+    currentHeightfield = generateIslandHeightfield({
+      seed: currentSeed,
+      width: WIDTH,
+      depth: DEPTH,
+      maxHeight: MAX_LEVEL,
+    });
+    const meshData = buildHeightfieldMeshData(currentHeightfield);
+    const veg = placeVegetation(currentHeightfield, currentSeed);
+    const propData = buildVegetationMeshData(veg.placements);
+    const group = new THREE.Group();
+    const terrain = new THREE.Mesh(toIndexedGeometry(meshData), material);
+    const props = new THREE.Mesh(toIndexedGeometry(propData), material);
+    props.visible = propsVisible;
+    group.add(terrain, props);
+    return {
+      group,
+      stats: {
+        mode: 'suave',
+        vertices: meshData.vertexCount,
+        triangles: meshData.triangleCount,
+        propCount: veg.placements.length,
+      },
+    };
+  };
+
+  const rebuild = (): void => {
+    disposeBuiltMode(blocks);
+    disposeBuiltMode(smooth);
+    blocks = buildBlocks();
+    smooth = buildSmooth();
+    world.add(blocks.group, smooth.group);
+    applyMode();
+  };
+
+  const applyMode = (): void => {
+    if (!blocks || !smooth) return;
+    blocks.group.visible = mode === 'bloques';
+    smooth.group.visible = mode === 'suave';
+    raycastGroup = mode === 'bloques'
+      ? blocks.group.children[0]
+      : smooth.group.children[0];
+  };
+
+  const cellAtWorld = (x: number, z: number): { i: number; j: number } | null => {
+    const i = Math.floor(x - centerX + WIDTH / 2);
+    const j = Math.floor(z - centerZ + DEPTH / 2);
+    if (i < 0 || j < 0 || i >= WIDTH || j >= DEPTH) return null;
+    return { i, j };
+  };
+
+  const cellHeight = (i: number, j: number): number =>
+    currentHeightfield.heights[j * WIDTH + i];
+
+  const groundHeightAt = (x: number, z: number): number => {
+    const cell = cellAtWorld(x, z);
+    if (!cell) return WATER_Y;
+    if (mode === 'suave') {
+      const y = cellHeight(cell.i, cell.j);
+      return y < currentHeightfield.waterLevel ? WATER_Y : y;
+    }
+    const level = currentBlockLevels[cell.j * WIDTH + cell.i];
+    return level < 0 ? WATER_Y : level;
+  };
+
+  const pickTerrain = (x: number, y: number, z: number): TerrainPick | null => {
+    const cell = cellAtWorld(x, z);
+    if (!cell) return null;
+    if (mode === 'suave') {
+      const height = cellHeight(cell.i, cell.j);
+      if (height < currentHeightfield.waterLevel) return null;
+      return {
+        i: cell.i,
+        j: cell.j,
+        level: null,
+        worldX: cell.i - WIDTH / 2 + 0.5 + centerX,
+        worldZ: cell.j - DEPTH / 2 + 0.5 + centerZ,
+        height,
+      };
+    }
+    const level = currentBlockLevels[cell.j * WIDTH + cell.i];
+    if (level < 0) return null;
+    let layer = Math.floor(y + 0.001);
+    if (y >= level - 0.001) layer = level - 1;
+    layer = Math.max(-1, Math.min(level - 1, layer));
+    return {
+      i: cell.i,
+      j: cell.j,
+      level,
+      worldX: cell.i - WIDTH / 2 + 0.5 + centerX,
+      worldZ: cell.j - DEPTH / 2 + 0.5 + centerZ,
+      height: layer + 0.5,
+    };
+  };
+
+  const setPropsVisible = (visible: boolean): void => {
+    propsVisible = visible;
+    if (!blocks || !smooth) return;
+    for (const built of [blocks, smooth]) {
+      const props = built.group.children[1];
+      props.visible = visible;
+    }
+  };
+
+  rebuild();
+  world.position.set(centerX, 0, centerZ);
+  world.visible = false;
+  scene.add(world);
+
+  return {
+    setMode: (nextMode) => {
+      mode = nextMode;
+      applyMode();
+    },
+    mode: () => mode,
+    setVisible: (visible) => {
+      world.visible = visible;
+      if (visible) applyMode();
+    },
+    regenerate: (newSeed) => {
+      currentSeed = newSeed;
+      rebuild();
+    },
+    groundHeightAt,
+    get raycastGroup() {
+      return raycastGroup;
+    },
+    pickTerrain,
+    setPropsVisible,
+    terrainStats: () => (mode === 'bloques' ? blocks!.stats : smooth!.stats),
+    /* El agua del comparador es estática; el método existe para mantener el
+     * mismo contrato de update que la isla y poder llamarlo de forma uniforme. */
+    update: () => {},
+    dispose: () => {
+      scene.remove(world);
+      disposeBuiltMode(blocks);
+      disposeBuiltMode(smooth);
+      material.dispose();
+      waterMaterial.dispose();
+      waterGeometry.dispose();
+      world.clear();
+    },
+  };
+}
+
+/* Contrato mínimo de world-bend para no acoplar el comparador a su impl. */
+interface WorldBendLike {
+  apply: <T extends THREE.Material>(material: T) => T;
+}
+
+function toGeometry(data: BlockMeshData): THREE.BufferGeometry {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(data.positions, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(data.normals, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(data.uvs, 2));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(data.colors, 3));
+  return g;
+}
+
+function toIndexedGeometry(data: {
+  readonly positions: Float32Array | readonly number[];
+  readonly normals: Float32Array | readonly number[];
+  readonly colors: Float32Array | readonly number[];
+  readonly indices: Uint32Array | readonly number[];
+  readonly uvs?: Float32Array | readonly number[];
+}): THREE.BufferGeometry {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(data.positions, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(data.normals, 3));
+  if (data.uvs) g.setAttribute('uv', new THREE.Float32BufferAttribute(data.uvs, 2));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(data.colors, 3));
+  g.setIndex(new THREE.BufferAttribute(data.indices as Uint32Array, 1));
+  return g;
+}
+
+function disposeBuiltMode(built: BuiltMode | null): void {
+  if (!built) return;
+  built.group.traverse((object) => {
+    if (object instanceof THREE.Mesh) object.geometry.dispose();
+  });
+  built.group.clear();
+}

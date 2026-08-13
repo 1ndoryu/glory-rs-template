@@ -6,7 +6,7 @@ import { runSentinel } from './adapters/sentinel.mjs';
 import { runVarsense } from './adapters/varsense.mjs';
 import { adapterEnvironmentAllowlist, adapterStageNames, assertImplementedStages, assertStageParity, readAdapterManifest, resolveWorkspacePath, validateAdapterManifest } from './adapter-manifest.mjs';
 import { DEFAULT_ENV_ALLOWLIST } from './runner.mjs';
-import { isFullExecution, PROFILE_STAGE_RULES } from './profile-contract.mjs';
+import { EXECUTABLE_PROFILES, isFullExecution, PROFILE_STAGE_RULES } from './profile-contract.mjs';
 
 const STAGE_FACTORIES = {
   sentinel: (context, scope) => ({ name: 'sentinel', run: () => runSentinel(context, scope) }),
@@ -26,7 +26,14 @@ function legacyStageNames(scope) {
 export function stageDefinitions(context, scope, taskId, adapter = undefined) {
   const effectiveAdapter = adapter ?? (context?.projectRoot ? loadAdapterManifestSync(context) : null);
   if (effectiveAdapter?.adapter?.environment) context.adapterEnvironmentAllowlist = adapterEnvironmentAllowlist(effectiveAdapter, DEFAULT_ENV_ALLOWLIST);
-  const stageNames = effectiveAdapter ? adapterStageNames(effectiveAdapter, [...scope.profiles], isFullExecution(scope)) : legacyStageNames(scope);
+  /* [138A-1] Misma corrección que stages.mjs: los perfiles de clasificación
+   * (desktop/mobile/workspace/auth/commerce) no seleccionan etapas; se filtran
+   * antes del transporte para que el adapter no falle fail-closed en modo
+   * incremental. El alcance completo (manifest/recordatorios) se conserva. */
+  const stageProfiles = effectiveAdapter
+    ? [...scope.profiles].filter(profile => EXECUTABLE_PROFILES.has(profile))
+    : [...scope.profiles];
+  const stageNames = effectiveAdapter ? adapterStageNames(effectiveAdapter, stageProfiles, isFullExecution(scope)) : legacyStageNames(scope);
   const definitions = stageNames.map(name => {
     const factory = STAGE_FACTORIES[name];
     if (!factory) throw new Error(`Etapa declarada por el adapter sin implementación: ${name}`);
