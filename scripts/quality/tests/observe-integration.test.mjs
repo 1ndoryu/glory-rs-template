@@ -19,13 +19,18 @@ function requireProcessResult(result, label, allowedCodes) {
 
 test('stages.mjs genera el contrato declarativo con las etapas del manifest', async () => {
   const { readAdapterManifest, adapterStageNames } = await import('../adapter-manifest.mjs');
+  const { EXECUTABLE_PROFILES } = await import('../profile-contract.mjs');
   const adapter = await readAdapterManifest(process.cwd());
   const { preflight } = await import('../preflight.mjs');
   const { detectScope } = await import('../scope.mjs');
   const { stageDefinitions } = await import('../stage-definitions.mjs');
   const context = await preflight({ taskId: '028A-6', cwd: process.cwd() });
   const scope = await detectScope(context, {});
-  const expected = adapterStageNames(adapter, [...scope.profiles], scope.executionFull ?? scope.full);
+  /* [138A-1] Mismo filtro que stages.mjs/stage-definitions.mjs: los perfiles de
+   * clasificación (desktop/mobile/workspace/auth/commerce) no seleccionan
+   * etapas y el adapter es fail-closed ante perfiles no declarados. */
+  const stageProfiles = [...scope.profiles].filter(profile => EXECUTABLE_PROFILES.has(profile));
+  const expected = adapterStageNames(adapter, stageProfiles, scope.executionFull ?? scope.full);
   const definitions = stageDefinitions(context, scope, '028A-6', adapter).map(item => item.name);
   const reportRoot = path.join(REPORT_FIXTURES, 'stages');
   try {
