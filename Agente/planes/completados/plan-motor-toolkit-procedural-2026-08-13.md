@@ -1,6 +1,6 @@
 # Plan 138A-1 — Motor propio + toolkit procedural del Bosque (2026-08-13)
 
-> **Estado:** ACTIVO · **Tarea:** 138A-1 · **Toma:** `task:take` por codex
+> **Estado:** COMPLETADO (2026-08-13) · **Tarea:** 138A-1 · **Toma:** `task:take` por codex
 > (T-1786625433993-4bd14a49) + `sentinel task claim` (state CLAIMED).
 > **Rama:** `wandorius` — trabajo en serie sobre el árbol actual, **sin worktree**:
 > el bloque depende de los cambios ajenos sin commitear del 128A-1 (mesher de
