@@ -1,7 +1,8 @@
-/* GAME-01 — Comparador visual del toolkit procedural (138A-1).
+/* GAME-01 — Comparador visual del toolkit procedural (138A-1/138A-2).
  * Monta el MISMO seed con dos estilos derivados de la misma base de altura:
  * 'bloques' reutiliza el mesher del experimento 128A-1 vía adaptador de
- * cuantización, y 'suave' usa el heightfield-mesh + vegetación del toolkit.
+ * cuantización, y 'suave' usa el heightfield-mesh + vegetación low-poly del
+ * toolkit (árboles con ramas y césped por matas, 138A-2).
  * Solo presentación y métricas estructurales para que el usuario decida el
  * estilo con evidencia; el agua es un plano toon simple porque aquí se
  * compara el terreno/props, no el shader de costa del 128A-1. */
@@ -9,7 +10,7 @@
 import * as THREE from 'three';
 import {
   buildHeightfieldMeshData,
-  buildVegetationMeshData,
+  buildLowPolyVegetationMeshData,
   generateIslandHeightfield,
   placeVegetation,
   type IslandHeightfield,
@@ -132,7 +133,7 @@ export function mountProceduralComparator(
     });
     const meshData = buildHeightfieldMeshData(currentHeightfield);
     const veg = placeVegetation(currentHeightfield, currentSeed);
-    const propData = buildVegetationMeshData(veg.placements);
+    const propData = buildLowPolyVegetationMeshData(veg.placements);
     const group = new THREE.Group();
     const terrain = new THREE.Mesh(toIndexedGeometry(meshData), material);
     const props = new THREE.Mesh(toIndexedGeometry(propData), material);

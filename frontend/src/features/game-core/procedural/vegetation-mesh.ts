@@ -4,6 +4,7 @@
  * del experimento 128A-1 pero sin depender de la capa app: game-core no puede
  * importar game-playable y el toolkit debe ser autónomo. */
 
+import { hash2 } from './noise';
 import type { VegetationPlacement } from './vegetation';
 
 export interface VegetationMeshData {
@@ -34,7 +35,7 @@ export const VEGETATION_MESH_DEFAULTS: VegetationMeshPalette = {
   rockDark: 0x7d7d78,
 };
 
-interface MeshBuffers {
+export interface MeshBuffers {
   readonly positions: number[];
   readonly normals: number[];
   readonly colors: number[];
@@ -50,7 +51,7 @@ export function buildVegetationMeshData(
 ): VegetationMeshData {
   const b: MeshBuffers = { positions: [], normals: [], colors: [], indices: [] };
   for (const placement of placements) {
-    const jitter = (hashHex(placement.x * 3, placement.z * 3, placement.seed) - 0.5) * 0.08;
+    const jitter = (hash2(placement.x * 3, placement.z * 3, placement.seed) - 0.5) * 0.08;
     if (placement.kind === 'grass') emitGrass(b, placement, palette.grass, jitter);
     else if (placement.kind === 'tree') emitTree(b, placement, palette, jitter);
     else emitRock(b, placement, palette, jitter);
@@ -65,15 +66,7 @@ export function buildVegetationMeshData(
   };
 }
 
-/* Hash local determinista en [0,1); el toolkit no exporta hash2 desde aquí. */
-function hashHex(x: number, y: number, seed: number): number {
-  let h = Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(seed | 0, 144665);
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  h = h ^ (h >>> 16);
-  return (h >>> 0) / 4294967296;
-}
-
-function rgb(hex: number, mul: number): readonly [number, number, number] {
+export function rgb(hex: number, mul: number): readonly [number, number, number] {
   return [
     (((hex >> 16) & 0xff) / 255) * mul,
     (((hex >> 8) & 0xff) / 255) * mul,
@@ -81,7 +74,7 @@ function rgb(hex: number, mul: number): readonly [number, number, number] {
   ];
 }
 
-function pushQuad(
+export function pushQuad(
   b: MeshBuffers,
   p: readonly (readonly number[])[],
   n: readonly number[],
@@ -97,7 +90,7 @@ function pushQuad(
 }
 
 /** Caja toon: cara superior, 4 laterales con AO y base (la base queda oculta). */
-function pushBox(
+export function pushBox(
   b: MeshBuffers,
   cx: number,
   cy: number,
