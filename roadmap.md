@@ -110,9 +110,16 @@ backend/realtime/colisión.
 shader de costa con olas y espuma se veía como una capa de triángulos encima
 del agua, tanto en el comparador como en el modo "Actual" (isla curva). Los
 tres modos (`Actual`/`Bloques`/`Suave`) quedaron con el MISMO agua toon plana
-estática (`PlaneGeometry` 1×1 + `MeshToonMaterial` con rampa): commits
-`3abb13c6` (comparador) y el posterior de isla/adaptador. El generador puro
-`buildWaterMeshData` sigue en `game-core` para futuras variantes de oleaje.
+estática (`MeshToonMaterial` con rampa compartida). Corrección final en
+`8684af12`: el plano se subdividió 32×32 y usa `polygonOffset` (−1,−1) +
+`renderOrder=1`, porque con 1×1 el bend de mundo (dist²×down) solo doblaba las
+4 esquinas y el interior interpolado quedaba decenas de unidades bajo el fondo
+marino del modo Suave (agua invisible solo ahí). El plano toon es UN único
+helper compartido (`game-toon-water.ts`) entre el comparador y la isla curva,
+para que la configuración no vuelva a divergir; commits `3abb13c6`
+(comparador), `0a5170f2` (isla/adaptador) y `8684af12` (subdivisión final). El
+generador puro `buildWaterMeshData` sigue en `game-core` para futuras variantes
+de oleaje.
 
 ### 028A-5 — Novedades: popover de campana + admin "novedades" con borrado
 

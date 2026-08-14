@@ -8,7 +8,7 @@
 
 import * as THREE from 'three';
 import { type WorldBend } from './game-world-bend';
-import { BLOCK_COLORS } from './game-block-palette';
+import { buildToonWaterPlane } from './game-toon-water';
 
 /* El plano de agua se extiende más allá del mapa (océano visible como límite). */
 export const WATER_MESH_SCALE = 2.4;
@@ -45,18 +45,8 @@ export function mountCurvedWater(
     throw new Error('escala de agua inválida');
   }
 
-  /* Misma geometría/material que el agua del comparador (plano toon con
-   * subdivisión para el bend: con 1×1 el interior se interpola entre esquinas
-   * a −48 y queda bajo el fondo marino; 32×32 sigue la parábola). */
-  const geometry = new THREE.PlaneGeometry(width * meshScale, depth * meshScale, 32, 32);
-  geometry.rotateX(-Math.PI / 2);
-  const material = bend.apply(new THREE.MeshToonMaterial({
-    color: BLOCK_COLORS.waterShallow,
-    gradientMap: toonRamp,
-  }));
-  (material as THREE.MeshToonMaterial).polygonOffset = true;
-  (material as THREE.MeshToonMaterial).polygonOffsetFactor = -1;
-  (material as THREE.MeshToonMaterial).polygonOffsetUnits = -1;
+  /* Misma geometría/material que el agua del comparador: helper compartido. */
+  const { geometry, material } = buildToonWaterPlane(bend, width * meshScale, depth * meshScale, toonRamp);
   const mesh = new THREE.Mesh(geometry, material);
   mesh.renderOrder = 1;
   mesh.position.set(centerX, waterY, centerZ);
