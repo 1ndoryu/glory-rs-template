@@ -1,6 +1,6 @@
 # Índice canónico de documentación de wandori.us
 
-> **Fecha de actualización:** 2026-08-10
+> **Fecha de actualización:** 2026-08-14
 > **Objetivo:** indicar qué documento decide cada aspecto y evitar duplicación.
 
 ## Fuentes de verdad
@@ -53,6 +53,7 @@
 | ¿Cómo se retiran los wrappers duplicados del repo tras dos releases? | `Agente/documentacion/herramientas/runbook-retirada-wrappers-sentinel-2026-08-05.md` |
 | ¿Qué versiones, hashes, ramas y retención usa el gate actual? | `sentinel.lock.json` + `quality-tools.json` + `quality.config.json` + `Agente/documentacion/herramientas/matriz-paridad-sentinel-varsense-2026-08-01.md` |
 | ¿Cómo se ejecuta backup, health y rollback sin SSH? | `Agente/documentacion/herramientas/runbook-coolify-backup-rollback-2026-08-01.md` |
+| ¿Cómo replicar el estilo anime/cel de Sakura Crossing en el constructor? | `Agente/documentacion/estilo-sakura-crossing/00-indice-pipeline.md` (8 guías + replicación 138A-13) |
 
 ## Regla de autoridad
 
@@ -76,6 +77,12 @@
 - Plan visual antiguo: referencia histórica del concepto aprobado.
 - Plan wandori.us original: superado; no es especificación activa.
 - Plan Sentinel/VarSense editor-agnóstico: trabajo histórico documentado en tareas completadas.
+- Estilo Sakura Crossing (138A-13): investigación documental del pipeline
+  visual del juego de referencia (cel shading con tinte violeta, luces anime
+  2+1, outlines ink+hull, color grading split-tone y cielo pintado) con
+  código real y guía de replicación sobre el constructor actual; no cambia la
+  decisión visual vigente "sin tinta" del Bosque hasta que el usuario la
+  revierta.
 - Matriz Sentinel/VarSense: actualizada con contrato de findings, comando combinado `all`, commits fijados, lockfile, branch-key y límites de runtime global.
 - Migración global 028A-6/108A-6: Sentinel 0.7.4/VarSense 2.2.1, lock/doctor y gates de consumidores verificados; CI Ubuntu #45/#46 y matriz focal verdes; capa A retirada. Permanece el baseline de producto `broadcast-mutex-riesgo-rs` de glory-rs-rest (warning visible) y la evolución de capa B en SNT-10.
 - Auditoría arquitectónica frontend v1: activa; plan de refactorización parcialmente ejecutado.

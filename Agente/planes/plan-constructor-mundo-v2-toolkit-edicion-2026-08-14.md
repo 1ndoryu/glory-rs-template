@@ -14,7 +14,11 @@
 > `Agente/documentacion/design-system/referencia-contour-terrain-editor-2026-08-14.md`
 > (artefacto Claude; su modelo de capas moldea 138A-9/138A-10) y
 > `Agente/documentacion/design-system/referencia-skydome-clouds-2026-08-14.md`
-> (artefacto Claude; su skydome/nubes por capas moldea 138A-12).
+> (artefacto Claude; su skydome/nubes por capas moldea 138A-12). Referencia de
+> estilo opcional (14-ago): `Agente/documentacion/estilo-sakura-crossing/`
+> (investigación 138A-13 sobre el pipeline anime/cel de Sakura Crossing, por
+> si el usuario decide probar ese look sobre el constructor; no cambia la
+> decisión "sin tinta" vigente).
 
 ## 1. Contexto y decisión del usuario (2026-08-14)
 

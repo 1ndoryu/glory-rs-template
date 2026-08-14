@@ -176,6 +176,43 @@ gate propio:
 suite completa, validación visual del usuario en `/forest-playable` y
 roadmap/completada actualizados; push con autorización.
 
+### 138A-13 — Guía del estilo Sakura Crossing (cerrado, 14-ago)
+
+**Fuente canónica:** `Agente/documentacion/estilo-sakura-crossing/` (carpeta
+nueva, 9 MD). Investigación autorizada por el usuario ("necesito entender a la
+perfección todo, con ejemplos código") sobre cómo el juego de referencia
+[Kenton-GMI/sakura-crossing](https://github.com/Kenton-GMI/sakura-crossing)
+logra su estilo anime/cel, para forzarlo sobre los assets existentes del
+constructor de mundos JS (`/forest-playable`). Repo clonado de solo lectura en
+`C:\tmp\sakura-crossing` (fuera del repo, no se commitea).
+
+- [x] Análisis del pipeline visual real del clon (cel shading con tinte
+      violeta, luces anime 2+1, outlines ink+hull, color grading split-tone,
+      cielo pintado) con rutas y líneas exactas.
+- [x] Guías con código real (GLSL/JS) por capa: materiales toon, paleta y
+      texturas procedurales, iluminación y sombras, outlines, postprocesado y
+      cielo.
+- [x] Guía de replicación sobre el constructor actual de WANDORIUS: gap
+      analysis (sin shadow map, sin postprocesado, sin tinte violeta), pasos
+      concretos con archivos, presupuestos y tests/teardown a respetar.
+- [x] Índice documental, completada y enlace desde el plan v2 actualizados.
+
+**Nota de tensión:** el roadmap 13-ago decidió "Genshin-like low poly verde
+stylized, **sin tinta como destino**" para el Bosque. Esta carpeta es
+referencia/investigación: documenta cómo lograr el estilo tipo Sakura Crossing
+por si el usuario decide probarlo, pero no cambia la decisión visual vigente
+hasta que el usuario la revierta. Cierre: `npm run gate:check -- 138A-13
+--profile docs` **PASS** (stack documental; sentinel PASS y docs PASS, 36
+archivos). El gate incremental completo falla en la etapa `frontend` por 4
+errores TS en código ajeno sin commitear de 138A-8..12 (constructor en
+curso), documentados en la completada y en `.quality-reports/check/138A-13/`;
+no se silencian ni se arreglan dentro de este bloque. `sentinel_inspector`:
+**OK** (gate usado correctamente, fallo ajeno documentado sin tapar).
+`supervisor_reviewer`: **APROBADO CON RESERVAS MENORES** (corregidas: cita
+de `EffectComposer`/`PCFSoftShadowMap` → `FullScreenQuad`/`PCFShadowMap`, y
+acotado "cero assets binarios visuales"). Commit explícito documental sin
+push.
+
 ### 028A-5 — Novedades: popover de campana + admin "novedades" con borrado
 
 **Depende de:** 297A-21 (notificaciones) y las recetas de popover/modal del OS.
