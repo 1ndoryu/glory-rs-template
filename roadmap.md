@@ -13,8 +13,9 @@
 - Identidad: `Agente/documentacion/design-system/manual-identidad-visual-os-2026-07-29.md`
 - Plan maestro: `Agente/planes/plan-escritorio-persistente-cuentas-admin-apps-2026-07-29.md`
 - Plan móvil: `Agente/planes/plan-experiencia-movil-launcher-2026-07-29.md`
-- Quality gate: `Agente/documentacion/herramientas/auditoria-sentinel-completa-2026-08-10.md` + `roadmap-sentinel.md`
-- Prevención: `Agente/prevencion/prevencion-wandorius-sentinel-varsense-2026-07-29.md`
+- Referencia visual del Bosque (Curved Island): `Agente/usuario/referencia-visual-curved-island-2026-08-12.md`
+- Terreno por bloques (Minecraft) del Bosque: `Agente/planes/completados/plan-terreno-bloques-bosque-minecraft-2026-08-12.md`
+- Toolkit de agua y lluvia del Bosque: `Agente/planes/completados/plan-toolkit-agua-lluvia-2026-08-13.md`
 - Tema claro/oscuro: `Agente/planes/plan-modo-oscuro-os-2026-07-31.md`
 - Juego bosque multijugador 3D: `Agente/planes/plan-juego-bosque-multijugador-2026-08-01.md`
 - Assets y terreno del bosque 3D: `Agente/planes/plan-assets-terreno-bosque-3d-2026-08-01.md`
@@ -24,13 +25,6 @@
 - Deep links: `Agente/planes/plan-deep-links-ventanas-2026-07-31.md`
 - Apps editoriales: `Agente/planes/plan-programas-editoriales-2026-07-31.md`
 - Interacción y medición: `Agente/planes/plan-contratos-interaccion-comandos-medicion-2026-07-29.md`
-- Guard de ejecuciones pesadas y targets Cargo: `Agente/planes/plan-heavy-run-guard-2026-08-02.md`
-- Sentinel global agnóstico por proyecto/rama (incluye guard/orquestación; VarSense como analizador): `Agente/planes/plan-global-quality-guard-agnostico-2026-08-02.md`
-- Optimización Sentinel/VarSense: `Agente/planes/plan-optimizacion-sentinel-varsense-2026-08-02.md`
-- Orquestación universal de tareas Sentinel: `Agente/planes/plan-sentinel-orquestacion-tareas-worktrees-2026-08-06.md`
-- Migración de scripts a Core/adapters: `Agente/planes/plan-migracion-scripts-adapters-sentinel-2026-08-06.md`
-- Preflight y recuperación Sentinel: `Agente/planes/plan-preflight-recuperacion-sentinel-2026-08-07.md`
-- Inventario de scripts/adapters: `Agente/documentacion/herramientas/inventario-scripts-adapters-sentinel-2026-08-06.md`
 
 ## Cómo leer este archivo
 
@@ -55,18 +49,62 @@
 - **Calidad y arquitectura:** quality gate incremental local/full CI con Sentinel + VarSense, cachés separadas, `test:changed`, suite frontend completa en CI, builds/budgets gzip, runbook Coolify y checkpoints SOLID/OCP/DIP/SRP documentados. El mínimo desbloqueante está cerrado: `quality:test` 31/31 y 24 reglas activas.
 - **Correcciones recientes relevantes:** se resolvieron la ruta legacy `/admin`, visibilidad editorial de proyectos (018A-83), contratos de URL/autosave, select nativo, `createEl` para `textarea`, Reader TipTap, sincronización del Finder, iconos por registro único, rejilla compacta y bordes/flechas del tema oscuro. La carpeta vacía "Galería" se sustituyó por "Documentos" con subcarpetas por tipo y sync de media al workspace (018A-87): los archivos subidos aparecen en el Finder, se abren con visor, se retiran al moverlos a la papelera y se restauran. El menú contextual ahora funciona dentro de las carpetas con acciones de creación (nuevo artículo/proyecto/producto, subir archivo, nueva carpeta, pegar) y el clic en ítems del Finder y del escritorio muestra selección visual con los tokens del OS (018A-88). El clic derecho dentro de las carpetas responde en todo el alto del panel del Finder, no solo sobre los ítems (018A-89). El menú sobre una carpeta dentro del Finder ofrece gestión completa — Abrir, Renombrar, Cortar, Copiar, Pegar en y Eliminar con borrado seguro (confirmación + subárbol restaurable) y `Ctrl+V` con destino (018A-90); el crear permanece en el fondo. La restauración de sesión conserva el chrome inferior de las apps (`MountedView.actions`) validado visualmente en desktop y tablet sin duplicar ventanas ni alterar geometría/taskbar/URL (018A-69). El fallback local del prototipo Bosque/Bosque 3D evita que un release local anterior al registro oculte los accesos durante desarrollo, sin sobrescribir la organización del release ni activar apps en producción (018A-92); el 05-ago se retiraron los bocetos Bosque (game) y Bosque 3D (game-3d) del registro, del release y del código (dirección visual decidida) y solo queda la app jugable `game-playable` (GAME-01). Una carpeta vacía del Finder ya no muestra texto (el grid queda en blanco y el clic derecho sigue abriendo el menú) y la barra de ruta tiene botón "volver a la carpeta anterior" con historial de navegación, deshabilitado en la raíz (018A-91). El grid del Finder alinea sus iconos al inicio, igual que el grid del escritorio, en vez de centrarlos (018A-93). La selección del Finder ya no se refleja en el escritorio (y viceversa): el `selectionStore` se escala por superficie (`desktop`/`finder`) y cada una solo refleja su propia selección, sin romper copiar/cortar (018A-95). Los planes GAME-01 y de assets/terreno ahora exigen auditoría de SOLID, rendimiento, escalabilidad, seguridad, observabilidad y accesibilidad al cierre de cada fase, con evidencia antes de avanzar (018A-94). GAME-01 añadió el fixture `game-playable` lazy/full-bleed: movimiento offline con `game-core`, cámara limitada, teclado/D-pad, pausa background y teardown WebGL; type-check, 40 tests, build, diff-check y navegador en `/forest-playable` pasan. Después se añadió el contrato puro `MapVersion` con terreno por chunks, manifiesto de assets, instancias, spawns, cuotas fail-closed, adaptación a colliders X/Z y 41 tests; build/diff-check y navegador siguen verdes. Endpoint, validación server-side, persistencia, realtime, identidad, editor y mediciones repetidas de GPU/memoria siguen pendientes. Gobernanza del escritorio (038A-2): la Papelera y los nodos de sistema (`trash`, `admin`, `settings`, `profile`, `about`) no pueden eliminarse (guard backend en `validate_release_tree` + guards frontend `tombstoneNode`/`tombstoneSubtree`/`workspace:trash`), y el contenido publicado (artículos/medios ready/public/active) SIEMPRE se materializa en la release efectiva server-side (`find_public_content` + `materialize_content_nodes`, sin mutar la release) bajo Notas/Documentos, para cualquier versión activa y cualquier cliente — solo desaparece con eliminación real en BD; `ArticleService::update` sincroniza el envelope al publicar/despublicar, y el borrado de artículos es soft delete transaccional con papelera y restore (028A-12). Validado por stack (`cargo build`/`--tests` EXIT 0, frontend sin errores TS); gate diferido por submódulo `tools/sentinel` sucio del hilo 028A-6. Los detalles y gotchas permanecen archivados.
 
-## Siguiente bloque habilitado
+## Sentinel/quality — CANCELADO (2026-08-12)
 
-> **Calidad/tooling movido (decisión del usuario, 2026-08-11):** el backlog de Calidad y tooling
-> (108A-1, 108A-6, Fases 0-9, 098A-1, 028A-18, SNT-12, SNT-13, SNT-16b, SNT-16c, SNT-16d, SNT-16f, 028A-3, 028A-6, 028A-8, 038A-2,
-> 038A-4, SNT-11, 028A-16) tiene su plan canónico en
-> [`Agente/planes/plan-calidad-tooling-2026-08-11.md`](Agente/planes/plan-calidad-tooling-2026-08-11.md).
-> El alias histórico bajo `Agente/calidad-tooling/` solo redirige a ese plan; no es fuente de backlog.
-> La capa A (shims/guards duplicados del repositorio) fue retirada tras verificar PATH, enforcement y rollback;
-> Sentinel 0.7.4 tiene CI #45/#46 verdes. La capa B (adapter/orquestador) permanece hasta SNT-10.
+> **Decisión del usuario:** no se continúa con el backlog de Sentinel/quality gate.
+> Los 11 planes (`plan-*-sentinel*`, `plan-heavy-run-guard`, `plan-triage-alertas-quality`,
+> `plan-mejora-quality-tool`, `plan-calidad-tooling`, `plan-ejecucion-auditoria-sentinel`,
+> `plan-agilizar-ceremonia-cierre-calidad`, `plan-global-quality-guard-agnostico`) fueron marcados
+> CANCELADOS y archivados en `Agente/planes/completados/`. `roadmap-sentinel.md` queda como historia cancelada.
+> El gate ya implementado (`npm run gate:check`, `quality:test`, etc.) no se toca: sigue funcionando,
+> simplemente deja de tener backlog pendiente.
+
+## Decisiones de producto (2026-08-12)
+
+- **Registro (297A-13):** registro público habilitado con verificación por email (Resend) + token de un solo uso.
+- **Conflictos preferencias/overlay (297A-13):** merge por campo + LWW por campo en colisión real, con aviso no bloqueante.
+- **MFA (297A-13/297A-17):** TOTP (códigos 6 dígitos, RFC 6238); passkey/WebAuthn queda como mejora posterior.
+- **Correo transaccional (297A-13):** Resend real solo en producción; en local se mockea (token en log/almacén de dev).
+- **Configuración (297A-29 Fase 4):** la app Configuración se convierte en el **panel de control**: fondo de pantalla, fuentes y escala (todo con default y restauración), config por usuario con la del admin como default, y ajustes de cuenta (nombre, foto de perfil, preferencias). Abierto a más ideas.
+- **GAME-02 / 018A-96:** no hace falta segundo motor ni consumidor de conformidad; se hace un `game-core` limpio y agnóstico, bien planificado (sin repo separado/SemVer). El plan `plan-glory-render-motor-juegos-2026-08-01.md` queda simplificado por esta decisión.
+- **GAME-01 visual:** réplica del aspecto "Curved Island" (estudio Three.js estilo New Horizons): mundo, personaje, agua, bending, lluvia y fog. Referencia exacta: `Agente/usuario/referencia-visual-curved-island-2026-08-12.md`. El usuario adaptará después los detalles.
+
+## Decisiones de producto (2026-08-13)
+
+- **Nuevo enfoque del Bosque (138A-1/138A-2):** construir primero
+  **herramientas/motor propio** para iterar rápido en lugar de pulir el terreno
+  por bloques como destino. El usuario decidirá low poly suave vs bloques
+  **probando** con el toolkit, no por hipótesis. 128A-1 queda como
+  **experimento reutilizable** dentro del toolkit; 138A-2 amplió el toolkit con
+  árboles low-poly y césped por matas en el comparador.
+- **Estilo visual:** Genshin-like, low poly verde stylized, cámara orbital
+  libre; sin tinta como destino.
+- **Sin distinción por color entre jugadores** y **sin indicadores** de estado
+  (selección/colisión): nada extra en pantalla.
+- **Mundo único compartido** con **cap 32 jugadores** (reafirma decisión "A").
 
 ## Pendientes ordenados
 
+### 128A-1 — Terreno por bloques (Minecraft) del Bosque (cerrado como experimento, 13-ago)
+
+**Fuente canónica:** `Agente/planes/completados/plan-terreno-bloques-bosque-minecraft-2026-08-12.md`.
+Cerrado como experimento reutilizable dentro del toolkit 138A-1: su mesher/panel
+se reutilizan como modo `bloques` del comparador; el estilo final lo decide el
+usuario probando. Validado en navegador real (`/forest-playable`) tras corregir
+la normalización de índices de la vegetación low-poly (TypedArray).
+
+### 138A-3 — Toolkit de agua y lluvia + split de la isla curva (cerrado, 13-ago)
+
+**Fuente canónica:** `Agente/planes/completados/plan-toolkit-agua-lluvia-2026-08-13.md`.
+Amplió el toolkit procedural (138A-1/138A-2) con generadores puros de agua
+(mesh indexado con phase de onda determinista) y lluvia (streaks deterministas
+con presupuesto), saldó la deuda declarada por el revisor del cierre 128A-1
+(dividir `game-curved-island.ts` de 399 líneas en `game-curved-water.ts` +
+`game-curved-rain.ts`) y conectó el MISMO agua real (costa/espuma/niebla) a
+ambos modos del comparador para probar el estilo 1:1 con la referencia Curved
+Island. Gate `npm run gate:check -- 138A-3` PASS; type-check limpio y vitest
+109 archivos / 780 tests como evidencia complementaria. Sin cambios de
+backend/realtime/colisión.
 
 ### 028A-5 — Novedades: popover de campana + admin "novedades" con borrado
 
@@ -256,19 +294,19 @@ temporal (297A-20) que quedó en producción.
   ajeno); cualquier `task:check`, `run-with-db` o `glory-dev` muestra un banner `EN CURSO` por cada
   toma ajena activa, no solo la tarea objetivo. `AGENTS.md` §6 y `roadmap-sentinel.md`
   actualizados; 3 tests nuevos (8/8) y suite quality 210/210. Cierre documental 06-ago.
-- [ ] **Verificación final: el usuario probó el 05-ago y SIGUE MAL; causa raíz encontrada y
+- [x] **Verificación final: el usuario probó el 05-ago y SIGUE MAL; causa raíz encontrada y
   corregida el 06-ago (F6).** El desfase real era el eje VERTICAL: `align-content: space-between`
   reparte el sobrante entre las filas que el CONTENIDO materializa (2 filas → fila 2 en top 772px)
   mientras la geometría JS asumía las 9 filas que caben por altura (fila 2 en 96.5px) — desfase
   ~675px que hacía aterrizar el icono lejos del highlight (y al caer sobre ocupantes, desplazar
   varios). Fix: `align-content: start` (filas deterministas desde arriba, mismo criterio que el
   Finder 018A-93), verificado en navegador real a 1440px con reflow forzado (26 items → filas 0/96,
-  no 0/772). Falta validación visual final del usuario en su sesión real.
+  no 0/772). Validación visual final confirmada por el usuario (12-ago): resuelto.
 
 **Gate/salida:** un único helper de geometría alimenta todo; el placeholder coincide con la celda
 real (verificado por el usuario — acta de 05-ago: falla); el drag de grupo no altera iconos no
 implicados (ni se superpone ni sale del grid); sin rejillas rojas en producción; tests
-DOM fijan la geometría frente a `space-between`+RTL. **Estado 05-ago: abierto (user probó y falla).**
+DOM fijan la geometría frente a `space-between`+RTL. **Estado 12-ago: cerrado (user confirmó resuelto).**
 
 ### 297A-21 — Notificaciones de novedades
 
