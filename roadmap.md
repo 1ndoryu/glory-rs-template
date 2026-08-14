@@ -17,6 +17,7 @@
 - Terreno por bloques (Minecraft) del Bosque: `Agente/planes/completados/plan-terreno-bloques-bosque-minecraft-2026-08-12.md`
 - Toolkit de agua y lluvia del Bosque: `Agente/planes/completados/plan-toolkit-agua-lluvia-2026-08-13.md`
 - Constructor de mundo del Bosque: `Agente/planes/completados/plan-constructor-mundo-2026-08-14.md`
+- Constructor de mundo v2 (plan activo): `Agente/planes/plan-constructor-mundo-v2-toolkit-edicion-2026-08-14.md`
 - Tema claro/oscuro: `Agente/planes/plan-modo-oscuro-os-2026-07-31.md`
 - Juego bosque multijugador 3D: `Agente/planes/plan-juego-bosque-multijugador-2026-08-01.md`
 - Assets y terreno del bosque 3D: `Agente/planes/plan-assets-terreno-bosque-3d-2026-08-01.md`
@@ -134,6 +135,27 @@ de `/forest-playable` que regenera el comparador (bloques/suave) sobre la
 misma base. Gate `npm run gate:check -- 138A-4` PASS; type-check limpio y
 vitest 30 archivos / 230 tests. Fase 4 (retoque fino con editor 2D) queda
 como siguiente bloque. Sin backend/realtime/colisión.
+
+### 138A-5..9 — Constructor de mundo v2: toolkit de edición (planificado, 14-ago)
+
+**Fuente canónica:** `Agente/planes/plan-constructor-mundo-v2-toolkit-edicion-2026-08-14.md`
+(activo, pendiente de aprobación). Planifica la lista completa del usuario
+(tiempo real, panel lateral con iconos tipo Blender, 2 estilos, sin árboles en
+suave, tamaño de bloques, persistencia, editor de objetos, 3 cámaras, paneles
+de color/textura/assets y dos auditorías) en 5 bloques con gate propio:
+
+- [ ] **138A-5 — UI por iconos + tiempo real + persistencia local** (`localStorage`).
+- [ ] **138A-6 — Dos estilos (`bloques`/`suave`, se retira `actual`), sin árboles
+      en suave, `cellSize` real en el preview y escala base menor (~0.5×).**
+- [ ] **138A-7 — Tres modos de cámara:** libre (orbital), primera persona y 3ª persona.
+- [ ] **138A-8 — Editor de objetos (bloques/variantes, quitar árboles, añadir
+      rocas) + paneles de Color, Textura y Assets.** Absorbe la Fase 4
+      (retoque fino con editor 2D) diferida de 138A-4.
+- [ ] **138A-9 — Auditorías SOLID/arquitectura y rendimiento con evidencia.**
+
+**Gate/salida:** cada bloque con `npm run gate:check -- <ID>` PASS, type-check y
+suite completa, validación visual del usuario en `/forest-playable` y
+roadmap/completada actualizados; push con autorización.
 
 ### 028A-5 — Novedades: popover de campana + admin "novedades" con borrado
 
