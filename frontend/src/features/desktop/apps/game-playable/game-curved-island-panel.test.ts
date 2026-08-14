@@ -127,6 +127,34 @@ describe('panel de la isla curva como orquestador del Constructor', () => {
     panel.destroy();
   });
 
+  it('la sección Cámara cambia el modo y sincroniza el segmento activo (138A-7)', () => {
+    const setCameraMode = vi.fn<(mode: 'libre' | 'primera' | 'tercera') => void>();
+    const panel = mountCurvedIslandPanel(host, { ...controls(), setCameraMode });
+
+    const labels = Array.from(host.querySelectorAll<HTMLButtonElement>('.juegoConstructor__icono'))
+      .map(button => button.getAttribute('aria-label'));
+    expect(labels).toContain('Cámara');
+
+    railButton('Cámara').click();
+    const subpanel = host.querySelector<HTMLElement>('.juegoConstructor__subpanel');
+    expect(subpanel?.textContent).toContain('Modo de cámara');
+    for (const label of ['Libre', 'Primera', '3ª persona']) {
+      expect(Array.from(subpanel?.querySelectorAll('button') ?? [])
+        .some(button => button.textContent === label)).toBe(true);
+    }
+    expect(subpanel?.textContent).toContain('tecla C');
+
+    clickText('Primera');
+    expect(setCameraMode).toHaveBeenCalledWith('primera');
+
+    panel.setCameraMode('tercera');
+    const tercera = Array.from(subpanel?.querySelectorAll('button') ?? [])
+      .find(button => button.textContent === '3ª persona');
+    expect(tercera?.classList.contains('juegoPanelTerreno__segmento--activo')).toBe(true);
+
+    panel.destroy();
+  });
+
   it('el rail mantiene un solo subpanel abierto y setPick escribe las stats', () => {
     const panel = mountCurvedIslandPanel(host, controls());
     const openLabels = (): string[] => Array.from(host.querySelectorAll<HTMLElement>('.juegoConstructor__subpanel'))

@@ -1,10 +1,12 @@
 /* GAME-01 — Grupos de controles de la isla curva, compartidos por el panel
  * clásico (sin constructor) y por las secciones del rail del Constructor
- * ("Isla" y "Estilos"). Solo DOM + contrato puro: las mutaciones se delegan
- * en los callbacks que recibe la escena. */
+ * ("Isla", "Estilos" y "Cámara"). Solo DOM + contrato puro: las mutaciones
+ * se delegan en los callbacks que recibe la escena. */
 
 import { createEl } from '../../../../utils/dom';
 import type { RenderStyle } from '../../../game-core';
+import { createSegmentControl } from './game-constructor-controls';
+import { CAMERA_MODES, type CameraMode } from './game-camera-modes';
 import type { WorldConstructorControls } from './game-world-constructor';
 
 export interface CurvedIslandPanelControls {
@@ -15,6 +17,8 @@ export interface CurvedIslandPanelControls {
   readonly regenerate: () => void;
   /** [138A-1] Comparador de estilos del toolkit (opcional: solo si existe). */
   readonly setTerrainMode?: (mode: RenderStyle) => void;
+  /** [138A-7] Cambio de modo de cámara (opcional: solo con constructor). */
+  readonly setCameraMode?: (mode: CameraMode) => void;
   /** [138A-4] Constructor de mundo (opcional: solo si existe). */
   readonly worldConstructor?: WorldConstructorControls;
 }
@@ -134,6 +138,31 @@ export function buildEstilosGroup(
   grupoComparador.appendChild(metricsEl);
   container.appendChild(grupoComparador);
   return { metricsEl, setActive };
+}
+
+/** Grupo "Cámara": selector de modo libre/primera/3ª persona del toolkit.
+ *  Devuelve el marcador de segmento activo para sincronizar desde fuera
+ *  (restauración, atajo de teclado). */
+export function buildCamaraGroup(
+  container: HTMLElement,
+  controls: CurvedIslandPanelControls,
+  initialMode: CameraMode,
+): { readonly setActive: (mode: CameraMode) => void } {
+  const grupo = createEl('div', { className: 'juegoPanelTerreno__grupo' });
+  grupo.appendChild(createEl('p', {
+    className: 'juegoPanelTerreno__tituloGrupo',
+    textContent: 'Modo de cámara',
+  }));
+  const segment = createSegmentControl(CAMERA_MODES, initialMode, (mode) => {
+    controls.setCameraMode?.(mode);
+  });
+  grupo.appendChild(segment.container);
+  grupo.appendChild(createEl('p', {
+    className: 'juegoPanelTerreno__statsLine',
+    textContent: 'Atajo: tecla C',
+  }));
+  container.appendChild(grupo);
+  return { setActive: segment.setActive };
 }
 
 /* createEl no asigna min/max/step: se fijan como propiedades para que el

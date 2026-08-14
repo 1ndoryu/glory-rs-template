@@ -5,15 +5,17 @@
  * Constructor de mundo, el panel exterior es el rail de iconos y los grupos de
  * la isla son secciones suyas; sin constructor conserva el panel clásico. */
 
-import { Layers, Waves } from 'lucide';
+import { Camera, Layers, Waves } from 'lucide';
 import { createEl } from '../../../../utils/dom';
 import type { RenderStyle, TerrainOptions } from '../../../game-core';
+import { DEFAULT_CAMERA_MODE, type CameraMode } from './game-camera-modes';
 import {
   mountWorldConstructor,
   type WorldConstructorSection,
   type WorldConstructorSubpanel,
 } from './game-world-constructor';
 import {
+  buildCamaraGroup,
   buildEstilosGroup,
   buildIslaGroup,
   type CurvedIslandPanelControls,
@@ -29,6 +31,8 @@ export interface CurvedIslandPanel {
   readonly setConstructorOptions: (options: TerrainOptions) => void;
   /** [138A-4] Marca el segmento de estilo activo sin disparar el control. */
   readonly setTerrainMode: (mode: RenderStyle) => void;
+  /** [138A-7] Marca el segmento de cámara activo sin disparar el control. */
+  readonly setCameraMode: (mode: CameraMode) => void;
   readonly destroy: () => void;
 }
 
@@ -39,7 +43,9 @@ export function mountCurvedIslandPanel(
   const stats = createEl('p', { className: 'juegoPanelTerreno__stats', textContent: '' });
   let metricsEl: HTMLParagraphElement | null = null;
   let currentMode: RenderStyle = 'bloques';
+  let currentCameraMode: CameraMode = DEFAULT_CAMERA_MODE;
   let estilosSetActive: ((mode: RenderStyle) => void) | null = null;
+  let camaraSetActive: ((mode: CameraMode) => void) | null = null;
   let constructorSection: WorldConstructorSection | null = null;
   let legacyPanel: HTMLElement | null = null;
 
@@ -47,6 +53,11 @@ export function mountCurvedIslandPanel(
     const grupo = buildEstilosGroup(container, controls, currentMode);
     metricsEl = grupo.metricsEl;
     estilosSetActive = grupo.setActive;
+  };
+
+  const mountCamara = (container: HTMLElement): void => {
+    const grupo = buildCamaraGroup(container, controls, currentCameraMode);
+    camaraSetActive = grupo.setActive;
   };
 
   if (controls.worldConstructor) {
@@ -57,6 +68,9 @@ export function mountCurvedIslandPanel(
     ];
     if (controls.setTerrainMode) {
       extraPanels.push({ key: 'estilos', label: 'Estilos', icon: Layers, build: mountEstilos });
+    }
+    if (controls.setCameraMode) {
+      extraPanels.push({ key: 'camara', label: 'Cámara', icon: Camera, build: mountCamara });
     }
     constructorSection = mountWorldConstructor(host, controls.worldConstructor, {
       title: 'Constructor',
@@ -106,13 +120,19 @@ export function mountCurvedIslandPanel(
       currentMode = mode;
       estilosSetActive?.(mode);
     },
+    setCameraMode: (mode) => {
+      currentCameraMode = mode;
+      camaraSetActive?.(mode);
+    },
     destroy: () => {
       legacyPanel?.remove();
       stats.remove();
       constructorSection?.destroy();
       metricsEl = null;
       estilosSetActive = null;
+      camaraSetActive = null;
       currentMode = 'bloques';
+      currentCameraMode = DEFAULT_CAMERA_MODE;
     },
   };
 }

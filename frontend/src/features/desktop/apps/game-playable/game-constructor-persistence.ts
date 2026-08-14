@@ -1,7 +1,7 @@
 /* 138A-5 — Persistencia local del Constructor de mundo.
- * Guarda las últimas opciones y el modo de render en localStorage (clave
- * versionada) para que la recarga no pierda valores. Sin backend: la fuente
- * portable sigue siendo el export/import JSON del panel. */
+ * Guarda las últimas opciones, el modo de render y el modo de cámara en
+ * localStorage (clave versionada) para que la recarga no pierda valores.
+ * Sin backend: la fuente portable sigue siendo el export/import JSON. */
 
 import {
   normalizeTerrainOptions,
@@ -9,6 +9,11 @@ import {
   type RenderStyle,
   type TerrainOptions,
 } from '../../../game-core';
+import {
+  DEFAULT_CAMERA_MODE,
+  isCameraMode,
+  type CameraMode,
+} from './game-camera-modes';
 
 export const CONSTRUCTOR_STORAGE_KEY = 'wandorius:constructor:v1';
 
@@ -18,6 +23,8 @@ export interface ConstructorPersistedState {
   /** Modo de render que el comparador muestra al recargar (unión única
    *  `RenderStyle` compartida con el panel; 138A-6). */
   readonly mode: RenderStyle;
+  /** [138A-7] Modo de cámara restaurado al recargar (fail-closed a `libre`). */
+  readonly camera: CameraMode;
 }
 
 const VALID_MODES: readonly RenderStyle[] = ['bloques', 'suave'];
@@ -35,7 +42,8 @@ export function saveConstructorState(state: ConstructorPersistedState): boolean 
 
 /** Restaura el estado guardado; null si no existe o es inválido (fail-closed).
  *  Un modo ausente/inválido (incluido el histórico `actual`) cae al default
- *  `bloques` conservando las opciones. */
+ *  `bloques` conservando las opciones; la cámara ausente/inválida cae a
+ *  `libre` (compatibilidad con estados guardados antes de 138A-7). */
 export function loadConstructorState(): ConstructorPersistedState | null {
   try {
     const raw = window.localStorage.getItem(CONSTRUCTOR_STORAGE_KEY);
@@ -53,7 +61,8 @@ export function loadConstructorState(): ConstructorPersistedState | null {
     const mode = typeof record.mode === 'string' && VALID_MODES.includes(record.mode as RenderStyle)
       ? (record.mode as RenderStyle)
       : 'bloques';
-    return { version: 1, options, mode };
+    const camera = isCameraMode(record.camera) ? record.camera : DEFAULT_CAMERA_MODE;
+    return { version: 1, options, mode, camera };
   } catch {
     /* JSON corrupto o storage no disponible: no se puede restaurar. */
     return null;

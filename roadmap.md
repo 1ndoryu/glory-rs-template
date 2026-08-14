@@ -136,13 +136,15 @@ misma base. Gate `npm run gate:check -- 138A-4` PASS; type-check limpio y
 vitest 30 archivos / 230 tests. Fase 4 (retoque fino con editor 2D) queda
 como siguiente bloque. Sin backend/realtime/colisión.
 
-### 138A-5..9 — Constructor de mundo v2: toolkit de edición (en curso, 14-ago)
+### 138A-5..12 — Constructor de mundo v2: toolkit de edición (en curso, 14-ago)
 
 **Fuente canónica:** `Agente/planes/plan-constructor-mundo-v2-toolkit-edicion-2026-08-14.md`
 (activo, pendiente de aprobación). Planifica la lista completa del usuario
 (tiempo real, panel lateral con iconos tipo Blender, 2 estilos, sin árboles en
-suave, tamaño de bloques, persistencia, editor de objetos, 3 cámaras, paneles
-de color/textura/assets y dos auditorías) en 5 bloques con gate propio:
+suave, tamaño de bloques, persistencia, ventana lateral colapsable, transform
+de objetos, 3 cámaras, editor de mapa por estilo, generador de pasto, paneles
+de color/textura/assets, cielo procedural y dos auditorías) en 8 bloques con
+gate propio:
 
 - [x] **138A-5 — UI por iconos + tiempo real + persistencia local** (`localStorage`).
       Rail lateral tipo Blender (iconos Lucide con aria), subpanel único a la
@@ -150,11 +152,25 @@ de color/textura/assets y dos auditorías) en 5 bloques con gate propio:
       restauración de opciones/modo desde `wandorius:constructor:v1`.
 - [x] **138A-6 — Dos estilos (`bloques`/`suave`, se retira `actual`), sin árboles
       en suave, `cellSize` real en el preview y escala base menor (~0.5×).**
-- [ ] **138A-7 — Tres modos de cámara:** libre (orbital), primera persona y 3ª persona.
-- [ ] **138A-8 — Editor de objetos (bloques/variantes, quitar árboles, añadir
-      rocas) + paneles de Color, Textura y Assets.** Absorbe la Fase 4
-      (retoque fino con editor 2D) diferida de 138A-4.
-- [ ] **138A-9 — Auditorías SOLID/arquitectura y rendimiento con evidencia.**
+- [x] **138A-7 — Tres modos de cámara:** libre (orbital), primera persona
+      (WASD + mouse look desde el jugador) y 3ª persona (sigue al personaje
+      con colisión contra el terreno); selector en el panel y tecla `C`,
+      persistido al recargar.
+- [ ] **138A-8 — Panel-ventana lateral** (alto total, sin título, colapsable a
+      los lados, ancho redimensionable, cabecera vertical al ocultar) **+
+      transform de objetos** (mover/colocar; sin editar modelos, eso es
+      Blender) **+ paneles de Color, Textura y Assets** (con arrastrar/quitar).
+- [ ] **138A-9 — Editor de mapa por estilo:** suave (pinceles de pintar
+      caminos, arena, agua y subir/bajar terreno) y bloques (colocar/quitar
+      bloques y variantes).
+- [ ] **138A-10 — Generador de pasto optimizado** (densidad/tamaño/color) con
+      pincel de poner/quitar pasto.
+- [ ] **138A-11 — Auditorías SOLID/arquitectura y rendimiento con evidencia.**
+- [ ] **138A-12 — Cielo procedural (skydome) y ambiente:** shader a pantalla
+      completa con nubes pintadas por capas (cerca/lejos, cobertura, deriva),
+      self-shadow y sol con glow, luces reales sincronizadas al vector solar
+      y panel compacto de ajustes en vivo con presets (referencia de diseño
+      incorporada).
 
 **Gate/salida:** cada bloque con `npm run gate:check -- <ID>` PASS, type-check y
 suite completa, validación visual del usuario en `/forest-playable` y

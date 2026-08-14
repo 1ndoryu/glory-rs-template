@@ -33,6 +33,11 @@ import {
   saveConstructorState,
 } from './game-constructor-persistence';
 import {
+  attachCameraModeShortcut,
+  DEFAULT_CAMERA_MODE,
+  type CameraMode,
+} from './game-camera-modes';
+import {
   mountProceduralComparator,
   type TerrainPick,
 } from './game-procedural-comparator';
@@ -90,6 +95,12 @@ const CAMERA_MIN_DISTANCE = 7;
 const CAMERA_MAX_DISTANCE = 30;
 const CAMERA_MIN_POLAR = 0.35;
 const CAMERA_MAX_POLAR = 1.15;
+/* [138A-7] Primera persona: altura de ojos, límites de inclinación y
+ * despeje mínimo del suelo para la 3ª persona. */
+const CAMERA_EYE_HEIGHT = 1.6;
+const CAMERA_PITCH_MIN = -1.2;
+const CAMERA_PITCH_MAX = 1.2;
+const CAMERA_GROUND_CLEARANCE = 1.1;
 /* [GAME-01-VIS] Firmeza del follow de cámara (1/s): la cámara se mantiene
  * pegada al personaje como en un mundo abierto, con suavizado exponencial
  * independiente del framerate (a 60 fps ≈ 18% por frame). */
@@ -210,8 +221,8 @@ export function mountGamePlayableScene(
     proceduralComparator.setMode(comparatorMode);
     panel.setTerrainMode(terrainMode);
     applyPick(null);
-    /* [138A-5] El modo de render se persiste junto a las opciones. */
-    saveConstructorState({ version: 1, options: constructorOptions, mode: terrainMode });
+    /* [138A-5][138A-7] El estilo y la cámara se persisten con las opciones. */
+    persistConstructorState(terrainMode);
   };
 
   /* [138A-4] Genera el documento con el pipeline puro y muestra el resultado
@@ -233,6 +244,26 @@ export function mountGamePlayableScene(
     showConstructorWorld(options);
   });
 
+  /* [138A-7] Persiste opciones + estilo + cámara en una sola llamada. */
+  const persistConstructorState = (mode: RenderStyle): void => {
+    saveConstructorState({ version: 1, options: constructorOptions, mode, camera: cameraMode });
+  };
+
+  /* [138A-7] Cambio de modo de cámara (panel, atajo C y restauración). Al
+   * entrar en primera persona la mirada parte del azimuth orbital para evitar
+   * saltos; el panel se sincroniza vía `syncCameraSegment` (asignado tras
+   * montarlo, patrón 138A-5) y el modo se persiste con el constructor. */
+  let syncCameraSegment: ((mode: CameraMode) => void) | null = null;
+  const setCameraMode = (mode: CameraMode): void => {
+    cameraMode = mode;
+    if (mode === 'primera') {
+      look.yaw = orbit.azimuth;
+      look.pitch = 0;
+    }
+    syncCameraSegment?.(mode);
+    persistConstructorState(comparatorMode);
+  };
+
   const panel = mountCurvedIslandPanel(host, {
     setCurvature: (down, pull) => bend.setCurvature(down, pull),
     setRain: (amount) => curvedIsland.setRain(amount),
@@ -247,6 +278,7 @@ export function mountGamePlayableScene(
       proceduralComparator.regenerate(newSeed);
     },
     setTerrainMode: applyTerrainMode,
+    setCameraMode,
     worldConstructor: {
       onGenerate: (options) => {
         /* [138A-5] Generar de forma explícita cancela el debounce pendiente
@@ -271,6 +303,7 @@ export function mountGamePlayableScene(
       },
     },
   });
+  syncCameraSegment = (mode) => panel.setCameraMode(mode);
 
   const chunkCache = new MapChunkCache(mapVersion);
   const visualCache = createGamePlayableVisualCache({
@@ -328,6 +361,11 @@ export function mountGamePlayableScene(
   /* [GAME-01-VIS] Estado orbital: distancia y ángulos que el jugador controla
    * con arrastre (azimuth/polar) y rueda o pellizco (distancia). */
   let orbit = { distance: CAMERA_DISTANCE, azimuth: Math.PI / 4, polar: 0.85 };
+  /* [138A-7] Modo de cámara activo y mirada de primera persona (yaw/pitch).
+   * `look.yaw` comparte la convención de `rotateInputToWorld`: la cámara
+   * mira hacia (-sin(yaw), -cos(yaw)) en X/Z para que W aleje de la cámara. */
+  let cameraMode: CameraMode = DEFAULT_CAMERA_MODE;
+  let look = { yaw: Math.PI / 4, pitch: 0 };
   let dragging = false;
   let lastPointer: { x: number; y: number } | null = null;
   let destroyed = false;
@@ -351,6 +389,22 @@ export function mountGamePlayableScene(
       const desired = clampTarget(new THREE.Vector3(currentPlayer.x, currentPlayerY + 0.8, currentPlayer.z));
       cameraTarget.lerp(desired, 1 - Math.exp(-CAMERA_FOLLOW_RATE * dt));
     }
+    /* [138A-7] Primera persona: la cámara está en los ojos del personaje y
+     * el arrastre mueve la mirada (look.yaw/pitch). Sin zoom: niebla fija en
+     * la distancia orbital por defecto. */
+    if (cameraMode === 'primera') {
+      const eye = new THREE.Vector3(currentPlayer.x, currentPlayerY + CAMERA_EYE_HEIGHT, currentPlayer.z);
+      const dir = new THREE.Vector3(
+        -Math.sin(look.yaw) * Math.cos(look.pitch),
+        Math.sin(look.pitch),
+        -Math.cos(look.yaw) * Math.cos(look.pitch),
+      );
+      camera.position.copy(eye);
+      camera.lookAt(eye.add(dir));
+      fog.near = CAMERA_DISTANCE + FOG_NEAR_MARGIN;
+      fog.far = CAMERA_DISTANCE + FOG_FAR_OFFSET;
+      return;
+    }
     const sinPolar = Math.sin(orbit.polar);
     const offset = new THREE.Vector3(
       orbit.distance * sinPolar * Math.sin(orbit.azimuth),
@@ -358,6 +412,14 @@ export function mountGamePlayableScene(
       orbit.distance * sinPolar * Math.cos(orbit.azimuth),
     );
     camera.position.copy(cameraTarget).add(offset);
+    /* [138A-7] 3ª persona: la órbita sigue al personaje y no se hunde en el
+     * terreno (colisión básica con la altura del suelo). */
+    if (cameraMode === 'tercera') {
+      camera.position.y = Math.max(
+        camera.position.y,
+        groundHeightAt(camera.position.x, camera.position.z) + CAMERA_GROUND_CLEARANCE,
+      );
+    }
     camera.lookAt(cameraTarget);
     /* Niebla adaptativa: cerca y lejos escalan con el zoom para que la escena
      * nunca se lave a distancia máxima ni se pierda el horizonte a mínimo. */
@@ -409,9 +471,13 @@ export function mountGamePlayableScene(
    * el modo) y antes de conectar el input de órbita. */
   const restored = loadConstructorState();
   if (restored) {
+    cameraMode = restored.camera;
     showConstructorWorld(restored.options);
     if (restored.mode !== 'bloques') applyTerrainMode(restored.mode);
   }
+  /* [138A-7] Sincroniza el segmento de cámara del panel y la mirada de
+   * primera persona con el modo restaurado (o el default `libre`). */
+  setCameraMode(cameraMode);
 
   const groundHeightAt = (x: number, z: number): number =>
     comparatorVisible
@@ -429,6 +495,13 @@ export function mountGamePlayableScene(
       const dx = event.clientX - lastPointer.x;
       const dy = event.clientY - lastPointer.y;
       lastPointer = { x: event.clientX, y: event.clientY };
+      /* [138A-7] En primera persona el arrastre gira la mirada; en libre y
+       * 3ª persona orbita la cámara alrededor del personaje. */
+      if (cameraMode === 'primera') {
+        look.yaw -= dx * 0.008;
+        look.pitch = THREE.MathUtils.clamp(look.pitch + dy * 0.008, CAMERA_PITCH_MIN, CAMERA_PITCH_MAX);
+        return;
+      }
       orbit.azimuth -= dx * 0.008;
       orbit.polar = THREE.MathUtils.clamp(orbit.polar + dy * 0.008, CAMERA_MIN_POLAR, CAMERA_MAX_POLAR);
       return;
@@ -444,12 +517,18 @@ export function mountGamePlayableScene(
   };
   const onWheel = (event: WheelEvent): void => {
     event.preventDefault();
+    /* [138A-7] En primera persona no hay zoom orbital; la rueda no cambia
+     * distancia (solo se consume para no hacer scroll de la página). */
+    if (cameraMode === 'primera') return;
     orbit.distance = THREE.MathUtils.clamp(
       orbit.distance * (event.deltaY > 0 ? 1.08 : 0.92),
       CAMERA_MIN_DISTANCE,
       CAMERA_MAX_DISTANCE,
     );
   };
+  /* [138A-7] Atajo C para alternar libre → primera → 3ª persona; se
+   * desmonta en destroy junto con el resto de listeners. */
+  const stopCameraShortcut = attachCameraModeShortcut(() => cameraMode, setCameraMode);
   host.addEventListener('pointerdown', onOrbitStart);
   host.addEventListener('pointermove', onOrbitMove);
   host.addEventListener('pointerup', onOrbitEnd);
@@ -601,7 +680,7 @@ export function mountGamePlayableScene(
     update,
     resize,
     render,
-    getCameraAzimuth: () => orbit.azimuth,
+    getCameraAzimuth: () => cameraMode === 'primera' ? look.yaw : orbit.azimuth,
     setCameraFollow: (follow: boolean): void => { followPlayer = follow; },
     streamingStats: () => currentStreamingStats,
     rendererMetrics: () => currentRendererMetrics,
@@ -621,6 +700,7 @@ export function mountGamePlayableScene(
       host.removeEventListener('pointercancel', onOrbitEnd);
       host.removeEventListener('pointerleave', onPointerLeave);
       host.removeEventListener('wheel', onWheel);
+      stopCameraShortcut();
       regenerateDebounced.dispose();
       panel.destroy();
       gpuFrameProbe.dispose();

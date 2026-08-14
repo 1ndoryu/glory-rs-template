@@ -1,8 +1,8 @@
-# Plan 138A-5..9 — Constructor de mundo v2: toolkit de edición (2026-08-14)
+# Plan 138A-5..12 — Constructor de mundo v2: toolkit de edición (2026-08-14)
 
-> **Estado:** ACTIVO — 138A-6 completado; siguiente bloque 138A-7.
+> **Estado:** ACTIVO — 138A-7 completado; siguiente bloque 138A-8.
 > **Rama:** `wandorius` · **Gates:** `npm run gate:check -- 138A-5` …
-> `npm run gate:check -- 138A-9`
+> `npm run gate:check -- 138A-12`
 > **Fuente de contexto:** decisiones de producto 2026-08-13/14 (motor propio,
 > estilo Genshin-like low poly, sin indicadores, mundo único cap 32), cierre
 > 138A-4 (constructor completo) y veredictos de cierre: supervisor_reviewer
@@ -10,7 +10,11 @@
 > observaciones menores: `cellSize` sin propagar al preview, campo `style` sin
 > consumir, import sin validación cruzada opciones↔mapa, error de lectura de
 > import silencioso) y sentinel_inspector **OK CON OBSERVACIONES, ACCION:
-> ninguna**.
+> ninguna**. Referencias de diseño incorporadas el 14-ago:
+> `Agente/documentacion/design-system/referencia-contour-terrain-editor-2026-08-14.md`
+> (artefacto Claude; su modelo de capas moldea 138A-9/138A-10) y
+> `Agente/documentacion/design-system/referencia-skydome-clouds-2026-08-14.md`
+> (artefacto Claude; su skydome/nubes por capas moldea 138A-12).
 
 ## 1. Contexto y decisión del usuario (2026-08-14)
 
@@ -34,13 +38,83 @@ El usuario pidió *"planifica todo esto a continuacion"* con la siguiente lista
 13. Panel para cambiar las texturas o agregarlas.
 14. Panel para manejar todos los assets.
 
+### Ajustes del usuario (14-ago, tarde)
+
+Al ver la base 138A-5/6 el usuario precisó y amplió el alcance (se integran
+al plan; "no sé si ya están pero es para asegurarnos y agregar lo que falte"):
+
+1. **`juegoConstructor` es una ventana dentro del juego:** panel lateral
+   completo (alto total), **sin título**, ocultable hacia los lados y con
+   **ancho redimensionable**; cuando está oculto, su cabecera
+   (`juegoConstructor__cabecera`) va en vertical.
+2. **No se editan modelos en el constructor** (eso es trabajo de Blender);
+   lo que sí se controla es su **posición/movimiento** (transform). Cambiar
+   texturas es deseable **si es viable técnicamente**; si no, queda
+   documentado como deuda.
+3. **Manejo de assets:** arrastrar, quitar, etc. (no solo inventario pasivo).
+4. **Editor de mapa por estilo:** como hay 2 estilos, cada uno tiene un
+   editor distinto. En **suave**: pintar caminos, dibujar dónde hay arena,
+   dónde hay agua, subir/bajar terreno, etc. En **bloques**: colocar/quitar
+   bloques y variantes.
+5. **Generador de pasto:** el pasto se genera donde corresponde al generar un
+   mundo aleatorio (lo más óptimo posible), con densidad, tamaño y color
+   elegibles, y se puede pintar dónde quitarlo y dónde ponerlo.
+
+### Referencia de diseño: Contour Terrain Editor (14-ago, tarde)
+
+Se incorpora `Agente/documentacion/design-system/
+referencia-contour-terrain-editor-2026-08-14.md` (artefacto público de
+Claude, con URL y código completo). Su lección principal: **las
+modificaciones al terreno son capas** — un stack de formas evaluadas de
+arriba abajo ("later shapes win") donde cada forma pregunta a cada vértice
+"¿a qué distancia estoy de ti?" (SDF) y convierte esa distancia en un peso
+que decae con un **falloff** (curva elegible y bias) y tira del vértice hacia
+una altura (`y = mix(y, height, w)`), con **blend** `set/add/max/min`,
+**taper** para ríos que bajan/ensanchan, alturas por punto y gizmo de
+transformación. Se adapta al plan:
+
+- **138A-9 pasa de "pinceles sueltos" a un stack de capas serializable**
+  (caminos, arena, agua, elevación) con orden, visibilidad, blend y
+  reordenamiento; los pinceles de la presentación crean/editan capas, no
+  mutan el heightfield directo.
+- **138A-10 reutiliza el modelo de capas** para la máscara de pasto
+  (poner/quitar = capa de vegetación con blend y cuota).
+- **138A-8 hereda del artefacto** el patrón de panel lateral compacto con
+  slider + readout sincronizado y secciones pequeñas (ya previsto en 138A-5).
+
+### Referencia de diseño: Skydome Procedural Painted Clouds (14-ago, noche)
+
+Se incorpora `Agente/documentacion/design-system/
+referencia-skydome-clouds-2026-08-14.md` (artefacto público de Claude, con
+URL y código completo). Su lección principal: **el cielo es un shader a
+pantalla completa (skydome), no una esfera texturizada** — nubes "pintadas"
+proceduralmente con una rampa posterizada + lookup de paleta
+(`deep/shadow/mid/light/high`, estilo óleo), dos capas de nubes (cerca/lejos
+con cobertura, octavas, escala y deriva), self-shadow barato muestreando
+hacia el sol, *silver lining* en bordes finos y disco/glow solar. Las luces
+reales (`DirectionalLight` + `HemisphereLight`) se mueven con el mismo vector
+solar, de modo que los controles del panel cambian cielo y sombras a la vez;
+el panel lateral compacto usa secciones colapsables con slider + readout en
+vivo y presets de paleta (cada preset con su elevación/azimut de sol). Se
+adapta al plan:
+
+- **Nuevo bloque 138A-12 — Cielo y ambiente:** skydome procedural en la capa
+  de presentación con paleta serializable, dos capas de nubes con
+  cobertura/deriva/octavas, luz direccional + ambiental sincronizadas al
+  mismo vector solar, presets y panel compacto de ajustes en vivo.
+- **138A-8 hereda del artefacto** el patrón de panel lateral colapsable con
+  slider + readout en vivo (mismo patrón que ya aporta el artefacto Contour).
+
 ## 2. Objetivo
 
 Convertir el constructor de mundo (138A-4) en un **toolkit de edición tipo
-estudio**: UI lateral por iconos con subpaneles pequeños, regeneración en vivo,
-persistencia local, dos estilos (`bloques`/`suave`), edición de objetos,
-panel de colores/texturas/assets, tres modos de cámara y dos auditorías
-(SOLID/arquitectura y rendimiento) con evidencia. Se mantiene el flujo canónico
+estudio**: ventana lateral completa (colapsable a los lados, sin título y con
+ancho redimensionable) con subpaneles por iconos, regeneración en vivo,
+persistencia local, dos estilos (`bloques`/`suave`) con editor de mapa propio
+para cada uno, generador de pasto optimizado y pintado, transform de objetos
+(sin edición de modelos), paneles de colores/texturas/assets con arrastrar y
+quitar, tres modos de cámara y dos auditorías (SOLID/arquitectura y
+rendimiento) con evidencia. Se mantiene el flujo canónico
 `TerrainOptions → buildMapVersionFromOptions → MapVersion` y `game-core` puro
 (sin Three/DOM/red).
 
@@ -114,52 +188,135 @@ panel de colores/texturas/assets, tres modos de cámara y dos auditorías
   (138A-5) y se restaura al recargar; teardown limpio de listeners/RAF.
 
 **Checklist:**
-- [ ] `CameraMode` tipado y controlador por modo en la capa de presentación
+- [x] `CameraMode` tipado y controlador por modo en la capa de presentación
       (sin lógica de cámara en `game-core`; solo contratos).
-- [ ] Tests DOM de cambio de modo y restauración; teardown sin RAF/listeners
+- [x] Tests DOM de cambio de modo y restauración; teardown sin RAF/listeners
       colgados.
-- [ ] Gate 138A-7 PASS + validación visual del usuario (los 3 modos).
+- [x] Gate 138A-7 PASS + validación visual del usuario (los 3 modos).
 
-### 138A-8 — Editor de objetos y paneles de Color, Textura y Assets
+### 138A-8 — Panel-ventana, transform de objetos y paneles de Color, Textura y Assets
 
-- **Editor de objetos:** añadir bloques y variantes (prefabs del toolkit),
-  quitar árboles y añadir rocas sobre las instancias del `MapVersion`; las
-  ediciones son capa posterior a la generación y se exportan en el JSON
-  (absorbe la Fase 4 "retoque fino" diferida de 138A-4; los pinceles del
-  editor 2D 297A-64..71 son referencia de operaciones).
+- **Panel-ventana:** `juegoConstructor` pasa a ser una ventana lateral
+  completa (alto total del viewport del juego) **sin título**, colapsable
+  hacia los lados (izquierda/derecha) y con **ancho redimensionable** por
+  arrastre del borde (mín/máx sensatos); al ocultarse, la cabecera
+  `juegoConstructor__cabecera` se muestra **vertical** (rail plegado con
+  iconos y handle para desplegar). Estado colapsado/ancho persistidos con
+  138A-5. Sin perder el rail de iconos existente.
+- **Transform de objetos (no edición de modelos):** controlar **posición y
+  movimiento** de bloques, variantes, árboles, rocas y césped sobre las
+  instancias del `MapVersion` (selección + mover/colocar); **sin** editar
+  geometría/modelos (eso es Blender). Las ediciones son capa posterior a la
+  generación y se exportan en el JSON (los pinceles del editor 2D
+  297A-64..71 son referencia de operaciones).
 - **Panel de Color:** paleta unificada del mundo (terreno, agua, vegetación,
   rocas, bloques y variantes) centralizada en `game-core` (tokens/paleta
   serializable), persistente y aplicable en tiempo real.
 - **Panel de Textura:** cambiar o agregar texturas/rampas por material
   (carga local con file input o URL; sin subida a servidor); validación de
-  imagen y teardown de object URLs.
+  imagen y teardown de object URLs. **Viabilidad técnica a evaluar al inicio
+  del bloque:** si el cambio de texturas por material no es viable con el
+  mesher actual, se documenta como deuda con alternativa (color/rampas) en
+  vez de bloquear el bloque.
 - **Panel de Assets:** inventario del manifiesto del mundo (árboles, rocas,
-  césped, agua, bloques y variantes) con recuento, visibilidad, cantidad y
-  limpieza; sin import de modelos externos en este bloque.
+  césped, agua, bloques y variantes) con recuento, visibilidad, cantidad,
+  limpieza y **arrastrar/soltar** (colocar en el mundo) y **quitar**
+  (eliminar instancia); sin import de modelos externos en este bloque.
 
 **Checklist:**
-- [ ] Operaciones del editor de objetos puras en `game-core`
-      (`editMapVersionObjects`/similar) con cuotas fail-closed y tests.
+- [ ] Panel-ventana: alto total, sin título, colapsable a los lados, ancho
+      redimensionable y cabecera vertical al ocultar; estado persistido.
+- [ ] Operaciones de transform puras en `game-core`
+      (`editMapVersionObjects`/similar: mover/colocar/quitar) con cuotas
+      fail-closed y tests; sin edición de geometría/modelos.
 - [ ] Paneles Color/Textura/Assets con tokens del OS, ≤300 líneas cada uno y
       tests DOM; persisten con 138A-5.
 - [ ] Texturas agregadas con revocación de object URLs y sin fugas de
       materiales (reutilizar patrón de `game-toon-water.ts`).
 - [ ] Gate 138A-8 PASS + validación visual del usuario en `/forest-playable`.
 
-### 138A-9 — Auditorías SOLID/arquitectura y rendimiento
+### 138A-9 — Editor de mapa por estilo con capas (suave y bloques)
+
+- **Modelo de capas (lección del Contour Terrain Editor):** las
+  modificaciones del terreno son un **stack de capas** evaluadas de arriba
+  abajo ("later layers win"), no mutaciones destructivas del heightfield.
+  Cada capa es un objeto puro serializable:
+  - **Tipo de contenido:** camino (color/desgaste de ruta), arena, agua
+    (máscara de bioma/costa) o elevación (subir/bajar).
+  - **Forma/alcance:** círculo (pincel), curva Bézier, polígono o máscara
+    pintada; la distancia con signo (SDF) a la forma se convierte en un peso
+    que decae con **falloff** (distancia + curva elegible: linear, smooth,
+    gauss, dome, spike, hard) y **bias** (`y = mix(y, height, w)`).
+  - **Elevación y blend:** la capa pide una altura/elevación (absoluta o
+    delta) y se mezcla con `blend ∈ set | add | max | min`; **taper**
+    interpola altura/falloff a lo largo de una curva (ríos que bajan y se
+    ensanchan).
+  - **Orden/visibilidad:** cada capa tiene `enabled` y posición en el stack;
+    se reordena, duplica, oculta y elimina desde el panel (referencia del
+    artefacto).
+- **Editor por estilo:** cada uno opera sobre su propio mesh/instancias del
+  `MapVersion`:
+  - **Suave:** los pinceles **pintan capas** (caminos, arena, agua,
+    subir/bajar con falloff de pincel); la regeneración aplica el stack
+    sobre la base generada con deltas acotados y solo sobre la zona
+    afectada, sin full-rebuild innecesario.
+  - **Bloques:** **colocar/quitar bloques y variantes** (prefabs del
+    toolkit) sobre la malla de celdas, con validación de cuotas y
+    regeneración local de la celda afectada.
+- Las capas viven en **`game-core`** (aplicador de stack puro con
+  SDF/falloff/blend, cuotas fail-closed y tests de presupuesto); los
+  pinceles viven en la capa de presentación (pointer → celda/mundo, mismo
+  `pick` del comparador). El stack completo se **serializa en el JSON del
+  mundo** y se restaura al recargar (138A-5).
+
+**Checklist:**
+- [ ] Módulo de capas puro en `game-core` (SDF + falloff + blend
+      `set/add/max/min` + taper) con cuotas, tests de presupuesto y paridad
+      preview↔documento.
+- [ ] Panel de capas (orden, visibilidad, duplicar/eliminar) + pinceles
+      suave (caminos/arena/agua/subir-bajar) y bloques (colocar/quitar
+      variantes) en la presentación con teardown.
+- [ ] Stack serializado/exportado en el JSON y restaurado al recargar.
+- [ ] Gate 138A-9 PASS + validación visual del usuario en `/forest-playable`.
+
+### 138A-10 — Generador de pasto optimizado y pintado
+
+- **Generación procedural:** el pasto se genera **donde corresponde** al
+  generar un mundo aleatorio (zonas de suelo/altura/vegetación según
+  presupuestos existentes), **lo más óptimo posible**: instancing/merged
+  geometry por chunk, sin objetos por hoja, presupuesto máximo configurable y
+  regeneración solo de la zona afectada al pintar.
+- **Parámetros elegibles:** **densidad**, **tamaño** y **color** desde el
+  panel (persisten con 138A-5 y se regeneran en tiempo real con debounce).
+- **Pintado:** pincel para **poner y quitar** pasto sobre el mundo (máscara
+  de vegetación por instancia), con cuota fail-closed y teardown limpio; la
+  máscara se modela como **capa de vegetación** del mismo stack de 138A-9
+  (reutiliza orden/blend/cuotas del aplicador de capas).
+
+**Checklist:**
+- [ ] Generador de pasto por chunks con instancing y presupuesto (test de
+      draw calls/instancias y de regeneración de zona).
+- [ ] Densidad/tamaño/color configurables, persistidos y en tiempo real.
+- [ ] Pincel poner/quitar pasto con cuotas y teardown; export/import JSON.
+- [ ] Gate 138A-10 PASS + validación visual del usuario en `/forest-playable`.
+
+### 138A-11 — Auditorías SOLID/arquitectura y rendimiento
 
 - **Auditoría SOLID/arquitectura** de todo lo relacionado con el juego
   (`game-core`, comparador, paneles, escena, renderer metrics, realtime):
   SRP/OCP/DIP/ISP/LSP, límites de líneas (componentes/CSS ≤300, hooks ≤120,
   utils ≤150), contratos, teardown y deuda acumulada (campo `style` muerto,
-  validación cruzada del import, error silencioso de lectura). Documentar
+  validación cruzada del import, error silencioso de lectura, escena a 624
+  líneas efectivas —extraer un controlador de cámara por modo desde 138A-7:
+  `updateCamera` + handlers en `game-camera-controls.ts`— y colisión de 3ª
+  persona de punto único —muestrear el segmento jugador→cámara—). Documentar
   hallazgos y corregir los materiales.
 - **Auditoría de rendimiento dedicada:** benchmark reproducible (generar N
   mundos, medir ms por generación, draw calls, instancias, geometrías/
   materiales vivos antes/después de N regeneraciones y tras `dispose`),
-  revisión de presupuestos (chunks ≤1024, instancias ≤10000, octaves),
-  memory/GPU con las métricas existentes (`readRendererMetrics` + GPU probe) y
-  corrección de hallazgos con tests.
+  revisión de presupuestos (chunks ≤1024, instancias ≤10000, octaves, pasto
+  instanciado), memory/GPU con las métricas existentes (`readRendererMetrics`
+  + GPU probe) y corrección de hallazgos con tests.
 
 **Checklist:**
 - [ ] Informe de auditoría SOLID con hallazgos por módulo y fixes aplicados
@@ -167,7 +324,33 @@ panel de colores/texturas/assets, tres modos de cámara y dos auditorías
 - [ ] Informe de auditoría de rendimiento con números y presupuestos
       verificables; sin fugas de material/geometría tras regeneración (test de
       ciclo de vida ampliado a geometrías).
-- [ ] Gate 138A-9 PASS + revisión del usuario con evidencia.
+- [ ] Gate 138A-11 PASS + revisión del usuario con evidencia.
+
+### 138A-12 — Cielo procedural (skydome) y ambiente
+
+- **Skydome shader procedural** (adaptación de
+  `referencia-skydome-clouds-2026-08-14.md`): cielo a pantalla completa con
+  rampa posterizada + paleta `deep/shadow/mid/light/high` estilo óleo; sin
+  esfera texturizada. Paleta serializable y persistente (se integra al panel
+  de Color de 138A-8).
+- **Nubes pintadas por capas:** dos capas (cerca/lejos) con cobertura,
+  octavas, escala y deriva; self-shadow barato hacia el sol, *silver lining*
+  y disco/glow solar; presupuestos de instrucciones/temps verificables.
+- **Luces sincronizadas:** `DirectionalLight` + `HemisphereLight` movidas por
+  el mismo vector solar del shader; los controles cambian cielo y sombras a
+  la vez. Presets de paleta con elevación/azimut del sol.
+- **Panel compacto de ambiente:** secciones colapsables con slider + readout
+  en vivo (cobertura, octavas, deriva, influencia solar, tamaño/glow del sol,
+  presets) dentro del rail de iconos de 138A-5; persistencia y teardown.
+
+**Checklist:**
+- [ ] Shader de skydome en la capa de presentación con paleta y parámetros
+      serializables (sin fugas de programa/material; teardown limpio).
+- [ ] Dos capas de nubes + self-shadow + sol (disco/glow) con presupuesto y
+      tests de renderer metrics.
+- [ ] Luces reales sincronizadas al vector solar + presets + panel compacto
+      en vivo con persistencia (138A-5).
+- [ ] Gate 138A-12 PASS + validación visual del usuario en `/forest-playable`.
 
 ## 4. Fuera de alcance
 
@@ -177,6 +360,9 @@ panel de colores/texturas/assets, tres modos de cámara y dos auditorías
   segundo consumidor real).
 - Importar el pack Synty (Polygon Meadow Forest) como dependencia: queda como
   referencia visual; el motor/toolkit propio se mantiene.
+- **Edición de modelos/geometría en el constructor:** fuera de alcance por
+  decisión del usuario (14-ago); los modelos se hacen en Blender y el
+  constructor solo los posiciona/transforma.
 - Subida de texturas/assets a servidor (solo local en este plan).
 - Migrar `game-core` a otro framework o renderer.
 
@@ -186,8 +372,18 @@ panel de colores/texturas/assets, tres modos de cámara y dos auditorías
 - 138A-5 precede a 138A-6/7/8 (persistencia y UI por iconos son la base).
 - 138A-8 reutiliza contratos de `MapVersion` y, como referencia de
   operaciones, el editor 2D de mapa (297A-64..71).
-- 138A-9 se apoya en métricas existentes (`readRendererMetrics`, GPU probe) y
+- 138A-9 se apoya en el heightfield/máscaras existentes del comparador y en
+  el editor 2D (297A-64..71) como referencia de pinceles; su modelo de capas
+  (stack + SDF + falloff + blend) se adapta de
+  `Agente/documentacion/design-system/referencia-contour-terrain-editor-2026-08-14.md`.
+- 138A-10 se apoya en el presupuesto de vegetación (138A-6) y en las
+  métricas de renderer para el pasto instanciado.
+- 138A-11 se apoya en métricas existentes (`readRendererMetrics`, GPU probe) y
   en el test de ciclo de vida del agua (`game-procedural-comparator.test.ts`).
+- 138A-12 se apoya en el patrón de materiales únicos y teardown del
+  comparador (`game-toon-water.ts`, `game-procedural-comparator.ts`) y en la
+  referencia
+  `Agente/documentacion/design-system/referencia-skydome-clouds-2026-08-14.md`.
 
 ## 6. Definition of Done (por bloque)
 
@@ -212,3 +408,6 @@ panel de colores/texturas/assets, tres modos de cámara y dos auditorías
 - **Retirada de `actual`:** el estilo histórico queda fuera del constructor;
   si el usuario quiere conservarlo como tercer estilo "referencia", se reduce
   el alcance de 138A-6.
+- **Texturas por material:** la viabilidad se evalúa al arrancar 138A-8; si
+  el mesher actual no permite texturas por material, se documenta la deuda y
+  se prioriza color/rampas en su lugar.
