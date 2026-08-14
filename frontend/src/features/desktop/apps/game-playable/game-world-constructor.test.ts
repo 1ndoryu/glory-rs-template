@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Waves } from 'lucide';
 import { terrainOptionsPreset, type TerrainOptions } from '../../../game-core';
 import {
   mountWorldConstructor,
@@ -162,5 +163,27 @@ describe('sección constructor de mundo (rail de iconos)', () => {
     await vi.waitFor(() => expect(onImport).toHaveBeenCalledTimes(1));
     expect(onImport).toHaveBeenCalledWith(json);
     section.destroy();
+  });
+
+  it('registra subpaneles extra del rail sin tocar el núcleo (OCP)', () => {
+    mountWorldConstructor(host, controls, {
+      title: 'Constructor',
+      extraPanels: [{
+        key: 'isla',
+        label: 'Isla',
+        icon: Waves,
+        build: (container) => {
+          container.appendChild(document.createElement('p')).textContent = 'Curva del mundo';
+        },
+      }],
+    });
+
+    const isla = railButton('Isla');
+    expect(isla).toBeDefined();
+    isla.click();
+    const subpanel = host.querySelector<HTMLElement>('.juegoConstructor__subpanel');
+    expect(subpanel?.getAttribute('aria-label')).toBe('Isla');
+    expect(subpanel?.textContent).toContain('Curva del mundo');
+    expect(isla.getAttribute('aria-pressed')).toBe('true');
   });
 });

@@ -73,6 +73,11 @@ panel de colores/texturas/assets, tres modos de cámara y dos auditorías
       limpieza en teardown.
 - [x] Gate 138A-5 PASS (pendiente la validación visual del usuario en
       `/forest-playable`, que se hace al probar el bloque).
+- [x] Corrección por feedback del usuario (14-ago): el rail de iconos es el
+      panel **exterior** (cabecera colapsable "Constructor") y los controles
+      del terreno clásico son secciones suyas ("Isla" y "Estilos"), no al
+      revés. `mountWorldConstructor` acepta `extraPanels`/`title`; el panel
+      clásico queda solo para el modo legacy sin constructor.
 
 ### 138A-6 — Dos estilos, sin árboles en suave, cellSize real, escala menor
 

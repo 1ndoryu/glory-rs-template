@@ -246,7 +246,7 @@ export function mountGamePlayableScene(
       proceduralComparator.regenerate(newSeed);
     },
     setTerrainMode: applyTerrainMode,
-    constructor: {
+    worldConstructor: {
       onGenerate: (options) => {
         /* [138A-5] Generar de forma explícita cancela el debounce pendiente
          * para no regenerar dos veces seguidas. */

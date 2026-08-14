@@ -1,10 +1,12 @@
 /* GAME-01 / 138A-5 — Toolkit de edición del Constructor de mundo.
  * Sustituye la sección única "Constructor" por un rail lateral de iconos
  * (tipo Blender): cada icono abre un subpanel pequeño con opciones
- * agrupadas y un solo subpanel activo a la vez. Cada mutación emite
- * `onChange` (tiempo real con debounce en la escena); Generar/Exportar/
- * Importar y las métricas quedan fijos bajo el rail. Solo DOM + contrato
- * puro de game-core: la generación y el 3D viven en la escena. */
+ * agrupadas y un solo subpanel activo a la vez. El panel es exterior
+ * (contenedor colapsable) y los controles del terreno son secciones del
+ * rail; así el panel de terreno no envuelve al constructor. Cada mutación
+ * emite `onChange` (tiempo real con debounce en la escena); Generar/
+ * Exportar/Importar y las métricas quedan fijos bajo el rail. Solo DOM +
+ * contrato puro de game-core: la generación y el 3D viven en la escena. */
 
 import { createElement, Globe, Mountain, type IconNode } from 'lucide';
 import { createEl } from '../../../../utils/dom';
@@ -37,10 +39,7 @@ export interface WorldConstructorSection {
   readonly destroy: () => void;
 }
 
-const DIMENSION_OPTIONS: readonly number[] = [16, 32, 48, 64, 96, 128];
-const CELL_SIZE_OPTIONS: readonly number[] = [0.5, 1, 1.5, 2];
-
-interface SubpanelDefinition {
+export interface WorldConstructorSubpanel {
   readonly key: string;
   readonly label: string;
   readonly icon: IconNode;
@@ -48,7 +47,17 @@ interface SubpanelDefinition {
   readonly build: (container: HTMLElement, ctx: ConstructorPanelContext) => void;
 }
 
-interface ConstructorPanelContext {
+export interface WorldConstructorOptions {
+  /** [138A-5] Secciones extra del rail (Isla, Estilos, Cámara, Objetos…). */
+  readonly extraPanels?: readonly WorldConstructorSubpanel[];
+  /** Título de la cabecera colapsable. Por defecto "Constructor". */
+  readonly title?: string;
+}
+
+const DIMENSION_OPTIONS: readonly number[] = [16, 32, 48, 64, 96, 128];
+const CELL_SIZE_OPTIONS: readonly number[] = [0.5, 1, 1.5, 2];
+
+export interface ConstructorPanelContext {
   /** Opciones actuales del constructor (mismo objeto hasta el próximo commit). */
   readonly state: TerrainOptions;
   /** Aplica una mutación sobre las opciones y emite tiempo real. */
@@ -60,7 +69,9 @@ interface ConstructorPanelContext {
 export function mountWorldConstructor(
   host: HTMLElement,
   controls: WorldConstructorControls,
+  options: WorldConstructorOptions = {},
 ): WorldConstructorSection {
+  const { extraPanels = [], title = 'Constructor' } = options;
   const defaults = { ...TERRAIN_OPTIONS_DEFAULTS };
   let state: TerrainOptions = normalizeTerrainOptions(defaults);
   const syncers: Array<() => void> = [];
@@ -78,7 +89,30 @@ export function mountWorldConstructor(
     sync,
   };
 
-  const root = createEl('div', { className: 'juegoConstructor' });
+  const root = createEl('section', {
+    className: 'juegoConstructor',
+    ariaLabel: title,
+  });
+  /* El panel no debe orbitar la cámara ni disparar el picking del terreno:
+   * sus eventos de puntero/rueda no burbujean al host de la escena. */
+  for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'wheel'] as const) {
+    root.addEventListener(type, (event) => event.stopPropagation());
+  }
+
+  const cabecera = createEl('button', {
+    className: 'juegoConstructor__cabecera',
+    type: 'button',
+    'aria-expanded': 'true',
+  });
+  cabecera.appendChild(createEl('span', {
+    className: 'juegoConstructor__titulo',
+    textContent: title,
+  }));
+  cabecera.addEventListener('click', () => {
+    const closed = root.classList.toggle('juegoConstructor--cerrado');
+    cabecera.setAttribute('aria-expanded', String(!closed));
+  });
+
   const cuerpo = createEl('div', { className: 'juegoConstructor__cuerpo' });
   const rail = createEl('nav', {
     className: 'juegoConstructor__rail',
@@ -136,16 +170,17 @@ export function mountWorldConstructor(
 
   /* --- registro de subpaneles (OCP: 138A-6/7/8 añaden Cámara, Objetos,
    * Color, Textura y Assets sin tocar el rail). --- */
-  const panels: readonly SubpanelDefinition[] = [
+  const panels: readonly WorldConstructorSubpanel[] = [
     { key: 'terreno', label: 'Terreno', icon: Mountain, build: buildTerrenoPanel },
     { key: 'mundo', label: 'Mundo/Estilo', icon: Globe, build: buildMundoPanel },
+    ...extraPanels,
   ];
 
   const railButtons = new Map<string, HTMLButtonElement>();
-  let activePanel: SubpanelDefinition | null = null;
+  let activePanel: WorldConstructorSubpanel | null = null;
   let subpanelEl: HTMLElement | null = null;
 
-  const openPanel = (panel: SubpanelDefinition): void => {
+  const openPanel = (panel: WorldConstructorSubpanel): void => {
     if (activePanel?.key === panel.key) {
       activePanel = null;
       subpanelEl?.remove();
@@ -190,7 +225,7 @@ export function mountWorldConstructor(
     rail.appendChild(button);
   }
 
-  root.append(cuerpo, acciones);
+  root.append(cabecera, cuerpo, acciones);
   host.appendChild(root);
   openPanel(panels[0]);
   railButtons.get(panels[0].key)?.classList.add('juegoConstructor__icono--activo');
