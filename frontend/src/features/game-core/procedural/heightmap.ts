@@ -1,12 +1,18 @@
-/* GAME-01 — Heightfield de isla del toolkit procedural (138A-1).
- * Un solo generador de altura continua (superelipse + fbm + warp + banda
- * costera) del que se derivan AMBOS estilos del comparador: 'suave' usa la
+/* GAME-01 — Heightfield del toolkit procedural (138A-1/138A-4).
+ * Generadores de altura continua (máscara de forma + fbm + warp + banda
+ * costera) de los que se derivan AMBOS estilos del comparador: 'suave' usa la
  * altura tal cual y 'bloques' la cuantiza con relajación de caminabilidad.
+ * 138A-4 añade `generateTerrainHeightfield` con presets de forma
+ * (isla/continente/archipiélago/valle) sin romper la API de la isla clásica.
  * Misma familia matemática que el experimento 128A-1 para que el comparador
- * compare estilos, no formas: el rect jugable queda siempre en tierra y el
- * océano rodea la isla. Datos puros, sin Three/DOM/red. */
+ * compare estilos, no formas. Datos puros, sin Three/DOM/red. */
 
 import { fbm2 } from './noise';
+import {
+  normalizeTerrainOptions,
+  type ShapePreset,
+  type TerrainOptions,
+} from './terrain-options';
 
 export const ISLAND_HEIGHTFIELD_DEFAULTS = {
   maxHeight: 4,
@@ -63,7 +69,52 @@ export function generateIslandHeightfield(options: IslandHeightfieldOptions): Is
   /* El desvío pico del fbm es warp/2: debe quedar bajo el umbral de costa para
    * que las esquinas de la rejilla sean siempre océano (isla rodeada de agua). */
   if (!Number.isFinite(warp) || warp < 0 || warp >= coast * 2) throw new Error('warp inválido');
+  return generateHeightfieldCore({
+    seed,
+    width,
+    depth,
+    maxHeight,
+    waterLevel,
+    coast,
+    warp,
+    octaves,
+    shape: 'isla',
+  });
+}
 
+/** Genera el heightfield parametrizado del constructor de mundo (138A-4).
+ * Acepta opciones completas (forma, estilo, tamaño, densidad de vegetación)
+ * y valida fail-closed antes de calcular; `generateIslandHeightfield` queda
+ * como caso particular con la API histórica. */
+export function generateTerrainHeightfield(options: TerrainOptions): IslandHeightfield {
+  const normalized = normalizeTerrainOptions(options);
+  return generateHeightfieldCore({
+    seed: normalized.seed,
+    width: normalized.width,
+    depth: normalized.depth,
+    maxHeight: normalized.maxHeight,
+    waterLevel: normalized.waterLevel,
+    coast: normalized.coast,
+    warp: normalized.warp,
+    octaves: normalized.octaves,
+    shape: normalized.shape,
+  });
+}
+
+interface HeightfieldCoreOptions {
+  readonly seed: number;
+  readonly width: number;
+  readonly depth: number;
+  readonly maxHeight: number;
+  readonly waterLevel: number;
+  readonly coast: number;
+  readonly warp: number;
+  readonly octaves: number;
+  readonly shape: ShapePreset;
+}
+
+function generateHeightfieldCore(options: HeightfieldCoreOptions): IslandHeightfield {
+  const { seed, width, depth, maxHeight, waterLevel, coast, warp, octaves, shape } = options;
   const heights = new Float32Array(width * depth);
   const cx = (width - 1) / 2;
   const cz = (depth - 1) / 2;
@@ -75,8 +126,7 @@ export function generateIslandHeightfield(options: IslandHeightfieldOptions): Is
         Math.pow(Math.abs(nx), ROUND_EXP) + Math.pow(Math.abs(nz), ROUND_EXP),
         1 / ROUND_EXP,
       );
-      const warpV = (fbm2(i * 0.18, j * 0.18, seed, octaves) - 0.5) * warp;
-      const mask = 1 - d + warpV;
+      const mask = shapeMask(shape, d, i, j, seed, octaves, warp);
       let h: number;
       if (mask < coast) {
         /* Fondo marino: se hunde suavemente hacia los bordes, siempre bajo el agua. */
@@ -88,12 +138,49 @@ export function generateIslandHeightfield(options: IslandHeightfieldOptions): Is
         const e2 = fbm2(i * 0.42 + 71.2, j * 0.42 + 47.9, seed + 5511, 2);
         const raw = Math.max(0, (e - 0.34) * 5.6 + (e2 - 0.5) * 1.0);
         const n = Math.min(1, raw / RELIEF_SCALE);
-        h = waterLevel + land * (LAND_FLOOR + (1 - LAND_FLOOR) * n) * maxHeight;
+        /* El continente mantiene un interior elevado aunque el ruido dé cero:
+         * su centro nunca queda pegado al nivel del mar. */
+        const floor = shape === 'continente' ? 0.5 : LAND_FLOOR;
+        h = waterLevel + land * (floor + (1 - floor) * n) * maxHeight;
       }
       heights[j * width + i] = h;
     }
   }
   return { width, depth, heights, waterLevel, maxHeight };
+}
+
+/** Máscara de forma normalizada: 0..1 es la transición costa→interior y los
+ * valores negativos caen al fondo marino. `isla` reproduce EXACTAMENTE la
+ * fórmula histórica (1 - d + warp) para no romper comparadores ni tests. */
+function shapeMask(
+  shape: ShapePreset,
+  d: number,
+  i: number,
+  j: number,
+  seed: number,
+  octaves: number,
+  warp: number,
+): number {
+  const warpV = (fbm2(i * 0.18, j * 0.18, seed, octaves) - 0.5) * warp;
+  switch (shape) {
+    case 'isla':
+      return 1 - d + warpV;
+    /* Continente: masa grande con costa irregular; las esquinas alternan
+     * océano según el seed (la pendiente deja un margen bajo el umbral de
+     * costa incluso con el warp máximo), el interior queda siempre en tierra. */
+    case 'continente':
+      return 1 - 0.9 * d + warpV;
+    /* Archipiélago: ruido de baja frecuencia reparte islas y canales; las
+     * esquinas de la rejilla son siempre océano (d alto). */
+    case 'archipielago': {
+      const clusters = (fbm2(i * 0.06, j * 0.06, seed + 777, 3) - 0.5) * 1.1;
+      return 1 - 1.35 * d + clusters + warpV * 0.8;
+    }
+    /* Valle: anillo montañoso en los bordes con una hondonada central que
+     * queda bajo el agua (lago); las esquinas son tierra alta. */
+    case 'valle':
+      return 1 - 0.45 * d - 1.1 * Math.exp(-((d * 3.2) ** 2)) + warpV * 0.8;
+  }
 }
 
 /**

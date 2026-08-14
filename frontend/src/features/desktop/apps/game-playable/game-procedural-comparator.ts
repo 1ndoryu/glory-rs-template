@@ -1,19 +1,20 @@
-/* GAME-01 — Comparador visual del toolkit procedural (138A-1/138A-2).
- * Monta el MISMO seed con dos estilos derivados de la misma base de altura:
- * 'bloques' reutiliza el mesher del experimento 128A-1 vía adaptador de
- * cuantización, y 'suave' usa el heightfield-mesh + vegetación low-poly del
- * toolkit (árboles con ramas y césped por matas, 138A-2).
- * Solo presentación y métricas estructurales para que el usuario decida el
- * estilo con evidencia; el agua es un plano toon simple porque aquí se
- * compara el terreno/props, no el shader de costa del 128A-1. */
+/* GAME-01 — Comparador visual del toolkit procedural (138A-1/138A-2, 138A-4).
+ * Monta la misma base de altura en dos estilos ('bloques' reutiliza el mesher
+ * 128A-1 vía adaptador; 'suave' usa heightfield-mesh + vegetación low-poly).
+ * Desde 138A-4 acepta `TerrainOptions` completas para comparar estilos sobre
+ * el MISMO mundo; sin opciones mantiene la isla clásica 48×32. Solo
+ * presentación y métricas: el agua es un plano toon simple. */
 
 import * as THREE from 'three';
 import {
   buildHeightfieldMeshData,
   buildLowPolyVegetationMeshData,
-  generateIslandHeightfield,
+  generateTerrainHeightfield,
+  normalizeTerrainOptions,
   placeVegetation,
+  terrainOptionsPreset,
   type IslandHeightfield,
+  type TerrainOptions,
 } from '../../../game-core';
 import {
   buildBlockPropsMeshData,
@@ -25,10 +26,6 @@ import { toGeometry, toIndexedGeometry } from './game-procedural-geometry';
 import { buildToonWaterPlane } from './game-toon-water';
 import { type WorldBend } from './game-world-bend';
 
-/* Misma rejilla que la isla 128A-1 para que el comparador sea 1:1. */
-const WIDTH = 48;
-const DEPTH = 32;
-const MAX_LEVEL = 4;
 const WATER_Y = -0.12;
 const PROP_COUNT = 60;
 
@@ -56,6 +53,8 @@ export interface ProceduralComparator {
   readonly mode: () => ProceduralTerrainMode;
   readonly setVisible: (visible: boolean) => void;
   readonly regenerate: (seed: number) => void;
+  /** [138A-4] Regenera con opciones completas del constructor. */
+  readonly regenerateFromOptions: (options: TerrainOptions) => void;
   readonly groundHeightAt: (x: number, z: number) => number;
   readonly raycastGroup: THREE.Object3D;
   readonly pickTerrain: (x: number, y: number, z: number) => TerrainPick | null;
@@ -77,8 +76,13 @@ export function mountProceduralComparator(
   seed = 1337,
   centerX = 0,
   centerZ = 0,
+  options?: TerrainOptions,
 ): ProceduralComparator {
-  let currentSeed = seed;
+  let currentOptions = options === undefined
+    ? { ...terrainOptionsPreset('isla'), seed }
+    : normalizeTerrainOptions({ ...options, seed: options.seed });
+  let currentWidth = currentOptions.width;
+  let currentDepth = currentOptions.depth;
   let currentHeightfield: IslandHeightfield;
   let currentBlockLevels: Int8Array;
   let mode: ProceduralTerrainMode = 'bloques';
@@ -86,16 +90,15 @@ export function mountProceduralComparator(
 
   const world = new THREE.Group();
   const material = bend.apply(new THREE.MeshToonMaterial({ gradientMap: toonRamp, vertexColors: true }));
-  const { geometry: waterGeometry, material: waterMaterial } = buildToonWaterPlane(
-    bend,
-    WIDTH * 2.4,
-    DEPTH * 2.4,
-    toonRamp,
-  );
+  /* Placeholder del tamaño exacto; rebuildWater lo sustituye (y lo libera) en
+   * cuanto se conocen las dimensiones. Una sola llamada crea geometría +
+   * material: llamar dos veces filtraría un material sin liberar. */
+  const initialWater = buildToonWaterPlane(bend, 1, 1, toonRamp);
+  let waterGeometry = initialWater.geometry;
+  const waterMaterial = initialWater.material;
   const water = new THREE.Mesh(waterGeometry, waterMaterial);
   water.position.y = WATER_Y;
-  // Asegurar que el agua quede por encima del fondo marino interpolado en
-  // la costa sin pelear en z en el borde.
+  /* El agua queda por encima del fondo marino sin pelear en z en el borde. */
   water.renderOrder = 1;
   world.add(water);
 
@@ -103,17 +106,22 @@ export function mountProceduralComparator(
   let smooth: BuiltMode | null = null;
   let raycastGroup: THREE.Object3D = water;
 
+  const rebuildWater = (): void => {
+    const next = buildToonWaterPlane(bend, currentWidth * 2.4, currentDepth * 2.4, toonRamp);
+    waterGeometry?.dispose();
+    waterGeometry = next.geometry;
+    water.geometry = waterGeometry;
+  };
+
+  const blockMaxLevel = (): number =>
+    Math.min(16, Math.max(1, Math.round(currentOptions.maxHeight)));
+
   const buildBlocks = (): BuiltMode => {
-    currentHeightfield = generateIslandHeightfield({
-      seed: currentSeed,
-      width: WIDTH,
-      depth: DEPTH,
-      maxHeight: MAX_LEVEL,
-    });
-    const blockH = buildBlockHeightmapFromIsland(currentHeightfield, MAX_LEVEL);
+    currentHeightfield = generateTerrainHeightfield(currentOptions);
+    const blockH = buildBlockHeightmapFromIsland(currentHeightfield, blockMaxLevel());
     currentBlockLevels = blockH.levels;
-    const terrainData = buildBlockTerrainMeshData(blockH, currentSeed);
-    const placements = placeBlockProps(blockH, currentSeed, PROP_COUNT);
+    const terrainData = buildBlockTerrainMeshData(blockH, currentOptions.seed);
+    const placements = placeBlockProps(blockH, currentOptions.seed, PROP_COUNT);
     const propsData = buildBlockPropsMeshData(placements);
     const group = new THREE.Group();
     const terrain = new THREE.Mesh(toGeometry(terrainData), material);
@@ -132,14 +140,14 @@ export function mountProceduralComparator(
   };
 
   const buildSmooth = (): BuiltMode => {
-    currentHeightfield = generateIslandHeightfield({
-      seed: currentSeed,
-      width: WIDTH,
-      depth: DEPTH,
-      maxHeight: MAX_LEVEL,
-    });
+    currentHeightfield = generateTerrainHeightfield(currentOptions);
     const meshData = buildHeightfieldMeshData(currentHeightfield);
-    const veg = placeVegetation(currentHeightfield, currentSeed);
+    const density = currentOptions.vegetationDensity;
+    const veg = placeVegetation(currentHeightfield, currentOptions.seed, {
+      maxGrass: Math.round(420 * density),
+      maxTrees: Math.round(64 * density),
+      maxRocks: Math.round(26 * density),
+    });
     const propData = buildLowPolyVegetationMeshData(veg.placements);
     const group = new THREE.Group();
     const terrain = new THREE.Mesh(toIndexedGeometry(meshData), material);
@@ -166,6 +174,14 @@ export function mountProceduralComparator(
     applyMode();
   };
 
+  const setOptions = (next: TerrainOptions): void => {
+    currentOptions = normalizeTerrainOptions(next);
+    currentWidth = currentOptions.width;
+    currentDepth = currentOptions.depth;
+    rebuildWater();
+    rebuild();
+  };
+
   const applyMode = (): void => {
     if (!blocks || !smooth) return;
     blocks.group.visible = mode === 'bloques';
@@ -174,14 +190,14 @@ export function mountProceduralComparator(
   };
 
   const cellAtWorld = (x: number, z: number): { i: number; j: number } | null => {
-    const i = Math.floor(x - centerX + WIDTH / 2);
-    const j = Math.floor(z - centerZ + DEPTH / 2);
-    if (i < 0 || j < 0 || i >= WIDTH || j >= DEPTH) return null;
+    const i = Math.floor(x - centerX + currentWidth / 2);
+    const j = Math.floor(z - centerZ + currentDepth / 2);
+    if (i < 0 || j < 0 || i >= currentWidth || j >= currentDepth) return null;
     return { i, j };
   };
 
   const cellHeight = (i: number, j: number): number =>
-    currentHeightfield.heights[j * WIDTH + i];
+    currentHeightfield.heights[j * currentWidth + i];
 
   const groundHeightAt = (x: number, z: number): number => {
     const cell = cellAtWorld(x, z);
@@ -190,7 +206,7 @@ export function mountProceduralComparator(
       const y = cellHeight(cell.i, cell.j);
       return y < currentHeightfield.waterLevel ? WATER_Y : y;
     }
-    const level = currentBlockLevels[cell.j * WIDTH + cell.i];
+    const level = currentBlockLevels[cell.j * currentWidth + cell.i];
     return level < 0 ? WATER_Y : level;
   };
 
@@ -204,12 +220,12 @@ export function mountProceduralComparator(
         i: cell.i,
         j: cell.j,
         level: null,
-        worldX: cell.i - WIDTH / 2 + 0.5 + centerX,
-        worldZ: cell.j - DEPTH / 2 + 0.5 + centerZ,
+        worldX: cell.i - currentWidth / 2 + 0.5 + centerX,
+        worldZ: cell.j - currentDepth / 2 + 0.5 + centerZ,
         height,
       };
     }
-    const level = currentBlockLevels[cell.j * WIDTH + cell.i];
+    const level = currentBlockLevels[cell.j * currentWidth + cell.i];
     if (level < 0) return null;
     let layer = Math.floor(y + 0.001);
     if (y >= level - 0.001) layer = level - 1;
@@ -218,8 +234,8 @@ export function mountProceduralComparator(
       i: cell.i,
       j: cell.j,
       level,
-      worldX: cell.i - WIDTH / 2 + 0.5 + centerX,
-      worldZ: cell.j - DEPTH / 2 + 0.5 + centerZ,
+      worldX: cell.i - currentWidth / 2 + 0.5 + centerX,
+      worldZ: cell.j - currentDepth / 2 + 0.5 + centerZ,
       height: layer + 0.5,
     };
   };
@@ -233,7 +249,7 @@ export function mountProceduralComparator(
     }
   };
 
-  rebuild();
+  setOptions(currentOptions);
   world.position.set(centerX, 0, centerZ);
   world.visible = false;
   scene.add(world);
@@ -249,8 +265,10 @@ export function mountProceduralComparator(
       if (visible) applyMode();
     },
     regenerate: (newSeed) => {
-      currentSeed = newSeed;
-      rebuild();
+      setOptions({ ...currentOptions, seed: newSeed });
+    },
+    regenerateFromOptions: (next) => {
+      setOptions(next);
     },
     groundHeightAt,
     get raycastGroup() {
@@ -259,8 +277,7 @@ export function mountProceduralComparator(
     pickTerrain,
     setPropsVisible,
     terrainStats: () => (mode === 'bloques' ? blocks!.stats : smooth!.stats),
-    /* El agua del comparador es estática; el método existe para mantener el
-     * mismo contrato de update que la isla y poder llamarlo de forma uniforme. */
+    /* Agua estática: el update existe solo por el contrato común con la isla. */
     update: () => {},
     dispose: () => {
       scene.remove(world);

@@ -14,3 +14,4 @@ export * from './terrain-mesh';
 export * from './performance-monitor';
 export * from './game-realtime';
 export * from './procedural';
+export * from './map-builder';

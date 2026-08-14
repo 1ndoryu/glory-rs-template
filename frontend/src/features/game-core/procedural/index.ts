@@ -13,3 +13,4 @@ export * from './grass-mesh';
 export * from './vegetation-lowpoly';
 export * from './water-mesh';
 export * from './rain-mesh';
+export * from './terrain-options';

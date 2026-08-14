@@ -415,6 +415,34 @@
   opacity: 0.85;
 }
 
+/* [138A-4] Constructor de mundo: entradas y filas dobles monocromo con los
+ * tokens del OS (sin radios, sombras ni colores nuevos). */
+.juegoPanelTerreno__doble {
+  display: flex;
+  gap: var(--espacio-xs);
+}
+
+.juegoPanelTerreno__doble > .juegoPanelTerreno__fila {
+  flex: 1;
+  min-width: 0;
+}
+
+.juegoPanelTerreno__entrada {
+  width: 100%;
+  box-sizing: border-box;
+  border: var(--sistema-borde);
+  color: var(--sistema-texto);
+  background: var(--sistema-superficie);
+  font: inherit;
+  font-size: var(--tamano-pequeno);
+}
+
+.juegoPanelTerreno__doble .juegoPanelTerreno__boton {
+  flex: 0 0 auto;
+  width: auto;
+  padding: 0 var(--espacio-sm);
+}
+
 /* [297A-73] Panel de versiones de Assets 3D: preview aislado monocromo con
  * grid y caja envolvente, dentro del modal del OS. */
 .asset-preview-host {

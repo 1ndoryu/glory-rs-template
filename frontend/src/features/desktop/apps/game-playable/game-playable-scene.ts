@@ -6,8 +6,16 @@
 
 import * as THREE from 'three';
 import {
+  buildMapVersionFromOptions,
   MapChunkCache,
+  mapBuilderStats,
+  normalizeTerrainOptions,
+  parseSerializedWorld,
+  serializeWorld,
+  terrainOptionsPreset,
+  type MapBuilderStats,
   type MapVersion,
+  type TerrainOptions,
   type WorldMap,
   type WorldSnapshot,
 } from '../../../game-core';
@@ -164,6 +172,50 @@ export function mountGamePlayableScene(
 
   /* [128A-1] Follow de cámara conmutable desde el panel temporal. */
   let followPlayer = true;
+  /* [138A-4] Estado del constructor: últimas opciones y documento generado. */
+  let constructorOptions: TerrainOptions = terrainOptionsPreset('isla');
+  let constructorMap: MapVersion | null = null;
+
+  const formatConstructorStats = (stats: MapBuilderStats): string =>
+    `mundo · chunks ${stats.chunks} · instancias ${stats.instances}`
+    + ` · árboles ${stats.trees} · rocas ${stats.rocks}`
+    + ` · tris ${stats.triangles} · vértices ${stats.vertices}`;
+
+  const downloadWorldJson = (): void => {
+    const map = constructorMap ?? buildMapVersionFromOptions(constructorOptions);
+    const json = serializeWorld(constructorOptions, map);
+    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `bosque-${constructorOptions.shape}-${constructorOptions.seed}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const applyTerrainMode = (terrainMode: 'actual' | 'bloques' | 'suave'): void => {
+    const showComparator = terrainMode !== 'actual';
+    if (showComparator) comparatorMode = terrainMode;
+    comparatorVisible = showComparator;
+    curvedIsland.setVisible(!showComparator);
+    proceduralComparator.setVisible(showComparator);
+    if (showComparator) proceduralComparator.setMode(comparatorMode);
+    panel.setTerrainMode(terrainMode);
+    applyPick(null);
+  };
+
+  /* [138A-4] Genera el documento con el pipeline puro y muestra el resultado
+   * en el comparador (misma base de opciones para bloques/suave). */
+  const showConstructorWorld = (options: TerrainOptions): void => {
+    constructorOptions = normalizeTerrainOptions(options);
+    constructorMap = buildMapVersionFromOptions(constructorOptions);
+    proceduralComparator.regenerateFromOptions(constructorOptions);
+    panel.setConstructorOptions(constructorOptions);
+    panel.setConstructorStats(formatConstructorStats(mapBuilderStats(constructorMap)));
+    applyTerrainMode('bloques');
+  };
+
   const panel = mountCurvedIslandPanel(host, {
     setCurvature: (down, pull) => bend.setCurvature(down, pull),
     setRain: (amount) => curvedIsland.setRain(amount),
@@ -177,14 +229,23 @@ export function mountGamePlayableScene(
       curvedIsland.regenerate(newSeed);
       proceduralComparator.regenerate(newSeed);
     },
-    setTerrainMode: (terrainMode) => {
-      const showComparator = terrainMode !== 'actual';
-      if (showComparator) comparatorMode = terrainMode;
-      comparatorVisible = showComparator;
-      curvedIsland.setVisible(!showComparator);
-      proceduralComparator.setVisible(showComparator);
-      if (showComparator) proceduralComparator.setMode(comparatorMode);
-      applyPick(null);
+    setTerrainMode: applyTerrainMode,
+    constructor: {
+      onGenerate: (options) => showConstructorWorld(options),
+      onExport: () => downloadWorldJson(),
+      onImport: (text) => {
+        try {
+          const world = parseSerializedWorld(text);
+          constructorOptions = world.options;
+          constructorMap = world.map;
+          proceduralComparator.regenerateFromOptions(world.options);
+          panel.setConstructorOptions(world.options);
+          panel.setConstructorStats(formatConstructorStats(mapBuilderStats(world.map)));
+          applyTerrainMode('bloques');
+        } catch (error) {
+          panel.setConstructorStats(error instanceof Error ? `error: ${error.message}` : 'mundo inválido');
+        }
+      },
     },
   });
 

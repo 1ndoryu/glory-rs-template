@@ -4,6 +4,12 @@
  * lluvia, los props, el follow de cámara y regenerar la isla. */
 
 import { createEl } from '../../../../utils/dom';
+import type { TerrainOptions } from '../../../game-core';
+import {
+  mountWorldConstructor,
+  type WorldConstructorControls,
+  type WorldConstructorSection,
+} from './game-world-constructor';
 
 export interface CurvedIslandPanelControls {
   readonly setCurvature: (down: number, pull: number) => void;
@@ -13,12 +19,20 @@ export interface CurvedIslandPanelControls {
   readonly regenerate: () => void;
   /** [138A-1] Comparador de estilos del toolkit (opcional: solo si existe). */
   readonly setTerrainMode?: (mode: 'actual' | 'bloques' | 'suave') => void;
+  /** [138A-4] Constructor de mundo (opcional: solo si existe). */
+  readonly constructor?: WorldConstructorControls;
 }
 
 export interface CurvedIslandPanel {
   readonly setPick: (pick: { i: number; j: number; level: number | null } | null) => void;
   /** [138A-1] Línea de métricas del comparador (vacío la oculta). */
   readonly setTerrainMetrics: (text: string) => void;
+  /** [138A-4] Línea de métricas del constructor (vacío la oculta). */
+  readonly setConstructorStats: (text: string) => void;
+  /** [138A-4] Sincroniza los controles del constructor con unas opciones. */
+  readonly setConstructorOptions: (options: TerrainOptions) => void;
+  /** [138A-4] Marca el segmento de estilo activo sin disparar el control. */
+  readonly setTerrainMode: (mode: 'actual' | 'bloques' | 'suave') => void;
   readonly destroy: () => void;
 }
 
@@ -34,6 +48,7 @@ export function mountCurvedIslandPanel(
 ): CurvedIslandPanel {
   const stats = createEl('p', { className: 'juegoPanelTerreno__stats', textContent: '' });
   let metricsEl: HTMLParagraphElement | null = null;
+  let constructorSection: WorldConstructorSection | null = null;
 
   const panel = createEl('section', {
     className: 'juegoPanelTerreno',
@@ -114,7 +129,13 @@ export function mountCurvedIslandPanel(
   grupoIsla.appendChild(regenButton);
   body.appendChild(grupoIsla);
 
+  /* --- grupo: constructor de mundo (138A-4) --- */
+  if (controls.constructor) {
+    constructorSection = mountWorldConstructor(body, controls.constructor);
+  }
+
   /* --- grupo: comparador de estilos (138A-1) --- */
+  let setTerrainMode: (mode: 'actual' | 'bloques' | 'suave') => void = () => {};
   if (controls.setTerrainMode) {
     const grupoComparador = createEl('div', { className: 'juegoPanelTerreno__grupo' });
     grupoComparador.appendChild(createEl('p', {
@@ -127,6 +148,7 @@ export function mountCurvedIslandPanel(
       { key: 'bloques', label: 'Bloques' },
       { key: 'suave', label: 'Suave' },
     ];
+    const styleButtons = new Map<'actual' | 'bloques' | 'suave', HTMLButtonElement>();
     for (const estilo of estilos) {
       const button = createEl('button', {
         className: 'juegoPanelTerreno__segmento',
@@ -135,13 +157,17 @@ export function mountCurvedIslandPanel(
       });
       if (estilo.key === 'actual') button.classList.add('juegoPanelTerreno__segmento--activo');
       button.addEventListener('click', () => {
-        for (const sibling of Array.from(segEstilos.children)) {
-          sibling.classList.toggle('juegoPanelTerreno__segmento--activo', sibling === button);
-        }
+        setTerrainMode(estilo.key);
         controls.setTerrainMode?.(estilo.key);
       });
+      styleButtons.set(estilo.key, button);
       segEstilos.appendChild(button);
     }
+    setTerrainMode = (mode) => {
+      for (const [key, button] of styleButtons) {
+        button.classList.toggle('juegoPanelTerreno__segmento--activo', key === mode);
+      }
+    };
     grupoComparador.appendChild(segEstilos);
     metricsEl = createEl('p', { className: 'juegoPanelTerreno__statsLine', textContent: '' });
     grupoComparador.appendChild(metricsEl);
@@ -162,10 +188,18 @@ export function mountCurvedIslandPanel(
     setTerrainMetrics: (text) => {
       if (metricsEl) metricsEl.textContent = text;
     },
+    setConstructorStats: (text) => {
+      constructorSection?.setStats(text);
+    },
+    setConstructorOptions: (options) => {
+      constructorSection?.applyOptions(options);
+    },
+    setTerrainMode,
     destroy: () => {
       panel.remove();
       stats.remove();
       metricsEl?.remove();
+      constructorSection?.destroy();
       void propsCheck;
       void followCheck;
     },
