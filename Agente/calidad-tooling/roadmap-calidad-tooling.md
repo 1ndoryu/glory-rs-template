@@ -1,3 +1,5 @@
+> **CANCELADO (2026-08-12, decisión del usuario):** contenido de Sentinel/quality gate. Se archiva sin ejecutar; no es trabajo pendiente.
+
 # Backlog de calidad movido
 
 Este alias se conserva solo para no romper referencias históricas. La fuente canónica del backlog y de

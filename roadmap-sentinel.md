@@ -1,3 +1,5 @@
+> **CANCELADO (2026-08-12, decisión del usuario):** contenido de Sentinel/quality gate. Se archiva sin ejecutar; no es trabajo pendiente.
+
 # Roadmap Sentinel / VarSense / Quality Gate — wandori.us
 
 > **Fecha:** 2026-08-01  
