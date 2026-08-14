@@ -28,10 +28,16 @@ import { createWorldBend } from './game-world-bend';
 import { mountCurvedIsland, type BlockPick } from './game-curved-island';
 import { mountCurvedIslandPanel } from './game-curved-island-panel';
 import {
+  loadConstructorState,
+  saveConstructorState,
+  type ConstructorTerrainMode,
+} from './game-constructor-persistence';
+import {
   mountProceduralComparator,
   type ProceduralTerrainMode,
   type TerrainPick,
 } from './game-procedural-comparator';
+import { createDebouncedRegenerator } from './game-realtime-debounce';
 import { FIXTURE_PROPS } from './game-fixture-map';
 import { createGamePlayableVisualCache } from './game-playable-visual-cache';
 import {
@@ -194,7 +200,7 @@ export function mountGamePlayableScene(
     URL.revokeObjectURL(url);
   };
 
-  const applyTerrainMode = (terrainMode: 'actual' | 'bloques' | 'suave'): void => {
+  const applyTerrainMode = (terrainMode: ConstructorTerrainMode): void => {
     const showComparator = terrainMode !== 'actual';
     if (showComparator) comparatorMode = terrainMode;
     comparatorVisible = showComparator;
@@ -203,18 +209,28 @@ export function mountGamePlayableScene(
     if (showComparator) proceduralComparator.setMode(comparatorMode);
     panel.setTerrainMode(terrainMode);
     applyPick(null);
+    /* [138A-5] El modo de render se persiste junto a las opciones. */
+    saveConstructorState({ version: 1, options: constructorOptions, mode: terrainMode });
   };
 
   /* [138A-4] Genera el documento con el pipeline puro y muestra el resultado
-   * en el comparador (misma base de opciones para bloques/suave). */
+   * en el comparador (misma base de opciones para bloques/suave).
+   * [138A-5] Al regenerar en tiempo real se conserva el modo visible del
+   * comparador en vez de volver a 'bloques' en cada cambio de valor. */
   const showConstructorWorld = (options: TerrainOptions): void => {
     constructorOptions = normalizeTerrainOptions(options);
     constructorMap = buildMapVersionFromOptions(constructorOptions);
     proceduralComparator.regenerateFromOptions(constructorOptions);
     panel.setConstructorOptions(constructorOptions);
     panel.setConstructorStats(formatConstructorStats(mapBuilderStats(constructorMap)));
-    applyTerrainMode('bloques');
+    applyTerrainMode(comparatorVisible ? comparatorMode : 'bloques');
   };
+
+  /* [138A-5] Regeneración en vivo: los cambios de controles se agrupan ~200 ms
+   * y la última opción gana; se cancela en destroy. */
+  const regenerateDebounced = createDebouncedRegenerator(200, (options) => {
+    showConstructorWorld(options);
+  });
 
   const panel = mountCurvedIslandPanel(host, {
     setCurvature: (down, pull) => bend.setCurvature(down, pull),
@@ -231,7 +247,13 @@ export function mountGamePlayableScene(
     },
     setTerrainMode: applyTerrainMode,
     constructor: {
-      onGenerate: (options) => showConstructorWorld(options),
+      onGenerate: (options) => {
+        /* [138A-5] Generar de forma explícita cancela el debounce pendiente
+         * para no regenerar dos veces seguidas. */
+        regenerateDebounced.cancel();
+        showConstructorWorld(options);
+      },
+      onChange: (options) => regenerateDebounced.schedule(options),
       onExport: () => downloadWorldJson(),
       onImport: (text) => {
         try {
@@ -380,6 +402,15 @@ export function mountGamePlayableScene(
         : curvedIsland.pickBlock(hit.point.x, hit.point.y, hit.point.z)
       : null);
   };
+
+  /* [138A-5] Restaura las últimas opciones y modo al recargar (fail-closed).
+   * Debe correr después de `applyPick` (la generación lo invoca al aplicar
+   * el modo) y antes de conectar el input de órbita. */
+  const restored = loadConstructorState();
+  if (restored) {
+    showConstructorWorld(restored.options);
+    if (restored.mode !== 'bloques') applyTerrainMode(restored.mode);
+  }
 
   const groundHeightAt = (x: number, z: number): number =>
     comparatorVisible
@@ -589,6 +620,7 @@ export function mountGamePlayableScene(
       host.removeEventListener('pointercancel', onOrbitEnd);
       host.removeEventListener('pointerleave', onPointerLeave);
       host.removeEventListener('wheel', onWheel);
+      regenerateDebounced.dispose();
       panel.destroy();
       gpuFrameProbe.dispose();
       visualCache.destroy();

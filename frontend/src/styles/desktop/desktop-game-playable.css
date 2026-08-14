@@ -443,6 +443,81 @@
   padding: 0 var(--espacio-sm);
 }
 
+/* [138A-5] Constructor de mundo v2: rail lateral de iconos (tipo Blender) con
+ * subpaneles pequeños y acciones fijas. Tokens B&W del OS, sin radios. */
+.juegoPanelTerreno--constructor {
+  width: 320px;
+}
+
+.juegoConstructor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-xs);
+  margin-top: var(--espacio-sm);
+}
+
+.juegoConstructor__cuerpo {
+  display: flex;
+  gap: var(--espacio-xs);
+  min-height: 0;
+}
+
+.juegoConstructor__rail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 0 0 auto;
+  padding: 2px;
+  border: var(--sistema-borde);
+}
+
+.juegoConstructor__icono {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  color: var(--sistema-texto);
+  background: transparent;
+  cursor: pointer;
+}
+
+.juegoConstructor__icono:hover,
+.juegoConstructor__icono:focus-visible,
+.juegoConstructor__icono--activo {
+  color: var(--sistema-superficie);
+  background: var(--sistema-texto);
+}
+
+.juegoConstructor__lienzo {
+  flex: 1;
+  min-width: 0;
+}
+
+.juegoConstructor__subpanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-xs);
+}
+
+.juegoConstructor__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espacio-xs);
+}
+
+.juegoConstructor__acciones .juegoPanelTerreno__boton {
+  flex: 1 0 auto;
+  width: auto;
+  padding: var(--espacio-xs) var(--espacio-sm);
+}
+
+.juegoConstructor__acciones .juegoPanelTerreno__statsLine {
+  flex-basis: 100%;
+  margin: 0;
+}
+
 /* [297A-73] Panel de versiones de Assets 3D: preview aislado monocromo con
  * grid y caja envolvente, dentro del modal del OS. */
 .asset-preview-host {

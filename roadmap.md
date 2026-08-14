@@ -136,7 +136,7 @@ misma base. Gate `npm run gate:check -- 138A-4` PASS; type-check limpio y
 vitest 30 archivos / 230 tests. Fase 4 (retoque fino con editor 2D) queda
 como siguiente bloque. Sin backend/realtime/colisión.
 
-### 138A-5..9 — Constructor de mundo v2: toolkit de edición (planificado, 14-ago)
+### 138A-5..9 — Constructor de mundo v2: toolkit de edición (en curso, 14-ago)
 
 **Fuente canónica:** `Agente/planes/plan-constructor-mundo-v2-toolkit-edicion-2026-08-14.md`
 (activo, pendiente de aprobación). Planifica la lista completa del usuario
@@ -144,7 +144,10 @@ como siguiente bloque. Sin backend/realtime/colisión.
 suave, tamaño de bloques, persistencia, editor de objetos, 3 cámaras, paneles
 de color/textura/assets y dos auditorías) en 5 bloques con gate propio:
 
-- [ ] **138A-5 — UI por iconos + tiempo real + persistencia local** (`localStorage`).
+- [x] **138A-5 — UI por iconos + tiempo real + persistencia local** (`localStorage`).
+      Rail lateral tipo Blender (iconos Lucide con aria), subpanel único a la
+      vez, regeneración con debounce de 200 ms que conserva el modo visible y
+      restauración de opciones/modo desde `wandorius:constructor:v1`.
 - [ ] **138A-6 — Dos estilos (`bloques`/`suave`, se retira `actual`), sin árboles
       en suave, `cellSize` real en el preview y escala base menor (~0.5×).**
 - [ ] **138A-7 — Tres modos de cámara:** libre (orbital), primera persona y 3ª persona.

@@ -5,11 +5,12 @@ import {
   type WorldConstructorControls,
 } from './game-world-constructor';
 
-describe('sección constructor de mundo', () => {
+describe('sección constructor de mundo (rail de iconos)', () => {
   let host: HTMLElement;
   let onGenerate: ReturnType<typeof vi.fn<(options: TerrainOptions) => void>>;
   let onExport: ReturnType<typeof vi.fn<() => void>>;
   let onImport: ReturnType<typeof vi.fn<(text: string) => void>>;
+  let onChange: ReturnType<typeof vi.fn<(options: TerrainOptions) => void>>;
   let controls: WorldConstructorControls;
 
   beforeEach(() => {
@@ -18,7 +19,8 @@ describe('sección constructor de mundo', () => {
     onGenerate = vi.fn();
     onExport = vi.fn();
     onImport = vi.fn();
-    controls = { onGenerate, onExport, onImport };
+    onChange = vi.fn();
+    controls = { onGenerate, onExport, onImport, onChange };
   });
 
   afterEach(() => {
@@ -30,6 +32,12 @@ describe('sección constructor de mundo', () => {
       .find(candidate => candidate.textContent === text);
     expect(button, `botón "${text}"`).toBeDefined();
     button?.click();
+  };
+
+  const railButton = (label: string): HTMLButtonElement => {
+    const button = host.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
+    expect(button, `icono "${label}"`).toBeDefined();
+    return button as HTMLButtonElement;
   };
 
   it('genera con las opciones por defecto al pulsar Generar mundo', () => {
@@ -47,7 +55,7 @@ describe('sección constructor de mundo', () => {
     });
   });
 
-  it('usa la forma activa y el seed aleatorio al generar', () => {
+  it('usa la forma activa y el seed editado al generar', () => {
     mountWorldConstructor(host, controls);
     clickText('Continente');
     const seed = host.querySelector<HTMLInputElement>('input[type="number"]');
@@ -58,7 +66,64 @@ describe('sección constructor de mundo', () => {
     expect(onGenerate.mock.calls[0][0]).toMatchObject({ shape: 'continente', seed: 4242 });
   });
 
-  it('applyOptions sincroniza los controles antes de generar', () => {
+  it('emite onChange en tiempo real al editar un valor', () => {
+    mountWorldConstructor(host, controls);
+    const seed = host.querySelector<HTMLInputElement>('input[type="number"]');
+    expect(seed).not.toBeNull();
+    if (seed) seed.value = '9001';
+    seed?.dispatchEvent(new Event('input'));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange.mock.calls[0][0]).toMatchObject({ seed: 9001 });
+  });
+
+  it('emite onChange al cambiar forma y vegetación sin pulsar Generar', () => {
+    mountWorldConstructor(host, controls);
+    clickText('Archipiélago');
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange.mock.calls[0][0]).toMatchObject({ shape: 'archipielago' });
+
+    railButton('Mundo/Estilo').click();
+    const density = Array.from(host.querySelectorAll<HTMLInputElement>('input[type="range"]'))
+      .find(input => input.closest('.juegoPanelTerreno__fila')?.textContent?.includes('Vegetación'));
+    expect(density).toBeDefined();
+    if (!density) return;
+    density.value = '25';
+    density.dispatchEvent(new Event('input'));
+    expect(onChange).toHaveBeenCalledTimes(2);
+    expect(onChange.mock.calls[1][0]).toMatchObject({ vegetationDensity: 0.25 });
+  });
+
+  it('mantiene un solo subpanel abierto y conmuta con los iconos del rail', () => {
+    mountWorldConstructor(host, controls);
+    const openPanels = (): string[] => Array.from(host.querySelectorAll<HTMLElement>('.juegoConstructor__subpanel'))
+      .map(panel => panel.getAttribute('aria-label') ?? '');
+
+    expect(openPanels()).toEqual(['Terreno']);
+    expect(railButton('Terreno').getAttribute('aria-pressed')).toBe('true');
+
+    railButton('Mundo/Estilo').click();
+    expect(openPanels()).toEqual(['Mundo/Estilo']);
+    expect(railButton('Terreno').getAttribute('aria-pressed')).toBe('false');
+    expect(railButton('Mundo/Estilo').getAttribute('aria-pressed')).toBe('true');
+
+    railButton('Mundo/Estilo').click();
+    expect(openPanels()).toEqual([]);
+  });
+
+  it('el subpanel Mundo cambia dimensiones y celda con onChange', () => {
+    mountWorldConstructor(host, controls);
+    railButton('Mundo/Estilo').click();
+    const selects = Array.from(host.querySelectorAll<HTMLSelectElement>('select'));
+    const ancho = selects.find(select => select.closest('.juegoPanelTerreno__fila')?.textContent?.includes('Ancho'));
+    expect(ancho).toBeDefined();
+    if (!ancho) return;
+    ancho.value = '64';
+    ancho.dispatchEvent(new Event('change'));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange.mock.calls[0][0]).toMatchObject({ width: 64 });
+  });
+
+  it('applyOptions sincroniza los controles activos antes de generar', () => {
     const section = mountWorldConstructor(host, controls);
     section.applyOptions(terrainOptionsPreset('valle'));
     clickText('Generar mundo');
@@ -74,7 +139,7 @@ describe('sección constructor de mundo', () => {
     const stats = host.querySelector('.juegoPanelTerreno__statsLine');
     expect(stats?.textContent).toContain('mundo · chunks 6');
     section.destroy();
-    expect(host.querySelector('.juegoPanelTerreno__grupo')).toBeNull();
+    expect(host.querySelector('.juegoConstructor')).toBeNull();
   });
 
   it('exporta e importa JSON desde el input de archivo', async () => {

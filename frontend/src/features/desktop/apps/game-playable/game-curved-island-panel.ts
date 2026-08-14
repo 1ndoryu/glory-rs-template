@@ -131,6 +131,8 @@ export function mountCurvedIslandPanel(
 
   /* --- grupo: constructor de mundo (138A-4) --- */
   if (controls.constructor) {
+    /* [138A-5] El rail de iconos necesita más ancho que el panel base. */
+    panel.classList.add('juegoPanelTerreno--constructor');
     constructorSection = mountWorldConstructor(body, controls.constructor);
   }
 

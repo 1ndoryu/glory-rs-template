@@ -1,6 +1,6 @@
 # Plan 138A-5..9 — Constructor de mundo v2: toolkit de edición (2026-08-14)
 
-> **Estado:** ACTIVO (en planificación; pendiente de aprobación del usuario)
+> **Estado:** ACTIVO — 138A-5 completado; siguiente bloque 138A-6.
 > **Rama:** `wandorius` · **Gates:** `npm run gate:check -- 138A-5` …
 > `npm run gate:check -- 138A-9`
 > **Fuente de contexto:** decisiones de producto 2026-08-13/14 (motor propio,
@@ -63,15 +63,16 @@ panel de colores/texturas/assets, tres modos de cámara y dos auditorías
   al recargar; export/import JSON sigue siendo la fuente portable. Sin backend.
 
 **Checklist:**
-- [ ] `game-world-constructor.ts` se divide en subpaneles por tema sin duplicar
+- [x] `game-world-constructor.ts` se divide en subpaneles por tema sin duplicar
       lógica de controles (helper compartido de campo/slider/select).
-- [ ] Iconos con accesibilidad (tooltip + teclado) y tokens del OS; un solo
+- [x] Iconos con accesibilidad (tooltip + teclado) y tokens del OS; un solo
       subpanel abierto a la vez.
-- [ ] Debounce de regeneración con cancelación; test DOM (N cambios rápidos →
+- [x] Debounce de regeneración con cancelación; test DOM (N cambios rápidos →
       1 regeneración) y teardown de timers.
-- [ ] Persistencia `localStorage` versionada con restauración fail-closed y
+- [x] Persistencia `localStorage` versionada con restauración fail-closed y
       limpieza en teardown.
-- [ ] Gate 138A-5 PASS + validación visual del usuario en `/forest-playable`.
+- [x] Gate 138A-5 PASS (pendiente la validación visual del usuario en
+      `/forest-playable`, que se hace al probar el bloque).
 
 ### 138A-6 — Dos estilos, sin árboles en suave, cellSize real, escala menor
 
