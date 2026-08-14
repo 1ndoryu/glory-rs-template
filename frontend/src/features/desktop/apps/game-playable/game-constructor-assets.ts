@@ -25,12 +25,100 @@ const CATEGORY_LABELS: Readonly<Record<AssetCategory, string>> = {
 
 const MAX_INSTANCE_ROWS = 60;
 
+/* [138A-9] Miniatura 2D por categoría y estilo: el panel no carga modelos,
+ * así que el thumbnail es un glifo monocromo (tokens B&W del OS) que cambia
+ * entre bloques y suave. Si no hay canvas 2D (jsdom/headless) se omite sin
+ * romper el panel. */
+function drawAssetThumbnail(
+  canvas: HTMLCanvasElement,
+  category: AssetCategory,
+  style: 'bloques' | 'suave',
+): void {
+  const context = canvas.getContext('2d');
+  if (!context) return;
+  const size = canvas.width;
+  context.clearRect(0, 0, size, size);
+  const ink = getComputedStyle(canvas).getPropertyValue('--sistema-texto').trim() || '#111111';
+  const paper = getComputedStyle(canvas).getPropertyValue('--sistema-superficie').trim() || '#ffffff';
+  context.fillStyle = paper;
+  context.fillRect(0, 0, size, size);
+  context.strokeStyle = ink;
+  context.lineWidth = 2;
+  const isBlock = style === 'bloques';
+  if (category === 'tree') {
+    /* Conífera: tronco + copa triangular (bloques) o cúpula (suave). */
+    context.beginPath();
+    context.moveTo(size / 2, 12);
+    context.lineTo(14, 30);
+    context.lineTo(size - 14, 30);
+    context.closePath();
+    context.stroke();
+    context.beginPath();
+    context.moveTo(size / 2 - 3, 40);
+    context.lineTo(size / 2 + 3, 40);
+    context.lineTo(size / 2 + 3, 48);
+    context.lineTo(size / 2 - 3, 48);
+    context.closePath();
+    context.stroke();
+  } else if (category === 'rock') {
+    context.beginPath();
+    if (isBlock) {
+      context.rect(16, 22, 24, 20);
+    } else {
+      context.moveTo(16, 42);
+      context.lineTo(20, 28);
+      context.lineTo(30, 22);
+      context.lineTo(38, 30);
+      context.lineTo(42, 42);
+    }
+    context.closePath();
+    context.stroke();
+  } else if (category === 'terrain') {
+    context.beginPath();
+    if (isBlock) {
+      context.rect(12, 34, 32, 12);
+    } else {
+      context.moveTo(10, 38);
+      context.quadraticCurveTo(28, 16, 46, 38);
+    }
+    context.stroke();
+  } else if (category === 'water') {
+    context.beginPath();
+    context.moveTo(12, 30);
+    context.quadraticCurveTo(20, 24, 28, 30);
+    context.quadraticCurveTo(36, 36, 44, 30);
+    context.stroke();
+    context.beginPath();
+    context.moveTo(12, 40);
+    context.quadraticCurveTo(20, 34, 28, 40);
+    context.quadraticCurveTo(36, 46, 44, 40);
+    context.stroke();
+  } else if (category === 'character') {
+    context.beginPath();
+    context.arc(size / 2, 20, 7, 0, Math.PI * 2);
+    context.stroke();
+    context.beginPath();
+    context.moveTo(16, 48);
+    context.lineTo(size / 2, 32);
+    context.lineTo(size - 16, 48);
+    context.stroke();
+  } else {
+    context.beginPath();
+    if (isBlock) context.rect(16, 16, 24, 24);
+    else context.arc(size / 2, 28, 12, 0, Math.PI * 2);
+    context.stroke();
+  }
+}
+
 /** Panel Assets: inventario del mundo con drag para colocar y quitar. */
 export function buildAssetsPanel(
   container: HTMLElement,
   ctx: ConstructorPanelContext,
 ): void {
-  const status = createEl('p', { className: 'juegoPanelTerreno__statsLine', textContent: '' });
+  const status = createEl('p', {
+    className: 'juegoPanelTerreno__statsLine',
+    textContent: 'Arrastra un asset al mundo para colocarlo.',
+  });
   const list = createEl('div', { className: 'juegoConstructor__assets' });
   container.appendChild(list);
   container.appendChild(status);
@@ -77,19 +165,31 @@ export function buildAssetsPanel(
       list.appendChild(row);
     }
 
+    /* [138A-9] Explorador en cuadrícula con miniatura por asset (estilo
+     * adaptado: bloques/suave). La tarjeta es arrastrable al mundo. */
+    const grid = createEl('div', { className: 'juegoConstructor__assetsGrid' });
+    const style = ctx.state.style === 'suave' ? 'suave' : 'bloques';
     for (const [assetId, asset] of Object.entries(map.assetManifest)) {
       const count = byAsset[assetId] ?? 0;
-      const row = createEl('div', { className: 'juegoConstructor__assetFila' });
+      const card = createEl('div', { className: 'juegoConstructor__assetTarjeta' });
+      const thumbnail = createEl('canvas', {
+        className: 'juegoConstructor__assetMiniatura',
+        ariaLabel: `Miniatura de ${assetId}`,
+      });
+      thumbnail.width = 56;
+      thumbnail.height = 56;
+      drawAssetThumbnail(thumbnail, asset.category, style);
       const label = createEl('span', {
         className: 'juegoConstructor__assetNombre',
-        textContent: `${assetId} · ${count} · ${asset.category}`,
+        textContent: `${assetId} · ${count}`,
+        title: `${assetId} · ${asset.category}`,
       });
-      row.appendChild(label);
+      card.append(thumbnail, label);
       /* [138A-8] Arrastrar un asset al mundo coloca una instancia nueva
        * (el drop en el host lo resuelve la escena con raycast). */
-      row.draggable = true;
-      row.title = 'Arrastra al mundo para colocar';
-      row.addEventListener('dragstart', (event) => {
+      card.draggable = true;
+      card.title = 'Arrastra al mundo para colocar';
+      card.addEventListener('dragstart', (event) => {
         event.dataTransfer?.setData(ASSET_DRAG_MIME, assetId);
         event.dataTransfer!.effectAllowed = 'copy';
       });
@@ -104,9 +204,10 @@ export function buildAssetsPanel(
           .filter(instance => instance.assetVersionId === assetId)
           .map(instance => ({ kind: 'remove' as const, id: instance.id })));
       });
-      row.appendChild(quitar);
-      list.appendChild(row);
+      card.appendChild(quitar);
+      grid.appendChild(card);
     }
+    list.appendChild(grid);
 
     /* Instancias individuales (primeras MAX_INSTANCE_ROWS) para quitar una. */
     const instancias = map.instances.slice(0, MAX_INSTANCE_ROWS);

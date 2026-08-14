@@ -6,11 +6,14 @@
 import {
   normalizeTerrainOptions,
   validateTerrainOptions,
+  normalizeTerrainLayerStack,
+  validateTerrainLayerStack,
   type RenderStyle,
   type TerrainOptions,
   normalizeWorldPalette,
   validateWorldPalette,
   type WorldPalette,
+  type TerrainLayer,
 } from '../../../game-core';
 import {
   DEFAULT_CAMERA_MODE,
@@ -62,6 +65,9 @@ export interface ConstructorPersistedState {
   readonly palette?: WorldPalette;
   /** [138A-8] Estado de la ventana del Constructor (colapso/lado/ancho). */
   readonly panel?: ConstructorPanelState;
+  /** [138A-9] Stack de capas de terreno (pinceles del editor de mapa);
+   *  ausente en estados guardados antes de 138A-9. */
+  readonly layers?: readonly TerrainLayer[];
 }
 
 const VALID_MODES: readonly RenderStyle[] = ['bloques', 'suave'];
@@ -105,6 +111,12 @@ export function loadConstructorState(): ConstructorPersistedState | null {
       ? normalizeWorldPalette(record.palette)
       : undefined;
     const panel = normalizePanelState(record.panel) ?? undefined;
+    /* [138A-9] Las capas son opcionales y solo se restauran si el stack
+     * completo es válido; un payload corrupto cae a omitido sin bloquear la
+     * carga del resto del estado (mismo patrón que paleta/panel). */
+    const layers = validateTerrainLayerStack(record.layers).length === 0
+      ? normalizeTerrainLayerStack(record.layers)
+      : undefined;
     return {
       version: 1,
       options,
@@ -112,6 +124,7 @@ export function loadConstructorState(): ConstructorPersistedState | null {
       camera,
       ...(palette ? { palette } : {}),
       ...(panel ? { panel } : {}),
+      ...(layers ? { layers } : {}),
     };
   } catch {
     /* JSON corrupto o storage no disponible: no se puede restaurar. */

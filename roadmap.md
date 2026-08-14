@@ -160,9 +160,11 @@ gate propio:
       los lados, ancho redimensionable, cabecera vertical al ocultar) **+
       transform de objetos** (mover/colocar; sin editar modelos, eso es
       Blender) **+ paneles de Color, Textura y Assets** (con arrastrar/quitar).
-- [ ] **138A-9 — Editor de mapa por estilo:** suave (pinceles de pintar
+- [x] **138A-9 — Editor de mapa por estilo:** suave (pinceles de pintar
       caminos, arena, agua y subir/bajar terreno) y bloques (colocar/quitar
-      bloques y variantes).
+      bloques y variantes); stack de capas serializable con visor tipo Blender
+      (orden/ojo/duplicar/eliminar), cámara libre desacoplada, primera persona
+      sin figura local y límites del MapVersion del constructor.
 - [ ] **138A-10 — Generador de pasto optimizado** (densidad/tamaño/color) con
       pincel de poner/quitar pasto.
 - [ ] **138A-11 — Auditorías SOLID/arquitectura y rendimiento con evidencia.**

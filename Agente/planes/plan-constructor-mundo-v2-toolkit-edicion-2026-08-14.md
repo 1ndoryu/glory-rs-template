@@ -1,6 +1,6 @@
 # Plan 138A-5..12 — Constructor de mundo v2: toolkit de edición (2026-08-14)
 
-> **Estado:** ACTIVO — 138A-7 completado; siguiente bloque 138A-8.
+> **Estado:** ACTIVO — 138A-9 completado; siguiente bloque 138A-10.
 > **Rama:** `wandorius` · **Gates:** `npm run gate:check -- 138A-5` …
 > `npm run gate:check -- 138A-12`
 > **Fuente de contexto:** decisiones de producto 2026-08-13/14 (motor propio,
@@ -109,6 +109,79 @@ adapta al plan:
 - **138A-8 hereda del artefacto** el patrón de panel lateral colapsable con
   slider + readout en vivo (mismo patrón que ya aporta el artefacto Contour).
 
+### Referencia de diseño: GrassSystemThreeJS / Soil Studio (14-ago, noche)
+
+Se incorpora `https://github.com/achrefelouafi/GrassSystemThreeJS` (repositorio
+MIT del "Soil Studio": terreno procedural + pasto en Three.js) como **referencia
+para el generador de pasto de 138A-10**. Su lección principal: **el pasto es
+GPU-instanced** — un solo `InstancedMesh` (una draw call) donde cada hoja se
+coloca, se curva con el terreno y se anima con viento en el vertex shader,
+pegada al mismo heightfield para que siga las montañas y los huecos en vivo;
+el campo de viento es coherente en world-space (dirección, fuerza, velocidad y
+tamaño de ráfaga) con flutter por hoja. El usuario avisa que **no está bien
+optimizado**, así que la adaptación al plan debe ser estrictamente orientada a
+rendimiento:
+
+- **138A-10 adopta** el patrón GPU-instanced de una draw call con curva/animación
+  en el vertex shader y altura muestreada del heightfield, **pero** con los
+  presupuestos del proyecto (chunks ≤1024, instancias ≤10000), merged geometry
+  por chunk, regeneración solo de la zona afectada al pintar y teardown sin
+  fugas (geometrías/materiales liberados); la versión del repo (mesh único
+  global, sin chunking ni presupuestos) queda como referencia de técnica, no
+  como código a copiar.
+- Densidad/tamaño/color y pincel poner/quitar siguen como capa de vegetación
+  del stack de 138A-9 (cuotas fail-closed).
+
+### Correcciones del usuario al ver el constructor (14-ago, noche)
+
+Al probar el constructor el usuario detectó dos problemas de diseño y un bug
+y pidió ajustar el plan antes de seguir:
+
+1. **El panel de Assets debe ser un EXPLORADOR en cuadrícula con miniatura**
+   de cada asset que realmente existe en el manifiesto (gestor de assets:
+   ver, arrastrar al mundo, quitar, limpiar), no una lista de instancias
+   actuales. La vista es **cuadrícula + miniatura por asset**, con su nombre
+   y recuento; el inventario de instancias (qué hay colocado y dónde) no se
+   mezcla en esa vista.
+2. **Los assets se adaptan al modo activo:** en el estilo `bloques` los
+   árboles/rocas del terreno son **bloques del mesher**, no assets low-poly;
+   en `suave` son props low-poly. El explorador muestra **assets de bloque y
+   assets suaves** según el modo, y el render del documento NO debe pintar
+   props low-poly encima de bloques ni duplicar vegetación al recargar.
+  3. **Bug de recarga:** al reiniciar se regeneraban árboles/rocas que "se ven
+     mal" y tapaban/borraban los buenos: la reconstrucción del documento
+     (`rebuildDocumentProps`) pintaba props low-poly sobre los bloques del
+     mesher y competía con la vegetación generada. La causa raíz es la
+     duplicación de fuentes (generada vs documento) y la falta de adaptación
+     por estilo. El arreglo aterriza en 138A-9 (render por estilo y una sola
+     fuente de props) y el visor de capas de 138A-9 es **solo el stack de
+     terreno**, no una colocación de assets sobre el mapa.
+4. **Cámara libre y primera persona (14-ago, noche):** al probar los modos,
+   "libre" no se comporta como cámara libre: la órbita sigue pegada al
+   personaje (se siente como una 3ª persona estática). Se corrige en 138A-9:
+   **libre = vuelo libre** (desacoplada del personaje, WASD + mouse look con
+   límites del mundo), **primera = ojos del personaje ocultando la figura
+   local** (el cuerpo del personaje no debe verse desde sus propios ojos), y
+   **3ª persona = órbita siguiendo al personaje** (comportamiento actual).
+   El visor/personaje local se oculta por modo, no por propiedad global.
+5. **Límite de movimiento "como encerrado en un chunk" (14-ago, noche):** con
+   el constructor activo no se puede recorrer todo el terreno: la simulación
+   y el clamp de cámara usan los bounds del **fixture** (mapa pequeño del
+   runtime), mientras el terreno del constructor (MapVersion) se extiende
+   mucho más; se queda uno "encerrado" dentro del área del fixture. Se
+   corrige en 138A-9: cuando `showConstructorWorld` está activo, el clamp de
+   cámara (libre/primera/tercera) y la simulación del jugador usan los
+   **bounds del MapVersion del constructor** (centrados en la misma isla),
+   no los del fixture; al salir del constructor se vuelve a los bounds
+   originales. Test: recorrer hasta los bordes del constructor y no quedar
+   atascado antes.
+
+El editor de mapa de 138A-9 queda definido como un **visor de capas tipo
+Blender**: lista del stack (orden, ojo de visibilidad, duplicar/eliminar,
+reordenar) y pinceles que crean/editan capas; **nunca** se muestran "todos
+los assets en el mapa" desde ese panel. El manejador de assets es un panel
+separado (138A-8) con su cuadrícula y su drag al mundo.
+
 ## 2. Objetivo
 
 Convertir el constructor de mundo (138A-4) en un **toolkit de edición tipo
@@ -196,6 +269,11 @@ rendimiento) con evidencia. Se mantiene el flujo canónico
       (sin lógica de cámara en `game-core`; solo contratos).
 - [x] Tests DOM de cambio de modo y restauración; teardown sin RAF/listeners
       colgados.
+- [x] (corrección 14-ago, noche) Libre = vuelo libre desacoplado del
+      personaje; primera persona oculta la figura local (ojos del personaje);
+      3ª persona conserva la órbita; bounds de movimiento/cámara = MapVersion
+      del constructor cuando está activo (no los del fixture). Tests de modo
+      con figura visible/oculta y de recorrido hasta los bordes del mundo.
 - [x] Gate 138A-7 PASS + validación visual del usuario (los 3 modos).
 
 ### 138A-8 — Panel-ventana, transform de objetos y paneles de Color, Textura y Assets
@@ -222,10 +300,15 @@ rendimiento) con evidencia. Se mantiene el flujo canónico
   del bloque:** si el cambio de texturas por material no es viable con el
   mesher actual, se documenta como deuda con alternativa (color/rampas) en
   vez de bloquear el bloque.
-- **Panel de Assets:** inventario del manifiesto del mundo (árboles, rocas,
-  césped, agua, bloques y variantes) con recuento, visibilidad, cantidad,
-  limpieza y **arrastrar/soltar** (colocar en el mundo) y **quitar**
-  (eliminar instancia); sin import de modelos externos en este bloque.
+- **Panel de Assets (corregido 14-ago, noche):** **explorador en cuadrícula
+  con miniatura por asset** de los assets que realmente existen en el
+  manifiesto, adaptado al modo activo (`bloques` → prefabs de bloque del
+  mesher; `suave` → props low-poly). Acciones: arrastrar al mundo (colocar),
+  quitar por asset, limpiar categoría y **visibilidad por asset**; el recuento
+  por asset acompaña a su miniatura. Sin import de modelos externos en este
+  bloque. **Fix de recarga:** una sola fuente de props (documento) que
+  renderiza según estilo y no duplica vegetación generada ni pinta low-poly
+  sobre bloques.
 
 **Checklist:**
 - [x] Panel-ventana: alto total, sin título, colapsable a los lados, ancho
@@ -275,15 +358,28 @@ rendimiento) con evidencia. Se mantiene el flujo canónico
   `pick` del comparador). El stack completo se **serializa en el JSON del
   mundo** y se restaura al recargar (138A-5).
 
+- **El panel es un VISOR DE CAPAS tipo Blender (corrección 14-ago, noche):**
+  lista del stack con **ojo de visibilidad**, orden, duplicar/eliminar y
+  reordenar; el pincel activo crea/edita una capa, y el panel **nunca**
+  coloca "todos los assets sobre el mapa" (eso es el manejador de assets de
+  138A-8). Una capa pintada y una capa círculo son ambas formas del mismo
+  stack; la vista muestra el contenido de cada capa (camino/arena/agua/
+  elevación) con su miniatura de forma.
+
 **Checklist:**
-- [ ] Módulo de capas puro en `game-core` (SDF + falloff + blend
+- [x] Módulo de capas puro en `game-core` (SDF + falloff + blend
       `set/add/max/min` + taper) con cuotas, tests de presupuesto y paridad
       preview↔documento.
-- [ ] Panel de capas (orden, visibilidad, duplicar/eliminar) + pinceles
-      suave (caminos/arena/agua/subir-bajar) y bloques (colocar/quitar
-      variantes) en la presentación con teardown.
-- [ ] Stack serializado/exportado en el JSON y restaurado al recargar.
-- [ ] Gate 138A-9 PASS + validación visual del usuario en `/forest-playable`.
+- [x] Visor de capas tipo Blender (orden, ojo de visibilidad, duplicar/
+      eliminar) + pinceles suave (caminos/arena/agua/subir-bajar) y bloques
+      (colocar/quitar variantes) en la presentación con teardown; sin colocar
+      assets sobre el mapa desde este panel.
+- [x] (corrección 14-ago, noche) Assets como explorador en cuadrícula con
+      miniatura + adaptación por estilo (bloques/suave) + fix de recarga sin
+      duplicar props (una sola fuente por estilo).
+- [x] Stack serializado/exportado en el JSON y restaurado al recargar.
+- [ ] Gate 138A-9 PASS + validación visual del usuario en `/forest-playable`
+      (pendiente el veredicto de cierre y la prueba del usuario).
 
 ### 138A-10 — Generador de pasto optimizado y pintado
 
@@ -291,7 +387,10 @@ rendimiento) con evidencia. Se mantiene el flujo canónico
   generar un mundo aleatorio (zonas de suelo/altura/vegetación según
   presupuestos existentes), **lo más óptimo posible**: instancing/merged
   geometry por chunk, sin objetos por hoja, presupuesto máximo configurable y
-  regeneración solo de la zona afectada al pintar.
+  regeneración solo de la zona afectada al pintar. Referencia de técnica:
+  `GrassSystemThreeJS` (GPU-instanced, una draw call, curva/viento en el vertex
+  shader pegada al heightfield); adaptación orientada a rendimiento (chunking,
+  presupuestos y teardown; no copiar el mesh global sin límites del repo).
 - **Parámetros elegibles:** **densidad**, **tamaño** y **color** desde el
   panel (persisten con 138A-5 y se regeneran en tiempo real con debounce).
 - **Pintado:** pincel para **poner y quitar** pasto sobre el mundo (máscara

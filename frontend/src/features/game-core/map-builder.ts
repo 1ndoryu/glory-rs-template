@@ -16,6 +16,13 @@ import type {
 import { generateTerrainHeightfield, placeVegetation } from './procedural';
 import { normalizeTerrainOptions, validateTerrainOptions } from './procedural/terrain-options';
 import type { TerrainOptions } from './procedural/terrain-options';
+import {
+  normalizeTerrainLayerStack,
+  validateTerrainLayerStack,
+  applyTerrainLayerStack,
+  TERRAIN_SURFACE_IDS,
+} from './terrain-layers';
+import type { TerrainLayer } from './terrain-layers';
 
 export const WORLD_SERIALIZATION_FORMAT = 'wandorius-map' as const;
 export const WORLD_SERIALIZATION_VERSION = 1 as const;
@@ -35,6 +42,8 @@ export interface SerializedWorld {
   readonly version: typeof WORLD_SERIALIZATION_VERSION;
   readonly options: TerrainOptions;
   readonly map: MapVersion;
+  /** Stack de capas de terreno (138A-9); ausente en exports previos a 138A-9. */
+  readonly layers?: readonly TerrainLayer[];
 }
 
 /* Manifiesto con los mismos ids que el fixture para que la escena jugable
@@ -50,10 +59,20 @@ const BUILDER_ASSETS: readonly GameAssetVersion[] = [
 export function buildMapVersionFromOptions(
   value: TerrainOptions,
   mapId = 'constructor-bosque',
+  layers?: readonly TerrainLayer[],
 ): MapVersion {
   const options = normalizeTerrainOptions(value);
   const { width, depth, cellSize, waterLevel, seed } = options;
   const heightfield = generateTerrainHeightfield(options);
+  /* 138A-9: el stack de capas se aplica SIEMPRE sobre la base generada
+   * (deltas acotados) para que sobreviva a regeneraciones; las superficies
+   * resultantes alimentan chunks y vegetación. */
+  const normalizedLayers = layers === undefined ? [] : normalizeTerrainLayerStack(layers);
+  const layered = normalizedLayers.length > 0
+    ? applyTerrainLayerStack(heightfield, normalizedLayers, cellSize)
+    : undefined;
+  const terrainHeights = layered?.heights ?? heightfield.heights;
+  const terrainSurfaces = layered?.surfaces;
   const chunkSide = MAP_VERSION_LIMITS.chunkSize;
   const chunksX = width / chunkSide;
   const chunksZ = depth / chunkSide;
@@ -69,7 +88,7 @@ export function buildMapVersionFromOptions(
            * de celdas para no pedir muestras fuera de rango. */
           const gi = Math.min(cx * chunkSide + lx, width - 1);
           const gj = Math.min(cz * chunkSide + lz, depth - 1);
-          heights.push(clampHeight(heightfield.heights[gj * width + gi]));
+          heights.push(clampHeight(terrainHeights[gj * width + gi]));
         }
       }
       const surfaces: number[] = [];
@@ -77,7 +96,9 @@ export function buildMapVersionFromOptions(
         for (let lx = 0; lx < chunkSide; lx += 1) {
           const gi = cx * chunkSide + lx;
           const gj = cz * chunkSide + lz;
-          surfaces.push(heightfield.heights[gj * width + gi] < waterLevel ? 1 : 0);
+          surfaces.push(terrainSurfaces !== undefined
+            ? terrainSurfaces[gj * width + gi]
+            : (heightfield.heights[gj * width + gi] < waterLevel ? TERRAIN_SURFACE_IDS.water : TERRAIN_SURFACE_IDS.grass));
         }
       }
       chunks.push({ x: cx, z: cz, heights, surfaces });
@@ -88,7 +109,7 @@ export function buildMapVersionFromOptions(
     BUILDER_ASSETS.map(asset => [asset.id, { ...asset, contentHash: `${asset.contentHash}-${seed}` }]),
   ) as Readonly<Record<string, GameAssetVersion>>;
 
-  const instances = buildInstances(options, heightfield, assetManifest);
+  const instances = buildInstances(options, heightfield, assetManifest, terrainHeights, terrainSurfaces);
   const bounds = {
     minX: -(width * cellSize) / 2,
     maxX: (width * cellSize) / 2,
@@ -107,7 +128,7 @@ export function buildMapVersionFromOptions(
     },
     assetManifest,
     instances,
-    spawnPoints: buildSpawnPoints(heightfield, options),
+    spawnPoints: buildSpawnPoints({ ...heightfield, heights: terrainHeights }, options),
   };
   assertValidMapVersion(map);
   return map;
@@ -119,6 +140,8 @@ function buildInstances(
   options: TerrainOptions,
   heightfield: ReturnType<typeof generateTerrainHeightfield>,
   manifest: Readonly<Record<string, GameAssetVersion>>,
+  terrainHeights?: Float32Array,
+  terrainSurfaces?: Uint8Array,
 ): readonly AssetInstance[] {
   const budgets = {
     maxGrass: Math.round(420 * options.vegetationDensity),
@@ -127,7 +150,12 @@ function buildInstances(
     maxTrees: options.style === 'suave' ? 0 : Math.round(64 * options.vegetationDensity),
     maxRocks: Math.round(26 * options.vegetationDensity),
   };
-  const placements = placeVegetation(heightfield, options.seed, budgets);
+  /* 138A-9: la vegetación se posiciona sobre el heightfield ya editado por
+   * las capas para no sembrar sobre tierra hundida o elevada. */
+  const placementHeightfield = terrainHeights !== undefined
+    ? { ...heightfield, heights: terrainHeights }
+    : heightfield;
+  const placements = placeVegetation(placementHeightfield, options.seed, budgets);
   const instances: AssetInstance[] = [];
   const colliderHalf = (assetId: string, scale: number): number => {
     const proxy = manifest[assetId]?.collisionProxy;
@@ -137,6 +165,16 @@ function buildInstances(
   let index = 0;
   for (const placement of placements.placements) {
     if (placement.kind === 'grass') continue;
+    /* 138A-9: la vegetación generada no pisa superficies pintadas
+     * (camino/arena/agua); solo crece sobre hierba. */
+    if (terrainSurfaces !== undefined) {
+      const cellI = Math.floor(placement.x);
+      const cellJ = Math.floor(placement.z);
+      if (cellI >= 0 && cellI < options.width && cellJ >= 0 && cellJ < options.depth
+        && terrainSurfaces[cellJ * options.width + cellI] !== TERRAIN_SURFACE_IDS.grass) {
+        continue;
+      }
+    }
     const assetVersionId = placement.kind === 'rock'
       ? 'asset-rock'
       : (placement.seed % 2 === 0 ? 'asset-conifer' : 'asset-broadleaf');
@@ -219,12 +257,17 @@ export function mapBuilderStats(map: MapVersion): MapBuilderStats {
 }
 
 /** Serializa mundo + opciones a JSON (export local, Fase 5). */
-export function serializeWorld(options: TerrainOptions, map: MapVersion): string {
+export function serializeWorld(
+  options: TerrainOptions,
+  map: MapVersion,
+  layers?: readonly TerrainLayer[],
+): string {
   const envelope: SerializedWorld = {
     format: WORLD_SERIALIZATION_FORMAT,
     version: WORLD_SERIALIZATION_VERSION,
     options: normalizeTerrainOptions(options),
     map,
+    layers: layers === undefined ? undefined : normalizeTerrainLayerStack(layers),
   };
   assertValidMapVersion(map);
   return JSON.stringify(envelope, null, 2);
@@ -248,11 +291,16 @@ export function parseSerializedWorld(text: string): SerializedWorld {
   const issues = validateTerrainOptions(envelope.options);
   if (issues.length > 0) throw new Error(`opciones del mundo inválidas: ${issues.join('; ')}`);
   assertValidMapVersion(envelope.map);
+  if (envelope.layers !== undefined) {
+    const layerIssues = validateTerrainLayerStack(envelope.layers);
+    if (layerIssues.length > 0) throw new Error(`capas del mundo inválidas: ${layerIssues.join('; ')}`);
+  }
   return {
     format: WORLD_SERIALIZATION_FORMAT,
     version: WORLD_SERIALIZATION_VERSION,
     options: normalizeTerrainOptions(envelope.options),
     map: envelope.map,
+    layers: envelope.layers === undefined ? undefined : normalizeTerrainLayerStack(envelope.layers),
   };
 }
 

@@ -10,6 +10,7 @@ import {
 } from './map-builder';
 import { TERRAIN_OPTIONS_DEFAULTS, terrainOptionsPreset } from './procedural/terrain-options';
 import type { MapVersion } from './map-version';
+import type { TerrainLayer } from './terrain-layers';
 
 describe('buildMapVersionFromOptions (138A-4)', () => {
   it('construye un MapVersion válido con chunks, assets, instancias y spawn', () => {
@@ -85,6 +86,37 @@ describe('buildMapVersionFromOptions (138A-4)', () => {
     expect(spawn.position.z).toBeGreaterThan(map.terrain.bounds.minZ);
     expect(spawn.position.z).toBeLessThan(map.terrain.bounds.maxZ);
   });
+
+  it('aplica el stack de capas a alturas y superficies (138A-9)', () => {
+    const options = { ...TERRAIN_OPTIONS_DEFAULTS, seed: 42, waterLevel: 0 };
+    const layer: TerrainLayer = {
+      id: 'colina', name: 'Colina', enabled: true, kind: 'elevation',
+      shape: { kind: 'circle', cx: 0, cz: 0, radius: 4 },
+      falloff: 'smooth', falloffRadius: 1, bias: 1, blend: 'set',
+      height: 3, elevationMode: 'absolute',
+    };
+    const base = buildMapVersionFromOptions(options);
+    const layered = buildMapVersionFromOptions(options, 'constructor-bosque', [layer]);
+    expect(() => assertValidMapVersion(layered)).not.toThrow();
+    /* El chunk central debe tener alguna altura mayor tras la capa. */
+    const centerChunk = layered.terrain.chunks.find(chunk => chunk.x === 1 && chunk.z === 1)!;
+    const baseCenter = base.terrain.chunks.find(chunk => chunk.x === 1 && chunk.z === 1)!;
+    expect(Math.max(...centerChunk.heights)).toBeGreaterThan(Math.max(...baseCenter.heights));
+  });
+
+  it('pinta superficies en los chunks y filtra vegetación sobre no-hierba', () => {
+    const options = { ...TERRAIN_OPTIONS_DEFAULTS, seed: 42, waterLevel: 0 };
+    const layer: TerrainLayer = {
+      id: 'lago', name: 'Lago', enabled: true, kind: 'water',
+      shape: { kind: 'circle', cx: 0, cz: 0, radius: 6 },
+      falloff: 'hard', falloffRadius: 0.5, bias: 1, blend: 'set', hardness: 0.5,
+      lowerToWater: true,
+    };
+    const layered = buildMapVersionFromOptions(options, 'constructor-bosque', [layer]);
+    const centerChunk = layered.terrain.chunks.find(chunk => chunk.x === 1 && chunk.z === 1)!;
+    expect(centerChunk.surfaces).toContain(1);
+    expect(() => assertValidMapVersion(layered)).not.toThrow();
+  });
 });
 
 describe('serializeWorld/parseSerializedWorld (138A-4)', () => {
@@ -105,5 +137,31 @@ describe('serializeWorld/parseSerializedWorld (138A-4)', () => {
     expect(() => parseSerializedWorld(JSON.stringify({ ...envelope, options: { ...options, width: 3 } }))).toThrow('opciones');
     expect(() => parseSerializedWorld(JSON.stringify({ ...envelope, map: { ...map, spawnPoints: [] } }))).toThrow('MapVersion');
     expect(() => parseSerializedWorld('{no json')).toThrow('JSON');
+  });
+
+  it('round-trip con stack de capas y fail-closed ante capas inválidas', () => {
+    const options = { ...TERRAIN_OPTIONS_DEFAULTS, seed: 9 };
+    const layer: TerrainLayer = {
+      id: 'arena', name: 'Arena', enabled: true, kind: 'sand',
+      shape: { kind: 'painted', cells: [[4, 4], [4, 5]] },
+      falloff: 'hard', falloffRadius: 0.25, bias: 1, blend: 'set', hardness: 0.5,
+    };
+    const map = buildMapVersionFromOptions(options, 'constructor-bosque', [layer]);
+    const text = serializeWorld(options, map, [layer]);
+    const parsed = parseSerializedWorld(text);
+    expect(parsed.layers).toHaveLength(1);
+    expect(parsed.layers![0].id).toBe('arena');
+    expect(JSON.stringify(parsed.map)).toBe(JSON.stringify(map));
+
+    const envelope = JSON.parse(text) as { layers: readonly TerrainLayer[] };
+    expect(() => parseSerializedWorld(JSON.stringify({ ...envelope, layers: [{ id: 'x' }] })))
+      .toThrow(/capas del mundo inválidas/);
+  });
+
+  it('exports previos a 138A-9 sin capas siguen parseando', () => {
+    const options = TERRAIN_OPTIONS_DEFAULTS;
+    const map = buildMapVersionFromOptions(options);
+    const parsed = parseSerializedWorld(serializeWorld(options, map));
+    expect(parsed.layers).toBeUndefined();
   });
 });

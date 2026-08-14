@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { terrainOptionsPreset, WORLD_PALETTE_DEFAULTS } from '../../../game-core';
+import {
+  terrainOptionsPreset,
+  WORLD_PALETTE_DEFAULTS,
+  type TerrainLayer,
+} from '../../../game-core';
 import {
   clearConstructorState,
   CONSTRUCTOR_STORAGE_KEY,
@@ -154,5 +158,72 @@ describe('persistencia del constructor de mundo', () => {
     clearConstructorState();
     expect(window.localStorage.getItem(CONSTRUCTOR_STORAGE_KEY)).toBeNull();
     clearConstructorState();
+  });
+
+  it('guarda y restaura el stack de capas del editor de mapa (138A-9)', () => {
+    const options = terrainOptionsPreset('isla');
+    const layers: readonly TerrainLayer[] = [
+      {
+        id: 'capa-path-1',
+        name: 'Camino pintado',
+        enabled: true,
+        kind: 'path',
+        shape: { kind: 'painted', cells: [[2, 3], [4, 5]] },
+        falloff: 'smooth',
+        falloffRadius: 1,
+        bias: 1,
+        blend: 'set',
+        hardness: 0.5,
+      },
+      {
+        id: 'capa-elevation-1',
+        name: 'Elevación pintada',
+        enabled: true,
+        kind: 'elevation',
+        shape: { kind: 'circle', cx: 0, cz: 0, radius: 3 },
+        falloff: 'gauss',
+        falloffRadius: 1.5,
+        bias: 1,
+        blend: 'add',
+        height: 2,
+        elevationMode: 'delta',
+      },
+    ];
+    expect(saveConstructorState({ version: 1, options, mode: 'suave', camera: 'libre', layers })).toBe(true);
+    expect(loadConstructorState()).toEqual({ version: 1, options, mode: 'suave', camera: 'libre', layers });
+  });
+
+  it('capas inválidas se omiten sin bloquear la restauración del resto (138A-9)', () => {
+    const options = terrainOptionsPreset('isla');
+    const layers = [
+      { id: 'mala', kind: 'path' }, // sin shape/hardness/blend...
+      {
+        id: 'capa-sand-1',
+        name: 'Arena pintada',
+        enabled: true,
+        kind: 'sand',
+        shape: { kind: 'painted', cells: [[0, 0]] },
+        falloff: 'hard',
+        falloffRadius: 0.5,
+        bias: 0.8,
+        blend: 'set',
+        hardness: 0.4,
+      },
+    ];
+    window.localStorage.setItem(CONSTRUCTOR_STORAGE_KEY, JSON.stringify({
+      version: 1,
+      options,
+      mode: 'bloques',
+      camera: 'tercera',
+      palette: { ...WORLD_PALETTE_DEFAULTS, sky: 0xabcdef },
+      layers,
+    }));
+    expect(loadConstructorState()).toEqual({
+      version: 1,
+      options,
+      mode: 'bloques',
+      camera: 'tercera',
+      palette: { ...WORLD_PALETTE_DEFAULTS, sky: 0xabcdef },
+    });
   });
 });

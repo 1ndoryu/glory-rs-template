@@ -5,15 +5,17 @@
  * Constructor de mundo, el panel exterior es el rail de iconos y los grupos de
  * la isla son secciones suyas; sin constructor conserva el panel clásico. */
 
-import { Boxes, Camera, Image, Layers, Palette, Waves } from 'lucide';
+import { Boxes, Brush, Camera, Image, Layers, Palette, Waves } from 'lucide';
 import { createEl } from '../../../../utils/dom';
 import type {
   MapVersion,
   RenderStyle,
   TerrainOptions,
+  TerrainLayer,
   WorldPalette,
 } from '../../../game-core';
 import { DEFAULT_CAMERA_MODE, type CameraMode } from './game-camera-modes';
+import { type ConstructorBrushState } from './game-layer-brush';
 import {
   mountWorldConstructor,
   type WorldConstructorSection,
@@ -23,6 +25,7 @@ import { buildAssetsPanel } from './game-constructor-assets';
 import { buildColorPanel } from './game-constructor-color';
 import type { ConstructorPanelState } from './game-constructor-persistence';
 import { buildTexturePanel } from './game-constructor-texture';
+import { buildLayerEditorPanel } from './game-layer-editor';
 import {
   buildCamaraGroup,
   buildEstilosGroup,
@@ -48,6 +51,10 @@ export interface CurvedIslandPanel {
   readonly setConstructorMap: (map: MapVersion | null) => void;
   /** [138A-8] Restaura colapso/lado/ancho de la ventana sin emitir. */
   readonly setConstructorPanelState: (state: ConstructorPanelState) => void;
+  /** [138A-9] Restaura el stack de capas en el visor sin emitir. */
+  readonly setConstructorLayers: (layers: readonly TerrainLayer[]) => void;
+  /** [138A-9] Restaura el estado del pincel (auto-creación de capa). */
+  readonly setConstructorBrush: (brush: ConstructorBrushState) => void;
   readonly destroy: () => void;
 }
 
@@ -111,6 +118,14 @@ export function mountCurvedIslandPanel(
         label: 'Assets',
         icon: Boxes,
         build: (container, ctx) => buildAssetsPanel(container, ctx),
+      });
+    }
+    if (controls.worldConstructor.onLayersChange) {
+      extraPanels.push({
+        key: 'capas',
+        label: 'Capas',
+        icon: Brush,
+        build: (container, ctx) => buildLayerEditorPanel(container, ctx),
       });
     }
     constructorSection = mountWorldConstructor(host, controls.worldConstructor, {
@@ -177,6 +192,12 @@ export function mountCurvedIslandPanel(
     },
     setConstructorPanelState: (state) => {
       constructorSection?.applyPanelState(state);
+    },
+    setConstructorLayers: (layers) => {
+      constructorSection?.applyLayers(layers);
+    },
+    setConstructorBrush: (brush) => {
+      constructorSection?.applyBrush(brush);
     },
     destroy: () => {
       legacyPanel?.remove();

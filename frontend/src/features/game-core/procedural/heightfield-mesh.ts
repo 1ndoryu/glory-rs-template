@@ -15,6 +15,10 @@ export interface HeightfieldMeshOptions {
   readonly uvScale?: number;
   /** Rampa de color por banda: [arena, hierba, roca] en RGB 0..1. */
   readonly colorRamp?: readonly (readonly [number, number, number])[];
+  /** Superficies por celda (ids 0..15 del contrato MapVersion, 138A-9). */
+  readonly surfaces?: Uint8Array;
+  /** Color RGB 0..1 por id de superficie (p. ej. de la paleta del mundo). */
+  readonly surfaceColors?: ReadonlyMap<number, readonly [number, number, number]>;
 }
 
 export interface HeightfieldMeshData {
@@ -42,11 +46,22 @@ export function buildHeightfieldMeshData(
   const cellSize = options.cellSize ?? HEIGHTFIELD_MESH_DEFAULTS.cellSize;
   const uvScale = options.uvScale ?? HEIGHTFIELD_MESH_DEFAULTS.uvScale;
   const ramp = options.colorRamp ?? DEFAULT_COLOR_RAMP;
+  const surfaces = options.surfaces;
+  const surfaceColors = options.surfaceColors;
   const { width, depth, heights, waterLevel, maxHeight } = h;
   if (!Number.isFinite(cellSize) || cellSize <= 0) throw new Error('cellSize inválido');
   if (!Number.isFinite(uvScale) || uvScale <= 0) throw new Error('uvScale inválido');
   if (ramp.length !== 3) throw new Error('colorRamp inválido');
   if (heights.length !== width * depth) throw new Error('heightfield incompleto');
+  if (surfaces !== undefined) {
+    if (surfaces.length !== width * depth) throw new Error('superficies incompletas');
+    for (const id of surfaces) {
+      if (!Number.isInteger(id) || id < 0 || id > 15) throw new Error('id de superficie inválido');
+    }
+  }
+  if (surfaces !== undefined && surfaceColors === undefined) {
+    throw new Error('surfaceColors requerido con surfaces');
+  }
   for (const y of heights) {
     if (!Number.isFinite(y)) throw new Error('altura inválida');
   }
@@ -87,9 +102,15 @@ export function buildHeightfieldMeshData(
       uvs[vertex * 2] = (i / (width - 1)) * uvScale;
       uvs[vertex * 2 + 1] = (j / (depth - 1)) * uvScale;
 
-      const t = Math.min(1, Math.max(0, (y - waterLevel) / Math.max(0.0001, maxHeight)));
       const depthShade = y < waterLevel ? 0.65 : 1;
-      const c = sampleRamp(ramp, t);
+      /* 138A-9: si hay superficies, el color del vértice es el de la celda
+       * (esquina inferior-izquierda, recortada al borde); si no, banda de
+       * altura de la rampa clásica. */
+      const surfaceId = surfaces === undefined
+        ? -1
+        : surfaces[Math.min(depth - 2, j) * width + Math.min(width - 2, i)];
+      const surfaceColor = surfaceId >= 0 ? surfaceColors!.get(surfaceId) : undefined;
+      const c = surfaceColor ?? sampleRamp(ramp, heightBandT(y, waterLevel, maxHeight));
       colors[p] = c[0] * depthShade;
       colors[p + 1] = c[1] * depthShade;
       colors[p + 2] = c[2] * depthShade;
@@ -123,6 +144,11 @@ export function buildHeightfieldMeshData(
     vertexCount,
     triangleCount: (width - 1) * (depth - 1) * 2,
   };
+}
+
+/** T normalizada de altura para la rampa por banda (arena→hierba→roca). */
+function heightBandT(y: number, waterLevel: number, maxHeight: number): number {
+  return Math.min(1, Math.max(0, (y - waterLevel) / Math.max(0.0001, maxHeight)));
 }
 
 /** Rampa lineal de 3 bandas: arena → hierba (0..0.35), hierba → roca (0.35..1). */

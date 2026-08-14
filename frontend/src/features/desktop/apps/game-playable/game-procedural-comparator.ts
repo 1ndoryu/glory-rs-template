@@ -7,24 +7,30 @@
 
 import * as THREE from 'three';
 import {
+  applyTerrainLayerStack,
   buildHeightfieldMeshData,
   buildLowPolyVegetationMeshData,
   generateTerrainHeightfield,
   normalizeTerrainOptions,
+  normalizeTerrainLayerStack,
   normalizeWorldPalette,
   placeVegetation,
+  TERRAIN_SURFACE_IDS,
   terrainOptionsPreset,
   WORLD_PALETTE_DEFAULTS,
   worldPaletteToHeightfieldRamp,
+  worldPaletteToSurfaceColors,
   worldPaletteToVegetationPalette,
   type IslandHeightfield,
   type MapVersion,
   type RenderStyle,
+  type TerrainLayer,
   type TerrainOptions,
   type VegetationPlacement,
   type WorldPalette,
 } from '../../../game-core';
 import {
+  type BlockPropPlacement,
   buildBlockPropsMeshData,
   buildBlockTerrainMeshData,
   placeBlockProps,
@@ -67,6 +73,8 @@ export interface ProceduralComparator {
   readonly setToonRamp: (ramp: THREE.Texture) => void;
   /** [138A-8] Muestra/oculta los props del documento MapVersion. */
   readonly setDocument: (map: MapVersion | null) => void;
+  /** [138A-9] Aplica el stack de capas sobre la base generada (deltas). */
+  readonly setLayers: (layers: readonly TerrainLayer[]) => void;
   readonly groundHeightAt: (x: number, z: number) => number;
   readonly raycastGroup: THREE.Object3D;
   readonly pickTerrain: (x: number, y: number, z: number) => TerrainPick | null;
@@ -102,6 +110,10 @@ export function mountProceduralComparator(
   /* [138A-8] Paleta del mundo activa y documento de instancias. */
   let currentPalette: WorldPalette = { ...WORLD_PALETTE_DEFAULTS };
   let currentMap: MapVersion | null = null;
+  let currentLayers: readonly TerrainLayer[] = [];
+  /* Superficies por celda tras aplicar el stack (solo suave; bloques usa el
+   * mesher que cuantiza el heightfield ya editado). */
+  let currentSurfaces: Uint8Array | undefined;
   let documentGroup: THREE.Group | null = null;
 
   const world = new THREE.Group();
@@ -165,6 +177,10 @@ export function mountProceduralComparator(
     const meshData = buildHeightfieldMeshData(heightfield, {
       cellSize,
       colorRamp: worldPaletteToHeightfieldRamp(currentPalette),
+      /* [138A-9] Si el stack pintó superficies (camino/arena/agua), el color
+       * del vértice viene de la superficie, no de la banda de altura. */
+      surfaces: currentSurfaces,
+      surfaceColors: worldPaletteToSurfaceColors(currentPalette),
     });
     const density = currentOptions.vegetationDensity;
     const veg = placeVegetation(heightfield, currentOptions.seed, {
@@ -175,7 +191,17 @@ export function mountProceduralComparator(
     });
     /* [138A-6] Las posiciones del toolkit están en celdas; el preview suave
      * las traduce al mundo escalado por cellSize igual que el documento. */
-    const scaledPlacements = veg.placements.map(placement => ({
+    /* [138A-9] La vegetación generada no pisa superficies pintadas (paridad
+     * con map-builder: solo crece sobre hierba). */
+    const onGrass = currentSurfaces === undefined
+      ? veg.placements
+      : veg.placements.filter((placement) => {
+        const i = Math.floor(placement.x);
+        const j = Math.floor(placement.z);
+        if (i < 0 || j < 0 || i >= currentWidth || j >= currentDepth) return false;
+        return currentSurfaces![j * currentWidth + i] === TERRAIN_SURFACE_IDS.grass;
+      });
+    const scaledPlacements = onGrass.map(placement => ({
       ...placement,
       x: placement.x * cellSize,
       z: placement.z * cellSize,
@@ -195,7 +221,7 @@ export function mountProceduralComparator(
         mode: 'suave',
         vertices: meshData.vertexCount,
         triangles: meshData.triangleCount,
-        propCount: veg.placements.length,
+        propCount: onGrass.length,
       },
     };
   };
@@ -210,13 +236,16 @@ export function mountProceduralComparator(
     documentGroup = null;
   };
 
-  /* [138A-8] Los props del documento viven en su propio grupo a escala mundo
-   * (posiciones ya en unidades de mundo); sin documento se conserva la
-   * vegetación generada del comparador. Los assets de categorías sin mesher
-   * (agua/personajes/genéricos) se omiten hoy: deuda documentada en el plan. */
+  /* [138A-8/9] Los props del documento viven en su propio grupo y se
+   * renderizan SEGÚN EL ESTILO activo: en 'bloques' se convierten a
+   * BlockPropPlacement del mesher (árboles/rocas de bloque, sin overlay
+   * low-poly); en 'suave' se pintan como props low-poly. Sin documento se
+   * conserva la vegetación generada del comparador. Los assets de categorías
+   * sin mesher (agua/personajes/genéricos) se omiten hoy: deuda documentada. */
   const rebuildDocumentProps = (): void => {
     disposeDocumentProps();
     if (currentMap && blocks && smooth) {
+      const blockPlacements: BlockPropPlacement[] = [];
       const placements: VegetationPlacement[] = [];
       for (const instance of currentMap.instances) {
         const asset = currentMap.assetManifest[instance.assetVersionId];
@@ -232,6 +261,20 @@ export function mountProceduralComparator(
         if (!cell) continue;
         const height = cellHeight(cell.i, cell.j);
         if (height < currentHeightfield.waterLevel) continue;
+        if (mode === 'bloques') {
+          const level = currentBlockLevels[cell.j * currentWidth + cell.i];
+          if (level < 0) continue;
+          /* Frame local del grupo de bloques (escala cellSize): el documento
+           * está en mundo, el mesher de props espera celdas. */
+          blockPlacements.push({
+            kind,
+            x: (sceneX - centerX) / currentOptions.cellSize,
+            z: (sceneZ - centerZ) / currentOptions.cellSize,
+            baseY: level,
+            seed: Math.floor(instance.rotationY * 7) + Math.round(instance.position.x * 13 + instance.position.z * 29),
+          });
+          continue;
+        }
         placements.push({
           kind,
           x: sceneX,
@@ -242,7 +285,15 @@ export function mountProceduralComparator(
           scale: instance.scale,
         });
       }
-      if (placements.length > 0) {
+      if (mode === 'bloques' && blockPlacements.length > 0) {
+        const data = buildBlockPropsMeshData(blockPlacements, currentPalette);
+        const mesh = new THREE.Mesh(toGeometry(data), material);
+        const group = new THREE.Group();
+        group.scale.set(currentOptions.cellSize, 1, currentOptions.cellSize);
+        group.add(mesh);
+        world.add(group);
+        documentGroup = group;
+      } else if (mode === 'suave' && placements.length > 0) {
         const data = buildLowPolyVegetationMeshData(
           placements,
           worldPaletteToVegetationPalette(currentPalette),
@@ -280,6 +331,16 @@ export function mountProceduralComparator(
     /* Un único heightfield por rebuild: bloques y suave comparten la MISMA
      * base exacta y la generación no se ejecuta dos veces por clic. */
     currentHeightfield = generateTerrainHeightfield(currentOptions);
+    /* [138A-9] El stack se reaplica SIEMPRE sobre la base generada para que
+     * sobreviva a regeneraciones; currentHeightfield queda como la base ya
+     * editada (pick/groundHeight reflejan las capas). */
+    if (currentLayers.length > 0) {
+      const layered = applyTerrainLayerStack(currentHeightfield, currentLayers, currentOptions.cellSize);
+      currentHeightfield = { ...currentHeightfield, heights: layered.heights };
+      currentSurfaces = layered.surfaces;
+    } else {
+      currentSurfaces = undefined;
+    }
     rebuildMeshes();
   };
 
@@ -365,6 +426,8 @@ export function mountProceduralComparator(
     setMode: (nextMode) => {
       mode = nextMode;
       applyMode();
+      /* El render del documento depende del estilo (bloques vs suave). */
+      rebuildDocumentProps();
     },
     mode: () => mode,
     setVisible: (visible) => {
@@ -398,6 +461,10 @@ export function mountProceduralComparator(
     setDocument: (map) => {
       currentMap = map;
       rebuildDocumentProps();
+    },
+    setLayers: (next) => {
+      currentLayers = normalizeTerrainLayerStack(next);
+      rebuild();
     },
     /* Agua estática: el update existe solo por el contrato común con la isla. */
     update: () => {},

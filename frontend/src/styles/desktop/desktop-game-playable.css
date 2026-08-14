@@ -675,6 +675,103 @@
   margin: 0;
 }
 
+/* [138A-9] Visor de capas (tipo Blender) y pincel del editor de mapa: filas
+ * compactas con ojo de visibilidad, reorden/duplicar/eliminar y controles de
+ * pincel dentro del lienzo del Constructor. Tokens B&W del OS, sin radios. */
+.juegoConstructor__capas {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.juegoConstructor__capaFila {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 26px;
+  padding: 2px;
+  border: var(--sistema-borde);
+}
+
+.juegoConstructor__capaOjo {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  color: var(--sistema-texto);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.juegoConstructor__capaOjo:hover,
+.juegoConstructor__capaOjo:focus-visible {
+  color: var(--sistema-superficie);
+  background: var(--sistema-texto);
+}
+
+.juegoConstructor__capaNombre {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--tamano-pequeno);
+}
+
+.juegoConstructor__capaBoton {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  text-align: center;
+}
+
+.juegoConstructor__pincel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espacio-xs);
+}
+
+/* [138A-9] Explorador de Assets en cuadrícula con miniatura por asset
+ * (estilo adaptado bloques/suave); la tarjeta es arrastrable al mundo. */
+.juegoConstructor__assetsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 6px;
+  margin: var(--espacio-xs) 0;
+}
+
+.juegoConstructor__assetTarjeta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: var(--sistema-borde);
+  cursor: grab;
+}
+
+.juegoConstructor__assetTarjeta:active {
+  cursor: grabbing;
+}
+
+.juegoConstructor__assetMiniatura {
+  display: block;
+  width: 56px;
+  height: 56px;
+  border: var(--sistema-borde);
+}
+
+.juegoConstructor__assetTarjeta .juegoConstructor__assetNombre {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--tamano-pequeno);
+}
+
 /* [297A-73] Panel de versiones de Assets 3D: preview aislado monocromo con
  * grid y caja envolvente, dentro del modal del OS. */
 .asset-preview-host {

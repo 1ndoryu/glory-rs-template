@@ -10,16 +10,19 @@ import {
   editMapVersionObjects,
   MapChunkCache,
   mapBuilderStats,
+  mergePaintedCells,
   normalizeWorldPalette,
   normalizeTerrainOptions,
+  normalizeTerrainLayerStack,
   parseSerializedWorld,
-  serializeWorld,
+  TERRAIN_LAYER_LIMITS,
   terrainOptionsPreset,
   WORLD_PALETTE_DEFAULTS,
   type MapBuilderStats,
   type MapEditOp,
   type MapVersion,
   type RenderStyle,
+  type TerrainLayer,
   type TerrainOptions,
   type WorldPalette,
   type WorldMap,
@@ -45,9 +48,39 @@ import {
   type CameraMode,
 } from './game-camera-modes';
 import {
+  applyFreeFlyKeyDown,
+  applyFreeFlyKeyUp,
+  cameraDirection,
+  CAMERA_GROUND_CLEARANCE,
+  clampCameraTarget,
+  createFreeFlyKeys,
+  isEditableTarget,
+  positionFirstPersonCamera,
+  resetFreeFlyKeys,
+  rotateCameraLook,
+  updateFreeFlyCamera,
+  type CameraBounds,
+  type CameraLook,
+  type FreeFlyKeys,
+} from './game-camera-controls';
+import {
+  DEFAULT_BRUSH_STATE,
+  normalizeBrushState,
+  type ConstructorBrushState,
+} from './game-layer-brush';
+import { createPaintedLayer } from './game-layer-editor';
+import { attachLayerPainter } from './game-layer-painter';
+import {
   mountProceduralComparator,
   type TerrainPick,
 } from './game-procedural-comparator';
+import { downloadSerializedWorld } from './game-world-io';
+import { estimateSceneGpuMemory } from './game-scene-gpu-estimate';
+import {
+  createToonRamp,
+  disposeObjectGeometries,
+  disposeScene,
+} from './game-scene-utils';
 import { createDebouncedRegenerator } from './game-realtime-debounce';
 import { FIXTURE_PROPS } from './game-fixture-map';
 import { ASSET_DRAG_MIME } from './game-constructor-assets';
@@ -59,7 +92,6 @@ import {
 } from './game-renderer-metrics';
 import {
   createGpuFrameProbe,
-  estimateGpuMemory,
   readGpuIdentity,
   type GpuFrameProbe,
   type GpuIdentity,
@@ -103,12 +135,6 @@ const CAMERA_MIN_DISTANCE = 7;
 const CAMERA_MAX_DISTANCE = 30;
 const CAMERA_MIN_POLAR = 0.35;
 const CAMERA_MAX_POLAR = 1.15;
-/* [138A-7] Primera persona: altura de ojos, límites de inclinación y
- * despeje mínimo del suelo para la 3ª persona. */
-const CAMERA_EYE_HEIGHT = 1.6;
-const CAMERA_PITCH_MIN = -1.2;
-const CAMERA_PITCH_MAX = 1.2;
-const CAMERA_GROUND_CLEARANCE = 1.1;
 /* [GAME-01-VIS] Firmeza del follow de cámara (1/s): la cámara se mantiene
  * pegada al personaje como en un mundo abierto, con suavizado exponencial
  * independiente del framerate (a 60 fps ≈ 18% por frame). */
@@ -226,6 +252,12 @@ export function mountGamePlayableScene(
    * (el comparador lo consume oculto; su generación propia ya coincide). */
   let constructorMap: MapVersion | null = buildMapVersionFromOptions(constructorOptions);
   proceduralComparator.setDocument(constructorMap);
+  /* [138A-9] Stack de capas del editor de mapa: se aplica SIEMPRE sobre la
+   * base generada en el comparador y en el documento, y se persiste/exporta
+   * para que sobreviva a regeneraciones y recargas. */
+  let constructorLayers: readonly TerrainLayer[] = [];
+  /* [138A-9] Estado del pincel (compartido con el visor de capas). */
+  let constructorBrush: ConstructorBrushState = { ...DEFAULT_BRUSH_STATE };
   /* [138A-8] Paleta del mundo y estado de ventana del Constructor (se
    * restauran desde storage en el bloque de restore, más abajo). */
   let constructorPalette: WorldPalette = { ...WORLD_PALETTE_DEFAULTS };
@@ -240,19 +272,6 @@ export function mountGamePlayableScene(
     + ` · árboles ${stats.trees} · rocas ${stats.rocks}`
     + ` · tris ${stats.triangles} · vértices ${stats.vertices}`;
 
-  const downloadWorldJson = (): void => {
-    const map = constructorMap ?? buildMapVersionFromOptions(constructorOptions);
-    const json = serializeWorld(constructorOptions, map);
-    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `bosque-${constructorOptions.shape}-${constructorOptions.seed}.json`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-  };
-
   /* [138A-6] Solo quedan dos estilos (bloques/suave): seleccionar uno muestra
    * el comparador del constructor; la isla curva queda como referencia
    * histórica inicial, sin selector propio. */
@@ -262,6 +281,11 @@ export function mountGamePlayableScene(
     curvedIsland.setVisible(false);
     proceduralComparator.setVisible(true);
     proceduralComparator.setMode(comparatorMode);
+    /* [138A-9] El visor de capas lee el estilo de las opciones para elegir
+     * pinceles (suave pinta superficies; bloques coloca/quita bloques). Se
+     * sincroniza sin emitir el cambio (applyOptions no dispara controles). */
+    constructorOptions = { ...constructorOptions, style: terrainMode };
+    panel.setConstructorOptions(constructorOptions);
     panel.setTerrainMode(terrainMode);
     applyPick(null);
     /* [138A-5][138A-7] El estilo y la cámara se persisten con las opciones. */
@@ -274,14 +298,96 @@ export function mountGamePlayableScene(
    * comparador en vez de volver a 'bloques' en cada cambio de valor. */
   const showConstructorWorld = (options: TerrainOptions): void => {
     constructorOptions = normalizeTerrainOptions(options);
-    constructorMap = buildMapVersionFromOptions(constructorOptions);
+    /* [138A-9] El stack de capas se aplica al generar el documento y al
+     * regenerar el comparador (paridad preview ↔ documento/export). */
+    constructorMap = buildMapVersionFromOptions(
+      constructorOptions,
+      'constructor-bosque',
+      constructorLayers,
+    );
     /* [138A-8] El documento es la fuente del comparador: los assets pintados
      * sobreviven a la regeneración (rebuildDocumentProps usa el actual). */
     proceduralComparator.setDocument(constructorMap);
+    proceduralComparator.setLayers(constructorLayers);
     proceduralComparator.regenerateFromOptions(constructorOptions);
     panel.setConstructorOptions(constructorOptions);
     panel.setConstructorStats(formatConstructorStats(mapBuilderStats(constructorMap)));
     applyTerrainMode(comparatorVisible ? comparatorMode : 'bloques');
+  };
+
+  /* [138A-9] Cambio del stack desde el visor de capas (añadir/orden/ojo/
+   * eliminar): se reaplica sobre la base generada en el comparador y se
+   * persiste. El documento conserva sus instancias (ediciones del usuario);
+   * las alturas/superficies del preview siempre reflejan el stack. */
+  const applyConstructorLayers = (layers: readonly TerrainLayer[]): void => {
+    try {
+      constructorLayers = normalizeTerrainLayerStack(layers);
+      proceduralComparator.setLayers(constructorLayers);
+      panel.setConstructorStats(
+        `capas ${constructorLayers.length} · ${constructorLayers.filter(layer => layer.enabled).length} activas`,
+      );
+      persistConstructorState(comparatorMode);
+    } catch (error) {
+      panel.setConstructorStats(error instanceof Error ? `error: ${error.message}` : 'capas inválidas');
+    }
+  };
+
+  /* [138A-9] Cambio del pincel desde el visor de capas. */
+  const applyConstructorBrush = (brush: ConstructorBrushState): void => {
+    constructorBrush = normalizeBrushState(brush);
+    panel.setConstructorBrush(constructorBrush);
+  };
+
+  /* [138A-9] Pincelada del painter: acumula celdas en una capa pintada del
+   * stack (nueva por sesión si el pincel no apunta a una existente). Los
+   * círculos del panel nunca se convierten: solo reciben capas pintadas. */
+  const applyBrushStroke = (
+    cells: readonly (readonly [number, number])[],
+    _ended: boolean,
+  ): void => {
+    if (cells.length === 0) return;
+    try {
+      let target = constructorBrush.targetLayerId
+        ? constructorLayers.find(layer => layer.id === constructorBrush.targetLayerId)
+        : undefined;
+      if (!target || target.kind !== constructorBrush.kind) {
+        target = createPaintedLayer(constructorBrush, constructorLayers);
+        constructorLayers = [...constructorLayers, target];
+        constructorBrush = { ...constructorBrush, targetLayerId: target.id };
+        panel.setConstructorBrush(constructorBrush);
+      }
+      /* Los círculos del panel nunca se convierten en pintados (fail-closed). */
+      if (target.shape.kind !== 'painted') {
+        throw new Error('la capa objetivo no es pintada');
+      }
+      if (target.shape.cells.length + cells.length > TERRAIN_LAYER_LIMITS.maxPaintedCells) {
+        throw new Error('cuota de celdas pintadas alcanzada');
+      }
+      const merged = mergePaintedCells(target.shape.cells, cells);
+      const updated: TerrainLayer = target.kind === 'elevation'
+        ? {
+          ...target,
+          shape: { kind: 'painted', cells: merged },
+          height: (constructorBrush.direction === 'lower' ? -1 : 1)
+            * constructorBrush.height * constructorBrush.strength,
+          falloff: constructorBrush.falloff,
+          falloffRadius: Math.max(0.25, constructorBrush.radius * 2),
+          bias: constructorBrush.strength,
+        }
+        : {
+          ...target,
+          shape: { kind: 'painted', cells: merged },
+          falloff: constructorBrush.falloff,
+          falloffRadius: Math.max(0.25, constructorBrush.radius * 2),
+          bias: constructorBrush.strength,
+          hardness: 0.5,
+        };
+      constructorLayers = constructorLayers.map(layer => layer.id === updated.id ? updated : layer);
+      applyConstructorLayers(constructorLayers);
+      panel.setConstructorStats(`pincel · ${merged.length} celdas en «${updated.name}»`);
+    } catch (error) {
+      panel.setConstructorStats(error instanceof Error ? `error: ${error.message}` : 'pincelada inválida');
+    }
   };
 
   /* [138A-5] Regeneración en vivo: los cambios de controles se agrupan ~200 ms
@@ -309,6 +415,7 @@ export function mountGamePlayableScene(
       camera: cameraMode,
       palette: constructorPalette,
       panel: constructorPanelState,
+      layers: constructorLayers,
     });
   };
 
@@ -322,7 +429,25 @@ export function mountGamePlayableScene(
     if (mode === 'primera') {
       look.yaw = orbit.azimuth;
       look.pitch = 0;
+    } else if (mode === 'libre') {
+      /* El vuelo libre parte desde la órbita actual para no saltar: la
+       * posición se copia del offset orbital y la mirada de su geometría. */
+      const sinPolar = Math.sin(orbit.polar);
+      camera.position.copy(cameraTarget).add(new THREE.Vector3(
+        orbit.distance * sinPolar * Math.sin(orbit.azimuth),
+        orbit.distance * Math.cos(orbit.polar),
+        orbit.distance * sinPolar * Math.cos(orbit.azimuth),
+      ));
+      camera.position.copy(clampCameraTarget(camera.position, activeCameraBounds()));
+      look.yaw = orbit.azimuth;
+      look.pitch = orbit.polar - Math.PI / 2;
+      cameraTarget.copy(camera.position).add(cameraDirection(look));
+    } else {
+      /* Al salir del vuelo libre se limpian las teclas para no arrastrar
+       * movimiento fantasma al volver a entrar. */
+      resetFreeFlyKeys(freeKeys);
     }
+    updateLocalFigureVisibility();
     syncCameraSegment?.(mode);
     persistConstructorState(comparatorMode);
   };
@@ -368,15 +493,19 @@ export function mountGamePlayableScene(
         showConstructorWorld(options);
       },
       onChange: (options) => regenerateDebounced.schedule(options),
-      onExport: () => downloadWorldJson(),
+      onExport: () => downloadSerializedWorld(constructorOptions, constructorMap, constructorLayers),
       onImport: (text) => {
         try {
           const world = parseSerializedWorld(text);
           constructorOptions = world.options;
           constructorMap = world.map;
+          /* [138A-9] El import recupera el stack de capas del mundo. */
+          constructorLayers = world.layers ? normalizeTerrainLayerStack(world.layers) : [];
           proceduralComparator.setDocument(constructorMap);
+          proceduralComparator.setLayers(constructorLayers);
           proceduralComparator.regenerateFromOptions(world.options);
           panel.setConstructorOptions(world.options);
+          panel.setConstructorLayers(constructorLayers);
           panel.setConstructorStats(formatConstructorStats(mapBuilderStats(world.map)));
           applyTerrainMode('bloques');
         } catch (error) {
@@ -387,6 +516,8 @@ export function mountGamePlayableScene(
         paletteDebounced.schedule(palette);
       },
       onEditObjects: applyConstructorObjectEdits,
+      onLayersChange: applyConstructorLayers,
+      onBrushStateChange: applyConstructorBrush,
       onToonRampChange: (dataUrl) => {
         if (dataUrl === null) {
           applyToonRamp(createToonRamp());
@@ -489,6 +620,13 @@ export function mountGamePlayableScene(
   };
 
   const entities = new Map<string, THREE.Group>();
+  /* [138A-9] En primera persona no se renderiza el cuerpo del personaje
+   * local (la cámara está en sus ojos); se reaplica al crear entidades y al
+   * cambiar de modo. */
+  const updateLocalFigureVisibility = (): void => {
+    const local = entities.get('local');
+    if (local) local.visible = cameraMode !== 'primera';
+  };
   let currentPlayer = { x: 0, z: -0.5 };
   let currentPlayerY = 0;
   let cameraTarget = new THREE.Vector3(currentPlayer.x, 0, currentPlayer.z);
@@ -502,19 +640,25 @@ export function mountGamePlayableScene(
    * `look.yaw` comparte la convención de `rotateInputToWorld`: la cámara
    * mira hacia (-sin(yaw), -cos(yaw)) en X/Z para que W aleje de la cámara. */
   let cameraMode: CameraMode = DEFAULT_CAMERA_MODE;
-  let look = { yaw: Math.PI / 4, pitch: 0 };
+  let look: CameraLook = { yaw: Math.PI / 4, pitch: 0 };
+  /* [138A-9] Teclas del vuelo libre; se limpian al salir del modo. */
+  const freeKeys: FreeFlyKeys = createFreeFlyKeys();
   let dragging = false;
   let lastPointer: { x: number; y: number } | null = null;
   let destroyed = false;
 
-  const clampTarget = (target: THREE.Vector3): THREE.Vector3 => {
-    const margin = 4;
-    return new THREE.Vector3(
-      THREE.MathUtils.clamp(target.x, map.bounds.minX + margin, map.bounds.maxX - margin),
-      target.y,
-      THREE.MathUtils.clamp(target.z, map.bounds.minZ + margin, map.bounds.maxZ - margin),
-    );
-  };
+  /* [138A-9] Límites del mundo visible: el comparador del constructor genera
+   * su propio bounds (centrado en la isla), así la cámara no queda encerrada
+   * en el chunk del fixture cuando el mapa procedural es más grande. */
+  const activeCameraBounds = (): CameraBounds =>
+    comparatorVisible && constructorMap
+      ? {
+        minX: constructorMap.terrain.bounds.minX + islandCenterX,
+        maxX: constructorMap.terrain.bounds.maxX + islandCenterX,
+        minZ: constructorMap.terrain.bounds.minZ + islandCenterZ,
+        maxZ: constructorMap.terrain.bounds.maxZ + islandCenterZ,
+      }
+      : map.bounds;
 
   const updateCamera = (): void => {
     /* [GAME-01-VIS] Suavizado exponencial con delta real: el follow de cámara
@@ -522,24 +666,33 @@ export function mountGamePlayableScene(
     const now = performance.now();
     const dt = Math.min(Math.max((now - lastCameraTime) / 1000, 0), 0.1);
     lastCameraTime = now;
-    if (followPlayer) {
-      const desired = clampTarget(new THREE.Vector3(currentPlayer.x, currentPlayerY + 0.8, currentPlayer.z));
+    if (followPlayer && cameraMode !== 'libre') {
+      const desired = clampCameraTarget(
+        new THREE.Vector3(currentPlayer.x, currentPlayerY + 0.8, currentPlayer.z),
+        activeCameraBounds(),
+      );
       cameraTarget.lerp(desired, 1 - Math.exp(-CAMERA_FOLLOW_RATE * dt));
     }
     /* [138A-7] Primera persona: la cámara está en los ojos del personaje y
      * el arrastre mueve la mirada (look.yaw/pitch). Sin zoom: niebla fija en
      * la distancia orbital por defecto. */
     if (cameraMode === 'primera') {
-      const eye = new THREE.Vector3(currentPlayer.x, currentPlayerY + CAMERA_EYE_HEIGHT, currentPlayer.z);
-      const dir = new THREE.Vector3(
-        -Math.sin(look.yaw) * Math.cos(look.pitch),
-        Math.sin(look.pitch),
-        -Math.cos(look.yaw) * Math.cos(look.pitch),
-      );
-      camera.position.copy(eye);
-      camera.lookAt(eye.add(dir));
+      positionFirstPersonCamera(look, camera, {
+        x: currentPlayer.x,
+        y: currentPlayerY,
+        z: currentPlayer.z,
+      });
       fog.near = CAMERA_DISTANCE + FOG_NEAR_MARGIN;
       fog.far = CAMERA_DISTANCE + FOG_FAR_OFFSET;
+      return;
+    }
+    if (cameraMode === 'libre') {
+      /* Vuelo libre: WASD/arrows mueven la cámara en el plano horizontal de
+       * la mirada, Space/Shift suben/bajan, y el foco es la propia cámara
+       * (no el jugador). El movimiento se acota a los bounds del mundo. */
+      updateFreeFlyCamera(freeKeys, look, camera, cameraTarget, dt, activeCameraBounds());
+      fog.near = orbit.distance + FOG_NEAR_MARGIN;
+      fog.far = orbit.distance + FOG_FAR_OFFSET;
       return;
     }
     const sinPolar = Math.sin(orbit.polar);
@@ -586,7 +739,9 @@ export function mountGamePlayableScene(
     }
     panel.setPick({ i: pick.i, j: pick.j, level: pick.level });
   };
-  const updatePick = (clientX: number, clientY: number): void => {
+  /* [138A-9] Raycast compartido: hover, drop de assets y pincel resuelven la
+   * celda sobre el grupo visible (comparador del constructor o isla curva). */
+  const raycastPickAt = (clientX: number, clientY: number): TerrainPick | BlockPick | null => {
     const rect = host.getBoundingClientRect();
     pointerNdc.set(
       ((clientX - rect.left) / Math.max(rect.width, 1)) * 2 - 1,
@@ -596,11 +751,18 @@ export function mountGamePlayableScene(
     const activeGroup = comparatorVisible ? proceduralComparator.raycastGroup : curvedIsland.raycastGroup;
     const hits = raycaster.intersectObject(activeGroup, true);
     const hit = hits[0];
-    applyPick(hit
-      ? comparatorVisible
-        ? proceduralComparator.pickTerrain(hit.point.x, hit.point.y, hit.point.z)
-        : curvedIsland.pickBlock(hit.point.x, hit.point.y, hit.point.z)
-      : null);
+    if (!hit) return null;
+    return comparatorVisible
+      ? proceduralComparator.pickTerrain(hit.point.x, hit.point.y, hit.point.z)
+      : curvedIsland.pickBlock(hit.point.x, hit.point.y, hit.point.z);
+  };
+  const updatePick = (clientX: number, clientY: number): void => {
+    applyPick(raycastPickAt(clientX, clientY));
+  };
+  /* Pick de celdas para el pincel del editor: solo sobre el comparador. */
+  const pickCellAt = (clientX: number, clientY: number): TerrainPick | null => {
+    if (!comparatorVisible) return null;
+    return raycastPickAt(clientX, clientY) as TerrainPick | null;
   };
 
   /* [138A-5] Restaura las últimas opciones y modo al recargar (fail-closed).
@@ -611,6 +773,9 @@ export function mountGamePlayableScene(
     cameraMode = restored.camera;
     if (restored.palette) constructorPalette = normalizeWorldPalette(restored.palette);
     if (restored.panel) constructorPanelState = { ...restored.panel };
+    /* [138A-9] El stack de capas se restaura antes de generar para que la
+     * primera vista ya muestre caminos/arena/agua/elevación guardados. */
+    if (restored.layers) constructorLayers = normalizeTerrainLayerStack(restored.layers);
     showConstructorWorld(restored.options);
     if (restored.mode !== 'bloques') applyTerrainMode(restored.mode);
     /* [138A-8] Restaura documento, paleta y ventana en los subpaneles del
@@ -618,6 +783,8 @@ export function mountGamePlayableScene(
     panel.setConstructorMap(constructorMap);
     panel.setConstructorPalette(constructorPalette);
     panel.setConstructorPanelState(constructorPanelState);
+    panel.setConstructorLayers(constructorLayers);
+    panel.setConstructorBrush(constructorBrush);
     proceduralComparator.setPalette(constructorPalette);
     backgroundColor.setHex(constructorPalette.sky);
     fog.color.copy(backgroundColor);
@@ -632,21 +799,25 @@ export function mountGamePlayableScene(
       : curvedIsland.groundHeightAt(x, z);
 
   const onOrbitStart = (event: PointerEvent): void => {
+    /* [138A-9] Con el pincel activo el arrastre pinta; no orbita ni sigue. */
+    if (constructorBrush.active) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     dragging = true;
     lastPointer = { x: event.clientX, y: event.clientY };
     host.setPointerCapture?.(event.pointerId);
   };
   const onOrbitMove = (event: PointerEvent): void => {
+    if (constructorBrush.active) return;
     if (dragging && lastPointer) {
       const dx = event.clientX - lastPointer.x;
       const dy = event.clientY - lastPointer.y;
       lastPointer = { x: event.clientX, y: event.clientY };
       /* [138A-7] En primera persona el arrastre gira la mirada; en libre y
        * 3ª persona orbita la cámara alrededor del personaje. */
-      if (cameraMode === 'primera') {
-        look.yaw -= dx * 0.008;
-        look.pitch = THREE.MathUtils.clamp(look.pitch + dy * 0.008, CAMERA_PITCH_MIN, CAMERA_PITCH_MAX);
+      /* [138A-9] En vuelo libre el arrastre también gira la mirada (yaw/pitch)
+       * en lugar de orbitar; el movimiento va con WASD/arrows. */
+      if (cameraMode === 'primera' || cameraMode === 'libre') {
+        rotateCameraLook(look, dx, dy);
         return;
       }
       orbit.azimuth -= dx * 0.008;
@@ -664,9 +835,12 @@ export function mountGamePlayableScene(
   };
   const onWheel = (event: WheelEvent): void => {
     event.preventDefault();
+    /* [138A-9] Con el pincel activo la rueda no cambia el zoom (pintar); en
+     * primera persona y vuelo libre tampoco hay zoom orbital. */
+    if (constructorBrush.active) return;
     /* [138A-7] En primera persona no hay zoom orbital; la rueda no cambia
      * distancia (solo se consume para no hacer scroll de la página). */
-    if (cameraMode === 'primera') return;
+    if (cameraMode === 'primera' || cameraMode === 'libre') return;
     orbit.distance = THREE.MathUtils.clamp(
       orbit.distance * (event.deltaY > 0 ? 1.08 : 0.92),
       CAMERA_MIN_DISTANCE,
@@ -682,6 +856,18 @@ export function mountGamePlayableScene(
   host.addEventListener('pointercancel', onOrbitEnd);
   host.addEventListener('pointerleave', onPointerLeave);
   host.addEventListener('wheel', onWheel, { passive: false });
+
+  /* [138A-9] Vuelo libre por teclado: WASD/arrows + Space/Shift con teardown.
+   * El foco en controles editables del panel no mueve la cámara. */
+  const onKeyDown = (event: KeyboardEvent): void => {
+    if (cameraMode !== 'libre' || isEditableTarget(event)) return;
+    if (applyFreeFlyKeyDown(freeKeys, event)) event.preventDefault();
+  };
+  const onKeyUp = (event: KeyboardEvent): void => {
+    applyFreeFlyKeyUp(freeKeys, event);
+  };
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onKeyUp);
 
   /* [138A-8] Drop de assets del panel Assets al mundo: el drag viaja con el
    * asset id y el drop resuelve la celda por raycast sobre el terreno visible
@@ -719,6 +905,17 @@ export function mountGamePlayableScene(
   };
   host.addEventListener('dragover', onDragOver);
   host.addEventListener('drop', onDropAsset);
+
+  /* [138A-9] Pincel del editor de mapa: cuando está activo consume el puntero
+   * (los handlers de órbita ya ignoran su estado) y delega las celdas en
+   * `applyBrushStroke` con commits intermedios y final. */
+  const stopLayerPainter = attachLayerPainter(host, {
+    isActive: () => constructorBrush.active,
+    pickAt: pickCellAt,
+    cellSize: () => constructorOptions.cellSize,
+    radius: () => constructorBrush.radius,
+    onStroke: applyBrushStroke,
+  });
 
   const createEntity = (id: string, characterId: string, localEntityId = 'local'): THREE.Group => {
     const remote = id !== localEntityId;
@@ -768,7 +965,12 @@ export function mountGamePlayableScene(
       disposeObjectGeometries(object);
       entities.delete(id);
     }
-    streamProps(currentPlayer);
+    updateLocalFigureVisibility();
+    /* [138A-9] En vuelo libre el streaming sigue a la cámara, no al jugador,
+     * para que el terreno lejano aparezca mientras se recorre el mundo. */
+    streamProps(cameraMode === 'libre'
+      ? { x: camera.position.x, z: camera.position.z }
+      : currentPlayer);
     bend.setOrigin(currentPlayer.x, currentPlayerY, currentPlayer.z);
     updateCamera();
   };
@@ -822,41 +1024,6 @@ export function mountGamePlayableScene(
     }
   };
 
-  const estimateGpuSceneMemory = (): GpuMemoryEstimate => {
-    const textures: Parameters<typeof estimateGpuMemory>[0] extends readonly (infer T)[] ? T[] : never[] = [];
-    const geometries: Parameters<typeof estimateGpuMemory>[1] extends readonly (infer T)[] ? T[] : never[] = [];
-    const seenTextures = new Set<THREE.Texture>();
-    const seenGeometries = new Set<THREE.BufferGeometry>();
-    scene.traverse((object) => {
-      if (object instanceof THREE.Mesh || object instanceof THREE.LineSegments) {
-        if (!seenGeometries.has(object.geometry)) {
-          seenGeometries.add(object.geometry);
-          const position = object.geometry.getAttribute('position');
-          const vertexCount = position ? position.count : 0;
-          const indexCount = object.geometry.index ? object.geometry.index.count : 0;
-          geometries.push({ vertexCount: vertexCount + indexCount, bytesPerVertex: 12 });
-        }
-      }
-      if (object instanceof THREE.Mesh || object instanceof THREE.LineSegments
-        || object instanceof THREE.InstancedMesh) {
-        const assigned = Array.isArray(object.material) ? object.material : [object.material];
-        for (const material of assigned) {
-          const candidate = (material as THREE.MeshBasicMaterial & { map?: THREE.Texture }).map;
-          if (candidate && !seenTextures.has(candidate)) {
-            seenTextures.add(candidate);
-            const image = candidate.image as { width?: number; height?: number } | undefined;
-            textures.push({
-              width: image?.width ?? 0,
-              height: image?.height ?? 0,
-              bytesPerPixel: 4,
-            });
-          }
-        }
-      }
-    });
-    return estimateGpuMemory(textures, geometries);
-  };
-
   resize();
 
   return {
@@ -874,7 +1041,7 @@ export function mountGamePlayableScene(
     }),
     gpuIdentity: () => gpuIdentity,
     gpuFrameMs: () => lastGpuFrameMs,
-    gpuMemoryEstimate: estimateGpuSceneMemory,
+    gpuMemoryEstimate: () => estimateSceneGpuMemory(scene),
     destroy: () => {
       if (destroyed) return;
       destroyed = true;
@@ -886,7 +1053,10 @@ export function mountGamePlayableScene(
       host.removeEventListener('wheel', onWheel);
       host.removeEventListener('dragover', onDragOver);
       host.removeEventListener('drop', onDropAsset);
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
       stopCameraShortcut();
+      stopLayerPainter();
       regenerateDebounced.dispose();
       paletteDebounced.dispose();
       panel.destroy();
@@ -902,53 +1072,4 @@ export function mountGamePlayableScene(
       entities.clear();
     },
   };
-}
-
-/* Rampa toon de 4 bandas compartida por todos los materiales lit (arena,
- * roca, agua, follaje y figura). El dato vive en espacio lineal: no debe
- * pasar por gestión de color. */
-function createToonRamp(): THREE.DataTexture {
-  const steps = [0.58, 0.75, 0.89, 1.0];
-  const data = new Uint8Array(steps.length * 4);
-  steps.forEach((value, index) => {
-    const band = Math.round(value * 255);
-    data[index * 4] = band;
-    data[index * 4 + 1] = band;
-    data[index * 4 + 2] = band;
-    data[index * 4 + 3] = 255;
-  });
-  const texture = new THREE.DataTexture(data, steps.length, 1, THREE.RGBAFormat);
-  texture.minFilter = THREE.NearestFilter;
-  texture.magFilter = THREE.NearestFilter;
-  texture.generateMipmaps = false;
-  texture.colorSpace = THREE.NoColorSpace;
-  texture.needsUpdate = true;
-  return texture;
-}
-
-function disposeObjectGeometries(object: THREE.Object3D): void {
-  object.traverse((child) => {
-    if (child instanceof THREE.Mesh || child instanceof THREE.LineSegments) {
-      child.geometry.dispose();
-    }
-  });
-}
-
-function disposeScene(
-  scene: THREE.Scene,
-  sharedMaterials: ForestMaterials,
-  extraMaterials: readonly THREE.Material[] = [],
-): void {
-  const geometries = new Set<THREE.BufferGeometry>();
-  const materials = new Set<THREE.Material>([...Object.values(sharedMaterials), ...extraMaterials]);
-  scene.traverse((object) => {
-    if (object instanceof THREE.Mesh || object instanceof THREE.LineSegments) {
-      geometries.add(object.geometry);
-      const assigned = Array.isArray(object.material) ? object.material : [object.material];
-      assigned.forEach(material => materials.add(material));
-    }
-  });
-  geometries.forEach(geometry => geometry.dispose());
-  materials.forEach(material => material.dispose());
-  scene.clear();
 }

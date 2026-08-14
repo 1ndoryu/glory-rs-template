@@ -19,6 +19,21 @@ function createCtx(overrides: Partial<ConstructorPanelContext> = {}): {
     commitObjectEdits: () => {},
     commitToonRamp: (dataUrl) => { onToonRamp(dataUrl); },
     syncMap: () => {},
+    layers: [],
+    commitLayers: () => {},
+    syncLayers: () => {},
+    syncBrush: () => {},
+    brush: {
+      active: false,
+      kind: 'path',
+      radius: 2,
+      strength: 1,
+      falloff: 'smooth',
+      targetLayerId: null,
+      height: 1,
+      direction: 'raise',
+    },
+    commitBrush: () => {},
     ...overrides,
   };
   return { ctx, onToonRamp };

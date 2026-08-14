@@ -117,6 +117,19 @@ export function worldPaletteToVegetationPalette(
   };
 }
 
+/** Colores RGB 0..1 por id de superficie (contrato 0..15; 138A-9 usa 0..3).
+ *  El camino usa `dirt` para que el panel de Color lo gobierne también. */
+export function worldPaletteToSurfaceColors(
+  palette: WorldPalette,
+): ReadonlyMap<number, readonly [number, number, number]> {
+  return new Map<number, readonly [number, number, number]>([
+    [0, hexToRgb(palette.grass)],
+    [1, hexToRgb(palette.waterDeep)],
+    [2, hexToRgb(palette.sand)],
+    [3, hexToRgb(palette.dirt)],
+  ]);
+}
+
 function hexToRgb(hex: number): readonly [number, number, number] {
   return [
     ((hex >> 16) & 0xff) / 255,

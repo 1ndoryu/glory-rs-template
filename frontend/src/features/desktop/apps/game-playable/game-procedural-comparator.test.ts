@@ -121,6 +121,105 @@ describe('comparador procedural — cellSize real y estilos (138A-6)', () => {
   });
 });
 
+describe('comparador procedural — capas de terreno y props del documento (138A-9)', () => {
+  const options = { ...terrainOptionsPreset('isla'), seed: 42 };
+
+  it('aplica el stack de capas a alturas, pick y groundHeight (deltas acotados)', () => {
+    const scene = new THREE.Scene();
+    const comparator: ProceduralComparator = mountProceduralComparator(
+      scene,
+      createWorldBend(),
+      new THREE.Texture(),
+      42,
+      0,
+      0,
+      options,
+    );
+    comparator.setMode('suave');
+    const before = comparator.groundHeightAt(0, 0);
+    comparator.setLayers([{
+      id: 'colina', name: 'Colina', enabled: true, kind: 'elevation',
+      shape: { kind: 'circle', cx: 0, cz: 0, radius: 3 },
+      falloff: 'smooth', falloffRadius: 1, bias: 1, blend: 'set',
+      height: 2, elevationMode: 'absolute',
+    }]);
+    const after = comparator.groundHeightAt(0, 0);
+    expect(after).toBeGreaterThan(before + 0.5);
+    expect(comparator.pickTerrain(0, 0, 0)?.height).toBeCloseTo(after, 3);
+    comparator.dispose();
+  });
+
+  it('renderiza los props del documento según estilo sin duplicar vegetación', () => {
+    const scene = new THREE.Scene();
+    const comparator: ProceduralComparator = mountProceduralComparator(
+      scene,
+      createWorldBend(),
+      new THREE.Texture(),
+      42,
+      0,
+      0,
+      options,
+    );
+    const map = buildMapVersionFromOptions(options);
+    comparator.setDocument(map);
+    const world = scene.children[0] as THREE.Group;
+    const blocksGroup = world.children[1] as THREE.Group;
+    /* Documento activo → la vegetación generada del comparador se oculta
+     * (una sola fuente de props; fix de recarga). */
+    expect((blocksGroup.children[1] as THREE.Mesh).visible).toBe(false);
+    /* Documento renderizado como props de bloque dentro del mundo. */
+    const documentGroup = world.children.find((child, index) =>
+      index > 2 && child instanceof THREE.Group && child.children.length === 1) as THREE.Group | undefined;
+    expect(documentGroup).toBeDefined();
+    const mesh = documentGroup!.children[0] as THREE.Mesh;
+    expect(mesh.geometry.attributes.position.count).toBeGreaterThan(0);
+    expect(documentGroup!.scale.x).toBe(options.cellSize);
+
+    /* Cambiar a suave reconstruye los props del documento como low-poly. */
+    comparator.setMode('suave');
+    const smoothGroup = world.children[2] as THREE.Group;
+    expect((smoothGroup.children[1] as THREE.Mesh).visible).toBe(false);
+    const smoothDocumentGroup = world.children.find((child, index) =>
+      index > 2 && child instanceof THREE.Group && child.children.length === 1
+      && child.scale.x === 1) as THREE.Group | undefined;
+    expect(smoothDocumentGroup).toBeDefined();
+
+    /* Sin documento se restaura la vegetación generada. */
+    comparator.setDocument(null);
+    expect((smoothGroup.children[1] as THREE.Mesh).visible).toBe(true);
+    comparator.dispose();
+  });
+
+  it('las superficies pintadas colorean el mesh suave (paridad documento)', () => {
+    const scene = new THREE.Scene();
+    const comparator: ProceduralComparator = mountProceduralComparator(
+      scene,
+      createWorldBend(),
+      new THREE.Texture(),
+      42,
+      0,
+      0,
+      options,
+    );
+    comparator.setMode('suave');
+    comparator.setLayers([{
+      id: 'camino', name: 'Camino', enabled: true, kind: 'path',
+      shape: { kind: 'circle', cx: 0, cz: 0, radius: 4 },
+      falloff: 'hard', falloffRadius: 0.5, bias: 1, blend: 'set', hardness: 0.5,
+    }]);
+    const world = scene.children[0] as THREE.Group;
+    /* Tras regenerar quedan grupos antiguos vaciados en el árbol; el grupo
+     * actual es el último que conserva sus dos hijos (terreno + props). */
+    const smoothGroup = [...world.children].reverse().find(child =>
+      child instanceof THREE.Group && child.children.length === 2) as THREE.Group;
+    const terrain = smoothGroup.children[0] as THREE.Mesh;
+    const colors = terrain.geometry.getAttribute('color') as THREE.BufferAttribute;
+    expect(colors).toBeDefined();
+    expect(colors.count).toBe(terrain.geometry.getAttribute('position').count);
+    comparator.dispose();
+  });
+});
+
 describe('comparador procedural — paleta, rampa y documento (138A-8)', () => {
   it('setPalette recolorea agua, bloques y suave sin tocar opciones', () => {
     const scene = new THREE.Scene();

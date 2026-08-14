@@ -15,5 +15,6 @@ export * from './performance-monitor';
 export * from './game-realtime';
 export * from './world-palette';
 export * from './map-edits';
+export * from './terrain-layers';
 export * from './procedural';
 export * from './map-builder';

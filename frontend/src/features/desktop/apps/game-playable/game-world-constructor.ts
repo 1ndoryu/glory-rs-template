@@ -15,14 +15,21 @@ import {
   TERRAIN_OPTIONS_DEFAULTS,
   TERRAIN_OPTIONS_LIMITS,
   WORLD_PALETTE_DEFAULTS,
+  normalizeTerrainLayerStack,
   normalizeWorldPalette,
   normalizeTerrainOptions,
   type MapEditOp,
   type MapVersion,
   type ShapePreset,
+  type TerrainLayer,
   type TerrainOptions,
   type WorldPalette,
 } from '../../../game-core';
+import {
+  DEFAULT_BRUSH_STATE,
+  normalizeBrushState,
+  type ConstructorBrushState,
+} from './game-layer-brush';
 import {
   CONSTRUCTOR_PANEL_DEFAULT_WIDTH,
   CONSTRUCTOR_PANEL_MAX_WIDTH,
@@ -49,6 +56,10 @@ export interface WorldConstructorControls {
   readonly onEditObjects?: (ops: readonly MapEditOp[]) => void;
   /** [138A-8] Cambio de rampa toon/textura global (null = reset). */
   readonly onToonRampChange?: (dataUrl: string | null) => void;
+  /** [138A-9] Cambio del stack de capas del editor de mapa (pinceles). */
+  readonly onLayersChange?: (layers: readonly TerrainLayer[]) => void;
+  /** [138A-9] Cambio del estado del pincel (activo/tamaño/objetivo). */
+  readonly onBrushStateChange?: (brush: ConstructorBrushState) => void;
 }
 
 export interface WorldConstructorSection {
@@ -60,6 +71,10 @@ export interface WorldConstructorSection {
   readonly applyMap: (map: MapVersion | null) => void;
   /** [138A-8] Aplica el estado de la ventana sin emitir el callback. */
   readonly applyPanelState: (state: ConstructorPanelState) => void;
+  /** [138A-9] Sincroniza el stack de capas desde fuera (restauración). */
+  readonly applyLayers: (layers: readonly TerrainLayer[]) => void;
+  /** [138A-9] Sincroniza el estado del pincel (restauración/auto-creación). */
+  readonly applyBrush: (brush: ConstructorBrushState) => void;
   readonly destroy: () => void;
 }
 
@@ -110,6 +125,18 @@ export interface ConstructorPanelContext {
   readonly commitToonRamp: (dataUrl: string | null) => void;
   /** [138A-8] Registra un sincronizador de documento (applyMap). */
   readonly syncMap: (fn: () => void) => void;
+  /** [138A-9] Stack de capas de terreno actual (mismo array hasta commit). */
+  readonly layers: readonly TerrainLayer[];
+  /** [138A-9] Aplica un stack de capas y emite tiempo real. */
+  readonly commitLayers: (next: readonly TerrainLayer[]) => void;
+  /** [138A-9] Registra un sincronizador de capas (applyLayers). */
+  readonly syncLayers: (fn: () => void) => void;
+  /** [138A-9] Registra un sincronizador de pincel (applyBrush). */
+  readonly syncBrush: (fn: () => void) => void;
+  /** [138A-9] Estado del pincel del editor de mapa. */
+  readonly brush: ConstructorBrushState;
+  /** [138A-9] Cambia el pincel y lo emite a la escena. */
+  readonly commitBrush: (next: ConstructorBrushState) => void;
 }
 
 export function mountWorldConstructor(
@@ -133,12 +160,20 @@ export function mountWorldConstructor(
     ? normalizeWorldPalette(initialPalette)
     : { ...WORLD_PALETTE_DEFAULTS };
   let worldMap: MapVersion | null = initialMap;
+  /* [138A-9] Stack de capas y pincel del editor de mapa: se comparten con el
+   * subpanel Capas y la escena (painter) vía commit/apply. */
+  let layers: readonly TerrainLayer[] = [];
+  let brush: ConstructorBrushState = { ...DEFAULT_BRUSH_STATE };
   const syncers: Array<() => void> = [];
   const paletteSyncers: Array<() => void> = [];
   const mapSyncers: Array<() => void> = [];
+  const layersSyncers: Array<() => void> = [];
+  const brushSyncers: Array<() => void> = [];
   const sync = (fn: () => void): void => { syncers.push(fn); };
   const syncPalette = (fn: () => void): void => { paletteSyncers.push(fn); };
   const syncMap = (fn: () => void): void => { mapSyncers.push(fn); };
+  const syncLayers = (fn: () => void): void => { layersSyncers.push(fn); };
+  const syncBrush = (fn: () => void): void => { brushSyncers.push(fn); };
   const commit = (next: TerrainOptions): void => {
     state = next;
     emitChange();
@@ -156,6 +191,19 @@ export function mountWorldConstructor(
   const commitToonRamp = (dataUrl: string | null): void => {
     controls.onToonRampChange?.(dataUrl);
   };
+  const commitLayers = (next: readonly TerrainLayer[]): void => {
+    layers = normalizeTerrainLayerStack(next);
+    controls.onLayersChange?.(layers);
+    /* [138A-9] El visor debe reflejar su propio commit (ojo/orden/duplicar/
+     * eliminar/añadir) aunque la escena no esté montada: los syncers son
+     * idempotentes y re-renderizan la lista y el selector del pincel. */
+    for (const syncer of layersSyncers) syncer();
+  };
+  const commitBrush = (next: ConstructorBrushState): void => {
+    brush = normalizeBrushState(next);
+    controls.onBrushStateChange?.(brush);
+    for (const syncer of brushSyncers) syncer();
+  };
   const ctx: ConstructorPanelContext = {
     get state() { return state; },
     commit,
@@ -167,6 +215,12 @@ export function mountWorldConstructor(
     commitObjectEdits,
     commitToonRamp,
     syncMap,
+    get layers() { return layers; },
+    commitLayers,
+    syncLayers,
+    syncBrush,
+    get brush() { return brush; },
+    commitBrush,
   };
 
   /* [138A-8] Estado de la ventana lateral: colapso, lado y ancho. El estado
@@ -411,6 +465,14 @@ export function mountWorldConstructor(
     applyMap: (next) => {
       worldMap = next;
       for (const syncer of mapSyncers) syncer();
+    },
+    applyLayers: (next) => {
+      layers = normalizeTerrainLayerStack(next);
+      for (const syncer of layersSyncers) syncer();
+    },
+    applyBrush: (next) => {
+      brush = normalizeBrushState(next);
+      for (const syncer of brushSyncers) syncer();
     },
     applyPanelState,
     destroy: () => { root.remove(); },

@@ -32,6 +32,21 @@ function createCtx(map: MapVersion | null): {
     commitObjectEdits: (ops) => { onEditObjects(ops); },
     commitToonRamp: () => {},
     syncMap: (fn) => { mapSyncers.push(fn); },
+    layers: [],
+    commitLayers: () => {},
+    syncLayers: () => {},
+    syncBrush: () => {},
+    brush: {
+      active: false,
+      kind: 'path',
+      radius: 2,
+      strength: 1,
+      falloff: 'smooth',
+      targetLayerId: null,
+      height: 1,
+      direction: 'raise',
+    },
+    commitBrush: () => {},
   };
   return {
     ctx,
