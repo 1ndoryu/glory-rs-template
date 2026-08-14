@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { TerrainOptions } from '../../../game-core';
+import type { RenderStyle, TerrainOptions } from '../../../game-core';
 import { mountCurvedIslandPanel } from './game-curved-island-panel';
-import type { CurvedIslandPanelControls, IslandTerrainMode } from './game-curved-island-controls';
+import type { CurvedIslandPanelControls } from './game-curved-island-controls';
 
 describe('panel de la isla curva como orquestador del Constructor', () => {
   let host: HTMLElement;
@@ -10,7 +10,7 @@ describe('panel de la isla curva como orquestador del Constructor', () => {
   let setPropsVisible: ReturnType<typeof vi.fn<(visible: boolean) => void>>;
   let setCameraFollow: ReturnType<typeof vi.fn<(follow: boolean) => void>>;
   let regenerate: ReturnType<typeof vi.fn<() => void>>;
-  let setTerrainMode: ReturnType<typeof vi.fn<(mode: IslandTerrainMode) => void>>;
+  let setTerrainMode: ReturnType<typeof vi.fn<(mode: RenderStyle) => void>>;
   let onGenerate: ReturnType<typeof vi.fn<(options: TerrainOptions) => void>>;
   let onExport: ReturnType<typeof vi.fn<() => void>>;
   let onImport: ReturnType<typeof vi.fn<(text: string) => void>>;
@@ -106,7 +106,7 @@ describe('panel de la isla curva como orquestador del Constructor', () => {
 
     const subpanel = host.querySelector<HTMLElement>('.juegoConstructor__subpanel');
     expect(subpanel?.textContent).toContain('Comparar estilos');
-    for (const label of ['Actual', 'Bloques', 'Suave']) {
+    for (const label of ['Bloques', 'Suave']) {
       expect(Array.from(subpanel?.querySelectorAll('button') ?? [])
         .some(button => button.textContent === label)).toBe(true);
     }
@@ -187,7 +187,7 @@ describe('panel de la isla curva como orquestador del Constructor', () => {
       warp: 0.1,
       octaves: 5,
       vegetationDensity: 0.5,
-      style: 'actual',
+      style: 'bloques',
     };
     panel.setConstructorOptions(options);
     clickText('Generar mundo');

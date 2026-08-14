@@ -1,6 +1,6 @@
 # Plan 138A-5..9 — Constructor de mundo v2: toolkit de edición (2026-08-14)
 
-> **Estado:** ACTIVO — 138A-5 completado; siguiente bloque 138A-6.
+> **Estado:** ACTIVO — 138A-6 completado; siguiente bloque 138A-7.
 > **Rama:** `wandorius` · **Gates:** `npm run gate:check -- 138A-5` …
 > `npm run gate:check -- 138A-9`
 > **Fuente de contexto:** decisiones de producto 2026-08-13/14 (motor propio,
@@ -91,17 +91,17 @@ panel de colores/texturas/assets, tres modos de cámara y dos auditorías
   cambiar "Celda" regenera el mundo en tiempo real y el documento escala igual.
 - **Escala menor:** escala base de vegetación/props reducida (~0.5× por
   defecto) para que las cosas "vayan más pequeñas"; la interpretación exacta
-  se ajusta probando en navegador (decisión abierta documentada en §8).
+  se ajusta probando en navegador (decisión abierta documentada en §7).
 
 **Checklist:**
-- [ ] `TerrainOptions.style` restringido a `'bloques'|'suave'`; consumidores y
+- [x] `TerrainOptions.style` restringido a `'bloques'|'suave'`; consumidores y
       tests actualizados (comparador, panel, serialización).
-- [ ] Sin árboles en suave (tests de presupuesto/instancias).
-- [ ] `cellSize` consumido por meshers, agua y pick; test de paridad preview↔
+- [x] Sin árboles en suave (tests de presupuesto/instancias).
+- [x] `cellSize` consumido por meshers, agua y pick; test de paridad preview↔
       documento con `cellSize=2`.
-- [ ] Escala base menor parametrizada (constante en game-core, no mágica en el
+- [x] Escala base menor parametrizada (constante en game-core, no mágica en el
       adaptador) con tests de presupuesto.
-- [ ] Gate 138A-6 PASS + validación visual del usuario en `/forest-playable`.
+- [x] Gate 138A-6 PASS + validación visual del usuario en `/forest-playable`.
 
 ### 138A-7 — Tres modos de cámara
 

@@ -6,21 +6,21 @@
 import {
   normalizeTerrainOptions,
   validateTerrainOptions,
+  type RenderStyle,
   type TerrainOptions,
 } from '../../../game-core';
 
 export const CONSTRUCTOR_STORAGE_KEY = 'wandorius:constructor:v1';
 
-/** Modo de render que el comparador muestra al recargar (138A-6 lo restringe). */
-export type ConstructorTerrainMode = 'actual' | 'bloques' | 'suave';
-
 export interface ConstructorPersistedState {
   readonly version: 1;
   readonly options: TerrainOptions;
-  readonly mode: ConstructorTerrainMode;
+  /** Modo de render que el comparador muestra al recargar (unión única
+   *  `RenderStyle` compartida con el panel; 138A-6). */
+  readonly mode: RenderStyle;
 }
 
-const VALID_MODES: readonly ConstructorTerrainMode[] = ['actual', 'bloques', 'suave'];
+const VALID_MODES: readonly RenderStyle[] = ['bloques', 'suave'];
 
 /** Persiste el estado; devuelve false si el storage no está disponible. */
 export function saveConstructorState(state: ConstructorPersistedState): boolean {
@@ -34,7 +34,8 @@ export function saveConstructorState(state: ConstructorPersistedState): boolean 
 }
 
 /** Restaura el estado guardado; null si no existe o es inválido (fail-closed).
- *  Un modo ausente/inválido cae al default `bloques` conservando las opciones. */
+ *  Un modo ausente/inválido (incluido el histórico `actual`) cae al default
+ *  `bloques` conservando las opciones. */
 export function loadConstructorState(): ConstructorPersistedState | null {
   try {
     const raw = window.localStorage.getItem(CONSTRUCTOR_STORAGE_KEY);
@@ -49,8 +50,8 @@ export function loadConstructorState(): ConstructorPersistedState | null {
     if (typeof rawOptions !== 'object' || rawOptions === null || Array.isArray(rawOptions)) return null;
     if (validateTerrainOptions(rawOptions).length > 0) return null;
     const options = normalizeTerrainOptions(rawOptions);
-    const mode = typeof record.mode === 'string' && VALID_MODES.includes(record.mode as ConstructorTerrainMode)
-      ? (record.mode as ConstructorTerrainMode)
+    const mode = typeof record.mode === 'string' && VALID_MODES.includes(record.mode as RenderStyle)
+      ? (record.mode as RenderStyle)
       : 'bloques';
     return { version: 1, options, mode };
   } catch {

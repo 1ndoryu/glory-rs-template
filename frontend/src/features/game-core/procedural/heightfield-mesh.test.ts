@@ -38,4 +38,15 @@ describe('heightfield-mesh (138A-1)', () => {
     expect(() => buildHeightfieldMeshData(h, { uvScale: -1 })).toThrow('uvScale');
     expect(() => buildHeightfieldMeshData(h, { colorRamp: [[0, 0, 0], [1, 1, 1]] })).toThrow('colorRamp');
   });
+
+  it('cellSize escala x/z sin tocar alturas (paridad con el documento, 138A-6)', () => {
+    const m1 = buildHeightfieldMeshData(h, { cellSize: 1 });
+    const m2 = buildHeightfieldMeshData(h, { cellSize: 2 });
+    expect(m1.positions[0]).toBeCloseTo(-(WIDTH - 1) / 2);
+    expect(m2.positions[0]).toBeCloseTo(-(WIDTH - 1));
+    expect(m2.positions[0]).toBeCloseTo(m1.positions[0] * 2);
+    for (let k = 0; k < WIDTH * DEPTH; k += 1) {
+      expect(m2.positions[k * 3 + 1]).toBe(h.heights[k]);
+    }
+  });
 });

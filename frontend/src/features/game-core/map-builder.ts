@@ -122,7 +122,9 @@ function buildInstances(
 ): readonly AssetInstance[] {
   const budgets = {
     maxGrass: Math.round(420 * options.vegetationDensity),
-    maxTrees: Math.round(64 * options.vegetationDensity),
+    /* [138A-6] En estilo suave el mundo no tiene árboles (solo césped/rocas);
+     * el estilo bloques conserva el presupuesto normal. */
+    maxTrees: options.style === 'suave' ? 0 : Math.round(64 * options.vegetationDensity),
     maxRocks: Math.round(26 * options.vegetationDensity),
   };
   const placements = placeVegetation(heightfield, options.seed, budgets);

@@ -22,12 +22,16 @@ describe('TerrainOptions (138A-4)', () => {
     for (const style of RENDER_STYLES) {
       expect(validateTerrainOptions({ ...TERRAIN_OPTIONS_DEFAULTS, style: style.key })).toEqual([]);
     }
+    /* 138A-6: solo dos estilos; el histórico 'actual' queda fuera del contrato. */
+    expect(RENDER_STYLES.map(style => style.key)).toEqual(['bloques', 'suave']);
+    expect(TERRAIN_OPTIONS_DEFAULTS.style).toBe('bloques');
   });
 
   it('rechaza opciones inválidas fail-closed', () => {
     expect(validateTerrainOptions(null)).not.toEqual([]);
     expect(validateTerrainOptions({ ...TERRAIN_OPTIONS_DEFAULTS, shape: 'luna' })).not.toEqual([]);
     expect(validateTerrainOptions({ ...TERRAIN_OPTIONS_DEFAULTS, style: 'wireframe' })).not.toEqual([]);
+    expect(validateTerrainOptions({ ...TERRAIN_OPTIONS_DEFAULTS, style: 'actual' })).not.toEqual([]);
     expect(validateTerrainOptions({ ...TERRAIN_OPTIONS_DEFAULTS, width: 10 })).not.toEqual([]);
     expect(validateTerrainOptions({ ...TERRAIN_OPTIONS_DEFAULTS, depth: 17 })).not.toEqual([]);
     expect(validateTerrainOptions({ ...TERRAIN_OPTIONS_DEFAULTS, width: 512 })).not.toEqual([]);
@@ -53,4 +57,3 @@ describe('TerrainOptions (138A-4)', () => {
     expect(seeds.size).toBe(WORLD_PRESETS.length);
   });
 });
-

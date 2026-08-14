@@ -4,9 +4,8 @@
  * en los callbacks que recibe la escena. */
 
 import { createEl } from '../../../../utils/dom';
+import type { RenderStyle } from '../../../game-core';
 import type { WorldConstructorControls } from './game-world-constructor';
-
-export type IslandTerrainMode = 'actual' | 'bloques' | 'suave';
 
 export interface CurvedIslandPanelControls {
   readonly setCurvature: (down: number, pull: number) => void;
@@ -15,7 +14,7 @@ export interface CurvedIslandPanelControls {
   readonly setCameraFollow: (follow: boolean) => void;
   readonly regenerate: () => void;
   /** [138A-1] Comparador de estilos del toolkit (opcional: solo si existe). */
-  readonly setTerrainMode?: (mode: IslandTerrainMode) => void;
+  readonly setTerrainMode?: (mode: RenderStyle) => void;
   /** [138A-4] Constructor de mundo (opcional: solo si existe). */
   readonly worldConstructor?: WorldConstructorControls;
 }
@@ -96,8 +95,8 @@ export function buildIslaGroup(
 export function buildEstilosGroup(
   container: HTMLElement,
   controls: CurvedIslandPanelControls,
-  initialMode: IslandTerrainMode,
-): { readonly metricsEl: HTMLParagraphElement; readonly setActive: (mode: IslandTerrainMode) => void } {
+  initialMode: RenderStyle,
+): { readonly metricsEl: HTMLParagraphElement; readonly setActive: (mode: RenderStyle) => void } {
   const grupoComparador = createEl('div', { className: 'juegoPanelTerreno__grupo' });
   grupoComparador.appendChild(createEl('p', {
     className: 'juegoPanelTerreno__tituloGrupo',
@@ -105,12 +104,11 @@ export function buildEstilosGroup(
   }));
 
   const segEstilos = createEl('div', { className: 'juegoPanelTerreno__segmentos' });
-  const estilos: readonly { key: IslandTerrainMode; label: string }[] = [
-    { key: 'actual', label: 'Actual' },
+  const estilos: readonly { key: RenderStyle; label: string }[] = [
     { key: 'bloques', label: 'Bloques' },
     { key: 'suave', label: 'Suave' },
   ];
-  const styleButtons = new Map<IslandTerrainMode, HTMLButtonElement>();
+  const styleButtons = new Map<RenderStyle, HTMLButtonElement>();
   for (const estilo of estilos) {
     const button = createEl('button', {
       className: 'juegoPanelTerreno__segmento',
@@ -125,7 +123,7 @@ export function buildEstilosGroup(
     styleButtons.set(estilo.key, button);
     segEstilos.appendChild(button);
   }
-  const setActive = (mode: IslandTerrainMode): void => {
+  const setActive = (mode: RenderStyle): void => {
     for (const [key, button] of styleButtons) {
       button.classList.toggle('juegoPanelTerreno__segmento--activo', key === mode);
     }

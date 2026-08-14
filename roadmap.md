@@ -148,7 +148,7 @@ de color/textura/assets y dos auditorías) en 5 bloques con gate propio:
       Rail lateral tipo Blender (iconos Lucide con aria), subpanel único a la
       vez, regeneración con debounce de 200 ms que conserva el modo visible y
       restauración de opciones/modo desde `wandorius:constructor:v1`.
-- [ ] **138A-6 — Dos estilos (`bloques`/`suave`, se retira `actual`), sin árboles
+- [x] **138A-6 — Dos estilos (`bloques`/`suave`, se retira `actual`), sin árboles
       en suave, `cellSize` real en el preview y escala base menor (~0.5×).**
 - [ ] **138A-7 — Tres modos de cámara:** libre (orbital), primera persona y 3ª persona.
 - [ ] **138A-8 — Editor de objetos (bloques/variantes, quitar árboles, añadir

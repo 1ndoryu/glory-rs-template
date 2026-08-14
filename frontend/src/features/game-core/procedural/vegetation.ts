@@ -18,7 +18,7 @@ export interface VegetationPlacement {
   readonly y: number;
   /** Seed del prop para tronco/copa/roca determinista. */
   readonly seed: number;
-  /** Escala 0.8..1.25 determinista por instancia. */
+  /** Escala determinista por instancia sobre `VEGETATION_BASE_SCALE`. */
   readonly scale: number;
 }
 
@@ -52,6 +52,11 @@ export const VEGETATION_DEFAULTS = {
   treeSpacing: 3.2,
   rockSpacing: 2.6,
 } as const;
+
+/** Escala base global de vegetación/props (138A-6): reduce el tamaño por
+ *  defecto (~0.5× sobre el rango histórico 0.8..1.25) sin magia en el
+ *  adaptador visual; el documento y el preview la consumen vía `scale`. */
+export const VEGETATION_BASE_SCALE = 0.5;
 
 /* Márgenes de zona (fracción de maxHeight sobre el nivel del agua). */
 const WATER_MARGIN = 0.08;
@@ -150,7 +155,7 @@ export function placeVegetation(
         z: pz,
         y,
         seed: hash2(i, j, seed + 7),
-        scale: 0.8 + hash2(i, j, seed + 3) * 0.45,
+        scale: VEGETATION_BASE_SCALE * (0.8 + hash2(i, j, seed + 3) * 0.45),
       });
     }
   }

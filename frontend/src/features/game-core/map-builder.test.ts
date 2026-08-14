@@ -56,6 +56,22 @@ describe('buildMapVersionFromOptions (138A-4)', () => {
     expect(bare.spawnPoints.length).toBe(1);
   });
 
+  it('estilo suave no coloca árboles y conserva rocas (138A-6)', () => {
+    const suave = buildMapVersionFromOptions({ ...TERRAIN_OPTIONS_DEFAULTS, style: 'suave' });
+    const stats = mapBuilderStats(suave);
+    expect(stats.trees).toBe(0);
+    expect(stats.instances).toBe(stats.rocks);
+    expect(stats.rocks).toBeGreaterThan(0);
+  });
+
+  it('las instancias heredan la escala base menor del toolkit (138A-6)', () => {
+    const map = buildMapVersionFromOptions(TERRAIN_OPTIONS_DEFAULTS);
+    expect(map.instances.length).toBeGreaterThan(0);
+    for (const instance of map.instances) {
+      expect(instance.scale).toBeLessThanOrEqual(0.625 + 1e-9);
+    }
+  });
+
   it('falla cerrado con opciones inválidas', () => {
     expect(() => buildMapVersionFromOptions({ ...TERRAIN_OPTIONS_DEFAULTS, width: 17 })).toThrow('width');
     expect(() => buildMapVersionFromOptions({ ...TERRAIN_OPTIONS_DEFAULTS, shape: 'luna' as never })).toThrow('shape');
@@ -91,4 +107,3 @@ describe('serializeWorld/parseSerializedWorld (138A-4)', () => {
     expect(() => parseSerializedWorld('{no json')).toThrow('JSON');
   });
 });
-

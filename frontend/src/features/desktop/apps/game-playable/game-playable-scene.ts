@@ -15,6 +15,7 @@ import {
   terrainOptionsPreset,
   type MapBuilderStats,
   type MapVersion,
+  type RenderStyle,
   type TerrainOptions,
   type WorldMap,
   type WorldSnapshot,
@@ -30,11 +31,9 @@ import { mountCurvedIslandPanel } from './game-curved-island-panel';
 import {
   loadConstructorState,
   saveConstructorState,
-  type ConstructorTerrainMode,
 } from './game-constructor-persistence';
 import {
   mountProceduralComparator,
-  type ProceduralTerrainMode,
   type TerrainPick,
 } from './game-procedural-comparator';
 import { createDebouncedRegenerator } from './game-realtime-debounce';
@@ -174,7 +173,7 @@ export function mountGamePlayableScene(
   const proceduralComparator = mountProceduralComparator(scene, bend, toonRamp, 1337, islandCenterX, islandCenterZ);
   proceduralComparator.setVisible(false);
   let comparatorVisible = false;
-  let comparatorMode: ProceduralTerrainMode = 'bloques';
+  let comparatorMode: RenderStyle = 'bloques';
 
   /* [128A-1] Follow de cámara conmutable desde el panel temporal. */
   let followPlayer = true;
@@ -200,13 +199,15 @@ export function mountGamePlayableScene(
     URL.revokeObjectURL(url);
   };
 
-  const applyTerrainMode = (terrainMode: ConstructorTerrainMode): void => {
-    const showComparator = terrainMode !== 'actual';
-    if (showComparator) comparatorMode = terrainMode;
-    comparatorVisible = showComparator;
-    curvedIsland.setVisible(!showComparator);
-    proceduralComparator.setVisible(showComparator);
-    if (showComparator) proceduralComparator.setMode(comparatorMode);
+  /* [138A-6] Solo quedan dos estilos (bloques/suave): seleccionar uno muestra
+   * el comparador del constructor; la isla curva queda como referencia
+   * histórica inicial, sin selector propio. */
+  const applyTerrainMode = (terrainMode: RenderStyle): void => {
+    comparatorMode = terrainMode;
+    comparatorVisible = true;
+    curvedIsland.setVisible(false);
+    proceduralComparator.setVisible(true);
+    proceduralComparator.setMode(comparatorMode);
     panel.setTerrainMode(terrainMode);
     applyPick(null);
     /* [138A-5] El modo de render se persiste junto a las opciones. */

@@ -8,8 +8,9 @@ import { MAP_VERSION_LIMITS } from '../map-version';
 /** Forma de máscara del mundo (cómo se reparte tierra y agua). */
 export type ShapePreset = 'isla' | 'continente' | 'archipielago' | 'valle';
 
-/** Estilo de render que el comparador prueba sobre la misma base de altura. */
-export type RenderStyle = 'actual' | 'bloques' | 'suave';
+/** Estilo de render del constructor (138A-6: solo bloques/suave; la isla
+ *  curva queda como referencia histórica sin selector). */
+export type RenderStyle = 'bloques' | 'suave';
 
 export interface TerrainOptions {
   readonly seed: number;
@@ -31,7 +32,7 @@ export interface TerrainOptions {
 export const TERRAIN_OPTIONS_DEFAULTS: Readonly<Required<TerrainOptions>> = {
   seed: 1337,
   shape: 'isla',
-  style: 'actual',
+  style: 'bloques',
   width: 48,
   depth: 32,
   cellSize: 1,
@@ -70,7 +71,6 @@ export const SHAPE_PRESETS: readonly { readonly key: ShapePreset; readonly label
 ];
 
 export const RENDER_STYLES: readonly { readonly key: RenderStyle; readonly label: string }[] = [
-  { key: 'actual', label: 'Actual' },
   { key: 'bloques', label: 'Bloques' },
   { key: 'suave', label: 'Suave' },
 ];

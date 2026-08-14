@@ -7,7 +7,7 @@
 
 import { Layers, Waves } from 'lucide';
 import { createEl } from '../../../../utils/dom';
-import type { TerrainOptions } from '../../../game-core';
+import type { RenderStyle, TerrainOptions } from '../../../game-core';
 import {
   mountWorldConstructor,
   type WorldConstructorSection,
@@ -17,7 +17,6 @@ import {
   buildEstilosGroup,
   buildIslaGroup,
   type CurvedIslandPanelControls,
-  type IslandTerrainMode,
 } from './game-curved-island-controls';
 
 export interface CurvedIslandPanel {
@@ -29,7 +28,7 @@ export interface CurvedIslandPanel {
   /** [138A-4] Sincroniza los controles del constructor con unas opciones. */
   readonly setConstructorOptions: (options: TerrainOptions) => void;
   /** [138A-4] Marca el segmento de estilo activo sin disparar el control. */
-  readonly setTerrainMode: (mode: IslandTerrainMode) => void;
+  readonly setTerrainMode: (mode: RenderStyle) => void;
   readonly destroy: () => void;
 }
 
@@ -39,8 +38,8 @@ export function mountCurvedIslandPanel(
 ): CurvedIslandPanel {
   const stats = createEl('p', { className: 'juegoPanelTerreno__stats', textContent: '' });
   let metricsEl: HTMLParagraphElement | null = null;
-  let currentMode: IslandTerrainMode = 'actual';
-  let estilosSetActive: ((mode: IslandTerrainMode) => void) | null = null;
+  let currentMode: RenderStyle = 'bloques';
+  let estilosSetActive: ((mode: RenderStyle) => void) | null = null;
   let constructorSection: WorldConstructorSection | null = null;
   let legacyPanel: HTMLElement | null = null;
 
@@ -113,7 +112,7 @@ export function mountCurvedIslandPanel(
       constructorSection?.destroy();
       metricsEl = null;
       estilosSetActive = null;
-      currentMode = 'actual';
+      currentMode = 'bloques';
     },
   };
 }

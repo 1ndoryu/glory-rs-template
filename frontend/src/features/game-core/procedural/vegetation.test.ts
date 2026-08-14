@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateIslandHeightfield } from './heightmap';
-import { placeVegetation, VEGETATION_DEFAULTS } from './vegetation';
+import { placeVegetation, VEGETATION_BASE_SCALE, VEGETATION_DEFAULTS } from './vegetation';
 
 const WIDTH = 48;
 const DEPTH = 32;
@@ -58,5 +58,15 @@ describe('placeVegetation (138A-1)', () => {
     expect(() => placeVegetation(h, SEED, { maxGrass: -1 })).toThrow('presupuestos');
     expect(() => placeVegetation(h, SEED, { maxTrees: 1.5 })).toThrow('presupuestos');
     expect(() => placeVegetation(h, SEED, { grassSpacing: 0 })).toThrow('distancias');
+  });
+
+  it('aplica la escala base menor (~0.5×) a todas las instancias (138A-6)', () => {
+    const h = generateIslandHeightfield({ seed: SEED, width: WIDTH, depth: DEPTH, maxHeight: 4 });
+    const result = placeVegetation(h, SEED);
+    expect(result.placements.length).toBeGreaterThan(0);
+    for (const placement of result.placements) {
+      expect(placement.scale).toBeGreaterThanOrEqual(VEGETATION_BASE_SCALE * 0.8 - 1e-9);
+      expect(placement.scale).toBeLessThanOrEqual(VEGETATION_BASE_SCALE * 1.25 + 1e-9);
+    }
   });
 });

@@ -65,6 +65,16 @@ describe('persistencia del constructor de mundo', () => {
     expect(loadConstructorState()).toEqual({ version: 1, options, mode: 'bloques' });
   });
 
+  it('el modo histórico actual cae a bloques al restaurar (138A-6)', () => {
+    const options = terrainOptionsPreset('isla');
+    window.localStorage.setItem(CONSTRUCTOR_STORAGE_KEY, JSON.stringify({
+      version: 1,
+      options,
+      mode: 'actual',
+    }));
+    expect(loadConstructorState()).toEqual({ version: 1, options, mode: 'bloques' });
+  });
+
   it('save devuelve false y load null si localStorage falla', () => {
     const blocked: Storage = {
       getItem: () => { throw new Error('denied'); },

@@ -14,6 +14,7 @@ import {
   placeVegetation,
   terrainOptionsPreset,
   type IslandHeightfield,
+  type RenderStyle,
   type TerrainOptions,
 } from '../../../game-core';
 import {
@@ -29,10 +30,8 @@ import { type WorldBend } from './game-world-bend';
 const WATER_Y = -0.12;
 const PROP_COUNT = 60;
 
-export type ProceduralTerrainMode = 'bloques' | 'suave';
-
 export interface ProceduralTerrainStats {
-  readonly mode: ProceduralTerrainMode;
+  readonly mode: RenderStyle;
   readonly vertices: number;
   readonly triangles: number;
   readonly propCount: number;
@@ -49,8 +48,8 @@ export interface TerrainPick {
 }
 
 export interface ProceduralComparator {
-  readonly setMode: (mode: ProceduralTerrainMode) => void;
-  readonly mode: () => ProceduralTerrainMode;
+  readonly setMode: (mode: RenderStyle) => void;
+  readonly mode: () => RenderStyle;
   readonly setVisible: (visible: boolean) => void;
   readonly regenerate: (seed: number) => void;
   /** [138A-4] Regenera con opciones completas del constructor. */
@@ -85,7 +84,7 @@ export function mountProceduralComparator(
   let currentDepth = currentOptions.depth;
   let currentHeightfield: IslandHeightfield;
   let currentBlockLevels: Int8Array;
-  let mode: ProceduralTerrainMode = 'bloques';
+  let mode: RenderStyle = 'bloques';
   let propsVisible = true;
 
   const world = new THREE.Group();
@@ -108,7 +107,9 @@ export function mountProceduralComparator(
 
   const rebuildWater = (): void => {
     waterGeometry?.dispose();
-    waterGeometry = buildToonWaterPlaneGeometry(currentWidth * 2.4, currentDepth * 2.4);
+    /* [138A-6] El agua cubre el rect del mundo escalado por cellSize. */
+    const cellSize = currentOptions.cellSize;
+    waterGeometry = buildToonWaterPlaneGeometry(currentWidth * cellSize * 2.4, currentDepth * cellSize * 2.4);
     water.geometry = waterGeometry;
   };
 
@@ -125,6 +126,10 @@ export function mountProceduralComparator(
     const terrain = new THREE.Mesh(toGeometry(terrainData), material);
     const props = new THREE.Mesh(toGeometry(propsData), material);
     props.visible = propsVisible;
+    /* [138A-6] El tamaño de bloque real: el mesher emite celdas de 1 unidad y
+     * el grupo escala la huella x/z por cellSize (la altura no se escala:
+     * maxHeight es un control independiente en el contrato). */
+    group.scale.set(currentOptions.cellSize, 1, currentOptions.cellSize);
     group.add(terrain, props);
     return {
       group,
@@ -138,14 +143,23 @@ export function mountProceduralComparator(
   };
 
   const buildSmooth = (heightfield: IslandHeightfield): BuiltMode => {
-    const meshData = buildHeightfieldMeshData(heightfield);
+    const cellSize = currentOptions.cellSize;
+    const meshData = buildHeightfieldMeshData(heightfield, { cellSize });
     const density = currentOptions.vegetationDensity;
     const veg = placeVegetation(heightfield, currentOptions.seed, {
       maxGrass: Math.round(420 * density),
-      maxTrees: Math.round(64 * density),
+      /* [138A-6] Sin árboles en suave: conserva césped y rocas. */
+      maxTrees: 0,
       maxRocks: Math.round(26 * density),
     });
-    const propData = buildLowPolyVegetationMeshData(veg.placements);
+    /* [138A-6] Las posiciones del toolkit están en celdas; el preview suave
+     * las traduce al mundo escalado por cellSize igual que el documento. */
+    const scaledPlacements = veg.placements.map(placement => ({
+      ...placement,
+      x: placement.x * cellSize,
+      z: placement.z * cellSize,
+    }));
+    const propData = buildLowPolyVegetationMeshData(scaledPlacements);
     const group = new THREE.Group();
     const terrain = new THREE.Mesh(toIndexedGeometry(meshData), material);
     const props = new THREE.Mesh(toIndexedGeometry(propData), material);
@@ -190,8 +204,10 @@ export function mountProceduralComparator(
   };
 
   const cellAtWorld = (x: number, z: number): { i: number; j: number } | null => {
-    const i = Math.floor(x - centerX + currentWidth / 2);
-    const j = Math.floor(z - centerZ + currentDepth / 2);
+    /* [138A-6] El mundo del comparador escala por cellSize (bloques via scale
+     * del grupo, suave via posiciones del mesh); el pick divide por cellSize. */
+    const i = Math.floor((x - centerX) / currentOptions.cellSize + currentWidth / 2);
+    const j = Math.floor((z - centerZ) / currentOptions.cellSize + currentDepth / 2);
     if (i < 0 || j < 0 || i >= currentWidth || j >= currentDepth) return null;
     return { i, j };
   };
@@ -220,8 +236,8 @@ export function mountProceduralComparator(
         i: cell.i,
         j: cell.j,
         level: null,
-        worldX: cell.i - currentWidth / 2 + 0.5 + centerX,
-        worldZ: cell.j - currentDepth / 2 + 0.5 + centerZ,
+        worldX: (cell.i - currentWidth / 2 + 0.5) * currentOptions.cellSize + centerX,
+        worldZ: (cell.j - currentDepth / 2 + 0.5) * currentOptions.cellSize + centerZ,
         height,
       };
     }
@@ -234,8 +250,8 @@ export function mountProceduralComparator(
       i: cell.i,
       j: cell.j,
       level,
-      worldX: cell.i - currentWidth / 2 + 0.5 + centerX,
-      worldZ: cell.j - currentDepth / 2 + 0.5 + centerZ,
+      worldX: (cell.i - currentWidth / 2 + 0.5) * currentOptions.cellSize + centerX,
+      worldZ: (cell.j - currentDepth / 2 + 0.5) * currentOptions.cellSize + centerZ,
       height: layer + 0.5,
     };
   };
