@@ -16,6 +16,7 @@
 - Referencia visual del Bosque (Curved Island): `Agente/usuario/referencia-visual-curved-island-2026-08-12.md`
 - Terreno por bloques (Minecraft) del Bosque: `Agente/planes/completados/plan-terreno-bloques-bosque-minecraft-2026-08-12.md`
 - Toolkit de agua y lluvia del Bosque: `Agente/planes/completados/plan-toolkit-agua-lluvia-2026-08-13.md`
+- Constructor de mundo del Bosque: `Agente/planes/completados/plan-constructor-mundo-2026-08-14.md`
 - Tema claro/oscuro: `Agente/planes/plan-modo-oscuro-os-2026-07-31.md`
 - Juego bosque multijugador 3D: `Agente/planes/plan-juego-bosque-multijugador-2026-08-01.md`
 - Assets y terreno del bosque 3D: `Agente/planes/plan-assets-terreno-bosque-3d-2026-08-01.md`
@@ -120,6 +121,19 @@ para que la configuración no vuelva a divergir; commits `3abb13c6`
 (comparador), `0a5170f2` (isla/adaptador) y `8684af12` (subdivisión final). El
 generador puro `buildWaterMeshData` sigue en `game-core` para futuras variantes
 de oleaje.
+
+### 138A-4 — Constructor de mundo del Bosque (cerrado, 14-ago)
+
+**Fuente canónica:** `Agente/planes/completados/plan-constructor-mundo-2026-08-14.md`.
+Primer constructor completo del Bosque: contrato puro `TerrainOptions`
+(forma isla/continente/archipiélago/valle, seed, tamaño 16..128, altura, agua,
+costa, warp, octaves, celda y densidad de vegetación), pipeline
+`buildMapVersionFromOptions` → `MapVersion` válido (manifest, instancias,
+spawns, fail-closed), export/import JSON, y sección "Constructor" en el panel
+de `/forest-playable` que regenera el comparador (bloques/suave) sobre la
+misma base. Gate `npm run gate:check -- 138A-4` PASS; type-check limpio y
+vitest 30 archivos / 230 tests. Fase 4 (retoque fino con editor 2D) queda
+como siguiente bloque. Sin backend/realtime/colisión.
 
 ### 028A-5 — Novedades: popover de campana + admin "novedades" con borrado
 
