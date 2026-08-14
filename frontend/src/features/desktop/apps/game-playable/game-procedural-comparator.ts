@@ -4,8 +4,8 @@
  * cuantización, y 'suave' usa el heightfield-mesh + vegetación low-poly del
  * toolkit (árboles con ramas y césped por matas, 138A-2).
  * Solo presentación y métricas estructurales para que el usuario decida el
- * estilo con evidencia; el agua es un plano toon simple porque aquí se
- * compara el terreno/props, no el shader de costa del 128A-1. */
+ * estilo con evidencia; desde 138A-3 ambos modos comparten el MISMO agua de
+ * costa (espuma + niebla) que la isla curva, para comparar 1:1. */
 
 import * as THREE from 'three';
 import {
@@ -19,10 +19,11 @@ import {
   buildBlockPropsMeshData,
   buildBlockTerrainMeshData,
   placeBlockProps,
-  type BlockMeshData,
 } from './game-block-mesher';
-import { BLOCK_COLORS } from './game-block-palette';
 import { buildBlockHeightmapFromIsland } from './game-procedural-blocks';
+import { mountCurvedWater, WATER_MESH_SCALE } from './game-curved-water';
+import { toGeometry, toIndexedGeometry } from './game-procedural-geometry';
+import { type WorldBend } from './game-world-bend';
 
 /* Misma rejilla que la isla 128A-1 para que el comparador sea 1:1. */
 const WIDTH = 48;
@@ -71,7 +72,7 @@ interface BuiltMode {
 
 export function mountProceduralComparator(
   scene: THREE.Scene,
-  bend: WorldBendLike,
+  bend: WorldBend,
   toonRamp: THREE.Texture,
   seed = 1337,
   centerX = 0,
@@ -85,16 +86,27 @@ export function mountProceduralComparator(
 
   const world = new THREE.Group();
   const material = bend.apply(new THREE.MeshToonMaterial({ gradientMap: toonRamp, vertexColors: true }));
-  const waterMaterial = bend.apply(new THREE.MeshToonMaterial({ color: BLOCK_COLORS.waterShallow, gradientMap: toonRamp }));
-  const waterGeometry = new THREE.PlaneGeometry(WIDTH * 2.4, DEPTH * 2.4, 1, 1);
-  waterGeometry.rotateX(-Math.PI / 2);
-  const water = new THREE.Mesh(waterGeometry, waterMaterial);
-  water.position.y = WATER_Y;
-  world.add(water);
+  /* Agua compartida con la isla (costa/espuma/niebla). Se monta sin anexarla a
+   * la escena (addToScene:false) porque vive re-parentada en `world` para que
+   * siga el bend del mundo junto al terreno; dispose la retira de su padre. */
+  const water = mountCurvedWater(scene, bend, {
+    width: WIDTH,
+    depth: DEPTH,
+    segmentsX: 120,
+    segmentsZ: 80,
+    meshScale: WATER_MESH_SCALE,
+    addToScene: false,
+    waterY: WATER_Y,
+    centerX,
+    centerZ,
+    seed,
+  });
+  water.mesh.position.set(0, WATER_Y, 0);
+  world.add(water.mesh);
 
   let blocks: BuiltMode | null = null;
   let smooth: BuiltMode | null = null;
-  let raycastGroup: THREE.Object3D = water;
+  let raycastGroup: THREE.Object3D = water.mesh;
 
   const buildBlocks = (): BuiltMode => {
     currentHeightfield = generateIslandHeightfield({
@@ -155,6 +167,10 @@ export function mountProceduralComparator(
     disposeBuiltMode(smooth);
     blocks = buildBlocks();
     smooth = buildSmooth();
+    water.setShore(Float32Array.from(
+      currentHeightfield.heights,
+      (h) => (h >= currentHeightfield.waterLevel ? 1 : 0),
+    ));
     world.add(blocks.group, smooth.group);
     applyMode();
   };
@@ -163,9 +179,7 @@ export function mountProceduralComparator(
     if (!blocks || !smooth) return;
     blocks.group.visible = mode === 'bloques';
     smooth.group.visible = mode === 'suave';
-    raycastGroup = mode === 'bloques'
-      ? blocks.group.children[0]
-      : smooth.group.children[0];
+    raycastGroup = (mode === 'bloques' ? blocks : smooth).group.children[0];
   };
 
   const cellAtWorld = (x: number, z: number): { i: number; j: number } | null => {
@@ -254,51 +268,16 @@ export function mountProceduralComparator(
     pickTerrain,
     setPropsVisible,
     terrainStats: () => (mode === 'bloques' ? blocks!.stats : smooth!.stats),
-    /* El agua del comparador es estática; el método existe para mantener el
-     * mismo contrato de update que la isla y poder llamarlo de forma uniforme. */
-    update: () => {},
+    update: (timeSeconds) => water.update(timeSeconds),
     dispose: () => {
       scene.remove(world);
+      water.dispose();
       disposeBuiltMode(blocks);
       disposeBuiltMode(smooth);
       material.dispose();
-      waterMaterial.dispose();
-      waterGeometry.dispose();
       world.clear();
     },
   };
-}
-
-/* Contrato mínimo de world-bend para no acoplar el comparador a su impl. */
-interface WorldBendLike {
-  apply: <T extends THREE.Material>(material: T) => T;
-}
-
-function toGeometry(data: BlockMeshData): THREE.BufferGeometry {
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(data.positions, 3));
-  g.setAttribute('normal', new THREE.Float32BufferAttribute(data.normals, 3));
-  g.setAttribute('uv', new THREE.Float32BufferAttribute(data.uvs, 2));
-  g.setAttribute('color', new THREE.Float32BufferAttribute(data.colors, 3));
-  return g;
-}
-
-function toIndexedGeometry(data: {
-  readonly positions: Float32Array | readonly number[];
-  readonly normals: Float32Array | readonly number[];
-  readonly colors: Float32Array | readonly number[];
-  readonly indices: Uint32Array | readonly number[];
-  readonly uvs?: Float32Array | readonly number[];
-}): THREE.BufferGeometry {
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(data.positions, 3));
-  g.setAttribute('normal', new THREE.Float32BufferAttribute(data.normals, 3));
-  if (data.uvs) g.setAttribute('uv', new THREE.Float32BufferAttribute(data.uvs, 2));
-  g.setAttribute('color', new THREE.Float32BufferAttribute(data.colors, 3));
-  /* El toolkit suave entrega índices como number[] (datos puros); Three exige
-   * TypedArray en BufferAttribute, así que se normalizan aquí en el adaptador. */
-  g.setIndex(new THREE.BufferAttribute(new Uint32Array(data.indices), 1));
-  return g;
 }
 
 function disposeBuiltMode(built: BuiltMode | null): void {
