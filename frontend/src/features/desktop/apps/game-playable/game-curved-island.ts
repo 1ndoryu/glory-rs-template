@@ -1,7 +1,7 @@
 /* GAME-01 — Isla del Bosque por bloques (Minecraft), override visual temporal.
  * Adaptador Three delgado sobre los módulos puros (heightmap + mesher): monta
- * la geometría de bloques, delega el agua (shore + espuma) y la lluvia a sus
- * adaptadores extraídos en 138A-3, y expone controles (lluvia, props,
+ * la geometría de bloques, delega el agua (plano toon estático) y la lluvia a
+ * sus adaptadores extraídos en 138A-3, y expone controles (lluvia, props,
  * regenerar) para el panel temporal. No alimenta colisión ni simulación:
  * solo presentación. */
 
@@ -59,13 +59,6 @@ export interface CurvedIsland {
   readonly dispose: () => void;
 }
 
-/* Mask de costa del heightmap: 1 = tierra (level ≥ 0), 0 = océano. */
-function shoreMaskFromLevels(levels: Int8Array): Float32Array {
-  const mask = new Float32Array(levels.length);
-  for (let k = 0; k < levels.length; k += 1) mask[k] = levels[k] >= 0 ? 1 : 0;
-  return mask;
-}
-
 export function mountCurvedIsland(
   scene: THREE.Scene,
   bend: WorldBend,
@@ -84,20 +77,17 @@ export function mountCurvedIsland(
   island.position.set(centerX, 0, centerZ);
   scene.add(island);
 
-  /* Agua: mismo shader de costa (deep/shallow/foam/niebla) que el original,
-   * extraído a su adaptador en 138A-3; la shore se refresca al regenerar. */
+  /* Agua: plano toon estático igual al del comparador (feedback 13-ago: el
+   * shader de costa con olas se veía como capa de triángulos sobre el agua). */
   const water = mountCurvedWater(scene, bend, {
     width: WIDTH,
     depth: DEPTH,
-    segmentsX: 120,
-    segmentsZ: 80,
     meshScale: WATER_MESH_SCALE,
     waterY: WATER_Y,
     centerX,
     centerZ,
-    seed,
+    toonRamp,
   });
-  water.setShore(shoreMaskFromLevels(heightmap.levels));
 
   /* Lluvia: streaks deterministas del toolkit (138A-3), misma cantidad/área. */
   const rain = mountCurvedRain(scene, bend, {
@@ -186,7 +176,6 @@ export function mountCurvedIsland(
     terrainMesh.geometry = toGeometry(buildBlockTerrainMeshData(heightmap, newSeed));
     propsMesh.geometry.dispose();
     propsMesh.geometry = toGeometry(buildBlockPropsMeshData(placeBlockProps(heightmap, newSeed, PROP_COUNT)));
-    water.setShore(shoreMaskFromLevels(heightmap.levels));
     setHighlight(null);
   };
 

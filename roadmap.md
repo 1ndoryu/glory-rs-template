@@ -106,6 +106,14 @@ Island. Gate `npm run gate:check -- 138A-3` PASS; type-check limpio y vitest
 109 archivos / 780 tests como evidencia complementaria. Sin cambios de
 backend/realtime/colisión.
 
+**Corrección 13-ago (feedback del usuario):** tras probar en el navegador, el
+shader de costa con olas y espuma se veía como una capa de triángulos encima
+del agua, tanto en el comparador como en el modo "Actual" (isla curva). Los
+tres modos (`Actual`/`Bloques`/`Suave`) quedaron con el MISMO agua toon plana
+estática (`PlaneGeometry` 1×1 + `MeshToonMaterial` con rampa): commits
+`3abb13c6` (comparador) y el posterior de isla/adaptador. El generador puro
+`buildWaterMeshData` sigue en `game-core` para futuras variantes de oleaje.
+
 ### 028A-5 — Novedades: popover de campana + admin "novedades" con borrado
 
 **Depende de:** 297A-21 (notificaciones) y las recetas de popover/modal del OS.
