@@ -214,3 +214,24 @@ export function positionFirstPersonCamera(
   camera.position.copy(eye);
   camera.lookAt(eye.add(dir));
 }
+
+/* [138A-11] Colisión de 3ª persona por segmento: en vez de muestrear solo el
+ * punto de la cámara (que se hundía en colinas intermedias), se eleva la
+ * cámara al máximo `suelo + despeje` del tramo jugador→cámara. Función pura:
+ * el llamador inyecta `groundHeightAt` para que sea testeable sin escena. */
+export function resolveThirdPersonCollision(
+  camera: THREE.PerspectiveCamera,
+  cameraTarget: THREE.Vector3,
+  groundHeightAt: (x: number, z: number) => number,
+  clearance = CAMERA_GROUND_CLEARANCE,
+  samples = 8,
+): void {
+  let maxGround = -Infinity;
+  for (let k = 0; k <= samples; k += 1) {
+    const t = k / samples;
+    const x = THREE.MathUtils.lerp(cameraTarget.x, camera.position.x, t);
+    const z = THREE.MathUtils.lerp(cameraTarget.z, camera.position.z, t);
+    maxGround = Math.max(maxGround, groundHeightAt(x, z));
+  }
+  camera.position.y = Math.max(camera.position.y, maxGround + clearance);
+}

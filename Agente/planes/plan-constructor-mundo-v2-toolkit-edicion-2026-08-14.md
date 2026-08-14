@@ -1,6 +1,6 @@
 # Plan 138A-5..12 — Constructor de mundo v2: toolkit de edición (2026-08-14)
 
-> **Estado:** ACTIVO — 138A-10 completado; siguiente bloque 138A-11.
+> **Estado:** ACTIVO — 138A-11 completado (gate PASS); siguiente bloque 138A-12.
 > **Rama:** `wandorius` · **Gates:** `npm run gate:check -- 138A-5` …
 > `npm run gate:check -- 138A-12`
 > **Fuente de contexto:** decisiones de producto 2026-08-13/14 (motor propio,
@@ -425,12 +425,13 @@ rendimiento) con evidencia. Se mantiene el flujo canónico
   + GPU probe) y corrección de hallazgos con tests.
 
 **Checklist:**
-- [ ] Informe de auditoría SOLID con hallazgos por módulo y fixes aplicados
+- [x] Informe de auditoría SOLID con hallazgos por módulo y fixes aplicados
       (o deuda documentada con ticket).
-- [ ] Informe de auditoría de rendimiento con números y presupuestos
+- [x] Informe de auditoría de rendimiento con números y presupuestos
       verificables; sin fugas de material/geometría tras regeneración (test de
       ciclo de vida ampliado a geometrías).
-- [ ] Gate 138A-11 PASS + revisión del usuario con evidencia.
+- [ ] Gate 138A-11 PASS (14-ago, evidencia en `.quality-reports/check/138A-11/`)
+      + validación visual del usuario en `/forest-playable` (pendiente).
 
 ### 138A-12 — Cielo procedural (skydome) y ambiente
 

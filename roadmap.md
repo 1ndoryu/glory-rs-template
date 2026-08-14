@@ -173,7 +173,17 @@ gate propio:
       de la zona afectada, InstancedMesh por chunk en el comparador, panel
       Pasto y persistencia); teardown sin fugas y verificación visual del
       usuario pendiente.
-- [ ] **138A-11 — Auditorías SOLID/arquitectura y rendimiento con evidencia.**
+- [x] **138A-11 — Auditorías SOLID/arquitectura y rendimiento con evidencia.**
+      Informes en `Agente/documentacion/arquitectura/auditoria-solid-constructor-mundo-2026-08-14.md`
+      y `auditoria-rendimiento-constructor-mundo-2026-08-14.md`. Fixes
+      materiales: doble rebuild del pasto (una regeneración), cuota global de
+      briznas por pasada filtrada, colisión de 3ª persona por segmento
+      (jugador→cámara) y validación cruzada opciones↔mapa en el import.
+      Benchmark reproducible: 25 mundos (48..256) a 15.8 ms de media; ciclo
+      de vida GPU sin fugas (geometrías/materiales estables tras 8
+      regeneraciones y escena vacía tras dispose). Deuda documentada
+      (líneas de escena/paneles y límite de utils) queda ticketizada en el
+      plan.
 - [ ] **138A-12 — Cielo procedural (skydome) y ambiente:** shader a pantalla
       completa con nubes pintadas por capas (cerca/lejos, cobertura, deriva),
       self-shadow y sol con glow, luces reales sincronizadas al vector solar

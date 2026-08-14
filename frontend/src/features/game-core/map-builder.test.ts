@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   assertValidMapVersion,
+  MAP_VERSION_LIMITS,
 } from './map-version';
 import {
   buildMapVersionFromOptions,
@@ -163,5 +164,102 @@ describe('serializeWorld/parseSerializedWorld (138A-4)', () => {
     const map = buildMapVersionFromOptions(options);
     const parsed = parseSerializedWorld(serializeWorld(options, map));
     expect(parsed.layers).toBeUndefined();
+  });
+
+  it('rechaza mundos con opciones y mapa incoherentes (138A-11)', () => {
+    const options = TERRAIN_OPTIONS_DEFAULTS;
+    const map = buildMapVersionFromOptions(options);
+    const envelope = JSON.parse(serializeWorld(options, map)) as {
+      options: typeof options;
+      map: MapVersion;
+    };
+
+    /* Bounds que no corresponden a width×cellSize. */
+    const wrongBounds: MapVersion = {
+      ...envelope.map,
+      terrain: {
+        ...envelope.map.terrain,
+        bounds: { ...envelope.map.terrain.bounds, maxX: 999 },
+      },
+    };
+    expect(() => parseSerializedWorld(JSON.stringify({ ...envelope, map: wrongBounds })))
+      .toThrow(/mundo inconsistente/);
+
+    /* cellSize del documento distinto de las opciones: assertValidMapVersion
+     * ya lo rechaza (chunks fuera de bounds), lo relevante es que nunca
+     * entra un mundo incoherente. */
+    const wrongCellSize: MapVersion = {
+      ...envelope.map,
+      terrain: { ...envelope.map.terrain, cellSize: 2 },
+    };
+    expect(() => parseSerializedWorld(JSON.stringify({ ...envelope, map: wrongCellSize })))
+      .toThrow();
+
+    /* Opciones de un mundo distinto al documento. */
+    expect(() => parseSerializedWorld(JSON.stringify({
+      ...envelope,
+      options: { ...options, width: 32, depth: 32 },
+    }))).toThrow(/mundo inconsistente/);
+  });
+
+  it('rechaza documentos con chunks faltantes o de más (138A-11)', () => {
+    const options = TERRAIN_OPTIONS_DEFAULTS;
+    const map = buildMapVersionFromOptions(options);
+    const envelope = JSON.parse(serializeWorld(options, map)) as { map: MapVersion };
+
+    const missingChunk: MapVersion = {
+      ...envelope.map,
+      terrain: { ...envelope.map.terrain, chunks: envelope.map.terrain.chunks.slice(0, -1) },
+    };
+    expect(() => parseSerializedWorld(JSON.stringify({ ...envelope, map: missingChunk })))
+      .toThrow(/cantidad de chunks/);
+
+    /* Chunk duplicado: lo detecta el validador estructural (assertValidMapVersion). */
+    const duplicateChunk: MapVersion = {
+      ...envelope.map,
+      terrain: {
+        ...envelope.map.terrain,
+        chunks: [...envelope.map.terrain.chunks, envelope.map.terrain.chunks[0]],
+      },
+    };
+    expect(() => parseSerializedWorld(JSON.stringify({ ...envelope, map: duplicateChunk })))
+      .toThrow();
+  });
+});
+
+describe('benchmark reproducible de generación (138A-11)', () => {
+  it('genera 25 mundos dentro de presupuestos y con tiempo acotado', () => {
+    const shapes = ['isla', 'continente', 'archipielago', 'valle'] as const;
+    const seeds = [1, 7, 42, 1337, 90210, 65537, 123456, 999999];
+    const sizes = [48, 64, 128, 192, 256] as const;
+    const durations: number[] = [];
+    let maxInstances = 0;
+    let maxChunks = 0;
+    let maxTriangles = 0;
+
+    for (let k = 0; k < 25; k += 1) {
+      const options = terrainOptionsPreset(shapes[k % shapes.length]);
+      const size = sizes[k % sizes.length];
+      const start = performance.now();
+      const map = buildMapVersionFromOptions({ ...options, seed: seeds[k % seeds.length], width: size, depth: size });
+      durations.push(performance.now() - start);
+      maxInstances = Math.max(maxInstances, map.instances.length);
+      maxChunks = Math.max(maxChunks, map.terrain.chunks.length);
+      const stats = mapBuilderStats(map);
+      maxTriangles = Math.max(maxTriangles, stats.triangles);
+      expect(() => assertValidMapVersion(map)).not.toThrow();
+    }
+
+    const averageMs = durations.reduce((sum, value) => sum + value, 0) / durations.length;
+    /* Presupuestos del contrato MapVersion (fail-closed en producción). */
+    expect(maxChunks).toBeLessThanOrEqual(MAP_VERSION_LIMITS.maxChunks);
+    expect(maxChunks).toBeGreaterThanOrEqual(256); /* el mayor mundo del set: 256×256 */
+    expect(maxInstances).toBeLessThanOrEqual(MAP_VERSION_LIMITS.maxInstances);
+    /* 1024 chunks × 16×16×2 triángulos. */
+    expect(maxTriangles).toBeLessThanOrEqual(MAP_VERSION_LIMITS.maxChunks * 16 * 16 * 2);
+    /* Cota de tiempo generosa para CI: la generación por mundo ronda pocos
+     * ms; 500 ms por mundo detecta regresiones O(n²) sin ser frágil. */
+    expect(averageMs).toBeLessThan(500);
+    expect(Math.max(...durations)).toBeLessThan(1000);
   });
 });

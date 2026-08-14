@@ -54,12 +54,12 @@ import {
   applyFreeFlyKeyDown,
   applyFreeFlyKeyUp,
   cameraDirection,
-  CAMERA_GROUND_CLEARANCE,
   clampCameraTarget,
   createFreeFlyKeys,
   isEditableTarget,
   positionFirstPersonCamera,
   resetFreeFlyKeys,
+  resolveThirdPersonCollision,
   rotateCameraLook,
   updateFreeFlyCamera,
   type CameraBounds,
@@ -315,8 +315,10 @@ export function mountGamePlayableScene(
      * sobreviven a la regeneración (rebuildDocumentProps usa el actual). */
     proceduralComparator.setDocument(constructorMap);
     proceduralComparator.setLayers(constructorLayers);
-    proceduralComparator.setGrassOptions(constructorGrass);
-    proceduralComparator.regenerateFromOptions(constructorOptions);
+    /* [138A-11] El pasto viaja en la misma regeneración: antes se hacían dos
+     * rebuilds seguidos (setGrassOptions + regenerateFromOptions) y el campo
+     * se recalculaba dos veces por cambio de valor. */
+    proceduralComparator.regenerateFromOptions(constructorOptions, constructorGrass);
     panel.setConstructorOptions(constructorOptions);
     panel.setConstructorStats(formatConstructorStats(mapBuilderStats(constructorMap)));
     applyTerrainMode(comparatorVisible ? comparatorMode : 'bloques');
@@ -724,13 +726,12 @@ export function mountGamePlayableScene(
       orbit.distance * sinPolar * Math.cos(orbit.azimuth),
     );
     camera.position.copy(cameraTarget).add(offset);
-    /* [138A-7] 3ª persona: la órbita sigue al personaje y no se hunde en el
-     * terreno (colisión básica con la altura del suelo). */
+    /* [138A-7][138A-11] 3ª persona: la órbita sigue al personaje y no se
+     * hunde en el terreno. La colisión muestrea el segmento jugador→cámara
+     * (un solo punto se clavaba en colinas intermedias) y eleva la cámara al
+     * máximo suelo+despeje del tramo. */
     if (cameraMode === 'tercera') {
-      camera.position.y = Math.max(
-        camera.position.y,
-        groundHeightAt(camera.position.x, camera.position.z) + CAMERA_GROUND_CLEARANCE,
-      );
+      resolveThirdPersonCollision(camera, cameraTarget, groundHeightAt);
     }
     camera.lookAt(cameraTarget);
     /* Niebla adaptativa: cerca y lejos escalan con el zoom para que la escena

@@ -38,6 +38,7 @@ import {
   type WorldPalette,
   type GrassChunkField,
   type GrassFieldOptions,
+  type GrassFieldResult,
 } from '../../../game-core';
 import {
   type BlockPropPlacement,
@@ -52,6 +53,15 @@ import { type WorldBend } from './game-world-bend';
 
 const WATER_Y = -0.12;
 const PROP_COUNT = 60;
+/* [138A-11] Resultado vacío reutilizable cuando la cuota global de briznas
+ * ya está consumida (evita llamar a buildGrassField con maxInstances 0,
+ * que es fail-closed y lanzaría). */
+const EMPTY_GRASS_FIELD: GrassFieldResult = {
+  chunks: [],
+  bladeCount: 0,
+  chunkCount: 0,
+  overriddenCells: 0,
+};
 
 export interface ProceduralTerrainStats {
   readonly mode: RenderStyle;
@@ -79,7 +89,10 @@ export interface ProceduralComparator {
   readonly setVisible: (visible: boolean) => void;
   readonly regenerate: (seed: number) => void;
   /** [138A-4] Regenera con opciones completas del constructor. */
-  readonly regenerateFromOptions: (options: TerrainOptions) => void;
+  /* [138A-11] `grass` opcional evita dos rebuilds seguidos (setGrassOptions
+   * + regenerateFromOptions) cuando el panel cambia terreno y pasto a la vez:
+   * la regeneración completa ya reconstruye el campo con las opciones dadas. */
+  readonly regenerateFromOptions: (options: TerrainOptions, grass?: GrassFieldOptions) => void;
   /** [138A-8] Aplica la paleta del mundo sin tocar opciones/terreno. */
   readonly setPalette: (palette: WorldPalette) => void;
   /** [138A-8] Cambia la rampa toon compartida (gradientMap del material). */
@@ -234,19 +247,27 @@ export function mountProceduralComparator(
       mesh.dispose();
     }
     grassMeshes = kept;
-    const field = buildGrassField(
-      currentHeightfield,
-      currentSurfaces,
-      currentVegetationMask,
-      currentOptions.seed,
-      currentGrassOptions,
-      {
-        maxChunks: GRASS_FIELD_LIMITS.maxChunks,
-        maxInstances: GRASS_FIELD_LIMITS.maxInstances,
-        chunkSize: GRASS_FIELD_LIMITS.chunkSize,
-      },
-      filter,
-    );
+    /* [138A-11] Presupuesto global: la cuota (10000) se reparte entre lo
+     * conservado (chunks fuera del filtro de la pincelada) y lo nuevo de
+     * esta pasada, en vez de conceder 10000 a cada rebuild filtrado. Si ya
+     * no queda cupo no se generan briznas nuevas; la retirada de pasto ya
+     * liberó sus meshes y queda aplicada. */
+    const remaining = Math.max(0, GRASS_FIELD_LIMITS.maxInstances - grassBladeTotal);
+    const field = remaining <= 0
+      ? EMPTY_GRASS_FIELD
+      : buildGrassField(
+        currentHeightfield,
+        currentSurfaces,
+        currentVegetationMask,
+        currentOptions.seed,
+        currentGrassOptions,
+        {
+          maxChunks: GRASS_FIELD_LIMITS.maxChunks,
+          maxInstances: remaining,
+          chunkSize: GRASS_FIELD_LIMITS.chunkSize,
+        },
+        filter,
+      );
     for (const chunk of field.chunks) {
       const mesh = createGrassMesh(chunk);
       grassMeshes.push(mesh);
@@ -588,7 +609,8 @@ export function mountProceduralComparator(
     regenerate: (newSeed) => {
       setOptions({ ...currentOptions, seed: newSeed });
     },
-    regenerateFromOptions: (next) => {
+    regenerateFromOptions: (next, grass) => {
+      if (grass !== undefined) currentGrassOptions = normalizeGrassFieldOptions(grass);
       setOptions(next);
     },
     groundHeightAt,

@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import * as gameCore from '../../../game-core';
-import { buildMapVersionFromOptions, terrainOptionsPreset, WORLD_PALETTE_DEFAULTS } from '../../../game-core';
+import {
+  buildMapVersionFromOptions,
+  GRASS_FIELD_LIMITS,
+  terrainOptionsPreset,
+  WORLD_PALETTE_DEFAULTS,
+  type GrassFieldResult,
+} from '../../../game-core';
 
 /* Spy sobre la fábrica real: el comparador debe crear el material del agua
  * UNA vez (al montar) y solo regenerar geometría después. Cada llamada extra
@@ -14,9 +20,15 @@ vi.mock('./game-toon-water', async (importOriginal) => {
 
 /* [138A-6] Spy sobre el presupuesto de vegetación: el modo suave debe llamar
  * `placeVegetation` con maxTrees=0 conservando césped y rocas. */
+/* [138A-11] También se espiá buildGrassField para verificar el presupuesto
+ * global de briznas por pasada y que la regeneración no duplica el rebuild. */
 vi.mock('../../../game-core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../game-core')>();
-  return { ...actual, placeVegetation: vi.fn(actual.placeVegetation) };
+  return {
+    ...actual,
+    placeVegetation: vi.fn(actual.placeVegetation),
+    buildGrassField: vi.fn(actual.buildGrassField),
+  };
 });
 
 import { createWorldBend } from './game-world-bend';
@@ -424,5 +436,141 @@ describe('comparador procedural — paleta, rampa y documento (138A-8)', () => {
     expect(world.children).not.toContain(docGroup);
 
     comparator.dispose();
+  });
+});
+
+describe('comparador procedural — auditoría SOLID/rendimiento (138A-11)', () => {
+  it('regenerateFromOptions con pasto hace UN solo rebuild del campo', () => {
+    const scene = new THREE.Scene();
+    const comparator: ProceduralComparator = mountProceduralComparator(
+      scene,
+      createWorldBend(),
+      new THREE.Texture(),
+      42,
+      0,
+      0,
+      { ...terrainOptionsPreset('isla'), seed: 42 },
+    );
+    comparator.setMode('suave');
+
+    /* La escena antes llamaba setGrassOptions + regenerateFromOptions y el
+     * campo se recalculaba dos veces; el contrato nuevo acepta el pasto en
+     * la misma regeneración. */
+    vi.mocked(gameCore.buildGrassField).mockClear();
+    comparator.regenerateFromOptions(
+      { ...terrainOptionsPreset('valle'), seed: 31 },
+      { size: 2, color: 0x123456 },
+    );
+    expect(gameCore.buildGrassField).toHaveBeenCalledTimes(1);
+    const call = vi.mocked(gameCore.buildGrassField).mock.calls.at(-1)!;
+    expect(call[4]).toMatchObject({ size: 2, color: 0x123456 });
+    expect(comparator.terrainStats().grassBlades).toBeGreaterThan(0);
+    comparator.dispose();
+  });
+
+  it('la cuota global de briznas se reparte entre pasadas filtradas', () => {
+    const scene = new THREE.Scene();
+    const comparator: ProceduralComparator = mountProceduralComparator(
+      scene,
+      createWorldBend(),
+      new THREE.Texture(),
+      42,
+      0,
+      0,
+      { ...terrainOptionsPreset('isla'), seed: 42 },
+    );
+    comparator.setMode('suave');
+
+    const sandCells: (readonly [number, number])[] = [];
+    for (let j = 16; j < 32; j += 1) {
+      for (let i = 32; i < 48; i += 1) sandCells.push([i, j]);
+    }
+    const sandLayer = createPaintedLayer(
+      { ...DEFAULT_BRUSH_STATE, kind: 'sand' },
+      [],
+      sandCells,
+    );
+    const zoneA: readonly (readonly [number, number])[] = [[16, 16], [17, 16], [16, 17], [17, 17]];
+    const zoneB: readonly (readonly [number, number])[] = [[40, 24], [41, 24], [40, 25], [41, 25]];
+    const grassA = createPaintedLayer(
+      { ...DEFAULT_BRUSH_STATE, kind: 'grass', mode: 'add' },
+      [sandLayer],
+      zoneA,
+    );
+    const grassB = createPaintedLayer(
+      { ...DEFAULT_BRUSH_STATE, kind: 'grass', mode: 'add' },
+      [sandLayer, grassA],
+      zoneB,
+    );
+
+    /* Primera pasada: sin capas previas el filtro es completo (presupuesto
+     * entero). La segunda pasada conserva los chunks fuera de A∪B y debe
+     * recibir SOLO el cupo restante (10000 − conservadas). */
+    comparator.setLayers([sandLayer, grassA]);
+    vi.mocked(gameCore.buildGrassField).mockClear();
+    comparator.setLayers([sandLayer, grassA, grassB]);
+
+    const call = vi.mocked(gameCore.buildGrassField).mock.calls.at(-1)!;
+    const result = vi.mocked(gameCore.buildGrassField).mock.results.at(-1)!.value as GrassFieldResult;
+    const keptBlades = comparator.terrainStats().grassBlades! - result.bladeCount;
+    expect(call[5]!.maxInstances).toBe(GRASS_FIELD_LIMITS.maxInstances - keptBlades);
+    expect(call[5]!.maxInstances).toBeLessThan(GRASS_FIELD_LIMITS.maxInstances);
+    expect(call[5]!.maxInstances).toBeGreaterThan(0);
+    expect(comparator.terrainStats().grassBlades!).toBeLessThanOrEqual(GRASS_FIELD_LIMITS.maxInstances);
+    comparator.dispose();
+  });
+
+  it('el ciclo de vida no acumula geometrías ni materiales al regenerar y libera en dispose', () => {
+    const scene = new THREE.Scene();
+    const comparator: ProceduralComparator = mountProceduralComparator(
+      scene,
+      createWorldBend(),
+      new THREE.Texture(),
+      42,
+      0,
+      0,
+      { ...terrainOptionsPreset('isla'), seed: 42 },
+    );
+    comparator.setMode('suave');
+
+    const countLiving = (): { geometries: number; materials: number; meshes: number } => {
+      const geometries = new Set<THREE.BufferGeometry>();
+      const materials = new Set<THREE.Material>();
+      let meshes = 0;
+      scene.traverse((object) => {
+        if (object instanceof THREE.Mesh) {
+          meshes += 1;
+          geometries.add(object.geometry);
+          const material = object.material;
+          if (Array.isArray(material)) {
+            material.forEach(entry => materials.add(entry));
+          } else {
+            materials.add(material);
+          }
+        }
+      });
+      return { geometries: geometries.size, materials: materials.size, meshes };
+    };
+
+    const before = countLiving();
+    expect(before.meshes).toBeGreaterThan(0);
+    for (let seed = 1; seed <= 8; seed += 1) {
+      comparator.regenerate(seed * 1000);
+    }
+    const after = countLiving();
+    expect(after.geometries).toBe(before.geometries);
+    expect(after.materials).toBe(before.materials);
+
+    /* La geometría de un mesh anterior queda liberada al regenerar. */
+    const world = scene.children[0] as THREE.Group;
+    const smoothGroup = [...world.children].reverse().find(child =>
+      child instanceof THREE.Group && child.children.length === 3) as THREE.Group;
+    const terrainMesh = smoothGroup.children[0] as THREE.Mesh;
+    const disposeSpy = vi.spyOn(terrainMesh.geometry, 'dispose');
+    comparator.regenerate(999);
+    expect(disposeSpy).toHaveBeenCalled();
+
+    comparator.dispose();
+    expect(scene.children).toHaveLength(0);
   });
 });

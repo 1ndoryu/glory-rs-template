@@ -291,6 +291,10 @@ export function parseSerializedWorld(text: string): SerializedWorld {
   const issues = validateTerrainOptions(envelope.options);
   if (issues.length > 0) throw new Error(`opciones del mundo inválidas: ${issues.join('; ')}`);
   assertValidMapVersion(envelope.map);
+  /* [138A-11] Validación cruzada opciones↔mapa: antes solo se validaban por
+   * separado y un JSON con opciones y documento de mundos distintos entraba
+   * silenciosamente (bounds/cellSize/chunks incoherentes con width×depth). */
+  assertWorldMatchesOptions(normalizeTerrainOptions(envelope.options), envelope.map);
   if (envelope.layers !== undefined) {
     const layerIssues = validateTerrainLayerStack(envelope.layers);
     if (layerIssues.length > 0) throw new Error(`capas del mundo inválidas: ${layerIssues.join('; ')}`);
@@ -302,6 +306,46 @@ export function parseSerializedWorld(text: string): SerializedWorld {
     map: envelope.map,
     layers: envelope.layers === undefined ? undefined : normalizeTerrainLayerStack(envelope.layers),
   };
+}
+
+/** [138A-11] Comprueba que el documento corresponde EXACTAMENTE a las
+ *  opciones serializadas (bounds = ±dimension×cellSize/2, mismo cellSize y
+ *  chunks completos con las coordenadas 0..chunksX/Z). */
+function assertWorldMatchesOptions(options: TerrainOptions, map: MapVersion): void {
+  const { width, depth, cellSize } = options;
+  const { bounds, cellSize: mapCellSize, chunks } = map.terrain;
+  const close = (a: number, b: number): boolean =>
+    Math.abs(a - b) <= 1e-4 * Math.max(1, Math.abs(a), Math.abs(b));
+  const halfWidth = (width * cellSize) / 2;
+  const halfDepth = (depth * cellSize) / 2;
+  const issues: string[] = [];
+  if (!close(mapCellSize, cellSize)) {
+    issues.push('cellSize del mapa no coincide con las opciones');
+  }
+  if (!close(bounds.minX, -halfWidth) || !close(bounds.maxX, halfWidth)) {
+    issues.push('bounds X no coinciden con width×cellSize');
+  }
+  if (!close(bounds.minZ, -halfDepth) || !close(bounds.maxZ, halfDepth)) {
+    issues.push('bounds Z no coinciden con depth×cellSize');
+  }
+  const chunksX = width / MAP_VERSION_LIMITS.chunkSize;
+  const chunksZ = depth / MAP_VERSION_LIMITS.chunkSize;
+  if (chunks.length !== chunksX * chunksZ) {
+    issues.push(`cantidad de chunks (${chunks.length}) no coincide con width×depth`);
+  } else {
+    const seen = new Set(chunks.map(chunk => `${chunk.x}:${chunk.z}`));
+    for (let cz = 0; cz < chunksZ; cz += 1) {
+      for (let cx = 0; cx < chunksX; cx += 1) {
+        if (!seen.has(`${cx}:${cz}`)) {
+          issues.push(`falta el chunk ${cx}:${cz}`);
+          break;
+        }
+      }
+    }
+  }
+  if (issues.length > 0) {
+    throw new Error(`mundo inconsistente con sus opciones: ${issues.join('; ')}`);
+  }
 }
 
 function round3(value: number): number {
