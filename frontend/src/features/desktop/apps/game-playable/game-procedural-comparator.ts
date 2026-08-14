@@ -23,7 +23,7 @@ import {
 } from './game-block-mesher';
 import { buildBlockHeightmapFromIsland } from './game-procedural-blocks';
 import { toGeometry, toIndexedGeometry } from './game-procedural-geometry';
-import { buildToonWaterPlane } from './game-toon-water';
+import { buildToonWaterPlane, buildToonWaterPlaneGeometry } from './game-toon-water';
 import { type WorldBend } from './game-world-bend';
 
 const WATER_Y = -0.12;
@@ -90,9 +90,9 @@ export function mountProceduralComparator(
 
   const world = new THREE.Group();
   const material = bend.apply(new THREE.MeshToonMaterial({ gradientMap: toonRamp, vertexColors: true }));
-  /* Placeholder del tamaño exacto; rebuildWater lo sustituye (y lo libera) en
-   * cuanto se conocen las dimensiones. Una sola llamada crea geometría +
-   * material: llamar dos veces filtraría un material sin liberar. */
+  /* El material del agua se crea UNA vez aquí (geometría placeholder) y cada
+   * rebuild solo regenera la geometría; crear un material por montaje o por
+   * regeneración filtraría recursos GPU sin liberar. */
   const initialWater = buildToonWaterPlane(bend, 1, 1, toonRamp);
   let waterGeometry = initialWater.geometry;
   const waterMaterial = initialWater.material;
@@ -107,18 +107,16 @@ export function mountProceduralComparator(
   let raycastGroup: THREE.Object3D = water;
 
   const rebuildWater = (): void => {
-    const next = buildToonWaterPlane(bend, currentWidth * 2.4, currentDepth * 2.4, toonRamp);
     waterGeometry?.dispose();
-    waterGeometry = next.geometry;
+    waterGeometry = buildToonWaterPlaneGeometry(currentWidth * 2.4, currentDepth * 2.4);
     water.geometry = waterGeometry;
   };
 
   const blockMaxLevel = (): number =>
     Math.min(16, Math.max(1, Math.round(currentOptions.maxHeight)));
 
-  const buildBlocks = (): BuiltMode => {
-    currentHeightfield = generateTerrainHeightfield(currentOptions);
-    const blockH = buildBlockHeightmapFromIsland(currentHeightfield, blockMaxLevel());
+  const buildBlocks = (heightfield: IslandHeightfield): BuiltMode => {
+    const blockH = buildBlockHeightmapFromIsland(heightfield, blockMaxLevel());
     currentBlockLevels = blockH.levels;
     const terrainData = buildBlockTerrainMeshData(blockH, currentOptions.seed);
     const placements = placeBlockProps(blockH, currentOptions.seed, PROP_COUNT);
@@ -139,11 +137,10 @@ export function mountProceduralComparator(
     };
   };
 
-  const buildSmooth = (): BuiltMode => {
-    currentHeightfield = generateTerrainHeightfield(currentOptions);
-    const meshData = buildHeightfieldMeshData(currentHeightfield);
+  const buildSmooth = (heightfield: IslandHeightfield): BuiltMode => {
+    const meshData = buildHeightfieldMeshData(heightfield);
     const density = currentOptions.vegetationDensity;
-    const veg = placeVegetation(currentHeightfield, currentOptions.seed, {
+    const veg = placeVegetation(heightfield, currentOptions.seed, {
       maxGrass: Math.round(420 * density),
       maxTrees: Math.round(64 * density),
       maxRocks: Math.round(26 * density),
@@ -168,8 +165,11 @@ export function mountProceduralComparator(
   const rebuild = (): void => {
     disposeBuiltMode(blocks);
     disposeBuiltMode(smooth);
-    blocks = buildBlocks();
-    smooth = buildSmooth();
+    /* Un único heightfield por rebuild: bloques y suave comparten la MISMA
+     * base exacta y la generación no se ejecuta dos veces por clic. */
+    currentHeightfield = generateTerrainHeightfield(currentOptions);
+    blocks = buildBlocks(currentHeightfield);
+    smooth = buildSmooth(currentHeightfield);
     world.add(blocks.group, smooth.group);
     applyMode();
   };

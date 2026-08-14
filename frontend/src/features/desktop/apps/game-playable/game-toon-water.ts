@@ -21,14 +21,22 @@ export interface ToonWaterPlane {
   readonly material: THREE.MeshToonMaterial;
 }
 
+/* Geometría pura del plano de agua: única fuente de verdad de subdivisión y
+ * orientación. El comparador la reutiliza al redimensionar el agua SIN crear
+ * un material nuevo por regeneración (un material por montaje, no por clic). */
+export function buildToonWaterPlaneGeometry(sizeX: number, sizeZ: number): THREE.PlaneGeometry {
+  const geometry = new THREE.PlaneGeometry(sizeX, sizeZ, TOON_WATER_SEGMENTS, TOON_WATER_SEGMENTS);
+  geometry.rotateX(-Math.PI / 2);
+  return geometry;
+}
+
 export function buildToonWaterPlane(
   bend: WorldBend,
   sizeX: number,
   sizeZ: number,
   toonRamp: THREE.Texture,
 ): ToonWaterPlane {
-  const geometry = new THREE.PlaneGeometry(sizeX, sizeZ, TOON_WATER_SEGMENTS, TOON_WATER_SEGMENTS);
-  geometry.rotateX(-Math.PI / 2);
+  const geometry = buildToonWaterPlaneGeometry(sizeX, sizeZ);
   const material = bend.apply(new THREE.MeshToonMaterial({
     color: BLOCK_COLORS.waterShallow,
     gradientMap: toonRamp,
