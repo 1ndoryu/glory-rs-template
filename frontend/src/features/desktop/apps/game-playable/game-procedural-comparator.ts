@@ -4,8 +4,8 @@
  * cuantización, y 'suave' usa el heightfield-mesh + vegetación low-poly del
  * toolkit (árboles con ramas y césped por matas, 138A-2).
  * Solo presentación y métricas estructurales para que el usuario decida el
- * estilo con evidencia; desde 138A-3 ambos modos comparten el MISMO agua de
- * costa (espuma + niebla) que la isla curva, para comparar 1:1. */
+ * estilo con evidencia; el agua es un plano toon simple porque aquí se
+ * compara el terreno/props, no el shader de costa del 128A-1. */
 
 import * as THREE from 'three';
 import {
@@ -20,8 +20,8 @@ import {
   buildBlockTerrainMeshData,
   placeBlockProps,
 } from './game-block-mesher';
+import { BLOCK_COLORS } from './game-block-palette';
 import { buildBlockHeightmapFromIsland } from './game-procedural-blocks';
-import { mountCurvedWater, WATER_MESH_SCALE } from './game-curved-water';
 import { toGeometry, toIndexedGeometry } from './game-procedural-geometry';
 import { type WorldBend } from './game-world-bend';
 
@@ -86,27 +86,16 @@ export function mountProceduralComparator(
 
   const world = new THREE.Group();
   const material = bend.apply(new THREE.MeshToonMaterial({ gradientMap: toonRamp, vertexColors: true }));
-  /* Agua compartida con la isla (costa/espuma/niebla). Se monta sin anexarla a
-   * la escena (addToScene:false) porque vive re-parentada en `world` para que
-   * siga el bend del mundo junto al terreno; dispose la retira de su padre. */
-  const water = mountCurvedWater(scene, bend, {
-    width: WIDTH,
-    depth: DEPTH,
-    segmentsX: 120,
-    segmentsZ: 80,
-    meshScale: WATER_MESH_SCALE,
-    addToScene: false,
-    waterY: WATER_Y,
-    centerX,
-    centerZ,
-    seed,
-  });
-  water.mesh.position.set(0, WATER_Y, 0);
-  world.add(water.mesh);
+  const waterMaterial = bend.apply(new THREE.MeshToonMaterial({ color: BLOCK_COLORS.waterShallow, gradientMap: toonRamp }));
+  const waterGeometry = new THREE.PlaneGeometry(WIDTH * 2.4, DEPTH * 2.4, 1, 1);
+  waterGeometry.rotateX(-Math.PI / 2);
+  const water = new THREE.Mesh(waterGeometry, waterMaterial);
+  water.position.y = WATER_Y;
+  world.add(water);
 
   let blocks: BuiltMode | null = null;
   let smooth: BuiltMode | null = null;
-  let raycastGroup: THREE.Object3D = water.mesh;
+  let raycastGroup: THREE.Object3D = water;
 
   const buildBlocks = (): BuiltMode => {
     currentHeightfield = generateIslandHeightfield({
@@ -167,10 +156,6 @@ export function mountProceduralComparator(
     disposeBuiltMode(smooth);
     blocks = buildBlocks();
     smooth = buildSmooth();
-    water.setShore(Float32Array.from(
-      currentHeightfield.heights,
-      (h) => (h >= currentHeightfield.waterLevel ? 1 : 0),
-    ));
     world.add(blocks.group, smooth.group);
     applyMode();
   };
@@ -268,13 +253,16 @@ export function mountProceduralComparator(
     pickTerrain,
     setPropsVisible,
     terrainStats: () => (mode === 'bloques' ? blocks!.stats : smooth!.stats),
-    update: (timeSeconds) => water.update(timeSeconds),
+    /* El agua del comparador es estática; el método existe para mantener el
+     * mismo contrato de update que la isla y poder llamarlo de forma uniforme. */
+    update: () => {},
     dispose: () => {
       scene.remove(world);
-      water.dispose();
       disposeBuiltMode(blocks);
       disposeBuiltMode(smooth);
       material.dispose();
+      waterMaterial.dispose();
+      waterGeometry.dispose();
       world.clear();
     },
   };
