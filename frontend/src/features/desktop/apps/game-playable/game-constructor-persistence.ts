@@ -14,6 +14,9 @@ import {
   validateWorldPalette,
   type WorldPalette,
   type TerrainLayer,
+  validateGrassFieldOptions,
+  normalizeGrassFieldOptions,
+  type GrassFieldOptions,
 } from '../../../game-core';
 import {
   DEFAULT_CAMERA_MODE,
@@ -68,6 +71,9 @@ export interface ConstructorPersistedState {
   /** [138A-9] Stack de capas de terreno (pinceles del editor de mapa);
    *  ausente en estados guardados antes de 138A-9. */
   readonly layers?: readonly TerrainLayer[];
+  /** [138A-10] Opciones del generador de pasto (densidad/tamaño/color);
+   *  ausentes en estados guardados antes de 138A-10. */
+  readonly grass?: GrassFieldOptions;
 }
 
 const VALID_MODES: readonly RenderStyle[] = ['bloques', 'suave'];
@@ -117,6 +123,11 @@ export function loadConstructorState(): ConstructorPersistedState | null {
     const layers = validateTerrainLayerStack(record.layers).length === 0
       ? normalizeTerrainLayerStack(record.layers)
       : undefined;
+    /* [138A-10] El pasto es opcional y solo se restaura si es válido (mismo
+     * patrón fail-closed que paleta/panel/capas). */
+    const grass = validateGrassFieldOptions(record.grass).length === 0
+      ? normalizeGrassFieldOptions(record.grass)
+      : undefined;
     return {
       version: 1,
       options,
@@ -125,6 +136,7 @@ export function loadConstructorState(): ConstructorPersistedState | null {
       ...(palette ? { palette } : {}),
       ...(panel ? { panel } : {}),
       ...(layers ? { layers } : {}),
+      ...(grass ? { grass } : {}),
     };
   } catch {
     /* JSON corrupto o storage no disponible: no se puede restaurar. */

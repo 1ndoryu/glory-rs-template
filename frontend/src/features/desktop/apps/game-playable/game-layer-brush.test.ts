@@ -13,6 +13,7 @@ import {
   createCircleLayer,
   createPaintedLayer,
   paintedLayersOfKind,
+  terrainLayerKindOfBrush,
 } from './game-layer-editor';
 
 describe('estado del pincel (138A-9)', () => {
@@ -26,6 +27,7 @@ describe('estado del pincel (138A-9)', () => {
       targetLayerId: 'pincel-sand-1',
       height: 2,
       direction: 'lower',
+      mode: 'add',
     };
     expect(normalizeBrushState(brush)).toEqual(brush);
   });
@@ -64,10 +66,18 @@ describe('estado del pincel (138A-9)', () => {
     expect(normalizeBrushState({ ...DEFAULT_BRUSH_STATE, targetLayerId: '' }).targetLayerId).toBeNull();
   });
 
+  it('el pincel de pasto normaliza su modo poner/quitar (138A-10)', () => {
+    const grass: ConstructorBrushState = { ...DEFAULT_BRUSH_STATE, kind: 'grass', mode: 'remove' };
+    expect(normalizeBrushState(grass)).toEqual(grass);
+    expect(normalizeBrushState({ ...DEFAULT_BRUSH_STATE, kind: 'grass', mode: 'otro' }).mode)
+      .toBe('add');
+  });
+
   it('brushLayerLabel nombra cada contenido del pincel', () => {
     expect(brushLayerLabel('path')).toBe('Camino pintado');
     expect(brushLayerLabel('sand')).toBe('Arena pintada');
     expect(brushLayerLabel('water')).toBe('Agua pintada');
+    expect(brushLayerLabel('grass')).toBe('Pasto pintado');
     expect(brushLayerLabel('elevation')).toBe('Elevación pintada');
   });
 });
@@ -95,6 +105,13 @@ describe('fábricas de capas del visor (138A-9)', () => {
       expect(elevation.elevationMode).toBe('delta');
       expect(elevation.height).toBe(1);
     }
+  });
+
+  it('la capa círculo de pasto es vegetación con modo poner (138A-10)', () => {
+    const grass = createCircleLayer('grass', []);
+    expect(grass.kind).toBe('vegetation');
+    expect(grass.name).toBe('Pasto pintado');
+    if (grass.kind === 'vegetation') expect(grass.mode).toBe('add');
   });
 
   it('createPaintedLayer usa pincel, celdas y falloff mínimo 0.25', () => {
@@ -126,6 +143,42 @@ describe('fábricas de capas del visor (138A-9)', () => {
     );
     expect(lowered.kind).toBe('elevation');
     if (lowered.kind === 'elevation') expect(lowered.height).toBe(-1.5);
+  });
+
+  it('la pincelada de pasto respeta el modo poner/quitar del pincel (138A-10)', () => {
+    const add = createPaintedLayer(
+      { ...DEFAULT_BRUSH_STATE, kind: 'grass', mode: 'add' },
+      [],
+      [[2, 3]],
+    );
+    expect(add.kind).toBe('vegetation');
+    if (add.kind === 'vegetation') expect(add.mode).toBe('add');
+
+    const remove = createPaintedLayer(
+      { ...DEFAULT_BRUSH_STATE, kind: 'grass', mode: 'remove' },
+      [],
+      [[4, 5]],
+    );
+    expect(remove.kind).toBe('vegetation');
+    if (remove.kind === 'vegetation') expect(remove.mode).toBe('remove');
+  });
+
+  it('paintedLayersOfKind filtra pasto pintado por su kind de terreno (138A-10)', () => {
+    const layers = [
+      createCircleLayer('grass', []),
+      createPaintedLayer({ ...DEFAULT_BRUSH_STATE, kind: 'grass', mode: 'remove' }, [], [[0, 0]]),
+      createPaintedLayer({ ...DEFAULT_BRUSH_STATE, kind: 'sand' }, [], [[1, 1]]),
+    ];
+    const grass = paintedLayersOfKind(layers, 'grass');
+    expect(grass).toHaveLength(1);
+    expect(grass[0].kind).toBe('vegetation');
+    expect(grass[0].shape.kind).toBe('painted');
+  });
+
+  it('terrainLayerKindOfBrush mapea grass a vegetation y deja el resto', () => {
+    expect(terrainLayerKindOfBrush('grass')).toBe('vegetation');
+    expect(terrainLayerKindOfBrush('path')).toBe('path');
+    expect(terrainLayerKindOfBrush('elevation')).toBe('elevation');
   });
 
   it('paintedLayersOfKind solo devuelve capas pintadas del contenido', () => {

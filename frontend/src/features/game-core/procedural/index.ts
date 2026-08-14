@@ -10,6 +10,7 @@ export * from './vegetation';
 export * from './vegetation-mesh';
 export * from './tree-mesh';
 export * from './grass-mesh';
+export * from './grass-field';
 export * from './vegetation-lowpoly';
 export * from './water-mesh';
 export * from './rain-mesh';

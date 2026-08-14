@@ -31,7 +31,7 @@ export const TERRAIN_LAYER_LIMITS = {
 } as const;
 
 /** Contenido de una capa de terreno. */
-export type TerrainLayerKind = 'path' | 'sand' | 'water' | 'elevation';
+export type TerrainLayerKind = 'path' | 'sand' | 'water' | 'vegetation' | 'elevation';
 
 /** Curvas de decaimiento del peso del pincel con la distancia (SDF). */
 export type FalloffKind = 'linear' | 'smooth' | 'gauss' | 'dome' | 'spike' | 'hard';
@@ -97,6 +97,22 @@ export type TerrainLayer =
     readonly id: string;
     readonly name: string;
     readonly enabled: boolean;
+    readonly kind: 'vegetation';
+    readonly shape: TerrainLayerShape;
+    readonly falloff: FalloffKind;
+    readonly falloffRadius: number;
+    readonly bias: number;
+    readonly blend: LayerBlend;
+    /** Umbral 0..1 del peso para pintar la máscara de vegetación. */
+    readonly hardness: number;
+    /** add = forzar pasto donde pinta; remove = prohibirlo (later wins). */
+    readonly mode: 'add' | 'remove';
+    readonly taper?: TerrainLayerTaper;
+  }
+  | {
+    readonly id: string;
+    readonly name: string;
+    readonly enabled: boolean;
     readonly kind: 'elevation';
     readonly shape: TerrainLayerShape;
     readonly falloff: FalloffKind;
@@ -122,12 +138,16 @@ export interface TerrainLayerStackResult {
   readonly heights: Float32Array;
   /** Superficies por celda (0..15) tras las capas. */
   readonly surfaces: Uint8Array;
+  /** Máscara de vegetación por celda: 0 = sin override, 1 = forzar pasto,
+   *  -1 = prohibir pasto (later layers win). Solo la leen los generadores
+   *  de césped; el documento MapVersion no la serializa. */
+  readonly vegetationMask: Int8Array;
   /** Celdas afectadas por al menos una capa habilitada. */
   readonly affectedCells: number;
 }
 
 const FALLOFFS: readonly FalloffKind[] = ['linear', 'smooth', 'gauss', 'dome', 'spike', 'hard'];
-const KINDS: readonly TerrainLayerKind[] = ['path', 'sand', 'water', 'elevation'];
+const KINDS: readonly TerrainLayerKind[] = ['path', 'sand', 'water', 'vegetation', 'elevation'];
 const BLENDS: readonly LayerBlend[] = ['set', 'add', 'max', 'min'];
 const ELEVATION_MODES: readonly ElevationMode[] = ['absolute', 'delta'];
 const RESERVED_IDS = new Set(['__proto__', 'prototype', 'constructor', 'toString', 'valueOf', 'hasOwnProperty']);
@@ -153,7 +173,7 @@ function within(value: number, min: number, max: number): boolean {
 export function validateTerrainLayer(value: unknown): readonly string[] {
   if (!isRecord(value)) return ['requiere un objeto de capa'];
   const issues: string[] = [];
-  const allowed = ['id', 'name', 'enabled', 'kind', 'shape', 'falloff', 'falloffRadius', 'bias', 'blend', 'hardness', 'lowerToWater', 'height', 'elevationMode', 'taper'];
+  const allowed = ['id', 'name', 'enabled', 'kind', 'shape', 'falloff', 'falloffRadius', 'bias', 'blend', 'hardness', 'mode', 'lowerToWater', 'height', 'elevationMode', 'taper'];
   for (const key of Object.keys(value)) {
     if (!allowed.includes(key)) issues.push(`campo no permitido: ${key}`);
   }
@@ -185,12 +205,15 @@ export function validateTerrainLayer(value: unknown): readonly string[] {
     issues.push(...validateShape(value.shape));
   }
   const kind = value.kind as TerrainLayerKind;
-  if (kind === 'path' || kind === 'sand' || kind === 'water') {
+  if (kind === 'path' || kind === 'sand' || kind === 'water' || kind === 'vegetation') {
     if (!finite(value.hardness) || !within(value.hardness, 0, 1)) {
       issues.push('hardness fuera de rango');
     }
     if (kind === 'water' && typeof value.lowerToWater !== 'boolean') {
       issues.push('lowerToWater debe ser booleano');
+    }
+    if (kind === 'vegetation' && value.mode !== 'add' && value.mode !== 'remove') {
+      issues.push('mode debe ser add o remove');
     }
   } else if (kind === 'elevation') {
     if (!finite(value.height) || !within(value.height, TERRAIN_LAYER_LIMITS.minHeight, TERRAIN_LAYER_LIMITS.maxHeight)) {
@@ -501,6 +524,7 @@ export function applyTerrainLayerStack(
   const { width, depth, waterLevel } = base;
   const heights = new Float32Array(base.heights);
   const surfaces = new Uint8Array(width * depth);
+  const vegetationMask = new Int8Array(width * depth);
   for (let k = 0; k < width * depth; k += 1) {
     surfaces[k] = base.heights[k] < waterLevel ? TERRAIN_SURFACE_IDS.water : TERRAIN_SURFACE_IDS.grass;
   }
@@ -515,6 +539,7 @@ export function applyTerrainLayerStack(
       base,
       heights,
       surfaces,
+      vegetationMask,
       affected,
       bounds,
       cellSize,
@@ -525,7 +550,7 @@ export function applyTerrainLayerStack(
   for (let k = 0; k < heights.length; k += 1) {
     heights[k] = Math.min(64, Math.max(-64, heights[k]));
   }
-  return { heights, surfaces, affectedCells };
+  return { heights, surfaces, vegetationMask, affectedCells };
 }
 
 function applyLayerRegion(
@@ -533,6 +558,7 @@ function applyLayerRegion(
   base: IslandHeightfield,
   heights: Float32Array,
   surfaces: Uint8Array,
+  vegetationMask: Int8Array,
   affected: Uint8Array,
   bounds: { minI: number; maxI: number; minJ: number; maxJ: number },
   cellSize: number,
@@ -567,6 +593,22 @@ function applyLayerRegion(
           if (affected[id] === 0) {
             affected[id] = 1;
             count += 1;
+          }
+        }
+        continue;
+      }
+
+      /* [138A-10] Capa de vegetación: pinta la máscara de césped (add/remove)
+       * donde el peso supera hardness, sin tocar superficie ni altura. */
+      if (layer.kind === 'vegetation') {
+        if (effectiveWeight >= layer.hardness) {
+          const next = layer.mode === 'add' ? 1 : -1;
+          if (vegetationMask[id] !== next) {
+            vegetationMask[id] = next;
+            if (affected[id] === 0) {
+              affected[id] = 1;
+              count += 1;
+            }
           }
         }
         continue;

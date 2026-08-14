@@ -49,6 +49,9 @@ function createCtx(overrides: {
       onCommitBrush(next);
       for (const fn of brushSyncers) fn();
     },
+    grass: { enabled: true, density: 1, size: 1, color: 0x86c65c },
+    commitGrass: () => {},
+    syncGrass: () => {},
   };
   return {
     ctx,

@@ -5,7 +5,7 @@
  * Constructor de mundo, el panel exterior es el rail de iconos y los grupos de
  * la isla son secciones suyas; sin constructor conserva el panel clásico. */
 
-import { Boxes, Brush, Camera, Image, Layers, Palette, Waves } from 'lucide';
+import { Boxes, Brush, Camera, Image, Layers, Leaf, Palette, Waves } from 'lucide';
 import { createEl } from '../../../../utils/dom';
 import type {
   MapVersion,
@@ -13,6 +13,7 @@ import type {
   TerrainOptions,
   TerrainLayer,
   WorldPalette,
+  GrassFieldOptions,
 } from '../../../game-core';
 import { DEFAULT_CAMERA_MODE, type CameraMode } from './game-camera-modes';
 import { type ConstructorBrushState } from './game-layer-brush';
@@ -26,6 +27,7 @@ import { buildColorPanel } from './game-constructor-color';
 import type { ConstructorPanelState } from './game-constructor-persistence';
 import { buildTexturePanel } from './game-constructor-texture';
 import { buildLayerEditorPanel } from './game-layer-editor';
+import { buildGrassPanel } from './game-constructor-grass';
 import {
   buildCamaraGroup,
   buildEstilosGroup,
@@ -55,6 +57,8 @@ export interface CurvedIslandPanel {
   readonly setConstructorLayers: (layers: readonly TerrainLayer[]) => void;
   /** [138A-9] Restaura el estado del pincel (auto-creación de capa). */
   readonly setConstructorBrush: (brush: ConstructorBrushState) => void;
+  /** [138A-10] Restaura las opciones del pasto sin emitir. */
+  readonly setConstructorGrass: (grass: GrassFieldOptions) => void;
   readonly destroy: () => void;
 }
 
@@ -128,6 +132,14 @@ export function mountCurvedIslandPanel(
         build: (container, ctx) => buildLayerEditorPanel(container, ctx),
       });
     }
+    if (controls.worldConstructor.onGrassChange) {
+      extraPanels.push({
+        key: 'pasto',
+        label: 'Pasto',
+        icon: Leaf,
+        build: (container, ctx) => buildGrassPanel(container, ctx),
+      });
+    }
     constructorSection = mountWorldConstructor(host, controls.worldConstructor, {
       title: 'Constructor',
       extraPanels,
@@ -198,6 +210,9 @@ export function mountCurvedIslandPanel(
     },
     setConstructorBrush: (brush) => {
       constructorSection?.applyBrush(brush);
+    },
+    setConstructorGrass: (grass) => {
+      constructorSection?.applyGrass(grass);
     },
     destroy: () => {
       legacyPanel?.remove();

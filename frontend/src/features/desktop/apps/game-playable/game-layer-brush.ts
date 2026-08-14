@@ -8,8 +8,9 @@
 import type { FalloffKind } from '../../../game-core';
 
 /** Contenido que pinta el pincel; elevar (subir) / bajar (quitar) modela
- *  el editor de bloques y el subir/bajar del terreno suave. */
-export type ConstructorBrushKind = 'path' | 'sand' | 'water' | 'elevation';
+ *  el editor de bloques y el subir/bajar del terreno suave. [138A-10] 'grass'
+ *  pinta la máscara de vegetación (poner/quitar pasto). */
+export type ConstructorBrushKind = 'path' | 'sand' | 'water' | 'grass' | 'elevation';
 
 export interface ConstructorBrushState {
   /** Pincel habilitado: mientras está activo, arrastrar pinta en vez de
@@ -27,6 +28,8 @@ export interface ConstructorBrushState {
   /** Altura (bloques/terreno) que sube o baja la elevación. */
   readonly height: number;
   readonly direction: 'raise' | 'lower';
+  /** [138A-10] Modo del pincel de pasto: add pinta césped, remove lo quita. */
+  readonly mode: 'add' | 'remove';
 }
 
 export const DEFAULT_BRUSH_STATE: ConstructorBrushState = {
@@ -38,17 +41,19 @@ export const DEFAULT_BRUSH_STATE: ConstructorBrushState = {
   targetLayerId: null,
   height: 1,
   direction: 'raise',
+  mode: 'add',
 };
 
 export const BRUSH_KINDS: readonly { readonly key: ConstructorBrushKind; readonly label: string }[] = [
   { key: 'path', label: 'Camino' },
   { key: 'sand', label: 'Arena' },
   { key: 'water', label: 'Agua' },
+  { key: 'grass', label: 'Pasto' },
   { key: 'elevation', label: 'Subir/bajar' },
 ];
 
 const FALLOFFS: readonly FalloffKind[] = ['linear', 'smooth', 'gauss', 'dome', 'spike', 'hard'];
-const KINDS: readonly ConstructorBrushKind[] = ['path', 'sand', 'water', 'elevation'];
+const KINDS: readonly ConstructorBrushKind[] = ['path', 'sand', 'water', 'grass', 'elevation'];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -85,6 +90,7 @@ export function normalizeBrushState(value: unknown): ConstructorBrushState {
       ? value.height
       : DEFAULT_BRUSH_STATE.height,
     direction: value.direction === 'lower' ? 'lower' : 'raise',
+    mode: value.mode === 'remove' ? 'remove' : 'add',
   };
 }
 
@@ -94,6 +100,7 @@ export function brushLayerLabel(kind: ConstructorBrushKind): string {
     case 'path': return 'Camino pintado';
     case 'sand': return 'Arena pintada';
     case 'water': return 'Agua pintada';
+    case 'grass': return 'Pasto pintado';
     case 'elevation': return 'Elevación pintada';
   }
 }

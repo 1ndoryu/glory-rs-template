@@ -226,4 +226,35 @@ describe('persistencia del constructor de mundo', () => {
       palette: { ...WORLD_PALETTE_DEFAULTS, sky: 0xabcdef },
     });
   });
+
+  it('guarda y restaura las opciones del generador de pasto (138A-10)', () => {
+    const options = terrainOptionsPreset('isla');
+    const grass = { enabled: true, density: 0.65, size: 1.2, color: 0x7ec850 };
+    expect(saveConstructorState({ version: 1, options, mode: 'suave', camera: 'libre', grass }))
+      .toBe(true);
+    expect(loadConstructorState()).toEqual({
+      version: 1,
+      options,
+      mode: 'suave',
+      camera: 'libre',
+      grass,
+    });
+  });
+
+  it('opciones de pasto inválidas se omiten sin bloquear el resto (138A-10)', () => {
+    const options = terrainOptionsPreset('isla');
+    window.localStorage.setItem(CONSTRUCTOR_STORAGE_KEY, JSON.stringify({
+      version: 1,
+      options,
+      mode: 'bloques',
+      camera: 'tercera',
+      grass: { enabled: true, density: 7, size: 1, color: 0x86c65c },
+    }));
+    expect(loadConstructorState()).toEqual({
+      version: 1,
+      options,
+      mode: 'bloques',
+      camera: 'tercera',
+    });
+  });
 });

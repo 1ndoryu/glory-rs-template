@@ -7,16 +7,24 @@
 
 import * as THREE from 'three';
 import {
+  affectedChunksForCells,
   applyTerrainLayerStack,
+  buildGrassClumpMeshData,
+  buildGrassField,
   buildHeightfieldMeshData,
   buildLowPolyVegetationMeshData,
   generateTerrainHeightfield,
+  grassChunkKey,
+  GRASS_FIELD_DEFAULTS,
+  GRASS_FIELD_LIMITS,
+  normalizeGrassFieldOptions,
   normalizeTerrainOptions,
   normalizeTerrainLayerStack,
   normalizeWorldPalette,
   placeVegetation,
   TERRAIN_SURFACE_IDS,
   terrainOptionsPreset,
+  VEGETATION_MESH_DEFAULTS,
   WORLD_PALETTE_DEFAULTS,
   worldPaletteToHeightfieldRamp,
   worldPaletteToSurfaceColors,
@@ -28,6 +36,8 @@ import {
   type TerrainOptions,
   type VegetationPlacement,
   type WorldPalette,
+  type GrassChunkField,
+  type GrassFieldOptions,
 } from '../../../game-core';
 import {
   type BlockPropPlacement,
@@ -48,6 +58,9 @@ export interface ProceduralTerrainStats {
   readonly vertices: number;
   readonly triangles: number;
   readonly propCount: number;
+  /** [138A-10] Pasto instanciado (solo estilo suave). */
+  readonly grassChunks?: number;
+  readonly grassBlades?: number;
 }
 
 export interface TerrainPick {
@@ -75,6 +88,9 @@ export interface ProceduralComparator {
   readonly setDocument: (map: MapVersion | null) => void;
   /** [138A-9] Aplica el stack de capas sobre la base generada (deltas). */
   readonly setLayers: (layers: readonly TerrainLayer[]) => void;
+  /** [138A-10] Cambia opciones de pasto (densidad/tamaño/color) y regenera
+   *  las matas sin tocar el terreno ni las superficies. */
+  readonly setGrassOptions: (options: GrassFieldOptions) => void;
   readonly groundHeightAt: (x: number, z: number) => number;
   readonly raycastGroup: THREE.Object3D;
   readonly pickTerrain: (x: number, y: number, z: number) => TerrainPick | null;
@@ -114,6 +130,15 @@ export function mountProceduralComparator(
   /* Superficies por celda tras aplicar el stack (solo suave; bloques usa el
    * mesher que cuantiza el heightfield ya editado). */
   let currentSurfaces: Uint8Array | undefined;
+  /* [138A-10] Máscara de vegetación del stack (0/1/-1) para el césped. */
+  let currentVegetationMask: Int8Array | undefined;
+  /* [138A-10] Opciones de pasto del panel (densidad/tamaño/color). */
+  let currentGrassOptions: GrassFieldOptions = { ...GRASS_FIELD_DEFAULTS };
+  let lastTerrainLayerSignature = '';
+  /* [138A-10] Capas del setLayers anterior: al eliminar/apagar una capa de
+   * vegetación su chunk desaparece de las capas ACTUALES y sin este rastro
+   * conservaría los meshes (pasto fantasma). */
+  let lastLayers: readonly TerrainLayer[] = [];
   let documentGroup: THREE.Group | null = null;
 
   const world = new THREE.Group();
@@ -134,6 +159,100 @@ export function mountProceduralComparator(
   let blocks: BuiltMode | null = null;
   let smooth: BuiltMode | null = null;
   let raycastGroup: THREE.Object3D = water;
+
+  /* [138A-10] Pasto instanciado: una sola geometría de mata compartida y un
+   * InstancedMesh por chunk. La geometría/material se crean UNA vez al
+   * montar; los rebuilds solo recrean los meshes (mesh.dispose(), nunca
+   * geometry.dispose() de un InstancedMesh) y `dispose()` libera el resto. */
+  const grassGroup = new THREE.Group();
+  const GRASS_GEOMETRY_SEED = 1337;
+  let grassGeometry: THREE.BufferGeometry | null = null;
+  let grassMaterial: THREE.MeshToonMaterial | null = null;
+  let grassMeshes: THREE.InstancedMesh[] = [];
+  let grassBladeTotal = 0;
+  const grassDummy = new THREE.Object3D();
+  const grassColor = new THREE.Color();
+
+  const ensureGrassResources = (): void => {
+    if (grassGeometry && grassMaterial) return;
+    const data = buildGrassClumpMeshData(GRASS_GEOMETRY_SEED, {
+      /* Geometría blanca: el color real llega por instanceColor (opción del
+       * panel de Pasto, independiente de la paleta del mundo). */
+      palette: { ...VEGETATION_MESH_DEFAULTS, grass: 0xffffff },
+    });
+    grassGeometry = toIndexedGeometry(data);
+    grassMaterial = bend.apply(new THREE.MeshToonMaterial({
+      gradientMap: toonRamp,
+      vertexColors: true,
+    }));
+  };
+
+  const clearGrassMeshes = (): void => {
+    for (const mesh of grassMeshes) {
+      grassGroup.remove(mesh);
+      mesh.dispose();
+    }
+    grassMeshes = [];
+    grassBladeTotal = 0;
+  };
+
+  const createGrassMesh = (chunk: GrassChunkField): THREE.InstancedMesh => {
+    ensureGrassResources();
+    const mesh = new THREE.InstancedMesh(grassGeometry!, grassMaterial!, chunk.blades.length);
+    mesh.userData.grassChunkKey = grassChunkKey(chunk.cx, chunk.cz);
+    const cellSize = currentOptions.cellSize;
+    grassColor.setHex(currentGrassOptions.color ?? GRASS_FIELD_DEFAULTS.color);
+    for (let k = 0; k < chunk.blades.length; k += 1) {
+      const blade = chunk.blades[k];
+      grassDummy.position.set(blade.x * cellSize, blade.y, blade.z * cellSize);
+      grassDummy.scale.setScalar(blade.scale * cellSize);
+      grassDummy.rotation.set(0, 0, 0);
+      grassDummy.updateMatrix();
+      mesh.setMatrixAt(k, grassDummy.matrix);
+      mesh.setColorAt(k, grassColor);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    mesh.frustumCulled = false;
+    grassBladeTotal += chunk.blades.length;
+    return mesh;
+  };
+
+  /* [138A-10] Regenera el pasto; con `filter` solo se recrean los chunks
+   * afectados (pinceladas) y el resto conserva sus meshes. */
+  const rebuildGrass = (filter?: ReadonlySet<string>): void => {
+    grassBladeTotal = 0;
+    const kept: THREE.InstancedMesh[] = [];
+    for (const mesh of grassMeshes) {
+      const key = mesh.userData.grassChunkKey as string | undefined;
+      if (filter !== undefined && key !== undefined && !filter.has(key)) {
+        kept.push(mesh);
+        grassBladeTotal += mesh.count;
+        continue;
+      }
+      grassGroup.remove(mesh);
+      mesh.dispose();
+    }
+    grassMeshes = kept;
+    const field = buildGrassField(
+      currentHeightfield,
+      currentSurfaces,
+      currentVegetationMask,
+      currentOptions.seed,
+      currentGrassOptions,
+      {
+        maxChunks: GRASS_FIELD_LIMITS.maxChunks,
+        maxInstances: GRASS_FIELD_LIMITS.maxInstances,
+        chunkSize: GRASS_FIELD_LIMITS.chunkSize,
+      },
+      filter,
+    );
+    for (const chunk of field.chunks) {
+      const mesh = createGrassMesh(chunk);
+      grassMeshes.push(mesh);
+      grassGroup.add(mesh);
+    }
+  };
 
   const rebuildWater = (): void => {
     waterGeometry?.dispose();
@@ -184,8 +303,10 @@ export function mountProceduralComparator(
     });
     const density = currentOptions.vegetationDensity;
     const veg = placeVegetation(heightfield, currentOptions.seed, {
-      maxGrass: Math.round(420 * density),
-      /* [138A-6] Sin árboles en suave: conserva césped y rocas. */
+      /* [138A-10] El césped ya no viene de placeVegetation: lo genera
+       * grass-field por chunks (instancing + presupuesto) en rebuildGrass. */
+      maxGrass: 0,
+      /* [138A-6] Sin árboles en suave: conserva rocas (y el pasto nuevo). */
       maxTrees: 0,
       maxRocks: Math.round(26 * density),
     });
@@ -214,7 +335,8 @@ export function mountProceduralComparator(
     const terrain = new THREE.Mesh(toIndexedGeometry(meshData), material);
     const props = new THREE.Mesh(toIndexedGeometry(propData), material);
     props.visible = propsVisible;
-    group.add(terrain, props);
+    grassGroup.visible = propsVisible;
+    group.add(terrain, props, grassGroup);
     return {
       group,
       stats: {
@@ -314,10 +436,15 @@ export function mountProceduralComparator(
     const hasDocument = documentGroup !== null;
     if (blocks) blocks.group.children[1].visible = propsVisible && !hasDocument;
     if (smooth) smooth.group.children[1].visible = propsVisible && !hasDocument;
+    grassGroup.visible = propsVisible;
     if (documentGroup) documentGroup.visible = propsVisible;
   };
 
   const rebuildMeshes = (): void => {
+    /* [138A-10] El pasto comparte una geometría con todos los chunks: se
+     * retiran los meshes ANTES de disposeBuiltMode para que el recorrido no
+     * libere la geometría compartida (los rebuilds solo recrean meshes). */
+    clearGrassMeshes();
     disposeBuiltMode(blocks);
     disposeBuiltMode(smooth);
     blocks = buildBlocks(currentHeightfield);
@@ -325,6 +452,7 @@ export function mountProceduralComparator(
     world.add(blocks.group, smooth.group);
     rebuildDocumentProps();
     applyMode();
+    rebuildGrass();
   };
 
   const rebuild = (): void => {
@@ -338,10 +466,33 @@ export function mountProceduralComparator(
       const layered = applyTerrainLayerStack(currentHeightfield, currentLayers, currentOptions.cellSize);
       currentHeightfield = { ...currentHeightfield, heights: layered.heights };
       currentSurfaces = layered.surfaces;
+      currentVegetationMask = layered.vegetationMask;
     } else {
       currentSurfaces = undefined;
+      currentVegetationMask = undefined;
     }
     rebuildMeshes();
+  };
+
+  /* [138A-10] Firma de las capas que tocan el terreno (todo excepto
+   * vegetation): si no cambia, una pincelada de pasto solo regenera los
+   * chunks afectados sin reconstruir mallas ni props. */
+  const terrainLayerSignature = (layers: readonly TerrainLayer[]): string => {
+    const affecting = layers
+      .filter(layer => layer.kind !== 'vegetation')
+      .map(layer => JSON.stringify(layer));
+    return affecting.join('|');
+  };
+
+  const vegetationAffectedChunks = (layers: readonly TerrainLayer[]): ReadonlySet<string> | undefined => {
+    const cells: (readonly [number, number])[] = [];
+    for (const layer of layers) {
+      if (layer.kind !== 'vegetation' || !layer.enabled) continue;
+      if (layer.shape.kind !== 'painted') return undefined;
+      cells.push(...layer.shape.cells);
+    }
+    if (cells.length === 0) return undefined;
+    return new Set(affectedChunksForCells(cells, GRASS_FIELD_LIMITS.chunkSize));
   };
 
   const setOptions = (next: TerrainOptions): void => {
@@ -447,7 +598,13 @@ export function mountProceduralComparator(
     pickTerrain,
     setPropsVisible,
     terrainStats: () => {
-      const base = mode === 'bloques' ? blocks!.stats : smooth!.stats;
+      const base = mode === 'bloques'
+        ? blocks!.stats
+        : {
+          ...smooth!.stats,
+          grassChunks: grassMeshes.length,
+          grassBlades: grassBladeTotal,
+        };
       return currentMap ? { ...base, propCount: currentMap.instances.length } : base;
     },
     setPalette: (next) => {
@@ -457,19 +614,67 @@ export function mountProceduralComparator(
     },
     setToonRamp: (nextRamp) => {
       material.gradientMap = nextRamp;
+      if (grassMaterial) grassMaterial.gradientMap = nextRamp;
     },
     setDocument: (map) => {
       currentMap = map;
       rebuildDocumentProps();
     },
     setLayers: (next) => {
+      const previousLayers = lastLayers;
       currentLayers = normalizeTerrainLayerStack(next);
-      rebuild();
+      /* [138A-10] Si solo cambian capas de vegetación (máscara de césped),
+       * el terreno y los props no se tocan: se regenera el pasto solo en los
+       * chunks afectados por las celdas pintadas. Cualquier otra capa
+       * (elevación/superficie/orden) fuerza el rebuild completo. */
+      const signature = terrainLayerSignature(currentLayers);
+      const terrainChanged = signature !== lastTerrainLayerSignature;
+      lastTerrainLayerSignature = signature;
+      currentHeightfield = generateTerrainHeightfield(currentOptions);
+      if (currentLayers.length > 0) {
+        const layered = applyTerrainLayerStack(currentHeightfield, currentLayers, currentOptions.cellSize);
+        currentHeightfield = { ...currentHeightfield, heights: layered.heights };
+        currentSurfaces = layered.surfaces;
+        currentVegetationMask = layered.vegetationMask;
+      } else {
+        currentSurfaces = undefined;
+        currentVegetationMask = undefined;
+      }
+      if (terrainChanged) {
+        rebuildMeshes();
+      } else {
+        /* [138A-10] Se regenera la UNIÓN de chunks previos y actuales: al
+         * retirar/apagar una capa de pasto su chunk ya no está en las capas
+         * actuales y, sin los previos, su mesh quedaría huérfano. Si cualquiera
+         * de los dos lados no tiene chunks pintados (p. ej. pasto natural),
+         * el rebuild completo es la única forma de no dejar residuos. */
+        const previousChunks = vegetationAffectedChunks(previousLayers);
+        const currentChunks = vegetationAffectedChunks(currentLayers);
+        const filter = previousChunks === undefined || currentChunks === undefined
+          ? undefined
+          : new Set([...previousChunks, ...currentChunks]);
+        rebuildGrass(filter);
+      }
+      lastLayers = currentLayers;
+    },
+    setGrassOptions: (next) => {
+      currentGrassOptions = normalizeGrassFieldOptions(next);
+      if (currentHeightfield) {
+        clearGrassMeshes();
+        rebuildGrass();
+      }
     },
     /* Agua estática: el update existe solo por el contrato común con la isla. */
     update: () => {},
     dispose: () => {
       scene.remove(world);
+      /* [138A-10] El pasto se libera ANTES de disposeBuiltMode: la geometría
+       * compartida no debe caer bajo el recorrido de los meshes. */
+      clearGrassMeshes();
+      grassGeometry?.dispose();
+      grassGeometry = null;
+      grassMaterial?.dispose();
+      grassMaterial = null;
       disposeBuiltMode(blocks);
       disposeBuiltMode(smooth);
       material.dispose();

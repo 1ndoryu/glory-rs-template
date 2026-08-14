@@ -1,6 +1,6 @@
 # Plan 138A-5..12 — Constructor de mundo v2: toolkit de edición (2026-08-14)
 
-> **Estado:** ACTIVO — 138A-9 completado; siguiente bloque 138A-10.
+> **Estado:** ACTIVO — 138A-10 completado; siguiente bloque 138A-11.
 > **Rama:** `wandorius` · **Gates:** `npm run gate:check -- 138A-5` …
 > `npm run gate:check -- 138A-12`
 > **Fuente de contexto:** decisiones de producto 2026-08-13/14 (motor propio,
@@ -399,11 +399,12 @@ rendimiento) con evidencia. Se mantiene el flujo canónico
   (reutiliza orden/blend/cuotas del aplicador de capas).
 
 **Checklist:**
-- [ ] Generador de pasto por chunks con instancing y presupuesto (test de
+- [x] Generador de pasto por chunks con instancing y presupuesto (test de
       draw calls/instancias y de regeneración de zona).
-- [ ] Densidad/tamaño/color configurables, persistidos y en tiempo real.
-- [ ] Pincel poner/quitar pasto con cuotas y teardown; export/import JSON.
-- [ ] Gate 138A-10 PASS + validación visual del usuario en `/forest-playable`.
+- [x] Densidad/tamaño/color configurables, persistidos y en tiempo real.
+- [x] Pincel poner/quitar pasto con cuotas y teardown; export/import JSON.
+- [ ] Gate 138A-10 PASS + validación visual del usuario en `/forest-playable`
+      (pendiente el veredicto de cierre y la prueba del usuario).
 
 ### 138A-11 — Auditorías SOLID/arquitectura y rendimiento
 

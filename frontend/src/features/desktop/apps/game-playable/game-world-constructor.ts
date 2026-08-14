@@ -15,15 +15,18 @@ import {
   TERRAIN_OPTIONS_DEFAULTS,
   TERRAIN_OPTIONS_LIMITS,
   WORLD_PALETTE_DEFAULTS,
+  GRASS_FIELD_DEFAULTS,
   normalizeTerrainLayerStack,
   normalizeWorldPalette,
   normalizeTerrainOptions,
+  normalizeGrassFieldOptions,
   type MapEditOp,
   type MapVersion,
   type ShapePreset,
   type TerrainLayer,
   type TerrainOptions,
   type WorldPalette,
+  type GrassFieldOptions,
 } from '../../../game-core';
 import {
   DEFAULT_BRUSH_STATE,
@@ -60,6 +63,8 @@ export interface WorldConstructorControls {
   readonly onLayersChange?: (layers: readonly TerrainLayer[]) => void;
   /** [138A-9] Cambio del estado del pincel (activo/tamaño/objetivo). */
   readonly onBrushStateChange?: (brush: ConstructorBrushState) => void;
+  /** [138A-10] Cambio de opciones del pasto (tiempo real, debounce en escena). */
+  readonly onGrassChange?: (grass: GrassFieldOptions) => void;
 }
 
 export interface WorldConstructorSection {
@@ -75,6 +80,8 @@ export interface WorldConstructorSection {
   readonly applyLayers: (layers: readonly TerrainLayer[]) => void;
   /** [138A-9] Sincroniza el estado del pincel (restauración/auto-creación). */
   readonly applyBrush: (brush: ConstructorBrushState) => void;
+  /** [138A-10] Sincroniza las opciones del pasto desde fuera (restauración). */
+  readonly applyGrass: (grass: GrassFieldOptions) => void;
   readonly destroy: () => void;
 }
 
@@ -137,6 +144,12 @@ export interface ConstructorPanelContext {
   readonly brush: ConstructorBrushState;
   /** [138A-9] Cambia el pincel y lo emite a la escena. */
   readonly commitBrush: (next: ConstructorBrushState) => void;
+  /** [138A-10] Opciones actuales del pasto (mismo objeto hasta el commit). */
+  readonly grass: GrassFieldOptions;
+  /** [138A-10] Aplica opciones de pasto y emite tiempo real. */
+  readonly commitGrass: (next: GrassFieldOptions) => void;
+  /** [138A-10] Registra un sincronizador de pasto (applyGrass). */
+  readonly syncGrass: (fn: () => void) => void;
 }
 
 export function mountWorldConstructor(
@@ -164,16 +177,21 @@ export function mountWorldConstructor(
    * subpanel Capas y la escena (painter) vía commit/apply. */
   let layers: readonly TerrainLayer[] = [];
   let brush: ConstructorBrushState = { ...DEFAULT_BRUSH_STATE };
+  /* [138A-10] Opciones del pasto compartidas con el subpanel Pasto y la
+   * escena vía commit/apply (mismo patrón que capas/pincel). */
+  let grass: GrassFieldOptions = { ...GRASS_FIELD_DEFAULTS };
   const syncers: Array<() => void> = [];
   const paletteSyncers: Array<() => void> = [];
   const mapSyncers: Array<() => void> = [];
   const layersSyncers: Array<() => void> = [];
   const brushSyncers: Array<() => void> = [];
+  const grassSyncers: Array<() => void> = [];
   const sync = (fn: () => void): void => { syncers.push(fn); };
   const syncPalette = (fn: () => void): void => { paletteSyncers.push(fn); };
   const syncMap = (fn: () => void): void => { mapSyncers.push(fn); };
   const syncLayers = (fn: () => void): void => { layersSyncers.push(fn); };
   const syncBrush = (fn: () => void): void => { brushSyncers.push(fn); };
+  const syncGrass = (fn: () => void): void => { grassSyncers.push(fn); };
   const commit = (next: TerrainOptions): void => {
     state = next;
     emitChange();
@@ -204,6 +222,11 @@ export function mountWorldConstructor(
     controls.onBrushStateChange?.(brush);
     for (const syncer of brushSyncers) syncer();
   };
+  const commitGrass = (next: GrassFieldOptions): void => {
+    grass = normalizeGrassFieldOptions(next);
+    controls.onGrassChange?.(grass);
+    for (const syncer of grassSyncers) syncer();
+  };
   const ctx: ConstructorPanelContext = {
     get state() { return state; },
     commit,
@@ -221,6 +244,9 @@ export function mountWorldConstructor(
     syncBrush,
     get brush() { return brush; },
     commitBrush,
+    get grass() { return grass; },
+    commitGrass,
+    syncGrass,
   };
 
   /* [138A-8] Estado de la ventana lateral: colapso, lado y ancho. El estado
@@ -473,6 +499,10 @@ export function mountWorldConstructor(
     applyBrush: (next) => {
       brush = normalizeBrushState(next);
       for (const syncer of brushSyncers) syncer();
+    },
+    applyGrass: (next) => {
+      grass = normalizeGrassFieldOptions(next);
+      for (const syncer of grassSyncers) syncer();
     },
     applyPanelState,
     destroy: () => { root.remove(); },

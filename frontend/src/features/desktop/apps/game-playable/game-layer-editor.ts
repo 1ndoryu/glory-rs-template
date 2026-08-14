@@ -25,6 +25,7 @@ export const LAYER_KIND_LABELS: Readonly<Record<string, string>> = {
   path: 'Camino',
   sand: 'Arena',
   water: 'Agua',
+  vegetation: 'Pasto',
   elevation: 'Elevación',
 };
 
@@ -85,6 +86,21 @@ export function createCircleLayer(
       lowerToWater: true,
     };
   }
+  if (kind === 'grass') {
+    return {
+      id,
+      name: brushLayerLabel(kind),
+      enabled: true,
+      kind: 'vegetation',
+      shape,
+      falloff: 'smooth',
+      falloffRadius: 1.5,
+      bias: 1,
+      blend: 'set',
+      hardness: 0.5,
+      mode: 'add',
+    };
+  }
   return {
     id,
     name: brushLayerLabel(kind),
@@ -138,6 +154,21 @@ export function createPaintedLayer(
       lowerToWater: true,
     };
   }
+  if (brush.kind === 'grass') {
+    return {
+      id,
+      name: brushLayerLabel(brush.kind),
+      enabled: true,
+      kind: 'vegetation',
+      shape,
+      falloff: brush.falloff,
+      falloffRadius: Math.max(0.25, brush.radius * 2),
+      bias: brush.strength,
+      blend: 'set',
+      hardness: 0.5,
+      mode: brush.mode,
+    };
+  }
   return {
     id,
     name: brushLayerLabel(brush.kind),
@@ -157,7 +188,13 @@ export function paintedLayersOfKind(
   layers: readonly TerrainLayer[],
   kind: ConstructorBrushKind,
 ): readonly TerrainLayer[] {
-  return layers.filter(layer => layer.kind === kind && layer.shape.kind === 'painted');
+  const terrainKind = terrainLayerKindOfBrush(kind);
+  return layers.filter(layer => layer.kind === terrainKind && layer.shape.kind === 'painted');
+}
+
+/** Kind de capa de terreno que pinta un pincel ('grass' → 'vegetation'). */
+export function terrainLayerKindOfBrush(kind: ConstructorBrushKind): TerrainLayer['kind'] {
+  return kind === 'grass' ? 'vegetation' : kind;
 }
 
 /** Visor de capas + pinceles. Registra syncers de capas y de pincel. */
@@ -382,11 +419,23 @@ export function buildLayerEditorPanel(
       brushHost.append(height.row, direction.container);
     }
 
+    if (brush.kind === 'grass') {
+      const mode = createSegmentControl<'add' | 'remove'>(
+        [
+          { key: 'add', label: 'Poner' },
+          { key: 'remove', label: 'Quitar' },
+        ],
+        brush.mode,
+        (modeValue) => ctx.commitBrush({ ...brush, mode: modeValue }),
+      );
+      brushHost.appendChild(mode.container);
+    }
+
     brushHost.appendChild(createEl('p', {
       className: 'juegoPanelTerreno__statsLine',
       textContent: blockMode
         ? 'Estilo bloques: subir/bajar coloca o quita bloques (y variantes del terreno).'
-        : 'Estilo suave: pinta caminos, arena, agua o eleva/baja el terreno.',
+        : 'Estilo suave: pinta caminos, arena, agua, pasto o eleva/baja el terreno.',
     }));
   };
 
@@ -403,6 +452,7 @@ export function surfaceIdOfKind(kind: ConstructorBrushKind): number {
     case 'path': return TERRAIN_SURFACE_IDS.path;
     case 'sand': return TERRAIN_SURFACE_IDS.sand;
     case 'water': return TERRAIN_SURFACE_IDS.water;
+    case 'grass':
     case 'elevation': return -1;
   }
 }

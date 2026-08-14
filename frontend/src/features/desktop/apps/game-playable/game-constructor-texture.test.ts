@@ -32,8 +32,12 @@ function createCtx(overrides: Partial<ConstructorPanelContext> = {}): {
       targetLayerId: null,
       height: 1,
       direction: 'raise',
+      mode: 'add',
     },
     commitBrush: () => {},
+    grass: { enabled: true, density: 1, size: 1, color: 0x86c65c },
+    commitGrass: () => {},
+    syncGrass: () => {},
     ...overrides,
   };
   return { ctx, onToonRamp };

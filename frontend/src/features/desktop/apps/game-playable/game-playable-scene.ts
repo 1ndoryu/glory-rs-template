@@ -14,6 +14,8 @@ import {
   normalizeWorldPalette,
   normalizeTerrainOptions,
   normalizeTerrainLayerStack,
+  normalizeGrassFieldOptions,
+  GRASS_FIELD_DEFAULTS,
   parseSerializedWorld,
   TERRAIN_LAYER_LIMITS,
   terrainOptionsPreset,
@@ -25,6 +27,7 @@ import {
   type TerrainLayer,
   type TerrainOptions,
   type WorldPalette,
+  type GrassFieldOptions,
   type WorldMap,
   type WorldSnapshot,
 } from '../../../game-core';
@@ -68,7 +71,7 @@ import {
   normalizeBrushState,
   type ConstructorBrushState,
 } from './game-layer-brush';
-import { createPaintedLayer } from './game-layer-editor';
+import { createPaintedLayer, terrainLayerKindOfBrush } from './game-layer-editor';
 import { attachLayerPainter } from './game-layer-painter';
 import {
   mountProceduralComparator,
@@ -258,6 +261,9 @@ export function mountGamePlayableScene(
   let constructorLayers: readonly TerrainLayer[] = [];
   /* [138A-9] Estado del pincel (compartido con el visor de capas). */
   let constructorBrush: ConstructorBrushState = { ...DEFAULT_BRUSH_STATE };
+  /* [138A-10] Opciones del generador de pasto (densidad/tamaño/color);
+   * el comparador regenera el campo instanciado por chunks al cambiarlas. */
+  let constructorGrass: GrassFieldOptions = { ...GRASS_FIELD_DEFAULTS };
   /* [138A-8] Paleta del mundo y estado de ventana del Constructor (se
    * restauran desde storage en el bloque de restore, más abajo). */
   let constructorPalette: WorldPalette = { ...WORLD_PALETTE_DEFAULTS };
@@ -309,6 +315,7 @@ export function mountGamePlayableScene(
      * sobreviven a la regeneración (rebuildDocumentProps usa el actual). */
     proceduralComparator.setDocument(constructorMap);
     proceduralComparator.setLayers(constructorLayers);
+    proceduralComparator.setGrassOptions(constructorGrass);
     proceduralComparator.regenerateFromOptions(constructorOptions);
     panel.setConstructorOptions(constructorOptions);
     panel.setConstructorStats(formatConstructorStats(mapBuilderStats(constructorMap)));
@@ -350,7 +357,7 @@ export function mountGamePlayableScene(
       let target = constructorBrush.targetLayerId
         ? constructorLayers.find(layer => layer.id === constructorBrush.targetLayerId)
         : undefined;
-      if (!target || target.kind !== constructorBrush.kind) {
+      if (!target || target.kind !== terrainLayerKindOfBrush(constructorBrush.kind)) {
         target = createPaintedLayer(constructorBrush, constructorLayers);
         constructorLayers = [...constructorLayers, target];
         constructorBrush = { ...constructorBrush, targetLayerId: target.id };
@@ -381,6 +388,9 @@ export function mountGamePlayableScene(
           falloffRadius: Math.max(0.25, constructorBrush.radius * 2),
           bias: constructorBrush.strength,
           hardness: 0.5,
+          /* [138A-10] El pincel de pasto lleva su modo add/remove a la capa
+           * de vegetación (later wins en la máscara). */
+          ...(target.kind === 'vegetation' ? { mode: constructorBrush.mode } : {}),
         };
       constructorLayers = constructorLayers.map(layer => layer.id === updated.id ? updated : layer);
       applyConstructorLayers(constructorLayers);
@@ -405,6 +415,14 @@ export function mountGamePlayableScene(
     fog.color.copy(backgroundColor);
     persistConstructorState(comparatorMode);
   });
+  /* [138A-10] Las opciones de pasto se aplican con el mismo debounce (no se
+   * regeneran mallas ni se persiste en cada evento del slider/picker). */
+  const grassDebounced = createDebouncedRegenerator<GrassFieldOptions>(200, (grass) => {
+    const next = normalizeGrassFieldOptions(grass);
+    constructorGrass = next;
+    proceduralComparator.setGrassOptions(next);
+    persistConstructorState(comparatorMode);
+  });
 
   /* [138A-7] Persiste opciones + estilo + cámara en una sola llamada. */
   const persistConstructorState = (mode: RenderStyle): void => {
@@ -416,6 +434,7 @@ export function mountGamePlayableScene(
       palette: constructorPalette,
       panel: constructorPanelState,
       layers: constructorLayers,
+      grass: constructorGrass,
     });
   };
 
@@ -518,6 +537,9 @@ export function mountGamePlayableScene(
       onEditObjects: applyConstructorObjectEdits,
       onLayersChange: applyConstructorLayers,
       onBrushStateChange: applyConstructorBrush,
+      onGrassChange: (grass) => {
+        grassDebounced.schedule(grass);
+      },
       onToonRampChange: (dataUrl) => {
         if (dataUrl === null) {
           applyToonRamp(createToonRamp());
@@ -776,6 +798,8 @@ export function mountGamePlayableScene(
     /* [138A-9] El stack de capas se restaura antes de generar para que la
      * primera vista ya muestre caminos/arena/agua/elevación guardados. */
     if (restored.layers) constructorLayers = normalizeTerrainLayerStack(restored.layers);
+    /* [138A-10] El pasto se restaura antes de generar la primera vista. */
+    if (restored.grass) constructorGrass = normalizeGrassFieldOptions(restored.grass);
     showConstructorWorld(restored.options);
     if (restored.mode !== 'bloques') applyTerrainMode(restored.mode);
     /* [138A-8] Restaura documento, paleta y ventana en los subpaneles del
@@ -785,6 +809,7 @@ export function mountGamePlayableScene(
     panel.setConstructorPanelState(constructorPanelState);
     panel.setConstructorLayers(constructorLayers);
     panel.setConstructorBrush(constructorBrush);
+    panel.setConstructorGrass(constructorGrass);
     proceduralComparator.setPalette(constructorPalette);
     backgroundColor.setHex(constructorPalette.sky);
     fog.color.copy(backgroundColor);
@@ -1059,6 +1084,7 @@ export function mountGamePlayableScene(
       stopLayerPainter();
       regenerateDebounced.dispose();
       paletteDebounced.dispose();
+      grassDebounced.dispose();
       panel.destroy();
       gpuFrameProbe.dispose();
       visualCache.destroy();

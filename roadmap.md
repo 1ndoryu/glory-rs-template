@@ -165,8 +165,14 @@ gate propio:
       bloques y variantes); stack de capas serializable con visor tipo Blender
       (orden/ojo/duplicar/eliminar), cámara libre desacoplada, primera persona
       sin figura local y límites del MapVersion del constructor.
-- [ ] **138A-10 — Generador de pasto optimizado** (densidad/tamaño/color) con
-      pincel de poner/quitar pasto.
+- [x] **138A-10 — Generador de pasto optimizado** (densidad/tamaño/color) con
+      pincel de poner/quitar pasto. Pipeline puro por chunks
+      (`grass-field.ts`, adaptación de GrassSystemThreeJS orientada a
+      rendimiento: presupuestos ≤1024 chunks/≤10000 briznas fail-closed,
+      máscara de vegetación add/remove como capa del stack, regeneración solo
+      de la zona afectada, InstancedMesh por chunk en el comparador, panel
+      Pasto y persistencia); teardown sin fugas y verificación visual del
+      usuario pendiente.
 - [ ] **138A-11 — Auditorías SOLID/arquitectura y rendimiento con evidencia.**
 - [ ] **138A-12 — Cielo procedural (skydome) y ambiente:** shader a pantalla
       completa con nubes pintadas por capas (cerca/lejos, cobertura, deriva),

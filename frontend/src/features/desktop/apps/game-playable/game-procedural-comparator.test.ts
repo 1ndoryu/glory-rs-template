@@ -20,6 +20,8 @@ vi.mock('../../../game-core', async (importOriginal) => {
 });
 
 import { createWorldBend } from './game-world-bend';
+import { DEFAULT_BRUSH_STATE } from './game-layer-brush';
+import { createPaintedLayer } from './game-layer-editor';
 import { mountProceduralComparator, type ProceduralComparator } from './game-procedural-comparator';
 import * as waterModule from './game-toon-water';
 
@@ -111,7 +113,9 @@ describe('comparador procedural — cellSize real y estilos (138A-6)', () => {
       expect.anything(),
       expect.objectContaining({
         maxTrees: 0,
-        maxGrass: expect.any(Number),
+        /* [138A-10] El césped ya no viene de placeVegetation: lo genera
+         * grass-field por chunks instanciados (una draw call por chunk). */
+        maxGrass: 0,
         maxRocks: expect.any(Number),
       }),
     );
@@ -210,12 +214,120 @@ describe('comparador procedural — capas de terreno y props del documento (138A
     const world = scene.children[0] as THREE.Group;
     /* Tras regenerar quedan grupos antiguos vaciados en el árbol; el grupo
      * actual es el último que conserva sus dos hijos (terreno + props). */
+    /* [138A-10] El grupo suave tiene terreno + props + grupo de pasto. */
     const smoothGroup = [...world.children].reverse().find(child =>
-      child instanceof THREE.Group && child.children.length === 2) as THREE.Group;
+      child instanceof THREE.Group && child.children.length === 3) as THREE.Group;
     const terrain = smoothGroup.children[0] as THREE.Mesh;
     const colors = terrain.geometry.getAttribute('color') as THREE.BufferAttribute;
     expect(colors).toBeDefined();
     expect(colors.count).toBe(terrain.geometry.getAttribute('position').count);
+    comparator.dispose();
+  });
+
+  it('setGrassOptions regenera el pasto instanciado por chunks (138A-10)', () => {
+    const scene = new THREE.Scene();
+    const comparator: ProceduralComparator = mountProceduralComparator(
+      scene,
+      createWorldBend(),
+      new THREE.Texture(),
+      42,
+      0,
+      0,
+      options,
+    );
+    comparator.setMode('suave');
+    /* Sin capas de vegetación el pasto nace sobre hierba natural. */
+    const stats = comparator.terrainStats();
+    expect(stats.grassBlades).toBeGreaterThan(0);
+    expect(stats.grassChunks).toBeGreaterThan(0);
+
+    const world = scene.children[0] as THREE.Group;
+    const smoothGroup = [...world.children].reverse().find(child =>
+      child instanceof THREE.Group && child.children.length === 3) as THREE.Group;
+    const grassGroup = smoothGroup.children[2] as THREE.Group;
+    expect(grassGroup.children.length).toBe(stats.grassChunks);
+    const first = grassGroup.children[0] as THREE.InstancedMesh;
+    expect(first.count).toBeGreaterThan(0);
+    expect(first.instanceColor).toBeDefined();
+
+    /* Cambiar tamaño/color regenera sin tocar el terreno (mismas stats). */
+    comparator.setGrassOptions({ size: 0.5, color: 0xff0000 });
+    const nextStats = comparator.terrainStats();
+    expect(nextStats.grassBlades).toBeGreaterThan(0);
+    expect(nextStats.grassChunks).toBe(stats.grassChunks);
+
+    /* Apagar el pasto libera los meshes y las stats caen a cero. */
+    comparator.setGrassOptions({ enabled: false });
+    expect(comparator.terrainStats().grassBlades).toBe(0);
+    expect(comparator.terrainStats().grassChunks).toBe(0);
+    expect(grassGroup.children.length).toBe(0);
+    comparator.dispose();
+  });
+
+  it('al eliminar una capa de pasto se retira el césped de su chunk (138A-10)', () => {
+    const scene = new THREE.Scene();
+    const comparator: ProceduralComparator = mountProceduralComparator(
+      scene,
+      createWorldBend(),
+      new THREE.Texture(),
+      42,
+      0,
+      0,
+      options,
+    );
+    comparator.setMode('suave');
+
+    /* Arena pintada en TODO el chunk 2:1 (i 32..47, j 16..31): sin máscara de
+     * vegetación ese chunk no tiene pasto, así que su césped solo puede venir
+     * de una capa de pasto pintada (repro del pasto fantasma). */
+    const sandCells: (readonly [number, number])[] = [];
+    for (let j = 16; j < 32; j += 1) {
+      for (let i = 32; i < 48; i += 1) sandCells.push([i, j]);
+    }
+    const sandLayer = createPaintedLayer(
+      { ...DEFAULT_BRUSH_STATE, kind: 'sand' },
+      [],
+      sandCells,
+    );
+    const zoneA: readonly (readonly [number, number])[] = [[16, 16], [17, 16], [16, 17], [17, 17]];
+    const zoneB: readonly (readonly [number, number])[] = [[40, 24], [41, 24], [40, 25], [41, 25]];
+    const grassA = createPaintedLayer(
+      { ...DEFAULT_BRUSH_STATE, kind: 'grass', mode: 'add' },
+      [sandLayer],
+      zoneA,
+    );
+    const grassB = createPaintedLayer(
+      { ...DEFAULT_BRUSH_STATE, kind: 'grass', mode: 'add' },
+      [sandLayer, grassA],
+      zoneB,
+    );
+
+    const grassKeys = (): ReadonlySet<string> => {
+      const world = scene.children[0] as THREE.Group;
+      const smoothGroup = [...world.children].reverse().find(child =>
+        child instanceof THREE.Group && child.children.length === 3) as THREE.Group;
+      const grassGroup = smoothGroup.children[2] as THREE.Group;
+      return new Set([...grassGroup.children]
+        .map(mesh => (mesh as THREE.InstancedMesh).userData.grassChunkKey as string));
+    };
+
+    comparator.setLayers([sandLayer, grassA, grassB]);
+    const both = comparator.terrainStats();
+    expect(both.grassBlades).toBeGreaterThan(0);
+    const keysWithBoth = grassKeys();
+    expect(keysWithBoth.has('1:1')).toBe(true);
+    expect(keysWithBoth.has('2:1')).toBe(true);
+
+    /* Quitar la capa B: su chunk (2:1) deja de estar en las capas actuales y,
+     * sin la unión de chunks previos/actuales, conservaría sus meshes. */
+    comparator.setLayers([sandLayer, grassA]);
+    const onlyA = comparator.terrainStats();
+    /* both.grassBlades ya se verificó > 0 arriba; el ! solo reafirma el
+     * contrato del comparador en modo suave. */
+    expect(onlyA.grassBlades).toBeLessThan(both.grassBlades!);
+    const keysWithOnlyA = grassKeys();
+    expect(keysWithOnlyA.has('1:1')).toBe(true);
+    expect(keysWithOnlyA.has('2:1')).toBe(false);
     comparator.dispose();
   });
 });
