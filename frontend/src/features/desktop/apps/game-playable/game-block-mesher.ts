@@ -2,7 +2,9 @@
  * Datos puros, sin THREE: emite arrays tipados (posición/normal/uv/color) de
  * caras de cubo unitario. La cara superior es hierba/arena; las laterales se
  * emiten SOLO donde el vecino es más bajo u océano, subdivididas por bloque
- * con jitter y AO para que la altura se lea "por bloques". */
+ * con jitter y AO para que la altura se lea "por bloques".
+ * [138A-8] Los colores son opcionales (default = BLOCK_COLORS): el panel de
+ * Paleta pasa una WorldPalette personalizada sin cambiar la geometría. */
 
 import {
   BEACH_LEVEL,
@@ -16,6 +18,7 @@ import {
   BLOCK_COLORS,
   BLOCK_SIDE_AO,
   tintRgb,
+  type BlockColors,
 } from './game-block-palette';
 
 export interface BlockMeshData {
@@ -102,7 +105,11 @@ function blockSide(
 }
 
 /* ---------------- terreno ---------------- */
-export function buildBlockTerrainMeshData(h: BlockHeightmap, seed: number): BlockMeshData {
+export function buildBlockTerrainMeshData(
+  h: BlockHeightmap,
+  seed: number,
+  colors: BlockColors = BLOCK_COLORS,
+): BlockMeshData {
   const b = makeBuf();
   const { width, depth, levels } = h;
 
@@ -115,8 +122,8 @@ export function buildBlockTerrainMeshData(h: BlockHeightmap, seed: number): Bloc
       const z0 = cellCenterZ(h, j) - 0.5, z1 = z0 + 1;
       const yT = lvl;
       const beach = lvl === BEACH_LEVEL;
-      const topHex = beach ? BLOCK_COLORS.sand : BLOCK_COLORS.grass;
-      const sideHex = beach ? BLOCK_COLORS.sandSide : BLOCK_COLORS.dirt;
+      const topHex = beach ? colors.sand : colors.grass;
+      const sideHex = beach ? colors.sandSide : colors.dirt;
 
       /* Cara superior con jitter suave. */
       const topJit = (hash2(i, j, seed + 3) - 0.5) * 0.05;
@@ -208,27 +215,30 @@ function emitBox(
   quadV(b, x1, z0, -1, 0, sx, y0, y1, tintRgb(hex, shade * BLOCK_SIDE_AO), tintRgb(hex, shade));
 }
 
-function emitTree(b: BlockMeshData, p: BlockPropPlacement): void {
+function emitTree(b: BlockMeshData, p: BlockPropPlacement, colors: BlockColors): void {
   /* Árbol toon (no bloques) de ~4-6 bloques: tronco + dos capas de follaje,
    * igual que la referencia pero con el tamaño correcto. */
   const trunkH = 2.2 + p.seed * 0.6; // 2.2..2.8
   const jit = (x: number, y: number): number => (hash2(x, y, p.seed * 977 + 31) - 0.5) * 0.05;
-  emitBox(b, p.x, p.baseY, p.z, 0.7, trunkH, 0.7, BLOCK_COLORS.trunk, jit(p.x, p.z));
-  emitBox(b, p.x, p.baseY + trunkH - 0.25, p.z, 3.0, 1.7, 3.0, BLOCK_COLORS.leafDark, jit(p.x, p.z + 1));
-  emitBox(b, p.x, p.baseY + trunkH + 1.0, p.z, 2.0, 1.6, 2.0, BLOCK_COLORS.leaf, jit(p.x + 1, p.z));
+  emitBox(b, p.x, p.baseY, p.z, 0.7, trunkH, 0.7, colors.trunk, jit(p.x, p.z));
+  emitBox(b, p.x, p.baseY + trunkH - 0.25, p.z, 3.0, 1.7, 3.0, colors.leafDark, jit(p.x, p.z + 1));
+  emitBox(b, p.x, p.baseY + trunkH + 1.0, p.z, 2.0, 1.6, 2.0, colors.leaf, jit(p.x + 1, p.z));
 }
 
-function emitRock(b: BlockMeshData, p: BlockPropPlacement): void {
+function emitRock(b: BlockMeshData, p: BlockPropPlacement, colors: BlockColors): void {
   const jit = (hash2(p.x * 3, p.z * 3, p.seed) - 0.5) * 0.05;
-  emitBox(b, p.x, p.baseY, p.z, 1.3, 0.9, 1.1, BLOCK_COLORS.rock, jit);
-  emitBox(b, p.x + 0.45, p.baseY, p.z - 0.25, 0.65, 0.5, 0.6, BLOCK_COLORS.rockDark, jit);
+  emitBox(b, p.x, p.baseY, p.z, 1.3, 0.9, 1.1, colors.rock, jit);
+  emitBox(b, p.x + 0.45, p.baseY, p.z - 0.25, 0.65, 0.5, 0.6, colors.rockDark, jit);
 }
 
-export function buildBlockPropsMeshData(placements: readonly BlockPropPlacement[]): BlockMeshData {
+export function buildBlockPropsMeshData(
+  placements: readonly BlockPropPlacement[],
+  colors: BlockColors = BLOCK_COLORS,
+): BlockMeshData {
   const b = makeBuf();
   for (const p of placements) {
-    if (p.kind === 'tree') emitTree(b, p);
-    else emitRock(b, p);
+    if (p.kind === 'tree') emitTree(b, p, colors);
+    else emitRock(b, p, colors);
   }
   return b;
 }

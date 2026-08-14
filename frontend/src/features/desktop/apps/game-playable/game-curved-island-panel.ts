@@ -5,15 +5,24 @@
  * Constructor de mundo, el panel exterior es el rail de iconos y los grupos de
  * la isla son secciones suyas; sin constructor conserva el panel clásico. */
 
-import { Camera, Layers, Waves } from 'lucide';
+import { Boxes, Camera, Image, Layers, Palette, Waves } from 'lucide';
 import { createEl } from '../../../../utils/dom';
-import type { RenderStyle, TerrainOptions } from '../../../game-core';
+import type {
+  MapVersion,
+  RenderStyle,
+  TerrainOptions,
+  WorldPalette,
+} from '../../../game-core';
 import { DEFAULT_CAMERA_MODE, type CameraMode } from './game-camera-modes';
 import {
   mountWorldConstructor,
   type WorldConstructorSection,
   type WorldConstructorSubpanel,
 } from './game-world-constructor';
+import { buildAssetsPanel } from './game-constructor-assets';
+import { buildColorPanel } from './game-constructor-color';
+import type { ConstructorPanelState } from './game-constructor-persistence';
+import { buildTexturePanel } from './game-constructor-texture';
 import {
   buildCamaraGroup,
   buildEstilosGroup,
@@ -33,6 +42,12 @@ export interface CurvedIslandPanel {
   readonly setTerrainMode: (mode: RenderStyle) => void;
   /** [138A-7] Marca el segmento de cámara activo sin disparar el control. */
   readonly setCameraMode: (mode: CameraMode) => void;
+  /** [138A-8] Restaura la paleta del mundo en los pickers sin emitir. */
+  readonly setConstructorPalette: (palette: WorldPalette) => void;
+  /** [138A-8] Restaura el documento (assets) sin emitir. */
+  readonly setConstructorMap: (map: MapVersion | null) => void;
+  /** [138A-8] Restaura colapso/lado/ancho de la ventana sin emitir. */
+  readonly setConstructorPanelState: (state: ConstructorPanelState) => void;
   readonly destroy: () => void;
 }
 
@@ -72,9 +87,39 @@ export function mountCurvedIslandPanel(
     if (controls.setCameraMode) {
       extraPanels.push({ key: 'camara', label: 'Cámara', icon: Camera, build: mountCamara });
     }
+    /* [138A-8] Paneles de Paleta, Textura y Assets: solo se registran cuando
+     * la escena expone su callback (evita rail muerto en modo legacy/test). */
+    if (controls.worldConstructor.onPaletteChange) {
+      extraPanels.push({
+        key: 'color',
+        label: 'Color',
+        icon: Palette,
+        build: (container, ctx) => buildColorPanel(container, ctx),
+      });
+    }
+    if (controls.worldConstructor.onToonRampChange) {
+      extraPanels.push({
+        key: 'textura',
+        label: 'Textura',
+        icon: Image,
+        build: (container, ctx) => buildTexturePanel(container, ctx),
+      });
+    }
+    if (controls.worldConstructor.onEditObjects) {
+      extraPanels.push({
+        key: 'assets',
+        label: 'Assets',
+        icon: Boxes,
+        build: (container, ctx) => buildAssetsPanel(container, ctx),
+      });
+    }
     constructorSection = mountWorldConstructor(host, controls.worldConstructor, {
       title: 'Constructor',
       extraPanels,
+      initialPalette: controls.initialPalette,
+      initialMap: controls.initialMap,
+      constructorPanelState: controls.constructorPanelState,
+      onConstructorPanelStateChange: controls.onConstructorPanelStateChange,
     });
   } else {
     /* Legacy sin constructor: se conserva el panel clásico del terreno. */
@@ -123,6 +168,15 @@ export function mountCurvedIslandPanel(
     setCameraMode: (mode) => {
       currentCameraMode = mode;
       camaraSetActive?.(mode);
+    },
+    setConstructorPalette: (palette) => {
+      constructorSection?.applyPalette(palette);
+    },
+    setConstructorMap: (map) => {
+      constructorSection?.applyMap(map);
+    },
+    setConstructorPanelState: (state) => {
+      constructorSection?.applyPanelState(state);
     },
     destroy: () => {
       legacyPanel?.remove();

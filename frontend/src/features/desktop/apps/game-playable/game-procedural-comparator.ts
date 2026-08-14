@@ -11,11 +11,18 @@ import {
   buildLowPolyVegetationMeshData,
   generateTerrainHeightfield,
   normalizeTerrainOptions,
+  normalizeWorldPalette,
   placeVegetation,
   terrainOptionsPreset,
+  WORLD_PALETTE_DEFAULTS,
+  worldPaletteToHeightfieldRamp,
+  worldPaletteToVegetationPalette,
   type IslandHeightfield,
+  type MapVersion,
   type RenderStyle,
   type TerrainOptions,
+  type VegetationPlacement,
+  type WorldPalette,
 } from '../../../game-core';
 import {
   buildBlockPropsMeshData,
@@ -54,6 +61,12 @@ export interface ProceduralComparator {
   readonly regenerate: (seed: number) => void;
   /** [138A-4] Regenera con opciones completas del constructor. */
   readonly regenerateFromOptions: (options: TerrainOptions) => void;
+  /** [138A-8] Aplica la paleta del mundo sin tocar opciones/terreno. */
+  readonly setPalette: (palette: WorldPalette) => void;
+  /** [138A-8] Cambia la rampa toon compartida (gradientMap del material). */
+  readonly setToonRamp: (ramp: THREE.Texture) => void;
+  /** [138A-8] Muestra/oculta los props del documento MapVersion. */
+  readonly setDocument: (map: MapVersion | null) => void;
   readonly groundHeightAt: (x: number, z: number) => number;
   readonly raycastGroup: THREE.Object3D;
   readonly pickTerrain: (x: number, y: number, z: number) => TerrainPick | null;
@@ -86,6 +99,10 @@ export function mountProceduralComparator(
   let currentBlockLevels: Int8Array;
   let mode: RenderStyle = 'bloques';
   let propsVisible = true;
+  /* [138A-8] Paleta del mundo activa y documento de instancias. */
+  let currentPalette: WorldPalette = { ...WORLD_PALETTE_DEFAULTS };
+  let currentMap: MapVersion | null = null;
+  let documentGroup: THREE.Group | null = null;
 
   const world = new THREE.Group();
   const material = bend.apply(new THREE.MeshToonMaterial({ gradientMap: toonRamp, vertexColors: true }));
@@ -95,6 +112,7 @@ export function mountProceduralComparator(
   const initialWater = buildToonWaterPlane(bend, 1, 1, toonRamp);
   let waterGeometry = initialWater.geometry;
   const waterMaterial = initialWater.material;
+  waterMaterial.color.setHex(currentPalette.waterShallow);
   const water = new THREE.Mesh(waterGeometry, waterMaterial);
   water.position.y = WATER_Y;
   /* El agua queda por encima del fondo marino sin pelear en z en el borde. */
@@ -119,9 +137,9 @@ export function mountProceduralComparator(
   const buildBlocks = (heightfield: IslandHeightfield): BuiltMode => {
     const blockH = buildBlockHeightmapFromIsland(heightfield, blockMaxLevel());
     currentBlockLevels = blockH.levels;
-    const terrainData = buildBlockTerrainMeshData(blockH, currentOptions.seed);
+    const terrainData = buildBlockTerrainMeshData(blockH, currentOptions.seed, currentPalette);
     const placements = placeBlockProps(blockH, currentOptions.seed, PROP_COUNT);
-    const propsData = buildBlockPropsMeshData(placements);
+    const propsData = buildBlockPropsMeshData(placements, currentPalette);
     const group = new THREE.Group();
     const terrain = new THREE.Mesh(toGeometry(terrainData), material);
     const props = new THREE.Mesh(toGeometry(propsData), material);
@@ -144,7 +162,10 @@ export function mountProceduralComparator(
 
   const buildSmooth = (heightfield: IslandHeightfield): BuiltMode => {
     const cellSize = currentOptions.cellSize;
-    const meshData = buildHeightfieldMeshData(heightfield, { cellSize });
+    const meshData = buildHeightfieldMeshData(heightfield, {
+      cellSize,
+      colorRamp: worldPaletteToHeightfieldRamp(currentPalette),
+    });
     const density = currentOptions.vegetationDensity;
     const veg = placeVegetation(heightfield, currentOptions.seed, {
       maxGrass: Math.round(420 * density),
@@ -159,7 +180,10 @@ export function mountProceduralComparator(
       x: placement.x * cellSize,
       z: placement.z * cellSize,
     }));
-    const propData = buildLowPolyVegetationMeshData(scaledPlacements);
+    const propData = buildLowPolyVegetationMeshData(
+      scaledPlacements,
+      worldPaletteToVegetationPalette(currentPalette),
+    );
     const group = new THREE.Group();
     const terrain = new THREE.Mesh(toIndexedGeometry(meshData), material);
     const props = new THREE.Mesh(toIndexedGeometry(propData), material);
@@ -176,16 +200,87 @@ export function mountProceduralComparator(
     };
   };
 
-  const rebuild = (): void => {
+  const disposeDocumentProps = (): void => {
+    if (!documentGroup) return;
+    world.remove(documentGroup);
+    documentGroup.traverse((object) => {
+      if (object instanceof THREE.Mesh) object.geometry.dispose();
+    });
+    documentGroup.clear();
+    documentGroup = null;
+  };
+
+  /* [138A-8] Los props del documento viven en su propio grupo a escala mundo
+   * (posiciones ya en unidades de mundo); sin documento se conserva la
+   * vegetación generada del comparador. Los assets de categorías sin mesher
+   * (agua/personajes/genéricos) se omiten hoy: deuda documentada en el plan. */
+  const rebuildDocumentProps = (): void => {
+    disposeDocumentProps();
+    if (currentMap && blocks && smooth) {
+      const placements: VegetationPlacement[] = [];
+      for (const instance of currentMap.instances) {
+        const asset = currentMap.assetManifest[instance.assetVersionId];
+        const kind = asset?.category === 'tree' ? 'tree' : asset?.category === 'rock' ? 'rock' : null;
+        if (!kind) continue;
+        /* [138A-8] Las instancias del documento viven en el frame local del
+         * terreno (bounds ±w/2·cellSize), pero el grupo `world` está en
+         * (centerX, 0, centerZ): se traduce a coordenadas de escena para
+         * posicionar el prop y para buscar su celda de anclaje. */
+        const sceneX = instance.position.x + centerX;
+        const sceneZ = instance.position.z + centerZ;
+        const cell = cellAtWorld(sceneX, sceneZ);
+        if (!cell) continue;
+        const height = cellHeight(cell.i, cell.j);
+        if (height < currentHeightfield.waterLevel) continue;
+        placements.push({
+          kind,
+          x: sceneX,
+          z: sceneZ,
+          y: height,
+          /* Determinista: la rotación (0..360) y la posición siembran la forma. */
+          seed: Math.floor(instance.rotationY * 7) + Math.round(instance.position.x * 13 + instance.position.z * 29),
+          scale: instance.scale,
+        });
+      }
+      if (placements.length > 0) {
+        const data = buildLowPolyVegetationMeshData(
+          placements,
+          worldPaletteToVegetationPalette(currentPalette),
+        );
+        const mesh = new THREE.Mesh(toIndexedGeometry(data), material);
+        const group = new THREE.Group();
+        group.add(mesh);
+        world.add(group);
+        documentGroup = group;
+      }
+    }
+    syncDocumentVisibility();
+  };
+
+  /* [138A-8] Con documento, la vegetación generada se oculta para no duplicar
+   * árboles/rocas; sin documento se restaura la generada. */
+  const syncDocumentVisibility = (): void => {
+    const hasDocument = documentGroup !== null;
+    if (blocks) blocks.group.children[1].visible = propsVisible && !hasDocument;
+    if (smooth) smooth.group.children[1].visible = propsVisible && !hasDocument;
+    if (documentGroup) documentGroup.visible = propsVisible;
+  };
+
+  const rebuildMeshes = (): void => {
     disposeBuiltMode(blocks);
     disposeBuiltMode(smooth);
-    /* Un único heightfield por rebuild: bloques y suave comparten la MISMA
-     * base exacta y la generación no se ejecuta dos veces por clic. */
-    currentHeightfield = generateTerrainHeightfield(currentOptions);
     blocks = buildBlocks(currentHeightfield);
     smooth = buildSmooth(currentHeightfield);
     world.add(blocks.group, smooth.group);
+    rebuildDocumentProps();
     applyMode();
+  };
+
+  const rebuild = (): void => {
+    /* Un único heightfield por rebuild: bloques y suave comparten la MISMA
+     * base exacta y la generación no se ejecuta dos veces por clic. */
+    currentHeightfield = generateTerrainHeightfield(currentOptions);
+    rebuildMeshes();
   };
 
   const setOptions = (next: TerrainOptions): void => {
@@ -258,11 +353,7 @@ export function mountProceduralComparator(
 
   const setPropsVisible = (visible: boolean): void => {
     propsVisible = visible;
-    if (!blocks || !smooth) return;
-    for (const built of [blocks, smooth]) {
-      const props = built.group.children[1];
-      props.visible = visible;
-    }
+    syncDocumentVisibility();
   };
 
   setOptions(currentOptions);
@@ -292,7 +383,22 @@ export function mountProceduralComparator(
     },
     pickTerrain,
     setPropsVisible,
-    terrainStats: () => (mode === 'bloques' ? blocks!.stats : smooth!.stats),
+    terrainStats: () => {
+      const base = mode === 'bloques' ? blocks!.stats : smooth!.stats;
+      return currentMap ? { ...base, propCount: currentMap.instances.length } : base;
+    },
+    setPalette: (next) => {
+      currentPalette = normalizeWorldPalette(next);
+      waterMaterial.color.setHex(currentPalette.waterShallow);
+      rebuildMeshes();
+    },
+    setToonRamp: (nextRamp) => {
+      material.gradientMap = nextRamp;
+    },
+    setDocument: (map) => {
+      currentMap = map;
+      rebuildDocumentProps();
+    },
     /* Agua estática: el update existe solo por el contrato común con la isla. */
     update: () => {},
     dispose: () => {
@@ -302,6 +408,7 @@ export function mountProceduralComparator(
       material.dispose();
       waterMaterial.dispose();
       waterGeometry.dispose();
+      disposeDocumentProps();
       world.clear();
     },
   };

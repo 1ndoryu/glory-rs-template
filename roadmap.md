@@ -156,7 +156,7 @@ gate propio:
       (WASD + mouse look desde el jugador) y 3ª persona (sigue al personaje
       con colisión contra el terreno); selector en el panel y tecla `C`,
       persistido al recargar.
-- [ ] **138A-8 — Panel-ventana lateral** (alto total, sin título, colapsable a
+- [x] **138A-8 — Panel-ventana lateral** (alto total, sin título, colapsable a
       los lados, ancho redimensionable, cabecera vertical al ocultar) **+
       transform de objetos** (mover/colocar; sin editar modelos, eso es
       Blender) **+ paneles de Color, Textura y Assets** (con arrastrar/quitar).

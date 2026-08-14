@@ -1,23 +1,14 @@
 /* GAME-01 — Paleta de bloques del Bosque (estilo Minecraft).
- * Colores base en hex; las mallas aplican jitter y AO por vértice. Ninguna
- * especificación visual vive en los componentes: aquí están los únicos
- * tokens de color del terreno. */
+ * [138A-8] Los tokens únicos viven en game-core (WorldPalette); esta capa
+ * solo re-exporta los defaults y el tipo de colores que consumen los meshers.
+ * Las mallas aplican jitter y AO por vértice. */
 
-export const BLOCK_COLORS = {
-  grass: 0x86c65c,
-  dirt: 0x9b6b46,
-  sand: 0xe8d8a0,
-  sandSide: 0xd3bf86,
-  trunk: 0x8a5a34,
-  leaf: 0x63b543,
-  leafDark: 0x4c9233,
-  rock: 0x9d9d96,
-  rockDark: 0x7d7d78,
-  waterDeep: 0x36a79e,
-  waterShallow: 0x63c9bb,
-  foam: 0xeafbf5,
-  sky: 0xaecfc4,
-} as const;
+import { WORLD_PALETTE_DEFAULTS, type WorldPalette } from '../../../game-core';
+
+export type BlockColors = WorldPalette;
+
+/** Tokens históricos del mesher de bloques (paridad con la paleta global). */
+export const BLOCK_COLORS: BlockColors = WORLD_PALETTE_DEFAULTS;
 
 /* AO falso en la base de las caras laterales de un bloque. */
 export const BLOCK_SIDE_AO = 0.78;

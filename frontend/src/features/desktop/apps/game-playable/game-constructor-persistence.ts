@@ -8,6 +8,9 @@ import {
   validateTerrainOptions,
   type RenderStyle,
   type TerrainOptions,
+  normalizeWorldPalette,
+  validateWorldPalette,
+  type WorldPalette,
 } from '../../../game-core';
 import {
   DEFAULT_CAMERA_MODE,
@@ -17,6 +20,36 @@ import {
 
 export const CONSTRUCTOR_STORAGE_KEY = 'wandorius:constructor:v1';
 
+/* [138A-8] Estado de la ventana lateral del Constructor: colapsado, lado y
+ * ancho redimensionable. Límites sensatos para el panel completo. */
+export const CONSTRUCTOR_PANEL_MIN_WIDTH = 240;
+export const CONSTRUCTOR_PANEL_MAX_WIDTH = 520;
+export const CONSTRUCTOR_PANEL_DEFAULT_WIDTH = 320;
+
+export interface ConstructorPanelState {
+  readonly collapsed: boolean;
+  readonly side: 'left' | 'right';
+  readonly width: number;
+}
+
+/** Normaliza un estado de panel válido; null ante cualquier valor malo
+ *  (fail-closed: no se rellenan defaults en silencio). */
+export function normalizePanelState(value: unknown): ConstructorPanelState | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.collapsed !== 'boolean') return null;
+  if (record.side !== 'left' && record.side !== 'right') return null;
+  if (typeof record.width !== 'number' || !Number.isFinite(record.width)
+    || record.width < CONSTRUCTOR_PANEL_MIN_WIDTH || record.width > CONSTRUCTOR_PANEL_MAX_WIDTH) {
+    return null;
+  }
+  return {
+    collapsed: record.collapsed,
+    side: record.side,
+    width: Math.round(record.width * 10) / 10,
+  };
+}
+
 export interface ConstructorPersistedState {
   readonly version: 1;
   readonly options: TerrainOptions;
@@ -25,6 +58,10 @@ export interface ConstructorPersistedState {
   readonly mode: RenderStyle;
   /** [138A-7] Modo de cámara restaurado al recargar (fail-closed a `libre`). */
   readonly camera: CameraMode;
+  /** [138A-8] Paleta del mundo persistida; ausente si nunca se guardó. */
+  readonly palette?: WorldPalette;
+  /** [138A-8] Estado de la ventana del Constructor (colapso/lado/ancho). */
+  readonly panel?: ConstructorPanelState;
 }
 
 const VALID_MODES: readonly RenderStyle[] = ['bloques', 'suave'];
@@ -62,7 +99,20 @@ export function loadConstructorState(): ConstructorPersistedState | null {
       ? (record.mode as RenderStyle)
       : 'bloques';
     const camera = isCameraMode(record.camera) ? record.camera : DEFAULT_CAMERA_MODE;
-    return { version: 1, options, mode, camera };
+    /* [138A-8] La paleta y el panel son opcionales y solo se restauran si
+     * son VÁLIDOS; payloads corruptos caen a omitidos sin bloquear la carga. */
+    const palette = validateWorldPalette(record.palette).length === 0
+      ? normalizeWorldPalette(record.palette)
+      : undefined;
+    const panel = normalizePanelState(record.panel) ?? undefined;
+    return {
+      version: 1,
+      options,
+      mode,
+      camera,
+      ...(palette ? { palette } : {}),
+      ...(panel ? { panel } : {}),
+    };
   } catch {
     /* JSON corrupto o storage no disponible: no se puede restaurar. */
     return null;

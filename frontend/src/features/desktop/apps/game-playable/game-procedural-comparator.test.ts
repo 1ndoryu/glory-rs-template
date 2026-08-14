@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import * as gameCore from '../../../game-core';
-import { terrainOptionsPreset } from '../../../game-core';
+import { buildMapVersionFromOptions, terrainOptionsPreset, WORLD_PALETTE_DEFAULTS } from '../../../game-core';
 
 /* Spy sobre la fábrica real: el comparador debe crear el material del agua
  * UNA vez (al montar) y solo regenerar geometría después. Cada llamada extra
@@ -116,6 +116,101 @@ describe('comparador procedural — cellSize real y estilos (138A-6)', () => {
       }),
     );
     expect(comparator.terrainStats().propCount).toBeGreaterThan(0);
+
+    comparator.dispose();
+  });
+});
+
+describe('comparador procedural — paleta, rampa y documento (138A-8)', () => {
+  it('setPalette recolorea agua, bloques y suave sin tocar opciones', () => {
+    const scene = new THREE.Scene();
+    const comparator: ProceduralComparator = mountProceduralComparator(
+      scene,
+      createWorldBend(),
+      new THREE.Texture(),
+      1337,
+      0,
+      0,
+      terrainOptionsPreset('isla'),
+    );
+    const world = scene.children[0] as THREE.Group;
+    const water = world.children[0] as THREE.Mesh;
+    const waterMaterial = water.material as THREE.MeshToonMaterial;
+    const blocksTerrain = comparator.raycastGroup as THREE.Mesh;
+    const blocksColors = () => Array.from(
+      (blocksTerrain.geometry.getAttribute('color') as THREE.BufferAttribute).array,
+    );
+    const before = blocksColors();
+
+    const custom = { ...WORLD_PALETTE_DEFAULTS, grass: 0x112233, waterShallow: 0xabcdef };
+    comparator.setPalette(custom);
+
+    expect(waterMaterial.color.getHex()).toBe(0xabcdef);
+    /* setPalette reconstruye los meshes: el raycastGroup apunta al nuevo. */
+    const afterTerrain = comparator.raycastGroup as THREE.Mesh;
+    const after = Array.from(
+      (afterTerrain.geometry.getAttribute('color') as THREE.BufferAttribute).array,
+    );
+    expect(after).not.toEqual(before);
+    /* La cara superior de hierba se tiñe con jitter ±0.05: tolerancia amplia. */
+    expect(after.some(value => Math.abs(value - 0x11 / 255) < 0.05)).toBe(true);
+
+    comparator.setMode('suave');
+    const smoothTerrain = comparator.raycastGroup as THREE.Mesh;
+    const smoothColors = Array.from(
+      (smoothTerrain.geometry.getAttribute('color') as THREE.BufferAttribute).array,
+    );
+    expect(smoothColors.some(value => Math.abs(value - 0x11 / 255) < 0.05)).toBe(true);
+
+    comparator.dispose();
+  });
+
+  it('setToonRamp actualiza el gradientMap del material compartido', () => {
+    const scene = new THREE.Scene();
+    const comparator: ProceduralComparator = mountProceduralComparator(
+      scene,
+      createWorldBend(),
+      new THREE.Texture(),
+    );
+    const nextRamp = new THREE.Texture();
+    comparator.setToonRamp(nextRamp);
+    const world = scene.children[0] as THREE.Group;
+    const blocksTerrain = (world.children[1] as THREE.Group).children[0] as THREE.Mesh;
+    expect((blocksTerrain.material as THREE.MeshToonMaterial).gradientMap).toBe(nextRamp);
+    comparator.dispose();
+  });
+
+  it('setDocument muestra los props del documento y setDocument(null) los restaura', () => {
+    const scene = new THREE.Scene();
+    const comparator: ProceduralComparator = mountProceduralComparator(
+      scene,
+      createWorldBend(),
+      new THREE.Texture(),
+      1337,
+      0,
+      0,
+      { ...terrainOptionsPreset('isla'), style: 'bloques', seed: 7 },
+    );
+    const map = buildMapVersionFromOptions({ ...terrainOptionsPreset('isla'), style: 'bloques', seed: 7 });
+
+    const world = scene.children[0] as THREE.Group;
+    const blocksGroup = world.children[1] as THREE.Group;
+    const generatedProps = blocksGroup.children[1] as THREE.Mesh;
+    expect(generatedProps.visible).toBe(true);
+    expect(comparator.terrainStats().propCount).toBeGreaterThan(0);
+
+    comparator.setDocument(map);
+    expect(comparator.terrainStats().propCount).toBe(map.instances.length);
+    expect(generatedProps.visible).toBe(false);
+    /* El grupo de documento se añade tras los dos modos (índice 3). */
+    const docGroup = world.children[3] as THREE.Group;
+    expect(docGroup.children.length).toBe(1);
+    expect(docGroup.visible).toBe(true);
+
+    comparator.setDocument(null);
+    expect(generatedProps.visible).toBe(true);
+    expect(comparator.terrainStats().propCount).toBeGreaterThan(0);
+    expect(world.children).not.toContain(docGroup);
 
     comparator.dispose();
   });

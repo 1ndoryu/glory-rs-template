@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { terrainOptionsPreset } from '../../../game-core';
+import { terrainOptionsPreset, WORLD_PALETTE_DEFAULTS } from '../../../game-core';
 import {
   clearConstructorState,
   CONSTRUCTOR_STORAGE_KEY,
+  normalizePanelState,
   loadConstructorState,
   saveConstructorState,
 } from './game-constructor-persistence';
@@ -93,6 +94,43 @@ describe('persistencia del constructor de mundo', () => {
 
     window.localStorage.setItem(CONSTRUCTOR_STORAGE_KEY, JSON.stringify({ version: 1, options, mode: 'suave' }));
     expect(loadConstructorState()).toEqual({ version: 1, options, mode: 'suave', camera: 'libre' });
+  });
+
+  it('guarda y restaura la paleta y el estado del panel (138A-8)', () => {
+    const options = terrainOptionsPreset('isla');
+    const palette = { ...WORLD_PALETTE_DEFAULTS, sky: 0x123456 };
+    const panel = { collapsed: true, side: 'left' as const, width: 360 };
+    expect(saveConstructorState({ version: 1, options, mode: 'bloques', camera: 'libre', palette, panel }))
+      .toBe(true);
+    expect(loadConstructorState()).toEqual({
+      version: 1,
+      options,
+      mode: 'bloques',
+      camera: 'libre',
+      palette,
+      panel,
+    });
+  });
+
+  it('una paleta o panel inválido se omiten sin bloquear la restauración (fail-closed)', () => {
+    const options = terrainOptionsPreset('isla');
+    window.localStorage.setItem(CONSTRUCTOR_STORAGE_KEY, JSON.stringify({
+      version: 1,
+      options,
+      mode: 'suave',
+      camera: 'libre',
+      palette: { ...WORLD_PALETTE_DEFAULTS, grass: -5 },
+      panel: { collapsed: 'si', side: 'right', width: 9999 },
+    }));
+    expect(loadConstructorState()).toEqual({ version: 1, options, mode: 'suave', camera: 'libre' });
+  });
+
+  it('normalizePanelState recorta el ancho a un decimal y valida lado/colapso', () => {
+    expect(normalizePanelState({ collapsed: false, side: 'right', width: 311.17 }))
+      .toEqual({ collapsed: false, side: 'right', width: 311.2 });
+    expect(normalizePanelState({ collapsed: true, side: 'top', width: 320 })).toBeNull();
+    expect(normalizePanelState({ collapsed: true, side: 'right', width: 100 })).toBeNull();
+    expect(normalizePanelState(null)).toBeNull();
   });
 
   it('save devuelve false y load null si localStorage falla', () => {

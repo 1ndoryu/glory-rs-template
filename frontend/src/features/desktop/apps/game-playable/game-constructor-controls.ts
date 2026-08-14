@@ -150,3 +150,50 @@ export function createSeedRow(
     },
   };
 }
+
+export interface ColorControl {
+  readonly row: HTMLDivElement;
+  /** Sincroniza el valor desde fuera sin disparar onChange. */
+  readonly setValue: (hex: number) => void;
+}
+
+/** Convierte un hex entero a `#rrggbb` (para input de color). */
+export function hexToCss(hex: number): string {
+  const clamped = Math.min(0xffffff, Math.max(0, Math.floor(hex)));
+  return `#${clamped.toString(16).padStart(6, '0')}`;
+}
+
+/** Fila de color del panel de Paleta: picker + texto editable + hex. */
+export function createColorControl(
+  label: string,
+  initial: number,
+  onChange: (hex: number) => void,
+): ColorControl {
+  const row = createEl('div', { className: 'juegoPanelTerreno__fila' });
+  const labelEl = createEl('label', {
+    className: 'juegoPanelTerreno__rangoLabel',
+    textContent: label,
+  });
+  const swatch = createEl('span', { className: 'juegoPanelTerreno__colorMuestra' });
+  const input = createEl('input', {
+    className: 'juegoPanelTerreno__color',
+    type: 'color',
+    value: hexToCss(initial),
+  });
+  input.addEventListener('input', () => {
+    const hex = Number.parseInt(input.value.slice(1), 16);
+    if (Number.isFinite(hex)) {
+      swatch.textContent = hexToCss(hex);
+      onChange(hex);
+    }
+  });
+  labelEl.append(swatch, input);
+  row.appendChild(labelEl);
+  return {
+    row,
+    setValue(hex) {
+      input.value = hexToCss(hex);
+      swatch.textContent = hexToCss(hex);
+    },
+  };
+}

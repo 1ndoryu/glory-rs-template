@@ -14,10 +14,22 @@ import {
   SHAPE_PRESETS,
   TERRAIN_OPTIONS_DEFAULTS,
   TERRAIN_OPTIONS_LIMITS,
+  WORLD_PALETTE_DEFAULTS,
+  normalizeWorldPalette,
   normalizeTerrainOptions,
+  type MapEditOp,
+  type MapVersion,
   type ShapePreset,
   type TerrainOptions,
+  type WorldPalette,
 } from '../../../game-core';
+import {
+  CONSTRUCTOR_PANEL_DEFAULT_WIDTH,
+  CONSTRUCTOR_PANEL_MAX_WIDTH,
+  CONSTRUCTOR_PANEL_MIN_WIDTH,
+  normalizePanelState,
+  type ConstructorPanelState,
+} from './game-constructor-persistence';
 import {
   createRangeControl,
   createSelectControl,
@@ -31,11 +43,23 @@ export interface WorldConstructorControls {
   readonly onImport: (text: string) => void;
   /** [138A-5] Tiempo real: cada cambio de valor emite las opciones válidas. */
   readonly onChange?: (options: TerrainOptions) => void;
+  /** [138A-8] Cambio de paleta del mundo (tiempo real, debounce en escena). */
+  readonly onPaletteChange?: (palette: WorldPalette) => void;
+  /** [138A-8] Edición de objetos del documento (mover/colocar/quitar). */
+  readonly onEditObjects?: (ops: readonly MapEditOp[]) => void;
+  /** [138A-8] Cambio de rampa toon/textura global (null = reset). */
+  readonly onToonRampChange?: (dataUrl: string | null) => void;
 }
 
 export interface WorldConstructorSection {
   readonly setStats: (text: string) => void;
   readonly applyOptions: (options: TerrainOptions) => void;
+  /** [138A-8] Sincroniza la paleta desde fuera (restauración). */
+  readonly applyPalette: (palette: WorldPalette) => void;
+  /** [138A-8] Sincroniza el documento actual (restauración/import). */
+  readonly applyMap: (map: MapVersion | null) => void;
+  /** [138A-8] Aplica el estado de la ventana sin emitir el callback. */
+  readonly applyPanelState: (state: ConstructorPanelState) => void;
   readonly destroy: () => void;
 }
 
@@ -52,6 +76,14 @@ export interface WorldConstructorOptions {
   readonly extraPanels?: readonly WorldConstructorSubpanel[];
   /** Título de la cabecera colapsable. Por defecto "Constructor". */
   readonly title?: string;
+  /** [138A-8] Paleta inicial (default = WORLD_PALETTE_DEFAULTS). */
+  readonly initialPalette?: WorldPalette;
+  /** [138A-8] Documento MapVersion inicial (restauración/import). */
+  readonly initialMap?: MapVersion | null;
+  /** [138A-8] Estado inicial de la ventana (colapso/lado/ancho). */
+  readonly constructorPanelState?: ConstructorPanelState;
+  /** [138A-8] Emite cambios de ventana para persistirlos con 138A-5. */
+  readonly onConstructorPanelStateChange?: (state: ConstructorPanelState) => void;
 }
 
 const DIMENSION_OPTIONS: readonly number[] = [16, 32, 48, 64, 96, 128];
@@ -64,6 +96,20 @@ export interface ConstructorPanelContext {
   readonly commit: (next: TerrainOptions) => void;
   /** Registra un sincronizador que `applyOptions` ejecuta al restaurar. */
   readonly sync: (fn: () => void) => void;
+  /** [138A-8] Paleta actual del mundo (mismo objeto hasta el próximo commit). */
+  readonly palette: WorldPalette;
+  /** [138A-8] Aplica una paleta y emite tiempo real. */
+  readonly commitPalette: (next: WorldPalette) => void;
+  /** [138A-8] Registra un sincronizador de paleta (applyPalette). */
+  readonly syncPalette: (fn: () => void) => void;
+  /** [138A-8] Documento del mundo actual (null antes de generar/importar). */
+  readonly worldMap: MapVersion | null;
+  /** [138A-8] Aplica operaciones de objetos sobre el documento. */
+  readonly commitObjectEdits: (ops: readonly MapEditOp[]) => void;
+  /** [138A-8] Cambia la rampa toon global (textura) o la resetea. */
+  readonly commitToonRamp: (dataUrl: string | null) => void;
+  /** [138A-8] Registra un sincronizador de documento (applyMap). */
+  readonly syncMap: (fn: () => void) => void;
 }
 
 export function mountWorldConstructor(
@@ -71,11 +117,28 @@ export function mountWorldConstructor(
   controls: WorldConstructorControls,
   options: WorldConstructorOptions = {},
 ): WorldConstructorSection {
-  const { extraPanels = [], title = 'Constructor' } = options;
+  const {
+    extraPanels = [],
+    title = 'Constructor',
+    initialPalette,
+    initialMap = null,
+    constructorPanelState,
+    onConstructorPanelStateChange,
+  } = options;
   const defaults = { ...TERRAIN_OPTIONS_DEFAULTS };
   let state: TerrainOptions = normalizeTerrainOptions(defaults);
+  /* [138A-8] Paleta y documento del mundo: el ctx los comparte con los
+   * subpaneles (Color/Assets) y `applyPalette`/`applyMap` los restauran. */
+  let palette: WorldPalette = initialPalette
+    ? normalizeWorldPalette(initialPalette)
+    : { ...WORLD_PALETTE_DEFAULTS };
+  let worldMap: MapVersion | null = initialMap;
   const syncers: Array<() => void> = [];
+  const paletteSyncers: Array<() => void> = [];
+  const mapSyncers: Array<() => void> = [];
   const sync = (fn: () => void): void => { syncers.push(fn); };
+  const syncPalette = (fn: () => void): void => { paletteSyncers.push(fn); };
+  const syncMap = (fn: () => void): void => { mapSyncers.push(fn); };
   const commit = (next: TerrainOptions): void => {
     state = next;
     emitChange();
@@ -83,10 +146,47 @@ export function mountWorldConstructor(
   const emitChange = (): void => {
     controls.onChange?.(normalizeTerrainOptions(state));
   };
+  const commitPalette = (next: WorldPalette): void => {
+    palette = normalizeWorldPalette(next);
+    controls.onPaletteChange?.(palette);
+  };
+  const commitObjectEdits = (ops: readonly MapEditOp[]): void => {
+    controls.onEditObjects?.(ops);
+  };
+  const commitToonRamp = (dataUrl: string | null): void => {
+    controls.onToonRampChange?.(dataUrl);
+  };
   const ctx: ConstructorPanelContext = {
     get state() { return state; },
     commit,
     sync,
+    get palette() { return palette; },
+    commitPalette,
+    syncPalette,
+    get worldMap() { return worldMap; },
+    commitObjectEdits,
+    commitToonRamp,
+    syncMap,
+  };
+
+  /* [138A-8] Estado de la ventana lateral: colapso, lado y ancho. El estado
+   * inválido cae al default (fail-closed) y cada mutación se emite para que
+   * la escena lo persista con 138A-5. */
+  let panelState: ConstructorPanelState = normalizePanelState(constructorPanelState) ?? {
+    collapsed: false,
+    side: 'right',
+    width: CONSTRUCTOR_PANEL_DEFAULT_WIDTH,
+  };
+  const applyPanelState = (next: ConstructorPanelState): void => {
+    panelState = normalizePanelState(next) ?? panelState;
+    root.classList.toggle('juegoConstructor--cerrado', panelState.collapsed);
+    root.classList.toggle('juegoConstructor--izquierda', panelState.side === 'left');
+    root.classList.toggle('juegoConstructor--derecha', panelState.side === 'right');
+    root.style.width = `${panelState.width}px`;
+    cabecera.setAttribute('aria-expanded', String(!panelState.collapsed));
+  };
+  const emitPanelState = (): void => {
+    onConstructorPanelStateChange?.({ ...panelState });
   };
 
   const root = createEl('section', {
@@ -99,19 +199,84 @@ export function mountWorldConstructor(
     root.addEventListener(type, (event) => event.stopPropagation());
   }
 
-  const cabecera = createEl('button', {
+  const cabecera = createEl('div', {
     className: 'juegoConstructor__cabecera',
-    type: 'button',
+    role: 'button',
     'aria-expanded': 'true',
+    'aria-label': 'Plegar constructor',
   });
+  cabecera.tabIndex = 0;
   cabecera.appendChild(createEl('span', {
     className: 'juegoConstructor__titulo',
     textContent: title,
   }));
-  cabecera.addEventListener('click', () => {
-    const closed = root.classList.toggle('juegoConstructor--cerrado');
-    cabecera.setAttribute('aria-expanded', String(!closed));
+  const dockButton = createEl('button', {
+    className: 'juegoConstructor__lado',
+    type: 'button',
+    title: 'Cambiar de lado',
+    'aria-label': 'Cambiar de lado',
+    textContent: '↔',
   });
+  dockButton.addEventListener('click', (event) => {
+    event.stopPropagation();
+    panelState = { ...panelState, side: panelState.side === 'left' ? 'right' : 'left' };
+    applyPanelState(panelState);
+    emitPanelState();
+  });
+  cabecera.append(createEl('span', {
+    className: 'juegoConstructor__plegar',
+    'aria-hidden': 'true',
+    textContent: '▸',
+  }), dockButton);
+  const toggleCollapsed = (): void => {
+    panelState = { ...panelState, collapsed: !panelState.collapsed };
+    applyPanelState(panelState);
+    emitPanelState();
+  };
+  cabecera.addEventListener('click', toggleCollapsed);
+  cabecera.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      toggleCollapsed();
+    }
+  });
+
+  /* [138A-8] Ancho redimensionable por arrastre del borde (pointer events
+   * locales; el root ya frena la propagación hacia la órbita de cámara). */
+  const resizeHandle = createEl('div', {
+    className: 'juegoConstructor__resize',
+    role: 'separator',
+    'aria-label': 'Redimensionar panel',
+  });
+  resizeHandle.setAttribute('aria-orientation', 'vertical');
+  let resizing = false;
+  let resizeStartX = 0;
+  let resizeStartWidth = CONSTRUCTOR_PANEL_DEFAULT_WIDTH;
+  resizeHandle.addEventListener('pointerdown', (event) => {
+    resizing = true;
+    resizeStartX = event.clientX;
+    resizeStartWidth = panelState.width;
+    resizeHandle.setPointerCapture?.(event.pointerId);
+  });
+  resizeHandle.addEventListener('pointermove', (event) => {
+    if (!resizing) return;
+    const delta = panelState.side === 'right' ? -(event.clientX - resizeStartX) : (event.clientX - resizeStartX);
+    panelState = {
+      ...panelState,
+      width: Math.round(Math.min(
+        CONSTRUCTOR_PANEL_MAX_WIDTH,
+        Math.max(CONSTRUCTOR_PANEL_MIN_WIDTH, resizeStartWidth + delta),
+      )),
+    };
+    applyPanelState(panelState);
+  });
+  const finishResize = (): void => {
+    if (!resizing) return;
+    resizing = false;
+    emitPanelState();
+  };
+  resizeHandle.addEventListener('pointerup', finishResize);
+  resizeHandle.addEventListener('pointercancel', finishResize);
 
   const cuerpo = createEl('div', { className: 'juegoConstructor__cuerpo' });
   const rail = createEl('nav', {
@@ -218,6 +383,8 @@ export function mountWorldConstructor(
     });
     button.appendChild(createEl('span', { ariaHidden: 'true' }, createElement(panel.icon)));
     button.addEventListener('click', () => {
+      /* [138A-8] Un clic en el rail plegado despliega la ventana. */
+      if (panelState.collapsed) toggleCollapsed();
       openPanel(panel);
       button.classList.toggle('juegoConstructor__icono--activo', activePanel?.key === panel.key);
     });
@@ -225,8 +392,9 @@ export function mountWorldConstructor(
     rail.appendChild(button);
   }
 
-  root.append(cabecera, cuerpo, acciones);
+  root.append(cabecera, cuerpo, acciones, resizeHandle);
   host.appendChild(root);
+  applyPanelState(panelState);
   openPanel(panels[0]);
   railButtons.get(panels[0].key)?.classList.add('juegoConstructor__icono--activo');
 
@@ -236,6 +404,15 @@ export function mountWorldConstructor(
       state = normalizeTerrainOptions(options);
       for (const syncer of syncers) syncer();
     },
+    applyPalette: (next) => {
+      palette = normalizeWorldPalette(next);
+      for (const syncer of paletteSyncers) syncer();
+    },
+    applyMap: (next) => {
+      worldMap = next;
+      for (const syncer of mapSyncers) syncer();
+    },
+    applyPanelState,
     destroy: () => { root.remove(); },
   };
 }

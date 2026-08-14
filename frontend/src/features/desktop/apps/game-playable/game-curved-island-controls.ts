@@ -4,9 +4,10 @@
  * se delegan en los callbacks que recibe la escena. */
 
 import { createEl } from '../../../../utils/dom';
-import type { RenderStyle } from '../../../game-core';
+import type { MapVersion, RenderStyle, WorldPalette } from '../../../game-core';
 import { createSegmentControl } from './game-constructor-controls';
 import { CAMERA_MODES, type CameraMode } from './game-camera-modes';
+import type { ConstructorPanelState } from './game-constructor-persistence';
 import type { WorldConstructorControls } from './game-world-constructor';
 
 export interface CurvedIslandPanelControls {
@@ -21,6 +22,14 @@ export interface CurvedIslandPanelControls {
   readonly setCameraMode?: (mode: CameraMode) => void;
   /** [138A-4] Constructor de mundo (opcional: solo si existe). */
   readonly worldConstructor?: WorldConstructorControls;
+  /** [138A-8] Paleta inicial para los pickers de Color (restauración). */
+  readonly initialPalette?: WorldPalette;
+  /** [138A-8] Documento MapVersion inicial del panel Assets (restauración). */
+  readonly initialMap?: MapVersion | null;
+  /** [138A-8] Estado inicial de la ventana (colapso/lado/ancho). */
+  readonly constructorPanelState?: ConstructorPanelState;
+  /** [138A-8] Emite cambios de ventana para persistirlos con 138A-5. */
+  readonly onConstructorPanelStateChange?: (state: ConstructorPanelState) => void;
 }
 
 const PRESETS: readonly { readonly key: string; readonly label: string; readonly down: number; readonly pull: number }[] = [

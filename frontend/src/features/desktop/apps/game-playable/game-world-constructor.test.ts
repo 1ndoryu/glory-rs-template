@@ -1,10 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Waves } from 'lucide';
-import { terrainOptionsPreset, type TerrainOptions } from '../../../game-core';
+import {
+  buildMapVersionFromOptions,
+  terrainOptionsPreset,
+  WORLD_PALETTE_DEFAULTS,
+  type MapVersion,
+  type TerrainOptions,
+  type WorldPalette,
+} from '../../../game-core';
 import {
   mountWorldConstructor,
   type WorldConstructorControls,
 } from './game-world-constructor';
+import { CONSTRUCTOR_PANEL_MAX_WIDTH, CONSTRUCTOR_PANEL_MIN_WIDTH } from './game-constructor-persistence';
 
 describe('sección constructor de mundo (rail de iconos)', () => {
   let host: HTMLElement;
@@ -185,5 +193,113 @@ describe('sección constructor de mundo (rail de iconos)', () => {
     expect(subpanel?.getAttribute('aria-label')).toBe('Isla');
     expect(subpanel?.textContent).toContain('Curva del mundo');
     expect(isla.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('aplica el estado inicial de la ventana y lo emite al plegar (138A-8)', () => {
+    const onPanelStateChange = vi.fn();
+    mountWorldConstructor(host, controls, {
+      constructorPanelState: { collapsed: true, side: 'left', width: 360 },
+      onConstructorPanelStateChange: onPanelStateChange,
+    });
+    const root = host.querySelector('.juegoConstructor') as HTMLElement;
+    expect(root.classList.contains('juegoConstructor--cerrado')).toBe(true);
+    expect(root.classList.contains('juegoConstructor--izquierda')).toBe(true);
+    expect(root.style.width).toBe('360px');
+
+    const cabecera = host.querySelector('.juegoConstructor__cabecera') as HTMLElement;
+    cabecera.click();
+    expect(root.classList.contains('juegoConstructor--cerrado')).toBe(false);
+    expect(cabecera.getAttribute('aria-expanded')).toBe('true');
+    expect(onPanelStateChange).toHaveBeenLastCalledWith({ collapsed: false, side: 'left', width: 360 });
+  });
+
+  it('un clic en el rail plegado despliega la ventana y abre la sección (138A-8)', () => {
+    const onPanelStateChange = vi.fn();
+    mountWorldConstructor(host, controls, {
+      constructorPanelState: { collapsed: true, side: 'right', width: 320 },
+      onConstructorPanelStateChange: onPanelStateChange,
+    });
+    railButton('Terreno').click();
+    expect(host.querySelector('.juegoConstructor')?.classList.contains('juegoConstructor--cerrado')).toBe(false);
+    expect(onPanelStateChange.mock.calls.at(-1)?.[0]).toMatchObject({ collapsed: false });
+  });
+
+  it('el botón de lado conmuta dock y applyPanelState restaura sin emitir (138A-8)', () => {
+    const onPanelStateChange = vi.fn();
+    const section = mountWorldConstructor(host, controls, {
+      onConstructorPanelStateChange: onPanelStateChange,
+    });
+    const root = host.querySelector('.juegoConstructor') as HTMLElement;
+    (host.querySelector('.juegoConstructor__lado') as HTMLButtonElement).click();
+    expect(root.classList.contains('juegoConstructor--izquierda')).toBe(true);
+    expect(onPanelStateChange).toHaveBeenCalledWith({ collapsed: false, side: 'left', width: 320 });
+
+    section.applyPanelState({ collapsed: true, side: 'right', width: 400 });
+    expect(root.classList.contains('juegoConstructor--cerrado')).toBe(true);
+    expect(root.classList.contains('juegoConstructor--derecha')).toBe(true);
+    expect(root.style.width).toBe('400px');
+    expect(onPanelStateChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('el arrastre del borde redimensiona dentro de los límites (138A-8)', () => {
+    const onPanelStateChange = vi.fn();
+    mountWorldConstructor(host, controls, {
+      onConstructorPanelStateChange: onPanelStateChange,
+    });
+    const handle = host.querySelector('.juegoConstructor__resize') as HTMLElement;
+    const root = host.querySelector('.juegoConstructor') as HTMLElement;
+    handle.dispatchEvent(new PointerEvent('pointerdown', { clientX: 800, bubbles: true }));
+    /* Lado derecho: arrastrar a la izquierda ensancha el panel. */
+    handle.dispatchEvent(new PointerEvent('pointermove', { clientX: 700, bubbles: true }));
+    expect(root.style.width).toBe('420px');
+    handle.dispatchEvent(new PointerEvent('pointermove', { clientX: 9999, bubbles: true }));
+    expect(Number.parseFloat(root.style.width)).toBeLessThanOrEqual(CONSTRUCTOR_PANEL_MAX_WIDTH);
+    handle.dispatchEvent(new PointerEvent('pointermove', { clientX: -9999, bubbles: true }));
+    expect(Number.parseFloat(root.style.width)).toBeGreaterThanOrEqual(CONSTRUCTOR_PANEL_MIN_WIDTH);
+    handle.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+    expect(onPanelStateChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('expone paleta, documento y rampa a los subpaneles extra (ctx 138A-8)', () => {
+    const onPaletteChange = vi.fn<(palette: WorldPalette) => void>();
+    const onEditObjects = vi.fn();
+    const onToonRampChange = vi.fn<(dataUrl: string | null) => void>();
+    const map: MapVersion = buildMapVersionFromOptions(terrainOptionsPreset('isla'));
+    let receivedPalette: WorldPalette | null = null;
+    let receivedMap: MapVersion | null = null;
+    mountWorldConstructor(host, {
+      ...controls,
+      onPaletteChange,
+      onEditObjects,
+      onToonRampChange,
+    }, {
+      initialPalette: { ...WORLD_PALETTE_DEFAULTS, sky: 0x010203 },
+      initialMap: map,
+      extraPanels: [{
+        key: 'prueba',
+        label: 'Prueba',
+        icon: Waves,
+        build: (container, ctx) => {
+          receivedPalette = ctx.palette;
+          receivedMap = ctx.worldMap;
+          const button = document.createElement('button');
+          button.textContent = 'aplicar';
+          button.addEventListener('click', () => {
+            ctx.commitPalette({ ...ctx.palette, grass: 0x112233 });
+            ctx.commitObjectEdits([{ kind: 'remove', id: map.instances[0].id }]);
+            ctx.commitToonRamp('data:image/png;base64,prueba');
+          });
+          container.appendChild(button);
+        },
+      }],
+    });
+
+    railButton('Prueba').click();
+    expect((receivedPalette as WorldPalette | null)?.sky).toBe(0x010203);
+    expect(receivedMap).toBe(map);
+    clickText('aplicar');
+    expect(onPaletteChange).toHaveBeenCalledWith(expect.objectContaining({ grass: 0x112233 }));
+    expect(onEditObjects).toHaveBeenCalledWith([{ kind: 'remove', id: map.instances[0].id }]);
+    expect(onToonRampChange).toHaveBeenCalledWith('data:image/png;base64,prueba');
   });
 });

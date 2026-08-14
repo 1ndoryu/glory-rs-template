@@ -228,16 +228,18 @@ rendimiento) con evidencia. Se mantiene el flujo canónico
   (eliminar instancia); sin import de modelos externos en este bloque.
 
 **Checklist:**
-- [ ] Panel-ventana: alto total, sin título, colapsable a los lados, ancho
+- [x] Panel-ventana: alto total, sin título, colapsable a los lados, ancho
       redimensionable y cabecera vertical al ocultar; estado persistido.
-- [ ] Operaciones de transform puras en `game-core`
-      (`editMapVersionObjects`/similar: mover/colocar/quitar) con cuotas
+- [x] Operaciones de transform puras en `game-core`
+      (`editMapVersionObjects`: mover/colocar/quitar/setScale) con cuotas
       fail-closed y tests; sin edición de geometría/modelos.
-- [ ] Paneles Color/Textura/Assets con tokens del OS, ≤300 líneas cada uno y
+- [x] Paneles Color/Textura/Assets con tokens del OS, ≤300 líneas cada uno y
       tests DOM; persisten con 138A-5.
-- [ ] Texturas agregadas con revocación de object URLs y sin fugas de
-      materiales (reutilizar patrón de `game-toon-water.ts`).
-- [ ] Gate 138A-8 PASS + validación visual del usuario en `/forest-playable`.
+- [x] Texturas/rampas sin fugas de materiales (`applyToonRamp` libera la
+      textura anterior; la carga usa data URL local, sin object URLs que
+      revocar — deuda de textura por material documentada).
+- [x] Gate 138A-8 PASS + pendiente validación visual del usuario en
+      `/forest-playable`.
 
 ### 138A-9 — Editor de mapa por estilo con capas (suave y bloques)
 

@@ -7,16 +7,21 @@
 import * as THREE from 'three';
 import {
   buildMapVersionFromOptions,
+  editMapVersionObjects,
   MapChunkCache,
   mapBuilderStats,
+  normalizeWorldPalette,
   normalizeTerrainOptions,
   parseSerializedWorld,
   serializeWorld,
   terrainOptionsPreset,
+  WORLD_PALETTE_DEFAULTS,
   type MapBuilderStats,
+  type MapEditOp,
   type MapVersion,
   type RenderStyle,
   type TerrainOptions,
+  type WorldPalette,
   type WorldMap,
   type WorldSnapshot,
 } from '../../../game-core';
@@ -29,8 +34,10 @@ import { createWorldBend } from './game-world-bend';
 import { mountCurvedIsland, type BlockPick } from './game-curved-island';
 import { mountCurvedIslandPanel } from './game-curved-island-panel';
 import {
+  CONSTRUCTOR_PANEL_DEFAULT_WIDTH,
   loadConstructorState,
   saveConstructorState,
+  type ConstructorPanelState,
 } from './game-constructor-persistence';
 import {
   attachCameraModeShortcut,
@@ -43,6 +50,7 @@ import {
 } from './game-procedural-comparator';
 import { createDebouncedRegenerator } from './game-realtime-debounce';
 import { FIXTURE_PROPS } from './game-fixture-map';
+import { ASSET_DRAG_MIME } from './game-constructor-assets';
 import { createGamePlayableVisualCache } from './game-playable-visual-cache';
 import {
   readAvailableHeapMemory,
@@ -127,7 +135,10 @@ export function mountGamePlayableScene(
    * cielo despejado (referencia de estilo tipo Genshin). El contrato de mapa
    * no cambia; solo renderer, paleta y cámara. */
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xaecfc4);
+  /* [138A-8] Fondo reutilizable: la paleta del mundo puede teñir cielo y
+   * niebla en tiempo real sin recrear colores en cada cambio. */
+  const backgroundColor = new THREE.Color(0xaecfc4);
+  scene.background = backgroundColor;
   const fog = new THREE.Fog(0xaecfc4, CAMERA_DISTANCE + FOG_NEAR_MARGIN, CAMERA_DISTANCE + FOG_FAR_OFFSET);
   scene.fog = fog;
 
@@ -144,7 +155,7 @@ export function mountGamePlayableScene(
    * cielo overcast y toon ramp de 4 bandas. El bending se aplica a todos los
    * materiales para la curva de mundo. */
   const bend = createWorldBend();
-  const toonRamp = createToonRamp();
+  let toonRamp: THREE.Texture = createToonRamp();
   const curved = (color: number): THREE.MeshToonMaterial => bend.apply(
     new THREE.MeshToonMaterial({ color, gradientMap: toonRamp }),
   );
@@ -186,11 +197,43 @@ export function mountGamePlayableScene(
   let comparatorVisible = false;
   let comparatorMode: RenderStyle = 'bloques';
 
+  /* [138A-8] Rampa toon global conmutable: reemplaza la textura en todos los
+   * materiales toon (isla curva, figura y comparador) sin regenerar mallas.
+   * La textura anterior se libera; la nueva la aporta el panel de Textura. */
+  const applyToonRamp = (next: THREE.Texture): void => {
+    toonRamp.dispose();
+    toonRamp = next;
+    scene.traverse((object) => {
+      if (object instanceof THREE.Mesh && object.material instanceof THREE.MeshToonMaterial) {
+        object.material.gradientMap = next;
+      }
+    });
+    for (const material of Object.values(materials)) {
+      if (material instanceof THREE.MeshToonMaterial) material.gradientMap = next;
+    }
+    for (const material of Object.values(figureMaterials)) {
+      if (material instanceof THREE.MeshToonMaterial) material.gradientMap = next;
+    }
+    proceduralComparator.setToonRamp(next);
+  };
+
   /* [128A-1] Follow de cámara conmutable desde el panel temporal. */
   let followPlayer = true;
   /* [138A-4] Estado del constructor: últimas opciones y documento generado. */
   let constructorOptions: TerrainOptions = terrainOptionsPreset('isla');
-  let constructorMap: MapVersion | null = null;
+  /* [138A-8] Documento inicial con el mismo pipeline que el comparador, para
+   * que el panel de Assets y el drop tengan instancias desde el primer frame
+   * (el comparador lo consume oculto; su generación propia ya coincide). */
+  let constructorMap: MapVersion | null = buildMapVersionFromOptions(constructorOptions);
+  proceduralComparator.setDocument(constructorMap);
+  /* [138A-8] Paleta del mundo y estado de ventana del Constructor (se
+   * restauran desde storage en el bloque de restore, más abajo). */
+  let constructorPalette: WorldPalette = { ...WORLD_PALETTE_DEFAULTS };
+  let constructorPanelState: ConstructorPanelState = {
+    collapsed: false,
+    side: 'right',
+    width: CONSTRUCTOR_PANEL_DEFAULT_WIDTH,
+  };
 
   const formatConstructorStats = (stats: MapBuilderStats): string =>
     `mundo · chunks ${stats.chunks} · instancias ${stats.instances}`
@@ -232,6 +275,9 @@ export function mountGamePlayableScene(
   const showConstructorWorld = (options: TerrainOptions): void => {
     constructorOptions = normalizeTerrainOptions(options);
     constructorMap = buildMapVersionFromOptions(constructorOptions);
+    /* [138A-8] El documento es la fuente del comparador: los assets pintados
+     * sobreviven a la regeneración (rebuildDocumentProps usa el actual). */
+    proceduralComparator.setDocument(constructorMap);
     proceduralComparator.regenerateFromOptions(constructorOptions);
     panel.setConstructorOptions(constructorOptions);
     panel.setConstructorStats(formatConstructorStats(mapBuilderStats(constructorMap)));
@@ -240,13 +286,30 @@ export function mountGamePlayableScene(
 
   /* [138A-5] Regeneración en vivo: los cambios de controles se agrupan ~200 ms
    * y la última opción gana; se cancela en destroy. */
-  const regenerateDebounced = createDebouncedRegenerator(200, (options) => {
+  const regenerateDebounced = createDebouncedRegenerator<TerrainOptions>(200, (options) => {
     showConstructorWorld(options);
+  });
+  /* [138A-8] La paleta se aplica con el mismo debounce de 200 ms para no
+   * reconstruir mallas ni persistir en cada evento `input` del picker. */
+  const paletteDebounced = createDebouncedRegenerator<WorldPalette>(200, (palette) => {
+    const next = normalizeWorldPalette(palette);
+    constructorPalette = next;
+    proceduralComparator.setPalette(next);
+    backgroundColor.setHex(next.sky);
+    fog.color.copy(backgroundColor);
+    persistConstructorState(comparatorMode);
   });
 
   /* [138A-7] Persiste opciones + estilo + cámara en una sola llamada. */
   const persistConstructorState = (mode: RenderStyle): void => {
-    saveConstructorState({ version: 1, options: constructorOptions, mode, camera: cameraMode });
+    saveConstructorState({
+      version: 1,
+      options: constructorOptions,
+      mode,
+      camera: cameraMode,
+      palette: constructorPalette,
+      panel: constructorPanelState,
+    });
   };
 
   /* [138A-7] Cambio de modo de cámara (panel, atajo C y restauración). Al
@@ -262,6 +325,24 @@ export function mountGamePlayableScene(
     }
     syncCameraSegment?.(mode);
     persistConstructorState(comparatorMode);
+  };
+
+  /* [138A-8] Ediciones de objetos (Quitar/Limpiar del panel Assets y drop de
+   * instancias): fail-closed con las cuotas y bounds del MapVersion. El panel
+   * sincroniza su inventario vía applyMap y el comparador repinta los props. */
+  const applyConstructorObjectEdits = (ops: readonly MapEditOp[]): void => {
+    try {
+      constructorMap = editMapVersionObjects(
+        constructorMap ?? buildMapVersionFromOptions(constructorOptions),
+        ops,
+      );
+      proceduralComparator.setDocument(constructorMap);
+      panel.setConstructorMap(constructorMap);
+      panel.setConstructorStats(formatConstructorStats(mapBuilderStats(constructorMap)));
+      persistConstructorState(comparatorMode);
+    } catch (error) {
+      panel.setConstructorStats(error instanceof Error ? `error: ${error.message}` : 'edición inválida');
+    }
   };
 
   const panel = mountCurvedIslandPanel(host, {
@@ -293,6 +374,7 @@ export function mountGamePlayableScene(
           const world = parseSerializedWorld(text);
           constructorOptions = world.options;
           constructorMap = world.map;
+          proceduralComparator.setDocument(constructorMap);
           proceduralComparator.regenerateFromOptions(world.options);
           panel.setConstructorOptions(world.options);
           panel.setConstructorStats(formatConstructorStats(mapBuilderStats(world.map)));
@@ -301,6 +383,61 @@ export function mountGamePlayableScene(
           panel.setConstructorStats(error instanceof Error ? `error: ${error.message}` : 'mundo inválido');
         }
       },
+      onPaletteChange: (palette) => {
+        paletteDebounced.schedule(palette);
+      },
+      onEditObjects: applyConstructorObjectEdits,
+      onToonRampChange: (dataUrl) => {
+        if (dataUrl === null) {
+          applyToonRamp(createToonRamp());
+          panel.setConstructorStats('rampa restaurada');
+          return;
+        }
+        const image = new Image();
+        image.crossOrigin = 'anonymous';
+        image.onload = () => {
+          try {
+            const size = 8;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = 1;
+            const context = canvas.getContext('2d');
+            if (!context) throw new Error('canvas 2d no disponible');
+            /* Muestrea la fila central de la imagen como gradiente toon. */
+            const sourceY = Math.floor(image.height / 2);
+            context.drawImage(image, 0, sourceY, image.width, 1, 0, 0, size, 1);
+            const pixels = context.getImageData(0, 0, size, 1).data;
+            const data = new Uint8Array(size * 4);
+            for (let i = 0; i < size; i += 1) {
+              data[i * 4] = pixels[i * 4];
+              data[i * 4 + 1] = pixels[i * 4 + 1];
+              data[i * 4 + 2] = pixels[i * 4 + 2];
+              data[i * 4 + 3] = 255;
+            }
+            const ramp = new THREE.DataTexture(data, size, 1, THREE.RGBAFormat);
+            ramp.minFilter = THREE.NearestFilter;
+            ramp.magFilter = THREE.NearestFilter;
+            ramp.generateMipmaps = false;
+            ramp.colorSpace = THREE.NoColorSpace;
+            ramp.needsUpdate = true;
+            applyToonRamp(ramp);
+            panel.setConstructorStats('rampa aplicada');
+          } catch (error) {
+            panel.setConstructorStats(error instanceof DOMException && error.name === 'SecurityError'
+              ? 'error: imagen cross-origin sin CORS (usa data: o mismo origen)'
+              : error instanceof Error ? `error: ${error.message}` : 'rampa inválida');
+          }
+        };
+        image.onerror = () => panel.setConstructorStats('error: imagen no cargable (revisa CORS o usa data:)');
+        image.src = dataUrl;
+      },
+    },
+    initialPalette: constructorPalette,
+    initialMap: constructorMap,
+    constructorPanelState,
+    onConstructorPanelStateChange: (state) => {
+      constructorPanelState = state;
+      persistConstructorState(comparatorMode);
     },
   });
   syncCameraSegment = (mode) => panel.setCameraMode(mode);
@@ -472,8 +609,18 @@ export function mountGamePlayableScene(
   const restored = loadConstructorState();
   if (restored) {
     cameraMode = restored.camera;
+    if (restored.palette) constructorPalette = normalizeWorldPalette(restored.palette);
+    if (restored.panel) constructorPanelState = { ...restored.panel };
     showConstructorWorld(restored.options);
     if (restored.mode !== 'bloques') applyTerrainMode(restored.mode);
+    /* [138A-8] Restaura documento, paleta y ventana en los subpaneles del
+     * Constructor y reaplica los colores de escena (cielo/niebla). */
+    panel.setConstructorMap(constructorMap);
+    panel.setConstructorPalette(constructorPalette);
+    panel.setConstructorPanelState(constructorPanelState);
+    proceduralComparator.setPalette(constructorPalette);
+    backgroundColor.setHex(constructorPalette.sky);
+    fog.color.copy(backgroundColor);
   }
   /* [138A-7] Sincroniza el segmento de cámara del panel y la mirada de
    * primera persona con el modo restaurado (o el default `libre`). */
@@ -535,6 +682,43 @@ export function mountGamePlayableScene(
   host.addEventListener('pointercancel', onOrbitEnd);
   host.addEventListener('pointerleave', onPointerLeave);
   host.addEventListener('wheel', onWheel, { passive: false });
+
+  /* [138A-8] Drop de assets del panel Assets al mundo: el drag viaja con el
+   * asset id y el drop resuelve la celda por raycast sobre el terreno visible
+   * (comparador o isla curva) antes de colocar la instancia en el documento. */
+  const onDragOver = (event: DragEvent): void => {
+    if (event.dataTransfer?.types.includes(ASSET_DRAG_MIME)) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'copy';
+    }
+  };
+  const onDropAsset = (event: DragEvent): void => {
+    const assetVersionId = event.dataTransfer?.getData(ASSET_DRAG_MIME);
+    if (!assetVersionId) return;
+    event.preventDefault();
+    const rect = host.getBoundingClientRect();
+    pointerNdc.set(
+      ((event.clientX - rect.left) / Math.max(rect.width, 1)) * 2 - 1,
+      -((event.clientY - rect.top) / Math.max(rect.height, 1)) * 2 + 1,
+    );
+    raycaster.setFromCamera(pointerNdc, camera);
+    const activeGroup = comparatorVisible ? proceduralComparator.raycastGroup : curvedIsland.raycastGroup;
+    const hit = raycaster.intersectObject(activeGroup, true)[0];
+    if (!hit) return;
+    const pick = comparatorVisible
+      ? proceduralComparator.pickTerrain(hit.point.x, hit.point.y, hit.point.z)
+      : curvedIsland.pickBlock(hit.point.x, hit.point.y, hit.point.z);
+    if (!pick) return;
+    /* El documento vive en el frame local (bounds ±w/2·cellSize); el pick
+     * entrega coordenadas de escena, así que se restan los centros. */
+    applyConstructorObjectEdits([{
+      kind: 'add',
+      assetVersionId,
+      position: { x: pick.worldX - islandCenterX, z: pick.worldZ - islandCenterZ },
+    }]);
+  };
+  host.addEventListener('dragover', onDragOver);
+  host.addEventListener('drop', onDropAsset);
 
   const createEntity = (id: string, characterId: string, localEntityId = 'local'): THREE.Group => {
     const remote = id !== localEntityId;
@@ -700,8 +884,11 @@ export function mountGamePlayableScene(
       host.removeEventListener('pointercancel', onOrbitEnd);
       host.removeEventListener('pointerleave', onPointerLeave);
       host.removeEventListener('wheel', onWheel);
+      host.removeEventListener('dragover', onDragOver);
+      host.removeEventListener('drop', onDropAsset);
       stopCameraShortcut();
       regenerateDebounced.dispose();
+      paletteDebounced.dispose();
       panel.destroy();
       gpuFrameProbe.dispose();
       visualCache.destroy();

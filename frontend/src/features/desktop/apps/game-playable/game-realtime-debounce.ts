@@ -3,30 +3,30 @@
  * regeneración tras `delayMs`; la última opción enviada gana. No depende de
  * Three/DOM y se puede testear con timers fake. */
 
-import type { TerrainOptions } from '../../../game-core';
-
-export interface DebouncedRegenerator {
+export interface DebouncedRegenerator<T> {
   /** Programa una regeneración con las últimas opciones (reemplaza la pendiente). */
-  readonly schedule: (options: TerrainOptions) => void;
+  readonly schedule: (value: T) => void;
   /** Cancela la regeneración pendiente sin disparar el callback. */
   readonly cancel: () => void;
   /** Cancela y marca el objeto como inservible (teardown). */
   readonly dispose: () => void;
 }
 
-export function createDebouncedRegenerator(
+/** Debounce genérico: agrupa N cambios rápidos de un valor en UNA invocación
+ *  del callback con el último valor enviado (opciones de terreno, paleta…). */
+export function createDebouncedRegenerator<T>(
   delayMs: number,
-  regenerate: (options: TerrainOptions) => void,
-): DebouncedRegenerator {
+  regenerate: (value: T) => void,
+): DebouncedRegenerator<T> {
   let timer: ReturnType<typeof setTimeout> | null = null;
-  let latest: TerrainOptions | null = null;
+  let latest: T | null = null;
   let disposed = false;
 
   const run = (): void => {
     timer = null;
-    const options = latest;
+    const value = latest;
     latest = null;
-    if (options !== null) regenerate(options);
+    if (value !== null) regenerate(value);
   };
 
   const cancel = (): void => {
@@ -38,9 +38,9 @@ export function createDebouncedRegenerator(
   };
 
   return {
-    schedule(options) {
+    schedule(value) {
       if (disposed) return;
-      latest = options;
+      latest = value;
       if (timer !== null) clearTimeout(timer);
       timer = setTimeout(run, Math.max(0, delayMs));
     },

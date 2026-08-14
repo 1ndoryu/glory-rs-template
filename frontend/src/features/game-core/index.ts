@@ -13,5 +13,7 @@ export * from './map-streaming';
 export * from './terrain-mesh';
 export * from './performance-monitor';
 export * from './game-realtime';
+export * from './world-palette';
+export * from './map-edits';
 export * from './procedural';
 export * from './map-builder';
