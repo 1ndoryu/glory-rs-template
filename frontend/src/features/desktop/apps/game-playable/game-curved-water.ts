@@ -45,15 +45,20 @@ export function mountCurvedWater(
     throw new Error('escala de agua inválida');
   }
 
-  /* Misma geometría/material que el agua del comparador (PlaneGeometry 1×1
-   * rotada + MeshToonMaterial con rampa): sin segmentos, sin olas, sin espuma. */
-  const geometry = new THREE.PlaneGeometry(width * meshScale, depth * meshScale, 1, 1);
+  /* Misma geometría/material que el agua del comparador (plano toon con
+   * subdivisión para el bend: con 1×1 el interior se interpola entre esquinas
+   * a −48 y queda bajo el fondo marino; 32×32 sigue la parábola). */
+  const geometry = new THREE.PlaneGeometry(width * meshScale, depth * meshScale, 32, 32);
   geometry.rotateX(-Math.PI / 2);
   const material = bend.apply(new THREE.MeshToonMaterial({
     color: BLOCK_COLORS.waterShallow,
     gradientMap: toonRamp,
   }));
+  (material as THREE.MeshToonMaterial).polygonOffset = true;
+  (material as THREE.MeshToonMaterial).polygonOffsetFactor = -1;
+  (material as THREE.MeshToonMaterial).polygonOffsetUnits = -1;
   const mesh = new THREE.Mesh(geometry, material);
+  mesh.renderOrder = 1;
   mesh.position.set(centerX, waterY, centerZ);
   scene.add(mesh);
 

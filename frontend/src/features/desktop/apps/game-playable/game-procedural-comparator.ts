@@ -87,10 +87,21 @@ export function mountProceduralComparator(
   const world = new THREE.Group();
   const material = bend.apply(new THREE.MeshToonMaterial({ gradientMap: toonRamp, vertexColors: true }));
   const waterMaterial = bend.apply(new THREE.MeshToonMaterial({ color: BLOCK_COLORS.waterShallow, gradientMap: toonRamp }));
-  const waterGeometry = new THREE.PlaneGeometry(WIDTH * 2.4, DEPTH * 2.4, 1, 1);
+  // Plano subdividido para que el bend de mundo (dist²*down) se aproxime por
+  // vértice; con 1×1 el interior se interpolaba entre esquinas dobladas y
+  // quedaba decenas de unidades bajo el fondo marino del mesh suave (por eso
+  // el agua "no se ve" solo en Suave). 32×32 mantiene el look toon plano
+  // pero sigue la parábola con error < 0.15.
+  const waterGeometry = new THREE.PlaneGeometry(WIDTH * 2.4, DEPTH * 2.4, 32, 32);
   waterGeometry.rotateX(-Math.PI / 2);
   const water = new THREE.Mesh(waterGeometry, waterMaterial);
   water.position.y = WATER_Y;
+  // Asegurar que el agua quede por encima del fondo marino interpolado en
+  // la costa sin pelear en z en el borde.
+  water.renderOrder = 1;
+  (water.material as THREE.MeshToonMaterial).polygonOffset = true;
+  (water.material as THREE.MeshToonMaterial).polygonOffsetFactor = -1;
+  (water.material as THREE.MeshToonMaterial).polygonOffsetUnits = -1;
   world.add(water);
 
   let blocks: BuiltMode | null = null;
