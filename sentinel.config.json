@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 2,
+  "mode": "enforce",
+  "project": {
+    "primaryBranch": "glory-rust-nakomi"
+  },
+  "gate": {
+    "command": [
+      "sentinel",
+      "check",
+      "--"
+    ],
+    "taskIdRequired": true
+  },
+  "guard": {
+    "directCommands": {
+      "npmScripts": [
+        "test",
+        "build",
+        "type-check",
+        "check",
+        "lint",
+        "fmt"
+      ],
+      "npxTools": [
+        "tsc",
+        "eslint",
+        "prettier",
+        "rustfmt"
+      ],
+      "cargoSubcommands": [
+        "check",
+        "clippy",
+        "test",
+        "bench",
+        "fmt"
+      ],
+      "tools": [
+        "tsc",
+        "eslint",
+        "prettier",
+        "rustfmt"
+      ]
+    }
+  },
+  "runtime": {
+    "minimumVersion": "0.7.5",
+    "protocolVersion": 1,
+    "lockFile": "sentinel.lock.json"
+  },
+  "analyzers": {
+    "sentinel": {
+      "enabled": true,
+      "profile": "project-default",
+      "config": {
+        "includePatterns": [
+          "**/*.rs",
+          "frontend/**/*.ts",
+          "frontend/**/*.tsx",
+          "frontend/**/*.js",
+          "frontend/**/*.jsx",
+          "frontend/**/*.css",
+          "scripts/**/*.mjs",
+          "scripts/**/*.ps1"
+        ],
+        "excludePatterns": [
+          "**/node_modules/**",
+          "**/dist/**",
+          "**/out/**",
+          "**/target/**",
+          "**/.quality-tools/**",
+          "**/.quality-reports/**",
+          "**/.sentinel/**",
+          "glory-rs/**",
+          "tools/**",
+          "frontend/src/api/generated/**",
+          "prerendered/**",
+          "legacy-assets/**",
+          "clients/**"
+        ],
+        "directoryExceptions": [
+          "migrations",
+          "scripts",
+          "src/handlers",
+          "frontend",
+          "src/models",
+          "src/repositories",
+          "src/services"
+        ],
+        "rules": {
+          "barras-decorativas": {
+            "severidad": "warning"
+          },
+          "catch-vacio": {
+            "severidad": "error"
+          },
+          "hardcoded-secret": {
+            "severidad": "error"
+          },
+          "innerhtml-variable": {
+            "severidad": "error"
+          },
+          "unwrap-produccion-rs": {
+            "severidad": "error"
+          },
+          "panic-produccion-rs": {
+            "severidad": "error"
+          },
+          "git-add-all": {
+            "severidad": "error"
+          },
+          "css-especificacion-diseno-local": {
+            "severidad": "warning"
+          },
+          "console-production": {
+            "severidad": "information"
+          },
+          "unsafe-process-shell": {
+            "severidad": "error"
+          }
+        }
+      }
+    },
+    "varsense": {
+      "enabled": true,
+      "profile": "project-default",
+      "config": "varsense.config.json"
+    }
+  }
+}

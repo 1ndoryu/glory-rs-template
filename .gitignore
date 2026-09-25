@@ -31,6 +31,10 @@ desktop.ini
 glory-rust-template.code-workspace
 frontend/openapi-debug.json
 
+# Quality gate (Sentinel + VarSense): reportes generados, nunca el lock
+.quality-reports/
+.sentinel/
+
 # App legacy (PHP files not tracked, React already migrated to frontend/)
 /App/Config/
 /App/Content/
@@ -48,6 +52,8 @@ frontend/tsconfig.tsbuildinfo
 !/scripts/dev.mjs
 !/scripts/prerender.mjs
 !/scripts/check-roadmap.mjs
+!/scripts/quality/
+!/scripts/quality/*
 !/scripts/register-cargo-cleanup.ps1
 !/scripts/run-cargo-cleanup-hidden.vbs
 /legacy-assets/

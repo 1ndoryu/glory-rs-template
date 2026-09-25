@@ -1,0 +1,25 @@
+{
+  "variableFiles": [
+    "frontend/src/styles/variables.css",
+    "frontend/src/App.css"
+  ],
+  "includePatterns": [
+    "frontend/src/**/*.css",
+    "frontend/src/**/*.ts",
+    "frontend/src/**/*.tsx"
+  ],
+  "excludePatterns": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/.quality-tools/**",
+    "**/.quality-reports/**",
+    "**/.sentinel/**",
+    "frontend/src/api/generated/**"
+  ],
+  "scanAllFiles": false,
+  "hardcodedDetection": {
+    "enabled": true,
+    "severity": "warning"
+  }
+}

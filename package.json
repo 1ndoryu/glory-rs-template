@@ -18,7 +18,13 @@
     "test": "cargo test",
     "roadmap": "node scripts/check-roadmap.mjs",
     "roadmap:watch": "node scripts/check-roadmap.mjs --watch",
-    "prerender": "node scripts/prerender.mjs"
+    "prerender": "node scripts/prerender.mjs",
+    "quality:setup": "node scripts/quality/quality-setup.mjs",
+    "quality:doctor": "node scripts/quality/quality-doctor.mjs",
+    "quality:analyze": "node scripts/quality/sentinel-analyze.mjs",
+    "quality:check": "node scripts/quality/task-check.mjs",
+    "quality:check:local": "node scripts/quality/task-check-local.mjs",
+    "quality:lock": "node scripts/quality/lock-generator.mjs"
   },
   "devDependencies": {
     "puppeteer": "^25.0.3",
