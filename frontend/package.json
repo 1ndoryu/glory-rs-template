@@ -43,9 +43,12 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.0",
     "orval": "^8.6.2",
-    "puppeteer": "^24.40.0",
+    "puppeteer": "^25.0.3",
     "sharp": "^0.34.5",
     "typescript": "^5.5.0",
     "vite": "^5.4.0"
+  },
+  "overrides": {
+    "js-yaml": "^4.3.2"
   }
 }

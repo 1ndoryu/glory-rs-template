@@ -21,7 +21,7 @@
     "prerender": "node scripts/prerender.mjs"
   },
   "devDependencies": {
-    "puppeteer": "^24.40.0",
+    "puppeteer": "^25.0.3",
     "typescript": "^6.0.3"
   }
 }
