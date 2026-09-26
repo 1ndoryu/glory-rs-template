@@ -86,7 +86,12 @@ function FilaBlogPost({
     onToggleFeatured?: (id: string, featured: boolean) => void;
 }) {
     const {attributes, listeners, setNodeRef, transform, transition, isDragging} = useSortable({id: post.id});
-    const style = {transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1};
+    /* [259A-6] dnd-kit via --var (style prop solo inyecta --var). */
+    const style = {
+        '--lista-sortable-transform': CSS.Transform.toString(transform),
+        '--lista-sortable-transition': transition,
+        '--lista-sortable-opacity': isDragging ? 0.5 : 1,
+    } as React.CSSProperties;
 
     const items: MenuContextualItem[] = [];
     if (post.status !== 'published' && onPublicar) {
@@ -106,7 +111,7 @@ function FilaBlogPost({
         <div
             ref={setNodeRef}
             style={style}
-            className={`listaFila listaBlogFila ${post.status === 'archived' ? 'listaBlogFila--inactivo' : ''}`}
+            className={`utilSortable listaFila listaBlogFila ${post.status === 'archived' ? 'listaBlogFila--inactivo' : ''}`}
         >
             <div className="listaBlogGrip" {...attributes} {...listeners}>
                 <GripVertical size={16} />

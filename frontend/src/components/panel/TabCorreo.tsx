@@ -87,6 +87,10 @@ export function TabCorreo({sub}: {sub: Subscription}) {
     const aliases: EmailAliasInfo[] = emailInfo?.aliases ?? [];
     const used = aliases.length;
     const remaining = aliasLimit > 0 ? aliasLimit - used : 0;
+    /* [259A-6] Cuota via --var (style prop solo inyecta --var, objeto nombrado). */
+    const estiloCuota = {
+        '--tabCorreo-cuota-uso': `${Math.min((used / aliasLimit) * 100, 100)}%`,
+    } as React.CSSProperties;
 
     if (aliasLimit === 0) {
         return (
@@ -123,7 +127,7 @@ export function TabCorreo({sub}: {sub: Subscription}) {
     return (
         <div className="hostingDetalleSection">
             <div className="tabCorreoHeader">
-                <h3 className="hostingDetalleSectionTitle" style={{borderBottom: 'none', paddingBottom: 0}}>
+                <h3 className="hostingDetalleSectionTitle hostingDetalleSectionTitle--sinBorde">
                     <Mail size={18} /> Correo
                 </h3>
                 {remaining > 0 && !showForm && (
@@ -147,7 +151,7 @@ export function TabCorreo({sub}: {sub: Subscription}) {
                     <div className="tabCorreoQuotaBar">
                         <div
                             className="tabCorreoQuotaFill"
-                            style={{width: `${Math.min((used / aliasLimit) * 100, 100)}%`}}
+                            style={estiloCuota}
                         />
                     </div>
                 )}

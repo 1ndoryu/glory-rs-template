@@ -6,7 +6,7 @@
     gap: var(--espaciado-md, 16px);
     padding: var(--espaciado-lg, 24px);
     background: var(--color-fondo, #fff);
-    border-radius: var(--radio-borde, 12px);
+    border-radius: var(--radius-lg);
     box-shadow: var(--sombra-tarjeta, 0 2px 8px rgba(0, 0, 0, 0.06));
     width: 100%;
     box-sizing: border-box;
@@ -16,7 +16,7 @@
     margin: 0;
     font-size: 20px;
     font-weight: 600;
-    color: var(--color-texto-primario, #1a1a1a);
+    color: var(--text-primary);
 }
 
 .previewDescripcion {
@@ -35,10 +35,10 @@
 
 .previewCatBtn {
     padding: 6px 16px;
-    border: 1px solid var(--color-borde, #e0e0e0);
+    border: 1px solid var(--border-default);
     border-radius: 20px;
     background: transparent;
-    color: var(--color-texto-secundario, #666);
+    color: var(--text-tertiary);
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
@@ -85,14 +85,14 @@
 .previewGrupoGrid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: var(--espaciado-sm, 10px);
+    gap: 10px;
 }
 
 /* Tarjetas de plantilla */
 .previewTarjeta {
     display: flex;
     align-items: center;
-    gap: var(--espaciado-sm, 10px);
+    gap: 10px;
     padding: 12px 14px;
     border: 1px solid var(--color-borde, #eee);
     border-radius: var(--radio-borde, 8px);
@@ -178,7 +178,7 @@
     display: flex;
     flex-direction: column;
     background: var(--color-fondo, #fff);
-    border-radius: var(--radio-borde, 12px);
+    border-radius: var(--radius-lg);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
     width: 100%;
     max-width: 720px;
@@ -217,12 +217,14 @@
     margin: 0;
     font-size: 16px;
     font-weight: 600;
-    color: var(--color-texto-primario, #1a1a1a);
+    color: var(--text-primary);
 }
 
 .previewModalId {
     font-size: 12px;
-    color: var(--color-texto-secundario, #999);
+    /* [259A-6] #999 sin token equivalente en el sistema; literal preservado
+     * (ya se renderizaba via fallback). */
+    color: #999;
     font-family: monospace;
 }
 
@@ -240,7 +242,7 @@
     border: none;
     border-radius: 6px;
     background: var(--color-fondo-secundario, #f5f5f5);
-    color: var(--color-texto-secundario, #666);
+    color: var(--text-tertiary);
     cursor: pointer;
     text-decoration: none;
     transition: all 0.15s ease;
@@ -260,7 +262,7 @@
     border: none;
     border-radius: 6px;
     background: var(--color-fondo-secundario, #f5f5f5);
-    color: var(--color-texto-secundario, #666);
+    color: var(--text-tertiary);
     cursor: pointer;
     transition: all 0.15s ease;
 }

@@ -30,20 +30,19 @@ export const SeccionGaleriaServicio: React.FC<SeccionGaleriaServicioProps> = ({i
     // Duplicamos las imagenes para efecto infinito
     const itemsTotales = [...imagenes, ...imagenes];
 
+    /* [259A-6] Slider via --var (style prop solo inyecta --var, objeto nombrado). */
+    const estiloPista = {
+        '--galeria-desplazamiento': `translateX(calc( -1 * (var(--galeria-item-width) + var(--galeria-item-gap)) * ${indiceActual} + ${dragOffset}px))`,
+        '--galeria-transicion': conTransicion ? 'transform 800ms cubic-bezier(0.25, 1, 0.5, 1)' : 'none',
+    } as React.CSSProperties;
+
     return (
         <section className="seccionGaleriaServicio">
             <div className="galeriaContenedorPrincipal">
                 <div
                     className="galeriaPista"
                     {...handlers}
-                    style={
-                        {
-                            transform: `translateX(calc( -1 * (var(--galeria-item-width) + var(--galeria-item-gap)) * ${indiceActual} + ${dragOffset}px))`,
-                            transition: conTransicion ? 'transform 800ms cubic-bezier(0.25, 1, 0.5, 1)' : 'none',
-                            cursor: 'grab',
-                            touchAction: 'pan-y'
-                        } as React.CSSProperties
-                    }>
+                    style={estiloPista}>
                     {itemsTotales.map((src, index) => (
                         <div key={`img-${index}`} className="galeriaItem">
                             <div className="galeriaImagenWrapper">

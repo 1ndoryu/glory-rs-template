@@ -71,20 +71,19 @@ export const CarruselShowcase: React.FC = () => {
 
     if (proyectosConImagen.length === 0) return null;
 
+    /* [259A-6] Slider via --var (style prop solo inyecta --var, objeto nombrado). */
+    const estiloPista = {
+        '--carrusel-desplazamiento': `translateX(${-offsetX + dragOffset}px)`,
+        '--carrusel-transicion': conTransicion ? 'transform 800ms cubic-bezier(0.25, 1, 0.5, 1)' : 'none',
+    } as React.CSSProperties;
+
     return (
         <div className="carruselContenedorPrincipal">
             <div
                 className="carruselPista"
                 ref={pistaRef}
                 {...handlers}
-                style={
-                    {
-                        transform: `translateX(${-offsetX + dragOffset}px)`,
-                        transition: conTransicion ? 'transform 800ms cubic-bezier(0.25, 1, 0.5, 1)' : 'none',
-                        cursor: 'grab',
-                        touchAction: 'pan-y'
-                    } as React.CSSProperties
-                }>
+                style={estiloPista}>
                 {itemsTotales.map((proyecto, index) => {
                     const categoriasArr = Array.isArray(proyecto.categorias)
                         ? proyecto.categorias

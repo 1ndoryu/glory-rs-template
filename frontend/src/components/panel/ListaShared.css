@@ -24,3 +24,12 @@
 .listaFila:hover .listaMenuContextual {
     opacity: 1;
 }
+
+/* [259A-6] Fila arrastrable (dnd-kit): transform/transition/opacity llegan por
+ * style prop SOLO como custom properties (--lista-*). Patron varsense-fix:
+ * style prop nunca con declaraciones, solo inyeccion de --var. */
+.utilSortable {
+    transform: var(--lista-sortable-transform);
+    transition: var(--lista-sortable-transition);
+    opacity: var(--lista-sortable-opacity, 1);
+}

@@ -77,7 +77,12 @@ function FilaServicio({
     onToggleHome?: (id: string, visible: boolean) => void;
 }) {
     const {attributes, listeners, setNodeRef, transform, transition, isDragging} = useSortable({id: svc.id});
-    const style = {transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1};
+    /* [259A-6] dnd-kit via --var (style prop solo inyecta --var). */
+    const style = {
+        '--lista-sortable-transform': CSS.Transform.toString(transform),
+        '--lista-sortable-transition': transition,
+        '--lista-sortable-opacity': isDragging ? 0.5 : 1,
+    } as React.CSSProperties;
 
     const items: MenuContextualItem[] = [];
     if (onToggleHome) {
@@ -105,7 +110,7 @@ function FilaServicio({
         <div
             ref={setNodeRef}
             style={style}
-            className={`listaFila listaServiciosFila ${!svc.is_active ? 'listaServiciosFila--inactivo' : ''}`}
+            className={`utilSortable listaFila listaServiciosFila ${!svc.is_active ? 'listaServiciosFila--inactivo' : ''}`}
         >
             <div className="listaServiciosGrip" {...attributes} {...listeners}>
                 <GripVertical size={16} />

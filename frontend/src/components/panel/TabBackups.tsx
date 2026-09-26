@@ -129,7 +129,7 @@ export function TabBackups({sub}: {sub: Subscription}) {
     return (
         <div className="hostingDetalleSection">
             <div className="tabBackupsHeader">
-                <h3 className="hostingDetalleSectionTitle" style={{borderBottom: 'none', paddingBottom: 0}}>
+                <h3 className="hostingDetalleSectionTitle hostingDetalleSectionTitle--sinBorde">
                     <HardDrive size={18} /> Respaldos
                 </h3>
                 <Button

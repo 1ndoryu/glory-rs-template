@@ -7,7 +7,7 @@
     gap: var(--espaciado-md, 16px);
     padding: var(--espaciado-lg, 24px);
     background: var(--color-fondo, #fff);
-    border-radius: var(--radio-borde, 12px);
+    border-radius: var(--radius-lg);
     box-shadow: var(--sombra-tarjeta, 0 2px 8px rgba(0, 0, 0, 0.06));
     width: 100%;
     box-sizing: border-box;
@@ -17,14 +17,14 @@
     margin: 0 0 var(--espaciado-sm, 8px);
     font-size: 20px;
     font-weight: 600;
-    color: var(--color-texto-primario, #1a1a1a);
+    color: var(--text-primary);
 }
 
 /* Pestañas: Vista previa / Enviados */
 .correosPestanias {
     display: flex;
     gap: 0;
-    border-bottom: 1px solid var(--color-borde, #e0e0e0);
+    border-bottom: 1px solid var(--border-default);
     margin-bottom: 0;
 }
 
@@ -59,7 +59,7 @@
     display: flex;
     align-items: center;
     gap: var(--espaciado-sm, 8px);
-    color: var(--color-texto-secundario, #666);
+    color: var(--text-tertiary);
     flex-wrap: wrap;
 }
 
@@ -90,8 +90,8 @@
     text-align: left;
     padding: 12px 16px;
     font-weight: 600;
-    color: var(--color-texto-secundario, #666);
-    background: var(--color-fondo-secundario, #f8f8f8);
+    color: var(--text-tertiary);
+    background: var(--bg-primary);
     border-bottom: 1px solid var(--color-borde, #eee);
     white-space: nowrap;
 }
@@ -116,7 +116,7 @@
 
 .correosTag {
     display: inline-block;
-    background: var(--color-fondo-secundario, #f0f0f0);
+    background: var(--bg-accent);
     color: var(--color-texto-primario, #333);
     padding: 3px 10px;
     border-radius: 12px;
@@ -130,7 +130,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: var(--color-texto-secundario, #666);
+    color: var(--text-tertiary);
 }
 
 .correosAsunto {

@@ -41,8 +41,13 @@
 .galeriaPista {
     display: flex;
     width: max-content;
+    /* [259A-6] Desplazamiento via --var inyectadas por React (varsense-fix). */
+    transform: var(--galeria-desplazamiento);
+    transition: var(--galeria-transicion);
     will-change: transform;
     gap: var(--galeria-item-gap);
+    cursor: grab;
+    touch-action: pan-y;
     /* Optimizacion de renderizado */
     backface-visibility: hidden;
 }

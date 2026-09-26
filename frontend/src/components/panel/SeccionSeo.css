@@ -44,6 +44,13 @@
     color: var(--text-tertiary);
 }
 
+/* [259A-6] Titulo de seccion de issues (antes style inline estatico). */
+.seoIssuesTitulo {
+    font-size: var(--text-sm);
+    color: var(--text-primary);
+    margin: var(--spacing-md) 0 var(--spacing-sm);
+}
+
 .seoResumenTarjeta--error .seoResumenValor {
     color: var(--text-primary);
 }

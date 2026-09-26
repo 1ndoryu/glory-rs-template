@@ -35,10 +35,14 @@
 .carruselPista {
     display: flex;
     width: max-content;
-    /* La transformacion se manejara via React style inline para el slider */
-    transition: transform 0.8s cubic-bezier(0.25, 1, 0.5, 1); /* Suave 'ease-out' */
+    /* [259A-6] Desplazamiento via --var inyectadas por React (varsense-fix);
+     * style prop solo inyecta --var, nunca declaraciones. */
+    transform: var(--carrusel-desplazamiento);
+    transition: var(--carrusel-transicion);
     will-change: transform;
     gap: var(--carrusel-item-gap);
+    cursor: grab;
+    touch-action: pan-y;
 }
 
 .carruselItem {

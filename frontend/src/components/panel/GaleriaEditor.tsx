@@ -13,6 +13,7 @@ import { Button } from '../ui/Button';
 import { apiUploadImage } from '../../api/uploads';
 import type { GaleriaImagen } from '../../types/contenido';
 import './EditorProyecto.css';
+import './ListaShared.css';
 
 interface GaleriaEditorProps {
     galeria: GaleriaImagen[];
@@ -29,17 +30,18 @@ const GaleriaItemSortable: React.FC<{
 }> = ({ img, idx, id, onToggleLayout, onRemove }) => {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
 
+    /* [259A-6] dnd-kit via --var (style prop solo inyecta --var). */
     const style: React.CSSProperties = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.5 : 1,
-    };
+        '--lista-sortable-transform': CSS.Transform.toString(transform),
+        '--lista-sortable-transition': transition,
+        '--lista-sortable-opacity': isDragging ? 0.5 : 1,
+    } as React.CSSProperties;
 
     return (
         <div
             ref={setNodeRef}
             style={style}
-            className={`editorProyectoGaleriaItem ${img.layout === 'half' ? 'editorProyectoGaleriaItem--half' : ''}`}
+            className={`utilSortable editorProyectoGaleriaItem ${img.layout === 'half' ? 'editorProyectoGaleriaItem--half' : ''}`}
         >
             <div className="editorProyectoGaleriaGrip" {...attributes} {...listeners}>
                 <GripVertical size={14} />

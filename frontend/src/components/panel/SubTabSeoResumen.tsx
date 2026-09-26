@@ -49,7 +49,7 @@ export const SubTabSeoResumen: React.FC<Props> = ({summary, pages}) => {
             </div>
             {criticalIssues.length > 0 && (
                 <>
-                    <h3 style={{fontSize: 'var(--text-sm)', color: 'var(--text-primary)', margin: 'var(--spacing-md) 0 var(--spacing-sm)'}}>
+                    <h3 className="seoIssuesTitulo">
                         Issues ({criticalIssues.length})
                     </h3>
                     <div className="seoIssuesLista">

@@ -13,7 +13,8 @@ interface TarjetaProps extends React.HTMLAttributes<HTMLDivElement | HTMLButtonE
 }
 
 export const Tarjeta: React.FC<TarjetaProps> = ({children, className, fondo, onClick, ...props}) => {
-    const estiloInline = fondo ? {backgroundColor: fondo} : undefined;
+    /* [259A-6] Fondo por instancia via --var (style prop solo inyecta --var). */
+    const estiloInline = fondo ? ({'--tarjeta-fondo': fondo} as React.CSSProperties) : undefined;
     const Tag = onClick ? 'button' : 'div';
 
     return (

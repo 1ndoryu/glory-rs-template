@@ -149,6 +149,12 @@
     border-bottom: 1px solid var(--bg-item-hover);
 }
 
+/* [259A-6] Variante sin separador para tabs que ya separan por layout. */
+.hostingDetalleSectionTitle--sinBorde {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
 .hostingDetalleSubTitle {
     margin: var(--spacing-sm) 0 0;
     font-family: var(--font-primary);
@@ -987,6 +993,8 @@
     background: var(--color-primary, #6366f1);
     border-radius: 4px;
     transition: width 0.3s ease;
+    /* [259A-6] Progreso via --var inyectada por React (varsense-fix). */
+    width: var(--tabCorreo-cuota-uso, 0%);
 }
 
 .tabCorreoError {
