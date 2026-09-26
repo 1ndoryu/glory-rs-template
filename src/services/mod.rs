@@ -1,7 +1,4 @@
 pub(crate) mod ai_chat;
-pub mod chat_alert;
-pub mod chat_alert_worker;
-pub mod response_cycle_worker;
 mod ai_prompts;
 mod ai_providers;
 pub(crate) mod ai_tools;
@@ -11,7 +8,8 @@ mod auth;
 pub mod bandwidth_enforcement;
 mod billing_stripe;
 mod chat;
-mod whatsapp_gateway;
+pub mod chat_alert;
+pub mod chat_alert_worker;
 mod chat_timing;
 pub mod contabo;
 pub mod contabo_domains;
@@ -37,6 +35,7 @@ mod order_slugs;
 mod payment;
 mod payment_method;
 mod refund;
+pub mod response_cycle_worker;
 mod seed;
 pub mod storage_enforcement;
 pub mod tc_throttle;
@@ -44,6 +43,7 @@ mod test_checkout;
 pub mod vps_monitor;
 mod vps_stripe;
 mod wallet;
+mod whatsapp_gateway;
 
 pub use ai_chat::{AiChatConfig, AiChatService, AiResponse, AiSessionContext};
 pub use assignment::AssignmentService;
@@ -60,9 +60,9 @@ pub use domain_stripe::{DomainCheckoutParams, DomainStripeService};
 pub use email::{EmailConfig, EmailService};
 pub use google_auth::GoogleAuthService;
 pub use hosting_runtime::{
-	HostingRuntimeBackupEntry, HostingRuntimeBackupReport, HostingRuntimeDeploymentSummary,
-	HostingRuntimeKind, HostingRuntimeProvisionResult, HostingRuntimeRestoreReport,
-	HostingRuntimeService, HostingRuntimeUpdate,
+    HostingRuntimeBackupEntry, HostingRuntimeBackupReport, HostingRuntimeDeploymentSummary,
+    HostingRuntimeKind, HostingRuntimeProvisionResult, HostingRuntimeRestoreReport,
+    HostingRuntimeService, HostingRuntimeUpdate,
 };
 pub use hosting_stripe::{CheckoutParams, HostingStripeService};
 pub use note::NoteService;
@@ -70,8 +70,8 @@ pub use notification::NotificationHub;
 pub use order::format_price_cents;
 pub use order::OrderService;
 pub use payment::PaymentService;
-pub use refund::RefundService;
 pub use payment_method::PaymentMethodService;
+pub use refund::RefundService;
 pub use seed::SeedService;
 pub use test_checkout::{checkout_bypass_is_configured, is_checkout_bypass_email};
 pub use vps_stripe::{vps_stripe_fee_cents, VpsCheckoutParams, VpsStripeService};

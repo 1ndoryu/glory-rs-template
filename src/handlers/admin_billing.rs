@@ -11,9 +11,7 @@ use uuid::Uuid;
 
 use crate::errors::AppError;
 use crate::middleware::AuthUser;
-use crate::models::{
-    AdminBillingItemResponse, AdminUpdateBillingStatusRequest, UserRole,
-};
+use crate::models::{AdminBillingItemResponse, AdminUpdateBillingStatusRequest, UserRole};
 use crate::repositories::{AdminBillingItem, BillingRepository};
 use crate::AppState;
 
@@ -22,7 +20,7 @@ pub struct ListBillingQuery {
     pub status: Option<String>,
 }
 
-/// Lista todos los billing_items (admin only) con email del usuario
+/// Lista todos los `billing_items` (admin only) con email del usuario
 #[utoipa::path(
     get,
     path = "/api/admin/billing-items",
@@ -49,7 +47,7 @@ pub async fn list_billing_items(
     Ok(Json(response))
 }
 
-/// Cambia el status de un billing_item (paid ↔ pending)
+/// Cambia el status de un `billing_item` (paid ↔ pending)
 #[utoipa::path(
     patch,
     path = "/api/admin/billing-items/{item_id}/status",
@@ -108,10 +106,7 @@ fn admin_item_to_response(item: AdminBillingItem) -> AdminBillingItemResponse {
 
 pub fn routes() -> Router<AppState> {
     Router::new()
-        .route(
-            "/admin/billing-items",
-            get(list_billing_items),
-        )
+        .route("/admin/billing-items", get(list_billing_items))
         .route(
             "/admin/billing-items/:item_id/status",
             patch(update_billing_status),

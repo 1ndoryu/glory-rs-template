@@ -32,9 +32,7 @@ pub struct TemplatesListResponse {
     security(("bearer_auth" = [])),
     tag = "admin"
 )]
-pub async fn list_templates(
-    auth: AuthUser,
-) -> Result<Json<TemplatesListResponse>, AppError> {
+pub async fn list_templates(auth: AuthUser) -> Result<Json<TemplatesListResponse>, AppError> {
     auth.require_role(&[UserRole::Admin])?;
     Ok(Json(TemplatesListResponse {
         templates: email_preview::list_templates(),
@@ -66,17 +64,19 @@ pub async fn render_template(
     /* [311A-INV] Usamos EmailConfig::from_env() para obtener la config actual
      * (solo necesario para from_name/from_email en el footer del template).
      * Si no hay SMTP configurado, usamos valores por defecto. */
-    let config = state.email_config.clone().unwrap_or_else(|| {
-        crate::services::email::EmailConfig {
-            host: String::new(),
-            port: 587,
-            user: String::new(),
-            pass: String::new(),
-            from_name: "Nakomi Studio".to_string(),
-            from_email: "noreply@nakomi.studio".to_string(),
-            bcc_email: None,
-        }
-    });
+    let config =
+        state
+            .email_config
+            .clone()
+            .unwrap_or_else(|| crate::services::email::EmailConfig {
+                host: String::new(),
+                port: 587,
+                user: String::new(),
+                pass: String::new(),
+                from_name: "Nakomi Studio".to_string(),
+                from_email: "noreply@nakomi.studio".to_string(),
+                bcc_email: None,
+            });
 
     let html = email_preview::render_preview(&config, &name)
         .map_err(|_| AppError::NotFound(format!("Plantilla '{name}' no encontrada")))?;

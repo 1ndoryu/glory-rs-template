@@ -48,7 +48,7 @@ pub async fn run_chat_alert_worker(
         tracing::debug!("[chat-alert-worker] Procesando lote de {batch_len} alertas");
 
         for entry in &batch {
-            process_entry(&pool, entry, &email_config, &http_client).await;
+            process_entry(&pool, entry, email_config.as_ref(), &http_client).await;
         }
 
         /* Emitir resumen del lote */
@@ -89,7 +89,7 @@ async fn recover_stale_processing(pool: &PgPool) {
 async fn process_entry(
     pool: &PgPool,
     entry: &ChatAlertOutbox,
-    email_config: &Option<crate::services::EmailConfig>,
+    email_config: Option<&crate::services::EmailConfig>,
     http_client: &reqwest::Client,
 ) {
     match entry.channel.as_str() {
@@ -106,7 +106,7 @@ async fn process_entry(
 async fn process_email(
     pool: &PgPool,
     entry: &ChatAlertOutbox,
-    email_config: &Option<crate::services::EmailConfig>,
+    email_config: Option<&crate::services::EmailConfig>,
 ) {
     if entry.event_type == "chat.continuation" {
         process_continuation_email(pool, entry, email_config).await;
@@ -200,7 +200,7 @@ async fn process_email(
 async fn process_continuation_email(
     pool: &PgPool,
     entry: &ChatAlertOutbox,
-    email_config: &Option<crate::services::EmailConfig>,
+    email_config: Option<&crate::services::EmailConfig>,
 ) {
     let Some(config) = email_config else {
         let _ = ChatAlertRepository::mark_dead(pool, entry.id, "SMTP no configurado").await;
@@ -318,7 +318,7 @@ async fn process_continuation_email(
     }
 }
 
-/// Envía WhatsApp vía gateway firmado y marca el resultado.
+/// Envía `WhatsApp` vía gateway firmado y marca el resultado.
 async fn process_whatsapp(pool: &PgPool, entry: &ChatAlertOutbox, http_client: &reqwest::Client) {
     let gateway_url = match std::env::var("GLORY_ALERT_GATEWAY_URL") {
         Ok(u) if !u.is_empty() => u,
@@ -378,18 +378,16 @@ async fn process_whatsapp(pool: &PgPool, entry: &ChatAlertOutbox, http_client: &
     )
     .await;
 
-    let gw_result = match result {
-        Ok(r) => r,
-        Err(_) => {
-            let _ = ChatAlertRepository::mark_retry(
-                pool,
-                entry.id,
-                "Timeout gateway (10s)",
-                entry.attempts,
-            )
-            .await;
-            return;
-        }
+    /* [259A-1] let-else en vez de match de un solo patron (clippy manual_let_else). */
+    let Ok(gw_result) = result else {
+        let _ = ChatAlertRepository::mark_retry(
+            pool,
+            entry.id,
+            "Timeout gateway (10s)",
+            entry.attempts,
+        )
+        .await;
+        return;
     };
 
     match gw_result {

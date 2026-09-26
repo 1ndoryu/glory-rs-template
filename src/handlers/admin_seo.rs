@@ -2,20 +2,29 @@
  * páginas públicas del sitio. Retorna resumen, detalle por página, estado del
  * blog y checks GEO. Solo accesible para admin. */
 
-use axum::{extract::{Query, State}, routing::{get, put}, Json, Router};
+use axum::{
+    extract::{Query, State},
+    routing::get,
+    Json, Router,
+};
 
 use serde::{Deserialize, Serialize};
 
 use crate::errors::AppError;
 use crate::middleware::AuthUser;
 use crate::models::UserRole;
-use crate::repositories::{BlogRepository, ProjectRepository, SeoSettingsRepository, ServiceRepository};
+use crate::repositories::{
+    BlogRepository, ProjectRepository, SeoSettingsRepository, ServiceRepository,
+};
 use crate::AppState;
 
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/admin/seo/audit", get(seo_audit))
-        .route("/admin/seo/settings", get(list_seo_settings).put(update_seo_setting))
+        .route(
+            "/admin/seo/settings",
+            get(list_seo_settings).put(update_seo_setting),
+        )
 }
 
 fn require_admin(auth: &AuthUser) -> Result<(), AppError> {
@@ -79,8 +88,17 @@ struct GeoCheck {
 }
 
 /* [277A-10] Páginas estáticas conocidas del middleware prerender.
- * Cada tupla: (path, label, title, description, og_has_custom_image, json_ld_type) */
-fn static_pages() -> Vec<(&'static str, &'static str, &'static str, &'static str, bool, Option<&'static str>)> {
+ * Cada tupla: (path, label, title, description, og_has_custom_image, json_ld_type)
+ * [259A-1] Alias para el lint type_complexity de clippy. */
+type StaticPageMeta = (
+    &'static str,
+    &'static str,
+    &'static str,
+    &'static str,
+    bool,
+    Option<&'static str>,
+);
+fn static_pages() -> Vec<StaticPageMeta> {
     vec![
         ("/", "Inicio", "Nakomi Studio — Agencia Creativa Digital", "Estudio creativo basado en Copenhague. Diseño web, apps e IA construidos con Rust para rendimiento real. Operamos en español, inglés y japonés.", true, Some("Organization+WebSite")),
         ("/servicios", "Servicios", "Nuestros Servicios — Nakomi Studio", "Servicios de desarrollo web, diseño UI/UX, branding y soluciones digitales a medida.", true, Some("Organization")),
@@ -95,7 +113,13 @@ fn static_pages() -> Vec<(&'static str, &'static str, &'static str, &'static str
     ]
 }
 
-fn evaluate_page(title: &Option<String>, description: &Option<String>, og_is_default: bool, json_ld: &Option<String>) -> (String, Vec<String>) {
+/* [259A-1] Option<&T> en vez de &Option<T> (clippy ref_option). */
+fn evaluate_page(
+    title: Option<&String>,
+    description: Option<&String>,
+    og_is_default: bool,
+    json_ld: Option<&String>,
+) -> (String, Vec<String>) {
     let mut issues: Vec<String> = Vec::new();
 
     match title {
@@ -140,21 +164,32 @@ async fn seo_audit(
     let pool = &state.pool;
 
     /* Cargar datos del CMS */
-    let services = ServiceRepository::list_services(pool).await.unwrap_or_default();
-    let projects = ProjectRepository::list_published(pool).await.unwrap_or_default();
+    let services = ServiceRepository::list_services(pool)
+        .await
+        .unwrap_or_default();
+    let projects = ProjectRepository::list_published(pool)
+        .await
+        .unwrap_or_default();
     let blog_posts = BlogRepository::list_all(pool).await.unwrap_or_default();
 
     let mut pages: Vec<SeoPageEntry> = Vec::new();
 
     /* Páginas estáticas: leer de DB (seo_settings) con fallback a hardcoded */
-    let db_settings = SeoSettingsRepository::list_all(pool).await.unwrap_or_default();
+    let db_settings = SeoSettingsRepository::list_all(pool)
+        .await
+        .unwrap_or_default();
     if db_settings.is_empty() {
         /* Fallback: si la tabla está vacía (migración no aplicada), usar hardcoded */
         for (path, label, title, desc, og_custom, json_type) in static_pages() {
             let title_opt = Some(title.to_string());
             let desc_opt = Some(desc.to_string());
             let json_opt = json_type.map(ToString::to_string);
-            let (status, issues) = evaluate_page(&title_opt, &desc_opt, !og_custom, &json_opt);
+            let (status, issues) = evaluate_page(
+                title_opt.as_ref(),
+                desc_opt.as_ref(),
+                !og_custom,
+                json_opt.as_ref(),
+            );
             pages.push(SeoPageEntry {
                 path: path.to_string(),
                 label: label.to_string(),
@@ -174,7 +209,12 @@ async fn seo_audit(
             let title_opt = Some(setting.title.clone());
             let desc_opt = Some(setting.description.clone());
             let og_custom = setting.og_image_url.is_some();
-            let (status, issues) = evaluate_page(&title_opt, &desc_opt, !og_custom, &setting.json_ld_type);
+            let (status, issues) = evaluate_page(
+                title_opt.as_ref(),
+                desc_opt.as_ref(),
+                !og_custom,
+                setting.json_ld_type.as_ref(),
+            );
             pages.push(SeoPageEntry {
                 path: setting.path.clone(),
                 label: setting.label.clone(),
@@ -196,7 +236,12 @@ async fn seo_audit(
         let title = Some(svc.title.clone());
         let desc = svc.description.clone();
         let json_ld: Option<String> = Some("Service".into());
-        let (status, issues) = evaluate_page(&title, &desc, svc.image_url.is_none(), &json_ld);
+        let (status, issues) = evaluate_page(
+            title.as_ref(),
+            desc.as_ref(),
+            svc.image_url.is_none(),
+            json_ld.as_ref(),
+        );
         pages.push(SeoPageEntry {
             path: format!("/servicios/{}", svc.slug),
             label: svc.title.clone(),
@@ -214,10 +259,23 @@ async fn seo_audit(
 
     /* Proyectos dinámicos */
     for proj in &projects {
-        let title = Some(proj.meta_title.clone().unwrap_or_else(|| proj.title.clone()));
-        let desc = Some(proj.meta_description.clone().unwrap_or_else(|| proj.description.clone()));
+        let title = Some(
+            proj.meta_title
+                .clone()
+                .unwrap_or_else(|| proj.title.clone()),
+        );
+        let desc = Some(
+            proj.meta_description
+                .clone()
+                .unwrap_or_else(|| proj.description.clone()),
+        );
         let json_ld: Option<String> = None;
-        let (status, issues) = evaluate_page(&title, &desc, proj.featured_image.is_none(), &json_ld);
+        let (status, issues) = evaluate_page(
+            title.as_ref(),
+            desc.as_ref(),
+            proj.featured_image.is_none(),
+            json_ld.as_ref(),
+        );
         pages.push(SeoPageEntry {
             path: format!("/proyectos/{}", proj.slug),
             label: proj.title.clone(),
@@ -241,8 +299,12 @@ async fn seo_audit(
             blog_published_count += 1;
         }
         let mut blog_issues: Vec<String> = Vec::new();
-        if post.meta_title.is_none() { blog_issues.push("MISSING_META_TITLE".into()); }
-        if post.meta_description.is_none() { blog_issues.push("MISSING_META_DESCRIPTION".into()); }
+        if post.meta_title.is_none() {
+            blog_issues.push("MISSING_META_TITLE".into());
+        }
+        if post.meta_description.is_none() {
+            blog_issues.push("MISSING_META_DESCRIPTION".into());
+        }
         let seo_status = if blog_issues.iter().any(|i| i.starts_with("MISSING_")) {
             "error".to_string()
         } else if !blog_issues.is_empty() {
@@ -309,7 +371,11 @@ async fn seo_audit(
             id: "json-ld-services".into(),
             label: "JSON-LD Service schema en servicios".into(),
             passed: !services.is_empty(),
-            detail: if services.is_empty() { Some("No hay servicios activos".into()) } else { Some(format!("{} servicios con schema", services.len())) },
+            detail: if services.is_empty() {
+                Some("No hay servicios activos".into())
+            } else {
+                Some(format!("{} servicios con schema", services.len()))
+            },
         },
         GeoCheck {
             id: "json-ld-blog".into(),
@@ -372,7 +438,8 @@ async fn update_seo_setting(
     Json(body): Json<UpdateSeoSettingBody>,
 ) -> Result<Json<crate::repositories::SeoSetting>, AppError> {
     require_admin(&auth)?;
-    let path = params.get("path")
+    let path = params
+        .get("path")
         .ok_or_else(|| AppError::BadRequest("Missing 'path' query param".into()))?;
     let setting = SeoSettingsRepository::upsert(
         &state.pool,
@@ -381,6 +448,7 @@ async fn update_seo_setting(
         &body.description,
         body.og_image_url.as_deref(),
         body.json_ld_type.as_deref(),
-    ).await?;
+    )
+    .await?;
     Ok(Json(setting))
 }

@@ -10,6 +10,7 @@ use uuid::Uuid;
 
 use crate::errors::AppError;
 use crate::services::AiChatService;
+use crate::util::join_write_path;
 use crate::AppState;
 
 use super::file_ai::process_file_with_ai;
@@ -143,11 +144,15 @@ async fn persist_upload_file(
 ) -> Result<String, AppError> {
     let ext = mime_to_safe_extension(content_type);
     let unique_name = format!("{}.{ext}", Uuid::new_v4());
-    let upload_dir = std::path::PathBuf::from(CHAT_UPLOAD_DIR).join(session_id.to_string());
+    /* [259A-2] Join via helper anti-traversal (rechazo lexico + contencion). */
+    let upload_dir = join_write_path(
+        std::path::Path::new(CHAT_UPLOAD_DIR),
+        &[&session_id.to_string()],
+    )?;
     tokio::fs::create_dir_all(&upload_dir)
         .await
         .map_err(|e| AppError::Internal(format!("Error creando directorio: {e}")))?;
-    let file_path = upload_dir.join(&unique_name);
+    let file_path = join_write_path(&upload_dir, &[&unique_name])?;
     tokio::fs::write(&file_path, data)
         .await
         .map_err(|e| AppError::Internal(format!("Error guardando archivo: {e}")))?;

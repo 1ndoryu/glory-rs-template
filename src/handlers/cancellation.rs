@@ -100,10 +100,7 @@ pub async fn create_cancellation_request(
         let notif = CreateNotification {
             user_id: notify_id,
             notification_type: "cancellation_requested".to_string(),
-            title: format!(
-                "Solicitud de cancelación Orden #{}",
-                order.order_number
-            ),
+            title: format!("Solicitud de cancelación Orden #{}", order.order_number),
             body: Some(notify_body),
             link: Some(format!("/panel?seccion=proyectos&orden={order_id}")),
             reference_type: Some("order".to_string()),
@@ -133,7 +130,10 @@ pub async fn create_cancellation_request(
                 reference_type: Some("order".to_string()),
                 reference_id: Some(order_id),
             };
-            let _ = state.notification_hub.notify_many(&admin_ids, &admin_notif).await;
+            let _ = state
+                .notification_hub
+                .notify_many(&admin_ids, &admin_notif)
+                .await;
         }
     }
 
@@ -428,11 +428,11 @@ fn truncate_str(s: &str, max: usize) -> String {
 pub fn cancellation_routes() -> Router<AppState> {
     Router::new()
         .route(
-            "/orders/{order_id}/cancel-request",
+            "/orders/:order_id/cancel-request",
             get(list_cancellation_requests).post(create_cancellation_request),
         )
         .route(
-            "/orders/{order_id}/cancel-request/{request_id}/respond",
+            "/orders/:order_id/cancel-request/:request_id/respond",
             post(respond_cancellation_request),
         )
 }

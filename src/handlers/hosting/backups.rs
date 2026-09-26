@@ -82,7 +82,9 @@ pub(super) async fn list_backups(
                 AppError::Validation("Suscripción Coolify sin server_ip configurado".into())
             })?;
             let key = resolve_ssh_key_for_sub(&state, ip).ok_or_else(|| {
-                AppError::Internal("SSH key no disponible para el servidor de esta suscripción".into())
+                AppError::Internal(
+                    "SSH key no disponible para el servidor de esta suscripción".into(),
+                )
             })?;
             (Some(ip), Some(key))
         }
@@ -139,7 +141,9 @@ pub(super) async fn create_backup(
                 AppError::Validation("Suscripción Coolify sin server_ip configurado".into())
             })?;
             let key = resolve_ssh_key_for_sub(&state, ip).ok_or_else(|| {
-                AppError::Internal("SSH key no disponible para el servidor de esta suscripción".into())
+                AppError::Internal(
+                    "SSH key no disponible para el servidor de esta suscripción".into(),
+                )
             })?;
             (Some(ip), Some(key))
         }
@@ -225,7 +229,9 @@ pub(super) async fn delete_backup(
                 AppError::Validation("Suscripción Coolify sin server_ip configurado".into())
             })?;
             let ssh_key_path = resolve_ssh_key_for_sub(&state, server_ip).ok_or_else(|| {
-                AppError::Internal("SSH key no disponible para el servidor de esta suscripción".into())
+                AppError::Internal(
+                    "SSH key no disponible para el servidor de esta suscripción".into(),
+                )
             })?;
             HostingRuntimeService::delete_coolify_backup_via_ssh(
                 server_ip,
@@ -300,7 +306,9 @@ pub(super) async fn restore_backup(
                 AppError::Validation("Suscripción Coolify sin server_ip configurado".into())
             })?;
             let key = resolve_ssh_key_for_sub(&state, ip).ok_or_else(|| {
-                AppError::Internal("SSH key no disponible para el servidor de esta suscripción".into())
+                AppError::Internal(
+                    "SSH key no disponible para el servidor de esta suscripción".into(),
+                )
             })?;
             (Some(ip), Some(key))
         }

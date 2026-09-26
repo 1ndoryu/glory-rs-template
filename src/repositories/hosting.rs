@@ -580,7 +580,10 @@ impl HostingRepository {
     }
 
     /* [265A-11] Contar aliases activos de una suscripcion */
-    pub async fn count_active_aliases(pool: &PgPool, subscription_id: Uuid) -> Result<i64, AppError> {
+    pub async fn count_active_aliases(
+        pool: &PgPool,
+        subscription_id: Uuid,
+    ) -> Result<i64, AppError> {
         let count = sqlx::query_scalar!(
             "SELECT COUNT(*) FROM hosting_email_aliases
              WHERE subscription_id = $1 AND status = 'active'",

@@ -325,7 +325,8 @@ mod tests {
 
         let (uptime, active_since) = calculate_uptime(created, "pending", &events);
 
-        assert_eq!(uptime, 0.0);
+        /* [259A-1] Comparacion exacta de f32 prohibida por clippy (float_cmp). */
+        assert!(uptime.abs() < f64::EPSILON);
         assert!(active_since.is_none());
     }
 }

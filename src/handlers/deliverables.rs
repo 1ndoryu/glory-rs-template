@@ -9,7 +9,6 @@ use axum::http::{header, StatusCode};
 use axum::response::Response;
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use std::path::PathBuf;
 use tokio::fs;
 use uuid::Uuid;
 
@@ -87,10 +86,11 @@ pub async fn deliver_phase_with_files(
     let current_rev = DeliverableRepository::current_revision_number(&state.pool, phase.id).await?;
     let revision_number = current_rev + 1;
 
-    /* Crear directorio de uploads */
-    let upload_path = PathBuf::from(UPLOAD_DIR)
-        .join(order_id.to_string())
-        .join(phase_number.to_string());
+    /* Crear directorio de uploads (join via helper anti-traversal). */
+    let upload_path = crate::util::join_write_path(
+        std::path::Path::new(UPLOAD_DIR),
+        &[&order_id.to_string(), &phase_number.to_string()],
+    )?;
     fs::create_dir_all(&upload_path)
         .await
         .map_err(|e| AppError::Internal(format!("Error creando directorio: {e}")))?;
@@ -129,19 +129,33 @@ pub async fn deliver_phase_with_files(
 
     /* [311A-1] Email al cliente notificando fase entregada (non-fatal) */
     if let Some(ref email_cfg) = state.email_config {
-        if let Ok(Some(client_email)) = UserRepository::get_email(&state.pool, order.client_id).await {
+        if let Ok(Some(client_email)) =
+            UserRepository::get_email(&state.pool, order.client_id).await
+        {
             let cfg = email_cfg.clone();
             let pool = state.pool.clone();
             let onum = order.order_number;
             let oid = order.id;
-            let cname = UserRepository::get_display_name(&state.pool, order.client_id).await
-                .ok().flatten().unwrap_or_else(|| "Cliente".to_string());
+            let cname = UserRepository::get_display_name(&state.pool, order.client_id)
+                .await
+                .ok()
+                .flatten()
+                .unwrap_or_else(|| "Cliente".to_string());
             let ptitle = phase.title.clone();
-            let site_url = std::env::var("SITE_URL").unwrap_or_else(|_| "https://nakomi.studio".to_string());
+            let site_url =
+                std::env::var("SITE_URL").unwrap_or_else(|_| "https://nakomi.studio".to_string());
             tokio::spawn(async move {
                 crate::services::EmailService::send_phase_delivered_client(
-                    &cfg, &pool, &client_email, &cname, onum, &ptitle, &site_url, oid,
-                ).await;
+                    &cfg,
+                    &pool,
+                    &client_email,
+                    &cname,
+                    onum,
+                    &ptitle,
+                    &site_url,
+                    oid,
+                )
+                .await;
             });
         }
     }
@@ -419,7 +433,8 @@ async fn process_multipart_files(
 
             let safe_name = sanitize_filename(&original_name);
             let unique_name = format!("{}-{}-{safe_name}", ctx.phase_id, ctx.revision_number);
-            let file_path = ctx.upload_path.join(&unique_name);
+            /* [259A-2] Join via helper anti-traversal (doble capa sobre sanitize). */
+            let file_path = crate::util::join_write_path(ctx.upload_path, &[&unique_name])?;
 
             fs::write(&file_path, &data)
                 .await

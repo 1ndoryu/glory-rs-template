@@ -2,9 +2,9 @@
  * Cada vez que EmailService::send() se ejecuta, registra una fila aquí.
  * Non-fatal: si el INSERT falla, el email ya fue entregado. */
 
+use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 /* [311A-1] Este repositorio usa query_as/query_scalar sin macro (sqlx::query_as::<_, T>)
  * en lugar de query_as! para evitar dependencia de tabla existente en compilación.
@@ -128,23 +128,16 @@ impl EmailLogRepository {
     }
 
     /// Cuenta total con filtro opcional por template.
-    pub async fn count(
-        pool: &PgPool,
-        template: Option<&str>,
-    ) -> Result<i64, sqlx::Error> {
+    pub async fn count(pool: &PgPool, template: Option<&str>) -> Result<i64, sqlx::Error> {
         if let Some(tpl) = template {
-            sqlx::query_scalar::<_, i64>(
-                r#"SELECT COUNT(*) FROM email_logs WHERE template = $1"#,
-            )
-            .bind(tpl)
-            .fetch_one(pool)
-            .await
+            sqlx::query_scalar::<_, i64>(r#"SELECT COUNT(*) FROM email_logs WHERE template = $1"#)
+                .bind(tpl)
+                .fetch_one(pool)
+                .await
         } else {
-            sqlx::query_scalar::<_, i64>(
-                r#"SELECT COUNT(*) FROM email_logs"#,
-            )
-            .fetch_one(pool)
-            .await
+            sqlx::query_scalar::<_, i64>(r#"SELECT COUNT(*) FROM email_logs"#)
+                .fetch_one(pool)
+                .await
         }
     }
 }

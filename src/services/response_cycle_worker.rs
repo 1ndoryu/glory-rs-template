@@ -51,12 +51,10 @@ pub async fn run_response_cycle_worker(pool: PgPool) {
 
 async fn process_expired_cycle(pool: &PgPool, cycle_id: uuid::Uuid, session_id: uuid::Uuid) {
     /* Verificar que la sesión sigue en human_priority */
-    let session = match ChatRepository::find_session_by_id(pool, session_id).await {
-        Ok(Some(s)) => s,
-        _ => {
-            tracing::warn!("Session {session_id} no encontrada, cancelando cycle {cycle_id}");
-            return;
-        }
+    /* [259A-1] let-else en vez de match de un solo patron (clippy manual_let_else). */
+    let Ok(Some(session)) = ChatRepository::find_session_by_id(pool, session_id).await else {
+        tracing::warn!("Session {session_id} no encontrada, cancelando cycle {cycle_id}");
+        return;
     };
 
     if session.ai_mode != "human_priority" {

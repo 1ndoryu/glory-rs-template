@@ -99,20 +99,35 @@ pub async fn report_problem(
 
     /* [311A-1] Email al cliente notificando problema reportado (non-fatal) */
     if let Some(ref email_cfg) = state.email_config {
-        if let Ok(Some(client_email)) = UserRepository::get_email(&state.pool, order.client_id).await {
+        if let Ok(Some(client_email)) =
+            UserRepository::get_email(&state.pool, order.client_id).await
+        {
             let cfg = email_cfg.clone();
             let pool = state.pool.clone();
             let onum = order.order_number;
             let oid = order.id;
-            let cname = UserRepository::get_display_name(&state.pool, order.client_id).await
-                .ok().flatten().unwrap_or_else(|| "Cliente".to_string());
+            let cname = UserRepository::get_display_name(&state.pool, order.client_id)
+                .await
+                .ok()
+                .flatten()
+                .unwrap_or_else(|| "Cliente".to_string());
             let ptitle = req.reason.chars().take(80).collect::<String>();
             let pdesc = req.reason.clone();
-            let site_url = std::env::var("SITE_URL").unwrap_or_else(|_| "https://nakomi.studio".to_string());
+            let site_url =
+                std::env::var("SITE_URL").unwrap_or_else(|_| "https://nakomi.studio".to_string());
             tokio::spawn(async move {
                 crate::services::EmailService::send_problem_reported_client(
-                    &cfg, &pool, &client_email, &cname, onum, &ptitle, &pdesc, &site_url, oid,
-                ).await;
+                    &cfg,
+                    &pool,
+                    &client_email,
+                    &cname,
+                    onum,
+                    &ptitle,
+                    &pdesc,
+                    &site_url,
+                    oid,
+                )
+                .await;
             });
         }
     }
@@ -124,17 +139,34 @@ pub async fn report_problem(
                 let pool = state.pool.clone();
                 let onum = order.order_number;
                 let oid = order.id;
-                let cname = UserRepository::get_display_name(&state.pool, order.client_id).await
-                    .ok().flatten().unwrap_or_else(|| "Cliente".to_string());
-                let cemail = UserRepository::get_email(&state.pool, order.client_id).await
-                    .ok().flatten().unwrap_or_else(|| "desconocido@email.com".to_string());
+                let cname = UserRepository::get_display_name(&state.pool, order.client_id)
+                    .await
+                    .ok()
+                    .flatten()
+                    .unwrap_or_else(|| "Cliente".to_string());
+                let cemail = UserRepository::get_email(&state.pool, order.client_id)
+                    .await
+                    .ok()
+                    .flatten()
+                    .unwrap_or_else(|| "desconocido@email.com".to_string());
                 let ptitle = req.reason.chars().take(80).collect::<String>();
                 let pdesc = req.reason.clone();
-                let site_url = std::env::var("SITE_URL").unwrap_or_else(|_| "https://nakomi.studio".to_string());
+                let site_url = std::env::var("SITE_URL")
+                    .unwrap_or_else(|_| "https://nakomi.studio".to_string());
                 tokio::spawn(async move {
                     crate::services::EmailService::send_problem_reported_admin(
-                        &cfg, &pool, &admin_emails, &cname, &cemail, onum, &ptitle, &pdesc, oid, &site_url,
-                    ).await;
+                        &cfg,
+                        &pool,
+                        &admin_emails,
+                        &cname,
+                        &cemail,
+                        onum,
+                        &ptitle,
+                        &pdesc,
+                        oid,
+                        &site_url,
+                    )
+                    .await;
                 });
             }
         }

@@ -219,26 +219,22 @@ pub async fn stripe_webhook(
 
                     /* [311A-1] Email a admins notificando pago recibido */
                     if let Some(ref email_cfg) = state.email_config {
-                        if let Ok(admin_emails) =
-                            UserRepository::admin_emails(&state.pool).await
-                        {
+                        if let Ok(admin_emails) = UserRepository::admin_emails(&state.pool).await {
                             if !admin_emails.is_empty() {
                                 let site_url = std::env::var("SITE_URL")
                                     .unwrap_or_else(|_| "https://nakomi.studio".to_string());
-                                let client_email = UserRepository::get_email(
-                                    &state.pool, order.client_id,
-                                )
-                                .await
-                                .ok()
-                                .flatten()
-                                .unwrap_or_else(|| "desconocido".to_string());
-                                let client_name = UserRepository::get_display_name(
-                                    &state.pool, order.client_id,
-                                )
-                                .await
-                                .ok()
-                                .flatten()
-                                .unwrap_or_else(|| "Cliente".to_string());
+                                let client_email =
+                                    UserRepository::get_email(&state.pool, order.client_id)
+                                        .await
+                                        .ok()
+                                        .flatten()
+                                        .unwrap_or_else(|| "desconocido".to_string());
+                                let client_name =
+                                    UserRepository::get_display_name(&state.pool, order.client_id)
+                                        .await
+                                        .ok()
+                                        .flatten()
+                                        .unwrap_or_else(|| "Cliente".to_string());
                                 EmailService::send_payment_received_admin(
                                     email_cfg,
                                     &state.pool,
@@ -259,14 +255,17 @@ pub async fn stripe_webhook(
                      * handle_payment_success movió la orden a awaiting_assignment (Full/HalfHalf 1er pago)
                      * o la dejó en payment_held (si no cambió status). En ambos casos, necesita activación.
                      * Para HalfHalf 2do pago o Phased subsiguiente, la orden ya está in_progress → skip. */
-                    let needs_activation = order.status == crate::models::OrderStatus::AwaitingAssignment
+                    let needs_activation = order.status
+                        == crate::models::OrderStatus::AwaitingAssignment
                         || order.status == crate::models::OrderStatus::PaymentHeld;
 
                     if needs_activation {
                         /* Obtener nombres de servicio y plan para emails/chat */
                         let (svc_title, _svc_slug, plan_name) =
                             OrderRepository::get_order_display_info(
-                                &state.pool, order.service_id, order.plan_id,
+                                &state.pool,
+                                order.service_id,
+                                order.plan_id,
                             )
                             .await
                             .unwrap_or_else(|_| ("Servicio".into(), String::new(), "Plan".into()));
@@ -275,7 +274,9 @@ pub async fn stripe_webhook(
                             .await
                             .unwrap_or_default();
                         if let Some(&admin_id) = admins.first() {
-                            match OrderRepository::assign_order(&state.pool, order.id, admin_id).await {
+                            match OrderRepository::assign_order(&state.pool, order.id, admin_id)
+                                .await
+                            {
                                 Ok(_) => {
                                     let _ = crate::repositories::ActivityLogRepository::log(
                                         &state.pool,
@@ -283,21 +284,33 @@ pub async fn stripe_webhook(
                                         "order_assigned",
                                         "order",
                                         order.id,
-                                        Some(serde_json::json!({"auto": true, "post_payment": true})),
+                                        Some(
+                                            serde_json::json!({"auto": true, "post_payment": true}),
+                                        ),
                                     )
                                     .await;
 
                                     /* Notificar admins de nueva orden */
                                     let notif_base = CreateNotification {
                                         user_id: Uuid::nil(),
-                                        notification_type: crate::models::NOTIF_NEW_ORDER.to_string(),
+                                        notification_type: crate::models::NOTIF_NEW_ORDER
+                                            .to_string(),
                                         title: format!("Nueva orden #{}", order.order_number),
-                                        body: Some(format!("{} — Pago confirmado", order.order_number)),
-                                        link: Some(format!("/panel?seccion=ordenes&id={}", order.id)),
+                                        body: Some(format!(
+                                            "{} — Pago confirmado",
+                                            order.order_number
+                                        )),
+                                        link: Some(format!(
+                                            "/panel?seccion=ordenes&id={}",
+                                            order.id
+                                        )),
                                         reference_type: Some("order".to_string()),
                                         reference_id: Some(order.id),
                                     };
-                                    let _ = state.notification_hub.notify_many(&admins, &notif_base).await;
+                                    let _ = state
+                                        .notification_hub
+                                        .notify_many(&admins, &notif_base)
+                                        .await;
                                 }
                                 Err(e) => tracing::error!(
                                     "[166A-1] Error auto-asignando orden {} post-pago: {e}",
@@ -364,18 +377,18 @@ pub async fn stripe_webhook(
 
                         /* Email a admins notificando nueva orden */
                         if let Some(ref email_cfg) = state.email_config {
-                            let admin_emails =
-                                UserRepository::admin_emails(&state.pool).await.unwrap_or_default();
+                            let admin_emails = UserRepository::admin_emails(&state.pool)
+                                .await
+                                .unwrap_or_default();
                             if !admin_emails.is_empty() {
                                 let cfg = email_cfg.clone();
                                 let pool = state.pool.clone();
-                                let client_email_admin = UserRepository::get_email(
-                                    &state.pool, order.client_id,
-                                )
-                                .await
-                                .ok()
-                                .flatten()
-                                .unwrap_or_else(|| "desconocido".to_string());
+                                let client_email_admin =
+                                    UserRepository::get_email(&state.pool, order.client_id)
+                                        .await
+                                        .ok()
+                                        .flatten()
+                                        .unwrap_or_else(|| "desconocido".to_string());
                                 let client_name_admin =
                                     UserRepository::get_display_name(&state.pool, order.client_id)
                                         .await
@@ -395,9 +408,18 @@ pub async fn stripe_webhook(
                                     .unwrap_or_else(|_| "https://nakomi.studio".to_string());
                                 tokio::spawn(async move {
                                     EmailService::send_new_order_admin(
-                                        &cfg, &pool, &admin_emails, &client_email_admin,
-                                        &client_name_admin, onum, &svc, &plan, &price,
-                                        &pmode, oid, &site_url,
+                                        &cfg,
+                                        &pool,
+                                        &admin_emails,
+                                        &client_email_admin,
+                                        &client_name_admin,
+                                        onum,
+                                        &svc,
+                                        &plan,
+                                        &price,
+                                        &pmode,
+                                        oid,
+                                        &site_url,
                                     )
                                     .await;
                                 });

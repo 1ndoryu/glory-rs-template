@@ -3,6 +3,8 @@
  * Cada función render_* genera el HTML completo usando helpers de layout.
  * email_preview.rs reutiliza estas funciones con datos SAMPLE. */
 
+use std::fmt::Write as _;
+
 use super::email::html_escape;
 
 /* ============================================================
@@ -52,9 +54,7 @@ fn email_layout_no_footer(header_color: &str, title: &str, content: &str) -> Str
 
 /// Título de sección (h2)
 fn section_title(text: &str) -> String {
-    format!(
-        r#"    <h2 style="margin:0 0 8px;color:#1a1a1a;font-size:20px;">{text}</h2>"#
-    )
+    format!(r#"    <h2 style="margin:0 0 8px;color:#1a1a1a;font-size:20px;">{text}</h2>"#)
 }
 
 /// Párrafo estándar
@@ -82,18 +82,20 @@ fn cta_button(text: &str, url: &str) -> String {
 fn summary_table(rows: &[(&str, &str)]) -> String {
     let mut table = String::from(
         r#"    <div style="background:#f8f8f8;border-radius:8px;padding:20px;margin-bottom:24px;">
-      <table style="width:100%;border-collapse:collapse;font-size:14px;color:#333;">"#
+      <table style="width:100%;border-collapse:collapse;font-size:14px;color:#333;">"#,
     );
     for (label, value) in rows {
-        table.push_str(&format!(
+        /* [259A-1] write! en vez de push_str(&format!(..)) (clippy format_push_string). */
+        let _ = write!(
+            table,
             r#"
         <tr><td style="padding:6px 0;color:#888;">{label}</td><td style="padding:6px 0;font-weight:500;text-align:right;">{value}</td></tr>"#
-        ));
+        );
     }
     table.push_str(
         r#"
       </table>
-    </div>"#
+    </div>"#,
     );
     table
 }
@@ -148,7 +150,12 @@ pub fn render_order_confirmation(
         desc = paragraph("Puedes seguir el progreso de tu pedido en tiempo real desde tu panel."),
         button = cta_button("Ver mi pedido", "https://nakomi.studio/panel"),
     );
-    email_layout("#1a1a1a", "Nakomi Studio", &content, "Este email fue enviado porque realizaste un pedido.")
+    email_layout(
+        "#1a1a1a",
+        "Nakomi Studio",
+        &content,
+        "Este email fue enviado porque realizaste un pedido.",
+    )
 }
 
 /// Nueva orden notificada a admins
@@ -165,7 +172,14 @@ pub fn render_new_order_admin(
     let rows = format!(
         "{r1}\n{r2}\n{r3}\n{r4}\n{r5}\n{r6}",
         r1 = table_row("Pedido", &format!("#{order_number}")),
-        r2 = table_row("Cliente", &format!("{} ({})", html_escape(client_name), html_escape(client_email))),
+        r2 = table_row(
+            "Cliente",
+            &format!(
+                "{} ({})",
+                html_escape(client_name),
+                html_escape(client_email)
+            )
+        ),
         r3 = table_row("Servicio", &html_escape(service_title)),
         r4 = table_row("Plan", &html_escape(plan_name)),
         r5 = table_row("Modalidad", payment_mode),
@@ -177,7 +191,12 @@ pub fn render_new_order_admin(
         table = simple_table(&rows),
         button = cta_button("Revisar pedido", panel_link),
     );
-    email_layout("#1a1a1a", "🆕 Nueva Orden", &content, "Notificación automática de nuevo pedido")
+    email_layout(
+        "#1a1a1a",
+        "🆕 Nueva Orden",
+        &content,
+        "Notificación automática de nuevo pedido",
+    )
 }
 
 /// Escalación de chat a admins
@@ -188,10 +207,17 @@ pub fn render_escalation(visitor_name: &str, panel_link: &str) -> String {
             "La IA detectó que <strong>{}</strong> necesita asistencia humana.",
             html_escape(visitor_name)
         )),
-        p2 = paragraph("Por favor, revisa la sesión de chat lo antes posible para atender al visitante."),
+        p2 = paragraph(
+            "Por favor, revisa la sesión de chat lo antes posible para atender al visitante."
+        ),
         button = cta_button("Abrir sesión de chat", panel_link),
     );
-    email_layout("#b91c1c", "⚠ Escalación de Chat", &content, "Notificación automática de escalación")
+    email_layout(
+        "#b91c1c",
+        "⚠ Escalación de Chat",
+        &content,
+        "Notificación automática de escalación",
+    )
 }
 
 /// Pago recibido notificado a admins
@@ -213,7 +239,12 @@ pub fn render_payment_received_admin(
         table = simple_table(&rows),
         button = cta_button("Ver pedido", panel_link),
     );
-    email_layout("#166534", "💰 Pago Recibido", &content, "Notificación automática de pago")
+    email_layout(
+        "#166534",
+        "💰 Pago Recibido",
+        &content,
+        "Notificación automática de pago",
+    )
 }
 
 /// Factura de chat pagada — cliente
@@ -232,7 +263,12 @@ pub fn render_chat_invoice_paid_client(
         ]),
         button = cta_button("Ver chat", "https://nakomi.studio/panel"),
     );
-    email_layout("#166534", "✅ Pago Confirmado", &content, "Notificación automática de pago")
+    email_layout(
+        "#166534",
+        "✅ Pago Confirmado",
+        &content,
+        "Notificación automática de pago",
+    )
 }
 
 /// Factura de chat pagada — admin
@@ -254,7 +290,12 @@ pub fn render_chat_invoice_paid_admin(
         table = simple_table(&rows),
         button = cta_button("Ver sesión", panel_link),
     );
-    email_layout("#166534", "💰 Factura de Chat Pagada", &content, "Notificación automática de pago")
+    email_layout(
+        "#166534",
+        "💰 Factura de Chat Pagada",
+        &content,
+        "Notificación automática de pago",
+    )
 }
 
 /// VPS pendiente de aprobación — admin
@@ -276,7 +317,12 @@ pub fn render_vps_pending_approval(
         table = simple_table(&rows),
         button = cta_button("Revisar solicitud", panel_link),
     );
-    email_layout("#92400e", "🖥 Solicitud de VPS", &content, "Notificación automática de VPS")
+    email_layout(
+        "#92400e",
+        "🖥 Solicitud de VPS",
+        &content,
+        "Notificación automática de VPS",
+    )
 }
 
 /// VPS aprobado — cliente
@@ -306,30 +352,37 @@ pub fn render_vps_approved(
         ]),
         desc = paragraph("Cambia la contraseña en tu primera conexión y guarda estas credenciales en un gestor seguro."),
     );
-    email_layout("#166534", "✅ VPS Aprobado", &content, "Notificación automática de VPS")
+    email_layout(
+        "#166534",
+        "✅ VPS Aprobado",
+        &content,
+        "Notificación automática de VPS",
+    )
 }
 
 /// VPS rechazado — cliente
-pub fn render_vps_rejected(
-    client_name: &str,
-    plan_name: &str,
-    reason: &str,
-) -> String {
+pub fn render_vps_rejected(client_name: &str, plan_name: &str, reason: &str) -> String {
     let content = format!(
         "{title}\n{msg}\n{table}\n{reason_block}",
         title = section_title(&format!("Hola, {}", html_escape(client_name))),
         msg = paragraph("Lamentablemente, tu solicitud de VPS no pudo ser aprobada."),
         table = summary_table(&[("Plan solicitado", &html_escape(plan_name))]),
-        reason_block = paragraph(&format!(
-            "<strong>Motivo:</strong> {}",
-            html_escape(reason)
-        )),
+        reason_block = paragraph(&format!("<strong>Motivo:</strong> {}", html_escape(reason))),
     );
-    email_layout("#991b1b", "❌ Solicitud de VPS Rechazada", &content, "Notificación automática de VPS")
+    email_layout(
+        "#991b1b",
+        "❌ Solicitud de VPS Rechazada",
+        &content,
+        "Notificación automática de VPS",
+    )
 }
 
 /// Email cambiado — notificación a nueva dirección
-pub fn render_profile_email_changed_new(old_email: &str, new_email: &str, recipient_name: &str) -> String {
+pub fn render_profile_email_changed_new(
+    old_email: &str,
+    new_email: &str,
+    recipient_name: &str,
+) -> String {
     let content = format!(
         "{greeting}\n{msg}\n{warn}",
         greeting = paragraph_tight(&format!("Hola, <strong>{}</strong>.", html_escape(recipient_name))),
@@ -344,7 +397,11 @@ pub fn render_profile_email_changed_new(old_email: &str, new_email: &str, recipi
 }
 
 /// Email cambiado — notificación a dirección anterior
-pub fn render_profile_email_changed_old(old_email: &str, new_email: &str, recipient_name: &str) -> String {
+pub fn render_profile_email_changed_old(
+    old_email: &str,
+    new_email: &str,
+    recipient_name: &str,
+) -> String {
     let content = format!(
         "{greeting}\n{msg}\n{warn}",
         greeting = paragraph_tight(&format!("Hola, <strong>{}</strong>.", html_escape(recipient_name))),
@@ -384,15 +441,16 @@ pub fn render_order_completed_client(
         table = summary_table(&[("Servicio", &html_escape(service_title))]),
         button = cta_button("Ver pedido", "https://nakomi.studio/panel"),
     );
-    email_layout("#166534", "✅ Pedido Completado", &content, "Notificación automática de pedido")
+    email_layout(
+        "#166534",
+        "✅ Pedido Completado",
+        &content,
+        "Notificación automática de pedido",
+    )
 }
 
 /// Pedido cancelado — cliente
-pub fn render_order_cancelled_client(
-    client_name: &str,
-    order_number: i32,
-    reason: &str,
-) -> String {
+pub fn render_order_cancelled_client(client_name: &str, order_number: i32, reason: &str) -> String {
     let content = format!(
         "{title}\n{msg}\n{table}\n{reason_block}",
         title = section_title(&format!("Hola, {}", html_escape(client_name))),
@@ -406,7 +464,12 @@ pub fn render_order_cancelled_client(
             paragraph(&format!("<strong>Motivo:</strong> {}", html_escape(reason)))
         },
     );
-    email_layout("#991b1b", "❌ Pedido Cancelado", &content, "Notificación automática de pedido")
+    email_layout(
+        "#991b1b",
+        "❌ Pedido Cancelado",
+        &content,
+        "Notificación automática de pedido",
+    )
 }
 
 /// Fase entregada — cliente
@@ -425,7 +488,12 @@ pub fn render_phase_delivered_client(
         table = summary_table(&[("Fase", &html_escape(phase_name))]),
         button = cta_button("Revisar entrega", panel_link),
     );
-    email_layout("#1a1a1a", "📦 Fase Entregada", &content, "Notificación automática de entrega")
+    email_layout(
+        "#1a1a1a",
+        "📦 Fase Entregada",
+        &content,
+        "Notificación automática de entrega",
+    )
 }
 
 /// Problema reportado — cliente
@@ -446,7 +514,12 @@ pub fn render_problem_reported_client(
             html_escape(problem_description)
         )),
     );
-    email_layout("#92400e", "⚠ Problema Reportado", &content, "Notificación automática de pedido")
+    email_layout(
+        "#92400e",
+        "⚠ Problema Reportado",
+        &content,
+        "Notificación automática de pedido",
+    )
 }
 
 /// Pedido completado — admin
@@ -468,7 +541,12 @@ pub fn render_order_completed_admin(
         table = simple_table(&rows),
         button = cta_button("Ver pedido", panel_link),
     );
-    email_layout("#166534", "✅ Pedido Completado", &content, "Notificación automática de pedido")
+    email_layout(
+        "#166534",
+        "✅ Pedido Completado",
+        &content,
+        "Notificación automática de pedido",
+    )
 }
 
 /// Pedido cancelado — admin
@@ -495,7 +573,12 @@ pub fn render_order_cancelled_admin(
         reason = reason_block,
         button = cta_button("Ver pedido", panel_link),
     );
-    email_layout("#991b1b", "❌ Pedido Cancelado", &content, "Notificación automática de pedido")
+    email_layout(
+        "#991b1b",
+        "❌ Pedido Cancelado",
+        &content,
+        "Notificación automática de pedido",
+    )
 }
 
 /// Problema reportado — admin
@@ -520,7 +603,12 @@ pub fn render_problem_reported_admin(
         )),
         button = cta_button("Ver problema", panel_link),
     );
-    email_layout("#92400e", "⚠ Problema Reportado", &content, "Notificación automática de pedido")
+    email_layout(
+        "#92400e",
+        "⚠ Problema Reportado",
+        &content,
+        "Notificación automática de pedido",
+    )
 }
 
 /// Solicitud de reembolso — admin
@@ -544,7 +632,12 @@ pub fn render_refund_requested_admin(
         reason = paragraph_tight(&format!("<strong>Motivo:</strong> {}", html_escape(reason))),
         button = cta_button("Ver solicitud", panel_link),
     );
-    email_layout("#92400e", "💸 Solicitud de Reembolso", &content, "Notificación automática de pago")
+    email_layout(
+        "#92400e",
+        "💸 Solicitud de Reembolso",
+        &content,
+        "Notificación automática de pago",
+    )
 }
 
 /// Nuevo usuario registrado — admin
@@ -564,7 +657,12 @@ pub fn render_new_user_registered_admin(
         table = simple_table(&rows),
         button = cta_button("Ver usuario", panel_link),
     );
-    email_layout("#1a1a1a", "👤 Nuevo Usuario", &content, "Notificación automática de registro")
+    email_layout(
+        "#1a1a1a",
+        "👤 Nuevo Usuario",
+        &content,
+        "Notificación automática de registro",
+    )
 }
 
 /* [237A-7d] Nuevo mensaje de cliente en chat — notificación a admin.
@@ -586,24 +684,33 @@ pub fn render_chat_client_message_admin(
         ]),
         button = cta_button("Abrir chat", panel_link),
     );
-    email_layout("#c9a84c", "💬 Nuevo Mensaje de Chat", &content, "Notificación automática de chat")
+    email_layout(
+        "#c9a84c",
+        "💬 Nuevo Mensaje de Chat",
+        &content,
+        "Notificación automática de chat",
+    )
 }
 
 /* [237A-7j] Email de continuación de conversación de chat.
  * Se envía cuando el visitante con email conocido se desconecta por más de 2 minutos.
  * Contiene un enlace firmado de un solo uso para reanudar la conversación. */
-pub fn render_chat_continuation(
-    visitor_name: &str,
-    continuation_url: &str,
-) -> String {
+pub fn render_chat_continuation(visitor_name: &str, continuation_url: &str) -> String {
     let content = format!(
         "{title}\n{p1}\n{p2}\n{button}\n{p3}",
         title = section_title(&format!("Hola, {}", html_escape(visitor_name))),
-        p1 = paragraph("Notamos que te desconectaste de nuestra conversación. \
-             Puedes continuar exactamente donde lo dejaste usando el botón de abajo."),
+        p1 = paragraph(
+            "Notamos que te desconectaste de nuestra conversación. \
+             Puedes continuar exactamente donde lo dejaste usando el botón de abajo."
+        ),
         p2 = paragraph("Este enlace es personal, de un solo uso y expira en 7 días."),
         button = cta_button("Continuar conversación", continuation_url),
         p3 = paragraph("Si no solicitaste este enlace, puedes ignorar este correo con seguridad."),
     );
-    email_layout("#c9a84c", "💬 Continúa tu conversación", &content, "Enlace de continuación de chat")
+    email_layout(
+        "#c9a84c",
+        "💬 Continúa tu conversación",
+        &content,
+        "Enlace de continuación de chat",
+    )
 }

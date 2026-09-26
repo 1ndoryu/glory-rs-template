@@ -65,7 +65,8 @@ fn hosting_billing_discount_cents(monthly_price_cents: i32, months: i32) -> i32 
 }
 
 fn hosting_period_amount_cents(monthly_price_cents: i32, months: i32) -> i32 {
-    (monthly_price_cents * months - hosting_billing_discount_cents(monthly_price_cents, months)).max(0)
+    (monthly_price_cents * months - hosting_billing_discount_cents(monthly_price_cents, months))
+        .max(0)
 }
 
 /* Comisión Stripe México: 3.6% + 1.5% (internacional) + 1% (divisa) = 6.1% + $3 MXN.

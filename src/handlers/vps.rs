@@ -23,8 +23,7 @@ use crate::models::{
 use crate::repositories::{CreateVpsSubscriptionParams, UserRepository, VpsRepository};
 use crate::services::{
     is_checkout_bypass_email, vps_stripe_fee_cents, CreateInstanceParams, EmailService,
-    VpsCheckoutParams,
-    VpsStripeService,
+    VpsCheckoutParams, VpsStripeService,
 };
 use crate::AppState;
 

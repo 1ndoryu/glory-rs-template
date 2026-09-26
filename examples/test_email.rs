@@ -11,7 +11,10 @@ fn main() {
         std::process::exit(1);
     };
 
-    let to = config.bcc_email.clone().unwrap_or_else(|| "andoryyu@gmail.com".to_string());
+    let to = config
+        .bcc_email
+        .clone()
+        .unwrap_or_else(|| "andoryyu@gmail.com".to_string());
     let subject = "🧪 Prueba SMTP — Nakomi Studio".to_string();
     let html = r#"<!DOCTYPE html>
 <html lang="es">
@@ -55,13 +58,27 @@ fn main() {
         .replace("{host}", &config.host)
         .replace("{port}", &config.port.to_string())
         .replace("{user}", &config.user)
-        .replace("{from}", &format!("{} <{}>", config.from_name, config.from_email))
-        .replace("{date}", &chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string());
+        .replace(
+            "{from}",
+            &format!("{} <{}>", config.from_name, config.from_email),
+        )
+        .replace(
+            "{date}",
+            &chrono::Utc::now()
+                .format("%Y-%m-%d %H:%M:%S UTC")
+                .to_string(),
+        );
 
-    match rt.block_on(glory_backend::services::EmailService::send(&config, &to, &subject, &html)) {
+    match rt.block_on(glory_backend::services::EmailService::send(
+        &config, &to, &subject, &html,
+    )) {
         Ok(()) => {
             let elapsed = start.elapsed();
-            println!("✅ Correo enviado exitosamente en {}.{:03}s", elapsed.as_secs(), elapsed.subsec_millis());
+            println!(
+                "✅ Correo enviado exitosamente en {}.{:03}s",
+                elapsed.as_secs(),
+                elapsed.subsec_millis()
+            );
             println!("   Revisa tu bandeja de entrada (y spam) en: {to}");
         }
         Err(e) => {

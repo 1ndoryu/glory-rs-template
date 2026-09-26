@@ -135,7 +135,6 @@ impl AiChatConfig {
             tracing::info!("AI: Gemini configurado como proveedor secundario");
         }
 
-
         Self {
             deepseek_key,
             deepseek_model,
@@ -396,8 +395,14 @@ impl AiChatService {
             serde_json::json!({"role": "user", "content": prompt}),
         ];
 
-        if let Ok(json) =
-            call_ai_api_with_options(config, &messages, None, ChatApiOptions::terse(400), Some(http_client)).await
+        if let Ok(json) = call_ai_api_with_options(
+            config,
+            &messages,
+            None,
+            ChatApiOptions::terse(400),
+            Some(http_client),
+        )
+        .await
         {
             if let Some(summary) = json["choices"][0]["message"]["content"].as_str() {
                 let _ = OrderRepository::update_ai_summary(pool, order_id, summary).await;
@@ -514,8 +519,16 @@ fn parse_escalation(raw: &str) -> (String, bool) {
     }
 }
 
-fn markdown_regex(pattern: &'static str, slot: &'static OnceLock<Regex>) -> &'static Regex {
-    slot.get_or_init(|| Regex::new(pattern).expect("valid chatbot markdown regex"))
+/* [259A-1] Sin expect: si el patron no compila, devuelve None y el texto
+ * pasa sin procesar ese paso (los patrones son literales; solo fallaria por
+ * error de programacion, nunca por input externo). */
+fn markdown_regex(pattern: &'static str, slot: &'static OnceLock<Regex>) -> Option<&'static Regex> {
+    if slot.get().is_none() {
+        if let Ok(re) = Regex::new(pattern) {
+            let _ = slot.set(re);
+        }
+    }
+    slot.get()
 }
 
 fn strip_chat_markdown(raw: &str) -> String {
@@ -543,9 +556,9 @@ fn strip_chat_markdown(raw: &str) -> String {
         (r"_([^_\n][^_]*?)_", &ITALIC_UNDERSCORE),
         (r"~~([^~\n][^~]*?)~~", &STRIKE),
     ] {
-        text = markdown_regex(pattern, slot)
-            .replace_all(&text, "$1")
-            .to_string();
+        if let Some(re) = markdown_regex(pattern, slot) {
+            text = re.replace_all(&text, "$1").to_string();
+        }
     }
 
     for (pattern, slot, replacement) in [
@@ -556,9 +569,9 @@ fn strip_chat_markdown(raw: &str) -> String {
         (r"(?m)^\s*[-*_]{3,}\s*$", &RULES, ""),
         (r"\n{3,}", &EXTRA_BLANKS, "\n\n"),
     ] {
-        text = markdown_regex(pattern, slot)
-            .replace_all(&text, replacement)
-            .to_string();
+        if let Some(re) = markdown_regex(pattern, slot) {
+            text = re.replace_all(&text, replacement).to_string();
+        }
     }
 
     text.trim().to_string()

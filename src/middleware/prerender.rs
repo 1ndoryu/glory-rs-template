@@ -40,6 +40,13 @@ pub struct SeoCache {
 
 impl SeoCache {
     pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+/* [259A-1] Default requerido por clippy (new_without_default). */
+impl Default for SeoCache {
+    fn default() -> Self {
         Self {
             entries: Arc::new(RwLock::new(HashMap::new())),
             ttl: Duration::from_secs(300),
@@ -188,13 +195,25 @@ fn json_escape(s: &str) -> String {
 
 /* [277A-13] Rutas estáticas conocidas por el prerender. */
 const KNOWN_STATIC: &[&str] = &[
-    "/", "/servicios", "/proyectos", "/nosotros",
-    "/soluciones/hosting", "/soluciones/hosting-wordpress", "/soluciones/vps",
-    "/blog", "/contacto", "/politica-privacidad",
+    "/",
+    "/servicios",
+    "/proyectos",
+    "/nosotros",
+    "/soluciones/hosting",
+    "/soluciones/hosting-wordpress",
+    "/soluciones/vps",
+    "/blog",
+    "/contacto",
+    "/politica-privacidad",
 ];
 
 /* Construye SeoMeta: estáticas con cache+DB fallback, dinámicas consultan BD. */
-async fn resolve_seo_meta(path: &str, pool: &PgPool, app_url: &str, cache: &SeoCache) -> Option<SeoMeta> {
+async fn resolve_seo_meta(
+    path: &str,
+    pool: &PgPool,
+    app_url: &str,
+    cache: &SeoCache,
+) -> Option<SeoMeta> {
     let canonical = format!("{app_url}{path}");
 
     if KNOWN_STATIC.contains(&path) {
@@ -234,7 +253,10 @@ async fn resolve_static_with_cache(
     }
 
     /* 2. Consultar DB */
-    let db_setting = SeoSettingsRepository::find_by_path(pool, path).await.ok().flatten();
+    let db_setting = SeoSettingsRepository::find_by_path(pool, path)
+        .await
+        .ok()
+        .flatten();
 
     /* 3. Construir SeoMeta con JSON-LD */
     let json_ld = static_json_ld(path, app_url);
@@ -256,17 +278,20 @@ async fn resolve_static_with_cache(
     /* 4. Guardar en cache */
     {
         let mut entries = cache.entries.write().await;
-        entries.insert(path.to_string(), CachedSeoEntry {
-            meta: SeoMeta {
-                title: meta.title.clone(),
-                description: meta.description.clone(),
-                og_image: meta.og_image.clone(),
-                canonical: meta.canonical.clone(),
-                og_type: meta.og_type,
-                json_ld: meta.json_ld.clone(),
+        entries.insert(
+            path.to_string(),
+            CachedSeoEntry {
+                meta: SeoMeta {
+                    title: meta.title.clone(),
+                    description: meta.description.clone(),
+                    og_image: meta.og_image.clone(),
+                    canonical: meta.canonical.clone(),
+                    og_type: meta.og_type,
+                    json_ld: meta.json_ld.clone(),
+                },
+                fetched_at: Instant::now(),
             },
-            fetched_at: Instant::now(),
-        });
+        );
     }
 
     Some(meta)
@@ -298,7 +323,12 @@ fn hardcoded_fallback(path: &str, canonical: &str) -> Option<SeoMeta> {
 }
 
 /* Rutas dinámicas: /servicios/:slug y /proyectos/:slug consultan la BD */
-async fn resolve_dynamic_meta(path: &str, pool: &PgPool, canonical: &str, app_url: &str) -> Option<SeoMeta> {
+async fn resolve_dynamic_meta(
+    path: &str,
+    pool: &PgPool,
+    canonical: &str,
+    app_url: &str,
+) -> Option<SeoMeta> {
     if let Some(slug) = path.strip_prefix("/servicios/") {
         let slug = slug.trim_end_matches('/');
         if slug.is_empty() {
@@ -313,7 +343,12 @@ async fn resolve_dynamic_meta(path: &str, pool: &PgPool, canonical: &str, app_ur
         .await
         .ok()??;
 
-        let json_ld = dynamic_service_json_ld(&json_escape(&row.0), &json_escape(row.1.as_deref().unwrap_or("")), slug, app_url);
+        let json_ld = dynamic_service_json_ld(
+            &json_escape(&row.0),
+            &json_escape(row.1.as_deref().unwrap_or("")),
+            slug,
+            app_url,
+        );
         Some(SeoMeta {
             title: format!("{} — Nakomi Studio", row.0),
             description: row.1.unwrap_or_default(),
@@ -364,7 +399,12 @@ async fn resolve_dynamic_meta(path: &str, pool: &PgPool, canonical: &str, app_ur
         .await
         .ok()??;
 
-        let json_ld = dynamic_blog_json_ld(&json_escape(&row.0), &json_escape(row.1.as_deref().unwrap_or("")), slug, app_url);
+        let json_ld = dynamic_blog_json_ld(
+            &json_escape(&row.0),
+            &json_escape(row.1.as_deref().unwrap_or("")),
+            slug,
+            app_url,
+        );
         Some(SeoMeta {
             title: format!("{} — Nakomi Studio", row.0),
             description: row.1.unwrap_or_default(),
@@ -412,9 +452,7 @@ fn inject_seo_into_html(html: &str, meta: &SeoMeta, app_url: &str) -> String {
 
     /* [277A-14] Inyectar JSON-LD structured data si existe */
     if let Some(ref json_ld) = meta.json_ld {
-        let script = format!(
-            "<script type=\"application/ld+json\">{json_ld}</script>\n"
-        );
+        let script = format!("<script type=\"application/ld+json\">{json_ld}</script>\n");
         result = result.replace("</head>", &format!("{script}</head>"));
     }
 
@@ -434,14 +472,18 @@ fn static_json_ld(path: &str, app_url: &str) -> Option<String> {
             let web = format!(
                 "{{\"@context\":\"https://schema.org\",\"@type\":\"WebSite\",\"name\":\"Nakomi Studio\",\"url\":\"{site}\"}}"
             );
-            Some(format!("{{\"@context\":\"https://schema.org\",\"@graph\":[{org},{web}]}}"))
+            Some(format!(
+                "{{\"@context\":\"https://schema.org\",\"@graph\":[{org},{web}]}}"
+            ))
         }
         "/servicios" | "/proyectos" => Some(org),
         "/nosotros" => {
             let breadcrumb = format!(
                 "{{\"@context\":\"https://schema.org\",\"@type\":\"BreadcrumbList\",\"itemListElement\":[{{\"@type\":\"ListItem\",\"position\":1,\"name\":\"Inicio\",\"item\":\"{site}\"}},{{\"@type\":\"ListItem\",\"position\":2,\"name\":\"Nosotros\",\"item\":\"{site}/nosotros\"}}]}}"
             );
-            Some(format!("{{\"@context\":\"https://schema.org\",\"@graph\":[{breadcrumb}]}}"))
+            Some(format!(
+                "{{\"@context\":\"https://schema.org\",\"@graph\":[{breadcrumb}]}}"
+            ))
         }
         _ => None,
     }
@@ -551,7 +593,8 @@ pub async fn prerender(
     };
 
     /* Resolver meta SEO para esta ruta (con cache DB para estáticas) */
-    let Some(meta) = resolve_seo_meta(path, &state.pool, &state.app_url, &state.seo_cache).await else {
+    let Some(meta) = resolve_seo_meta(path, &state.pool, &state.app_url, &state.seo_cache).await
+    else {
         /* Ruta desconocida: el SPA se encarga */
         return next.run(request).await;
     };
@@ -566,9 +609,11 @@ pub async fn prerender(
         .header(header::CACHE_CONTROL, "public, max-age=3600")
         .body(Body::from(html))
         .unwrap_or_else(|_| {
-            Response::builder()
-                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .body(Body::empty())
-                .expect("fallback response")
+            /* [259A-1] Fallback infalible: Response::new + status_mut no pueden
+             * fallar (el builder con valores fijos solo falla por input invalido,
+             * y aqui ya fallo una vez). Sin expect. */
+            let mut fallback = Response::new(Body::empty());
+            *fallback.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+            fallback
         })
 }

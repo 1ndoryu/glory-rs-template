@@ -3,12 +3,12 @@
 #![allow(clippy::needless_for_each)] // Generado por utoipa OpenApi derive
 
 mod admin_billing;
-mod admin_seo;
 mod admin_client_bootstrap;
 mod admin_email_preview;
 mod admin_emails;
 mod admin_fixtures;
 mod admin_seed;
+mod admin_seo;
 mod admin_services;
 mod admin_users;
 mod assignment;
@@ -44,14 +44,14 @@ mod vps;
 mod wallet;
 
 use argon2::PasswordHasher;
-use axum::Router;
 use axum::body::Body;
 use axum::extract::State;
-use axum::http::{HeaderName, HeaderValue, Method, StatusCode, header};
+use axum::http::{header, HeaderName, HeaderValue, Method, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
+use axum::Router;
 use tower_governor::{
-    GovernorLayer, governor::GovernorConfigBuilder, key_extractor::SmartIpKeyExtractor,
+    governor::GovernorConfigBuilder, key_extractor::SmartIpKeyExtractor, GovernorLayer,
 };
 use tower_http::compression::CompressionLayer;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
@@ -456,7 +456,12 @@ pub fn create_router(pool: sqlx::PgPool, config: crate::config::AppConfig) -> Ro
         http_client: reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .build()
-            .expect("HTTP client"),
+            /* [259A-1] Arranque: builder con valores fijos; fallo = salida
+             * explicita, nunca panic en produccion. */
+            .unwrap_or_else(|e| {
+                eprintln!("[fatal] no se pudo construir HTTP client: {e}");
+                std::process::exit(1);
+            }),
         stripe_publishable_key: config.stripe_publishable_key,
         stripe_secret_key: config.stripe_secret_key,
         stripe_webhook_secret: config.stripe_webhook_secret,
@@ -648,19 +653,27 @@ fn api_routes() -> Router<AppState> {
      * Para tasas altas se usa per_millisecond(). Config correcta:
      *   auth: 30/s sostenido, burst 30 — login/registro no necesitan más
      *   api:  50/s sostenido, burst 200 — SPA carga ~20 polls concurrentes */
+    /* [259A-1] Arranque: configs fijas validas por construccion; fallo =
+     * salida explicita, nunca panic en produccion. */
     let auth_governor = GovernorConfigBuilder::default()
         .key_extractor(SmartIpKeyExtractor)
         .per_millisecond(33)
         .burst_size(30)
         .finish()
-        .expect("rate limit config válida");
+        .unwrap_or_else(|| {
+            eprintln!("[fatal] auth rate limit config invalida");
+            std::process::exit(1);
+        });
 
     let api_governor = GovernorConfigBuilder::default()
         .key_extractor(SmartIpKeyExtractor)
         .per_millisecond(20)
         .burst_size(200)
         .finish()
-        .expect("rate limit config válida");
+        .unwrap_or_else(|| {
+            eprintln!("[fatal] api rate limit config invalida");
+            std::process::exit(1);
+        });
 
     let auth_routes = auth::routes().layer(GovernorLayer {
         config: std::sync::Arc::new(auth_governor),

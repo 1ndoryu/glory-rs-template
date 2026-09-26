@@ -43,11 +43,19 @@ pub async fn register(
                 let user_email = response.email.clone();
                 let user_name = response.email.clone();
                 let user_id = response.user_id;
-                let site_url = std::env::var("SITE_URL").unwrap_or_else(|_| "https://nakomi.studio".to_string());
+                let site_url = std::env::var("SITE_URL")
+                    .unwrap_or_else(|_| "https://nakomi.studio".to_string());
                 tokio::spawn(async move {
                     crate::services::EmailService::send_new_user_registered_admin(
-                        &cfg, &pool, &admin_emails, &user_email, &user_name, user_id, &site_url,
-                    ).await;
+                        &cfg,
+                        &pool,
+                        &admin_emails,
+                        &user_email,
+                        &user_name,
+                        user_id,
+                        &site_url,
+                    )
+                    .await;
                 });
             }
         }

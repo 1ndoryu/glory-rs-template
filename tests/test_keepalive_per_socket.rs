@@ -32,7 +32,10 @@ fn keepalive_applied_to_accepted_socket() {
     accepted_socket.set_tcp_keepalive(&ka).unwrap();
 
     let ka_after = accepted_socket.keepalive().unwrap();
-    assert!(ka_after, "SO_KEEPALIVE debe estar activo después de aplicar fix v5");
+    assert!(
+        ka_after,
+        "SO_KEEPALIVE debe estar activo después de aplicar fix v5"
+    );
     println!("✅ SO_KEEPALIVE activo en socket aceptado (keepalive={ka_after})");
 
     connect_handle.join().unwrap();
@@ -51,7 +54,10 @@ fn keepalive_listener_does_not_propagate_to_accepted() {
         .with_interval(Duration::from_secs(15));
     listener_socket.set_tcp_keepalive(&ka).unwrap();
 
-    assert!(listener_socket.keepalive().unwrap(), "Listener debe tener SO_KEEPALIVE");
+    assert!(
+        listener_socket.keepalive().unwrap(),
+        "Listener debe tener SO_KEEPALIVE"
+    );
     println!("✅ Listener tiene keepalive activo");
 
     let connect_handle = std::thread::spawn(move || {
@@ -83,7 +89,9 @@ fn timeout_does_not_fire_on_quick_connection() {
         let port = listener.local_addr().unwrap().port();
 
         let connect_handle = tokio::spawn(async move {
-            let stream = tokio::net::TcpStream::connect(format!("127.0.0.1:{port}")).await.unwrap();
+            let stream = tokio::net::TcpStream::connect(format!("127.0.0.1:{port}"))
+                .await
+                .unwrap();
             drop(stream);
         });
 
@@ -95,7 +103,10 @@ fn timeout_does_not_fire_on_quick_connection() {
         })
         .await;
 
-        assert!(result.is_ok(), "Conexión rápida no debe ser matada por timeout");
+        assert!(
+            result.is_ok(),
+            "Conexión rápida no debe ser matada por timeout"
+        );
         println!("✅ Timeout no interfiere con conexiones rápidas");
 
         connect_handle.await.unwrap();

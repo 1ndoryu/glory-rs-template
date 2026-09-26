@@ -14,9 +14,8 @@ use uuid::Uuid;
 use crate::errors::AppError;
 use crate::middleware::AuthUser;
 use crate::models::{
-    CreateNotification, PaymentStatus, RefundResponse, RefundStatus,
-    RequestRefundBody, ReviewAction, ReviewRefundBody, UserRole, NOTIF_REFUND_REQUESTED,
-    NOTIF_REFUND_RESOLVED,
+    CreateNotification, PaymentStatus, RefundResponse, RefundStatus, RequestRefundBody,
+    ReviewAction, ReviewRefundBody, UserRole, NOTIF_REFUND_REQUESTED, NOTIF_REFUND_RESOLVED,
 };
 use crate::repositories::{OrderRepository, PaymentRepository, RefundRepository, UserRepository};
 use crate::services::RefundService;
@@ -101,17 +100,35 @@ pub async fn request_refund(
                 let pool = state.pool.clone();
                 let onum = order.order_number;
                 let rid = refund.id;
-                let cname = UserRepository::get_display_name(&state.pool, order.client_id).await
-                    .ok().flatten().unwrap_or_else(|| "Cliente".to_string());
-                let cemail = UserRepository::get_email(&state.pool, order.client_id).await
-                    .ok().flatten().unwrap_or_else(|| "desconocido@email.com".to_string());
-                let amount_display = crate::services::email::format_usd_cents(refundable_payment.amount_cents);
+                let cname = UserRepository::get_display_name(&state.pool, order.client_id)
+                    .await
+                    .ok()
+                    .flatten()
+                    .unwrap_or_else(|| "Cliente".to_string());
+                let cemail = UserRepository::get_email(&state.pool, order.client_id)
+                    .await
+                    .ok()
+                    .flatten()
+                    .unwrap_or_else(|| "desconocido@email.com".to_string());
+                let amount_display =
+                    crate::services::email::format_usd_cents(refundable_payment.amount_cents);
                 let reason = body.reason.clone();
-                let site_url = std::env::var("SITE_URL").unwrap_or_else(|_| "https://nakomi.studio".to_string());
+                let site_url = std::env::var("SITE_URL")
+                    .unwrap_or_else(|_| "https://nakomi.studio".to_string());
                 tokio::spawn(async move {
                     crate::services::EmailService::send_refund_requested_admin(
-                        &cfg, &pool, &admin_email_list, &cname, &cemail, onum, &amount_display, &reason, rid, &site_url,
-                    ).await;
+                        &cfg,
+                        &pool,
+                        &admin_email_list,
+                        &cname,
+                        &cemail,
+                        onum,
+                        &amount_display,
+                        &reason,
+                        rid,
+                        &site_url,
+                    )
+                    .await;
                 });
             }
         }
@@ -175,9 +192,7 @@ pub async fn review_refund(
             .await;
 
             match result {
-                Ok(()) => {
-                    /* Refund exitoso — la notificación se envía abajo */
-                }
+                Ok(()) => { /* Refund exitoso — la notificación se envía abajo */ }
                 Err(e) => {
                     /* Refund falló en Stripe pero ya se programó retry en RefundService.
                      * Notificamos al admin del error pero NO devolvemos error al cliente:

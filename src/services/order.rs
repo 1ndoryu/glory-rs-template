@@ -829,19 +829,21 @@ impl OrderService {
 
     /// [SEO-D] Descuento 50% para primer pedido. Retorna 0 si ya tiene órdenes previas.
     async fn first_order_discount_percent(pool: &PgPool, user_id: Uuid) -> Result<i32, AppError> {
-        let count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM orders WHERE client_id = $1",
-        )
-        .bind(user_id)
-        .fetch_one(pool)
-        .await
-        .map_err(|e| AppError::Internal(format!("Error verificando órdenes previas: {e}")))?;
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM orders WHERE client_id = $1")
+            .bind(user_id)
+            .fetch_one(pool)
+            .await
+            .map_err(|e| AppError::Internal(format!("Error verificando órdenes previas: {e}")))?;
 
-        if count == 0 { Ok(50) } else { Ok(0) }
+        if count == 0 {
+            Ok(50)
+        } else {
+            Ok(0)
+        }
     }
 
     /// Estado inicial de la primera fase segun modo de pago.
-    /// [166A-2] Pública para uso desde PaymentService (checkout directo).
+    /// [166A-2] Pública para uso desde `PaymentService` (checkout directo).
     pub fn initial_phase_status(mode: PaymentMode) -> PhaseStatus {
         match mode {
             PaymentMode::Full => PhaseStatus::Paid,

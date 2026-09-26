@@ -59,7 +59,9 @@ pub struct HostingSubscription {
 impl HostingSubscription {
     #[must_use]
     pub fn deployment_id_or_legacy(&self) -> Option<&str> {
-        self.deployment_id.as_deref().or(self.server_uuid.as_deref())
+        self.deployment_id
+            .as_deref()
+            .or(self.server_uuid.as_deref())
     }
 
     #[must_use]

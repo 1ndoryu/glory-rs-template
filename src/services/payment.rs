@@ -7,14 +7,16 @@ use reqwest::Client;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use super::order_slugs::{find_plan_for_order, find_service_for_order};
 use crate::errors::AppError;
 use crate::models::{
     OrderPayment, OrderStatus, PaymentIntentResponse, PaymentMode, PaymentResponse, PaymentStatus,
     PhaseStatus,
 };
-use crate::repositories::{CreateOrderParams, CreatePaymentParams, CreatePhaseParams, OrderRepository,
-    PaymentRepository, ServiceRepository, UserRepository};
-use super::order_slugs::{find_plan_for_order, find_service_for_order};
+use crate::repositories::{
+    CreateOrderParams, CreatePaymentParams, CreatePhaseParams, OrderRepository, PaymentRepository,
+    ServiceRepository, UserRepository,
+};
 
 pub struct PaymentService;
 
@@ -306,10 +308,7 @@ impl PaymentService {
             None
         };
 
-        let description = format!(
-            "{} — {} ({:?})",
-            svc.title, plan.name, payment_mode
-        );
+        let description = format!("{} — {} ({:?})", svc.title, plan.name, payment_mode);
 
         let payment = PaymentRepository::create_payment(
             pool,
@@ -376,36 +375,47 @@ impl PaymentService {
 
                 /* [166A-2] Detectar checkout flow: si metadata.source == "checkout",
                  * crear la orden + pago desde cero. El intent NO tiene order_id asociado. */
-                let meta_source = event_data
-                    .and_then(|d| d["object"]["metadata"]["source"].as_str());
+                let meta_source =
+                    event_data.and_then(|d| d["object"]["metadata"]["source"].as_str());
 
                 if meta_source == Some("checkout") {
                     /* [20CA-1] Extraer email de metadata (en vez de user_id).
                      * El usuario se crea/encuentra dentro de handle_checkout_payment_succeeded. */
                     let email = event_data
                         .and_then(|d| d["object"]["metadata"]["email"].as_str())
-                        .ok_or_else(|| AppError::BadRequest("Missing email in checkout metadata".into()))?;
+                        .ok_or_else(|| {
+                            AppError::BadRequest("Missing email in checkout metadata".into())
+                        })?;
                     let service_slug = event_data
                         .and_then(|d| d["object"]["metadata"]["service_slug"].as_str())
-                        .ok_or_else(|| AppError::BadRequest("Missing service_slug in metadata".into()))?;
+                        .ok_or_else(|| {
+                            AppError::BadRequest("Missing service_slug in metadata".into())
+                        })?;
                     let plan_slug = event_data
                         .and_then(|d| d["object"]["metadata"]["plan_slug"].as_str())
-                        .ok_or_else(|| AppError::BadRequest("Missing plan_slug in metadata".into()))?;
+                        .ok_or_else(|| {
+                            AppError::BadRequest("Missing plan_slug in metadata".into())
+                        })?;
                     let payment_mode_str = event_data
                         .and_then(|d| d["object"]["metadata"]["payment_mode"].as_str())
                         .unwrap_or("Full");
-                    let payment_mode: PaymentMode = serde_json::from_str(
-                        &format!("\"{}\"", payment_mode_str.to_lowercase())
-                    ).unwrap_or(PaymentMode::Full);
+                    let payment_mode: PaymentMode =
+                        serde_json::from_str(&format!("\"{}\"", payment_mode_str.to_lowercase()))
+                            .unwrap_or(PaymentMode::Full);
 
-                    let amount_cents = data["object"]["amount"]
-                        .as_i64()
-                        .unwrap_or(0) as i32;
+                    let amount_cents = data["object"]["amount"].as_i64().unwrap_or(0) as i32;
 
                     Self::handle_checkout_payment_succeeded(
-                        pool, email, service_slug, plan_slug, payment_mode,
-                        pi_id, charge_id, amount_cents,
-                    ).await?;
+                        pool,
+                        email,
+                        service_slug,
+                        plan_slug,
+                        payment_mode,
+                        pi_id,
+                        charge_id,
+                        amount_cents,
+                    )
+                    .await?;
 
                     return Ok(());
                 }
@@ -580,7 +590,10 @@ impl PaymentService {
         } else {
             user
         };
-        tracing::info!("[20CA-1] Usuario {} creado post-pago para email {email}", user.id);
+        tracing::info!(
+            "[20CA-1] Usuario {} creado post-pago para email {email}",
+            user.id
+        );
         Ok(user)
     }
 
@@ -597,7 +610,9 @@ impl PaymentService {
                 if order.status != OrderStatus::PendingPayment
                     && order.status != OrderStatus::PaymentHeld
                 {
-                    return Err(AppError::BadRequest("La orden ya fue pagada o no está disponible para pago".into()));
+                    return Err(AppError::BadRequest(
+                        "La orden ya fue pagada o no está disponible para pago".into(),
+                    ));
                 }
                 Ok((
                     order.final_price_cents,

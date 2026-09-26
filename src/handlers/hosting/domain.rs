@@ -108,8 +108,7 @@ pub(super) async fn sync_custom_domain_route(
     runtime_kind: HostingRuntimeKind,
     update: HostingRuntimeUpdate<'_>,
 ) -> Result<(), AppError> {
-    HostingRuntimeService::update_deployment(http_client, config, Some(runtime_kind), update)
-        .await
+    HostingRuntimeService::update_deployment(http_client, config, Some(runtime_kind), update).await
 }
 
 pub(super) fn compose_update_from_subscription<'a>(

@@ -762,8 +762,8 @@ impl InfrastructureRepository {
         .map_err(AppError::from)
     }
 
-        pub async fn cpu_burst_candidates(pool: &PgPool) -> Result<Vec<CpuBurstCandidate>, AppError> {
-                sqlx::query_as::<_, CpuBurstCandidate>(
+    pub async fn cpu_burst_candidates(pool: &PgPool) -> Result<Vec<CpuBurstCandidate>, AppError> {
+        sqlx::query_as::<_, CpuBurstCandidate>(
                         r"SELECT hs.id AS subscription_id,
                                             COALESCE(hs.deployment_id, hs.server_uuid) AS deployment_uuid,
                                             hs.coolify_site_name,
@@ -816,7 +816,7 @@ impl InfrastructureRepository {
                 .fetch_all(pool)
                 .await
                 .map_err(AppError::from)
-        }
+    }
 
     pub async fn upsert_vps_monitor_state(
         pool: &PgPool,

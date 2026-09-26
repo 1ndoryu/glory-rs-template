@@ -4,7 +4,7 @@
 
 use sqlx::PgPool;
 
-/// Fila de la tabla seo_settings
+/// Fila de la tabla `seo_settings`
 #[derive(sqlx::FromRow, serde::Serialize)]
 pub struct SeoSetting {
     pub path: String,

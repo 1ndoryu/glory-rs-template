@@ -140,8 +140,13 @@ async fn sitemap_xml(State(state): State<AppState>) -> impl IntoResponse {
 /* [277A-14] RSS feed para el blog: /blog/feed.xml
  * Genera Atom feed con posts publicados para suscriptores y agregadores. */
 async fn blog_feed_xml(State(state): State<AppState>) -> impl IntoResponse {
-    let posts = BlogRepository::list_all(&state.pool).await.unwrap_or_default();
-    let published: Vec<_> = posts.into_iter().filter(|p| p.status == "published").collect();
+    let posts = BlogRepository::list_all(&state.pool)
+        .await
+        .unwrap_or_default();
+    let published: Vec<_> = posts
+        .into_iter()
+        .filter(|p| p.status == "published")
+        .collect();
 
     let entries: String = published
         .iter()
@@ -188,7 +193,10 @@ async fn blog_feed_xml(State(state): State<AppState>) -> impl IntoResponse {
         chrono::Utc::now().to_rfc3339(),
     );
 
-    ([(header::CONTENT_TYPE, "application/atom+xml; charset=utf-8")], feed)
+    (
+        [(header::CONTENT_TYPE, "application/atom+xml; charset=utf-8")],
+        feed,
+    )
 }
 
 fn html_escape_atom(s: &str) -> String {

@@ -1781,7 +1781,7 @@ fn exec_request_human(args: &Value) -> ToolExecResult {
 
     let rich_message = support_whatsapp.and_then(|raw_number| {
         /* Normalizar a dígitos para wa.me — requiere al menos 7 dígitos (número real) */
-        let digits: String = raw_number.chars().filter(|c| c.is_ascii_digit()).collect();
+        let digits: String = raw_number.chars().filter(char::is_ascii_digit).collect();
         if digits.len() < 7 {
             tracing::warn!("PUBLIC_SUPPORT_WHATSAPP no tiene dígitos suficientes: {raw_number}");
             return None;

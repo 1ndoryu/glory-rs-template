@@ -94,7 +94,7 @@ pub async fn image_proxy(
     };
 
     /* Resolver la raíz local permitida según el namespace solicitado */
-    let (source_root, original_path) = resolve_source_path(&state, &path);
+    let (source_root, original_path) = resolve_source_path(&state, &path)?;
 
     /* Verificar que el archivo existe y está dentro de la raíz permitida */
     let canonical = original_path.canonicalize().map_err(|e| {
@@ -164,17 +164,26 @@ pub async fn image_proxy(
     ))
 }
 
-fn resolve_source_path(state: &AppState, path: &str) -> (PathBuf, PathBuf) {
+/* [259A-2] Rechazo sintactico de traversal ANTES del join: `path` viene de
+ * la URL (ruta /api/img/ con wildcard, input externo). El check
+ * canonicalize+starts_with del llamador cubre symlinks; esto cubre `..` y
+ * separadores Windows. */
+fn resolve_source_path(state: &AppState, path: &str) -> Result<(PathBuf, PathBuf), AppError> {
+    if path.split('/').any(|seg| seg == ".." || seg.contains('\\')) {
+        return Err(AppError::BadRequest(
+            "Ruta fuera de directorio permitido".into(),
+        ));
+    }
     if path.starts_with("assets/") {
         let root = state
             .static_dir
             .as_deref()
             .map_or_else(|| PathBuf::from("frontend/public"), PathBuf::from);
-        return (root.clone(), root.join(path));
+        return Ok((root.clone(), root.join(path)));
     }
 
     let root = PathBuf::from("uploads");
-    (root.clone(), root.join(path))
+    Ok((root.clone(), root.join(path)))
 }
 
 pub fn routes() -> Router<AppState> {

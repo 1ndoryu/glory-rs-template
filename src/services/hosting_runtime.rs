@@ -11,20 +11,19 @@ use uuid::Uuid;
 use crate::errors::AppError;
 use crate::models::HostingPlanConfig;
 
-pub use super::hosting_runtime_backups::{
-    HostingRuntimeBackupEntry, HostingRuntimeBackupReport, HostingRuntimeRestoreReport,
-};
-use super::hosting_runtime_backups::{
-    LightweightManagerBackupListReport, LightweightManagerBackupReport,
-    LightweightManagerRestoreReport,
-    parse_coolify_backup_listing,
-};
-use super::hosting_runtime_lightweight_types::{
-    LightweightManagerInventoryReport, LightweightManagerProvisionStaticReport,
-};
 use super::coolify::{
     CoolifyConfig, CoolifyProvisionResult, CoolifyService, CoolifyServiceSummary,
     HostingComposeUpdate, HostingProvisionPreferences,
+};
+use super::hosting_runtime_backups::{
+    parse_coolify_backup_listing, LightweightManagerBackupListReport,
+    LightweightManagerBackupReport, LightweightManagerRestoreReport,
+};
+pub use super::hosting_runtime_backups::{
+    HostingRuntimeBackupEntry, HostingRuntimeBackupReport, HostingRuntimeRestoreReport,
+};
+use super::hosting_runtime_lightweight_types::{
+    LightweightManagerInventoryReport, LightweightManagerProvisionStaticReport,
 };
 
 const HOSTING_RUNTIME_PROVIDER_ENV: &str = "HOSTING_RUNTIME_PROVIDER";
@@ -160,9 +159,7 @@ struct LightweightManagerConfig {
 
 impl LightweightManagerConfig {
     fn configured() -> bool {
-        std::env::var(HOSTING_LIGHTWEIGHT_TARGET_ENV)
-            .ok()
-            .is_some_and(|value| !value.trim().is_empty())
+        std::env::var(HOSTING_LIGHTWEIGHT_TARGET_ENV).is_ok_and(|value| !value.trim().is_empty())
     }
 
     fn from_env() -> Result<Self, AppError> {
@@ -268,13 +265,11 @@ impl HostingRuntimeService {
         operation: &str,
     ) -> Result<Option<&'a CoolifyConfig>, AppError> {
         match runtime_kind {
-            HostingRuntimeKind::Coolify => {
-                Ok(Some(Self::require_target_config_for(
-                    runtime_kind,
-                    coolify_config,
-                    operation,
-                )?))
-            }
+            HostingRuntimeKind::Coolify => Ok(Some(Self::require_target_config_for(
+                runtime_kind,
+                coolify_config,
+                operation,
+            )?)),
             HostingRuntimeKind::Lightweight => Ok(None),
         }
     }
@@ -287,8 +282,11 @@ impl HostingRuntimeService {
         let runtime_kind = Self::resolved_kind(runtime_kind);
         match runtime_kind {
             HostingRuntimeKind::Coolify => {
-                let config =
-                    Self::require_target_config_for(runtime_kind, coolify_config, "listar despliegues")?;
+                let config = Self::require_target_config_for(
+                    runtime_kind,
+                    coolify_config,
+                    "listar despliegues",
+                )?;
                 Ok(CoolifyService::list_services(http_client, config)
                     .await?
                     .into_iter()
@@ -464,7 +462,13 @@ impl HostingRuntimeService {
                     .await
             }
             HostingRuntimeKind::Lightweight => {
-                Self::run_lightweight_site_action("eliminar despliegues", deployment_id, "delete", delete_volumes).await
+                Self::run_lightweight_site_action(
+                    "eliminar despliegues",
+                    deployment_id,
+                    "delete",
+                    delete_volumes,
+                )
+                .await
             }
         }
     }
@@ -488,24 +492,23 @@ impl HostingRuntimeService {
                     AppError::Internal("server_ip requerido para listar backups Coolify".into())
                 })?;
                 let ssh_key_path = ssh_key_path.ok_or_else(|| {
-                    AppError::Internal(
-                        "ssh_key_path requerido para listar backups Coolify".into(),
-                    )
+                    AppError::Internal("ssh_key_path requerido para listar backups Coolify".into())
                 })?;
                 Self::list_coolify_backups_via_ssh(server_ip, ssh_key_path, deployment_id).await
             }
             HostingRuntimeKind::Lightweight => {
-                let report: LightweightManagerBackupListReport = Self::run_lightweight_manager_json(
-                    "listar backups",
-                    "light-backup",
-                    &[
-                        "--site".to_string(),
-                        deployment_id.to_string(),
-                        "--list".to_string(),
-                        "--json".to_string(),
-                    ],
-                )
-                .await?;
+                let report: LightweightManagerBackupListReport =
+                    Self::run_lightweight_manager_json(
+                        "listar backups",
+                        "light-backup",
+                        &[
+                            "--site".to_string(),
+                            deployment_id.to_string(),
+                            "--list".to_string(),
+                            "--json".to_string(),
+                        ],
+                    )
+                    .await?;
 
                 Ok(report
                     .entries
@@ -557,12 +560,9 @@ impl HostingRuntimeService {
                     args.push(label.to_string());
                 }
 
-                let report: LightweightManagerBackupReport = Self::run_lightweight_manager_json(
-                    "crear backups",
-                    "light-backup",
-                    &args,
-                )
-                .await?;
+                let report: LightweightManagerBackupReport =
+                    Self::run_lightweight_manager_json("crear backups", "light-backup", &args)
+                        .await?;
 
                 Ok(HostingRuntimeBackupReport {
                     backup_id: report.backup_id,
@@ -590,7 +590,9 @@ impl HostingRuntimeService {
                     AppError::Internal("server_ip requerido para restaurar backups Coolify".into())
                 })?;
                 let ssh_key_path = ssh_key_path.ok_or_else(|| {
-                    AppError::Internal("ssh_key_path requerido para restaurar backups Coolify".into())
+                    AppError::Internal(
+                        "ssh_key_path requerido para restaurar backups Coolify".into(),
+                    )
                 })?;
                 Self::restore_coolify_backup_via_ssh(
                     server_ip,
@@ -619,12 +621,9 @@ impl HostingRuntimeService {
                     args.push("--skip-safety-snapshot".to_string());
                 }
 
-                let report: LightweightManagerRestoreReport = Self::run_lightweight_manager_json(
-                    "restaurar backups",
-                    "light-restore",
-                    &args,
-                )
-                .await?;
+                let report: LightweightManagerRestoreReport =
+                    Self::run_lightweight_manager_json("restaurar backups", "light-restore", &args)
+                        .await?;
 
                 Ok(HostingRuntimeRestoreReport {
                     backup_id: report.backup_id,
@@ -658,10 +657,14 @@ impl HostingRuntimeService {
         );
         let output = tokio::process::Command::new("ssh")
             .args([
-                "-i", ssh_key_path,
-                "-o", "StrictHostKeyChecking=accept-new",
-                "-o", "ConnectTimeout=10",
-                "-o", "BatchMode=yes",
+                "-i",
+                ssh_key_path,
+                "-o",
+                "StrictHostKeyChecking=accept-new",
+                "-o",
+                "ConnectTimeout=10",
+                "-o",
+                "BatchMode=yes",
                 &format!("root@{server_ip}"),
                 &docker_cmd,
             ])
@@ -672,7 +675,10 @@ impl HostingRuntimeService {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             /* docker volume inspect falló = volumen no existe = sin backups todavía */
-            if stderr.is_empty() || stderr.contains("no such volume") || stderr.contains("not found") {
+            if stderr.is_empty()
+                || stderr.contains("no such volume")
+                || stderr.contains("not found")
+            {
                 return Ok(vec![]);
             }
             return Err(AppError::Internal(format!(
@@ -717,10 +723,14 @@ impl HostingRuntimeService {
         );
         let output = tokio::process::Command::new("ssh")
             .args([
-                "-i", ssh_key_path,
-                "-o", "StrictHostKeyChecking=accept-new",
-                "-o", "ConnectTimeout=10",
-                "-o", "BatchMode=yes",
+                "-i",
+                ssh_key_path,
+                "-o",
+                "StrictHostKeyChecking=accept-new",
+                "-o",
+                "ConnectTimeout=10",
+                "-o",
+                "BatchMode=yes",
                 &format!("root@{server_id}"),
                 &backup_cmd,
             ])
@@ -739,7 +749,10 @@ impl HostingRuntimeService {
             backup_id: backup_id.clone(),
             tier: "manual".to_string(),
             status: "created".to_string(),
-            notes: vec![format!("Backup manual creado vía SSH para {deployment_id}"), backup_id],
+            notes: vec![
+                format!("Backup manual creado vía SSH para {deployment_id}"),
+                backup_id,
+            ],
         })
     }
 
@@ -807,10 +820,14 @@ impl HostingRuntimeService {
 
         let output = tokio::process::Command::new("ssh")
             .args([
-                "-i", ssh_key_path,
-                "-o", "StrictHostKeyChecking=accept-new",
-                "-o", "ConnectTimeout=10",
-                "-o", "BatchMode=yes",
+                "-i",
+                ssh_key_path,
+                "-o",
+                "StrictHostKeyChecking=accept-new",
+                "-o",
+                "ConnectTimeout=10",
+                "-o",
+                "BatchMode=yes",
                 &format!("root@{server_id}"),
                 &restore_cmd,
             ])
@@ -828,7 +845,9 @@ impl HostingRuntimeService {
             access_user: None,
             access_password: None,
             notes: if success {
-                vec![format!("Backup {backup_file_name} restaurado exitosamente en {deployment_id}")]
+                vec![format!(
+                    "Backup {backup_file_name} restaurado exitosamente en {deployment_id}"
+                )]
             } else {
                 vec![
                     format!("Restore de {backup_file_name} puede haber tenido problemas"),
@@ -850,19 +869,21 @@ impl HostingRuntimeService {
         let volume_name = format!("{deployment_id}_backup-data");
         /* Sanitizar nombre de archivo: solo permitir nombres de backup válidos */
         if backup_file_name.contains('/') || backup_file_name.contains("..") {
-            return Err(AppError::Validation(
-                "Nombre de backup inválido".into(),
-            ));
+            return Err(AppError::Validation("Nombre de backup inválido".into()));
         }
         let docker_cmd = format!(
             "docker run --rm -v {volume_name}:/backups alpine:3.20 rm -f /backups/{backup_file_name}"
         );
         let output = tokio::process::Command::new("ssh")
             .args([
-                "-i", ssh_key_path,
-                "-o", "StrictHostKeyChecking=accept-new",
-                "-o", "ConnectTimeout=10",
-                "-o", "BatchMode=yes",
+                "-i",
+                ssh_key_path,
+                "-o",
+                "StrictHostKeyChecking=accept-new",
+                "-o",
+                "ConnectTimeout=10",
+                "-o",
+                "BatchMode=yes",
                 &format!("root@{server_ip}"),
                 &docker_cmd,
             ])
@@ -898,7 +919,13 @@ impl HostingRuntimeService {
                 CoolifyService::stop_service(http_client, config, deployment_id).await
             }
             HostingRuntimeKind::Lightweight => {
-                Self::run_lightweight_site_action("detener despliegues", deployment_id, "stop", false).await
+                Self::run_lightweight_site_action(
+                    "detener despliegues",
+                    deployment_id,
+                    "stop",
+                    false,
+                )
+                .await
             }
         }
     }
@@ -920,7 +947,13 @@ impl HostingRuntimeService {
                 CoolifyService::start_service(http_client, config, deployment_id).await
             }
             HostingRuntimeKind::Lightweight => {
-                Self::run_lightweight_site_action("iniciar despliegues", deployment_id, "start", false).await
+                Self::run_lightweight_site_action(
+                    "iniciar despliegues",
+                    deployment_id,
+                    "start",
+                    false,
+                )
+                .await
             }
         }
     }
@@ -942,13 +975,19 @@ impl HostingRuntimeService {
                 CoolifyService::restart_service(http_client, config, deployment_id).await
             }
             HostingRuntimeKind::Lightweight => {
-                Self::run_lightweight_site_action("reiniciar despliegues", deployment_id, "restart", false).await
+                Self::run_lightweight_site_action(
+                    "reiniciar despliegues",
+                    deployment_id,
+                    "restart",
+                    false,
+                )
+                .await
             }
         }
     }
 
-    async fn list_lightweight_deployments(
-    ) -> Result<Vec<HostingRuntimeDeploymentSummary>, AppError> {
+    async fn list_lightweight_deployments() -> Result<Vec<HostingRuntimeDeploymentSummary>, AppError>
+    {
         let report: LightweightManagerInventoryReport = Self::run_lightweight_manager_json(
             "listar despliegues",
             "inventory-light",
@@ -989,12 +1028,8 @@ impl HostingRuntimeService {
         if delete_volumes {
             args.push("--delete-volumes".to_string());
         }
-        let _: serde_json::Value = Self::run_lightweight_manager_json(
-            operation,
-            "light-site",
-            &args,
-        )
-        .await?;
+        let _: serde_json::Value =
+            Self::run_lightweight_manager_json(operation, "light-site", &args).await?;
         Ok(())
     }
 

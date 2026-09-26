@@ -133,7 +133,8 @@ impl AuthService {
             /* [20CA-1] Usuario sin contraseña (creado por checkout o quick_register previo).
              * Retornar JWT sin crear duplicado. */
             let effective = existing.effective_role();
-            let token = Self::generate_token(existing.id, existing.role, effective, None, jwt_secret)?;
+            let token =
+                Self::generate_token(existing.id, existing.role, effective, None, jwt_secret)?;
             return Ok(AuthResponse {
                 token,
                 user_id: existing.id,

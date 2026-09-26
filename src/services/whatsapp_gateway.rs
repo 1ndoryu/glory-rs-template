@@ -65,13 +65,12 @@ pub async fn send_alert(
     };
 
     /* Canonical string */
-    let canonical = format!(
-        "POST\n/wp-json/glory/v1/internal/alerts\n{timestamp}\n{nonce}\n{body_hash}"
-    );
+    let canonical =
+        format!("POST\n/wp-json/glory/v1/internal/alerts\n{timestamp}\n{nonce}\n{body_hash}");
 
     let signature = {
-        let mut mac =
-            HmacSha256::new_from_slice(shared_secret.as_bytes()).expect("HMAC accepts any key size");
+        let mut mac = HmacSha256::new_from_slice(shared_secret.as_bytes())
+            .expect("HMAC accepts any key size");
         mac.update(canonical.as_bytes());
         hex::encode(mac.finalize().into_bytes())
     };
@@ -83,10 +82,7 @@ pub async fn send_alert(
         .header("Content-Type", "application/json")
         .header("X-Glory-Timestamp", timestamp.to_string())
         .header("X-Glory-Nonce", &nonce)
-        .header(
-            "X-Glory-Idempotency-Key",
-            &payload.idempotency_key,
-        )
+        .header("X-Glory-Idempotency-Key", &payload.idempotency_key)
         .header("X-Glory-Signature", &signature)
         .body(body)
         .timeout(std::time::Duration::from_secs(10))
@@ -105,7 +101,8 @@ pub async fn send_alert(
     let status = response.status();
     if status == reqwest::StatusCode::ACCEPTED || status == reqwest::StatusCode::OK {
         GatewayResult::Accepted
-    } else if status.is_client_error() && status != reqwest::StatusCode::TOO_MANY_REQUESTS
+    } else if status.is_client_error()
+        && status != reqwest::StatusCode::TOO_MANY_REQUESTS
         && status != reqwest::StatusCode::REQUEST_TIMEOUT
     {
         GatewayResult::Fatal(format!("Gateway rechazó: HTTP {status}"))

@@ -198,7 +198,8 @@ fn parse_sampler_output(output: &str) -> ServerSshSnapshot {
         }
 
         match line {
-            "__CPU__" | "__NPROC__" | "__MEM__" | "__DISK__" | "__DOCKER__" | "__DOCKER_LIMITS__" | "__STORAGE__" => {
+            "__CPU__" | "__NPROC__" | "__MEM__" | "__DISK__" | "__DOCKER__"
+            | "__DOCKER_LIMITS__" | "__STORAGE__" => {
                 section = line;
                 continue;
             }

@@ -103,9 +103,9 @@ impl ResponseCycleRepository {
         Ok(Some(message))
     }
 
-    /// Crear un ciclo de respuesta cuando el cliente envía mensaje en modo human_priority.
+    /// Crear un ciclo de respuesta cuando el cliente envía mensaje en modo `human_priority`.
     /// INSERT con ON CONFLICT para garantizar un solo ciclo "waiting" por sesión.
-    /// Retorna Some(cycle_id) si se creó, None si ya existía uno waiting.
+    /// Retorna `Some(cycle_id)` si se creó, None si ya existía uno waiting.
     pub async fn create_if_needed(
         pool: &PgPool,
         session_id: Uuid,
@@ -130,7 +130,7 @@ impl ResponseCycleRepository {
 
     /// Reclamar ciclos expirados (deadline pasada y status='waiting').
     /// Usa FOR UPDATE SKIP LOCKED para concurrencia segura entre workers.
-    /// Retorna los session_ids que necesitan fallback IA.
+    /// Retorna los `session_ids` que necesitan fallback IA.
     pub async fn claim_expired(pool: &PgPool) -> Result<Vec<(Uuid, Uuid)>, AppError> {
         let rows = sqlx::query_as::<_, (Uuid, Uuid)>(
             "UPDATE chat_response_cycles \
@@ -203,7 +203,7 @@ impl ResponseCycleRepository {
         Ok(())
     }
 
-    /// Verificar si la sesión tiene ai_mode='human_priority' y hay ciclo waiting.
+    /// Verificar si la sesión tiene `ai_mode`='`human_priority`' y hay ciclo waiting.
     /// Retorna true si la IA NO debe responder automáticamente.
     pub async fn is_in_human_window(pool: &PgPool, session_id: Uuid) -> Result<bool, AppError> {
         let exists = sqlx::query_scalar::<_, bool>(

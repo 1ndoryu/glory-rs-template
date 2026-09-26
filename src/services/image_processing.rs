@@ -101,9 +101,17 @@ pub fn cache_path(original_path: &str, params: &OptimizeParams) -> PathBuf {
         cached_name.set_extension(params.format.extension());
     }
 
+    /* [259A-2] Funcion pura (sin IO): canonicalize imposible. Filtrado lexico
+     * de componentes — se descartan `..`, raices y prefijos absolutos para que
+     * el join nunca escape de CACHE_DIR aunque original_path traiga `..`. */
+    let safe_original: PathBuf = cached_name
+        .components()
+        .filter(|c| matches!(c, std::path::Component::Normal(_)))
+        .collect();
+
     PathBuf::from(CACHE_DIR)
         .join(cache_subdir)
-        .join(cached_name)
+        .join(safe_original)
 }
 
 /* Procesa una imagen: redimensiona y/o comprime según los parámetros.

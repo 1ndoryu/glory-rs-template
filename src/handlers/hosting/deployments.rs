@@ -1,20 +1,20 @@
-use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
+use axum::Json;
 use std::collections::{HashMap, HashSet};
 
 use super::deployment_helpers::{
-    FailedRuntimeLookup, build_subscription_lookups, collect_pending_deployment_batches,
-    deployments_cache, duplicate_name_keys, invalidate_deployments_cache,
-    locate_runtime_deployment, resolve_server_label, runtime_link_key,
+    build_subscription_lookups, collect_pending_deployment_batches, deployments_cache,
+    duplicate_name_keys, invalidate_deployments_cache, locate_runtime_deployment,
+    resolve_server_label, runtime_link_key, FailedRuntimeLookup,
 };
-use crate::AppState;
 use crate::errors::AppError;
 use crate::middleware::AuthUser;
 use crate::models::{CoolifyDeploymentResponse, HostingSubscription, UserRole};
 use crate::repositories::{HostingRepository, InfrastructureRepository};
 use crate::services::infrastructure::coolify_server_targets;
 use crate::services::{HostingRuntimeDeploymentSummary, HostingRuntimeKind, HostingRuntimeService};
+use crate::AppState;
 
 fn map_runtime_deployments(
     services: Vec<HostingRuntimeDeploymentSummary>,
@@ -580,8 +580,8 @@ mod tests {
     }
 
     #[test]
-    fn build_failed_runtime_fallback_batches_accepts_missing_server_ip_if_runtime_failure_is_unique()
-     {
+    fn build_failed_runtime_fallback_batches_accepts_missing_server_ip_if_runtime_failure_is_unique(
+    ) {
         let failed_lookups = vec![FailedRuntimeLookup {
             fallback_label: "VPS2".to_string(),
             runtime_kind: HostingRuntimeKind::Coolify,

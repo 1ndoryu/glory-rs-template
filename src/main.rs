@@ -20,7 +20,9 @@ use glory_backend::services::storage_enforcement::storage_enforcement_loop;
 use glory_backend::services::vps_monitor::vps_monitor_loop;
 use glory_backend::services::{AssignmentService, ContaboConfig, ContaboService, CoolifyConfig};
 use glory_rs::fixtures::ContentManager;
-use glory_rs::runtime::{spawn_runtime_watchdog, HttpProbeConfig, RuntimeHeartbeat, RuntimeWatchdogConfig};
+use glory_rs::runtime::{
+    spawn_runtime_watchdog, HttpProbeConfig, RuntimeHeartbeat, RuntimeWatchdogConfig,
+};
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 8)]
 #[allow(clippy::too_many_lines)]
@@ -268,17 +270,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
  * que las conexiones activas se drenen antes de cerrar el proceso. */
 async fn shutdown_signal() {
     let ctrl_c = async {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("failed to install Ctrl+C handler");
+        /* [259A-1] Sin expect: si no se puede instalar el handler, el servidor
+         * sigue corriendo sin esa señal (pending eterno) en vez de paniquear. */
+        if tokio::signal::ctrl_c().await.is_err() {
+            tracing::error!("No se pudo instalar handler Ctrl+C; shutdown graceful sin Ctrl+C");
+            std::future::pending::<()>().await;
+        }
     };
 
     #[cfg(unix)]
     let terminate = async {
-        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-            .expect("failed to install signal handler")
-            .recv()
-            .await;
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut sig) => {
+                sig.recv().await;
+            }
+            Err(e) => {
+                tracing::error!(
+                    "No se pudo instalar handler SIGTERM: {e}; shutdown graceful sin SIGTERM"
+                );
+                std::future::pending::<()>().await;
+            }
+        }
     };
 
     #[cfg(not(unix))]
@@ -352,10 +364,18 @@ fn spawn_background_services(pool: &sqlx::PgPool, _config: &AppConfig) {
     /* [237A-7d] Background task: worker de alertas de chat (outbox → SMTP + WhatsApp) */
     let alert_pool = pool.clone();
     let alert_email = glory_backend::services::EmailConfig::from_env();
-    let alert_client = reqwest::Client::builder()
+    /* [259A-1] build() falla solo con configuracion invalida (fija aqui):
+     * salida explicita en arranque, nunca panic. */
+    let alert_client = match reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(10))
         .build()
-        .expect("alert worker HTTP client");
+    {
+        Ok(client) => client,
+        Err(e) => {
+            eprintln!("[fatal] alert worker HTTP client: {e}");
+            std::process::exit(1);
+        }
+    };
     tokio::spawn(async move {
         glory_backend::services::chat_alert_worker::run_chat_alert_worker(
             alert_pool,
@@ -365,15 +385,12 @@ fn spawn_background_services(pool: &sqlx::PgPool, _config: &AppConfig) {
         .await;
     });
 
-    /* [237A-9] Background task: worker de response cycles (fallback IA 10min) 
+    /* [237A-9] Background task: worker de response cycles (fallback IA 10min)
      * Solo necesita el pool: persiste mensajes directamente vía ChatRepository.
      * El broadcast WS se omite (ChatHub se crea después en AppState). */
     let cycle_pool = pool.clone();
     tokio::spawn(async move {
-        glory_backend::services::response_cycle_worker::run_response_cycle_worker(
-            cycle_pool,
-        )
-        .await;
+        glory_backend::services::response_cycle_worker::run_response_cycle_worker(cycle_pool).await;
     });
 
     let coolify_config = CoolifyConfig::from_env();
@@ -392,10 +409,18 @@ fn spawn_background_services(pool: &sqlx::PgPool, _config: &AppConfig) {
 
     if coolify_config.is_some() || coolify_config_vps1.is_some() {
         let metrics_pool = pool.clone();
-        let metrics_client = reqwest::Client::builder()
+        /* [259A-1] build() falla solo con configuracion invalida (fija aqui):
+         * salida explicita en arranque, nunca panic. */
+        let metrics_client = match reqwest::Client::builder()
             .timeout(Duration::from_secs(30))
             .build()
-            .expect("metrics HTTP client");
+        {
+            Ok(client) => client,
+            Err(e) => {
+                eprintln!("[fatal] metrics HTTP client: {e}");
+                std::process::exit(1);
+            }
+        };
         let metrics_vps1 = coolify_config_vps1.clone();
         let metrics_default = coolify_config.clone();
         tokio::spawn(async move {

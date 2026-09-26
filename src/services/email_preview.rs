@@ -197,26 +197,68 @@ pub fn render_preview(_config: &EmailConfig, template: &str) -> Result<String, S
     let chat_panel = format!("{SITE}/panel/chat?session={UUID}");
 
     match template {
-        "order_confirmation" => Ok(t::render_order_confirmation(NAME, ORDER, SERVICE, PLAN, PRICE)),
-        "new_order_admin" => Ok(t::render_new_order_admin(NAME, EMAIL, ORDER, SERVICE, PLAN, PRICE, PAYMENT_MODE, &panel)),
-        "payment_received_admin" => Ok(t::render_payment_received_admin(NAME, ORDER, PRICE, &panel)),
+        "order_confirmation" => Ok(t::render_order_confirmation(
+            NAME, ORDER, SERVICE, PLAN, PRICE,
+        )),
+        "new_order_admin" => Ok(t::render_new_order_admin(
+            NAME,
+            EMAIL,
+            ORDER,
+            SERVICE,
+            PLAN,
+            PRICE,
+            PAYMENT_MODE,
+            &panel,
+        )),
+        "payment_received_admin" => {
+            Ok(t::render_payment_received_admin(NAME, ORDER, PRICE, &panel))
+        }
         "order_completed_client" => Ok(t::render_order_completed_client(NAME, ORDER, SERVICE)),
-        "order_completed_admin" => Ok(t::render_order_completed_admin(NAME, ORDER, SERVICE, &panel)),
+        "order_completed_admin" => Ok(t::render_order_completed_admin(
+            NAME, ORDER, SERVICE, &panel,
+        )),
         "order_cancelled_client" => Ok(t::render_order_cancelled_client(NAME, ORDER, REASON)),
         "order_cancelled_admin" => Ok(t::render_order_cancelled_admin(NAME, ORDER, REASON, &panel)),
-        "phase_delivered_client" => Ok(t::render_phase_delivered_client(NAME, ORDER, PHASE, &panel)),
-        "problem_reported_client" => Ok(t::render_problem_reported_client(NAME, ORDER, PROBLEM_DESC)),
-        "problem_reported_admin" => Ok(t::render_problem_reported_admin(NAME, ORDER, PROBLEM_DESC, &panel)),
-        "refund_requested_admin" => Ok(t::render_refund_requested_admin(NAME, ORDER, PRICE, REASON, &panel)),
+        "phase_delivered_client" => {
+            Ok(t::render_phase_delivered_client(NAME, ORDER, PHASE, &panel))
+        }
+        "problem_reported_client" => {
+            Ok(t::render_problem_reported_client(NAME, ORDER, PROBLEM_DESC))
+        }
+        "problem_reported_admin" => Ok(t::render_problem_reported_admin(
+            NAME,
+            ORDER,
+            PROBLEM_DESC,
+            &panel,
+        )),
+        "refund_requested_admin" => Ok(t::render_refund_requested_admin(
+            NAME, ORDER, PRICE, REASON, &panel,
+        )),
         "new_user_registered_admin" => Ok(t::render_new_user_registered_admin(NAME, EMAIL, &panel)),
         "escalation" => Ok(t::render_escalation(VISITOR, &chat_panel)),
         "chat_invoice_paid_client" => Ok(t::render_chat_invoice_paid_client(NAME, PRICE, UUID)),
-        "chat_invoice_paid_admin" => Ok(t::render_chat_invoice_paid_admin(NAME, PRICE, UUID, &chat_panel)),
-        "vps_pending_approval" => Ok(t::render_vps_pending_approval(NAME, TIER, "mi-dominio.com", &panel)),
-        "vps_approved" => Ok(t::render_vps_approved(NAME, TIER, PUBLIC_IP, USERNAME, PASSWORD)),
+        "chat_invoice_paid_admin" => Ok(t::render_chat_invoice_paid_admin(
+            NAME,
+            PRICE,
+            UUID,
+            &chat_panel,
+        )),
+        "vps_pending_approval" => Ok(t::render_vps_pending_approval(
+            NAME,
+            TIER,
+            "mi-dominio.com",
+            &panel,
+        )),
+        "vps_approved" => Ok(t::render_vps_approved(
+            NAME, TIER, PUBLIC_IP, USERNAME, PASSWORD,
+        )),
         "vps_rejected" => Ok(t::render_vps_rejected(NAME, TIER, REASON)),
-        "profile_email_changed_new" => Ok(t::render_profile_email_changed_new(OLD_EMAIL, NEW_EMAIL, NAME)),
-        "profile_email_changed_old" => Ok(t::render_profile_email_changed_old(OLD_EMAIL, NEW_EMAIL, NAME)),
+        "profile_email_changed_new" => Ok(t::render_profile_email_changed_new(
+            OLD_EMAIL, NEW_EMAIL, NAME,
+        )),
+        "profile_email_changed_old" => Ok(t::render_profile_email_changed_old(
+            OLD_EMAIL, NEW_EMAIL, NAME,
+        )),
         "profile_password_changed" => Ok(t::render_profile_password_changed(NAME)),
         _ => Err(format!("Plantilla desconocida: {template}")),
     }

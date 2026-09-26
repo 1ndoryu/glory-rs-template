@@ -17,9 +17,7 @@ use crate::models::{
 };
 use crate::repositories::{HostingRepository, NotificationRepository, ServerInfo};
 use crate::services::coolify::HostingProvisionPreferences;
-use crate::services::{
-    CoolifyConfig, HostingRuntimeProvisionResult, HostingRuntimeService,
-};
+use crate::services::{CoolifyConfig, HostingRuntimeProvisionResult, HostingRuntimeService};
 
 /* Respuesta mínima de Stripe Checkout Session */
 #[derive(Debug, Deserialize)]
@@ -256,7 +254,8 @@ impl HostingStripeService {
         activation_source: &str,
     ) {
         let hosting_id = subscription.id;
-        let runtime_kind = crate::services::HostingRuntimeKind::from_persisted(&subscription.runtime_kind);
+        let runtime_kind =
+            crate::services::HostingRuntimeKind::from_persisted(&subscription.runtime_kind);
         let Some((service_name, sftp_port, plan_config)) =
             load_auto_provision_request(pool, subscription, activation_source).await
         else {
@@ -563,16 +562,16 @@ impl HostingStripeService {
 
         /* [104A-42] Eliminar despliegue del runtime al cancelar — no-fatal */
         if let Some(deployment_id) = hosting.deployment_id_or_legacy() {
-            let runtime_kind = crate::services::HostingRuntimeKind::from_persisted(&hosting.runtime_kind);
-            if let Err(e) =
-                HostingRuntimeService::delete_deployment(
-                    http_client,
-                    coolify_config,
-                    Some(runtime_kind),
-                    deployment_id,
-                    false,
-                )
-                .await
+            let runtime_kind =
+                crate::services::HostingRuntimeKind::from_persisted(&hosting.runtime_kind);
+            if let Err(e) = HostingRuntimeService::delete_deployment(
+                http_client,
+                coolify_config,
+                Some(runtime_kind),
+                deployment_id,
+                false,
+            )
+            .await
             {
                 tracing::warn!(
                     "Error eliminando despliegue {} para hosting {}: {e}",

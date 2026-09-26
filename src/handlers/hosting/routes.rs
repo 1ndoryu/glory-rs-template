@@ -9,6 +9,7 @@ use super::checkout::{admin_test_subscribe, create_checkout, subscribe_self};
 use super::control::{restart_hosting, start_hosting, stop_hosting};
 use super::deployments::{delete_deployment, list_deployments};
 use super::domain::{dns_check, verify_domain};
+use super::email_aliases::{create_alias, delete_alias, get_email_info};
 use super::infrastructure::{
     deployment_metrics, list_infrastructure_servers, refresh_infrastructure_metrics,
     resource_usage_report,
@@ -21,7 +22,6 @@ use super::subscriptions::{
     list_subscriptions, request_cancel, update_status, update_subscription,
 };
 use super::vps::{get_vps, list_vps};
-use super::email_aliases::{create_alias, delete_alias, get_email_info};
 use crate::AppState;
 
 fn subscription_routes() -> Router<AppState> {
@@ -30,18 +30,26 @@ fn subscription_routes() -> Router<AppState> {
      *
      * [176A-1] Corregido: per_second(N) = 1 token cada N segundos.
      * Checkout: 1 req/s, burst 5 — prevenir abuso sin bloquear compras legítimas. */
+    /* [259A-1] Config fija valida por construccion; si falla es error de
+     * programacion en arranque: salida explicita, nunca panic en produccion. */
     let subscribe_gov = GovernorConfigBuilder::default()
         .key_extractor(SmartIpKeyExtractor)
         .per_second(1)
         .burst_size(5)
         .finish()
-        .expect("subscribe rate limit config");
+        .unwrap_or_else(|| {
+            eprintln!("[fatal] subscribe rate limit config invalida");
+            std::process::exit(1);
+        });
     let checkout_gov = GovernorConfigBuilder::default()
         .key_extractor(SmartIpKeyExtractor)
         .per_second(1)
         .burst_size(5)
         .finish()
-        .expect("checkout rate limit config");
+        .unwrap_or_else(|| {
+            eprintln!("[fatal] checkout rate limit config invalida");
+            std::process::exit(1);
+        });
 
     Router::new()
         .route(
@@ -122,10 +130,7 @@ fn subscription_routes() -> Router<AppState> {
             axum::routing::post(admin_test_subscribe),
         )
         /* [265A-11] Alias de correo: listar, crear, eliminar */
-        .route(
-            "/hosting/subscriptions/:id/email",
-            get(get_email_info),
-        )
+        .route("/hosting/subscriptions/:id/email", get(get_email_info))
         .route(
             "/hosting/subscriptions/:id/email/aliases",
             axum::routing::post(create_alias),

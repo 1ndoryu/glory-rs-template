@@ -382,10 +382,13 @@ mod tests {
 
     #[test]
     fn activation_ratio_greater_than_deactivation() {
-        assert!(
-            ACTIVATION_RATIO > DEACTIVATION_RATIO,
-            "histeresis: activacion debe ser mayor que desactivacion"
-        );
+        /* [259A-1] assert sobre constantes en bloque const (clippy assertions_on_constants). */
+        const {
+            assert!(
+                ACTIVATION_RATIO > DEACTIVATION_RATIO,
+                "histeresis: activacion debe ser mayor que desactivacion"
+            );
+        }
     }
 
     #[test]
@@ -398,16 +401,22 @@ mod tests {
 
     #[test]
     fn throttle_rates_positive() {
-        assert!(THROTTLE_RATE_MODERATE > 0);
-        assert!(THROTTLE_RATE_AGGRESSIVE > 0);
-        assert!(THROTTLE_RATE_PREVENTIVE > 0);
+        /* [259A-1] assert sobre constantes en bloque const (clippy assertions_on_constants). */
+        const {
+            assert!(THROTTLE_RATE_MODERATE > 0);
+            assert!(THROTTLE_RATE_AGGRESSIVE > 0);
+            assert!(THROTTLE_RATE_PREVENTIVE > 0);
+        }
     }
 
     #[test]
     fn aggressive_rate_less_than_moderate() {
-        assert!(
-            THROTTLE_RATE_AGGRESSIVE < THROTTLE_RATE_MODERATE,
-            "agresivo debe ser menor que moderado"
-        );
+        /* [259A-1] assert sobre constantes en bloque const (clippy assertions_on_constants). */
+        const {
+            assert!(
+                THROTTLE_RATE_AGGRESSIVE < THROTTLE_RATE_MODERATE,
+                "agresivo debe ser menor que moderado"
+            );
+        }
     }
 }

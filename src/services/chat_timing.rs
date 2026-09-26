@@ -496,9 +496,17 @@ async fn session_timing_loop(
          * Limita peticiones IA concurrentes para proteger pool DB y APIs. */
         /* [096A-8] Timeout en semaphore: si 3 permits ocupados >30s, abortar en vez de bloquear.
          * Sin timeout, una 4ta sesión espera indefinidamente → canal mpsc se llena → WS se congela. */
-        let _permit =
+        let permit =
             match tokio::time::timeout(Duration::from_secs(30), ai_semaphore.acquire()).await {
-                Ok(permit) => permit.expect("semaphore closed"),
+                /* [259A-1] Semaphore cerrado (permits liberados): responder sin limite
+                 * en vez de paniquear; el cierre solo ocurre en shutdown. */
+                Ok(Ok(permit)) => Some(permit),
+                Ok(Err(e)) => {
+                    tracing::warn!(
+                    "Semaforo IA cerrado para sesion {session_id}: {e}; respondiendo sin limite"
+                );
+                    None
+                }
                 Err(_) => {
                     tracing::warn!("Timeout 30s esperando semáforo IA para sesión {session_id}");
                     continue;
@@ -512,7 +520,7 @@ async fn session_timing_loop(
             &deps,
         )
         .await;
-        drop(_permit);
+        drop(permit);
     }
 
     /* [T-3] Al cerrar sesión, generar resumen de contexto para futuras conversaciones.
@@ -631,15 +639,13 @@ async fn generate_ai_response(
     /* Verificar que la sesión sigue con IA activa.
      * [237A-9] Respetar ai_mode: manual_pause bloquea IA completamente;
      * human_priority con ciclo waiting también bloquea (el worker genera fallback). */
-    let session =
-        match crate::repositories::ChatRepository::find_session_by_id(&deps.pool, session_id).await
-        {
-            Ok(Some(s)) => s,
-            _ => {
-                tracing::info!(%session_id, "generate_ai_response: sesión no encontrada");
-                return irrelevant_count;
-            }
-        };
+    /* [259A-1] let-else en vez de match de un solo patron (clippy manual_let_else). */
+    let Ok(Some(session)) =
+        crate::repositories::ChatRepository::find_session_by_id(&deps.pool, session_id).await
+    else {
+        tracing::info!(%session_id, "generate_ai_response: sesión no encontrada");
+        return irrelevant_count;
+    };
 
     if !session.ai_enabled || session.assigned_staff_id.is_some() {
         tracing::info!(%session_id, "generate_ai_response: sesión no activa, saltando IA");
@@ -1135,7 +1141,13 @@ mod tests {
         /* Forzar que el mute ya expiró y resetear count para provocar nuevo exceso */
         {
             let mut entry = svc.rate_limits.get_mut("visitor-4").unwrap();
-            entry.mute_until = Some(Instant::now() - Duration::from_secs(1));
+            entry.mute_until = Some(
+                Instant::now()
+                    .checked_sub(Duration::from_secs(1))
+                    /* [259A-1] checked_sub en vez de resta directa (clippy unchecked_time_subtraction);
+                     * en test: unwrap porque 1s siempre es restable. */
+                    .unwrap(),
+            );
             entry.count = RATE_LIMIT_PER_MIN;
         }
         /* Siguiente exceso → cooldown_level=3 → Closed */
@@ -1304,9 +1316,12 @@ mod tests {
 
     #[test]
     fn rate_constants_sane() {
-        assert!(RATE_LIMIT_PER_MIN > 0);
-        assert!(IP_RATE_LIMIT_PER_MIN > RATE_LIMIT_PER_MIN);
-        assert!(MAX_WS_CONNECTIONS_PER_IP > 0);
-        assert!(AI_IP_TOKEN_BUDGET_PER_HOUR > AI_VISITOR_TOKEN_BUDGET_PER_HOUR);
+        /* [259A-1] assert sobre constantes en bloque const (clippy assertions_on_constants). */
+        const {
+            assert!(RATE_LIMIT_PER_MIN > 0);
+            assert!(IP_RATE_LIMIT_PER_MIN > RATE_LIMIT_PER_MIN);
+            assert!(MAX_WS_CONNECTIONS_PER_IP > 0);
+            assert!(AI_IP_TOKEN_BUDGET_PER_HOUR > AI_VISITOR_TOKEN_BUDGET_PER_HOUR);
+        }
     }
 }

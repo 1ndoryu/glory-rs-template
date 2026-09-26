@@ -55,34 +55,34 @@ pub(crate) async fn call_ai_api_with_options(
     client: Option<&reqwest::Client>,
 ) -> Result<Value, String> {
     let default_client;
-    let client = match client {
-        Some(c) => c,
-        None => {
-            default_client = reqwest::Client::builder()
-                .timeout(std::time::Duration::from_secs(options.timeout_secs))
-                .build()
-                .unwrap_or_default();
-            &default_client
-        }
+    /* [259A-1] if-let-else en vez de match de un solo patron (clippy single_match_else). */
+    let client = if let Some(c) = client {
+        c
+    } else {
+        default_client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(options.timeout_secs))
+            .build()
+            .unwrap_or_default();
+        &default_client
     };
     let mut last_error = String::new();
 
     if config.deepseek_key.is_some() {
-        match try_deepseek_provider(config, &client, messages, tools, options).await {
+        match try_deepseek_provider(config, client, messages, tools, options).await {
             Ok(json) => return Ok(json),
             Err(e) => last_error = e,
         }
     }
 
     if !config.api_keys.is_empty() {
-        match try_groq_provider(config, &client, messages, tools, options).await {
+        match try_groq_provider(config, client, messages, tools, options).await {
             Ok(json) => return Ok(json),
             Err(e) => last_error = e,
         }
     }
 
     if config.gemini_key.is_some() {
-        match try_gemini_provider(config, &client, messages, tools, options).await {
+        match try_gemini_provider(config, client, messages, tools, options).await {
             Ok(json) => return Ok(json),
             Err(e) => last_error = e,
         }

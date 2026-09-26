@@ -102,7 +102,7 @@ impl ChatAlertRepository {
         Ok(())
     }
 
-    /// Marca como 'accepted_by_gateway' (encolada en el gateway remoto).
+    /// Marca como '`accepted_by_gateway`' (encolada en el gateway remoto).
     pub async fn mark_accepted_by_gateway(pool: &PgPool, id: Uuid) -> Result<(), AppError> {
         let now = Utc::now();
         sqlx::query(
@@ -116,7 +116,7 @@ impl ChatAlertRepository {
         Ok(())
     }
 
-    /// Reintenta con backoff. Si se exceden MAX_ATTEMPTS → dead.
+    /// Reintenta con backoff. Si se exceden `MAX_ATTEMPTS` → dead.
     pub async fn mark_retry(
         pool: &PgPool,
         id: Uuid,
@@ -137,10 +137,10 @@ impl ChatAlertRepository {
             .await
             .map_err(|e| AppError::Internal(format!("Error marcando outbox dead: {e}")))?;
         } else {
-            let backoff_secs = BACKOFF_SEQUENCE
-                .get(attempt.saturating_sub(1) as usize)
-                .copied()
-                .unwrap_or(1800);
+            /* [259A-1] Sin `as usize` (clippy cast_sign_loss): attempt viene de
+             * BD (i32, podria ser <= 0 en filas anómalas). Clamp a >= 0. */
+            let idx = usize::try_from(attempt.saturating_sub(1).max(0)).unwrap_or(0);
+            let backoff_secs = BACKOFF_SEQUENCE.get(idx).copied().unwrap_or(1800);
             let available_at = now + Duration::seconds(backoff_secs);
             sqlx::query(
                 "UPDATE chat_alert_outbox SET status = 'pending', last_error = $2, available_at = $3, updated_at = $3, locked_at = NULL WHERE id = $1",

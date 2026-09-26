@@ -47,7 +47,7 @@ fn alert_email_override() -> Option<String> {
         .filter(|s| !s.is_empty())
 }
 
-/// SITE_URL para construir enlaces al panel.
+/// `SITE_URL` para construir enlaces al panel.
 fn site_url() -> String {
     std::env::var("SITE_URL").unwrap_or_else(|_| "https://nakomi.studio".to_string())
 }
@@ -55,10 +55,10 @@ fn site_url() -> String {
 /// Guarda un mensaje y crea todas las alertas en una sola transacción.
 /// Retorna el mensaje persistido.
 ///
-/// Solo genera alertas para mensajes de cliente/visitor (sender_type == "client").
+/// Solo genera alertas para mensajes de cliente/visitor (`sender_type` == "client").
 /// Los mensajes de IA, admin, employee se persisten sin outbox.
 ///
-/// Después del commit, el caller debe hacer broadcast WS y notification_hub.
+/// Después del commit, el caller debe hacer broadcast WS y `notification_hub`.
 pub async fn send_message_with_alerts(
     pool: &PgPool,
     session_id: Uuid,
@@ -133,7 +133,7 @@ pub async fn send_message_with_alerts(
             reference_type: Some("chat_session".to_string()),
             reference_id: Some(session_id),
         };
-        NotificationRepository::create_tx(&mut *tx, &notif).await?;
+        NotificationRepository::create_tx(&mut tx, &notif).await?;
     }
 
     /* 3. Outbox email */
@@ -156,7 +156,7 @@ pub async fn send_message_with_alerts(
             })?;
 
             ChatAlertRepository::insert_tx(
-                &mut *tx,
+                &mut tx,
                 &idempotency_key,
                 AlertEventType::ClientMessage.as_str(),
                 "email",
@@ -185,7 +185,7 @@ pub async fn send_message_with_alerts(
         })?;
 
         ChatAlertRepository::insert_tx(
-            &mut *tx,
+            &mut tx,
             &idempotency_key,
             AlertEventType::ClientMessage.as_str(),
             "whatsapp",

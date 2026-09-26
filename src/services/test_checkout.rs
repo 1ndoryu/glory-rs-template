@@ -5,8 +5,7 @@
 #[must_use]
 pub fn checkout_bypass_is_configured() -> bool {
     std::env::var("GLORY_TEST_CHECKOUT_EMAILS")
-        .ok()
-        .is_some_and(|raw| raw.split(',').any(|entry| !entry.trim().is_empty()))
+        .is_ok_and(|raw| raw.split(',').any(|entry| !entry.trim().is_empty()))
 }
 
 #[must_use]
@@ -16,15 +15,13 @@ pub fn is_checkout_bypass_email(email: &str) -> bool {
         return false;
     }
 
-    std::env::var("GLORY_TEST_CHECKOUT_EMAILS")
-        .ok()
-        .is_some_and(|raw| {
-            raw.split(',')
-                .map(str::trim)
-                .filter(|entry| !entry.is_empty())
-                .map(str::to_ascii_lowercase)
-                .any(|entry| entry == normalized)
-        })
+    std::env::var("GLORY_TEST_CHECKOUT_EMAILS").is_ok_and(|raw| {
+        raw.split(',')
+            .map(str::trim)
+            .filter(|entry| !entry.is_empty())
+            .map(str::to_ascii_lowercase)
+            .any(|entry| entry == normalized)
+    })
 }
 
 #[cfg(test)]

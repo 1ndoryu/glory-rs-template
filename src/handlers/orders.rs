@@ -347,13 +347,11 @@ async fn check_first_order_discount(
     auth: AuthUser,
 ) -> Result<Json<serde_json::Value>, AppError> {
     auth.require_role(&[UserRole::Client, UserRole::Admin])?;
-    let count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM orders WHERE client_id = $1",
-    )
-    .bind(auth.user_id)
-    .fetch_one(&state.pool)
-    .await
-    .map_err(|e| AppError::Internal(format!("Error verificando órdenes: {e}")))?;
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM orders WHERE client_id = $1")
+        .bind(auth.user_id)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|e| AppError::Internal(format!("Error verificando órdenes: {e}")))?;
 
     Ok(Json(serde_json::json!({
         "qualifies": count == 0,
@@ -363,7 +361,10 @@ async fn check_first_order_discount(
 
 pub fn routes() -> Router<AppState> {
     Router::new()
-        .route("/orders/first-order-discount", get(check_first_order_discount))
+        .route(
+            "/orders/first-order-discount",
+            get(check_first_order_discount),
+        )
         .route("/orders", post(create_order).get(list_orders))
         .route("/orders/:order_id", get(get_order))
         .route(

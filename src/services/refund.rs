@@ -5,10 +5,10 @@ use reqwest::Client;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use super::PaymentService;
 use crate::errors::AppError;
 use crate::models::{OrderStatus, PaymentStatus, RefundStatus};
 use crate::repositories::{OrderRepository, PaymentRepository, RefundRepository};
-use super::PaymentService;
 
 pub struct RefundService;
 
@@ -46,9 +46,7 @@ impl RefundService {
         let payment = payments
             .iter()
             .find(|p| p.id == refund.payment_id)
-            .ok_or_else(|| {
-                AppError::Internal("Pago asociado al reembolso no encontrado".into())
-            })?;
+            .ok_or_else(|| AppError::Internal("Pago asociado al reembolso no encontrado".into()))?;
 
         /* Ejecutar refund en Stripe */
         let stripe_refund_id = match stripe_key {
@@ -62,10 +60,7 @@ impl RefundService {
             Some(key) => match PaymentService::refund_payment(http_client, key, payment).await {
                 Ok(id) => id,
                 Err(e) => {
-                    tracing::error!(
-                        "[277A-7] Stripe refund falló para {}: {e}",
-                        refund_id
-                    );
+                    tracing::error!("[277A-7] Stripe refund falló para {}: {e}", refund_id);
                     /* Determinar si se puede reintentar (usando computed_attempts ya incrementado) */
                     if computed_attempts >= refund.max_attempts {
                         /* Agotar intentos → marcar failed permanente (sin next_retry_at) */
@@ -117,8 +112,7 @@ impl RefundService {
         RefundRepository::mark_completed(pool, refund_id, &stripe_refund_id).await?;
 
         /* Cancelar la orden */
-        OrderRepository::update_order_status(pool, refund.order_id, OrderStatus::Cancelled)
-            .await?;
+        OrderRepository::update_order_status(pool, refund.order_id, OrderStatus::Cancelled).await?;
 
         tracing::info!(
             "[277A-7] Reembolso {} completado (stripe: {stripe_refund_id})",
@@ -132,10 +126,20 @@ impl RefundService {
      * Ejecuta periódicamente desde background task. */
     pub async fn run_refund_retry_loop(pool: PgPool, stripe_key: Option<String>) {
         const CHECK_INTERVAL: std::time::Duration = std::time::Duration::from_mins(15);
-        let http_client = Client::builder()
+        let http_client = match Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .build()
-            .expect("refund retry HTTP client");
+        {
+            /* [259A-1] Sin expect: si el builder falla, el worker no arranca
+             * (log explicito) en vez de paniquear el proceso. */
+            Ok(client) => client,
+            Err(e) => {
+                tracing::error!(
+                    "[refund-retry] No se pudo construir HTTP client: {e}; worker detenido"
+                );
+                return;
+            }
+        };
 
         tracing::info!("[refund-retry] Worker iniciado (intervalo: 15min)");
 
@@ -168,10 +172,7 @@ impl RefundService {
                 )
                 .await
                 {
-                    tracing::error!(
-                        "[refund-retry] Error procesando retry {}: {e}",
-                        refund.id
-                    );
+                    tracing::error!("[refund-retry] Error procesando retry {}: {e}", refund.id);
                 }
             }
         }

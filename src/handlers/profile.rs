@@ -136,7 +136,8 @@ pub async fn upload_avatar(
     }
 
     let filename = format!("{}-{}.{ext}", auth.user_id, Utc::now().timestamp_millis());
-    let filepath = dir.join(&filename);
+    /* [259A-2] Join via helper anti-traversal (rechazo lexico + contencion). */
+    let filepath = crate::util::join_write_path(dir, &[&filename])?;
     tokio::fs::write(&filepath, &data)
         .await
         .map_err(|e| AppError::Internal(format!("Error guardando archivo: {e}")))?;

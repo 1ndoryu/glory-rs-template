@@ -3,7 +3,7 @@
  * Solo admin. Whitelist MIME para imágenes. Max 5 MB. */
 
 use axum::extract::{DefaultBodyLimit, Multipart, State};
-use axum::routing::{get, post};
+use axum::routing::get;
 use axum::{Json, Router};
 use serde::Serialize;
 use std::path::PathBuf;
@@ -91,8 +91,23 @@ pub async fn upload_image(
         )));
     }
 
-    /* Generar nombre único con UUID para evitar colisiones */
-    let extension = original_name.rsplit('.').next().unwrap_or("bin");
+    /* Generar nombre único con UUID para evitar colisiones.
+     * [259A-2] La extension viene del nombre original (input externo): se
+     * filtra a alfanumerico (antes `uuid.<ext-sin-filtrar>` permitia
+     * `..` tras el ultimo punto y escape de UPLOAD_DIR). */
+    let extension: String = original_name
+        .rsplit('.')
+        .next()
+        .unwrap_or("bin")
+        .chars()
+        .filter(char::is_ascii_alphanumeric)
+        .take(10)
+        .collect();
+    let extension = if extension.is_empty() {
+        "bin".to_string()
+    } else {
+        extension
+    };
     let unique_name = format!("{}.{}", Uuid::new_v4(), extension);
 
     let upload_path = PathBuf::from(UPLOAD_DIR);
@@ -100,7 +115,8 @@ pub async fn upload_image(
         .await
         .map_err(|e| AppError::Internal(format!("Error creando directorio: {e}")))?;
 
-    let file_path = upload_path.join(&unique_name);
+    /* [259A-2] Join via helper anti-traversal (doble capa sobre el filtrado). */
+    let file_path = crate::util::join_write_path(&upload_path, &[&unique_name])?;
     fs::write(&file_path, &data)
         .await
         .map_err(|e| AppError::Internal(format!("Error guardando archivo: {e}")))?;
@@ -135,12 +151,19 @@ async fn list_uploads(auth: AuthUser) -> Result<Json<Vec<UploadEntry>>, AppError
         .await
         .map_err(|e| AppError::Internal(format!("Error leyendo directorio: {e}")))?;
 
-    while let Some(entry) = dir.next_entry().await.map_err(|e| AppError::Internal(format!("Error leyendo entrada: {e}")))? {
+    while let Some(entry) = dir
+        .next_entry()
+        .await
+        .map_err(|e| AppError::Internal(format!("Error leyendo entrada: {e}")))?
+    {
         let metadata = entry.metadata().await.ok();
         let name = entry.file_name().to_string_lossy().to_string();
         /* Solo incluir archivos de imagen por extensión */
         let ext = name.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
-        if !matches!(ext.as_str(), "jpg" | "jpeg" | "png" | "webp" | "gif" | "svg") {
+        if !matches!(
+            ext.as_str(),
+            "jpg" | "jpeg" | "png" | "webp" | "gif" | "svg"
+        ) {
             continue;
         }
         let size = metadata.map(|m| m.len()).unwrap_or(0);

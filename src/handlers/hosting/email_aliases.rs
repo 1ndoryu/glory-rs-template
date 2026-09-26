@@ -10,8 +10,8 @@ use uuid::Uuid;
 use crate::errors::AppError;
 use crate::middleware::AuthUser;
 use crate::models::{
-    CreateEmailAliasRequest, EmailAliasResponse, EmailMailboxResponse,
-    HostingEmailInfoResponse, UserRole,
+    CreateEmailAliasRequest, EmailAliasResponse, EmailMailboxResponse, HostingEmailInfoResponse,
+    UserRole,
 };
 use crate::repositories::HostingRepository;
 use crate::AppState;
@@ -57,12 +57,14 @@ pub async fn get_email_info(
     ensure_subscription_access(&auth, sub.user_id)?;
 
     let aliases = HostingRepository::list_aliases(&state.pool, id).await?;
-    let aliases_limit = HostingRepository::get_plan_included_aliases(&state.pool, &sub.plan).await?;
+    let aliases_limit =
+        HostingRepository::get_plan_included_aliases(&state.pool, &sub.plan).await?;
     let aliases_count = HostingRepository::count_active_aliases(&state.pool, id).await?;
 
     /* [265A-12] Buzones preparados (vacios hasta Fase 2) */
     let mailboxes: Vec<EmailMailboxResponse> = Vec::new();
-    let mailboxes_limit = HostingRepository::get_plan_included_mailboxes(&state.pool, &sub.plan).await?;
+    let mailboxes_limit =
+        HostingRepository::get_plan_included_mailboxes(&state.pool, &sub.plan).await?;
 
     Ok(Json(HostingEmailInfoResponse {
         aliases: aliases.into_iter().map(Into::into).collect(),
@@ -147,7 +149,8 @@ pub async fn create_alias(
         "alias": format!("{}@{}", req.alias, req.domain),
         "destination": req.destination,
     });
-    let _ = HostingRepository::add_event(&state.pool, id, "email_alias_created", Some(details)).await;
+    let _ =
+        HostingRepository::add_event(&state.pool, id, "email_alias_created", Some(details)).await;
 
     Ok((StatusCode::CREATED, Json(EmailAliasResponse::from(alias))))
 }
@@ -199,7 +202,8 @@ pub async fn delete_alias(
         "action": "alias_deleted",
         "alias": format!("{}@{}", alias.alias, alias.domain),
     });
-    let _ = HostingRepository::add_event(&state.pool, id, "email_alias_deleted", Some(details)).await;
+    let _ =
+        HostingRepository::add_event(&state.pool, id, "email_alias_deleted", Some(details)).await;
 
     Ok(StatusCode::NO_CONTENT)
 }

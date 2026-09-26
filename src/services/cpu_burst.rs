@@ -217,8 +217,7 @@ fn baseline_site_limit(candidate: &CpuBurstCandidate) -> f64 {
 }
 
 fn observed_limit_target(candidate: &CpuBurstCandidate) -> CpuLimitTarget {
-    current_site_limit(candidate)
-    .map_or(CpuLimitTarget::Unlimited, CpuLimitTarget::limited)
+    current_site_limit(candidate).map_or(CpuLimitTarget::Unlimited, CpuLimitTarget::limited)
 }
 
 fn utilization_reference_limit(observed: CpuLimitTarget, baseline: f64) -> f64 {
@@ -310,7 +309,11 @@ fn desired_baseline_burst_limit(
         return boosted.then_some(baseline_target);
     }
 
-    let demander_count = demanders.get(&candidate.server_id).copied().unwrap_or(1).max(1);
+    let demander_count = demanders
+        .get(&candidate.server_id)
+        .copied()
+        .unwrap_or(1)
+        .max(1);
     let target = CpuLimitTarget::limited(compute_burst_target(
         baseline,
         candidate.server_cpu_cores,
@@ -356,7 +359,11 @@ fn desired_contention_throttle_limit(
         return Some(CpuLimitTarget::Unlimited);
     }
 
-    let demander_count = demanders.get(&candidate.server_id).copied().unwrap_or(1).max(1);
+    let demander_count = demanders
+        .get(&candidate.server_id)
+        .copied()
+        .unwrap_or(1)
+        .max(1);
     let target = CpuLimitTarget::limited(compute_burst_target(
         baseline,
         candidate.server_cpu_cores,
@@ -580,7 +587,8 @@ async fn evaluate_cpu_burst(
         let ssh_key = if let Some(existing) = ssh_cache.get(&candidate.server_ip) {
             existing.clone()
         } else {
-            let Some(ssh_key) = ssh_key_for(&candidate.server_ip, vps1_config, default_config) else {
+            let Some(ssh_key) = ssh_key_for(&candidate.server_ip, vps1_config, default_config)
+            else {
                 tracing::warn!("[cpu-burst] Sin SSH key para {}", candidate.server_ip);
                 continue;
             };
@@ -645,7 +653,8 @@ mod tests {
     #[test]
     fn compute_burst_target_keeps_host_reserve() {
         let target = compute_burst_target(0.5, Some(8.0), 1);
-        assert_eq!(target, 6.0);
+        /* [259A-1] comparacion con epsilon en vez de assert_eq float (clippy float_cmp). */
+        assert!((target - 6.0).abs() < 0.001);
     }
 
     #[test]
@@ -707,7 +716,10 @@ mod tests {
     #[test]
     fn compose_project_candidates_prefers_deployment_uuid() {
         let candidates = compose_project_candidates("v77j8dfkb8rat8mlhzoid2eh", "hosting-0fa1d5da");
-        assert_eq!(candidates, vec!["v77j8dfkb8rat8mlhzoid2eh", "hosting-0fa1d5da"]);
+        assert_eq!(
+            candidates,
+            vec!["v77j8dfkb8rat8mlhzoid2eh", "hosting-0fa1d5da"]
+        );
     }
 
     #[test]

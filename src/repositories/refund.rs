@@ -202,9 +202,7 @@ impl RefundRepository {
     /* [277A-7] Buscar reembolsos que necesitan retry:
      * 1. failed con next_retry_at alcanzado y attempts < max_attempts
      * 2. processing stuck >30min (proceso crash antes de completar) */
-    pub async fn find_pending_retry(
-        pool: &PgPool,
-    ) -> Result<Vec<OrderRefund>, sqlx::Error> {
+    pub async fn find_pending_retry(pool: &PgPool) -> Result<Vec<OrderRefund>, sqlx::Error> {
         sqlx::query_as::<_, OrderRefund>(&format!(
             "SELECT {SELECT_COLS} FROM order_refunds
              WHERE (status = 'failed'

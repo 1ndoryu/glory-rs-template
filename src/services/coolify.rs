@@ -9,12 +9,12 @@
  * Diseño no-fatal: los errores de provisioning se loguean pero no bloquean el pago. */
 
 use base64::Engine;
-use rand::Rng;
 use rand::distributions::Alphanumeric;
+use rand::Rng;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tokio::time::{Duration, sleep};
+use tokio::time::{sleep, Duration};
 use tracing;
 
 use crate::errors::AppError;
@@ -692,10 +692,9 @@ fn build_compose_wp_db(
         let smtp_pass = std::env::var("SMTP_PASS")
             .or_else(|_| std::env::var("GLORY_SMTP_PASSWORD"))
             .unwrap_or_default();
-        let smtp_from = std::env::var("SMTP_FROM")
-            .unwrap_or_else(|_| smtp_user.clone());
-        let smtp_from_name = std::env::var("SMTP_FROM_NAME")
-            .unwrap_or_else(|_| "Nakomi Studio".to_string());
+        let smtp_from = std::env::var("SMTP_FROM").unwrap_or_else(|_| smtp_user.clone());
+        let smtp_from_name =
+            std::env::var("SMTP_FROM_NAME").unwrap_or_else(|_| "Nakomi Studio".to_string());
         format!(
             "      - WORDPRESS_SMTP_HOST={smtp_host}\n      - WORDPRESS_SMTP_PORT={smtp_port}\n      - WORDPRESS_SMTP_USER={smtp_user}\n      - WORDPRESS_SMTP_PASSWORD={smtp_pass}\n      - WORDPRESS_SMTP_FROM={smtp_from}\n      - WORDPRESS_SMTP_FROM_NAME={smtp_from_name}\n",
         )

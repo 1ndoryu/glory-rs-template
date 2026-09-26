@@ -223,12 +223,6 @@ primaria `glory-rust-nakomi`. Comandos: `npm run quality:setup|doctor|analyze|lo
 `npm run quality:check -- <ID>`. Baseline `.quality-reports/analyze.json`: 643
 archivos, 157 con violaciones (34 errores, 363 warnings, 6 info, 60 hints).
 
-- **259A-1** — Liquidar 15 `expect-produccion-rs` (handlers/hosting, mod, main,
-  middleware/prerender, models/hosting/validation, services ai_chat/chat_timing/refund).
-- **259A-2** — Endurecer 11 `path-join-sin-canonicalize` (rest_upload, deliverables,
-  image_proxy, profile, uploads, image_processing): canonicalize + starts_with.
-- **259A-3** — Corregir 3 `axum-ruta-sintaxis-rs` (cancellation:429/433, wallet:329):
-  `{param}` → `:param` (matchit 0.7.3).
 - **259A-4** — Partir 5 `god-object-rs` error (>800 líneas): ai_tools, chat_timing,
   email, hosting_runtime, repositories/infrastructure.
 - **259A-5** — Triage warnings Glory-DS (html-nativo 37, window-reference 42,

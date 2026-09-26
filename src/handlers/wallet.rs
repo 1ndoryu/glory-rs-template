@@ -327,5 +327,5 @@ pub fn wallet_routes() -> Router<AppState> {
 pub fn withdrawal_admin_routes() -> Router<AppState> {
     Router::new()
         .route("/admin/withdrawals", get(admin_list_withdrawals))
-        .route("/admin/withdrawals/{id}", patch(admin_resolve_withdrawal))
+        .route("/admin/withdrawals/:id", patch(admin_resolve_withdrawal))
 }

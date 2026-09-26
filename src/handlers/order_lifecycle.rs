@@ -186,12 +186,17 @@ pub async fn cancel_order_handler(
                 user_id: Uuid::nil(),
                 notification_type: NOTIF_ORDER_CANCELLED.to_string(),
                 title: format!("Orden #{} cancelada", order.order_number),
-                body: reason.as_deref().map(|r| format!("Motivo: {}", r.chars().take(100).collect::<String>())),
+                body: reason
+                    .as_deref()
+                    .map(|r| format!("Motivo: {}", r.chars().take(100).collect::<String>())),
                 link: Some(format!("/panel?seccion=ordenes&id={}", order.id)),
                 reference_type: Some("order".to_string()),
                 reference_id: Some(order.id),
             };
-            let _ = state.notification_hub.notify_many(&admins_filtered, &admin_base).await;
+            let _ = state
+                .notification_hub
+                .notify_many(&admins_filtered, &admin_base)
+                .await;
         }
     }
 
@@ -208,18 +213,32 @@ pub async fn cancel_order_handler(
 
     /* [311A-1] Email al cliente notificando cancelación (non-fatal) */
     if let Some(ref email_cfg) = state.email_config {
-        let reason_clone = reason.clone().unwrap_or_else(|| "Sin motivo especificado".to_string());
-        if let Ok(Some(client_email)) = UserRepository::get_email(&state.pool, order.client_id).await {
+        let reason_clone = reason
+            .clone()
+            .unwrap_or_else(|| "Sin motivo especificado".to_string());
+        if let Ok(Some(client_email)) =
+            UserRepository::get_email(&state.pool, order.client_id).await
+        {
             let cfg = email_cfg.clone();
             let pool = state.pool.clone();
             let onum = order.order_number;
             let oid = order.id;
-            let cname = UserRepository::get_display_name(&state.pool, order.client_id).await
-                .ok().flatten().unwrap_or_else(|| "Cliente".to_string());
+            let cname = UserRepository::get_display_name(&state.pool, order.client_id)
+                .await
+                .ok()
+                .flatten()
+                .unwrap_or_else(|| "Cliente".to_string());
             tokio::spawn(async move {
                 crate::services::EmailService::send_order_cancelled_client(
-                    &cfg, &pool, &client_email, &cname, onum, &reason_clone, oid,
-                ).await;
+                    &cfg,
+                    &pool,
+                    &client_email,
+                    &cname,
+                    onum,
+                    &reason_clone,
+                    oid,
+                )
+                .await;
             });
         }
     }
@@ -232,16 +251,34 @@ pub async fn cancel_order_handler(
                 let pool = state.pool.clone();
                 let onum = order.order_number;
                 let oid = order.id;
-                let cname = UserRepository::get_display_name(&state.pool, order.client_id).await
-                    .ok().flatten().unwrap_or_else(|| "Cliente".to_string());
-                let cemail = UserRepository::get_email(&state.pool, order.client_id).await
-                    .ok().flatten().unwrap_or_else(|| "desconocido@email.com".to_string());
-                let reason_clone = reason.clone().unwrap_or_else(|| "Sin motivo especificado".to_string());
-                let site_url = std::env::var("SITE_URL").unwrap_or_else(|_| "https://nakomi.studio".to_string());
+                let cname = UserRepository::get_display_name(&state.pool, order.client_id)
+                    .await
+                    .ok()
+                    .flatten()
+                    .unwrap_or_else(|| "Cliente".to_string());
+                let cemail = UserRepository::get_email(&state.pool, order.client_id)
+                    .await
+                    .ok()
+                    .flatten()
+                    .unwrap_or_else(|| "desconocido@email.com".to_string());
+                let reason_clone = reason
+                    .clone()
+                    .unwrap_or_else(|| "Sin motivo especificado".to_string());
+                let site_url = std::env::var("SITE_URL")
+                    .unwrap_or_else(|_| "https://nakomi.studio".to_string());
                 tokio::spawn(async move {
                     crate::services::EmailService::send_order_cancelled_admin(
-                        &cfg, &pool, &admin_emails, &cname, &cemail, onum, &reason_clone, oid, &site_url,
-                    ).await;
+                        &cfg,
+                        &pool,
+                        &admin_emails,
+                        &cname,
+                        &cemail,
+                        onum,
+                        &reason_clone,
+                        oid,
+                        &site_url,
+                    )
+                    .await;
                 });
             }
         }
@@ -302,13 +339,19 @@ pub async fn approve_phase(
                 let base = CreateNotification {
                     user_id: Uuid::nil(),
                     notification_type: NOTIF_PHASE_APPROVED.to_string(),
-                    title: format!("Orden #{} — Fase {} aprobada", order.order_number, phase_number),
+                    title: format!(
+                        "Orden #{} — Fase {} aprobada",
+                        order.order_number, phase_number
+                    ),
                     body: Some("El cliente aprobó la entrega".to_string()),
                     link: Some(format!("/panel?seccion=ordenes&id={}", order.id)),
                     reference_type: Some("order".to_string()),
                     reference_id: Some(order.id),
                 };
-                let _ = state.notification_hub.notify_many(&admins_filtered, &base).await;
+                let _ = state
+                    .notification_hub
+                    .notify_many(&admins_filtered, &base)
+                    .await;
             }
         }
         if order.status == OrderStatus::Completed {
@@ -350,29 +393,48 @@ pub async fn approve_phase(
                         user_id: Uuid::nil(),
                         notification_type: NOTIF_ORDER_COMPLETED.to_string(),
                         title: format!("Orden #{} completada", order.order_number),
-                        body: Some(format!("Precio final: ${:.2}", order.final_price_cents as f64 / 100.0)),
+                        body: Some(format!(
+                            "Precio final: ${:.2}",
+                            order.final_price_cents as f64 / 100.0
+                        )),
                         link: Some(format!("/panel?seccion=ordenes&id={}", order.id)),
                         reference_type: Some("order".to_string()),
                         reference_id: Some(order.id),
                     };
-                    let _ = state.notification_hub.notify_many(&admins_filtered, &admin_base).await;
+                    let _ = state
+                        .notification_hub
+                        .notify_many(&admins_filtered, &admin_base)
+                        .await;
                 }
             }
 
             /* [311A-1] Email al cliente notificando orden completada (non-fatal) */
             if let Some(ref email_cfg) = state.email_config {
-                if let Ok(Some(client_email)) = UserRepository::get_email(&state.pool, order.client_id).await {
+                if let Ok(Some(client_email)) =
+                    UserRepository::get_email(&state.pool, order.client_id).await
+                {
                     let cfg = email_cfg.clone();
                     let pool = state.pool.clone();
                     let onum = order.order_number;
                     let oid = order.id;
-                    let cname = UserRepository::get_display_name(&state.pool, order.client_id).await
-                        .ok().flatten().unwrap_or_else(|| "Cliente".to_string());
-                    let site_url = std::env::var("SITE_URL").unwrap_or_else(|_| "https://nakomi.studio".to_string());
+                    let cname = UserRepository::get_display_name(&state.pool, order.client_id)
+                        .await
+                        .ok()
+                        .flatten()
+                        .unwrap_or_else(|| "Cliente".to_string());
+                    let site_url = std::env::var("SITE_URL")
+                        .unwrap_or_else(|_| "https://nakomi.studio".to_string());
                     tokio::spawn(async move {
                         crate::services::EmailService::send_order_completed_client(
-                            &cfg, &pool, &client_email, &cname, onum, &site_url, oid,
-                        ).await;
+                            &cfg,
+                            &pool,
+                            &client_email,
+                            &cname,
+                            onum,
+                            &site_url,
+                            oid,
+                        )
+                        .await;
                     });
                 }
             }
@@ -385,15 +447,30 @@ pub async fn approve_phase(
                         let pool = state.pool.clone();
                         let onum = order.order_number;
                         let oid = order.id;
-                        let cname = UserRepository::get_display_name(&state.pool, order.client_id).await
-                            .ok().flatten().unwrap_or_else(|| "Cliente".to_string());
-                        let cemail = UserRepository::get_email(&state.pool, order.client_id).await
-                            .ok().flatten().unwrap_or_else(|| "desconocido@email.com".to_string());
-                        let site_url = std::env::var("SITE_URL").unwrap_or_else(|_| "https://nakomi.studio".to_string());
+                        let cname = UserRepository::get_display_name(&state.pool, order.client_id)
+                            .await
+                            .ok()
+                            .flatten()
+                            .unwrap_or_else(|| "Cliente".to_string());
+                        let cemail = UserRepository::get_email(&state.pool, order.client_id)
+                            .await
+                            .ok()
+                            .flatten()
+                            .unwrap_or_else(|| "desconocido@email.com".to_string());
+                        let site_url = std::env::var("SITE_URL")
+                            .unwrap_or_else(|_| "https://nakomi.studio".to_string());
                         tokio::spawn(async move {
                             crate::services::EmailService::send_order_completed_admin(
-                                &cfg, &pool, &admin_emails, &cname, &cemail, onum, oid, &site_url,
-                            ).await;
+                                &cfg,
+                                &pool,
+                                &admin_emails,
+                                &cname,
+                                &cemail,
+                                onum,
+                                oid,
+                                &site_url,
+                            )
+                            .await;
                         });
                     }
                 }
@@ -413,8 +490,11 @@ pub async fn approve_phase(
                     /* [20CA-10] Notificar a admins que el pago fue liberado al empleado */
                     if let Ok(admin_ids) = UserRepository::admin_ids(&state.pool).await {
                         let emp_name = if let Some(eid) = order.assigned_employee_id {
-                            UserRepository::get_display_name(&state.pool, eid).await
-                                .ok().flatten().unwrap_or_else(|| "Empleado".to_string())
+                            UserRepository::get_display_name(&state.pool, eid)
+                                .await
+                                .ok()
+                                .flatten()
+                                .unwrap_or_else(|| "Empleado".to_string())
                         } else {
                             "Empleado".to_string()
                         };
@@ -422,7 +502,11 @@ pub async fn approve_phase(
                             user_id: Uuid::nil(),
                             notification_type: NOTIF_PAYMENT_RELEASED.to_string(),
                             title: format!("Pago liberado — Orden #{}", order.order_number),
-                            body: Some(format!("${:.2} liberados a {}", order.final_price_cents as f64 / 100.0, emp_name)),
+                            body: Some(format!(
+                                "${:.2} liberados a {}",
+                                order.final_price_cents as f64 / 100.0,
+                                emp_name
+                            )),
                             link: Some(format!("/panel?seccion=ordenes&id={}", order.id)),
                             reference_type: Some("order".to_string()),
                             reference_id: Some(order.id),
@@ -503,9 +587,7 @@ pub async fn request_revision(
         }
 
         /* [20CA-10] Notificar también a todos los admins */
-        if let Ok(admin_ids) =
-            crate::repositories::UserRepository::admin_ids(&state.pool).await
-        {
+        if let Ok(admin_ids) = crate::repositories::UserRepository::admin_ids(&state.pool).await {
             let admins_filtered: Vec<Uuid> = admin_ids
                 .into_iter()
                 .filter(|id| Some(*id) != order.assigned_employee_id && *id != auth.user_id)

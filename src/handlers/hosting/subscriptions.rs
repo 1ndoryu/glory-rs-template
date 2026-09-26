@@ -304,7 +304,8 @@ pub(super) async fn update_subscription(
 
     if domain_changed && active_custom_domain(&sub).is_some() {
         if let Some(update) = compose_update_from_subscription(&sub, None, &plan_config) {
-            let runtime_kind = crate::services::HostingRuntimeKind::from_persisted(&sub.runtime_kind);
+            let runtime_kind =
+                crate::services::HostingRuntimeKind::from_persisted(&sub.runtime_kind);
             let config = HostingRuntimeService::optional_target_config_for(
                 runtime_kind,
                 state.coolify_config.as_ref(),
@@ -387,15 +388,14 @@ pub(super) async fn delete_subscription(
         (sub.deployment_id_or_legacy(), &state.coolify_config)
     {
         let runtime_kind = crate::services::HostingRuntimeKind::from_persisted(&sub.runtime_kind);
-        if let Err(e) =
-            HostingRuntimeService::delete_deployment(
-                &state.http_client,
-                Some(coolify_config),
-                Some(runtime_kind),
-                deployment_id,
-                true,
-            )
-            .await
+        if let Err(e) = HostingRuntimeService::delete_deployment(
+            &state.http_client,
+            Some(coolify_config),
+            Some(runtime_kind),
+            deployment_id,
+            true,
+        )
+        .await
         {
             tracing::warn!(
                 "Error eliminando despliegue {} para suscripción {id}: {e}",

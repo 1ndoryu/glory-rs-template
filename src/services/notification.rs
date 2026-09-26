@@ -40,15 +40,12 @@ impl NotificationHub {
     #[must_use]
     pub fn subscribe(&self, user_id: Uuid) -> mpsc::UnboundedReceiver<WsNotification> {
         let (tx, rx) = mpsc::unbounded_channel();
-        self.channels
-            .entry(user_id)
-            .or_default()
-            .push(tx);
+        self.channels.entry(user_id).or_default().push(tx);
         rx
     }
 
     /// Crea una notificación en BD y la emite por WS al usuario si está conectado.
-    /// [096A-13] broadcast_to_user() itera Vec de senders con send() lock-free.
+    /// [096A-13] `broadcast_to_user()` itera Vec de senders con `send()` lock-free.
     pub async fn notify(&self, params: CreateNotification) -> Result<Notification, AppError> {
         let user_id = params.user_id;
 
@@ -66,7 +63,7 @@ impl NotificationHub {
     }
 
     /// Envía el conteo actual de no leídas por WS.
-    /// [096A-13] El await de DB está fuera de cualquier lock de DashMap o Mutex.
+    /// [096A-13] El await de DB está fuera de cualquier lock de `DashMap` o `Mutex`.
     pub async fn send_unread_count(&self, user_id: Uuid) {
         if let Ok(count) = NotificationRepository::count_unread(&self.pool, user_id).await {
             self.broadcast_to_user(user_id, &WsNotification::UnreadCount { count });

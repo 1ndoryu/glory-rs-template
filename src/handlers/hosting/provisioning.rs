@@ -65,11 +65,7 @@ async fn prepare_provision(
             AppError::Internal(format!("Plan config '{}' no encontrado en BD", sub.plan))
         })?;
     let allocation = if config_ref.is_some() {
-        Some(InfrastructureRepository::hosting_allocation_for_plan(
-            pool,
-            &sub.plan,
-        )
-        .await?)
+        Some(InfrastructureRepository::hosting_allocation_for_plan(pool, &sub.plan).await?)
     } else {
         None
     };
@@ -81,7 +77,9 @@ async fn prepare_provision(
         )
         .await?;
         if !capacity_reserved {
-            HostingRepository::update_status(pool, id, "pending").await.ok();
+            HostingRepository::update_status(pool, id, "pending")
+                .await
+                .ok();
             return Err(AppError::Validation(
                 "La VPS no tiene capacidad suficiente para provisionar este plan".into(),
             ));
@@ -115,8 +113,7 @@ async fn execute_provision(
     prep: &ProvisionPrep,
     id: Uuid,
 ) -> Result<HostingRuntimeProvisionResult, AppError> {
-    let provision_preferences =
-        HostingStripeService::load_provision_preferences(pool, id).await;
+    let provision_preferences = HostingStripeService::load_provision_preferences(pool, id).await;
     let result = match HostingRuntimeService::provision_hosting(
         &state.http_client,
         prep.config.as_ref(),
@@ -133,7 +130,9 @@ async fn execute_provision(
         Ok(result) => result,
         Err(error) => {
             tracing::error!("[Provision] Falló para {id}: {error}");
-            if let (Some(config), Some(allocation)) = (prep.config.as_ref(), prep.allocation.as_ref()) {
+            if let (Some(config), Some(allocation)) =
+                (prep.config.as_ref(), prep.allocation.as_ref())
+            {
                 InfrastructureRepository::release_capacity(
                     &state.pool,
                     &config.server_uuid,

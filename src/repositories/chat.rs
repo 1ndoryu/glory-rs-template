@@ -137,7 +137,7 @@ impl ChatRepository {
 
     /// Sesiones activas con historial (panel staff).
     /// [277A-4] Solo sesiones no cerradas. Las cerradas se cargan bajo demanda
-    /// mediante list_all_sessions_incl_archived() para no hidratar todo el
+    /// mediante `list_all_sessions_incl_archived()` para no hidratar todo el
     /// historial en cada reconexión de admin.
     pub async fn list_sessions(pool: &PgPool) -> Result<Vec<ChatSession>, sqlx::Error> {
         /* [074A-30] Filtrar sesiones sin mensajes — no tiene sentido mostrarlas.
@@ -157,7 +157,9 @@ impl ChatRepository {
     }
 
     /// Todas las sesiones incluyendo archivadas (para búsqueda/admin).
-    pub async fn list_all_sessions_incl_archived(pool: &PgPool) -> Result<Vec<ChatSession>, sqlx::Error> {
+    pub async fn list_all_sessions_incl_archived(
+        pool: &PgPool,
+    ) -> Result<Vec<ChatSession>, sqlx::Error> {
         sqlx::query_as::<_, ChatSession>(
             "SELECT id, visitor_id, visitor_name, user_id, order_id, status, \
                assigned_staff_id, ai_enabled, created_at, updated_at, \
@@ -193,7 +195,7 @@ impl ChatRepository {
         .await
     }
 
-    /// Toggle IA en una sesión. También sincroniza ai_mode.
+    /// Toggle IA en una sesión. También sincroniza `ai_mode`.
     /* [237A-9] Al reactivar IA → ai_mode='automatic'; al desactivar → ai_mode='manual_pause'.
      * El staff puede usar set_ai_mode('human_priority') para modo intermedio. */
     pub async fn toggle_ai(

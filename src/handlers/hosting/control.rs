@@ -13,7 +13,14 @@ async fn resolve_provisioned_sub(
     state: &AppState,
     auth: &AuthUser,
     id: Uuid,
-) -> Result<(crate::models::HostingSubscription, HostingRuntimeKind, String), AppError> {
+) -> Result<
+    (
+        crate::models::HostingSubscription,
+        HostingRuntimeKind,
+        String,
+    ),
+    AppError,
+> {
     let sub = HostingRepository::find_by_id(&state.pool, id)
         .await?
         .ok_or(AppError::NotFound("Suscripción no encontrada".into()))?;

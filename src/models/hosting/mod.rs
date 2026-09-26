@@ -12,17 +12,16 @@ mod validation;
 
 pub use entities::{
     normalize_cpu_scaling_policy, HostingEmailAlias, HostingEmailMailbox, HostingEvent,
-    HostingPlanConfig, HostingSubscription, PublicHostingPlan,
-    CPU_SCALING_POLICY_BASELINE_BURST, CPU_SCALING_POLICY_CONTENTION_THROTTLE,
+    HostingPlanConfig, HostingSubscription, PublicHostingPlan, CPU_SCALING_POLICY_BASELINE_BURST,
+    CPU_SCALING_POLICY_CONTENTION_THROTTLE,
 };
 pub use requests::{
     AssignHostingRequest, CreateEmailAliasRequest, CreateHostingRequest, SelfSubscribeRequest,
     UpdateHostingRequest, UpdateHostingStatusRequest, UpdatePlanConfigRequest,
 };
 pub use responses::{
-    CoolifyDeploymentResponse, EmailAliasResponse, EmailMailboxResponse,
-    HostingEmailInfoResponse, HostingStatsResponse, HostingSubscriptionResponse,
-    SelfSubscribeResponse,
+    CoolifyDeploymentResponse, EmailAliasResponse, EmailMailboxResponse, HostingEmailInfoResponse,
+    HostingStatsResponse, HostingSubscriptionResponse, SelfSubscribeResponse,
 };
 pub use sanitization::{sanitize_hosting_event, sanitize_hosting_event_details};
 

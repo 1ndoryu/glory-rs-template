@@ -511,13 +511,9 @@ fn determine_phase_status(
                 "locked"
             }
         }
-        ("phased", "pending_payment") => {
-            if phase_idx == 0 {
-                "pending_payment"
-            } else {
-                "locked"
-            }
-        }
+        /* [259A-1] guarda colapsada en el match (clippy collapsible_match/match_same_arms:
+        el caso phase_idx != 0 cae al comodín "locked"). */
+        ("phased", "pending_payment") if phase_idx == 0 => "pending_payment",
 
         _ => "locked",
     }
