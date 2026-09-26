@@ -12,6 +12,8 @@ mod email_log;
 mod fixture;
 mod hosting;
 mod infrastructure;
+mod infrastructure_bandwidth;
+mod infrastructure_servers;
 mod note;
 mod notification;
 mod order;
