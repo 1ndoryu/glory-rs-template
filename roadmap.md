@@ -264,10 +264,5 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   con `{orden}` para reordenar sin borrar+re-subir (menos churn y sin
   cambiar urls/ids que cachea el store local de mejora).
 
-## Aclarar 3 originales faltantes en Altos del Caroní (26CA-1, pendiente 2026-09-26)
-
-- 26CA-1: la ficha `e244aec5` tiene 15/15 mejoradas pero solo 12 originales
-  (faltan orden 12-14; los 15 uploads dieron 201 y el código solo hace
-  INSERT). Preguntado a la usuaria si los borró a mano desde el admin; según
-  responda, re-subir los 3 o investigar.
+## (siguiente bloque)
 
