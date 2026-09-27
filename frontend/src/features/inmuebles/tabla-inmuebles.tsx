@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { BedDouble, Bath, CarFront, Globe, Ruler, LandPlot, MapPin, Pencil, Trash2, Building2, Eye, EyeOff, EllipsisVertical, ImagePlus, ImageDown, Images, Megaphone } from 'lucide-react';
 import { ETIQUETAS_TIPO, formatearPrecio, fotosVisiblesDe, portadaDe, type EstadoInmueble, type Inmueble } from '@/domain/inmueble';
+import { calcularCompletitud } from '@/domain/ficha-ask';
 import { recetaVigenteDe, resolverReceta } from '@/domain/plantilla-publicidad';
 import { exportarPublicidad } from '@/platform/canvas-publicidad';
 import { usePublicidades } from '@/hooks/publicidad/use-publicidades';
@@ -41,6 +42,23 @@ interface Props {
 /* Sin obligatorios: lo no indicado se muestra neutro ("—" / "Sin título"). */
 function precioVisible(precio: number): string {
   return precio > 0 ? formatearPrecio(precio) : '—';
+}
+
+/* Semáforo de ficha /ask (279A-3): % de preguntas respondidas por tipo.
+ * Solo aviso visual: nunca bloquea publicar ni editar. */
+function SemaforoFicha({ inmueble }: { inmueble: Inmueble }) {
+  const { porcentaje } = calcularCompletitud(inmueble.tipo, inmueble.extras ?? {}, inmueble.precioMinimo ?? null);
+  const color =
+    porcentaje === 100
+      ? 'border-transparent bg-emerald-100 text-emerald-900'
+      : porcentaje >= 50
+        ? 'border-transparent bg-amber-100 text-amber-900'
+        : 'border-transparent bg-red-100 text-red-900';
+  return (
+    <Badge variant="secondary" className={color} title={`Ficha al ${porcentaje}%`}>
+      {porcentaje}%
+    </Badge>
+  );
 }
 
 /* Etiqueta de visibilidad en la web pública. */
@@ -235,6 +253,7 @@ export function TablaInmuebles({ inmuebles, onVer, onEditar, onEliminar, onAnadi
               <TableHead>Precio</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Público</TableHead>
+              <TableHead>Ficha</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
@@ -270,6 +289,9 @@ export function TablaInmuebles({ inmuebles, onVer, onEditar, onEliminar, onAnadi
                 </TableCell>
                 <TableCell>
                   <Publico publicado={i.publicado} />
+                </TableCell>
+                <TableCell>
+                  <SemaforoFicha inmueble={i} />
                 </TableCell>
                 <TableCell>
                   <div className="flex justify-end">
@@ -308,6 +330,7 @@ export function TablaInmuebles({ inmuebles, onVer, onEditar, onEliminar, onAnadi
                 </h3>
                 <div className="flex shrink-0 items-center gap-1.5">
                   <Publico publicado={i.publicado} />
+                  <SemaforoFicha inmueble={i} />
                   <Badge variant="secondary" className={cn('capitalize', claseEstado[i.estado])}>
                     {i.estado}
                   </Badge>

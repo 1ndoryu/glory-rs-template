@@ -13,7 +13,16 @@ use crate::models::{FiltrosPublicos, Foto, InmuebleRow, RecetaPublicidad};
 
 const COLUMNAS: &str = "id, titulo, descripcion, ubicacion, puestos, residencia, precio, \
     tipo, operacion, habitaciones, banos, metros, metros_terreno, estado, publicado, \
-    slug, copy_corta, copy_larga, copy_modelo, copy_actualizada_en, receta, created_at, updated_at";
+    slug, copy_corta, copy_larga, copy_modelo, copy_actualizada_en, receta, extras, \
+    precio_minimo, created_at, updated_at";
+
+/* [279A-3] Columnas para la web pública: las mismas salvo `extras` y
+ * `precio_minimo` (privados de la dueña). Se rellenan con valores vacíos
+ * para reutilizar `InmuebleRow` sin exponer nada sensible. */
+const COLUMNAS_PUBLICAS: &str = "id, titulo, descripcion, ubicacion, puestos, residencia, precio, \
+    tipo, operacion, habitaciones, banos, metros, metros_terreno, estado, publicado, \
+    slug, copy_corta, copy_larga, copy_modelo, copy_actualizada_en, receta, \
+    '{}'::JSONB AS extras, NULL::FLOAT8 AS precio_minimo, created_at, updated_at";
 
 /// Valores ya normalizados listos para insertar
 pub struct NuevoInmueble<'a> {
@@ -95,7 +104,7 @@ impl InmuebleRepository {
         slug: &str,
     ) -> Result<Option<InmuebleRow>, sqlx::Error> {
         sqlx::query_as::<_, InmuebleRow>(&format!(
-            "SELECT {COLUMNAS} FROM inmuebles WHERE slug = $1 AND publicado = TRUE"
+            "SELECT {COLUMNAS_PUBLICAS} FROM inmuebles WHERE slug = $1 AND publicado = TRUE"
         ))
         .bind(slug)
         .fetch_optional(pool)
@@ -150,7 +159,7 @@ impl InmuebleRepository {
         let offset = (f.page - 1) * f.per_page;
 
         let mut qb = QueryBuilder::new(format!(
-            "SELECT {COLUMNAS} FROM inmuebles WHERE publicado = TRUE"
+            "SELECT {COLUMNAS_PUBLICAS} FROM inmuebles WHERE publicado = TRUE"
         ));
         Self::aplicar_filtros(&mut qb, f);
         qb.push(" ORDER BY created_at DESC LIMIT ");
@@ -348,6 +357,41 @@ impl InmuebleRepository {
              FROM fotos WHERE id = $1",
         )
         .bind(foto_id)
+        .fetch_optional(pool)
+        .await
+    }
+
+    /* [279A-3] Ficha /ask: leer y guardar `extras` + `precio_minimo`.
+     * Lo privado solo sale por aquí (rutas admin con JWT); las vistas
+     * públicas usan `Inmueble`, que ni declara el campo. */
+
+    /// Lee la ficha /ask de un inmueble (incluye lo privado)
+    pub async fn get_ficha(
+        pool: &PgPool,
+        id: Uuid,
+    ) -> Result<Option<(sqlx::types::Json<serde_json::Value>, Option<f64>)>, sqlx::Error> {
+        sqlx::query_as::<_, (sqlx::types::Json<serde_json::Value>, Option<f64>)>(
+            "SELECT extras, precio_minimo FROM inmuebles WHERE id = $1",
+        )
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+    }
+
+    /// Guarda la ficha /ask y devuelve la fila completa
+    pub async fn set_ficha(
+        pool: &PgPool,
+        id: Uuid,
+        extras: sqlx::types::Json<serde_json::Value>,
+        precio_minimo: Option<f64>,
+    ) -> Result<Option<InmuebleRow>, sqlx::Error> {
+        sqlx::query_as::<_, InmuebleRow>(&format!(
+            "UPDATE inmuebles SET extras = $1, precio_minimo = $2, updated_at = NOW() \
+              WHERE id = $3 RETURNING {COLUMNAS}",
+        ))
+        .bind(extras)
+        .bind(precio_minimo)
+        .bind(id)
         .fetch_optional(pool)
         .await
     }

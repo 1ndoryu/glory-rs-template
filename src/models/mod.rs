@@ -5,10 +5,10 @@ mod suscriptor;
 mod user;
 
 pub use inmueble::{
-    AddFotoRequest, CopyInmueble, CreateInmuebleRequest, CreateUserRequest, FiltrosPublicos, Foto,
-    FotoPublica, Inmueble, InmuebleRow, PaginatedInmuebles, PublicacionRequest, RecetaPublicidad,
-    UpdateInmuebleRequest, ESTADOS, EXTENSIONES_FOTO, FORMATOS_RECETA, MAX_FOTO_BYTES, OPERACIONES,
-    ORIGENES_FOTO, TIPOS,
+    validar_extras, AddFotoRequest, CopyInmueble, CreateInmuebleRequest, CreateUserRequest,
+    FichaAskRequest, FichaAskResponse, FiltrosPublicos, Foto, FotoPublica, Inmueble, InmuebleRow,
+    PaginatedInmuebles, PublicacionRequest, RecetaPublicidad, UpdateInmuebleRequest, ESTADOS,
+    EXTENSIONES_FOTO, FORMATOS_RECETA, MAX_FOTO_BYTES, OPERACIONES, ORIGENES_FOTO, TIPOS,
 };
 
 pub use note::{CreateNoteRequest, Note, PaginatedNotes, PaginationParams, UpdateNoteRequest};

@@ -1,5 +1,6 @@
 #![allow(clippy::needless_for_each)] // Generado por utoipa OpenApi derive
 
+mod ask;
 mod auth;
 mod chat;
 mod chat_staff;
@@ -54,6 +55,8 @@ impl utoipa::Modify for SecurityAddon {
         health::health_check,
         auth::register,
         auth::login,
+        ask::get_ficha,
+        ask::set_ficha,
         users::create_user,
         notes::create_note,
         notes::get_note,
@@ -86,6 +89,8 @@ impl utoipa::Modify for SecurityAddon {
         crate::models::AuthResponse,
         crate::models::UserResponse,
         crate::models::CreateUserRequest,
+        crate::models::FichaAskRequest,
+        crate::models::FichaAskResponse,
         crate::models::Note,
         crate::models::CreateNoteRequest,
         crate::models::UpdateNoteRequest,
@@ -228,6 +233,8 @@ fn api_routes() -> Router<AppState> {
 fn admin_routes() -> Router<AppState> {
     Router::new()
         .merge(inmuebles::routes())
+        /* [279A-3] Ficha /ask de la dueña (rutas bajo /api/admin/...). */
+        .merge(ask::routes())
         .merge(solicitud::admin_routes())
         .merge(uploads::routes())
         .merge(users::routes())

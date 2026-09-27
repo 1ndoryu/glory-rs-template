@@ -94,6 +94,13 @@ pub struct InmuebleRow {
     pub copy_actualizada_en: Option<DateTime<Utc>>,
     /// Receta publicitaria elegida en admin (`None` = automática)
     pub receta: Option<sqlx::types::Json<RecetaPublicidad>>,
+    /* [279A-3] Ficha /ask: respuestas de la dueña por clave (`piso`,
+     * `punto_referencia`...). Objeto plano validado en `validar_extras`. */
+    pub extras: sqlx::types::Json<serde_json::Value>,
+    /* [279A-3] Precio mínimo privado: NUNCA se serializa a público ni a
+     * tools de IA que citen cifras (solo insinuación). Solo viaja en
+     * `FichaAskResponse` (rutas admin con JWT). */
+    pub precio_minimo: Option<f64>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -122,6 +129,10 @@ pub struct Inmueble {
     pub copy: Option<CopyInmueble>,
     /// Receta publicitaria elegida en admin (`None` = automática)
     pub receta: Option<RecetaPublicidad>,
+    /* [279A-3] Respuestas /ask (piso, referencia...): enriquecen la ficha
+     * pública y el contexto de la IA. Lo privado (`precio_minimo`) jamás
+     * entra aquí: la frontera es por construcción (no existe el campo). */
+    pub extras: serde_json::Value,
     pub fotos: Vec<FotoPublica>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -164,6 +175,7 @@ impl Inmueble {
             slug: row.slug,
             copy,
             receta: row.receta.map(|j| j.0),
+            extras: row.extras.0,
             fotos: fotos.into_iter().map(FotoPublica::from).collect(),
             created_at: row.created_at,
             updated_at: row.updated_at,
@@ -313,6 +325,56 @@ pub struct AddFotoRequest {
     pub storage_key: String,
     pub orden: Option<i32>,
     pub origen: Option<String>,
+}
+
+/* [279A-3] Ficha /ask: lo que la dueña responde por inmueble. `extras` es
+ * objeto plano `{clave: string|number|bool|null}`; las claves las define el
+ * esquema del front por tipo (`piso`, `punto_referencia`...). `precio_minimo`
+ * solo existe en estas rutas admin: ningún `Inmueble` público lo incluye. */
+
+/// Guardar ficha /ask (admin)
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct FichaAskRequest {
+    pub extras: serde_json::Value,
+    pub precio_minimo: Option<f64>,
+}
+
+/// Ficha /ask leída (admin): incluye lo privado
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct FichaAskResponse {
+    pub inmueble_id: Uuid,
+    pub extras: serde_json::Value,
+    pub precio_minimo: Option<f64>,
+}
+
+/// Valida `extras`: objeto, tope de claves y valores simples acotados.
+/// Pura (sin BD): testeable sin `DATABASE_URL`.
+pub fn validar_extras(v: &serde_json::Value) -> Result<(), String> {
+    const MAX_CLAVES: usize = 64;
+    const MAX_CLAVE: usize = 64;
+    const MAX_TEXTO: usize = 500;
+    let obj = v
+        .as_object()
+        .ok_or_else(|| "extras debe ser un objeto".to_string())?;
+    if obj.len() > MAX_CLAVES {
+        return Err(format!("extras admite hasta {MAX_CLAVES} campos"));
+    }
+    for (k, val) in obj {
+        if k.len() > MAX_CLAVE || !k.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_') {
+            return Err(format!("clave de ficha inválida: {k}"));
+        }
+        let ok = match val {
+            serde_json::Value::Null | serde_json::Value::Bool(_) | serde_json::Value::Number(_) => {
+                true
+            }
+            serde_json::Value::String(s) => s.len() <= MAX_TEXTO,
+            serde_json::Value::Array(_) | serde_json::Value::Object(_) => false,
+        };
+        if !ok {
+            return Err(format!("valor de ficha inválido para: {k}"));
+        }
+    }
+    Ok(())
 }
 
 /// Filtros públicos + paginación

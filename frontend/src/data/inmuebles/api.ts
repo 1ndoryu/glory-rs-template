@@ -209,7 +209,12 @@ export interface InmuebleRemoto
     RemotoClase,
     RemotoMedidas,
     RemotoMedia,
-    RemotoAuditoria {}
+    RemotoAuditoria {
+  /* [279A-3] Ficha /ask: `extras` JSONB y `precio_minimo` privado. El
+   * backend los incluye en los endpoints admin (nunca en los públicos). */
+  extras?: Record<string, string | number | boolean> | null;
+  precio_minimo?: number | null;
+}
 
 export function urlAbsoluta(url: string): string {
   return url.startsWith('/') ? `${API_URL}${url}` : url;
@@ -280,6 +285,9 @@ export function remotoADominio(r: InmuebleRemoto): Inmueble {
     publicado: r.publicado,
     copy: r.copy ? { corta: r.copy.corta, larga: r.copy.larga, modelo: r.copy.modelo, actualizadaEn: r.copy.actualizada_en } : null,
     receta: adaptarRecetaRemota(r.receta),
+    /* Ficha /ask (ausente = aún sin responder; nunca sale a lo público). */
+    extras: r.extras ?? undefined,
+    precioMinimo: r.precio_minimo ?? undefined,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };

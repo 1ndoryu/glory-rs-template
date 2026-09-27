@@ -1,0 +1,2 @@
+ALTER TABLE inmuebles ADD COLUMN extras JSONB NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE inmuebles ADD COLUMN precio_minimo DOUBLE PRECISION;

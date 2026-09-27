@@ -83,6 +83,12 @@ export interface Inmueble
     MultimediaInmueble,
     AuditoriaInmueble {
   precio: number;
+  /* [279A-3] Ficha /ask de la dueña: respuestas por tipo (`extras`) y
+   * mínimo privado. Opcionales: registros leídos antes de existir la
+   * ficha y borradores aún sin ficha los omiten. Nunca viajan a la web
+   * pública (el backend los excluye de los endpoints públicos). */
+  extras?: Record<string, string | number | boolean>;
+  precioMinimo?: number | null;
 }
 
 /** Mejora IA guardada en el servidor, emparejada con su original por `orden`.
@@ -258,6 +264,9 @@ export function draftAInmueble(d: InmuebleDraft, base?: Inmueble): Inmueble {
     publicado: base?.publicado ?? false,
     copy: base?.copy ?? null,
     receta: base?.receta ?? null,
+    /* La ficha /ask no se edita en el formulario: se conserva. */
+    extras: base?.extras,
+    precioMinimo: base?.precioMinimo,
     createdAt: base?.createdAt ?? ahora,
     updatedAt: ahora,
   };
