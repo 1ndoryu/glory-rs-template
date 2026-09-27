@@ -268,3 +268,11 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 
 (279A-1 cerrada 2026-09-27 ~17:10: ver `Agente/completados/tareas-2026-09-27.md`.)
 
+## 279A-2 — Agente WhatsApp MN (pendiente: número + QR de usuaria)
+- Plan: `Agente/planes/plan-whatsapp-2026-09-27.md`.
+- Gateway Baileys en PC usuaria, cerebro `opencode serve` local, sin API de pago.
+- Fases: F1 envío manual → F2 lectura+bandeja `/admin` → F3 borradores →
+  F4 auto-respuesta + imágenes + audios (Whisper local). Mismo agente
+  (glory-agent: canal en sesiones, outbox con destino/texto/media).
+- Requiere de usuaria: número WhatsApp + 2 min para escanear QR. Sin código hasta entonces.
+
