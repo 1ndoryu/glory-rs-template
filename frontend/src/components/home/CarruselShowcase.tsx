@@ -69,21 +69,25 @@ export const CarruselShowcase: React.FC = () => {
         return () => observer.disconnect();
     }, [indiceActual, itemsTotales.length]);
 
-    if (proyectosConImagen.length === 0) return null;
+    /* [279A-1] Desplazamiento via setProperty (patron runtime whitelisteado e
+     * indexado por VarSense): style={} con --var dispara cssInlineReact aunque
+     * solo inyecte datos dinamicos, y el objeto nunca entra al indice de vars.
+     * useLayoutEffect = pre-paint, sin flash respecto al style prop. */
+    useLayoutEffect(() => {
+        const pista = pistaRef.current;
+        if (!pista) return;
+        pista.style.setProperty('--carrusel-desplazamiento', `translateX(${-offsetX + dragOffset}px)`);
+        pista.style.setProperty('--carrusel-transicion', conTransicion ? 'transform 800ms cubic-bezier(0.25, 1, 0.5, 1)' : 'none');
+    }, [offsetX, dragOffset, conTransicion]);
 
-    /* [259A-6] Slider via --var (style prop solo inyecta --var, objeto nombrado). */
-    const estiloPista = {
-        '--carrusel-desplazamiento': `translateX(${-offsetX + dragOffset}px)`,
-        '--carrusel-transicion': conTransicion ? 'transform 800ms cubic-bezier(0.25, 1, 0.5, 1)' : 'none',
-    } as React.CSSProperties;
+    if (proyectosConImagen.length === 0) return null;
 
     return (
         <div className="carruselContenedorPrincipal">
             <div
                 className="carruselPista"
                 ref={pistaRef}
-                {...handlers}
-                style={estiloPista}>
+                {...handlers}>
                 {itemsTotales.map((proyecto, index) => {
                     const categoriasArr = Array.isArray(proyecto.categorias)
                         ? proyecto.categorias

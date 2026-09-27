@@ -84,7 +84,10 @@ function FilaProyecto({
         isDragging,
     } = useSortable({ id: proyecto.id });
 
-    /* [259A-6] dnd-kit via --var (style prop solo inyecta --var). */
+    /* [259A-6] dnd-kit via --var (style prop solo inyecta --var).
+     * [279A-1] dnd-kit exige style object en el nodo sortable; las --var son
+     * mediciones por frame de la libreria (transform/transition/opacity), sin
+     * equivalente declarativo. varsense-disable-next-line cssInlineReact */
     const style = {
         '--lista-sortable-transform': CSS.Transform.toString(transform),
         '--lista-sortable-transition': transition,
@@ -108,6 +111,7 @@ function FilaProyecto({
     return (
         <div
             ref={setNodeRef}
+            /* [279A-1] Ver justificacion dnd-kit arriba. varsense-disable-next-line cssInlineReact */
             style={style}
             className={`utilSortable listaFila listaProyectosFila ${proyecto.status === 'archived' ? 'listaProyectosFila--inactivo' : ''}`}
         >

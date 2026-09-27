@@ -4,7 +4,10 @@
     border: 1px solid var(--border-default);
     border-radius: var(--radius-lg);
     padding: var(--spacing-lg);
-    /* [259A-6] Fondo por instancia via --var (style prop solo inyecta --var). */
+    /* [259A-6] Fondo por instancia via --var (style prop solo inyecta --var).
+     * [279A-1] Valor inicial = mismo fallback: el objeto style nunca entra
+     * al indice de vars, asi que la definicion vive aqui. */
+    --tarjeta-fondo: var(--bg-primary);
     background: var(--tarjeta-fondo, var(--bg-primary));
 }
 

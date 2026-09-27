@@ -993,7 +993,9 @@
     background: var(--color-primary);
     border-radius: 4px;
     transition: width 0.3s ease;
-    /* [259A-6] Progreso via --var inyectada por React (varsense-fix). */
+    /* [259A-6] Progreso via --var inyectada por React (varsense-fix).
+     * [279A-1] Valor inicial: el objeto style nunca entra al indice de vars. */
+    --tabCorreo-cuota-uso: 0%;
     width: var(--tabCorreo-cuota-uso, 0%);
 }
 

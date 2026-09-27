@@ -41,7 +41,10 @@
 .galeriaPista {
     display: flex;
     width: max-content;
-    /* [259A-6] Desplazamiento via --var inyectadas por React (varsense-fix). */
+    /* [259A-6] Desplazamiento via --var inyectadas por React (varsense-fix).
+     * [279A-1] Valores iniciales: el objeto style nunca entra al indice de vars. */
+    --galeria-desplazamiento: translateX(0);
+    --galeria-transicion: none;
     transform: var(--galeria-desplazamiento);
     transition: var(--galeria-transicion);
     will-change: transform;

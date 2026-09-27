@@ -27,8 +27,13 @@
 
 /* [259A-6] Fila arrastrable (dnd-kit): transform/transition/opacity llegan por
  * style prop SOLO como custom properties (--lista-*). Patron varsense-fix:
- * style prop nunca con declaraciones, solo inyeccion de --var. */
+ * style prop nunca con declaraciones, solo inyeccion de --var.
+ * [279A-1] Valores iniciales: el objeto style nunca entra al indice de vars
+ * (solo setProperty literal indexa); la definicion vive aqui. */
 .utilSortable {
+    --lista-sortable-transform: none;
+    --lista-sortable-transition: none;
+    --lista-sortable-opacity: 1;
     transform: var(--lista-sortable-transform);
     transition: var(--lista-sortable-transition);
     opacity: var(--lista-sortable-opacity, 1);

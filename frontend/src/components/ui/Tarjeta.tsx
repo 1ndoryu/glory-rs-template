@@ -20,6 +20,10 @@ export const Tarjeta: React.FC<TarjetaProps> = ({children, className, fondo, onC
     return (
         <Tag
             className={`tarjetaBase ${className ?? ''}`}
+            /* [279A-1] Tag polimorfico (button|div): ref+setProperty exigiria
+             * plumbing de tipos por un solo dato dinamico; style prop solo
+             * inyecta --tarjeta-fondo (definida en Tarjeta.css).
+             * varsense-disable-next-line cssInlineReact */
             style={estiloInline}
             onClick={onClick}
             {...props}

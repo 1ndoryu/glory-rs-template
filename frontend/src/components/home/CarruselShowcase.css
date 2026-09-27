@@ -36,7 +36,11 @@
     display: flex;
     width: max-content;
     /* [259A-6] Desplazamiento via --var inyectadas por React (varsense-fix);
-     * style prop solo inyecta --var, nunca declaraciones. */
+     * style prop solo inyecta --var, nunca declaraciones.
+     * [279A-1] Valores iniciales: el objeto style nunca entra al indice de
+     * vars (solo setProperty literal indexa), asi que la definicion vive aqui. */
+    --carrusel-desplazamiento: translateX(0);
+    --carrusel-transicion: none;
     transform: var(--carrusel-desplazamiento);
     transition: var(--carrusel-transicion);
     will-change: transform;

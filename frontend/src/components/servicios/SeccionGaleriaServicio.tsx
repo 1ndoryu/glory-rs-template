@@ -3,7 +3,7 @@
  * Descripcion: Galeria de imagenes con scroll infinito, efecto de arrastre y formato 3:4.
  * [044A-3] Acepta imagenes como prop; si no se pasan, usa useImagenes().
  */
-import React from 'react';
+import React, {useLayoutEffect, useRef} from 'react';
 import {useCarruselInfinito} from '../../hooks/useCarruselInfinito';
 import {useImagenes} from '../../hooks/useImagenes';
 import OptimizedImage from '../ui/OptimizedImage';
@@ -25,24 +25,30 @@ export const SeccionGaleriaServicio: React.FC<SeccionGaleriaServicioProps> = ({i
         tiempoTransicion: 800
     });
 
+    /* [279A-1] Slider via setProperty (patron runtime whitelisteado e indexado
+     * por VarSense; espejo de CarruselShowcase): style={} con --var dispara
+     * cssInlineReact aunque solo inyecte datos dinamicos. Pre-paint, sin flash.
+     * Ref+efecto ANTES del early return (Rules of Hooks, ver [074A-59]). */
+    const pistaRef = useRef<HTMLDivElement>(null);
+    useLayoutEffect(() => {
+        const pista = pistaRef.current;
+        if (!pista) return;
+        pista.style.setProperty('--galeria-desplazamiento', `translateX(calc( -1 * (var(--galeria-item-width) + var(--galeria-item-gap)) * ${indiceActual} + ${dragOffset}px))`);
+        pista.style.setProperty('--galeria-transicion', conTransicion ? 'transform 800ms cubic-bezier(0.25, 1, 0.5, 1)' : 'none');
+    }, [indiceActual, dragOffset, conTransicion]);
+
     if (imagenes.length === 0) return null;
 
     // Duplicamos las imagenes para efecto infinito
     const itemsTotales = [...imagenes, ...imagenes];
-
-    /* [259A-6] Slider via --var (style prop solo inyecta --var, objeto nombrado). */
-    const estiloPista = {
-        '--galeria-desplazamiento': `translateX(calc( -1 * (var(--galeria-item-width) + var(--galeria-item-gap)) * ${indiceActual} + ${dragOffset}px))`,
-        '--galeria-transicion': conTransicion ? 'transform 800ms cubic-bezier(0.25, 1, 0.5, 1)' : 'none',
-    } as React.CSSProperties;
 
     return (
         <section className="seccionGaleriaServicio">
             <div className="galeriaContenedorPrincipal">
                 <div
                     className="galeriaPista"
-                    {...handlers}
-                    style={estiloPista}>
+                    ref={pistaRef}
+                    {...handlers}>
                     {itemsTotales.map((src, index) => (
                         <div key={`img-${index}`} className="galeriaItem">
                             <div className="galeriaImagenWrapper">

@@ -23,17 +23,24 @@ export function crearElemento<K extends keyof HTMLElementTagNameMap>(etiqueta: K
 
 /* Bloquea el scroll de la pagina compensando el ancho del scrollbar para
  * evitar layout shift. Devuelve el ancho compensado. Par de
- * desbloquearDesplazamientoPagina: llamar siempre en el cleanup. */
+ * desbloquearDesplazamientoPagina: llamar siempre en el cleanup.
+ * [279A-1] Scroll-lock imperativo: paddingRight compensa el ancho MEDIDO del
+ * scrollbar (px runtime, sin equivalente declarativo); overflow va en par con
+ * el restore. Supresiones cssInlineScript por linea. */
 export function bloquearDesplazamientoPagina(): number {
     const anchoBarra = anchuraVentana() - document.documentElement.clientWidth;
+    /* varsense-disable-next-line cssInlineScript */
     document.body.style.overflow = 'hidden';
     if (anchoBarra > 0) {
+        /* varsense-disable-next-line cssInlineScript */
         document.body.style.paddingRight = `${anchoBarra}px`;
     }
     return anchoBarra;
 }
 
 export function desbloquearDesplazamientoPagina(): void {
+    /* varsense-disable-next-line cssInlineScript */
     document.body.style.overflow = '';
+    /* varsense-disable-next-line cssInlineScript */
     document.body.style.paddingRight = '';
 }

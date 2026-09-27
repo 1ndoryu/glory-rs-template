@@ -152,6 +152,9 @@ export function TabCorreo({sub}: {sub: Subscription}) {
                     <div className="tabCorreoQuotaBar">
                         <div
                             className="tabCorreoQuotaFill"
+                            /* [279A-1] Ancho = % calculado (dato, no diseno); style
+                             * prop solo inyecta --tabCorreo-cuota-uso (definida en
+                             * HostingDetalle.css). varsense-disable-next-line cssInlineReact */
                             style={estiloCuota}
                         />
                     </div>
