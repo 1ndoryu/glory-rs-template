@@ -73,20 +73,8 @@
     position: relative;
 }
 
-/* [064A-38] Botón 3 puntos: mismo tamaño que botón Pagar (tamano=pequeño). */
-.ordenDetalleOpcionesBoton {
-    min-width: auto;
-    min-height: auto;
-    padding: var(--spacing-xs) var(--spacing-sm);
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--text-primary);
-    text-decoration: none;
-}
-
-.ordenDetalleOpcionesBoton:hover {
-    background: var(--overlay-hover);
-}
+/* [064A-38] Botón 3 puntos: mismo tamaño que botón Pagar (tamano=pequeño).
+ * [259A-5 5b-7] Migrado a variante canon 'accion' de MenuContextual. */
 
 /* sentinel-disable-next-line css-especificacion-diseno-local */
 .ordenDetalleMenuPanel {

@@ -76,15 +76,8 @@
     border-color: var(--border-default);
 }
 
-/* [064A-17+064A-53] Boton de filtro: border --bg-item-active, padding lateral, texto centrado */
-.usuariosFiltroBtn {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    white-space: nowrap;
-    border-color: var(--bg-item-active);
-    padding: var(--spacing-sm) var(--spacing-md);
-}
+/* [259A-5 5b-7] Filtros migrados a variante canon 'filtro' de MenuContextual
+ * (unifica padding 10px 12px y borde border-light del patron mayoritario). */
 
 .usuariosTotal {
     display: flex;

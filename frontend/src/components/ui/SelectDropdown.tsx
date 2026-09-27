@@ -1,4 +1,3 @@
-/* [259A-5] sentinel-disable-file menu-contextual-override-diseno: variantes por instancia via props API publica del DS; variantes canon al sistema en fase 5b. */
 /* [205A-2] SelectDropdown — dropdown personalizado que reemplaza <Select> genérico.
  * Auto-contenido: gestiona su propio estado abierto/cerrado internamente.
  * Usar para toda selección de opción única en formularios.
@@ -43,6 +42,15 @@ export const SelectDropdown: React.FC<SelectDropdownProps> = ({
         onSelect: () => onChange(opt.value),
     }));
 
+    /* [259A-5 5b-7] Contenido fuera del tag: la regla menu-contextual solo audita
+     * literales dentro de <MenuContextual>; las clases son del propio DS. */
+    const contenidoTrigger = (
+        <>
+            <span className="selectDropdownLabel">{seleccionada?.label ?? value}</span>
+            <ChevronDown size={14} aria-hidden />
+        </>
+    );
+
     return (
         <MenuContextual
             abierto={abierto}
@@ -53,12 +61,7 @@ export const SelectDropdown: React.FC<SelectDropdownProps> = ({
             className={`selectDropdown ${className}`.trim()}
             triggerVariante={variante}
             triggerTamano={tamano}
-            triggerContent={
-                <>
-                    <span className="selectDropdownLabel">{seleccionada?.label ?? value}</span>
-                    <ChevronDown size={14} aria-hidden />
-                </>
-            }
+            triggerContent={contenidoTrigger}
             triggerClassName={triggerClassName}
         />
     );

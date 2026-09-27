@@ -1,4 +1,3 @@
-/* [259A-5] sentinel-disable-file menu-contextual-override-diseno: variantes por instancia via props API publica del DS; variantes canon al sistema en fase 5b. */
 /* [054A-1] Sección admin: gestión de usuarios registrados.
  * Búsqueda por email/nombre, filtros por rol y status, paginación.
  * Acciones: cambiar rol, banear/reactivar.
@@ -77,10 +76,8 @@ export function SeccionUsuarios() {
                     abierto={rolMenuAbierto}
                     onToggle={() => setRolMenuAbierto(prev => !prev)}
                     onCerrar={() => setRolMenuAbierto(false)}
-                    ariaLabel="Filtrar por rol"
-                    triggerClassName="usuariosFiltroBtn"
-                    triggerVariante="outline"
-                    triggerTamano="pequeno"
+                ariaLabel="Filtrar por rol"
+                variante="filtro"
                     triggerContent={<>{roleFilter ? ROLE_LABELS[roleFilter] : 'Todos los roles'} <ChevronDown size={14} /></>}
                     items={[
                         {id: 'all', label: 'Todos los roles', onSelect: () => setRoleFilter('')},
@@ -94,10 +91,8 @@ export function SeccionUsuarios() {
                     abierto={statusMenuAbierto}
                     onToggle={() => setStatusMenuAbierto(prev => !prev)}
                     onCerrar={() => setStatusMenuAbierto(false)}
-                    ariaLabel="Filtrar por status"
-                    triggerClassName="usuariosFiltroBtn"
-                    triggerVariante="outline"
-                    triggerTamano="pequeno"
+                ariaLabel="Filtrar por status"
+                variante="filtro"
                     triggerContent={<>{statusFilter ? STATUS_LABELS[statusFilter] : 'Todos los status'} <ChevronDown size={14} /></>}
                     items={[
                         {id: 'all', label: 'Todos los status', onSelect: () => setStatusFilter('')},

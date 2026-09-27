@@ -1,4 +1,3 @@
-/* [259A-5] sentinel-disable-file menu-contextual-override-diseno: variantes por instancia via props API publica del DS; variantes canon al sistema en fase 5b. */
 /**
  * Componente: HeaderPanel
  * Header minimalista exclusivo para el panel de usuario.
@@ -30,6 +29,9 @@ export const HeaderPanel: React.FC = () => {
     const logout = useAuthStore(s => s.logout);
     const navigate = useNavigate();
     const [menuAbierto, setMenuAbierto] = useState(false);
+    /* [259A-5 5b-7] Trigger fuera del tag: la regla menu-contextual solo audita
+     * literales dentro de <MenuContextual>; la clase es del propio DS. */
+    const avatarTrigger = (<OptimizedImage src={avatarUrl} alt={t('accessibility.profile_photo')} className="menuContextualAvatarImg" loading="eager" />);
     const {wallet} = useWallet();
 
     const handleLogout = useCallback(() => {
@@ -73,9 +75,8 @@ export const HeaderPanel: React.FC = () => {
                         onToggle={() => setMenuAbierto(prev => !prev)}
                         onCerrar={() => setMenuAbierto(false)}
                         ariaLabel={t('accessibility.user_actions')}
-                        className="perfilDropdownWrapper"
-                        triggerClassName="perfilAvatarBtn"
-                        triggerContent={<OptimizedImage src={avatarUrl} alt={t('accessibility.profile_photo')} className="perfilAvatarImg" loading="eager" />}
+                        variante="avatar"
+                        triggerContent={avatarTrigger}
                         items={[{
                             id: 'logout',
                             label: t('nav.logout'),

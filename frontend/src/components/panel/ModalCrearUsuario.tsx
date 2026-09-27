@@ -1,4 +1,6 @@
-/* [259A-5] sentinel-disable-file menu-contextual-override-diseno: variantes por instancia via props API publica del DS; variantes canon al sistema en fase 5b. */
+/* [259A-5 5b-7] sentinel-disable-file menu-contextual-override-diseno: trigger de rol
+ * a ancho completo del formulario (layout one-off width:100%); no encaja en la
+ * variante canon 'filtro' del DS. */
 /* [015A-1+] ModalCrearUsuario extraido de SeccionUsuarios.tsx para cumplir limite de 300 lineas.
  * Form state local (email, password, role). Solo cierra en éxito; muestra error inline.
  * Gotcha: no usar estado global para el form — evita contaminar useUsersSection.

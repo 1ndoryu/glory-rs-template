@@ -1,55 +1,13 @@
 /* [104A-34] Estilos del dropdown de chat en header.
  * Mantiene consistencia visual con NotificationBell.
+ * [259A-5 5b-7] Trigger e insignia migrados a variante canon 'campana' de
+ * MenuContextual; panel bespoke (ancho 340px + offset responsive propios).
  * sentinel-disable-file css-especificacion-diseno-local: Mismo patrón contextmenu que
- * NotificationBell — clases __trigger, __dropdown, __item con vars CSS del sistema. */
+ * NotificationBell — clases __dropdown, __item con vars CSS del sistema. */
 
 .chatBell {
-    position: relative;
     display: inline-flex;
     align-items: center;
-}
-
-.chatBell .menuContextualBoton.chatBell__trigger {
-    background: none;
-    border: none;
-    cursor: pointer;
-    position: relative;
-    padding: 4px;
-    color: var(--brand-black);
-    border-radius: 50%;
-    transition: opacity 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    line-height: 1;
-    min-width: auto;
-    min-height: auto;
-    text-decoration: none;
-}
-
-.chatBell .menuContextualBoton.chatBell__trigger:hover {
-    opacity: 0.6;
-    background: none;
-}
-
-/* [104A-35 fix] bg-accent es #f5f3f1 (casi blanco), brand-black da contraste real */
-.chatBell__badge {
-    position: absolute;
-    top: 0;
-    right: 0;
-    background: var(--brand-black);
-    color: var(--brand-white);
-    font-size: var(--text-2xs);
-    font-weight: 700;
-    min-width: 18px;
-    height: 18px;
-    border-radius: var(--radius-full);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 4px;
-    transform: translate(30%, -30%);
-    line-height: 1;
 }
 
 .chatBell__dropdown {

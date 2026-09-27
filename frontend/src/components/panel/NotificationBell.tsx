@@ -1,4 +1,6 @@
-/* [259A-5] sentinel-disable-file menu-contextual-override-diseno: variantes por instancia via props API publica del DS; variantes canon al sistema en fase 5b. */
+/* [259A-5 5b-7] sentinel-disable-file menu-contextual-override-diseno: panel bespoke
+ * de centro de notificaciones (ancho 340px, lista con estados, offset responsive
+ * propio); trigger e insignia ya usan la variante canon 'campana' del DS. */
 /* [044A-38 Fase 9] Campana de notificaciones con dropdown.
  * Badge de no leídas, dropdown con lista, marcar leídas, navegar a link. */
 
@@ -65,13 +67,13 @@ export default function NotificationBell() {
       onCerrar={closeDropdown}
       ariaLabel={`Notificaciones${unreadCount > 0 ? ` (${unreadCount} sin leer)` : ''}`}
       className="notificationBell"
-      triggerClassName="notificationBell__trigger"
+      variante="campana"
       panelClassName="notificationBell__dropdown"
       triggerContent={(
         <>
           <Bell size={20} />
           {unreadCount > 0 && (
-            <span className="notificationBell__badge">
+            <span className="menuContextualCampanaInsignia">
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}

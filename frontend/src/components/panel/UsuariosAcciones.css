@@ -12,17 +12,8 @@
 }
 
 /* [batch-4] usuariosMenuBtn ya renderizado por <Button variante="texto">:
- * solo quedan overrides visuales; props estructurales eliminados. */
-.usuariosMenuBtn {
-    font-size: var(--text-lg);
-    color: var(--brand-black);
-    line-height: 1;
-    transition: background 0.15s;
-}
-
-.usuariosMenuBtn:hover {
-    background: var(--overlay-hover);
-}
+ * solo quedan overrides visuales; props estructurales eliminados.
+ * [259A-5 5b-7] Migrado a variante canon 'accion' de MenuContextual. */
 
 /* Paginación */
 

@@ -1,4 +1,3 @@
-/* [259A-5] sentinel-disable-file menu-contextual-override-diseno: variantes por instancia via props API publica del DS; variantes canon al sistema en fase 5b. */
 /* [044A-38 Fase 2] Sección "Mis Proyectos" del panel.
  * Muestra lista de órdenes con progreso visual + detalle con fases.
  * Vista lista ↔ detalle. Detalle extraído a OrdenDetalle.tsx (SRP).
@@ -136,10 +135,8 @@ export const SeccionProyectos: React.FC = () => {
                             abierto={empleadoMenuAbierto}
                             onToggle={() => setEmpleadoMenuAbierto(prev => !prev)}
                             onCerrar={() => setEmpleadoMenuAbierto(false)}
-                            ariaLabel="Filtrar por freelancer"
-                            triggerClassName="proyectosFiltroEmpleado"
-                            triggerVariante="outline"
-                            triggerTamano="pequeno"
+                ariaLabel="Filtrar por freelancer"
+                variante="filtro"
                             triggerContent={<>{filtroEmpleado ? empleadosUnicos.find(e => e.id === filtroEmpleado)?.nombre ?? 'Freelancer' : 'Todos los freelancers'} <ChevronDown size={14} /></>}
                             items={[
                                 {id: 'all', label: 'Todos los freelancers', onSelect: () => setFiltroEmpleado('')},

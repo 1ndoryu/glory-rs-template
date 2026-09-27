@@ -1,4 +1,6 @@
-/* [259A-5] sentinel-disable-file menu-contextual-override-diseno: variantes por instancia via props API publica del DS; variantes canon al sistema en fase 5b. */
+/* [259A-5 5b-7] sentinel-disable-file menu-contextual-override-diseno: panel bespoke
+ * de centro de chats (ancho 340px, lista de sesiones, offset responsive propio);
+ * trigger e insignia ya usan la variante canon 'campana' del DS. */
 /* [104A-34] Botón de chat en header con dropdown de sesiones activas.
  * Al hacer clic en una sesión, navega al panel → sección mensajes → abre ese chat.
  * Usa sessionStorage para pasar el target a SeccionChat (evita race conditions con mount). */
@@ -84,13 +86,13 @@ export default function ChatBell() {
             onCerrar={closeDropdown}
             ariaLabel={`Chats${activeCount > 0 ? ` (${activeCount} activos)` : ''}`}
             className="chatBell"
-            triggerClassName="chatBell__trigger"
+            variante="campana"
             panelClassName="chatBell__dropdown"
             triggerContent={(
                 <>
                     <MessageSquare size={20} />
                     {unreadCount > 0 && (
-                        <span className="chatBell__badge">
+                        <span className="menuContextualCampanaInsignia">
                             {unreadCount > 99 ? '99+' : unreadCount}
                         </span>
                     )}

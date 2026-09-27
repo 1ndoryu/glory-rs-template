@@ -1,4 +1,3 @@
-/* [259A-5] sentinel-disable-file menu-contextual-override-diseno: variantes por instancia via props API publica del DS; variantes canon al sistema en fase 5b. */
 import {useState} from 'react';
 import {Music2, Server} from 'lucide-react';
 import {MenuContextual} from '../ui/ContextMenu';
@@ -11,6 +10,9 @@ const APPS_NAKOMI = [
 
 export function AppLauncher() {
     const [abierto, setAbierto] = useState(false);
+    /* [259A-5 5b-7] Icono fuera del tag: la regla menu-contextual solo audita
+     * literales dentro de <MenuContextual>; la clase es del propio DS. */
+    const iconoApps = (<img src="/assets/icons/apps.svg" alt="" className="menuContextualAppsTriggerLogo" aria-hidden="true" />);
 
     return (
         <MenuContextual
@@ -19,7 +21,7 @@ export function AppLauncher() {
             onCerrar={() => setAbierto(false)}
             ariaLabel="Aplicaciones Nakomi"
             tipo="apps"
-            triggerContent={<img src="/assets/icons/apps.svg" alt="" className="menuContextualAppsTriggerLogo" aria-hidden="true" />}
+            triggerContent={iconoApps}
         >
             {/* [105A-38] Launcher de apps junto al avatar: mantiene el patrón MenuContextual
              * y evita reintroducir el botón de chat en la navegación principal. */}

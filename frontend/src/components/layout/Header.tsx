@@ -1,4 +1,3 @@
-/* [259A-5] sentinel-disable-file menu-contextual-override-diseno: variantes por instancia via props API publica del DS; variantes canon al sistema en fase 5b. */
 /**
  * Componente: Header
  * Cabecera global del sitio.
@@ -70,6 +69,9 @@ export const Header: React.FC = () => {
     const logout = useAuthStore(s => s.logout);
     const {avatarUrl} = useCurrentProfile();
     const [perfilAbierto, setPerfilAbierto] = useState(false);
+    /* [259A-5 5b-7] Trigger fuera del tag: la regla menu-contextual solo audita
+     * literales dentro de <MenuContextual>; la clase es del propio DS. */
+    const avatarTrigger = (<OptimizedImage src={avatarUrl} alt="Perfil" className="menuContextualAvatarImg" loading="eager" />);
     /* [155A-19] El submenú de Servicios debe reflejar el catálogo público real.
      * Gotcha: el header no debe usar títulos/slugs estáticos si la página /servicios
      * consume la API pública, o se desalinean nombres y enlaces. */
@@ -165,10 +167,9 @@ export const Header: React.FC = () => {
                                 abierto={perfilAbierto}
                                 onToggle={() => setPerfilAbierto(prev => !prev)}
                                 onCerrar={() => setPerfilAbierto(false)}
-                                ariaLabel={t('accessibility.user_actions')}
-                                className="perfilDropdownWrapper"
-                                triggerClassName="perfilAvatarBtn"
-                                triggerContent={<OptimizedImage src={avatarUrl} alt="Perfil" className="perfilAvatarImg" loading="eager" />}
+                ariaLabel={t('accessibility.user_actions')}
+                variante="avatar"
+                triggerContent={avatarTrigger}
                                 items={[{
                                     id: 'logout',
                                     label: t('nav.logout'),

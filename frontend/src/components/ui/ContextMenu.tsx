@@ -31,6 +31,13 @@ interface MenuContextualProps {
      * para fondos oscuros (footer, hero dark). No inyecta diseño local. */
     contexto?: 'oscuro';
     tipo?: 'menu' | 'apps';
+    /* [259A-5 5b-7] Variante canonica del trigger. 'filtro' = selector con
+     * etiqueta (era proyectosFiltroEmpleado/seoPaginasFiltroTipo/usuariosFiltroBtn);
+     * 'campana' = campana con insignia (era chatBell__trigger/notificationBell__trigger);
+     * 'avatar' = foto de perfil (era perfilAvatarBtn); 'accion' = icono de fila
+     * (era ordenDetalleOpcionesBoton/usuariosMenuBtn). La receta vive en
+     * ContextMenu.css; las instancias solo declaran la variante. */
+    variante?: 'filtro' | 'campana' | 'avatar' | 'accion';
 }
 
 type MenuContextualPosicion = 'abajoDerecha' | 'abajoIzquierda' | 'arribaDerecha' | 'arribaIzquierda';
@@ -51,6 +58,7 @@ export const MenuContextual: React.FC<MenuContextualProps> = ({
     children,
     contexto,
     tipo = 'menu',
+    variante,
 }) => {
     const contenedorRef = useRef<HTMLDivElement>(null);
     const panelRef = useRef<HTMLDivElement>(null);
@@ -101,10 +109,18 @@ export const MenuContextual: React.FC<MenuContextualProps> = ({
         panelClassName,
     ].filter(Boolean).join(' ');
 
+    /* [259A-5 5b-7] Receta del trigger por variante canonica. */
+    const RECETAS_TRIGGER: Record<NonNullable<typeof variante>, string> = {
+        filtro: 'menuContextualFiltro',
+        campana: 'menuContextualCampana',
+        avatar: 'menuContextualAvatar',
+        accion: 'menuContextualAccion',
+    };
+
     return (
         <div ref={contenedorRef} className={`menuContextual${contexto === 'oscuro' ? ' menuContextualOscuro' : ''}${tipo === 'apps' ? ' menuContextualApps' : ''} ${className}`.trim()} onBlur={handleBlur}>
             <Button
-                className={`menuContextualBoton ${triggerClassName}`.trim()}
+                className={`menuContextualBoton${variante ? ` ${RECETAS_TRIGGER[variante]}` : ''} ${triggerClassName}`.trim()}
                 onClick={onToggle}
                 type="button"
                 aria-haspopup="menu"

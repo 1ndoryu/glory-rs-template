@@ -2,7 +2,6 @@
  * Reutiliza patrón visual de SeccionCorreo (tabla + badges).
  * Búsqueda por texto + filtro por tipo de página.
  * [277A-13] Columna acciones: ✏️ editar (estáticas), 🔗 ir al CMS (dinámicas). */
-/* [259A-5] sentinel-disable-file menu-contextual-override-diseno: filtro via props API publica del DS (5b-7). */
 import React, {useState} from 'react';
 import {Search, ChevronDown, Pencil, ExternalLink} from 'lucide-react';
 import {useQuery} from '@tanstack/react-query';
@@ -109,9 +108,7 @@ export const SubTabSeoPaginas: React.FC<Props> = ({pages}) => {
                     onToggle={() => setMenuAbierto(prev => !prev)}
                     onCerrar={() => setMenuAbierto(false)}
                     ariaLabel="Filtrar por tipo de página"
-                    triggerClassName="seoPaginasFiltroTipo"
-                    triggerVariante="outline"
-                    triggerTamano="pequeno"
+                    variante="filtro"
                     triggerContent={<>{TYPE_LABELS[filtroTipo] ?? 'Todas las páginas'} <ChevronDown size={14} /></>}
                     items={TYPE_OPTIONS.map(opt => ({
                         id: opt.id,

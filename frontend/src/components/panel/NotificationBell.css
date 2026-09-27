@@ -1,54 +1,13 @@
 /* [044A-38 Fase 9] Estilos de la campana de notificaciones
  * [044A-42] Fix hover negro + alineación vertical con texto adyacente
+ * [259A-5 5b-7] Trigger e insignia migrados a variante canon 'campana' de
+ * MenuContextual; panel bespoke (ancho 340px + offset responsive propio).
  * sentinel-disable-file css-especificacion-diseno-local: Componente contextmenu-pattern; las
- * clases __trigger, __dropdown, __item siguen la misma arquitectura que ContextMenu.css. */
+ * clases __dropdown, __item siguen la misma arquitectura que ContextMenu.css. */
 
 .notificationBell {
-  position: relative;
   display: inline-flex;
   align-items: center;
-}
-
-.notificationBell .menuContextualBoton.notificationBell__trigger {
-  background: none;
-  border: none;
-  cursor: pointer;
-  position: relative;
-  padding: 4px;
-  color: var(--brand-black);
-  border-radius: 50%;
-  transition: opacity 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  min-width: auto;
-  min-height: auto;
-  text-decoration: none;
-}
-
-.notificationBell .menuContextualBoton.notificationBell__trigger:hover {
-  opacity: 0.6;
-  background: none;
-}
-
-.notificationBell__badge {
-  position: absolute;
-  top: 0;
-  right: 0;
-  background: var(--brand-black);
-  color: var(--brand-white);
-  font-size: var(--text-2xs);
-  font-weight: 700;
-  min-width: 18px;
-  height: 18px;
-  border-radius: var(--radius-full);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 4px;
-  transform: translate(30%, -30%);
-  line-height: 1;
 }
 
 .notificationBell__dropdown {
