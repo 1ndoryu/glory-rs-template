@@ -290,5 +290,16 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   pública (`extras={}` sin `precio_minimo`, 422 a array), login `/ask`
   centrado, lista + cuestionario (respuesta → 14% en DB y UI), `tsc` 0,
   `cargo test --lib` 18 passed. Dato de prueba limpiado.
+- F2 mejora /ask verificada local (commit `e119b9c4`, `tsc` 0): sin
+  `urbanizacion_zona` en `extras`; paso inteligente ubicación+residencia
+  (rellena columnas vía PUT, confirma lo existente); numéricos
+  condicionales por tipo (m² salvo terreno, parcela en casa/terreno,
+  puestos salvo terreno, solo si faltan); orden aleatorio por sesión;
+  botón Anterior (deshacer/corrige); No sé en Sí/No; numéricos con unidad,
+  stepper y error visible; página centrada angosta con foto de portada +
+  descripción; sección Ficha /ask editable en el modal admin (pisa
+  `extras`/`precio_minimo`; ubicación/medidas ya se editaban). Flujo
+  probado en navegador sin ensuciar datos (ubicación restaurada,
+  `extras={}` intacto, guardado admin sin cambios = no-op).
 - Requiere de usuaria: responder el cuestionario en `/ask`.
 
