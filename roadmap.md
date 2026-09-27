@@ -301,5 +301,13 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   `extras`/`precio_minimo`; ubicación/medidas ya se editaban). Flujo
   probado en navegador sin ensuciar datos (ubicación restaurada,
   `extras={}` intacto, guardado admin sin cambios = no-op).
+- 279A-4 sin lista /ask verificado local (commit `ecb71411`, `tsc` 0): al
+  entrar elige sola una propiedad con algo que preguntar (candidatas en
+  aleatorio, ficha una a una, primera con pendientes); sin lista visible,
+  solo preguntas; botón Otra propiedad (excluye la actual) + Otra pregunta
+  aleatoria al terminar; panel ¡Todo al día! con Revisar de nuevo;
+  `estado-ask.ts` separa estado/updaters (hook 117 líneas). Navegador:
+  entrada directa a pregunta, Otra propiedad salta de Calas Suites a
+  Arivana, recarga cae en Riberas del Caroní, solo lecturas.
 - Requiere de usuaria: responder el cuestionario en `/ask`.
 
