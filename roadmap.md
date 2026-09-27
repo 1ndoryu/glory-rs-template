@@ -268,13 +268,15 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 
 (279A-1 cerrada 2026-09-27 ~17:10: ver `Agente/completados/tareas-2026-09-27.md`.)
 
-## 279A-2 — Agente WhatsApp MN (pendiente: número + QR de usuaria)
-- Plan: `Agente/planes/plan-whatsapp-2026-09-27.md`.
-- Gateway Baileys en PC usuaria, cerebro `opencode serve` local, sin API de pago.
-- Fases: F1 envío manual → F2 lectura+bandeja `/admin` → F3 borradores →
-  F4 auto-respuesta + imágenes + audios (Whisper local). Mismo agente
-  (glory-agent: canal en sesiones, outbox con destino/texto/media).
-- Requiere de usuaria: número WhatsApp + 2 min para escanear QR. Sin código hasta entonces.
+## 279A-2 — Agente MN pulido: 2 modos, delegación, clientes, observabilidad (plan revisado 2026-09-27)
+- Plan: `Agente/planes/plan-whatsapp-2026-09-27.md` (revisión mayor: ya no
+  es solo WhatsApp; dos números × dos modos completo/inicial, personalidad,
+  congelamiento, `clientes`, tokens, consola de dueña; pista núcleo
+  glory-agent para historial real + usage).
+- Fases: F0 pista núcleo → F1 tablas+clientes → F2 webhook 2 números →
+  F3 delegación → F4 memoria+media → F5 consola dueña.
+- Requiere de usuaria: 2 números + QR (×2) + respuestas `[DECIDIR]`
+  (identidad, campos cliente/ficha, storage fotos). Sin código hasta entonces.
 
 ## 279A-3 — /ask cuestionario de ficha (F1 verificado local 2026-09-27; pendiente: respuestas usuaria)
 - Plan: `Agente/planes/plan-ask-2026-09-27.md`.

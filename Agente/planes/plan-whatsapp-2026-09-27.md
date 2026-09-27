@@ -1,65 +1,182 @@
-# Plan: Agente WhatsApp MN (279A-2) — 2026-09-27
+# Plan: Agente MN pulido — dos modos, delegación, clientes, observabilidad (279A-2) — 2026-09-27
 
-## Objetivo
-Un solo agente (glory-agent) que atiende WhatsApp: envía, lee, muestra
-bandeja en `/admin`, propone borradores y auto-responde FAQs con datos
-reales del catálogo. Sin API de pago.
+> Revisión mayor 2026-09-27 (~18:30): ya no es "solo WhatsApp". Cubre
+> personalidad, 2 números × 2 modos, delegación con congelamiento, gestión
+> de clientes, ventana de contexto, logs de tokens y consola del dueño.
+> Decisiones de infra previas (Baileys, PC usuaria, `opencode serve`) se
+> mantienen. `[DECIDIR]` = pregunta abierta a la usuaria al final del plan.
 
-## Decisiones tomadas (con usuaria)
-- Gateway: **Baileys** (open-source, QR una vez, sesión persistente).
-  Evolution API queda como migración futura si hacen falta varios números o UI propia.
-- Hospedaje gateway: **PC usuaria** (gratis; solo envía/lee con PC encendida).
-  VPS descartado por ahora (más ops).
-- Número: lo aporta la usuaria más tarde (nuevo o actual).
-- Cerebro auto-respuesta: `opencode serve` local (v1.18.30 verificado),
-  sesión por número de cliente.
+## 0. Visión y piezas
 
-## Requisitos aceptados
-1. Conectado al catálogo: respuestas solo con datos de la BD (precio,
-   hab/baños, link ficha). Prohibido inventar.
-2. Enviar y recibir **imágenes** (con pie / guardadas y visibles).
-3. **Audios**: transcripción local con Whisper (gratis, español), texto al
-   cerebro, audio original guardado.
-4. Todo visible en `/admin → Mensajes`, pestaña WhatsApp (PC y móvil).
-5. Mismo agente: sesión WhatsApp = sesión glory-agent (historial unificado
-   web + WhatsApp por cliente).
+- **Parte agentes**: la IA atiende (web + 2 números WhatsApp), los agentes
+  humanos toman hilos, la IA delega/consulta. Todo queda registrado.
+- **Parte dueña**: la usuaria (o yo en su nombre) ve conversaciones, envía
+  mensajes manuales, audita qué hacen agentes humanos e IA, y ve uso
+  (mensajes, tokens). Endpoints documentados para operarlos.
+- Dos piezas separadas por rol, misma BD. Nada de lógica de dueña dentro
+  del loop de la IA y viceversa (SRP).
 
-## Reparto glory-agent / inmobiliaria (regla 17)
-- `glory-agent` (agnóstico): abstracción de canal en sesiones, payload
-  `destino`+`texto`+`media` en outbox, manejo de media entrante.
-- Este repo: tools inmobiliarias, PromptConfig, rutas staff, worker
-  extendido, bandeja WhatsApp en front.
-- Fuera de repos: gateway Baileys + Whisper en PC (servicio local con
-  QR; documentado, versionado como script en este repo).
+## 1. Personalidad y reglas de conversación (prompt)
 
-## Fases (cada una usable sola, con su verificación)
-- **F1 Envío manual**: endpoint admin encolar + worker acepta
-  `destino`/`texto` del payload (hoy solo `whatsapp_admin` fijo) +
-  gateway Baileys `POST /send` + QR. Verificar: mensaje real al número
-  de prueba, outbox `sent`.
-- **F2 Lectura + bandeja**: webhook entrante → tabla mensajes WhatsApp →
-  pestaña en `VistaMensajes` (lista + hilo + responder) + aviso de
-  nuevos. Verificar: escribir desde un teléfono, verlo en `/admin`.
-- **F3 Borradores sugeridos**: opencode propone respuesta, staff aprueba
-  con un clic. Verificar: propuesta coherente con catálogo, envío tras
-  aprobar.
-- **F4 Auto-respuesta + media**: fotos con pie, recepción de imágenes,
-  audios→Whisper→texto, guardarraíles (solo FAQs con datos BD, escala a
-  humano lo demás, horario, firma como asistente). Verificar: matriz de
-  casos (precio real, invento bloqueado, visita → humano).
+- Cordial, amable, **breve** (WhatsApp: 1 idea por mensaje, sin muros).
+- Siempre se declara: «Soy el asistente IA de MN Inmobiliaria».
+- En WhatsApp habla con continuidad de la persona del número (el cliente
+  escribe al número de siempre; la IA lo dice: asistente, no suplanta).
+- Nunca inventa: precio/dirección/foto solo de `buscar/detalle`; lo que
+  no sabe → `consultar_agente` (§5), no improvisación.
+- `No lo sé` de /ask también informa: «aún no tenemos ese dato» en vez
+  de callar o inventar.
+
+## 2. Dos números × dos modos (dos instancias, mismo binario)
+
+- **Completo (número A)**: atiende todo; **nunca delega dentro de la
+  conversación**. Si hay que escalar, avisa al **otro número** (el del
+  agente humano) con la **ficha del cliente** y sigue disponible.
+- **Inicial (número B, el que usa un agente humano)**: solo preguntas
+  iniciales; **casi siempre delega** (el humano sigue en el mismo chat).
+- Implementación: dos `AgentState` (dos `PromptConfig`, tools y
+  `prompt_extra` distintos) anidados como `Router<()>` bajo prefijos
+  distintos (`/agente/completo`, `/agente/inicial`) — el núcleo solo deja
+  UN `PromptConfig` por instancia y `process_incoming`/`rest_send` son
+  privados, así que el webhook reparte por HTTP loopback interno, no por
+  llamada directa. Comparten pool; hub compartido (fanout por sesión).
+- Sesión = cliente × canal. Web + WhatsApp del mismo cliente se enlazan
+  por `clientes` (§4), no mezclando hilos.
+
+## 3. Delegación con congelamiento (máquina de estados)
+
+Estados por sesión (tabla propia `atencion_sesiones`, §4; el núcleo no
+tiene campo): `activa` → `consultando` → (`activa` | `delegada`).
+
+- **Consultar** (duda puntual): tool `consultar_agente` → outbox al número
+  humano con contexto + `ai_enabled=false` (el gate del núcleo calla) +
+  ciclo `waiting`. Al responder el humano: acción staff «devolver a IA
+  con nota» → `ai_enabled=true`, nota como mensaje `staff`, ciclo
+  `answered`, la IA retoma con contexto.
+- **Delegar**: `escalar_a_humano` (existe) → `status=escalated` + ciclo
+  `escalated` + `ai_enabled=false`: triple freno verificado del núcleo.
+  La IA **no vuelve sola**; solo un humano la re-activa.
+- Regla de oro: `waiting`=la IA sigue pudiendo hablar (así es el núcleo:
+  solo `escalated` calla); el silencio en `consultando` lo da
+  `ai_enabled=false` + la fila propia. No confundir con toma humana:
+  el modo queda en `atencion_sesiones.modo`.
+- Completo avisa al otro número con ficha del cliente (nombre, teléfono,
+  resumen, último interés) vía outbox `kind='whatsapp'` con `destino`
+  explícito (hoy el worker solo sabe `whatsapp_admin` fijo: ampliar).
+
+## 4. Datos (todo en este repo; el núcleo no se toca — regla 17)
+
+- `clientes(id, nombre, telefono UNIQUE, origen, interes, presupuesto,
+  zona, notas, created_at)` `[DECIDIR]` campos exactos.
+- `canal_sesiones(session_id PK→agent_sessions, cliente_id→clientes,
+  canal: web|wa_a|wa_b, telefono, modo: completo|inicial)`.
+- `atencion_sesiones(session_id PK, estado: activa|consultando|delegada,
+  modo, asignado_a, updated_at)`.
+- `uso_mensajes(id, session_id, remitente, modelo, tokens_est,
+  tokens_in, tokens_out, created_at)`: conteo sale de `agent_messages`;
+  tokens fase 1 estimados (`len/4`, fórmula del núcleo), fase 2 exactos
+  con pista núcleo (§7).
+- `registrar_contacto` además crea/actualiza `clientes` (hoy solo toca
+  la sesión: no perder clientes = entidad propia).
+
+## 5. Conversación natural (capacidades)
+
+- Enviar inmuebles: texto + **fotos con pie** (outbox payload con
+  `media_url`; gateway Baileys las manda; pie = título+precio+slug).
+- Descripción y preguntas: con `detalle_inmueble` (ya trae `extras` y
+  margen — 279A-8) + `buscar_inmuebles`.
+- Recibir fotos del cliente: se guardan (storage `[DECIDIR]`: disco PC
+  vs volumen) y se describen vía `/ia/completar` → el texto entra al
+  loop como contexto (el loop del núcleo hoy es solo-texto).
+- Audios → Whisper local → texto (plan original F4, se mantiene).
+- Desconocimiento → `consultar_agente` primero (§3). Jamás rellenar.
+
+## 6. Ventana de contexto
+
+- Hoy el núcleo arma el LLM con **solo el mensaje actual** + tope 30k
+  (`transport` + `MAX_CONTEXT_TOKENS` fijos): no hay memoria multi-turno
+  real. «Subir la ventana» = pista núcleo (§7): historial real con tope
+  configurable + resumen. Sin eso, «fluida» es solo apariencia.
+- Mientras tanto: nada de parches (inyectar historial por `prompt_extra`
+  global es inseguro y mezcla hilos).
+
+## 7. Pista núcleo (repo `glory-agent`, otro release)
+
+Requiere versión nueva (publicar + bump de `rev`, flujo regla 17):
+
+1. Historial real al LLM (últimos N mensajes + resumen, tope
+   configurable; hoy solo el actual).
+2. `usage` del provider por turno (`input/output_tokens`; hoy se
+   descarta) → alimenta `uso_mensajes` exacto.
+3. Ventana configurable (`MAX_CONTEXT_TOKENS` hoy const 30k).
+4. Opcional tarde: passthrough de media/canal en mensajes y outbox
+   (hoy todo es `body` texto; lo suplimos con payload propio).
+
+Sin 1+2 el plan llega hasta: estima de tokens + memoria de un turno.
+
+## 8. Consola de la dueña (admin + operable por mí)
+
+- Existe: bandeja, hilo, responder (toma el hilo), tomar/soltar IA,
+  cerrar, config (`VistaMensajes`, rutas staff).
+- Nuevo: **clientes** (CRUD + ver sus sesiones), **iniciar/enviar
+  mensaje** (nueva sesión o existente → outbox; «dime y lo envío»),
+  **auditoría** (quién tomó cada hilo, tiempos, mensajes IA vs humano),
+  **uso** (mensajes y tokens por día/sesión/cliente).
+- Todo vía endpoints admin documentados en el propio plan al
+  implementar, para que yo pueda operarlos por terminal/HTTP.
+
+## 9. Fases (cada una usable sola, con su verificación)
+
+- **F0 Pista núcleo**: release glory-agent (historial+usage+ventana) y
+  bump aquí. Sin esto, F4 es parcial. Verificar: turno con memoria de
+  3 mensajes + `usage` persistido.
+- **F1 Tablas propias + `registrar_contacto`→clientes**: `clientes`,
+  `canal_sesiones`, `atencion_sesiones`, `uso_mensajes` (estima).
+  Verificar: contacto guarda cliente sin duplicar por teléfono.
+- **F2 Webhook + reparto por número**: Baileys 2 sesiones (QR ×2),
+  webhook con `numero_destino` → modo → instancia; worker con
+  `destino`+`media`. Verificar: mensaje a cada número llega a su modo.
+- **F3 Delegación real**: `consultar_agente`, aviso con ficha al otro
+  número, congelar/retomar, toma en mismo chat (inicial). Verificar:
+  matriz (consulta→retoma, delega→calla, completo→avisa+ficha).
+- **F4 Memoria + exactitud**: historial del núcleo + tokens exactos +
+  fotos entrantes/salientes + audios. Verificar: conversación de 10
+  turnos coherente, fotos con pie, audio transcrito.
+- **F5 Consola dueña**: clientes, envío manual, auditoría, uso.
+  Verificar: enviar desde panel, ver tokens del día, auditar toma.
+
+## 10. SOLID / escala / huecos (revisión 2026-09-27)
+
+- Hoy bien: handlers por dominio, structs `Tarjeta`/`Ficha` en vez de
+  tuplas, una query por bandeja (sin N+1), errores con contexto.
+- Riesgos al crecer: `chat_tools.rs` será god-file → un módulo por tool
+  al añadir `consultar_agente`/`enviar_ficha`; webhook, workers y rutas
+  en módulos propios (`canal/`, `delegacion/`, `clientes/`,
+  `observabilidad/`), nunca todo en `chat.rs`.
+- Escala: hub realtime en memoria (al reiniciar se re-suscribe; las
+  sesiones persisten: degradado aceptado); outbox con un worker por
+  `kind`; gateway en PC = cuello documentado (requiere PC encendida);
+  coste LLM con tope por sesión/día (config) + alerta.
+- Huecos que este plan cierra: memoria multi-turno (F0), tokens (F1/F4),
+  clientes (F1), media (F2/F4), dos modos (F2), auditoría (F5).
 
 ## Estado
-- **Bloqueado esperando usuaria**: número + 2 min para QR.
-- Nada implementado; sin cambios de código hasta F1.
+
+- **Bloqueado esperando usuaria**: 2 números + QR (×2) + respuestas
+  `[DECIDIR]` (identidad, campos cliente/ficha, storage fotos).
+- Nada implementado de este plan; sin código hasta F0/F1.
 
 ## Gate / DoD por fase
-- Rust: `cargo fmt --check && cargo check && cargo clippy -- -D warnings && cargo test`.
+
+- Rust: `cargo fmt --check && cargo check && cargo clippy -- -D
+  warnings && cargo test` (en rama `inmobiliaria`, BD de rama).
 - Front: `npx tsc --noEmit` (+ 2 resoluciones si hay UI).
-- Funcional real en cada fase (mensaje/bandeja/respuesta de verdad,
-  no solo compila). Deploy vía coolify-manager-rs si toca prod.
+- Funcional real en cada fase (conversación/mensaje de verdad).
+- Deploy vía coolify-manager-rs si toca prod.
 
 ## Riesgos
-- Automatización no oficial: solo 1:1, nada masivo (riesgo de restricción).
+
+- Baileys no oficial: solo 1:1, nada masivo (restricción).
 - Gateway en PC: requiere PC encendida; documentar arranque.
-- Precios/visitas inventadas: mitigado por F3→F4 con guardarraíles y
-  escalación a humano.
+- Núcleo externo: F0 depende de otro repo (publicar+probar+bump).
+- Coste LLM: medir desde F1 (estima), tope desde F4 (exacto).
