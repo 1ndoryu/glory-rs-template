@@ -238,11 +238,12 @@ archivos, 157 con violaciones (34 errores, 363 warnings, 6 info, 60 hints).
    2026-09-27 (modales→`<Modal>` x5, botones/Select→DS, MenuContextual
    variantes filtro/campana/avatar/accion, css-hardcoded-value 0; commits
    6f4ede94→82ac16d4; tsc 0 + build 23.94s + bundle dist verificado;
-  navegador real bloqueado — 5173 ocupado, background no sobrevive —
-  registrado en completada). Gate: Rust sin cambios desde 5a → vale PASS 5a +
+   navegador 27/09 18:15 (dev :5176): landing 13/13 DS, modal auth DS,
+   consola 0 errores; panel con auth y 320px pendientes de verificación
+   manual — registrado en completada). Gate: Rust sin cambios desde 5a → vale PASS 5a +
   fmt/clippy PASS 27/09 13:42 (findings vacíos); test 26/09 sobre mismo código.
-  Docs 5b commiteadas (b38aeca4). Estado: 259A-5 CERRADA salvo verificación
-  visual en navegador real (bloqueada por entorno, registrada).
+  Docs 5b commiteadas (b38aeca4 + visual). Estado: 259A-5 CERRADA salvo
+  verificación manual pendiente (panel con auth + 320px, registrada).
   Fix tool `reactAnalyzer` disables HECHO en sentinel 0.7.14 (token exacto +
   ventana sin break + guards; pin NAKOMI 647b0603, prevencion
   sentinel-disable-ignorado RESUELTA).
