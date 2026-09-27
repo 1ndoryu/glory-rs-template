@@ -550,8 +550,8 @@
     gap: var(--spacing-xs);
     margin-top: var(--spacing-xs);
     padding: var(--spacing-xs) var(--spacing-md);
-    background: #25d366;
-    color: #fff;
+    background: var(--chat-whatsapp);
+    color: var(--brand-white);
     border-radius: var(--radius-sm);
     text-decoration: none;
     font-size: var(--text-sm);

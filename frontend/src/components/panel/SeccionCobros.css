@@ -42,7 +42,7 @@
 }
 
 .cobrosFiltroActivo {
-    color: #fff;
+    color: var(--brand-white);
     background: var(--brand-black);
 }
 
@@ -68,8 +68,8 @@
     display: flex;
     align-items: center;
     gap: var(--spacing-xs);
-    color: #dc2626;
-    background: #fef2f2;
+    color: var(--color-error-fuerte);
+    background: var(--color-error-bg-soft);
     padding: var(--spacing-sm) var(--spacing-md);
     border-radius: var(--radius-md);
 }
@@ -177,13 +177,13 @@
 }
 
 .cobrosBadgePendiente {
-    background: #fef9c3;
-    color: #92400e;
+    background: var(--color-warning-bg-claro);
+    color: var(--color-warning-text-solido);
 }
 
 .cobrosBadgePagado {
-    background: #dcfce7;
-    color: #166534;
+    background: var(--color-success-bg);
+    color: var(--color-success-text);
 }
 
 @media (max-width: 767px) {

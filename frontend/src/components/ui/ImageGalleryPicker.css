@@ -4,7 +4,7 @@
     position: fixed;
     inset: 0;
     z-index: 1050;
-    background: rgba(0, 0, 0, 0.5);
+    background: var(--overlay-medium);
     display: flex;
     align-items: center;
     justify-content: center;

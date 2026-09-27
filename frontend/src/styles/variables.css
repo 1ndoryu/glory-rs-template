@@ -190,6 +190,37 @@
     --panel-card-icono-bg: var(--bg-accent);
     --panel-card-icono-color: var(--text-tertiary);
 
+    /* [259A-5 5b] Tokens nuevos para migrar css-hardcoded a variables.
+     * Cada valor es IDENTICO al literal que reemplaza (cero cambio visual).
+     * Los fallbacks muertos de var() se eliminan porque la variable ya existe. */
+    --overlay-fuerte: rgba(0, 0, 0, 0.7);
+    --white-3: rgba(255, 255, 255, 0.03);
+    --white-6: rgba(255, 255, 255, 0.06);
+    --white-8: rgba(255, 255, 255, 0.08);
+    --white-30: rgba(255, 255, 255, 0.3);
+    --white-52: rgba(255, 255, 255, 0.52);
+    --white-72: rgba(255, 255, 255, 0.72);
+    --bg-glass-primary: rgba(253, 252, 252, 0.92);
+    --bg-profundo: #0e0e0d;
+    --color-error-fuerte: #dc2626;
+    --color-error-bg-claro: #fde8e8;
+    --color-error-fantasma: rgba(239, 68, 68, 0.06);
+    --color-error-borde-fantasma: rgba(239, 68, 68, 0.18);
+    --color-warning-bg-claro: #fef9c3;
+    --color-warning-bg-profundo: #fde68a;
+    --color-warning-text-solido: #92400e;
+    --color-success-bg-claro: #e6f7e6;
+    --color-primario-alfa-04: rgba(201, 168, 76, 0.04);
+    --color-primario-alfa-12: rgba(201, 168, 76, 0.12);
+    --color-gris-claro: #f0f0f0;
+    --color-gris-medio: #666666;
+    --ventana-punto-rojo: #ff5f57;
+    --ventana-punto-ambar: #febc2e;
+    --ventana-punto-verde: #28c840;
+    --chat-whatsapp: #25d366;
+    --sombra-suave: 0 4px 12px rgba(0, 0, 0, 0.05);
+    --anillo-foco-primario: 0 0 0 3px rgba(99, 102, 241, 0.15);
+
     /* [259A-6] Aliases canonicos para 24 variables usadas pero nunca definidas
      * (varsense variableNoDefinida 107 -> 0). Cada alias conserva el valor del
      * fallback mayoritario que ya se renderizaba; los usos minoritarios se

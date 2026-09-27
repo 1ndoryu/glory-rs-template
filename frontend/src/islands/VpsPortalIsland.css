@@ -16,7 +16,7 @@
     position: sticky;
     top: 0;
     z-index: 100;
-    background: rgba(253, 252, 252, 0.92);
+    background: var(--bg-glass-primary);
     backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--border-light);
 }
@@ -86,9 +86,9 @@
     color: var(--error-color);
     margin: 0;
     padding: 0.5rem 0.75rem;
-    background: rgba(239, 68, 68, 0.06);
+    background: var(--color-error-fantasma);
     border-radius: var(--radius-sm);
-    border: 1px solid rgba(239, 68, 68, 0.18);
+    border: 1px solid var(--color-error-borde-fantasma);
 }
 
 /* ─── Hero ─── */
@@ -200,8 +200,8 @@
     width: 100%;
     max-width: 560px;
     border-radius: var(--radius-lg);
-    background: #0e0e0d;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--bg-profundo);
+    border: 1px solid var(--white-8);
     overflow: hidden;
 }
 
@@ -210,8 +210,8 @@
     align-items: center;
     gap: 6px;
     padding: 0.75rem 1rem;
-    background: rgba(255, 255, 255, 0.03);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--white-3);
+    border-bottom: 1px solid var(--white-6);
 }
 
 .vpsDemoPunto {
@@ -221,13 +221,13 @@
     flex-shrink: 0;
 }
 
-.vpsDemoPuntoRojo  { background: #ff5f57; }
-.vpsDemoPuntoAmbar { background: #febc2e; }
-.vpsDemoPuntoVerde { background: #28c840; }
+.vpsDemoPuntoRojo  { background: var(--ventana-punto-rojo); }
+.vpsDemoPuntoAmbar { background: var(--ventana-punto-ambar); }
+.vpsDemoPuntoVerde { background: var(--ventana-punto-verde); }
 
 .vpsDemoCabeceraLabel {
     font-size: var(--text-xs);
-    color: rgba(255, 255, 255, 0.3);
+    color: var(--white-30);
     font-family: var(--font-mono);
     margin-left: 0.375rem;
 }
@@ -238,7 +238,7 @@
     font-family: var(--font-mono);
     font-size: 0.8rem;
     line-height: 1.75;
-    color: rgba(255, 255, 255, 0.72);
+    color: var(--white-72);
     white-space: pre;
     overflow-x: auto;
 }
@@ -465,7 +465,7 @@
 
 .vpsCtaFinalSub {
     font-size: var(--text-base);
-    color: rgba(255, 255, 255, 0.52);
+    color: var(--white-52);
     max-width: 480px;
     margin: 0;
 }
