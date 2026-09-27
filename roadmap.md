@@ -229,7 +229,9 @@ archivos, 157 con violaciones (34 errores, 363 warnings, 6 info, 60 hints).
   lifecycle 288 + backup_ops 418 + lightweight 113, gate PASS 84baf49d);
   ✅ 4c email (hub ~140 + orders ~250 + admin ~440 + misc ~430, gate PASS);
   ✅ 4d chat_timing (hub 508 + rate 198 + loop 181 + response 311 +
-  escalation 195, gate PASS); pendiente 4e ai_tools.
+  escalation 195, gate PASS); ✅ 4e ai_tools (hub 489 + hosting 456 +
+  misc 740 + orders 269 + reports 360 + vps 404, gate 259A-4 PASS
+  fmt 7.1s/clippy 203.1s/test 8.6s).
 - **259A-5** — Triage warnings Glory-DS (html-nativo 37, window-reference 42,
   menu-contextual 23, modal ~12, css-hardcoded 105) + hints large-interface-isp 43:
   corregir o afinar `sentinel.config.json` con evidencia por regla.
