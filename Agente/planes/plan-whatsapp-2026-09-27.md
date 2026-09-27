@@ -19,9 +19,8 @@
 ## 1. Personalidad y reglas de conversación (prompt)
 
 - Cordial, amable, **breve** (WhatsApp: 1 idea por mensaje, sin muros).
-- Siempre se declara: «Soy el asistente IA de MN Inmobiliaria».
-- En WhatsApp habla con continuidad de la persona del número (el cliente
-  escribe al número de siempre; la IA lo dice: asistente, no suplanta).
+- Siempre se declara: «Soy el asistente IA de MN Inmobiliaria» (decidido
+  2026-09-27: sin nombre de persona, igual en ambos números y en web).
 - Nunca inventa: precio/dirección/foto solo de `buscar/detalle`; lo que
   no sabe → `consultar_agente` (§5), no improvisación.
 - `No lo sé` de /ask también informa: «aún no tenemos ese dato» en vez
@@ -30,8 +29,9 @@
 ## 2. Dos números × dos modos (dos instancias, mismo binario)
 
 - **Completo (número A)**: atiende todo; **nunca delega dentro de la
-  conversación**. Si hay que escalar, avisa al **otro número** (el del
-  agente humano) con la **ficha del cliente** y sigue disponible.
+  conversación**. Si hay que escalar, avisa al número del agente humano
+  (el del modo inicial, decidido 2026-09-27) con la **ficha comercial**
+  del cliente y sigue disponible.
 - **Inicial (número B, el que usa un agente humano)**: solo preguntas
   iniciales; **casi siempre delega** (el humano sigue en el mismo chat).
 - Implementación: dos `AgentState` (dos `PromptConfig`, tools y
@@ -67,7 +67,8 @@ tiene campo): `activa` → `consultando` → (`activa` | `delegada`).
 ## 4. Datos (todo en este repo; el núcleo no se toca — regla 17)
 
 - `clientes(id, nombre, telefono UNIQUE, origen, interes, presupuesto,
-  zona, notas, created_at)` `[DECIDIR]` campos exactos.
+  zona, notas, created_at)` (ficha comercial decidida 2026-09-27: la de
+  delegación lleva nombre+teléfono+resumen+interés+presupuesto+zona).
 - `canal_sesiones(session_id PK→agent_sessions, cliente_id→clientes,
   canal: web|wa_a|wa_b, telefono, modo: completo|inicial)`.
 - `atencion_sesiones(session_id PK, estado: activa|consultando|delegada,
@@ -86,8 +87,8 @@ tiene campo): `activa` → `consultando` → (`activa` | `delegada`).
 - Descripción y preguntas: con `detalle_inmueble` (ya trae `extras` y
   margen — 279A-8) + `buscar_inmuebles`.
 - Recibir fotos del cliente: se guardan (storage `[DECIDIR]`: disco PC
-  vs volumen) y se describen vía `/ia/completar` → el texto entra al
-  loop como contexto (el loop del núcleo hoy es solo-texto).
+  vs volumen) pero **no se describen** (decidido 2026-09-27: WhatsApp es
+  solo-enviar; las fotos quedan para la web).
 - Audios → Whisper local → texto (plan original F4, se mantiene).
 - Desconocimiento → `consultar_agente` primero (§3). Jamás rellenar.
 
@@ -162,8 +163,9 @@ Sin 1+2 el plan llega hasta: estima de tokens + memoria de un turno.
 
 ## Estado
 
-- **Bloqueado esperando usuaria**: 2 números + QR (×2) + respuestas
-  `[DECIDIR]` (identidad, campos cliente/ficha, storage fotos).
+- **Bloqueado esperando usuaria**: 2 números + QR (×2) + storage de fotos
+  (disco PC vs volumen). Identidad, ficha comercial, fotos y destino del
+  aviso ya decididos (2026-09-27).
 - Nada implementado de este plan; sin código hasta F0/F1.
 
 ## Gate / DoD por fase
