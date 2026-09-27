@@ -4,11 +4,12 @@
  * [064A-61] Submenú móvil para navegación anidada en overlay modal. */
 import {useState, useRef, useCallback, useEffect} from 'react';
 import {useAuthStore} from '../stores/authStore';
+/* [259A-5] Acceso window via platform/navigation (boundary sentinel). */
+import {obtenerRuta} from '../platform/navigation';
 
 /* Comprueba si la ruta actual coincide con un path dado */
 function esRutaActual(path: string): boolean {
-    if (typeof window === 'undefined') return false;
-    return window.location.pathname.replace(/\/+$/, '') === path.replace(/\/+$/, '');
+    return obtenerRuta().replace(/\/+$/, '') === path.replace(/\/+$/, '');
 }
 
 export const useHeader = () => {

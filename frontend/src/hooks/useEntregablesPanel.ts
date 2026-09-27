@@ -3,6 +3,8 @@
 
 import { useState, useCallback } from 'react';
 import { useDeliverables } from './useDeliverables';
+/* [259A-5] Creacion de enlace de descarga via platform/dom (boundary sentinel). */
+import {crearElemento} from '../platform/dom';
 import type { PhaseDeliverable } from '../api/deliverables';
 
 export function useEntregablesPanel(orderId: string, phaseNumber: number) {
@@ -48,7 +50,7 @@ export function useEntregablesPanel(orderId: string, phaseNumber: number) {
     const handleDownload = useCallback(async (deliverableId: string, fileName: string) => {
         try {
             const blobUrl = await descargar(deliverableId);
-            const a = document.createElement('a');
+            const a = crearElemento('a');
             a.href = blobUrl;
             a.download = fileName;
             a.click();

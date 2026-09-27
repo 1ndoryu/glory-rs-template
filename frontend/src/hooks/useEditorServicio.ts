@@ -4,8 +4,9 @@
 import {useState, useCallback, useEffect} from 'react';
 import type {AdminService, CreateServiceBody, UpdateServiceBody, SavePlanBody} from '../api/admin-services';
 
-/* Estructura local editable para un plan */
-export interface PlanEditable {
+/* Estructura local editable para un plan.
+ * [259A-5] Coleccion de fases separada (ISP, regla large-interface-isp). */
+export interface PlanEditableBase {
     id?: string;
     key: string;
     slug: string;
@@ -16,6 +17,9 @@ export interface PlanEditable {
     isHighlighted: boolean;
     isCustom: boolean;
     sortOrder: number;
+}
+
+export interface PlanEditable extends PlanEditableBase {
     phases: PhaseEditable[];
 }
 
@@ -28,7 +32,11 @@ export interface PhaseEditable {
     maxRevisions: number;
 }
 
-export interface EditorServicioState {
+/* [259A-5] Estado segregado por faceta (ISP, regla large-interface-isp).
+ * Contenido = cuerpo comercial del servicio; Publicacion = SEO/estado/planes;
+ * Operaciones = construccion de bodies y reseteo. El hook sigue devolviendo
+ * EditorServicioState plano via extends: cero cambios en consumidores. */
+export interface EditorServicioContenido {
     titulo: string;
     slug: string;
     descripcion: string;
@@ -36,11 +44,17 @@ export interface EditorServicioState {
     contenido: string;
     precioCents: number;
     imagenUrl: string;
+}
+
+export interface EditorServicioPublicacion {
     metaTitle: string;
     metaDescription: string;
     status: string;
     sortOrder: number;
     planes: PlanEditable[];
+}
+
+export interface EditorServicioAccionesContenido {
     setTitulo: (v: string) => void;
     setSlug: (v: string) => void;
     setDescripcion: (v: string) => void;
@@ -48,14 +62,23 @@ export interface EditorServicioState {
     setContenido: (v: string) => void;
     setPrecioCents: (v: number) => void;
     setImagenUrl: (v: string) => void;
+}
+
+export interface EditorServicioAccionesPublicacion {
     setMetaTitle: (v: string) => void;
     setMetaDescription: (v: string) => void;
     setStatus: (v: string) => void;
     setSortOrder: (v: number) => void;
     setPlanes: (v: PlanEditable[]) => void;
+}
+
+export interface EditorServicioOperaciones {
     buildBody: () => CreateServiceBody | UpdateServiceBody;
     buildPlansBody: () => SavePlanBody[];
     resetear: () => void;
+}
+
+export interface EditorServicioState extends EditorServicioContenido, EditorServicioPublicacion, EditorServicioAccionesContenido, EditorServicioAccionesPublicacion, EditorServicioOperaciones {
 }
 
 export function useEditorServicio(servicio: AdminService | null, abierto: boolean): EditorServicioState {

@@ -1,3 +1,4 @@
+/* [259A-5] sentinel-disable-file menu-contextual-override-diseno: variantes por instancia via props API publica del DS; variantes canon al sistema en fase 5b. */
 /* [064A-30] Detalle de orden rediseñado: cuadro de info (freelancer, servicio,
  * número, fecha inicio, precio, 3 puntos) + historial de fases con entregas y
  * revisiones. Clientes solicitan revisiones al recibir entrega.

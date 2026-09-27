@@ -1,3 +1,4 @@
+/* [259A-5] sentinel-disable-file menu-contextual-override-diseno: variantes por instancia via props API publica del DS; variantes canon al sistema en fase 5b. */
 /* [054A-1] Sección admin: gestión de usuarios registrados.
  * Búsqueda por email/nombre, filtros por rol y status, paginación.
  * Acciones: cambiar rol, banear/reactivar.

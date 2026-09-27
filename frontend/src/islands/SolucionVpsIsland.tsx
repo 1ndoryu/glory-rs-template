@@ -11,6 +11,8 @@ import {SolucionHeroImagen} from '../components/soluciones/SolucionHeroImagen';
 import {PlanFeatureTooltip} from '../components/servicios/PlanFeatureTooltip';
 import {useVpsCatalog} from '../hooks/useVpsCatalog';
 import {navegar} from '../navegacionSPA';
+/* [259A-5] Scroll a ancla via platform/dom (boundary sentinel). */
+import {desplazarHastaElemento} from '../platform/dom';
 import '../components/servicios/SeccionPlanesServicio.css';
 import './SolucionHostingIsland.css';
 
@@ -60,7 +62,7 @@ export const SolucionVpsIsland = (): JSX.Element => {
                     </p>
                     <div className="hostingHeroBotones">
                         <Button variante="primario" onClick={() => {
-                            document.getElementById('planesVps')?.scrollIntoView({behavior: 'smooth'});
+                            desplazarHastaElemento('planesVps');
                         }}>
                             Ver planes
                         </Button>

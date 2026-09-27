@@ -18,6 +18,8 @@ import type {PlanServicio} from '../data/planes/tipos';
 import {incluida} from '../data/planes/tipos';
 import {useHostingCatalog} from '../hooks/useHostingCatalog';
 import {navegar} from '../navegacionSPA';
+/* [259A-5] Scroll a ancla via platform/dom (boundary sentinel). */
+import {desplazarHastaElemento} from '../platform/dom';
 import {PlanFeatureTooltip} from '../components/servicios/PlanFeatureTooltip';
 import '../components/servicios/SeccionPlanesServicio.css';
 import './SolucionHostingIsland.css';
@@ -147,7 +149,7 @@ function SolucionHostingContenido({kind}: {kind: HostingSolutionKind}): JSX.Elem
                     </p>
                     <div className="hostingHeroBotones">
                         <Button variante="primario" onClick={() => {
-                            document.getElementById('planesHosting')?.scrollIntoView({behavior: 'smooth'});
+                            desplazarHastaElemento('planesHosting');
                         }}>
                             {t('hosting_page.view_plans', 'Ver Planes')}
                         </Button>

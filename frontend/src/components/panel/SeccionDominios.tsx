@@ -15,6 +15,8 @@ import {
     type DomainOrder,
 } from '../../api/hosting';
 import {useAuthStore} from '../../stores/authStore';
+/* [259A-5] Acceso window via platform/navigation (boundary sentinel). */
+import {redirigir} from '../../platform/navigation';
 import {Button} from '../ui/Button';
 import {Input} from '../ui/Input';
 import './SeccionDominios.css';
@@ -124,7 +126,7 @@ export const SeccionDominios: React.FC = () => {
         try {
             const response = await apiCreateDomainCheckout(ui.quote.domain);
             await refetchOrders();
-            window.location.href = response.checkout_url;
+            redirigir(response.checkout_url);
         } catch (error) {
             const message = error instanceof Error ? error.message : 'No se pudo iniciar el checkout del dominio.';
             setUi(prev => ({...prev, loading: false, error: message}));

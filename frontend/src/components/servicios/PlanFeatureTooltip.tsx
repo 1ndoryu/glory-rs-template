@@ -1,3 +1,4 @@
+/* [259A-5] sentinel-disable-file componente-sin-hook-glory: logica pura sin estado/efectos (lookup de tooltip); nada que extraer a hook. */
 import {Info} from 'lucide-react';
 
 export type PlanFeatureTooltipContext = 'hosting' | 'wordpress' | 'vps';

@@ -7,6 +7,8 @@ import {
     resolveBestWidth,
     resolveResponsiveWidths,
 } from '../utils/imageUtils';
+/* [259A-5] Listener window via platform/viewport (boundary sentinel). */
+import {desuscribirVentana, suscribirVentana} from '../platform/viewport';
 
 interface UseOptimizedImageParams {
     src: string;
@@ -71,8 +73,9 @@ export function useOptimizedImage({
 
         if (typeof ResizeObserver === 'undefined') {
             const handleResize = () => updateWidth();
-            window.addEventListener('resize', handleResize);
-            return () => window.removeEventListener('resize', handleResize);
+            /* [259A-5] Listener via platform/viewport (boundary sentinel). */
+            suscribirVentana('resize', handleResize);
+            return () => desuscribirVentana('resize', handleResize);
         }
 
         const resizeObserver = new ResizeObserver((entries) => {

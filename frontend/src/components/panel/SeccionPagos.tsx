@@ -114,6 +114,7 @@ export function SeccionPagos() {
                                     alt={ordenActiva.service_title}
                                     loading="lazy"
                                 />
+                                {/* sentinel-disable-next-line modal-con-titulo -- [259A-5] factura: h3 con className canon modalTitulo como titulo de servicio, no titulo de modal */}
                                 <div className="pagosFacturaServicioInfo">
                                     <h3 className="modalTitulo">{ordenActiva.service_title}</h3>
                                     <p className="modalTexto">
@@ -150,6 +151,7 @@ export function SeccionPagos() {
                         </div>
 
                         {/* Lineas de Transacciones */}
+                        {/* sentinel-disable-next-line modal-con-titulo -- [259A-5] factura: h4 de seccion "Movimientos de pago", jerarquia de factura, no titulo de modal */}
                         <div className="pagosFacturaLineasBloque">
                             <h4 className="pagosFacturaSubtitulo">
                                 Movimientos de pago
@@ -213,6 +215,7 @@ export function SeccionPagos() {
                             )}
                         </div>
 
+                        {/* sentinel-disable-next-line modal-acciones-no-canonico -- [259A-5] factura: el div YA lleva modalAcciones canon; pagosFacturaAcciones solo anade layout local */}
                         {puedeSolicitarReembolso && (
                             <div className="modalAcciones pagosFacturaAcciones">
                                 <Button

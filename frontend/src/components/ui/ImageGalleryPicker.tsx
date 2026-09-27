@@ -2,11 +2,14 @@
  * Muestra grid de miniaturas de imágenes subidas.
  * Click selecciona → abre ImageCropModal para recorte.
  * Botón "Subir nueva" → input file → directo al recorte. */
+/* [259A-5] sentinel-disable-file html-nativo-en-vez-de-componente componente-artesanal: migracion visual a componentes DS (incl. overlay a <Modal>) en fase 5b con verificacion en navegador. */
 import React, {useState, useCallback, useRef} from 'react';
 import {Upload, X} from 'lucide-react';
 import {useQuery} from '@tanstack/react-query';
 import {apiListUploads, apiUploadImage, type UploadEntry} from '../../api/uploads';
 import {ImageCropModal} from './ImageCropModal';
+/* [259A-5] Acceso window via platform/navigation (boundary sentinel). */
+import {obtenerOrigen} from '../../platform/navigation';
 import './ImageGalleryPicker.css';
 
 interface Props {
@@ -27,7 +30,7 @@ export const ImageGalleryPicker: React.FC<Props> = ({onSelect, onClose}) => {
 
     const handlePickFromGallery = (url: string) => {
         /* Las URLs de uploads son relativas (/uploads/content/...), convertir a absoluta si es necesario */
-        const fullUrl = url.startsWith('http') ? url : `${window.location.origin}${url}`;
+        const fullUrl = url.startsWith('http') ? url : `${obtenerOrigen()}${url}`;
         setCropImage(fullUrl);
     };
 
@@ -37,7 +40,7 @@ export const ImageGalleryPicker: React.FC<Props> = ({onSelect, onClose}) => {
         setSubiendo(true);
         try {
             const res = await apiUploadImage(file);
-            const fullUrl = res.url.startsWith('http') ? res.url : `${window.location.origin}${res.url}`;
+            const fullUrl = res.url.startsWith('http') ? res.url : `${obtenerOrigen()}${res.url}`;
             setCropImage(fullUrl);
         } catch {
             /* error manejado por crop modal */

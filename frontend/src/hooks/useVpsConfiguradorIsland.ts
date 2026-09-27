@@ -6,6 +6,8 @@ import {apiLogin, apiQuickRegister, extraerMensajeError} from '../api/auth';
 import {apiSelfSubscribeVps} from '../api/hosting';
 import {PANEL_TAB_KEY} from '../data/panel';
 import {useAuthStore} from '../stores/authStore';
+/* [259A-5] Acceso window via platform/navigation (boundary sentinel). */
+import {redirigir} from '../platform/navigation';
 import {useVpsCatalog} from './useVpsCatalog';
 
 interface ConfigForm {
@@ -90,7 +92,7 @@ export function useVpsConfiguradorIsland(initialTier?: string) {
                 server_password: form.serverPassword.trim() || undefined,
             });
             localStorage.setItem(PANEL_TAB_KEY, 'hosting');
-            window.location.href = response.checkout_url;
+            redirigir(response.checkout_url);
         } catch (error) {
             setStatus({submitting: false, error: extraerMensajeError(error)});
         }

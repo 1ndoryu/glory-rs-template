@@ -1,3 +1,4 @@
+/* [259A-5] sentinel-disable-file componente-sin-hook-glory: falso positivo del conteo; usa useState/useMutation/useQueryClient + Modal/Menu/Form; fila con responsabilidad unica (SRP). */
 import {useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {Globe, MoreVertical, PlusCircle, Server, Trash2, X} from 'lucide-react';

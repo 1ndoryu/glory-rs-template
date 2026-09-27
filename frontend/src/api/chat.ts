@@ -2,6 +2,8 @@
  * Soporta chat de orden (autenticado) y chat pre-venta (visitante anónimo). */
 
 import axiosInstance, {getApiHost} from './axios-instance';
+/* [259A-5] Acceso window via platform/navigation (boundary sentinel). */
+import {protocoloSocket} from '../platform/navigation';
 
 /*    TIPOS */
 
@@ -204,7 +206,7 @@ export async function apiClaimChatContinuation(token: string): Promise<ChatConti
 /* [T-9] Acepta token JWT opcional para clientes autenticados */
 /* [084A-28] Acepta context para soporte contextual (hosting:id, service:slug, etc.) */
 export function buildVisitorWsUrl(visitorId: string, visitorName?: string, token?: string | null, context?: string | null, sessionId?: string | null): string {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const protocol = protocoloSocket();
     const host = getApiHost();
     let url = `${protocol}//${host}/ws/chat/visitor?visitor_id=${encodeURIComponent(visitorId)}`;
     if (visitorName) {
@@ -224,7 +226,7 @@ export function buildVisitorWsUrl(visitorId: string, visitorName?: string, token
 
 /** Construye URL de WebSocket para staff */
 export function buildStaffWsUrl(token: string): string {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const protocol = protocoloSocket();
     const host = getApiHost();
     return `${protocol}//${host}/ws/chat/staff?token=${encodeURIComponent(token)}`;
 }

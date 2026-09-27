@@ -11,6 +11,8 @@ import type {PaymentMode} from '../api/orders';
 import {apiSelfSubscribe, apiSelfSubscribeVps} from '../api/hosting';
 import {apiCreateCheckoutIntent} from '../api/payments';
 import {PANEL_TAB_KEY} from '../data/panel';
+/* [259A-5] Acceso window via platform/navigation (boundary sentinel). */
+import {redirigir} from '../platform/navigation';
 import {navegar} from '../navegacionSPA';
 import type {PlanServicio} from '../data/planes/tipos';
 
@@ -104,7 +106,7 @@ export function useModalCompra({plan, servicioSlug, onClose}: UseModalCompraPara
                 domain: hostingDomain.trim() || undefined,
             });
             localStorage.setItem(PANEL_TAB_KEY, 'hosting');
-            window.location.href = response.checkout_url;
+            redirigir(response.checkout_url);
         } catch (err: unknown) {
             setPaso('error');
             setErrorMsg(getPurchaseErrorMessage(err, 'Error al iniciar el checkout de hosting.'));
@@ -119,7 +121,7 @@ export function useModalCompra({plan, servicioSlug, onClose}: UseModalCompraPara
                 hostname: hostingDomain.trim() || undefined,
             });
             localStorage.setItem(PANEL_TAB_KEY, 'hosting');
-            window.location.href = response.checkout_url;
+            redirigir(response.checkout_url);
         } catch (err: unknown) {
             setPaso('error');
             setErrorMsg(getPurchaseErrorMessage(err, 'Error al iniciar el checkout de VPS.'));

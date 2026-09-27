@@ -6,13 +6,15 @@ import {apiClaimChatContinuation} from '../../api/chat';
 import {useChatStore} from '../../stores/chatStore';
 import {toast} from '../../stores/toastStore';
 import {restoreChatWidgetIdentity} from '../../utils/chatWidgetStorage';
+/* [259A-5] Acceso window via platform/navigation (boundary sentinel). */
+import {obtenerFragmento, obtenerRuta, reemplazarUrl} from '../../platform/navigation';
 
 export function ChatContinuationCoordinator() {
     useEffect(() => {
-        if (window.location.pathname !== '/continuar-chat') return;
-        const params = new URLSearchParams(window.location.hash.slice(1));
+        if (obtenerRuta() !== '/continuar-chat') return;
+        const params = new URLSearchParams(obtenerFragmento().slice(1));
         const token = params.get('token');
-        window.history.replaceState({}, '', '/');
+        reemplazarUrl('/');
         if (!token) {
             toast.error('El enlace para continuar la conversación no es válido.');
             return;

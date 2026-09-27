@@ -1,3 +1,4 @@
+/* [259A-5] sentinel-disable-file menu-contextual-override-diseno: variantes por instancia via props API publica del DS; variantes canon al sistema en fase 5b. */
 /* [104A-34] Botón de chat en header con dropdown de sesiones activas.
  * Al hacer clic en una sesión, navega al panel → sección mensajes → abre ese chat.
  * Usa sessionStorage para pasar el target a SeccionChat (evita race conditions con mount). */

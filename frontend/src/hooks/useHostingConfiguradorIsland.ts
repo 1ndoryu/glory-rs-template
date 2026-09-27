@@ -6,6 +6,8 @@ import {apiLogin, apiQuickRegister, extraerMensajeError} from '../api/auth';
 import {apiSelfSubscribe, type HostingPlanInfo} from '../api/hosting';
 import {PANEL_TAB_KEY} from '../data/panel';
 import {useAuthStore} from '../stores/authStore';
+/* [259A-5] Acceso window via platform/navigation (boundary sentinel). */
+import {redirigir} from '../platform/navigation';
 import {useHostingCatalog} from './useHostingCatalog';
 
 export type HostingConfiguradorKind = 'normal' | 'wordpress';
@@ -142,7 +144,7 @@ export function useHostingConfiguradorIsland(kind: HostingConfiguradorKind, init
                 sftp_password: form.sftpPassword.trim() || undefined,
             });
             localStorage.setItem(PANEL_TAB_KEY, 'hosting');
-            window.location.href = response.checkout_url;
+            redirigir(response.checkout_url);
         } catch (error) {
             setStatus({submitting: false, error: extraerMensajeError(error)});
         }

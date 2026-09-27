@@ -11,6 +11,8 @@ import {BrowserRouter, Routes, Route, useNavigate, useParams} from 'react-router
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import {registrarNavigate} from './navegacionSPA';
 import {ScrollToTop} from './components/ui/ScrollToTop';
+/* [259A-5] Acceso window via platform/navigation (boundary sentinel). */
+import {leerParametrosBusqueda, obtenerRuta, reemplazarUrl} from './platform/navigation';
 
 /* Pages (ex-islands) — solo BienvenidaIsland queda eager (es la ruta de aterrizaje principal).
  * [175A-1] ServiciosIsland, ProyectosIsland y NotFoundIsland → lazy para reducir bundle inicial. */
@@ -79,7 +81,7 @@ function NavigateRegistrar() {
     const navigate = useNavigate();
     useLayoutEffect(() => {
         /* [065A-4] Registrar navigate antes del primer paint evita que CTAs tempranos
-         * caigan al fallback window.location.href y recarguen el documento completo. */
+         * caigan al fallback de asignacion directa de URL y recarguen el documento. */
         registrarNavigate((to: string) => navigate(to));
     }, [navigate]);
     return null;
@@ -93,13 +95,13 @@ function GoogleAuthCallback() {
     const authLogin = useAuthStore(s => s.login);
 
     useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
+        const params = leerParametrosBusqueda();
         const code = params.get('code');
         if (!code) return;
 
         /* Limpiar ?code= de la URL inmediatamente (el code es de un solo uso) */
-        const cleanUrl = window.location.pathname;
-        window.history.replaceState({}, '', cleanUrl);
+        const cleanUrl = obtenerRuta();
+        reemplazarUrl(cleanUrl);
 
         apiGoogleLogin(code)
             .then(resp => {

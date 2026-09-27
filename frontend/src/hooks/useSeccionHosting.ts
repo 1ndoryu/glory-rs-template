@@ -13,6 +13,8 @@ import {useHostingMutations} from './useHostingMutations';
 import {useVpsMutations} from './useVpsMutations';
 import {useBillingItems} from './useBillingItems';
 import {getPanelHostingIdFromUrl, syncPanelHostingInUrl} from '../utils/panelUrlState';
+/* [259A-5] Acceso window via platform/navigation (boundary sentinel). */
+import {leerParametrosBusqueda, obtenerHref, reemplazarUrl} from '../platform/navigation';
 
 const ACTIVE_STATUSES = new Set(['pending', 'provisioning', 'active']);
 
@@ -30,7 +32,7 @@ export function useSeccionHosting() {
      * [245A-11] El bypass de test vuelve con `hosting=test-bypass&subscription_id=...`;
      * mostrar feedback y dejar que panelUrlState canonice a `hostingId`. */
     useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
+        const params = leerParametrosBusqueda();
         const hostingResult = params.get('hosting');
         if (hostingResult === 'success') {
             toast.success('¡Pago completado! Tu hosting se activará en breve.');
@@ -46,16 +48,16 @@ export function useSeccionHosting() {
             toast.warning('Checkout VPS cancelado. Puedes intentarlo de nuevo.');
         }
         if (hostingResult) {
-            const url = new URL(window.location.href);
+            const url = new URL(obtenerHref());
             url.searchParams.delete('hosting');
             url.searchParams.delete('session_id');
-            window.history.replaceState({}, '', url.pathname + url.search);
+            reemplazarUrl(url.pathname + url.search);
         }
         if (vpsResult) {
-            const url = new URL(window.location.href);
+            const url = new URL(obtenerHref());
             url.searchParams.delete('vps');
             url.searchParams.delete('session_id');
-            window.history.replaceState({}, '', url.pathname + url.search);
+            reemplazarUrl(url.pathname + url.search);
         }
     }, []);
 

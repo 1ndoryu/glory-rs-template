@@ -37,6 +37,8 @@ import {useAuthStore} from '../stores/authStore';
 import {SEOHead} from '../components/seo/SEOHead';
 import type {UserRole} from '../api/auth';
 import {resolvePanelSectionFromUrl, syncPanelSectionInUrl} from '../utils/panelUrlState';
+/* [259A-5] Listeners window via platform/viewport (boundary sentinel). */
+import {desuscribirVentana, suscribirVentana} from '../platform/viewport';
 import '../styles/variables.css';
 import './PanelIsland.css';
 
@@ -107,8 +109,8 @@ export const PanelIsland: React.FC = () => {
             const tab = (e as CustomEvent).detail as SeccionPanel;
             if (tab) setSeccionActiva(tab);
         };
-        window.addEventListener('panel-cambiar-tab', handler);
-        return () => window.removeEventListener('panel-cambiar-tab', handler);
+        suscribirVentana('panel-cambiar-tab', handler);
+        return () => desuscribirVentana('panel-cambiar-tab', handler);
     }, []);
 
     const tabActual = tabs.find(t => t.id === seccionActiva) || tabs[0];

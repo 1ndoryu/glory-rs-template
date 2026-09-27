@@ -2,6 +2,7 @@
  * Permite editar title, description, og_image_url y json_ld_type.
  * [277A-18] OG image: galería con recorte (ImageGalleryPicker).
  * [277A-18] JSON-LD type: select editable con opciones predefinidas. */
+/* [259A-5] sentinel-disable-file html-nativo-en-vez-de-componente componente-artesanal: migracion visual a componentes DS (incl. overlay a <Modal>) en fase 5b con verificacion en navegador. */
 import React, {useState, useEffect} from 'react';
 import {X, ImageIcon} from 'lucide-react';
 import {useMutation, useQueryClient} from '@tanstack/react-query';

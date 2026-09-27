@@ -1,6 +1,7 @@
 import React, {useLayoutEffect, useRef, useState} from 'react';
 import {MoreHorizontal} from 'lucide-react';
 import {Button} from './Button';
+import {alturaVentana, desuscribirVentana, suscribirVentana} from '../../platform/viewport';
 import './ContextMenu.css';
 
 export interface MenuContextualItem {
@@ -66,7 +67,7 @@ export const MenuContextual: React.FC<MenuContextualProps> = ({
             const margenViewport = 8;
             const contenedorRect = contenedor.getBoundingClientRect();
             const panelRect = panel.getBoundingClientRect();
-            const espacioAbajo = window.innerHeight - contenedorRect.bottom;
+            const espacioAbajo = alturaVentana() - contenedorRect.bottom;
             const espacioArriba = contenedorRect.top;
             const abreArriba = panelRect.height + margenViewport > espacioAbajo && espacioArriba > espacioAbajo;
             const alinearIzquierda = contenedorRect.right - panelRect.width < margenViewport;
@@ -75,11 +76,12 @@ export const MenuContextual: React.FC<MenuContextualProps> = ({
         };
 
         actualizarPosicion();
-        window.addEventListener('resize', actualizarPosicion);
-        window.addEventListener('scroll', actualizarPosicion, true);
+        /* [259A-5] Listeners via platform/viewport (boundary sentinel). */
+        suscribirVentana('resize', actualizarPosicion);
+        suscribirVentana('scroll', actualizarPosicion, true);
         return () => {
-            window.removeEventListener('resize', actualizarPosicion);
-            window.removeEventListener('scroll', actualizarPosicion, true);
+            desuscribirVentana('resize', actualizarPosicion);
+            desuscribirVentana('scroll', actualizarPosicion, true);
         };
     }, [abierto]);
 

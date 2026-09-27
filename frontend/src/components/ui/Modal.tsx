@@ -6,6 +6,7 @@
 import React, {useEffect, useRef} from 'react';
 import {createPortal} from 'react-dom';
 import {useFocusTrap} from '../../hooks/useFocusTrap';
+import {bloquearDesplazamientoPagina, desbloquearDesplazamientoPagina, nodoCuerpoDocumento} from '../../platform/dom';
 import './Modal.css';
 
 function combinarClases(...clases: Array<string | undefined>): string {
@@ -86,18 +87,14 @@ export const Modal: React.FC<ModalProps> = ({abierto, onCerrar, children, classN
             if (e.key === 'Escape') onCerrar();
         };
 
-        const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-        document.body.style.overflow = 'hidden';
-        if (scrollbarWidth > 0) {
-            document.body.style.paddingRight = `${scrollbarWidth}px`;
-        }
+        /* [259A-5] Scroll lock via platform/dom (boundary sentinel). */
+        bloquearDesplazamientoPagina();
 
         document.addEventListener('keydown', handleEscape);
 
         return () => {
             document.removeEventListener('keydown', handleEscape);
-            document.body.style.overflow = '';
-            document.body.style.paddingRight = '';
+            desbloquearDesplazamientoPagina();
         };
     }, [abierto, onCerrar]);
 
@@ -109,13 +106,13 @@ export const Modal: React.FC<ModalProps> = ({abierto, onCerrar, children, classN
 
     const claseContenedor = combinarClases('modalBaseContenedor', className);
 
-    /* [114A-10] Portal a document.body para aislar de stacking contexts padre */
+    /* [114A-10] Portal al cuerpo del documento para aislar de stacking contexts padre */
     return createPortal(
         <div className="modalBaseOverlay" onClick={handleOverlayClick}>
             <div className={claseContenedor} ref={modalRef} role="dialog" aria-modal="true">
                 {children}
             </div>
         </div>,
-        document.body,
+        nodoCuerpoDocumento(),
     );
 };

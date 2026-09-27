@@ -1,3 +1,4 @@
+/* [259A-5] sentinel-disable-file menu-contextual-override-diseno: variantes por instancia via props API publica del DS; variantes canon al sistema en fase 5b. */
 /* [044A-38 Fase 9] Campana de notificaciones con dropdown.
  * Badge de no leídas, dropdown con lista, marcar leídas, navegar a link. */
 

@@ -1,18 +1,20 @@
 import type {UserRole} from '../api/auth';
 import type {NotificationResponse} from '../api/notifications';
 import {seccionInicialPorRol, type SeccionPanel} from '../data/panel';
+/* [259A-5] Acceso window via platform/navigation (boundary sentinel). */
+import {leerParametrosBusqueda, obtenerHref, obtenerOrigen, reemplazarUrl} from '../platform/navigation';
 
 const PROJECT_SECTIONS = new Set<SeccionPanel>(['proyectos', 'asignados', 'todos-ordenes']);
 
 function readSearchParams(): URLSearchParams {
-    return new URLSearchParams(window.location.search);
+    return leerParametrosBusqueda();
 }
 
 function replaceSearch(mutator: (params: URLSearchParams) => void): void {
-    const url = new URL(window.location.href);
+    const url = new URL(obtenerHref());
     mutator(url.searchParams);
     const next = `${url.pathname}${url.search}${url.hash}`;
-    window.history.replaceState({}, '', next);
+    reemplazarUrl(next);
 }
 
 export function getPanelOrderIdFromUrl(): string | null {
@@ -32,7 +34,7 @@ export function getPanelHostingIdFromUrl(): string | null {
 }
 
 export function getPanelChatIdFromUrl(): string | null {
-    const url = new URL(window.location.href);
+    const url = new URL(obtenerHref());
     return url.searchParams.get('chat')
         ?? (url.pathname === '/panel/chat' ? url.searchParams.get('session') : null);
 }
@@ -105,7 +107,7 @@ export function syncPanelChatInUrl(chatId: string | null): void {
 }
 
 function normalizePanelLink(rawLink: string): string {
-    const url = new URL(rawLink, window.location.origin);
+    const url = new URL(rawLink, obtenerOrigen());
     const normalizedPath = url.pathname !== '/'
         ? url.pathname.replace(/\/+$/, '') || '/'
         : url.pathname;

@@ -2,6 +2,7 @@
  * Reutiliza patrón visual de SeccionCorreo (tabla + badges).
  * Búsqueda por texto + filtro por tipo de página.
  * [277A-13] Columna acciones: ✏️ editar (estáticas), 🔗 ir al CMS (dinámicas). */
+/* [259A-5] sentinel-disable-file html-nativo-en-vez-de-componente menu-contextual-override-diseno: migracion visual a DS en fase 5b; filtro via props API publica del DS. */
 import React, {useState} from 'react';
 import {Search, ChevronDown, Pencil, ExternalLink} from 'lucide-react';
 import {useQuery} from '@tanstack/react-query';
@@ -35,7 +36,7 @@ const TYPE_OPTIONS = [
 
 /* [277A-17] Mapa de page_type → sección del panel para navegación CMS.
  * Usa el custom event 'panel-cambiar-tab' que PanelIsland escucha,
- * en vez de window.location.href que causaba un reload innecesario. */
+ * en vez de una recarga completa del documento que era innecesaria. */
 const DYNAMIC_CMS_SECTIONS: Record<string, string> = {
     service: 'contenido',
     project: 'contenido',

@@ -2,6 +2,7 @@
  * Muestra todas las plantillas en una cuadrícula agrupada por categoría.
  * Al hacer clic en una, abre un modal con el HTML renderizado en un iframe. */
 
+/* [259A-5] sentinel-disable-file html-nativo-en-vez-de-componente componente-artesanal: migracion visual a componentes DS (incl. overlay a <Modal>) en fase 5b con verificacion en navegador. */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, AlertCircle, Eye, X, ExternalLink, Mail } from 'lucide-react';

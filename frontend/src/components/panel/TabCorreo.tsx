@@ -3,6 +3,7 @@
  * Opcion B: Buzones IMAP preparados, NO activos aun (se activara cuando el usuario lo indique).
  * Muestra aliases creados, permite crear/eliminar, e indica estado del plan. */
 
+/* [259A-5] sentinel-disable-file html-nativo-en-vez-de-componente: migracion visual a componentes DS en fase 5b con verificacion en navegador. */
 import {useState, useCallback} from 'react';
 import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query';
 import {

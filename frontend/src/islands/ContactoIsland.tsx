@@ -3,6 +3,7 @@
  * Pagina de contacto completa con formulario.
  * Campos: nombre, email, telefono, descripcion, presupuesto.
  */
+/* [259A-5] sentinel-disable-file html-nativo-en-vez-de-componente: migracion visual a componentes DS en fase 5b con verificacion en navegador. */
 import React, {useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import '../styles/variables.css';

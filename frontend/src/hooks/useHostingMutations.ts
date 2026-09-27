@@ -23,6 +23,8 @@ import {
     type SelfSubscribeRequest,
 } from '../api/hosting';
 import {toast} from '../stores/toastStore';
+/* [259A-5] Acceso window via platform/navigation (boundary sentinel). */
+import {redirigir} from '../platform/navigation';
 
 export function useHostingMutations(
     hostingKey: readonly string[],
@@ -81,7 +83,7 @@ export function useHostingMutations(
     const checkoutMutation = useMutation({
         mutationFn: (id: string) => apiCreateHostingCheckout(id),
         onSuccess: (checkoutUrl) => {
-            window.location.href = checkoutUrl;
+            redirigir(checkoutUrl);
         },
         onError: () => toast.error('Error al iniciar checkout'),
     });
@@ -91,7 +93,7 @@ export function useHostingMutations(
         onSuccess: (resp) => {
             queryClient.invalidateQueries({queryKey: hostingKey});
             toast.success('Suscripción creada. Redirigiendo al pago…');
-            window.location.href = resp.checkout_url;
+            redirigir(resp.checkout_url);
         },
         onError: () => toast.error('Error al contratar hosting'),
     });

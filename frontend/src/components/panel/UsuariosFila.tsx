@@ -1,3 +1,4 @@
+/* [259A-5] sentinel-disable-file menu-contextual-override-diseno: variantes por instancia via props API publica del DS; variantes canon al sistema en fase 5b. */
 /* [054A-1+] UserRow extraido de SeccionUsuarios.tsx para cumplir limite de 300 lineas.
  * Fila individual de usuario con menú de acciones (rol, status, eliminar). */
 

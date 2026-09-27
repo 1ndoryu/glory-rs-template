@@ -96,7 +96,9 @@ pub async fn image_proxy(
     /* Resolver la raíz local permitida según el namespace solicitado */
     let (source_root, original_path) = resolve_source_path(&state, &path)?;
 
-    /* Verificar que el archivo existe y está dentro de la raíz permitida */
+    /* Verificar que el archivo existe y está dentro de la raíz permitida.
+     * [259A-5] `resolve_source_path` ya validó (join→canonicalize→starts_with);
+     * esta es la segunda capa idempotente junto al uso. */
     let canonical = original_path.canonicalize().map_err(|e| {
         tracing::warn!(
             path = %path,
@@ -165,25 +167,46 @@ pub async fn image_proxy(
 }
 
 /* [259A-2] Rechazo sintactico de traversal ANTES del join: `path` viene de
- * la URL (ruta /api/img/ con wildcard, input externo). El check
- * canonicalize+starts_with del llamador cubre symlinks; esto cubre `..` y
- * separadores Windows. */
+ * la URL (ruta /api/img/ con wildcard, input externo).
+ * [259A-5] canonicalize+starts_with ADYACENTE al join (path-join-sin-canonicalize):
+ * el llamador re-valida de forma idempotente; esto deja la garantia junto al join.
+ * Orden preservado: primero el recurso (NotFound) y luego la raiz (Internal),
+ * identico al llamador. El check sintactico cubre `..` y separadores Windows;
+ * canonicalize+starts_with cubre symlinks. */
 fn resolve_source_path(state: &AppState, path: &str) -> Result<(PathBuf, PathBuf), AppError> {
     if path.split('/').any(|seg| seg == ".." || seg.contains('\\')) {
         return Err(AppError::BadRequest(
             "Ruta fuera de directorio permitido".into(),
         ));
     }
-    if path.starts_with("assets/") {
+    let (root, joined) = if path.starts_with("assets/") {
         let root = state
             .static_dir
             .as_deref()
             .map_or_else(|| PathBuf::from("frontend/public"), PathBuf::from);
-        return Ok((root.clone(), root.join(path)));
+        (root.clone(), root.join(path))
+    } else {
+        let root = PathBuf::from("uploads");
+        (root.clone(), root.join(path))
+    };
+    let canonical = joined.canonicalize().map_err(|e| {
+        tracing::warn!(
+            path = %path,
+            resolved = %joined.display(),
+            error = %e,
+            "Imagen no encontrada en disco"
+        );
+        AppError::NotFound("Imagen no encontrada".into())
+    })?;
+    let canonical_root = root
+        .canonicalize()
+        .map_err(|_| AppError::Internal("Directorio de imágenes no encontrado".into()))?;
+    if !canonical.starts_with(&canonical_root) {
+        return Err(AppError::BadRequest(
+            "Ruta fuera de directorio permitido".into(),
+        ));
     }
-
-    let root = PathBuf::from("uploads");
-    Ok((root.clone(), root.join(path)))
+    Ok((root, canonical))
 }
 
 pub fn routes() -> Router<AppState> {

@@ -4,29 +4,47 @@
 import {useState, useCallback, useEffect} from 'react';
 import type {AdminBlogPost, CreateBlogPostBody, UpdateBlogPostBody} from '../api/admin-blog';
 
-export interface EditorBlogState {
+/* [259A-5] Estado segregado por faceta (ISP, regla large-interface-isp).
+ * Mismo patron que useEditorServicio: el hook sigue devolviendo
+ * EditorBlogState plano via extends, sin cambios en consumidores. */
+export interface EditorBlogContenido {
     titulo: string;
     slug: string;
     extracto: string;
     contenido: string;
     imagenUrl: string;
+}
+
+export interface EditorBlogPublicacion {
     status: string;
     tags: string[];
     metaTitle: string;
     metaDescription: string;
     isFeatured: boolean;
+}
+
+export interface EditorBlogAccionesContenido {
     setTitulo: (v: string) => void;
     setSlug: (v: string) => void;
     setExtracto: (v: string) => void;
     setContenido: (v: string) => void;
     setImagenUrl: (v: string) => void;
+}
+
+export interface EditorBlogAccionesPublicacion {
     setStatus: (v: string) => void;
     setTags: (v: string[]) => void;
     setMetaTitle: (v: string) => void;
     setMetaDescription: (v: string) => void;
     setIsFeatured: (v: boolean) => void;
+}
+
+export interface EditorBlogOperaciones {
     buildBody: () => CreateBlogPostBody | UpdateBlogPostBody;
     resetear: () => void;
+}
+
+export interface EditorBlogState extends EditorBlogContenido, EditorBlogPublicacion, EditorBlogAccionesContenido, EditorBlogAccionesPublicacion, EditorBlogOperaciones {
 }
 
 export function useEditorBlog(post: AdminBlogPost | null, abierto: boolean): EditorBlogState {

@@ -18,6 +18,8 @@ import { apiInitiatePayment } from '../../api/payments';
 import { formatPrice } from '../../api/orders';
 import { useStripeClient } from '../../hooks/useStripeClient';
 import { Button } from '../ui/Button';
+/* [259A-5] Acceso window via platform/navigation (boundary sentinel). */
+import {obtenerOrigen} from '../../platform/navigation';
 import { Modal } from '../ui/Modal';
 import './CheckoutModal.css';
 
@@ -145,7 +147,7 @@ function FormularioPago({
         const { error } = await stripe.confirmPayment({
             elements,
             confirmParams: {
-                return_url: `${window.location.origin}/panel`,
+                return_url: `${obtenerOrigen()}/panel`,
             },
             redirect: 'if_required',
         });

@@ -24,24 +24,38 @@ interface EstadoPassword {
     confirmar: string;
 }
 
-interface RetornoUsePerfil {
+/* [259A-5] Retorno segregado por area (ISP, regla large-interface-isp).
+ * El hook sigue devolviendo RetornoUsePerfil plano via extends. */
+interface PerfilDatos {
     estado: EstadoPerfil;
+    perfil: PerfilResponse | null;
+    avatarUrl: string;
+}
+
+interface PerfilGuardado {
     guardado: boolean;
     guardando: boolean;
     errorGuardar: string | null;
     cargando: boolean;
-    perfil: PerfilResponse | null;
-    avatarUrl: string;
+    actualizarCampo: (campo: keyof EstadoPerfil, valor: string) => void;
+    guardarPerfil: () => Promise<boolean>;
+}
+
+interface PerfilAvatar {
     subiendoAvatar: boolean;
+    handleSubirAvatar: (archivo: File) => Promise<void>;
+}
+
+interface PerfilPassword {
     estadoPassword: EstadoPassword;
     passwordActualizada: boolean;
     guardandoPassword: boolean;
     errorPassword: string | null;
-    actualizarCampo: (campo: keyof EstadoPerfil, valor: string) => void;
     actualizarPasswordCampo: (campo: keyof EstadoPassword, valor: string) => void;
-    guardarPerfil: () => Promise<boolean>;
     handleGuardarPassword: (e: React.FormEvent) => void;
-    handleSubirAvatar: (archivo: File) => Promise<void>;
+}
+
+interface RetornoUsePerfil extends PerfilDatos, PerfilGuardado, PerfilAvatar, PerfilPassword {
 }
 
 export const usePerfil = (): RetornoUsePerfil => {

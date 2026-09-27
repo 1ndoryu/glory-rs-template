@@ -1,5 +1,7 @@
 import axios from 'axios';
 import type { AxiosRequestConfig } from 'axios';
+/* [259A-5] Acceso window via platform/navigation (boundary sentinel). */
+import {obtenerHost, obtenerOrigen} from '../platform/navigation';
 
 /* [104A-1] En producción, API_BASE_URL vacío = URLs relativas al mismo origen (nakomi.studio/api/...).
  * En desarrollo, VITE_API_URL=http://localhost:3000 viene de .env.development. */
@@ -10,8 +12,8 @@ const instance = axios.create({
 });
 
 export function getApiHost(): string {
-  if (!API_BASE_URL) return window.location.host;
-  return new URL(API_BASE_URL, window.location.origin).host;
+  if (!API_BASE_URL) return obtenerHost();
+  return new URL(API_BASE_URL, obtenerOrigen()).host;
 }
 
 /* Interceptor: agrega el token JWT a cada request si existe */

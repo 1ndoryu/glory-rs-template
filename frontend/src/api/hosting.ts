@@ -419,42 +419,59 @@ export async function apiGetHostingStats(id: string): Promise<HostingStatsData> 
     return data;
 }
 
-/* [215A-14] Enriquecido con recursos reales y nombre del cliente dueño */
-export interface CoolifyDeployment {
+/* [215A-14] Enriquecido con recursos reales y nombre del cliente dueño.
+ * [259A-5] Segregado en facetas (ISP, regla large-interface-isp): la forma
+ * plana se conserva via extends para no romper el contrato JSON del backend. */
+export interface DeploymentIdentidad {
     uuid: string;
     runtime_kind: string;
     deployment_id: string;
     name: string;
     status: string;
     fqdn: string | null;
+}
+
+export interface DeploymentVinculo {
     server_uuid: string | null;
     server_name: string | null;
+    server_label: string;
     project_uuid: string | null;
     environment_name: string | null;
     linked_subscription_id: string | null;
     linked_subscription_domain: string | null;
     linked_subscription_status: string | null;
     linked_subscription_plan: string | null;
-    server_label: string;
     linked_subscription_client: string | null;
+}
+
+export interface DeploymentMuestra {
     runtime_sampled_at: string | null;
     cpu_percent: number | null;
     ram_used_mb: number | null;
     ram_limit_mb: number | null;
     storage_used_mb: number | null;
     storage_limit_mb: number | null;
+}
+
+export interface DeploymentLimitesRuntime {
     runtime_site_cpu_limit_cores: number | null;
     runtime_site_ram_limit_mb: number | null;
     runtime_db_cpu_limit_cores: number | null;
     runtime_db_ram_limit_mb: number | null;
     runtime_ssh_cpu_limit_cores: number | null;
     runtime_ssh_ram_limit_mb: number | null;
+}
+
+export interface DeploymentLimitesPlan {
     plan_wp_cpu_millicores: number | null;
     plan_db_cpu_millicores: number | null;
     plan_ssh_cpu_millicores: number | null;
     plan_wp_memory_mb: number | null;
     plan_db_memory_mb: number | null;
     plan_ssh_memory_mb: number | null;
+}
+
+export interface CoolifyDeployment extends DeploymentIdentidad, DeploymentVinculo, DeploymentMuestra, DeploymentLimitesRuntime, DeploymentLimitesPlan {
 }
 
 /* [164A-19] Despliegues reales de Coolify en todos los servidores configurados. */

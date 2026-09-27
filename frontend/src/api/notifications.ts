@@ -2,6 +2,8 @@
  * REST + WebSocket para notificaciones en tiempo real. */
 
 import axiosInstance, {getApiHost} from './axios-instance';
+/* [259A-5] Acceso window via platform/navigation (boundary sentinel). */
+import {protocoloSocket} from '../platform/navigation';
 
 /* Types */
 
@@ -101,7 +103,7 @@ export async function apiMarkAllRead(): Promise<{ marked: number }> {
 /* WebSocket URL builder */
 
 export function buildNotificationsWsUrl(token: string): string {
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const protocol = protocoloSocket();
   const host = getApiHost();
   return `${protocol}//${host}/ws/notifications?token=${encodeURIComponent(token)}`;
 }

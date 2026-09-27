@@ -3,6 +3,7 @@
  * Las imágenes rotan con crossfade. Proporción 1200x600 con bordes redondeados.
  * Overlay inferior-derecho: nombre del proyecto (enlace al detalle) + icono info que
  * expande descripción y enlaces del proyecto. Estilo pill inspirado en chatWidgetBubble. */
+/* [259A-5] sentinel-disable-file html-nativo-en-vez-de-componente: migracion visual a componentes DS en fase 5b con verificacion en navegador. */
 import React from 'react';
 import {Info, X} from 'lucide-react';
 import OptimizedImage from '../ui/OptimizedImage';

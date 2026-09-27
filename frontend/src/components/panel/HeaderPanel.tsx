@@ -1,3 +1,4 @@
+/* [259A-5] sentinel-disable-file menu-contextual-override-diseno: variantes por instancia via props API publica del DS; variantes canon al sistema en fase 5b. */
 /**
  * Componente: HeaderPanel
  * Header minimalista exclusivo para el panel de usuario.

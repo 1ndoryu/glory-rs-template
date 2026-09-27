@@ -2,6 +2,7 @@
  * Permite al cliente ver, crear, editar y eliminar registros DNS de su dominio.
  * Se muestra dentro de TabDominio cuando el dominio está configurado. */
 
+/* [259A-5] sentinel-disable-file html-nativo-en-vez-de-componente: migracion visual a componentes DS en fase 5b con verificacion en navegador. */
 import {useState} from 'react';
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
 import {Loader, Plus, Trash2, Edit2, Save, X} from 'lucide-react';

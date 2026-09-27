@@ -10,10 +10,12 @@ import './styles/variables.css';
 import './styles/init.css';
 import App from './App';
 import {useAuthStore} from './stores/authStore';
+/* [259A-5] Bootstrap: raiz del documento via platform/dom (boundary sentinel). */
+import {obtenerElementoPorId} from './platform/dom';
 
 useAuthStore.getState().inicializar();
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+ReactDOM.createRoot(obtenerElementoPorId('root')!).render(
   <React.StrictMode>
     <HelmetProvider>
       <App />

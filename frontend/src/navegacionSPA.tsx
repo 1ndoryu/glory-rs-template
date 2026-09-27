@@ -5,6 +5,8 @@
  * [044A-39] Añadido spaClick: handler para <a> que previene reload preservando cmd/ctrl+click. */
 
 import type React from 'react';
+/* [259A-5] Fallback de navegacion via platform (boundary sentinel). */
+import {redirigir} from './platform/navigation';
 
 let navigateRef: ((to: string) => void) | null = null;
 
@@ -24,7 +26,8 @@ export function navegar(url: string): void {
     if (navigateRef) {
         navigateRef(url);
     } else {
-        window.location.href = url;
+        /* [259A-5] Fallback via platform/navigation (boundary sentinel). */
+        redirigir(url);
     }
 }
 

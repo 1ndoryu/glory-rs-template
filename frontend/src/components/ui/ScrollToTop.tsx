@@ -3,12 +3,14 @@
 
 import {useEffect} from 'react';
 import {useLocation} from 'react-router-dom';
+/* [259A-5] Acceso window via platform/viewport (boundary sentinel). */
+import {irArriba} from '../../platform/viewport';
 
 export function ScrollToTop() {
     const {pathname} = useLocation();
 
     useEffect(() => {
-        window.scrollTo(0, 0);
+        irArriba();
     }, [pathname]);
 
     return null;

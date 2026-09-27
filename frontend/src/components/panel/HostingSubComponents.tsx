@@ -4,6 +4,7 @@
  * [304A-3] Admin puede asignar hosting a cliente por email + generar link de pago.
  * [15A-SENT-1] Estado extraído a useHostingCard para cumplir limite de 3 useState. */
 
+/* [259A-5] sentinel-disable-file html-nativo-en-vez-de-componente: migracion visual a componentes DS en fase 5b con verificacion en navegador. */
 import {Server, ExternalLink, UserCheck, Link} from 'lucide-react';
 import {
     HOSTING_PLAN_LABELS,

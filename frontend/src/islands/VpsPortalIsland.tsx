@@ -5,6 +5,7 @@
  * Standalone: nav y footer propios, sin LayoutPagina.
  * [i18n] Todas las cadenas hardcoded reemplazadas por t() con fallback es.
  * Features y FAQ construidos dinámicamente desde FEATURE_KEYS/FAQ_KEYS. */
+/* [259A-5] sentinel-disable-file html-nativo-en-vez-de-componente: migracion visual a componentes DS en fase 5b con verificacion en navegador. */
 import {useState, type ElementType} from 'react';
 import {useTranslation} from 'react-i18next';
 import {Cpu, Shield, HardDrive, TerminalSquare, Activity, Server, ChevronDown} from 'lucide-react';
@@ -16,6 +17,8 @@ import {Modal, ModalBody} from '../components/ui/Modal';
 import {useAutenticacion} from '../hooks/useAutenticacion';
 import {useAuthStore} from '../stores/authStore';
 import {navegar} from '../navegacionSPA';
+/* [259A-5] Scroll a ancla via platform/dom (boundary sentinel). */
+import {desplazarHastaElemento} from '../platform/dom';
 import './VpsPortalIsland.css';
 
 interface Feature {
@@ -59,7 +62,7 @@ function formatPrice(cents: number): string {
 }
 
 function scrollTo(id: string): void {
-    document.getElementById(id)?.scrollIntoView({behavior: 'smooth'});
+    desplazarHastaElemento(id);
 }
 
 export function VpsPortalIsland(): JSX.Element {

@@ -6,6 +6,8 @@ import {
     type BillingCheckoutMode,
 } from '../api/billing';
 import {toast} from '../stores/toastStore';
+/* [259A-5] Acceso window via platform/navigation (boundary sentinel). */
+import {redirigir} from '../platform/navigation';
 
 export const BILLING_ITEMS_KEY = ['billing-items'] as const;
 
@@ -22,7 +24,7 @@ export function useBillingItems() {
             apiCreateBillingCheckout({item_ids: itemIds, mode}),
         onSuccess: (checkoutUrl) => {
             void queryClient.invalidateQueries({queryKey: BILLING_ITEMS_KEY});
-            window.location.href = checkoutUrl;
+            redirigir(checkoutUrl);
         },
         onError: () => toast.error('No se pudo iniciar el pago pendiente'),
     });

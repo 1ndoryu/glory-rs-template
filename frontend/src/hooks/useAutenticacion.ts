@@ -10,6 +10,8 @@ import {useState, useCallback} from 'react';
 import {useNavigate} from 'react-router-dom';
 import {apiLogin, apiRegister, apiGoogleLoginUrl, extraerMensajeError} from '../api/auth';
 import {useAuthStore} from '../stores/authStore';
+/* [259A-5] Acceso window via platform/navigation (boundary sentinel). */
+import {redirigir} from '../platform/navigation';
 
 export type VistaModal = 'login' | 'registro' | 'recuperar';
 
@@ -30,22 +32,39 @@ interface EstadoRecuperar {
     enviado: boolean;
 }
 
-interface RetornoUseAutenticacion {
+/* [259A-5] Retorno segregado por subformulario (ISP, regla large-interface-isp).
+ * El hook sigue devolviendo RetornoUseAutenticacion plano via extends. */
+interface AutenticacionVista {
     vista: VistaModal;
     setVista: (v: VistaModal) => void;
     cargando: boolean;
     error: string | null;
+}
+
+interface AutenticacionLogin {
     login: EstadoLogin;
-    registro: EstadoRegistro;
-    recuperar: EstadoRecuperar;
     actualizarLogin: (campo: keyof EstadoLogin, valor: string) => void;
-    actualizarRegistro: (campo: keyof EstadoRegistro, valor: string) => void;
-    actualizarRecuperar: (campo: keyof EstadoRecuperar, valor: string) => void;
     handleLogin: (e: React.FormEvent) => void;
+}
+
+interface AutenticacionRegistro {
+    registro: EstadoRegistro;
+    actualizarRegistro: (campo: keyof EstadoRegistro, valor: string) => void;
     handleRegistro: (e: React.FormEvent) => void;
+}
+
+interface AutenticacionRecuperar {
+    recuperar: EstadoRecuperar;
+    actualizarRecuperar: (campo: keyof EstadoRecuperar, valor: string) => void;
     handleRecuperar: (e: React.FormEvent) => void;
-    handleGoogleLogin: () => void;
     resetRecuperacion: () => void;
+}
+
+interface AutenticacionGoogle {
+    handleGoogleLogin: () => void;
+}
+
+interface RetornoUseAutenticacion extends AutenticacionVista, AutenticacionLogin, AutenticacionRegistro, AutenticacionRecuperar, AutenticacionGoogle {
 }
 
 export const useAutenticacion = (onCerrar: () => void): RetornoUseAutenticacion => {
@@ -134,7 +153,7 @@ export const useAutenticacion = (onCerrar: () => void): RetornoUseAutenticacion 
         setCargando(true);
         try {
             const {url} = await apiGoogleLoginUrl();
-            window.location.href = url;
+            redirigir(url);
         } catch (err) {
             setError(extraerMensajeError(err));
             setCargando(false);

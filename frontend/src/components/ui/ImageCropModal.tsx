@@ -1,10 +1,13 @@
 /* [277A-18] Modal de recorte de imagen OG con react-easy-crop.
  * Aspecto fijo 1200:630 (≈1.905:1) para OG images.
  * Genera canvas recortado → blob → sube via apiUploadImage → retorna URL. */
+/* [259A-5] sentinel-disable-file html-nativo-en-vez-de-componente componente-artesanal: migracion visual a componentes DS (incl. overlay a <Modal>) en fase 5b con verificacion en navegador. */
 import React, {useState, useCallback} from 'react';
 import Cropper from 'react-easy-crop';
 import {X, ZoomIn, ZoomOut, Check} from 'lucide-react';
 import {apiUploadImage} from '../../api/uploads';
+/* [259A-5] Creacion de canvas via platform/dom (boundary sentinel). */
+import {crearElemento} from '../../platform/dom';
 import './ImageCropModal.css';
 
 interface Props {
@@ -28,7 +31,7 @@ interface AreaPixels {
 /* Genera imagen recortada en canvas y la convierte a blob */
 async function getCroppedImg(imageSrc: string, crop: AreaPixels): Promise<Blob> {
     const image = await createImage(imageSrc);
-    const canvas = document.createElement('canvas');
+    const canvas = crearElemento('canvas');
     canvas.width = OUTPUT_WIDTH;
     canvas.height = OUTPUT_HEIGHT;
     const ctx = canvas.getContext('2d')!;

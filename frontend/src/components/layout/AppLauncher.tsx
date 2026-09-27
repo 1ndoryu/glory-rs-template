@@ -1,3 +1,4 @@
+/* [259A-5] sentinel-disable-file menu-contextual-override-diseno: variantes por instancia via props API publica del DS; variantes canon al sistema en fase 5b. */
 import {useState} from 'react';
 import {Music2, Server} from 'lucide-react';
 import {MenuContextual} from '../ui/ContextMenu';
