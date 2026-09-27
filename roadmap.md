@@ -276,3 +276,12 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   (glory-agent: canal en sesiones, outbox con destino/texto/media).
 - Requiere de usuaria: número WhatsApp + 2 min para escanear QR. Sin código hasta entonces.
 
+## 279A-3 — /ask cuestionario dueña (pendiente: respuestas usuaria)
+- Plan: `Agente/planes/plan-ask-2026-09-27.md`.
+- Página privada con login existente; preguntas por tipo (piso solo
+  apartamento), condicionales, dinámicas IA opcional; `precio_minimo`
+  privado con frontera en API; tabla % + semáforo en admin; alimenta
+  chat web + WhatsApp.
+- Requiere de usuaria: 5 dudas (privados, piso por tipo, IA dinámica,
+  formato página, bloquear vs avisar).
+
