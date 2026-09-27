@@ -159,7 +159,7 @@
 }
 
 .correosBadge.badgeExito {
-    background: var(--color-success-bg-claro);
+    background: var(--fondo-insignia-cliente);
     color: var(--color-success-text);
 }
 

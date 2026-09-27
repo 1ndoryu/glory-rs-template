@@ -17,8 +17,8 @@
     width: calc(var(--spacing-lg) + var(--spacing-xs));
     height: calc(var(--spacing-lg) + var(--spacing-xs));
     border-radius: var(--radius-md);
-    color: var(--error-color);
-    background: color-mix(in srgb, var(--error-color) 10%, transparent);
+    color: var(--color-error);
+    background: color-mix(in srgb, var(--color-error) 10%, transparent);
 }
 
 .tarjetaEyebrow,

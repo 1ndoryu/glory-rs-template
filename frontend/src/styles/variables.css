@@ -24,7 +24,7 @@
 
     /* Colors - Cards */
     --bg-card-subtle: rgba(0, 0, 0, 0.03);
-    --bg-card-hover: rgba(0, 0, 0, 0.06);
+    /* [279A-3] --bg-card-hover eliminado: 0 usos, duplicaba --bg-item-active. */
 
     /* Colors - Text */
     --text-primary: #151411;
@@ -81,7 +81,7 @@
     --border-hover-strong: rgba(0, 0, 0, 0.3);
     --success-color: #16a34a;
     --warning-color: #eab308;
-    --error-color: #ef4444;
+    /* [279A-3] --error-color eliminado: 11 usos migrados a --color-error (canonico, 31 usos). */
 
     /* [084A-3] Scrollbar */
     --scrollbar-thumb: rgba(0, 0, 0, 0.15);
@@ -120,7 +120,9 @@
     --brand-primary: #c8a97e;
 
     /* SEO Preview (Google-style) */
-    --seo-title: #1a0dab;
+    /* [279A-3] Unico token global (antes --seo-title EN + --seo-titulo scoped
+     * en EditorBlog/EditorProyecto; los 3 valian #1a0dab). */
+    --seo-titulo: #1a0dab;
     --seo-url: #006621;
 
     /* Status - Error */
@@ -190,7 +192,7 @@
     /* [varsense-fix] Panel card icon dimensions/colors injected per instance via style prop */
     --panel-card-icono-width: 140px;
     --panel-card-icono-bg: var(--bg-accent);
-    --panel-card-icono-color: var(--text-tertiary);
+    /* [279A-3] --panel-card-icono-color eliminado: 0 usos, duplicaba --text-secondary. */
 
     /* [259A-5 5b] Tokens nuevos para migrar css-hardcoded a variables.
      * Cada valor es IDENTICO al literal que reemplaza (cero cambio visual).
@@ -211,7 +213,7 @@
     --color-warning-bg-claro: #fef9c3;
     --color-warning-bg-profundo: #fde68a;
     --color-warning-text-solido: #92400e;
-    --color-success-bg-claro: #e6f7e6;
+    /* [279A-3] --color-success-bg-claro eliminado: 1 uso migrado a --fondo-insignia-cliente. */
     --color-primario-alfa-04: rgba(201, 168, 76, 0.04);
     --color-primario-alfa-12: rgba(201, 168, 76, 0.12);
     --color-gris-claro: #f0f0f0;
@@ -231,7 +233,7 @@
      * reales (computaban a initial) y toman su valor de intencion documentado.
      * Pendiente: consolidar la escala legacy de correo a tokens del sistema. */
     --color-primario: #c9a84c;
-    --color-primary: var(--primary-500);
+    /* [279A-3] --color-primary eliminado: 5 usos migrados a --accent-primary (canonico, 9 usos). */
     --color-texto-primario: #333333;
     --color-texto-secundario: #888888;
     --color-fondo: var(--brand-white);
@@ -244,7 +246,7 @@
     --espaciado-lg: 24px;
     --radio-borde: var(--radius-md);
     --sombra-tarjeta: 0 2px 8px rgba(0, 0, 0, 0.06);
-    --surface-primary: var(--brand-white);
+    /* [279A-3] --surface-primary eliminado: 2 usos migrados a --color-fondo. */
     --surface-secondary: #f9fafb;
     --font-size-xs: var(--text-xs);
     --font-size-sm: var(--text-sm);

@@ -121,7 +121,7 @@
     height: var(--spacing-xs);
     flex: 0 0 auto;
     border-radius: var(--radius-full);
-    background: var(--error-color);
+    background: var(--color-error);
 }
 
 .sidebarItemIndicadorMovil {

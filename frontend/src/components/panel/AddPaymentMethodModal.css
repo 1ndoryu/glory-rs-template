@@ -11,7 +11,7 @@
     margin: 0;
     font-family: var(--font-serif);
     font-size: var(--text-sm);
-    color: var(--error-color);
+    color: var(--color-error);
     line-height: 1.5;
 }
 

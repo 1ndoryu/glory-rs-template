@@ -62,7 +62,9 @@
     width: var(--panel-card-icono-width);
     flex-shrink: 0;
     background: var(--panel-card-icono-bg, var(--bg-accent));
-    color: var(--panel-card-icono-color, var(--text-tertiary));
+    /* [279A-3] Migrado de --panel-card-icono-color (eliminado, duplicaba
+     * --text-secondary con el mismo fallback). */
+    color: var(--text-secondary);
 }
 
 /* [195A-1] Imagen de screenshot de dominio dentro de panelCardIcono. */

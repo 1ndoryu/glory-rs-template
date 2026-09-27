@@ -83,7 +83,7 @@
 
 .vpsLoginError {
     font-size: var(--text-sm);
-    color: var(--error-color);
+    color: var(--color-error);
     margin: 0;
     padding: 0.5rem 0.75rem;
     background: var(--color-error-fantasma);

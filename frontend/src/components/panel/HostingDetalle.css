@@ -512,9 +512,9 @@
 }
 
 .hostingDetalleDnsResult--error {
-    background: color-mix(in srgb, var(--error-color) 10%, transparent);
-    color: var(--error-color);
-    border: 1px solid color-mix(in srgb, var(--error-color) 20%, transparent);
+    background: color-mix(in srgb, var(--color-error) 10%, transparent);
+    color: var(--color-error);
+    border: 1px solid color-mix(in srgb, var(--color-error) 20%, transparent);
 }
 
 /* [195A-1] Acciones: estado a la izquierda, botones a la derecha. */
@@ -990,7 +990,7 @@
 
 .tabCorreoQuotaFill {
     height: 100%;
-    background: var(--color-primary);
+    background: var(--accent-primary);
     border-radius: 4px;
     transition: width 0.3s ease;
     /* [259A-6] Progreso via --var inyectada por React (varsense-fix).
@@ -1033,17 +1033,17 @@
     /* [279A-2] Fallback muerto (el token gana siempre); era 6px, pasa a 8px. */
     border-radius: var(--radius-md);
     font-size: var(--font-size-sm);
-    background: var(--surface-primary);
+    background: var(--color-fondo);
     color: var(--text-primary);
     outline: none;
     transition: border-color 0.15s ease;
 }
 
 .tabCorreoInput:focus {
-    border-color: var(--color-primary);
+    border-color: var(--accent-primary);
     /* [279A-2] Anillo via outline (a11y, sin layout shift) en vez de
      * box-shadow (propiedad prohibida por VarSense). */
-    outline: 2px solid var(--color-primary);
+    outline: 2px solid var(--accent-primary);
     outline-offset: 1px;
 }
 
@@ -1112,12 +1112,12 @@
     padding: var(--spacing-sm) var(--spacing-md);
     border: 1px solid var(--border-default);
     border-radius: var(--radius-md);
-    background: var(--surface-primary);
+    background: var(--color-fondo);
     transition: border-color 0.15s ease;
 }
 
 .tabCorreoItem:hover {
-    border-color: var(--color-primary);
+    border-color: var(--accent-primary);
 }
 
 .tabCorreoItemInfo {
@@ -1131,7 +1131,7 @@
 .tabCorreoItemEmail {
     font-weight: 600;
     font-size: var(--font-size-sm);
-    color: var(--color-primary);
+    color: var(--accent-primary);
 }
 
 .tabCorreoItemArrow {

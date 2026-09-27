@@ -5,7 +5,7 @@
 /* Colores de Google para SEO preview */
 /* max-width: 800px migrado a modalGrande (Modal.css) */
 .editorProyectoModal {
-    --seo-titulo: #1a0dab;
+    /* [279A-3] --seo-titulo ahora global en variables.css (mismo valor). */
     --seo-url: #006621;
     width: 90vw;
     max-height: 85vh;

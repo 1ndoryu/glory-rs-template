@@ -121,7 +121,7 @@
 
 .editorServicioSeoTitulo {
     font-size: var(--text-base);
-    color: var(--seo-title);
+    color: var(--seo-titulo);
     font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
