@@ -47,7 +47,7 @@ function precioVisible(precio: number): string {
 /* Semáforo de ficha /ask (279A-3): % de preguntas respondidas por tipo.
  * Solo aviso visual: nunca bloquea publicar ni editar. */
 function SemaforoFicha({ inmueble }: { inmueble: Inmueble }) {
-  const { porcentaje } = calcularCompletitud(inmueble.tipo, inmueble.extras ?? {}, inmueble.precioMinimo ?? null);
+  const { porcentaje } = calcularCompletitud(inmueble.tipo, inmueble.extras ?? {}, inmueble.precioMinimo ?? null, inmueble);
   const color =
     porcentaje === 100
       ? 'border-transparent bg-emerald-100 text-emerald-900'

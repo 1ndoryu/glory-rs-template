@@ -1,11 +1,18 @@
-import { useState } from 'react';
 import { useAsk } from '../../hooks/ask/use-ask';
 import { useLogin } from '../../hooks/sesion/use-login';
 import { useSesion } from '../../hooks/sesion/use-sesion';
-import { CHECKLIST_ASK, calcularCompletitud, type PreguntaAsk } from '../../domain/ficha-ask';
-import { ETIQUETAS_TIPO } from '../../domain/inmueble';
+import { calcularCompletitud } from '../../domain/ficha-ask';
 import {
-  ANCHO_PAGINA,
+  etiquetaUbicacion,
+  progresoPasos,
+  type ColumnasAsk,
+  type PasoAsk,
+  type ValorUbicacion,
+} from '../../domain/pasos-ask';
+import { ETIQUETAS_TIPO, portadaDe, type Inmueble } from '../../domain/inmueble';
+import { EntradaPregunta } from './entrada-pregunta';
+import { EntradaUbicacion } from './entrada-ubicacion';
+import {
   CLASE_ACTIVO,
   CLASE_BORDE,
   CLASE_FONDO,
@@ -83,7 +90,7 @@ function CuestionarioAsk() {
   const ask = useAsk();
   return (
     <main className={`flex min-h-dvh flex-col items-center justify-start ${CLASE_FONDO} pt-4 pb-16 font-soehne`}>
-      <div className={`mx-auto w-full ${ANCHO_PAGINA} ${RELLENO_LATERAL_SITIO}`}>
+      <div className={`mx-auto w-full max-w-md text-center ${RELLENO_LATERAL_SITIO}`}>
         <h1 className={`text-xl ${CLASE_TINTA}`}>Completar ficha de propiedad</h1>
         {ask.error && (
           <p role="alert" className={`mt-2 border ${CLASE_BORDE} px-3 py-2 text-sm text-red-800`}>
@@ -104,16 +111,15 @@ function CuestionarioAsk() {
           <p className={`mt-4 text-sm ${CLASE_TINTA}`}>Cargando ficha…</p>
         ) : (
           <PreguntaActual
-            titulo={ask.seleccionado.titulo || 'Sin título'}
-            tipoEtiqueta={ETIQUETAS_TIPO[ask.seleccionado.tipo]}
-            preguntas={CHECKLIST_ASK[ask.seleccionado.tipo] ?? []}
+            inmueble={ask.seleccionado}
+            pasos={ask.pasos}
             indice={ask.indice}
             extras={ask.ficha.extras}
             precioMinimo={ask.ficha.precioMinimo}
-            tipo={ask.seleccionado.tipo}
             guardando={ask.guardando}
             alResponder={(v) => void ask.responder(v)}
             alSaltar={ask.saltar}
+            alAnterior={ask.anterior}
             alVolver={ask.volver}
           />
         )}
@@ -144,7 +150,7 @@ function ListaPropiedades({
             </span>
             <span className={`text-xs ${CLASE_TINTA} opacity-70`}>
               {(() => {
-                const { porcentaje } = calcularCompletitud(i.tipo, i.extras ?? {}, i.precioMinimo ?? null);
+                const { porcentaje } = calcularCompletitud(i.tipo, i.extras ?? {}, i.precioMinimo ?? null, i);
                 return porcentaje === 100 ? 'Completa ✓' : porcentaje === 0 ? 'Sin empezar' : `${porcentaje}% · continuar`;
               })()}
             </span>
@@ -156,135 +162,109 @@ function ListaPropiedades({
 }
 
 function PreguntaActual({
-  titulo,
-  tipoEtiqueta,
-  preguntas,
+  inmueble,
+  pasos,
   indice,
   extras,
   precioMinimo,
-  tipo,
   guardando,
   alResponder,
   alSaltar,
+  alAnterior,
   alVolver,
 }: {
-  titulo: string;
-  tipoEtiqueta: string;
-  preguntas: PreguntaAsk[];
+  inmueble: Inmueble;
+  pasos: PasoAsk[];
   indice: number;
   extras: ReturnType<typeof useAsk>['ficha']['extras'];
   precioMinimo: number | null;
-  tipo: Parameters<typeof calcularCompletitud>[0];
   guardando: boolean;
-  alResponder: (v: string | number | boolean | null) => void;
+  alResponder: (v: string | number | boolean | null | ValorUbicacion) => void;
   alSaltar: () => void;
+  alAnterior: () => void;
   alVolver: () => void;
 }) {
-  const { porcentaje, faltan } = calcularCompletitud(tipo, extras, precioMinimo);
-  const pregunta = preguntas[indice];
+  const columnas: ColumnasAsk = inmueble;
+  const { porcentaje, faltan } = progresoPasos(pasos, columnas, extras, precioMinimo);
+  const paso = pasos[indice];
+  /* Valor ya guardado (para resaltar al deshacer y corregir). */
+  const valorFicha = paso?.kind === 'ficha'
+    ? paso.pregunta.clave === 'precio_minimo'
+      ? precioMinimo
+      : (extras[paso.pregunta.clave] ?? null)
+    : null;
+  const portada = portadaDe(inmueble);
   return (
     <div className="mt-4">
-      <p className={`text-sm ${CLASE_TINTA} opacity-70`}>
-        {titulo} · {tipoEtiqueta}
+      {/* Cabecera: foto de portada + descripción para situar la propiedad. */}
+      {portada && <img src={portada} alt="" className={`mx-auto aspect-[4/3] w-full border ${CLASE_BORDE} object-cover`} />}
+      <p className={`mt-2 text-sm ${CLASE_TINTA}`}>
+        {inmueble.titulo || 'Sin título'} <span className="opacity-60">· {ETIQUETAS_TIPO[inmueble.tipo]}</span>
       </p>
+      {inmueble.descripcion.trim() && (
+        <p className={`mt-1 text-xs ${CLASE_TINTA} opacity-70`}>{inmueble.descripcion}</p>
+      )}
       {/* Progreso: aviso visual del % completado (nunca bloquea). */}
       <div className={`mt-2 h-2 w-full border ${CLASE_BORDE}`}>
         <div className={`${CLASE_ACTIVO} h-full`} style={{ width: `${porcentaje}%` }} />
       </div>
-      <p className={`mt-1 text-xs ${CLASE_TINTA} opacity-70`}>Ficha al {porcentaje}%{faltan.length > 0 ? ` · faltan ${faltan.length}` : ' · completa'}</p>
-      {pregunta ? (
-        <EntradaPregunta key={pregunta.clave} pregunta={pregunta} guardando={guardando} alResponder={alResponder} alSaltar={alSaltar} />
+      <p className={`mt-1 text-xs ${CLASE_TINTA} opacity-70`}>Ficha al {porcentaje}%{faltan > 0 ? ` · faltan ${faltan}` : ' · completa'}</p>
+      {paso?.kind === 'ficha' ? (
+        <EntradaPregunta
+          key={`ficha-${paso.pregunta.clave}-${String(valorFicha)}`}
+          pregunta={paso.pregunta}
+          guardando={guardando}
+          conNoAplica
+          valorActual={valorFicha ?? undefined}
+          alResponder={alResponder}
+          alSaltar={alSaltar}
+        />
+      ) : paso?.kind === 'ubicacion' ? (
+        <EntradaUbicacion
+          key={`ubicacion-${columnas.ubicacion}-${columnas.residencia}`}
+          etiqueta={etiquetaUbicacion(columnas)}
+          ubicacionActual={columnas.ubicacion}
+          residenciaActual={columnas.residencia}
+          guardando={guardando}
+          alResponder={alResponder}
+          alSaltar={alSaltar}
+        />
+      ) : paso?.kind === 'columna' ? (
+        <EntradaPregunta
+          key={`columna-${paso.columna}-${columnas[paso.columna]}`}
+          pregunta={{
+            clave: paso.columna,
+            etiqueta: paso.etiqueta,
+            tipo: paso.entero ? 'entero' : 'decimal',
+            ayuda: paso.ayuda,
+            unidad: paso.unidad,
+            privada: false,
+          }}
+          guardando={guardando}
+          conNoAplica={false}
+          valorActual={columnas[paso.columna] > 0 ? columnas[paso.columna] : undefined}
+          alResponder={alResponder}
+          alSaltar={alSaltar}
+        />
       ) : (
         <div className={`mt-4 border ${CLASE_BORDE} px-4 py-6 text-center`}>
           <p className={`${CLASE_TINTA}`}>¡Listo! Respondiste todas las preguntas de esta propiedad.</p>
           <p className={`mt-1 text-sm ${CLASE_TINTA} opacity-70`}>Ficha al {porcentaje}%.</p>
         </div>
       )}
-      <button type="button" onClick={alVolver} className={`mt-4 cursor-pointer text-sm ${CLASE_TINTA} underline`}>
-        ← Volver a mis propiedades
-      </button>
-    </div>
-  );
-}
-
-function EntradaPregunta({
-  pregunta,
-  guardando,
-  alResponder,
-  alSaltar,
-}: {
-  pregunta: PreguntaAsk;
-  guardando: boolean;
-  alResponder: (v: string | number | boolean | null) => void;
-  alSaltar: () => void;
-}) {
-  const [texto, setTexto] = useState('');
-  const contestarNumero = () => {
-    const n = Number(texto.replace(',', '.'));
-    if (texto.trim() && Number.isFinite(n) && n >= 0) alResponder(n);
-  };
-  return (
-    <div className={`mt-4 border ${CLASE_BORDE} px-4 py-6`}>
-      <p className={`text-lg ${CLASE_TINTA}`}>{pregunta.etiqueta}</p>
-      {pregunta.privada && <p className={`mt-1 text-xs ${CLASE_TINTA} opacity-60`}>🔒 Privado: nadie lo ve en la página.</p>}
-      {pregunta.ayuda && <p className={`mt-1 text-xs ${CLASE_TINTA} opacity-60`}>{pregunta.ayuda}</p>}
-      {pregunta.tipo === 'si_no' ? (
-        <div className="mt-4 flex gap-3">
-          <button
-            type="button"
-            disabled={guardando}
-            onClick={() => alResponder(true)}
-            className={`flex-1 cursor-pointer rounded-none border ${CLASE_BORDE} ${CLASE_ACTIVO} px-4 py-3 ${CLASE_TEXTO} disabled:cursor-wait disabled:opacity-60`}
-          >
-            Sí
+      <div className="mt-4 flex justify-center gap-6">
+        {indice > 0 && (
+          <button type="button" onClick={alAnterior} className={`cursor-pointer text-sm ${CLASE_TINTA} underline`}>
+            ← Anterior
           </button>
-          <button
-            type="button"
-            disabled={guardando}
-            onClick={() => alResponder(false)}
-            className={`flex-1 cursor-pointer rounded-none border ${CLASE_BORDE} bg-transparent px-4 py-3 ${CLASE_TEXTO} ${CLASE_TINTA} disabled:cursor-wait disabled:opacity-60`}
-          >
-            No
-          </button>
-        </div>
-      ) : (
-        <div className="mt-4 flex flex-col gap-3">
-          <input
-            type={pregunta.tipo === 'texto_corto' ? 'text' : 'number'}
-            value={texto}
-            min={pregunta.tipo === 'texto_corto' ? undefined : 0}
-            onChange={(e) => setTexto(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                if (pregunta.tipo === 'texto_corto') texto.trim() && alResponder(texto);
-                else contestarNumero();
-              }
-            }}
-            placeholder={pregunta.tipo === 'texto_corto' ? 'Escribe tu respuesta…' : '0'}
-            className={`w-full rounded-none border ${CLASE_BORDE} bg-transparent px-3 py-3 text-sm outline-none placeholder:text-black/40 ${CLASE_TINTA}`}
-          />
-          <button
-            type="button"
-            disabled={guardando}
-            onClick={() => {
-              if (pregunta.tipo === 'texto_corto') texto.trim() && alResponder(texto);
-              else contestarNumero();
-            }}
-            className={`cursor-pointer rounded-none border ${CLASE_BORDE} ${CLASE_ACTIVO} px-4 py-2 ${CLASE_TEXTO} disabled:cursor-wait disabled:opacity-60`}
-          >
-            {guardando ? 'Guardando…' : 'Guardar y seguir'}
-          </button>
-        </div>
-      )}
-      <div className="mt-3 flex gap-4">
-        <button type="button" onClick={alSaltar} className={`cursor-pointer text-sm ${CLASE_TINTA} underline`}>
-          Saltar por ahora
-        </button>
-        <button type="button" onClick={() => alResponder(null)} className={`cursor-pointer text-sm ${CLASE_TINTA} opacity-60 underline`}>
-          No aplica
+        )}
+        <button type="button" onClick={alVolver} className={`cursor-pointer text-sm ${CLASE_TINTA} opacity-70 underline`}>
+          Volver a mis propiedades
         </button>
       </div>
     </div>
   );
 }
+
+/* [279A-3 F2] EntradaPregunta vive en `./entrada-pregunta.tsx` y
+ * EntradaUbicacion en `./entrada-ubicacion.tsx` (límite de líneas). */

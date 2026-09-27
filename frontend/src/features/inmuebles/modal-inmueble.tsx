@@ -1,4 +1,4 @@
-import { Trash2, History, Sparkles } from 'lucide-react';
+import { Trash2, Sparkles } from 'lucide-react';
 import {
   ESTADOS,
   ETIQUETAS_TIPO,
@@ -7,7 +7,9 @@ import {
   type Inmueble,
   type InmuebleDraft,
 } from '@/domain/inmueble';
-import { CLASE_SELECT, Etiqueta } from './campos-formulario';
+import { BannerBorrador, CLASE_SELECT, Etiqueta } from './campos-formulario';
+import { FichaFormulario } from './ficha-formulario';
+import { useFichaInmueble } from '@/hooks/inmuebles/use-ficha-inmueble';
 import { FotosFormulario } from './fotos-formulario';
 import { ModalIA } from './modal-ia';
 import { Button } from '@/components/ui/button';
@@ -47,6 +49,8 @@ interface Props {
 
 export function ModalInmueble(props: Props) {
   const { abierto, alCambiarAbierto } = props;
+  /* Ficha /ask editable: se fusiona al guardar (pisa lo guardado). */
+  const ficha = useFichaInmueble(abierto, props.editando);
   const {
     esEdicion,
     form,
@@ -68,8 +72,8 @@ export function ModalInmueble(props: Props) {
     setBorrador: props.borrador.alCambiar,
     alCambiarAbierto,
     limpiarTrasGuardar: props.borrador.alLimpiarTrasGuardar,
-    onGuardarNuevo: props.alGuardarNuevo,
-    onGuardarEdicion: props.alGuardarEdicion,
+    onGuardarNuevo: (inm) => props.alGuardarNuevo(ficha.conFicha(inm)),
+    onGuardarEdicion: (inm) => props.alGuardarEdicion(ficha.conFicha(inm)),
   });
 
   const mostrarBannerRecuperar =
@@ -98,20 +102,7 @@ export function ModalInmueble(props: Props) {
         </DialogHeader>
 
         {mostrarBannerRecuperar && (
-          <div className="flex flex-col gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm sm:flex-row sm:items-center">
-            <p className="flex flex-1 items-center gap-2">
-              <History className="h-4 w-4 shrink-0" />
-              Hay un borrador sin guardar de la última vez.
-            </p>
-            <div className="flex gap-2">
-              <Button size="sm" onClick={props.borrador.alRestaurar}>
-                Continuar
-              </Button>
-              <Button size="sm" variant="outline" onClick={props.borrador.alEmpezarDeCero}>
-                Empezar de cero
-              </Button>
-            </div>
-          </div>
+          <BannerBorrador alRestaurar={props.borrador.alRestaurar} alEmpezarDeCero={props.borrador.alEmpezarDeCero} />
         )}
 
         <div className="grid gap-4">
@@ -253,6 +244,15 @@ export function ModalInmueble(props: Props) {
                 value={form.descripcion}
                 onChange={(e) => cambiar('descripcion', e.target.value)}
                 placeholder="Orientación, plantas, extras, estado de conservación…"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <FichaFormulario
+                tipo={form.tipo}
+                extras={ficha.extras}
+                minimo={ficha.minimo}
+                alCambiarExtra={ficha.cambiarExtra}
+                alCambiarMinimo={ficha.setMinimo}
               />
             </div>
             <FotosFormulario

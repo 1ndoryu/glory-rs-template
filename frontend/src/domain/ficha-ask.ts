@@ -16,25 +16,25 @@ export interface PreguntaAsk {
   tipo: TipoPreguntaAsk;
   /** Ayuda corta bajo la pregunta (ejemplo de respuesta válida). */
   ayuda?: string;
+  /** Unidad junto al campo numérico (`m²`, `€`…). */
+  unidad?: string;
   /** Privado = nunca sale a la web pública (solo admin + IA sin cifras). */
   privada: boolean;
 }
 
 export type ExtrasAsk = Record<string, string | number | boolean>;
 
-/* Comunes a todo tipo (4): referencia privada, zona, negociable y mínimo. */
-const COMUNES: PreguntaAsk[] = [
+/* Comunes a todo tipo (3): referencia privada, negociable y mínimo.
+ * (La zona/residencia dejó de ser pregunta de `extras`: es el paso
+ * inteligente de columnas `ubicacion`+`residencia`, que rellena el
+ * inmueble de verdad en vez de un texto suelto.)
+ * Exportadas para la sección Ficha del modal admin (misma fuente que /ask). */
+export const COMUNES: PreguntaAsk[] = [
   {
     clave: 'punto_referencia',
     etiqueta: '¿Qué punto de referencia hay cerca? (p. ej. frente al Orinokia)',
     tipo: 'texto_corto',
     privada: true,
-  },
-  {
-    clave: 'urbanizacion_zona',
-    etiqueta: '¿En qué urbanización o zona queda?',
-    tipo: 'texto_corto',
-    privada: false,
   },
   {
     clave: 'negociable',
@@ -47,11 +47,12 @@ const COMUNES: PreguntaAsk[] = [
     etiqueta: '¿Cuál es lo mínimo que aceptarías? (privado, nadie lo ve)',
     tipo: 'decimal',
     ayuda: 'Solo lo ves tú en el panel; la página nunca lo muestra.',
+    unidad: '€',
     privada: true,
   },
 ];
 
-/* Checklist fijo por tipo (degradado sin IA): 4 comunes + 3 propias. */
+/* Checklist fijo por tipo (degradado sin IA): 3 comunes + 3 propias. */
 export const CHECKLIST_ASK: Record<TipoInmueble, PreguntaAsk[]> = {
   apartamento: [
     ...COMUNES,
@@ -94,15 +95,7 @@ export function preguntaRespondida(pregunta: PreguntaAsk, extras: ExtrasAsk, pre
   return true;
 }
 
-/* % de ficha completa + claves que faltan (aviso visual, nunca bloquea). */
-export function calcularCompletitud(
-  tipo: TipoInmueble,
-  extras: ExtrasAsk,
-  precioMinimo?: number | null,
-): { porcentaje: number; faltan: string[] } {
-  const lista = CHECKLIST_ASK[tipo] ?? [];
-  if (lista.length === 0) return { porcentaje: 100, faltan: [] };
-  const faltan = lista.filter((p) => !preguntaRespondida(p, extras, precioMinimo)).map((p) => p.clave);
-  const porcentaje = Math.round(((lista.length - faltan.length) / lista.length) * 100);
-  return { porcentaje, faltan };
-}
+/* % de ficha completa + claves que faltan (aviso visual, nunca bloquea).
+ * Con `columnas` suma además el paso ubicación+residencia y los numéricos
+ * (lógica en `./pasos-ask`; se reexporta aquí para no romper imports). */
+export { calcularCompletitud } from './pasos-ask';
