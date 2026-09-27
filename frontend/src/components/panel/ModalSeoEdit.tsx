@@ -1,13 +1,18 @@
 /* [277A-13] Modal de edición SEO para páginas estáticas.
  * Permite editar title, description, og_image_url y json_ld_type.
  * [277A-18] OG image: galería con recorte (ImageGalleryPicker).
- * [277A-18] JSON-LD type: select editable con opciones predefinidas. */
-/* [259A-5] sentinel-disable-file html-nativo-en-vez-de-componente componente-artesanal: migracion visual a componentes DS (incl. overlay a <Modal>) en fase 5b con verificacion en navegador. */
+ * [277A-18] JSON-LD type: select editable con opciones predefinidas.
+ * [259A-5 5b-2] Migrado a <Modal> + recetas (modalTitulo/modalAcciones,
+ * ModalBody/ModalField/ModalLabel) + Button + SelectDropdown. Clases locales
+ * solo para layout especifico (header, contadores, preview OG, ayudas). */
 import React, {useState, useEffect} from 'react';
 import {X, ImageIcon} from 'lucide-react';
 import {useMutation, useQueryClient} from '@tanstack/react-query';
 import {apiUpdateSeoSetting, type SeoSetting} from '../../api/admin-seo';
 import {ImageGalleryPicker} from '../ui/ImageGalleryPicker';
+import {Modal, ModalBody, ModalField, ModalLabel} from '../ui/Modal';
+import {Button} from '../ui/Button';
+import {SelectDropdown} from '../ui/SelectDropdown';
 import './ModalSeoEdit.css';
 
 interface Props {
@@ -74,151 +79,146 @@ export const ModalSeoEdit: React.FC<Props> = ({setting, onClose}) => {
 
     return (
         <>
-            <div className="modalSeoOverlay" onClick={onClose}>
-                <div className="modalSeoContenedor" onClick={e => e.stopPropagation()}>
-                    <div className="modalSeoHeader">
-                        <h2 className="modalSeoTitulo">Editar SEO: {setting.label}</h2>
-                        <button type="button" className="modalSeoCerrar" onClick={onClose} aria-label="Cerrar">
-                            <X size={18} />
-                        </button>
-                    </div>
-
-                    <div className="modalSeoCuerpo">
-                        <div className="modalSeoCampo">
-                            <label className="modalSeoLabel">
-                                Título
-                                <span className={`modalSeoContador modalSeoContador--${titleStatus}`}>
-                                    {titleLen}/{TITLE_MAX}
-                                </span>
-                            </label>
-                            <input
-                                type="text"
-                                className="modalSeoInput"
-                                value={title}
-                                onChange={e => setTitle(e.target.value)}
-                                maxLength={255}
-                                placeholder="Título de la página para Google"
-                            />
-                            <span className="modalSeoAyuda">
-                                {titleLen < TITLE_MIN && titleLen > 0 && `⚠ Mínimo recomendado: ${TITLE_MIN} caracteres`}
-                                {titleLen > TITLE_MAX && `⚠ Máximo recomendado: ${TITLE_MAX} caracteres`}
-                                {titleLen >= TITLE_MIN && titleLen <= TITLE_MAX && '✓ Longitud ideal'}
-                            </span>
-                        </div>
-
-                        <div className="modalSeoCampo">
-                            <label className="modalSeoLabel">
-                                Descripción
-                                <span className={`modalSeoContador modalSeoContador--${descStatus}`}>
-                                    {descLen}/{DESC_MAX}
-                                </span>
-                            </label>
-                            <textarea
-                                className="modalSeoTextarea"
-                                value={description}
-                                onChange={e => setDescription(e.target.value)}
-                                maxLength={500}
-                                rows={3}
-                                placeholder="Descripción para los resultados de búsqueda"
-                            />
-                            <span className="modalSeoAyuda">
-                                {descLen < DESC_MIN && descLen > 0 && `⚠ Mínimo recomendado: ${DESC_MIN} caracteres`}
-                                {descLen > DESC_MAX && `⚠ Máximo recomendado: ${DESC_MAX} caracteres`}
-                                {descLen >= DESC_MIN && descLen <= DESC_MAX && '✓ Longitud ideal'}
-                            </span>
-                        </div>
-
-                        {/* [277A-18] Imagen OG: preview + botón galería */}
-                        <div className="modalSeoCampo">
-                            <label className="modalSeoLabel">Imagen OG</label>
-                            <div className="modalSeoOgPreview">
-                                {ogImageUrl ? (
-                                    <img
-                                        src={ogImageUrl}
-                                        alt="OG Preview"
-                                        className="modalSeoOgThumb"
-                                    />
-                                ) : (
-                                    <div className="modalSeoOgVacio">
-                                        <ImageIcon size={20} />
-                                        <span>Sin imagen OG</span>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="modalSeoOgAcciones">
-                                <button
-                                    type="button"
-                                    className="modalSeoOgBtn"
-                                    onClick={() => setShowGallery(true)}
-                                >
-                                    <ImageIcon size={14} />
-                                    Elegir de galería
-                                </button>
-                                {ogImageUrl && (
-                                    <button
-                                        type="button"
-                                        className="modalSeoOgBtn modalSeoOgBtn--quitar"
-                                        onClick={() => setOgImageUrl('')}
-                                    >
-                                        <X size={14} />
-                                        Quitar
-                                    </button>
-                                )}
-                            </div>
-                            <span className="modalSeoAyuda">Recomendado: 1200×630px. Se recorta automáticamente.</span>
-                        </div>
-
-                        {/* [277A-18] JSON-LD type: select editable */}
-                        <div className="modalSeoCampo">
-                            <label className="modalSeoLabel">Tipo JSON-LD</label>
-                            <select
-                                className="modalSeoInput modalSeoSelect"
-                                value={jsonLdType}
-                                onChange={e => setJsonLdType(e.target.value)}
-                            >
-                                {JSON_LD_OPTIONS.map(opt => (
-                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                ))}
-                            </select>
-                            <span className="modalSeoAyuda">Schema structured data para Google rich snippets</span>
-                        </div>
-
-                        <div className="modalSeoCampo modalSeoCampo--readonly">
-                            <label className="modalSeoLabel">Ruta</label>
-                            <input
-                                type="text"
-                                className="modalSeoInput modalSeoInput--disabled"
-                                value={setting.path}
-                                disabled
-                            />
-                        </div>
-                    </div>
-
-                    <div className="modalSeoFooter">
-                        <button
-                            type="button"
-                            className="modalSeoBtn modalSeoBtn--cancelar"
-                            onClick={onClose}
-                        >
-                            Cancelar
-                        </button>
-                        <button
-                            type="button"
-                            className="modalSeoBtn modalSeoBtn--guardar"
-                            onClick={() => mutation.mutate()}
-                            disabled={!isValid || mutation.isPending}
-                        >
-                            {mutation.isPending ? 'Guardando...' : 'Guardar'}
-                        </button>
-                    </div>
-
-                    {mutation.isError && (
-                        <div className="modalSeoError">
-                            Error al guardar: {(mutation.error as Error).message}
-                        </div>
-                    )}
+            <Modal abierto onCerrar={onClose} className="modalMedio">
+                <div className="modalSeoHeader">
+                    {/* [259A-5] sentinel-disable-next-line modal-con-titulo: el canon
+                      * Modal.css (.modalTitulo) contradice la regla; precedente SeccionPagos 5a. */}
+                    <h3 className="modalTitulo">Editar SEO: {setting.label}</h3>
+                    <Button variante="texto" tamano="pequeno" onClick={onClose} aria-label="Cerrar">
+                        <X size={18} />
+                    </Button>
                 </div>
-            </div>
+
+                <ModalBody>
+                    <ModalField>
+                        <ModalLabel className="modalSeoLabel">
+                            Título
+                            <span className={`modalSeoContador modalSeoContador--${titleStatus}`}>
+                                {titleLen}/{TITLE_MAX}
+                            </span>
+                        </ModalLabel>
+                        <input
+                            type="text"
+                            className="modalInput modalSeoInput"
+                            value={title}
+                            onChange={e => setTitle(e.target.value)}
+                            maxLength={255}
+                            placeholder="Título de la página para Google"
+                        />
+                        <span className="modalSeoAyuda">
+                            {titleLen < TITLE_MIN && titleLen > 0 && `⚠ Mínimo recomendado: ${TITLE_MIN} caracteres`}
+                            {titleLen > TITLE_MAX && `⚠ Máximo recomendado: ${TITLE_MAX} caracteres`}
+                            {titleLen >= TITLE_MIN && titleLen <= TITLE_MAX && '✓ Longitud ideal'}
+                        </span>
+                    </ModalField>
+
+                    <ModalField>
+                        <ModalLabel className="modalSeoLabel">
+                            Descripción
+                            <span className={`modalSeoContador modalSeoContador--${descStatus}`}>
+                                {descLen}/{DESC_MAX}
+                            </span>
+                        </ModalLabel>
+                        <textarea
+                            className="modalInput modalSeoTextarea"
+                            value={description}
+                            onChange={e => setDescription(e.target.value)}
+                            maxLength={500}
+                            rows={3}
+                            placeholder="Descripción para los resultados de búsqueda"
+                        />
+                        <span className="modalSeoAyuda">
+                            {descLen < DESC_MIN && descLen > 0 && `⚠ Mínimo recomendado: ${DESC_MIN} caracteres`}
+                            {descLen > DESC_MAX && `⚠ Máximo recomendado: ${DESC_MAX} caracteres`}
+                            {descLen >= DESC_MIN && descLen <= DESC_MAX && '✓ Longitud ideal'}
+                        </span>
+                    </ModalField>
+
+                    {/* [277A-18] Imagen OG: preview + botón galería */}
+                    <ModalField>
+                        <ModalLabel>Imagen OG</ModalLabel>
+                        <div className="modalSeoOgPreview">
+                            {ogImageUrl ? (
+                                <img
+                                    src={ogImageUrl}
+                                    alt="OG Preview"
+                                    className="modalSeoOgThumb"
+                                />
+                            ) : (
+                                <div className="modalSeoOgVacio">
+                                    <ImageIcon size={20} />
+                                    <span>Sin imagen OG</span>
+                                </div>
+                            )}
+                        </div>
+                        <div className="modalAcciones">
+                            <Button
+                                variante="outline"
+                                tamano="pequeno"
+                                onClick={() => setShowGallery(true)}
+                            >
+                                <ImageIcon size={14} />
+                                Elegir de galería
+                            </Button>
+                            {ogImageUrl && (
+                                <Button
+                                    variante="texto"
+                                    tamano="pequeno"
+                                    onClick={() => setOgImageUrl('')}
+                                >
+                                    <X size={14} />
+                                    Quitar
+                                </Button>
+                            )}
+                        </div>
+                        <span className="modalSeoAyuda">Recomendado: 1200×630px. Se recorta automáticamente.</span>
+                    </ModalField>
+
+                    {/* [277A-18] JSON-LD type: select editable */}
+                    <ModalField>
+                        <ModalLabel>Tipo JSON-LD</ModalLabel>
+                        <SelectDropdown
+                            value={jsonLdType}
+                            opciones={JSON_LD_OPTIONS}
+                            onChange={setJsonLdType}
+                            ariaLabel="Tipo JSON-LD"
+                        />
+                        <span className="modalSeoAyuda">Schema structured data para Google rich snippets</span>
+                    </ModalField>
+
+                    <ModalField className="modalSeoCampo--readonly">
+                        <ModalLabel>Ruta</ModalLabel>
+                        <input
+                            type="text"
+                            className="modalInput modalSeoInput modalSeoInput--disabled"
+                            value={setting.path}
+                            disabled
+                        />
+                    </ModalField>
+                </ModalBody>
+
+                <div className="modalAcciones">
+                    <Button
+                        variante="texto"
+                        onClick={onClose}
+                    >
+                        Cancelar
+                    </Button>
+                    <Button
+                        variante="secundario"
+                        onClick={() => mutation.mutate()}
+                        disabled={!isValid || mutation.isPending}
+                    >
+                        {mutation.isPending ? 'Guardando...' : 'Guardar'}
+                    </Button>
+                </div>
+
+                {mutation.isError && (
+                    <div className="modalSeoError">
+                        Error al guardar: {(mutation.error as Error).message}
+                    </div>
+                )}
+            </Modal>
 
             {showGallery && (
                 <ImageGalleryPicker

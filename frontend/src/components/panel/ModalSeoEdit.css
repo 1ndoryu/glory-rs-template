@@ -1,27 +1,6 @@
 /* [277A-13] Estilos del modal de edición SEO.
- * Reutiliza tokens del sistema de diseño existente. */
-
-.modalSeoOverlay {
-    position: fixed;
-    inset: 0;
-    z-index: 1000;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--spacing-md);
-}
-
-.modalSeoContenedor {
-    background: var(--bg-primary);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-lg);
-    width: 100%;
-    max-width: 560px;
-    max-height: 90vh;
-    overflow-y: auto;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-}
+ * [259A-5 5b-2] Overlay/contenedor/titulo/campos/footer a <Modal> + recetas;
+ * aqui solo layout especifico (header, contadores, preview OG, ayudas). */
 
 .modalSeoHeader {
     display: flex;
@@ -31,52 +10,13 @@
     border-bottom: 1px solid var(--border-light);
 }
 
-.modalSeoTitulo {
-    font-size: var(--text-base);
-    font-weight: 600;
-    color: var(--text-primary);
-    margin: 0;
-}
+/* [259A-5 5b-2] Cerrar ahora <Button variante="texto">; sin clase local. */
 
-.modalSeoCerrar {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border: none;
-    background: transparent;
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    color: var(--text-tertiary);
-    transition: background 0.15s, color 0.15s;
-}
-
-.modalSeoCerrar:hover {
-    background: var(--bg-item-hover);
-    color: var(--text-primary);
-}
-
-.modalSeoCuerpo {
-    padding: var(--spacing-lg);
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-md);
-}
-
-.modalSeoCampo {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-xs);
-}
-
+/* Layout local: etiqueta + contador en extremos (tipografia de modalEtiqueta). */
 .modalSeoLabel {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-size: var(--text-sm);
-    font-weight: 500;
-    color: var(--text-primary);
 }
 
 .modalSeoContador {
@@ -143,49 +83,6 @@
     opacity: 0.7;
 }
 
-.modalSeoFooter {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-md) var(--spacing-lg);
-    border-top: 1px solid var(--border-light);
-}
-
-.modalSeoBtn {
-    padding: 8px 16px;
-    border-radius: var(--radius-md);
-    font-size: var(--text-sm);
-    font-weight: 500;
-    font-family: var(--font-primary);
-    cursor: pointer;
-    transition: background 0.15s, opacity 0.15s;
-    border: 1px solid var(--border-default);
-}
-
-.modalSeoBtn--cancelar {
-    background: var(--bg-primary);
-    color: var(--text-primary);
-}
-
-.modalSeoBtn--cancelar:hover {
-    background: var(--bg-item-hover);
-}
-
-.modalSeoBtn--guardar {
-    background: var(--brand-black);
-    color: var(--bg-primary);
-    border-color: var(--brand-black);
-}
-
-.modalSeoBtn--guardar:hover {
-    opacity: 0.85;
-}
-
-.modalSeoBtn--guardar:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
 .modalSeoError {
     padding: var(--spacing-sm) var(--spacing-lg) var(--spacing-md);
     font-size: var(--text-xs);
@@ -221,38 +118,4 @@
     font-size: var(--text-xs);
 }
 
-.modalSeoOgAcciones {
-    display: flex;
-    gap: var(--spacing-xs);
-    margin-top: var(--spacing-xs);
-}
-
-.modalSeoOgBtn {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 5px 10px;
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius-md);
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    font-size: var(--text-2xs);
-    font-family: var(--font-primary);
-    cursor: pointer;
-    transition: background 0.15s, border-color 0.15s;
-}
-
-.modalSeoOgBtn:hover {
-    background: var(--bg-item-hover);
-    border-color: var(--border-default);
-}
-
-.modalSeoOgBtn--quitar {
-    color: var(--text-tertiary);
-}
-
-/* [277A-18] Select JSON-LD */
-.modalSeoSelect {
-    appearance: auto;
-    cursor: pointer;
-}
+/* [259A-5 5b-2] Fila OG ahora .modalAcciones (receta); solo queda el contenedor. */
