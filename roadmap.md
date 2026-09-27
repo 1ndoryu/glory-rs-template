@@ -241,7 +241,8 @@ archivos, 157 con violaciones (34 errores, 363 warnings, 6 info, 60 hints).
   navegador real bloqueado — 5173 ocupado, background no sobrevive —
   registrado en completada). Gate: Rust sin cambios desde 5a → vale PASS 5a +
   fmt/clippy PASS 27/09 13:42 (findings vacíos); test 26/09 sobre mismo código.
-  Pendiente: commit docs + cierre.
+  Docs 5b commiteadas (b38aeca4). Estado: 259A-5 CERRADA salvo verificación
+  visual en navegador real (bloqueada por entorno, registrada).
   Fix tool `reactAnalyzer` disables HECHO en sentinel 0.7.14 (token exacto +
   ventana sin break + guards; pin NAKOMI 647b0603, prevencion
   sentinel-disable-ignorado RESUELTA).
