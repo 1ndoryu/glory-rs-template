@@ -332,7 +332,15 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   (seleccionado = semibold + subrayado); amoblado con «En trato» en
   apartamento/townhouse/casa. Navegador: mínimo→9%, puestos→10%,
   agua A veces→30%, resaltados correctos, datos de prueba limpiados
-  (`extras={}` en ambas).
+   (`extras={}` en ambas).
+- 279A-8 verificado local (`cargo check` + clippy 0 en `inmobiliaria` con la
+  BD de rama; en `main` el check no compila por `agent_outbox` ausente en
+  `glory_backend`, preexistente): la IA ve todo lo rellenable —
+  `detalle_inmueble` devuelve `extras` tal cual (incluidos `no_se`/`a_veces`)
+  + `margen_negociable` calculado en SQL; la cifra del mínimo jamás sale
+  (frontera 279A-3); prompt + descripción de la tool instruyen insinuar sin
+  cifras. SQL probado con psql en transacción con ROLLBACK (margen `t`/`f`,
+  cifra filtrada, cero cambios).
 - Pendiente: cablear `extras` públicos (`privada: false`) a la ficha
   visible y a la IA — hoy nadie los lee fuera del panel (la pública ni los
   pide, el backend los pela con `'{}'`).

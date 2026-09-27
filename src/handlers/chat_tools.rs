@@ -33,7 +33,9 @@ pub fn definiciones() -> Vec<ToolDefinition> {
         ),
         ToolDefinition::new(
             "detalle_inmueble",
-            "Ficha completa de un inmueble por su id (sale de buscar_inmuebles).",
+            "Ficha completa de un inmueble por su id (sale de buscar_inmuebles). \
+             Trae `extras` con lo respondido en /ask (internet, agua, amoblado...) \
+             y `margen_negociable` (bool, sin cifras: el minimo nunca se dice).",
             json!({
                 "type": "object",
                 "properties": {"id": {"type": "string", "format": "uuid"}},
@@ -209,6 +211,10 @@ struct Tarjeta {
 /// Ficha completa de un inmueble para `detalle_inmueble` (struct en vez de
 /// tupla de 12: legible y evita el lint de tipos complejos). Tipos alineados
 /// con `20260915000002_inmuebles.up.sql` (todo NOT NULL salvo `copy_corta`).
+/* [279A-8] La IA ve todo lo rellenable: `extras` (respuestas /ask, tal cual,
+ * incluidos `no_se`/`a_veces`: saber lo que falta también informa) y si el
+ * precio tiene margen (`margen_negociable`, calculado en SQL). La cifra del
+ * mínimo jamás sale (frontera 279A-3: la IA insinúa sin cifras). */
 #[derive(Debug, sqlx::FromRow)]
 struct Ficha {
     titulo: String,
@@ -225,6 +231,8 @@ struct Ficha {
     metros_terreno: f64,
     estado: String,
     copy_corta: Option<String>,
+    extras: Value,
+    margen_negociable: bool,
 }
 
 async fn detalle(pool: &PgPool, args: &Value) -> Result<Value, AgentError> {
@@ -236,8 +244,9 @@ async fn detalle(pool: &PgPool, args: &Value) -> Result<Value, AgentError> {
         .map_err(|_| AgentError::BadRequest("id de inmueble invalido".to_string()))?;
     let fila: Option<Ficha> = sqlx::query_as(
         "SELECT titulo, descripcion, ubicacion, puestos, residencia, precio, tipo, operacion, \
-             habitaciones, banos, metros, metros_terreno, estado, copy_corta \
-             FROM inmuebles WHERE id = $1 AND publicado",
+              habitaciones, banos, metros, metros_terreno, estado, copy_corta, extras, \
+              (precio_minimo IS NOT NULL AND precio_minimo > 0) AS margen_negociable \
+              FROM inmuebles WHERE id = $1 AND publicado",
     )
     .bind(id)
     .fetch_optional(pool)
@@ -252,7 +261,8 @@ async fn detalle(pool: &PgPool, args: &Value) -> Result<Value, AgentError> {
               "puestos": f.puestos, "residencia": f.residencia,
               "precio": f.precio, "tipo": f.tipo, "operacion": f.operacion, "habitaciones": f.habitaciones,
               "banos": f.banos, "metros": f.metros, "metros_terreno": f.metros_terreno, "estado": f.estado,
-              "resumen": f.copy_corta.unwrap_or_default()}),
+              "resumen": f.copy_corta.unwrap_or_default(),
+              "extras": f.extras, "margen_negociable": f.margen_negociable}),
     )
 }
 
