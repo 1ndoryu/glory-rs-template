@@ -163,9 +163,10 @@ Sin 1+2 el plan llega hasta: estima de tokens + memoria de un turno.
 
 ## Estado
 
-- **Bloqueado esperando usuaria**: 2 números + QR (×2) + storage de fotos
-  (disco PC vs volumen). Identidad, ficha comercial, fotos y destino del
-  aviso ya decididos (2026-09-27).
+- **Número A (completo, pruebas): 0412 0825234** → `584120825234`
+  (registrado 2026-09-27).
+- **Falta**: número B (inicial, el del agente humano) + QR de ambos
+  (2 min por número) + storage de fotos (disco PC vs volumen).
 - Nada implementado de este plan; sin código hasta F0/F1.
 
 ## Gate / DoD por fase

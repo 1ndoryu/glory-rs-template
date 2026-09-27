@@ -275,8 +275,9 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   glory-agent para historial real + usage).
 - Fases: F0 pista núcleo → F1 tablas+clientes → F2 webhook 2 números →
   F3 delegación → F4 memoria+media → F5 consola dueña.
-- Requiere de usuaria: 2 números + QR (×2) + respuestas `[DECIDIR]`
-  (identidad, campos cliente/ficha, storage fotos). Sin código hasta entonces.
+- Requiere de usuaria: número B (inicial) + QR de ambos (2 min por
+  número) + storage de fotos. Número A (completo, pruebas): 0412 0825234
+  (`584120825234`). Sin código hasta entonces.
 
 ## 279A-3 — /ask cuestionario de ficha (F1 verificado local 2026-09-27; pendiente: respuestas usuaria)
 - Plan: `Agente/planes/plan-ask-2026-09-27.md`.
