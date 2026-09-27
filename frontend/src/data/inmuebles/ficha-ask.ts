@@ -4,7 +4,7 @@
 
 import { actualizarRemoto, apiFetch } from './api';
 import type { ExtrasAsk } from '../../domain/ficha-ask';
-import type { ColumnaNumericaAsk, ValorUbicacion } from '../../domain/pasos-ask';
+import { pasoRespondido, pasosPara, type ColumnaNumericaAsk, type ValorUbicacion } from '../../domain/pasos-ask';
 import type { Inmueble } from '../../domain/inmueble';
 
 export interface FichaAsk {
@@ -47,4 +47,31 @@ export async function guardarColumnaAsk(
   valor: number,
 ): Promise<Inmueble> {
   return actualizarRemoto({ ...actual, [columna]: valor });
+}
+
+/* Primera propiedad con algo que preguntar (279A-4): candidatas en orden
+ * aleatorio, trae la ficha una a una y devuelve la primera con algún paso
+ * sin responder. `null` = todo al día (o lista vacía). Las fichas que
+ * fallan se saltan en silencio: ya habrá otra candidata. */
+export async function buscarPendiente(
+  lista: Inmueble[],
+  excluirId?: string | null,
+): Promise<{ inmueble: Inmueble; ficha: FichaAsk } | null> {
+  const candidatas = lista.filter((i) => i.id !== excluirId);
+  for (let i = candidatas.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [candidatas[i], candidatas[j]] = [candidatas[j], candidatas[i]];
+  }
+  for (const candidata of candidatas) {
+    try {
+      const ficha = await obtenerFicha(candidata.id);
+      const pendientes = pasosPara(candidata.tipo, candidata).some(
+        (p) => !pasoRespondido(p, candidata, ficha.extras, ficha.precioMinimo),
+      );
+      if (pendientes) return { inmueble: candidata, ficha };
+    } catch {
+      continue;
+    }
+  }
+  return null;
 }

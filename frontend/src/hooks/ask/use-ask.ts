@@ -1,73 +1,79 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { listarRemoto } from '../../data/inmuebles/api';
 import {
+  buscarPendiente,
   guardarColumnaAsk,
   guardarFicha,
   guardarUbicacionAsk,
-  obtenerFicha,
-  type FichaAsk,
 } from '../../data/inmuebles/ficha-ask';
-import { extrasTrasRespuesta, mazclarPasos, pasosPara, type PasoAsk, type ValorUbicacion } from '../../domain/pasos-ask';
+import { extrasTrasRespuesta, mazclarPasos, pasosPara } from '../../domain/pasos-ask';
 import type { Inmueble } from '../../domain/inmueble';
+import {
+  FICHA_VACIA,
+  esUbicacion,
+  trasFicha,
+  trasInmueble,
+  type EstadoAsk,
+  type ValorAsk,
+} from './estado-ask';
 
-/* Máquina /ask (279A-3 F2): foto de pasos al elegir (ubicación + ficha +
- * numéricos que faltan, en orden aleatorio) y guardado por tipo de paso —
- * ficha a `extras`, ubicación y numéricos a columnas (PUT admin existente).
+/* Máquina /ask (279A-3 F2 + 279A-4): sin lista de propiedades — al entrar
+ * (y al pedir otra) elige sola una propiedad con algo que preguntar, en
+ * orden aleatorio, y mezcla sus pasos. Guardado por tipo de paso: ficha a
+ * `extras`, ubicación y numéricos a columnas (PUT admin existente).
  * Saltar avanza sin guardar; anterior deshace para corregir. */
-
-export type ValorAsk = string | number | boolean | null | ValorUbicacion;
-
-interface EstadoAsk {
-  inmuebles: Inmueble[];
-  seleccionado: Inmueble | null;
-  ficha: FichaAsk;
-  pasos: PasoAsk[];
-  indice: number;
-  cargando: boolean;
-  guardando: boolean;
-  error: string | null;
-  aviso: string | null;
-}
-
-const VACIA: FichaAsk = { extras: {}, precioMinimo: null };
-
-function esUbicacion(v: ValorAsk): v is ValorUbicacion {
-  return typeof v === 'object' && v !== null;
-}
-
-/* Updaters puros (sin hook) para no engordar el componente. */
-function trasFicha(guardada: FichaAsk): (e: EstadoAsk) => EstadoAsk {
-  return (e) => ({ ...e, ficha: guardada, guardando: false, indice: Math.min(e.indice + 1, e.pasos.length) });
-}
-
-function trasInmueble(guardado: Inmueble): (e: EstadoAsk) => EstadoAsk {
-  return (e) => ({
-    ...e,
-    seleccionado: guardado,
-    inmuebles: e.inmuebles.map((i) => (i.id === guardado.id ? guardado : i)),
-    guardando: false,
-    indice: Math.min(e.indice + 1, e.pasos.length),
-  });
-}
 
 export function useAsk() {
   const [estado, setEstado] = useState<EstadoAsk>({
     inmuebles: [],
     seleccionado: null,
-    ficha: VACIA,
+    ficha: FICHA_VACIA,
     pasos: [],
     indice: 0,
     cargando: true,
     guardando: false,
     error: null,
     aviso: null,
+    terminado: false,
   });
+
+  /* Elige sola una propiedad con pendientes (279A-4): al cargar la lista y
+   * cada vez que la dueña pide otra. Sin lista visible: solo preguntas. */
+  const iniciarEn = useCallback(async (lista: Inmueble[], excluirId?: string | null) => {
+    setEstado((e) => ({
+      ...e,
+      inmuebles: lista,
+      seleccionado: null,
+      ficha: FICHA_VACIA,
+      pasos: [],
+      indice: 0,
+      cargando: true,
+      error: null,
+      aviso: null,
+      terminado: false,
+    }));
+    try {
+      const hallada = await buscarPendiente(lista, excluirId);
+      if (!hallada) {
+        setEstado((e) => ({ ...e, cargando: false, terminado: true }));
+        return;
+      }
+      /* Orden aleatorio por sesión: no es una lista fija. */
+      const pasos = mazclarPasos(pasosPara(hallada.inmueble.tipo, hallada.inmueble));
+      setEstado((e) => ({ ...e, seleccionado: hallada.inmueble, ficha: hallada.ficha, pasos, cargando: false }));
+    } catch (e: unknown) {
+      setEstado((s) => ({ ...s, cargando: false, error: e instanceof Error ? e.message : 'No se pudo cargar la ficha.' }));
+    }
+  }, []);
+
+  const iniciarEnRef = useRef(iniciarEn);
+  iniciarEnRef.current = iniciarEn;
 
   useEffect(() => {
     let vivo = true;
     listarRemoto()
       .then((lista) => {
-        if (vivo) setEstado((e) => ({ ...e, inmuebles: lista, cargando: false }));
+        if (vivo) void iniciarEnRef.current(lista);
       })
       .catch((e: unknown) => {
         if (vivo) setEstado((s) => ({ ...s, cargando: false, error: e instanceof Error ? e.message : 'No se pudo cargar la lista.' }));
@@ -75,17 +81,6 @@ export function useAsk() {
     return () => {
       vivo = false;
     };
-  }, []);
-
-  const elegir = useCallback(async (inmueble: Inmueble) => {
-    setEstado((e) => ({ ...e, seleccionado: inmueble, cargando: true, error: null, aviso: null, indice: 0, pasos: [] }));
-    try {
-      const ficha = await obtenerFicha(inmueble.id);
-      /* Orden aleatorio por sesión: no es una lista fija. */
-      setEstado((e) => ({ ...e, ficha, pasos: mazclarPasos(pasosPara(inmueble.tipo, inmueble)), cargando: false }));
-    } catch (e: unknown) {
-      setEstado((s) => ({ ...s, cargando: false, error: e instanceof Error ? e.message : 'No se pudo cargar la ficha.' }));
-    }
   }, []);
 
   const estadoRef = useRef(estado);
@@ -123,9 +118,11 @@ export function useAsk() {
     setEstado((e) => ({ ...e, indice: Math.max(0, e.indice - 1) }));
   }, []);
 
-  const volver = useCallback(() => {
-    setEstado((e) => ({ ...e, seleccionado: null, ficha: VACIA, pasos: [], indice: 0, error: null, aviso: null }));
-  }, []);
+  /* Otra propiedad con pendientes (excluye la actual para no repetirla). */
+  const siguiente = useCallback(() => {
+    const { inmuebles, seleccionado } = estadoRef.current;
+    void iniciarEn(inmuebles, seleccionado?.id ?? null);
+  }, [iniciarEn]);
 
-  return { ...estado, elegir, responder, saltar, anterior, volver };
+  return { ...estado, responder, saltar, anterior, siguiente };
 }

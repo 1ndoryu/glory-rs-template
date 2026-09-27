@@ -1,7 +1,6 @@
 import { useAsk } from '../../hooks/ask/use-ask';
 import { useLogin } from '../../hooks/sesion/use-login';
 import { useSesion } from '../../hooks/sesion/use-sesion';
-import { calcularCompletitud } from '../../domain/ficha-ask';
 import {
   etiquetaUbicacion,
   progresoPasos,
@@ -21,10 +20,12 @@ import {
   RELLENO_LATERAL_SITIO,
 } from '../publica/disenno';
 
-/* /ask (279A-3): cuestionario privado de la dueña, misma línea visual que
- * la página pública (fondo #e8e7e3, tinta, sin redondeados ni sombras,
- * Söhne; tokens de `publica/disenno`, nunca literales). Exige sesión del
- * panel (reutiliza `useSesion`+`useLogin`); el % es solo aviso visual. */
+/* /ask (279A-3 + 279A-4): cuestionario privado de la dueña, misma línea
+ * visual que la página pública (fondo #e8e7e3, tinta, sin redondeados ni
+ * sombras, Söhne; tokens de `publica/disenno`, nunca literales). Exige
+ * sesión del panel (reutiliza `useSesion`+`useLogin`); sin lista de
+ * propiedades: al entrar elige sola una con algo que preguntar, en orden
+ * aleatorio. El % es solo aviso visual. */
 
 export function PaginaAsk() {
   const { email, alEntrar } = useSesion();
@@ -97,16 +98,15 @@ function CuestionarioAsk() {
             {ask.error}
           </p>
         )}
-        {ask.cargando && !ask.seleccionado ? (
-          <p className={`mt-4 text-sm ${CLASE_TINTA}`}>Cargando propiedades…</p>
-        ) : !ask.seleccionado ? (
-          <ListaPropiedades
-            inmuebles={ask.inmuebles}
-            alElegir={(id) => {
-              const encontrado = ask.inmuebles.find((i) => i.id === id);
-              if (encontrado) void ask.elegir(encontrado);
-            }}
+        {ask.cargando && !ask.seleccionado && !ask.terminado ? (
+          <p className={`mt-4 text-sm ${CLASE_TINTA}`}>Buscando preguntas…</p>
+        ) : ask.terminado ? (
+          <PanelTerminado
+            vacio={ask.inmuebles.length === 0}
+            alRevisar={ask.siguiente}
           />
+        ) : !ask.seleccionado ? (
+          <p className={`mt-4 text-sm ${CLASE_TINTA}`}>Buscando preguntas…</p>
         ) : ask.cargando ? (
           <p className={`mt-4 text-sm ${CLASE_TINTA}`}>Cargando ficha…</p>
         ) : (
@@ -120,7 +120,7 @@ function CuestionarioAsk() {
             alResponder={(v) => void ask.responder(v)}
             alSaltar={ask.saltar}
             alAnterior={ask.anterior}
-            alVolver={ask.volver}
+            alOtra={ask.siguiente}
           />
         )}
       </div>
@@ -128,36 +128,24 @@ function CuestionarioAsk() {
   );
 }
 
-function ListaPropiedades({
-  inmuebles,
-  alElegir,
-}: {
-  inmuebles: ReturnType<typeof useAsk>['inmuebles'];
-  alElegir: (id: string) => void;
-}) {
-  if (inmuebles.length === 0) return <p className={`mt-4 text-sm ${CLASE_TINTA}`}>Aún no hay propiedades cargadas.</p>;
+/* Sin pendientes: todo al día (o aún sin propiedades). Sin lista: solo
+ * el botón para revisar de nuevo. */
+function PanelTerminado({ vacio, alRevisar }: { vacio: boolean; alRevisar: () => void }) {
   return (
-    <ul className={`mt-4 flex flex-col gap-2`}>
-      {inmuebles.map((i) => (
-        <li key={i.id}>
-          <button
-            type="button"
-            onClick={() => alElegir(i.id)}
-            className={`flex w-full cursor-pointer items-center justify-between gap-3 rounded-none border ${CLASE_BORDE} bg-transparent px-4 py-3 text-left ${CLASE_TINTA} hover:bg-[#dddbd5]`}
-          >
-            <span className="text-sm">
-              {i.titulo || 'Sin título'} <span className="opacity-60">· {ETIQUETAS_TIPO[i.tipo]}</span>
-            </span>
-            <span className={`text-xs ${CLASE_TINTA} opacity-70`}>
-              {(() => {
-                const { porcentaje } = calcularCompletitud(i.tipo, i.extras ?? {}, i.precioMinimo ?? null, i);
-                return porcentaje === 100 ? 'Completa ✓' : porcentaje === 0 ? 'Sin empezar' : `${porcentaje}% · continuar`;
-              })()}
-            </span>
-          </button>
-        </li>
-      ))}
-    </ul>
+    <div className={`mt-4 border ${CLASE_BORDE} px-4 py-6 text-center`}>
+      <p className={`${CLASE_TINTA}`}>
+        {vacio ? 'Aún no hay propiedades cargadas.' : '¡Todo al día! No quedan preguntas pendientes.'}
+      </p>
+      {!vacio && (
+        <button
+          type="button"
+          onClick={alRevisar}
+          className={`mt-3 cursor-pointer rounded-none border ${CLASE_BORDE} ${CLASE_ACTIVO} px-4 py-2 text-sm ${CLASE_TEXTO}`}
+        >
+          Revisar de nuevo
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -171,7 +159,7 @@ function PreguntaActual({
   alResponder,
   alSaltar,
   alAnterior,
-  alVolver,
+  alOtra,
 }: {
   inmueble: Inmueble;
   pasos: PasoAsk[];
@@ -182,7 +170,7 @@ function PreguntaActual({
   alResponder: (v: string | number | boolean | null | ValorUbicacion) => void;
   alSaltar: () => void;
   alAnterior: () => void;
-  alVolver: () => void;
+  alOtra: () => void;
 }) {
   const columnas: ColumnasAsk = inmueble;
   const { porcentaje, faltan } = progresoPasos(pasos, columnas, extras, precioMinimo);
@@ -250,6 +238,14 @@ function PreguntaActual({
         <div className={`mt-4 border ${CLASE_BORDE} px-4 py-6 text-center`}>
           <p className={`${CLASE_TINTA}`}>¡Listo! Respondiste todas las preguntas de esta propiedad.</p>
           <p className={`mt-1 text-sm ${CLASE_TINTA} opacity-70`}>Ficha al {porcentaje}%.</p>
+          <button
+            type="button"
+            onClick={alOtra}
+            disabled={guardando}
+            className={`mt-3 cursor-pointer rounded-none border ${CLASE_BORDE} ${CLASE_ACTIVO} px-4 py-2 text-sm ${CLASE_TEXTO} disabled:cursor-wait disabled:opacity-60`}
+          >
+            Otra pregunta aleatoria →
+          </button>
         </div>
       )}
       <div className="mt-4 flex justify-center gap-6">
@@ -258,8 +254,13 @@ function PreguntaActual({
             ← Anterior
           </button>
         )}
-        <button type="button" onClick={alVolver} className={`cursor-pointer text-sm ${CLASE_TINTA} opacity-70 underline`}>
-          Volver a mis propiedades
+        <button
+          type="button"
+          onClick={alOtra}
+          disabled={guardando}
+          className={`cursor-pointer text-sm ${CLASE_TINTA} opacity-70 underline disabled:cursor-wait`}
+        >
+          Otra propiedad
         </button>
       </div>
     </div>
