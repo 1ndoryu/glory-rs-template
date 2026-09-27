@@ -276,12 +276,19 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   (glory-agent: canal en sesiones, outbox con destino/texto/media).
 - Requiere de usuaria: número WhatsApp + 2 min para escanear QR. Sin código hasta entonces.
 
-## 279A-3 — /ask cuestionario dueña (pendiente: respuestas usuaria)
+## 279A-3 — /ask cuestionario dueña (F1 verificado local 2026-09-27; pendiente: respuestas usuaria)
 - Plan: `Agente/planes/plan-ask-2026-09-27.md`.
 - Página privada con login existente; preguntas por tipo (piso solo
   apartamento), condicionales, dinámicas IA opcional; `precio_minimo`
   privado con frontera en API; tabla % + semáforo en admin; alimenta
   chat web + WhatsApp.
-- Requiere de usuaria: 5 dudas (privados, piso por tipo, IA dinámica,
-  formato página, bloquear vs avisar).
+- Dudas resueltas 2026-09-27 (commit `40244fb5`): mínimo insinuable sin
+  cifras, piso = apartamento + townhouse, dinámicas desde F1, aviso sin
+  bloquear, `/ask` con sesión admin.
+- F1 implementado y verificado local (commit `57f8410f`): migración
+  `extras` + `precio_minimo`, `GET/PUT /api/admin/.../ficha`, frontera
+  pública (`extras={}` sin `precio_minimo`, 422 a array), login `/ask`
+  centrado, lista + cuestionario (respuesta → 14% en DB y UI), `tsc` 0,
+  `cargo test --lib` 18 passed. Dato de prueba limpiado.
+- Requiere de usuaria: responder el cuestionario en `/ask`.
 
