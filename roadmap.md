@@ -285,6 +285,13 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   `uso_mensajes` + trigger estima len/4); `registrar_contacto` y
   `POST .../contacto` crean `clientes` sin duplicar (`0412 0825234` →
   `584120825234`); `fmt`+`check`+clippy 0, `cargo test` 20 passed.
+- F3 verificado local 2026-09-27: `consultar_agente` (consultando +
+  `ai_enabled=false` + ciclo `waiting`) y `escalar_a_humano` (delegada +
+  triple freno) con `destino` explícito + `resumen`; worker arma ficha
+  comercial (`ficha_para_aviso`) con fallback a texto mínimo; staff
+  `POST .../devolver` (nota `staff` + `answered` + `ai_enabled=true` +
+  `activa`) y bandeja con `estado_atencion/modo_atencion`;
+  `fmt`+`check`+clippy 0, `cargo test` 22 passed, outbox/atención limpios.
 
 ## 279A-3 — /ask cuestionario de ficha (F1 verificado local 2026-09-27; pendiente: respuestas usuaria)
 - Plan: `Agente/planes/plan-ask-2026-09-27.md`.
