@@ -161,7 +161,7 @@ export const ModalCompra: React.FC<ModalCompraProps> = ({plan, servicioSlug, abi
                     {qualifiesFirstOrder && (
                         <div className="modalCompraPrimerPedido">
                             <span className="modalCompraPrimerPedidoBadge">50% OFF</span>
-                            <span className="modalCompraPrimerPedidoTexto">Descuento en tu primer servicio</span>
+                            <span className="modalTexto modalTextoAviso">Descuento en tu primer servicio</span>
                         </div>
                     )}
                     {/* [084A-12] Resumen de precio con descuento aplicado */}

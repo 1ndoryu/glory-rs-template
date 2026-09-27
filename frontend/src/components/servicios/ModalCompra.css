@@ -80,7 +80,7 @@
 }
 
 .modalCompraErrorMensaje {
-    color: var(--color-error, var(--color-error));
+    color: var(--color-error);
     font-size: var(--text-sm);
 }
 
@@ -97,7 +97,7 @@
     flex-direction: column;
     gap: 2px;
     padding: var(--spacing-sm) var(--spacing-md);
-    border: 1px solid var(--border-default, var(--bg-item-active));
+    border: 1px solid var(--border-default);
     border-radius: var(--radius-md);
     cursor: pointer;
     transition: border-color 0.15s;
@@ -205,15 +205,17 @@
     border-radius: var(--radius-sm);
 }
 
-/* [277A-10] Banner 50% OFF primer pedido */
+/* [277A-10] Banner 50% OFF primer pedido.
+ * [259A-5 5b-4] Literales a tokens warning (stops exactos, texto converge a
+ * --color-warning-text); texto a recetas modalTexto+modalTextoAviso. */
 .modalCompraPrimerPedido {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: var(--spacing-sm);
     padding: var(--spacing-sm) var(--spacing-md);
-    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-    border: 1px solid #f59e0b;
+    background: linear-gradient(135deg, var(--color-warning-bg) 0%, var(--color-warning-bg-profundo) 100%);
+    border: 1px solid var(--color-warning);
     border-radius: var(--radius-md);
     width: 100%;
 }
@@ -221,14 +223,8 @@
 .modalCompraPrimerPedidoBadge {
     font-size: var(--text-sm);
     font-weight: 700;
-    color: #92400e;
-    background: #f59e0b;
+    color: var(--color-warning-text);
+    background: var(--color-warning);
     padding: 2px var(--spacing-xs);
     border-radius: var(--radius-sm);
-}
-
-.modalCompraPrimerPedidoTexto {
-    font-size: var(--text-sm);
-    font-weight: 500;
-    color: #92400e;
 }

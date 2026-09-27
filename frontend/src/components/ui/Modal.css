@@ -73,6 +73,14 @@
     color: var(--success-color);
 }
 
+/* [259A-5 5b-4] Variante aviso (texto ambar sobre fondo warning): paralela a
+ * modalTextoExito; la usa el banner 50% OFF de ModalCompra. */
+.modalTextoAviso {
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--color-warning-text);
+}
+
 .modalAcciones {
     display: flex;
     justify-content: flex-end;
