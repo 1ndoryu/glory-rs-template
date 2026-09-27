@@ -83,7 +83,7 @@ export interface Inmueble
     MultimediaInmueble,
     AuditoriaInmueble {
   precio: number;
-  /* [279A-3] Ficha /ask de la dueña: respuestas por tipo (`extras`) y
+  /* [279A-3] Ficha /ask: respuestas por tipo (`extras`) y
    * mínimo privado. Opcionales: registros leídos antes de existir la
    * ficha y borradores aún sin ficha los omiten. Nunca viajan a la web
    * pública (el backend los excluye de los endpoints públicos). */

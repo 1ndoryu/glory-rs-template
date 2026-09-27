@@ -8,7 +8,7 @@ import {
   type PasoAsk,
   type ValorUbicacion,
 } from '../../domain/pasos-ask';
-import { ETIQUETAS_TIPO, portadaDe, type Inmueble } from '../../domain/inmueble';
+import { ETIQUETAS_TIPO, formatearPrecio, portadaDe, type Inmueble } from '../../domain/inmueble';
 import { EntradaPregunta } from './entrada-pregunta';
 import { EntradaUbicacion } from './entrada-ubicacion';
 import {
@@ -20,12 +20,12 @@ import {
   RELLENO_LATERAL_SITIO,
 } from '../publica/disenno';
 
-/* /ask (279A-3 + 279A-4): cuestionario privado de la dueña, misma línea
- * visual que la página pública (fondo #e8e7e3, tinta, sin redondeados ni
- * sombras, Söhne; tokens de `publica/disenno`, nunca literales). Exige
- * sesión del panel (reutiliza `useSesion`+`useLogin`); sin lista de
- * propiedades: al entrar elige sola una con algo que preguntar, en orden
- * aleatorio. El % es solo aviso visual. */
+/* /ask (279A-3 + 279A-4): cuestionario privado para completar fichas,
+ * misma línea visual que la página pública (fondo #e8e7e3, tinta, sin
+ * redondeados ni sombras, Söhne; tokens de `publica/disenno`, nunca
+ * literales). Exige sesión del panel (reutiliza `useSesion`+`useLogin`);
+ * sin lista de propiedades: al entrar elige sola una con algo que
+ * preguntar, en orden aleatorio. El % es solo aviso visual. */
 
 export function PaginaAsk() {
   const { email, alEntrar } = useSesion();
@@ -40,7 +40,7 @@ function EntradaAsk({ alEntrar }: { alEntrar: (email: string) => void }) {
       <div className={`mx-auto w-full max-w-md ${RELLENO_LATERAL_SITIO}`}>
         <h1 className={`text-center text-xl ${CLASE_TINTA}`}>Completar ficha de propiedad</h1>
         <p className={`mt-1 text-center text-sm ${CLASE_TINTA} opacity-70`}>
-          Entra con tu cuenta del panel para responder las preguntas de tus propiedades.
+          Entra con tu cuenta del panel para completar la ficha de las propiedades.
         </p>
         <form
           className="mt-4 flex w-full flex-col gap-4"
@@ -184,10 +184,13 @@ function PreguntaActual({
   const portada = portadaDe(inmueble);
   return (
     <div className="mt-4">
-      {/* Cabecera: foto de portada + descripción para situar la propiedad. */}
+      {/* Cabecera: foto de portada + precio para situar la propiedad. */}
       {portada && <img src={portada} alt="" className={`mx-auto aspect-[4/3] w-full border ${CLASE_BORDE} object-cover`} />}
       <p className={`mt-2 text-sm ${CLASE_TINTA}`}>
         {inmueble.titulo || 'Sin título'} <span className="opacity-60">· {ETIQUETAS_TIPO[inmueble.tipo]}</span>
+      </p>
+      <p className={`mt-1 text-base ${CLASE_TINTA}`}>
+        {inmueble.precio > 0 ? `${formatearPrecio(inmueble.precio)} · ${inmueble.operacion}` : 'Precio a consultar'}
       </p>
       {inmueble.descripcion.trim() && (
         <p className={`mt-1 text-xs ${CLASE_TINTA} opacity-70`}>{inmueble.descripcion}</p>

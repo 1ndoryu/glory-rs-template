@@ -1,4 +1,4 @@
-// Ficha /ask (279A-3): cuestionario privado de la dueña por tipo.
+// Ficha /ask (279A-3): cuestionario privado por tipo para completar fichas.
 // Dominio puro: sin DOM, sin fetch, sin React (reutilizable en móvil).
 // Claves snake_case ≤64 (las valida el backend en `validar_extras`);
 // `precio_minimo` NO vive aquí: es columna privada aparte (nunca viaja
@@ -11,7 +11,7 @@ export type TipoPreguntaAsk = 'si_no' | 'texto_corto' | 'entero' | 'decimal';
 export interface PreguntaAsk {
   /** Clave guardada en `extras` (`precio_minimo` usa su columna). */
   clave: string;
-  /** Pregunta tal como la lee la dueña (cercana, sin jerga). */
+  /** Pregunta tal como se lee al responder (cercana, sin jerga). */
   etiqueta: string;
   tipo: TipoPreguntaAsk;
   /** Ayuda corta bajo la pregunta (ejemplo de respuesta válida). */
@@ -44,9 +44,9 @@ export const COMUNES: PreguntaAsk[] = [
   },
   {
     clave: 'precio_minimo',
-    etiqueta: '¿Cuál es lo mínimo que aceptarías? (privado, nadie lo ve)',
+    etiqueta: '¿Cuál es el precio mínimo aceptado? (privado, no se publica)',
     tipo: 'decimal',
-    ayuda: 'Solo lo ves tú en el panel; la página nunca lo muestra.',
+    ayuda: 'Solo visible en el panel; la página nunca lo muestra.',
     unidad: '€',
     privada: true,
   },

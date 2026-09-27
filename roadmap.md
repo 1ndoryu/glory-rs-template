@@ -276,7 +276,7 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   (glory-agent: canal en sesiones, outbox con destino/texto/media).
 - Requiere de usuaria: número WhatsApp + 2 min para escanear QR. Sin código hasta entonces.
 
-## 279A-3 — /ask cuestionario dueña (F1 verificado local 2026-09-27; pendiente: respuestas usuaria)
+## 279A-3 — /ask cuestionario de ficha (F1 verificado local 2026-09-27; pendiente: respuestas usuaria)
 - Plan: `Agente/planes/plan-ask-2026-09-27.md`.
 - Página privada con login existente; preguntas por tipo (piso solo
   apartamento), condicionales, dinámicas IA opcional; `precio_minimo`
@@ -309,5 +309,11 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   `estado-ask.ts` separa estado/updaters (hook 117 líneas). Navegador:
   entrada directa a pregunta, Otra propiedad salta de Calas Suites a
   Arivana, recarga cae en Riberas del Caroní, solo lecturas.
+- 279A-5 verificado local (`tsc` 0): numéricos nombran el tipo («¿Cuántos
+  m² tiene el apartamento?»; terreno: «¿Cuántos m² tiene el terreno?»);
+  precio arriba («35.000 € · venta», «Precio a consultar» si es 0);
+  lenguaje neutral en UI/comentarios/plan (no es para el dueño): mínimo
+  «¿Cuál es el precio mínimo aceptado? (privado, no se publica)».
+  Navegador: precio + m² + mínimo confirmados, solo saltos sin guardar.
 - Requiere de usuaria: responder el cuestionario en `/ask`.
 

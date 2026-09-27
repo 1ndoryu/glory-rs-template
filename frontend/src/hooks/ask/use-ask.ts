@@ -38,7 +38,7 @@ export function useAsk() {
   });
 
   /* Elige sola una propiedad con pendientes (279A-4): al cargar la lista y
-   * cada vez que la dueña pide otra. Sin lista visible: solo preguntas. */
+   * cada vez que se pide otra. Sin lista visible: solo preguntas. */
   const iniciarEn = useCallback(async (lista: Inmueble[], excluirId?: string | null) => {
     setEstado((e) => ({
       ...e,
@@ -91,7 +91,7 @@ export function useAsk() {
     const paso = pasos[indice];
     if (!seleccionado || !paso) return;
     /* `null` = no aplica: en ficha borra la clave; en columnas no existe
-     * (la dueña salta o corrige el valor). */
+     * (se salta o se corrige el valor). */
     if (valor === null && paso.kind !== 'ficha') return;
     setEstado((e) => ({ ...e, guardando: true, error: null }));
     try {

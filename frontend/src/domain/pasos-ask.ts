@@ -41,12 +41,30 @@ const ETIQUETAS_COLUMNA: Record<ColumnaNumericaAsk, { etiqueta: string; ayuda: s
   puestos: { etiqueta: '¿Cuántos puestos de estacionamiento tiene?', ayuda: '0 = ninguno.', entero: true, unidad: 'puestos' },
 };
 
+/* Nombre con artículo para preguntar en concreto (279A-5): "¿Cuántos m²
+ * tiene el apartamento?" en vez del genérico "construidos". */
+const NOMBRE_TIPO: Record<TipoInmueble, string> = {
+  apartamento: 'el apartamento',
+  townhouse: 'el townhouse',
+  casa: 'la casa',
+  local: 'el local',
+  terreno: 'el terreno',
+};
+
+function etiquetaColumna(tipo: TipoInmueble, columna: ColumnaNumericaAsk): string {
+  const nombre = NOMBRE_TIPO[tipo];
+  if (columna === 'metrosTerreno' && tipo === 'terreno') return `¿Cuántos m² tiene ${nombre}?`;
+  if (columna === 'metrosTerreno') return `¿Cuántos m² de terreno tiene ${nombre}?`;
+  if (columna === 'puestos') return `¿Cuántos puestos de estacionamiento tiene ${nombre}?`;
+  return `¿Cuántos m² tiene ${nombre}?`;
+}
+
 function ubicacionCompleta(columnas: ColumnasAsk): boolean {
   return columnas.ubicacion.trim() !== '' && columnas.residencia.trim() !== '';
 }
 
 /* Pregunta inteligente ubicación vs residencia: confirma lo que hay y pide
- * lo que falta, nombrando los valores para que la dueña los reconozca. */
+ * lo que falta, nombrando los valores para reconocerlos al responder. */
 export function etiquetaUbicacion(columnas: ColumnasAsk): string {
   const u = columnas.ubicacion.trim();
   const r = columnas.residencia.trim();
@@ -63,8 +81,8 @@ export function pasosPara(tipo: TipoInmueble, columnas: ColumnasAsk): PasoAsk[] 
   for (const pregunta of CHECKLIST_ASK[tipo] ?? []) pasos.push({ kind: 'ficha', pregunta });
   for (const columna of columnasAplicables(tipo)) {
     if (!(columnas[columna] > 0)) {
-      const { etiqueta, ayuda, entero, unidad } = ETIQUETAS_COLUMNA[columna];
-      pasos.push({ kind: 'columna', columna, etiqueta, ayuda, entero, unidad });
+      const { ayuda, entero, unidad } = ETIQUETAS_COLUMNA[columna];
+      pasos.push({ kind: 'columna', columna, etiqueta: etiquetaColumna(tipo, columna), ayuda, entero, unidad });
     }
   }
   return pasos;

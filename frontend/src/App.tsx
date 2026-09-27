@@ -7,7 +7,7 @@ import { rutaActual } from './platform/ventana';
 const AppAdmin = lazy(() =>
   import('./app/app-admin').then((m) => ({ default: m.AppAdmin })),
 );
-/* [279A-3] /ask: cuestionario privado de la dueña en chunk aparte (igual
+/* [279A-3] /ask: cuestionario privado para completar fichas en chunk aparte (igual
  * que el panel: el visitante público no descarga este código). */
 const PaginaAsk = lazy(() =>
   import('./features/ask/pagina-ask').then((m) => ({ default: m.PaginaAsk })),

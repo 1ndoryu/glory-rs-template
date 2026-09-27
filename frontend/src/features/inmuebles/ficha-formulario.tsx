@@ -3,9 +3,9 @@ import type { TipoInmueble } from '@/domain/inmueble';
 import { CLASE_SELECT, Etiqueta } from './campos-formulario';
 import { Input } from '@/components/ui/input';
 
-/* Sección Ficha /ask del modal admin: las mismas preguntas que la dueña
- * responde en /ask, editables aquí (pisan lo guardado; vacío = sin
- * responder). Sin tipo aún muestra solo las comunes. */
+/* Sección Ficha /ask del modal admin: las mismas preguntas que /ask,
+ * editables aquí (pisan lo guardado; vacío = sin responder). Sin tipo aún
+ * muestra solo las comunes. */
 
 export function FichaFormulario(props: {
   tipo: TipoInmueble | '';
@@ -17,7 +17,7 @@ export function FichaFormulario(props: {
   const preguntas = props.tipo ? (CHECKLIST_ASK[props.tipo] ?? COMUNES) : COMUNES;
   return (
     <fieldset className="space-y-3 rounded-md border border-input p-3">
-      <legend className="px-1 text-sm font-medium">Ficha /ask (respuestas de la dueña)</legend>
+      <legend className="px-1 text-sm font-medium">Ficha /ask (respuestas guardadas)</legend>
       {preguntas.map((p) => {
         if (p.clave === 'precio_minimo') {
           return (
