@@ -1,35 +1,30 @@
-/* [311A-INV] Estilos para VistaPreviaCorreos — galería de plantillas email */
+/* [311A-INV] Estilos para VistaPreviaCorreos — galería de plantillas email.
+ * [259A-5 5b-3] Fallbacks legacy eliminados: las vars ya existen en
+ * variables.css con valores identicos; overlay/modal artesanal a <Modal>. */
 
 .previewContenedor {
     display: flex;
     flex-direction: column;
-    gap: var(--espaciado-md, 16px);
-    padding: var(--espaciado-lg, 24px);
-    background: var(--color-fondo, #fff);
+    gap: var(--espaciado-md);
+    padding: var(--espaciado-lg);
+    background: var(--color-fondo);
     border-radius: var(--radius-lg);
-    box-shadow: var(--sombra-tarjeta, 0 2px 8px rgba(0, 0, 0, 0.06));
+    box-shadow: var(--sombra-tarjeta);
     width: 100%;
     box-sizing: border-box;
-}
-
-.previewTitulo {
-    margin: 0;
-    font-size: 20px;
-    font-weight: 600;
-    color: var(--text-primary);
 }
 
 .previewDescripcion {
     margin: 0;
     font-size: 14px;
-    color: var(--color-texto-secundario, #888);
+    color: var(--color-texto-secundario);
     line-height: 1.5;
 }
 
 /* Navegación por categorías */
 .previewCategorias {
     display: flex;
-    gap: var(--espaciado-xs, 6px);
+    gap: var(--espaciado-xs);
     flex-wrap: wrap;
 }
 
@@ -46,40 +41,40 @@
 }
 
 .previewCatBtn:hover {
-    border-color: var(--color-primario, #c9a84c);
-    color: var(--color-primario, #c9a84c);
+    border-color: var(--color-primario);
+    color: var(--color-primario);
 }
 
 .previewCatActiva {
-    background: var(--color-primario, #c9a84c);
-    border-color: var(--color-primario, #c9a84c);
-    color: #fff;
+    background: var(--color-primario);
+    border-color: var(--color-primario);
+    color: var(--brand-white);
 }
 
 .previewCatActiva:hover {
-    color: #fff;
+    color: var(--brand-white);
 }
 
 /* Grupos y cuadrícula */
 .previewGrid {
     display: flex;
     flex-direction: column;
-    gap: var(--espaciado-lg, 24px);
+    gap: var(--espaciado-lg);
 }
 
 .previewGrupo {
     display: flex;
     flex-direction: column;
-    gap: var(--espaciado-sm, 8px);
+    gap: var(--espaciado-sm);
 }
 
 .previewGrupoTitulo {
     margin: 0;
     font-size: 15px;
     font-weight: 600;
-    color: var(--color-texto-primario, #333);
-    padding-bottom: var(--espaciado-xs, 6px);
-    border-bottom: 1px solid var(--color-borde, #eee);
+    color: var(--color-texto-primario);
+    padding-bottom: var(--espaciado-xs);
+    border-bottom: 1px solid var(--color-borde);
 }
 
 .previewGrupoGrid {
@@ -94,9 +89,9 @@
     align-items: center;
     gap: 10px;
     padding: 12px 14px;
-    border: 1px solid var(--color-borde, #eee);
-    border-radius: var(--radio-borde, 8px);
-    background: var(--color-fondo, #fff);
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio-borde);
+    background: var(--color-fondo);
     cursor: pointer;
     transition: all 0.15s ease;
     text-align: left;
@@ -106,14 +101,14 @@
 }
 
 .previewTarjeta:hover {
-    border-color: var(--color-primario, #c9a84c);
-    box-shadow: 0 2px 8px rgba(201, 168, 76, 0.12);
+    border-color: var(--color-primario);
+    box-shadow: 0 2px 8px var(--color-primario-alfa-12);
     transform: translateY(-1px);
 }
 
 .previewTarjetaActiva {
-    border-color: var(--color-primario, #c9a84c);
-    background: rgba(201, 168, 76, 0.04);
+    border-color: var(--color-primario);
+    background: var(--color-primario-alfa-04);
 }
 
 .previewTarjetaIcono {
@@ -123,9 +118,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--color-fondo-secundario, #f5f5f5);
+    background: var(--color-fondo-secundario);
     border-radius: 8px;
-    color: var(--color-primario, #c9a84c);
+    color: var(--color-primario);
 }
 
 .previewTarjetaInfo {
@@ -139,7 +134,7 @@
 .previewTarjetaLabel {
     font-size: 13px;
     font-weight: 500;
-    color: var(--color-texto-primario, #333);
+    color: var(--color-texto-primario);
     line-height: 1.3;
 }
 
@@ -153,84 +148,39 @@
 }
 
 .previewBadgeAdmin {
-    background: #e8eaf6;
-    color: #3949ab;
+    background: var(--fondo-insignia-admin);
+    color: var(--texto-insignia-admin);
 }
 
 .previewBadgeCliente {
-    background: #e6f7e6;
-    color: #166534;
+    background: var(--fondo-insignia-cliente);
+    color: var(--color-success-text);
 }
 
-/* Modal */
-.previewModalOverlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    padding: 24px;
-}
-
-.previewModal {
-    display: flex;
-    flex-direction: column;
-    background: var(--color-fondo, #fff);
-    border-radius: var(--radius-lg);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
-    width: 100%;
-    max-width: 720px;
-    max-height: 90vh;
-    overflow: hidden;
-    animation: previewModalIn 0.2s ease;
-}
-
-@keyframes previewModalIn {
-    from {
-        opacity: 0;
-        transform: scale(0.96) translateY(8px);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1) translateY(0);
-    }
-}
-
+/* [259A-5 5b-3] Contenido del <Modal>: solo layout especifico (header,
+ * cuerpo del iframe, estados). Overlay/contenedor/animacion los pone Modal. */
 .previewModalHeader {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 16px 20px;
-    border-bottom: 1px solid var(--color-borde, #eee);
+    border-bottom: 1px solid var(--color-borde);
     flex-shrink: 0;
 }
 
-.previewModalTitulo {
+/* Layout local: titulo + id en fila (tipografia de .modalTitulo). */
+.previewModalEncabezado {
     display: flex;
     align-items: center;
-    gap: var(--espaciado-sm, 8px);
-}
-
-.previewModalTitulo h3 {
-    margin: 0;
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--text-primary);
+    gap: var(--espaciado-sm);
 }
 
 .previewModalId {
     font-size: 12px;
-    /* [259A-6] #999 sin token equivalente en el sistema; literal preservado
-     * (ya se renderizaba via fallback). */
-    color: #999;
+    /* [259A-6] #999 sin token equivalente -> [259A-5 5b-3] converge a
+     * --color-texto-secundario (#888): metadata secundaria, delta minimo. */
+    color: var(--color-texto-secundario);
     font-family: monospace;
-}
-
-.previewModalAcciones {
-    display: flex;
-    gap: var(--espaciado-xs, 6px);
 }
 
 .previewDescargarBtn {
@@ -241,7 +191,7 @@
     height: 32px;
     border: none;
     border-radius: 6px;
-    background: var(--color-fondo-secundario, #f5f5f5);
+    background: var(--color-fondo-secundario);
     color: var(--text-tertiary);
     cursor: pointer;
     text-decoration: none;
@@ -249,34 +199,17 @@
 }
 
 .previewDescargarBtn:hover {
-    background: var(--color-primario, #c9a84c);
-    color: #fff;
+    background: var(--color-primario);
+    color: var(--brand-white);
 }
 
-.previewCerrarBtn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border: none;
-    border-radius: 6px;
-    background: var(--color-fondo-secundario, #f5f5f5);
-    color: var(--text-tertiary);
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.previewCerrarBtn:hover {
-    background: #fde8e8;
-    color: #991b1b;
-}
+/* [259A-5 5b-3] Cerrar ahora <Button variante="texto">; sin clase local. */
 
 .previewModalCuerpo {
     flex: 1;
     overflow: auto;
     min-height: 300px;
-    background: #f8f8f8;
+    background: var(--color-fondo-hover);
 }
 
 .previewIframe {
@@ -291,19 +224,19 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: var(--espaciado-sm, 8px);
+    gap: var(--espaciado-sm);
     padding: 48px 24px;
-    color: var(--color-texto-secundario, #888);
+    color: var(--color-texto-secundario);
 }
 
 .previewModalError {
     display: flex;
     align-items: center;
-    gap: var(--espaciado-sm, 8px);
+    gap: var(--espaciado-sm);
     padding: 24px;
-    color: #991b1b;
-    background: #fde8e8;
-    border-radius: var(--radio-borde, 8px);
+    color: var(--color-error-text);
+    background: var(--color-error-bg-claro);
+    border-radius: var(--radio-borde);
     margin: 16px;
 }
 
@@ -313,9 +246,9 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: var(--espaciado-sm, 8px);
+    gap: var(--espaciado-sm);
     padding: 48px 24px;
-    color: var(--color-texto-secundario, #888);
+    color: var(--color-texto-secundario);
     text-align: center;
 }
 
@@ -336,9 +269,9 @@
 .previewError {
     display: flex;
     align-items: center;
-    gap: var(--espaciado-sm, 8px);
+    gap: var(--espaciado-sm);
     padding: 24px;
-    color: #991b1b;
-    background: #fde8e8;
-    border-radius: var(--radio-borde, 8px);
+    color: var(--color-error-text);
+    background: var(--color-error-bg-claro);
+    border-radius: var(--radio-borde);
 }

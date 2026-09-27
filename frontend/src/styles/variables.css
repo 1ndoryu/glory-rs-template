@@ -252,4 +252,9 @@
     --bg-item: var(--bg-card-subtle);
     --bg-secondary: var(--bg-warm);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.18);
+    /* [259A-5 5b-3] Insignias Admin/Cliente de VistaPreviaCorreos: sin
+     * equivalente en el DS; valores identicos a los que ya se renderizaban. */
+    --fondo-insignia-admin: #e8eaf6;
+    --texto-insignia-admin: #3949ab;
+    --fondo-insignia-cliente: #e6f7e6;
 }
