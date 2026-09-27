@@ -234,8 +234,15 @@ archivos, 157 con violaciones (34 errores, 363 warnings, 6 info, 60 hints).
   fmt 7.1s/clippy 203.1s/test 8.6s).
 - **259A-5** — Triage Glory-DS + ISP: fase 5a HECHA (platform/ x3,
   window/dom 0 restantes, ISP x6, image_proxy, disables; gate PASS
-   fmt 8.4s/clippy 36.2s/test 38.3s, commit 725cbf47). Queda fase 5b visual
-   (migracion DS + css-tokens, requiere navegador); fix tool `reactAnalyzer`
-   disables HECHO en sentinel 0.7.14 (token exacto + ventana sin break + guards;
-   pin NAKOMI 647b0603, prevencion sentinel-disable-ignorado RESUELTA).
+   fmt 8.4s/clippy 36.2s/test 38.3s, commit 725cbf47). Fase 5b visual HECHA
+   2026-09-27 (modales→`<Modal>` x5, botones/Select→DS, MenuContextual
+   variantes filtro/campana/avatar/accion, css-hardcoded-value 0; commits
+   6f4ede94→82ac16d4; tsc 0 + build 23.94s + bundle dist verificado;
+  navegador real bloqueado — 5173 ocupado, background no sobrevive —
+  registrado en completada). Gate: Rust sin cambios desde 5a → vale PASS 5a +
+  fmt/clippy PASS 27/09 13:42 (findings vacíos); test 26/09 sobre mismo código.
+  Pendiente: commit docs + cierre.
+  Fix tool `reactAnalyzer` disables HECHO en sentinel 0.7.14 (token exacto +
+  ventana sin break + guards; pin NAKOMI 647b0603, prevencion
+  sentinel-disable-ignorado RESUELTA).
   Plan: `Agente/planes/plan-259A-5-2026-09-26.md`.
