@@ -236,7 +236,7 @@
     margin: 0;
     padding: 1.25rem;
     font-family: var(--font-mono);
-    font-size: 0.8rem;
+    font-size: var(--text-xs);
     line-height: 1.75;
     color: var(--white-72);
     white-space: pre;

@@ -34,7 +34,8 @@
 }
 
 .seoResumenValor {
-    font-size: 24px;
+    /* [279A-2] Token nuevo (era literal 24px). */
+    font-size: var(--text-destacado);
     font-weight: 600;
     color: var(--text-primary);
 }

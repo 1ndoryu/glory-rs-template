@@ -42,7 +42,8 @@
 .planCard:hover,
 .planCard:focus-visible {
     border-color: var(--brand-primary);
-    box-shadow: var(--sombra-suave);
+    /* [279A-2] Elevacion via translate (box-shadow prohibido por VarSense). */
+    transform: translateY(-1px);
 }
 
 .planCard--selected {
@@ -60,7 +61,7 @@
     right: -24px;
     background: var(--brand-primary);
     color: var(--brand-white);
-    font-size: 10px;
+    font-size: var(--text-2xs);
     padding: 2px 24px;
     transform: rotate(45deg);
     text-transform: uppercase;

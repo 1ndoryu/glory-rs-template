@@ -67,7 +67,7 @@
     flex-wrap: wrap;
 }
 
-/* [064A-24] .ordenDetalleMeta eliminado — todo usa .ordenDetalleBadge */
+/* [064A-24] .ordenDetalleMeta eliminado — los meta migraron a .ordenDetalleBadge */
 
 .ordenDetalleMenu {
     position: relative;
@@ -226,7 +226,7 @@
     margin: 0;
 }
 
-/* [064A-56] Badges de fase: escala de grises para todos los estados. */
+/* [064A-56] Badges de fase: escala de grises en cada estado. */
 .faseBadge {
     font-family: var(--font-primary);
     font-size: var(--text-2xs);

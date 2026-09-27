@@ -1,6 +1,6 @@
 /* [054A-2] Sección Hosting del panel.
  * Dashboard de suscripciones de hosting: lista, status, acciones.
- * [064A-32] Ahora role-aware: admin ve todo + crear/cambiar status, cliente solo ve sus suscripciones.
+ * [064A-32] Ahora role-aware: admin ve el catalogo + crear/cambiar status, cliente solo ve sus suscripciones.
  * [054A-17] Corregidos: <button>→<Button>, inline styles→CSS classes, overlay→MenuContextual.
  * [074A-63] Tabs Activos/Inactivos como en SeccionProyectos. Titulo de card = dominio o nombre del hosting.
  *           Logica de estado extraida a useSeccionHosting. Sub-componentes en HostingSubComponents.

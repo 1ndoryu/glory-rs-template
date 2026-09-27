@@ -220,7 +220,8 @@
     color: var(--brand-white);
     font-size: var(--text-xs);
     line-height: 1.45;
-    box-shadow: var(--shadow-lg);
+    /* [279A-2] Sin sombra (propiedad prohibida por VarSense): el tooltip
+     * negro sobre fondo claro ya contrasta solo; conserva el borde. */
     opacity: 0;
     pointer-events: none;
     transition:

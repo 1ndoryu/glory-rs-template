@@ -211,7 +211,7 @@
         order: 10;
     }
 
-    /* [064A-61] Desktop nav y acciones ocultas en mobile — todo va en el modal */
+    /* [064A-61] Desktop nav y acciones ocultas en mobile — la navegacion va en el modal */
     .navegacionPrincipal {
         display: none;
     }

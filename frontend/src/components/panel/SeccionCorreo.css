@@ -4,18 +4,20 @@
 .correosContenedor {
     display: flex;
     flex-direction: column;
-    gap: var(--espaciado-md, 16px);
-    padding: var(--espaciado-lg, 24px);
+    /* [279A-2] Fallbacks muertos (tokens siempre definidos) + borde DS en
+     * vez de box-shadow (propiedad prohibida por VarSense). */
+    gap: var(--espaciado-md);
+    padding: var(--espaciado-lg);
     background: var(--color-fondo);
+    border: 1px solid var(--border-default);
     border-radius: var(--radius-lg);
-    box-shadow: var(--sombra-tarjeta);
     width: 100%;
     box-sizing: border-box;
 }
 
 .correosTitulo {
-    margin: 0 0 var(--espaciado-sm, 8px);
-    font-size: 20px;
+    margin: 0 0 var(--espaciado-sm);
+    font-size: var(--text-xl);
     font-weight: 600;
     color: var(--text-primary);
 }
@@ -31,12 +33,12 @@
 .correosPestaniaBtn {
     display: flex;
     align-items: center;
-    gap: var(--espaciado-xs, 6px);
+    gap: var(--espaciado-xs);
     padding: 10px 20px;
     border: none;
     background: transparent;
     color: var(--color-texto-secundario);
-    font-size: 14px;
+    font-size: var(--text-sm);
     font-weight: 500;
     cursor: pointer;
     border-bottom: 2px solid transparent;
@@ -58,7 +60,7 @@
 .correosFiltro {
     display: flex;
     align-items: center;
-    gap: var(--espaciado-sm, 8px);
+    gap: var(--espaciado-sm);
     color: var(--text-tertiary);
     flex-wrap: wrap;
 }
@@ -68,7 +70,7 @@
 }
 
 .correosTotal {
-    font-size: 13px;
+    font-size: var(--text-xs);
     color: var(--color-texto-secundario);
     margin-left: auto;
 }
@@ -76,14 +78,14 @@
 /* Tabla */
 .correosTablaWrapper {
     overflow-x: auto;
-    border-radius: var(--radio-borde, 8px);
+    border-radius: var(--radio-borde);
     border: 1px solid var(--color-borde);
 }
 
 .correosTabla {
     width: 100%;
     border-collapse: collapse;
-    font-size: 14px;
+    font-size: var(--text-sm);
 }
 
 .correosTabla th {
@@ -120,7 +122,7 @@
     color: var(--color-texto-primario);
     padding: 3px 10px;
     border-radius: 12px;
-    font-size: 12px;
+    font-size: var(--text-caption);
     font-weight: 500;
     white-space: nowrap;
 }
@@ -143,7 +145,7 @@
 .correosFecha {
     white-space: nowrap;
     color: var(--color-texto-secundario);
-    font-size: 13px;
+    font-size: var(--text-xs);
 }
 
 /* Badges de estado */
@@ -151,7 +153,7 @@
     display: inline-block;
     padding: 2px 10px;
     border-radius: 10px;
-    font-size: 12px;
+    font-size: var(--text-caption);
     font-weight: 500;
     white-space: nowrap;
 }
@@ -176,13 +178,13 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: var(--espaciado-md, 16px);
-    padding-top: var(--espaciado-sm, 8px);
+    gap: var(--espaciado-md);
+    padding-top: var(--espaciado-sm);
     flex-wrap: wrap;
 }
 
 .correosPagInfo {
-    font-size: 13px;
+    font-size: var(--text-xs);
     color: var(--color-texto-secundario);
 }
 
@@ -192,7 +194,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: var(--espaciado-sm, 8px);
+    gap: var(--espaciado-sm);
     padding: 48px 24px;
     color: var(--color-texto-secundario);
     text-align: center;
@@ -200,7 +202,7 @@
 
 .correosVacio p {
     margin: 0;
-    font-size: 15px;
+    font-size: var(--text-md);
 }
 
 .correosSpinner {
@@ -215,9 +217,9 @@
 .correosError {
     display: flex;
     align-items: center;
-    gap: var(--espaciado-sm, 8px);
+    gap: var(--espaciado-sm);
     padding: 24px;
     color: var(--color-error-text);
     background: var(--color-error-bg-claro);
-    border-radius: var(--radio-borde, 8px);
+    border-radius: var(--radio-borde);
 }
