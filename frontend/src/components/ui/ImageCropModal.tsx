@@ -1,13 +1,17 @@
 /* [277A-18] Modal de recorte de imagen OG con react-easy-crop.
  * Aspecto fijo 1200:630 (≈1.905:1) para OG images.
- * Genera canvas recortado → blob → sube via apiUploadImage → retorna URL. */
-/* [259A-5] sentinel-disable-file html-nativo-en-vez-de-componente componente-artesanal: migracion visual a componentes DS (incl. overlay a <Modal>) en fase 5b con verificacion en navegador. */
+ * Genera canvas recortado → blob → sube via apiUploadImage → retorna URL.
+ * [259A-5 5b-5] Migrado a <Modal> + recetas + Button. Area de recorte,
+ * controles de zoom y slider nativo (sin DS) quedan como layout local. */
+/* [259A-5] sentinel-disable-file html-nativo-en-vez-de-componente: slider range nativo sin componente DS; migracion de botones a Button hecha en 5b-5. */
 import React, {useState, useCallback} from 'react';
 import Cropper from 'react-easy-crop';
 import {X, ZoomIn, ZoomOut, Check} from 'lucide-react';
 import {apiUploadImage} from '../../api/uploads';
 /* [259A-5] Creacion de canvas via platform/dom (boundary sentinel). */
 import {crearElemento} from '../../platform/dom';
+import {Modal} from './Modal';
+import {Button} from './Button';
 import './ImageCropModal.css';
 
 interface Props {
@@ -89,64 +93,62 @@ export const ImageCropModal: React.FC<Props> = ({imageUrl, onCropped, onClose}) 
     }, [croppedAreaPixels, imageUrl, onCropped]);
 
     return (
-        <div className="cropOverlay" onClick={onClose}>
-            <div className="cropContenedor" onClick={e => e.stopPropagation()}>
-                <div className="cropHeader">
-                    <h3 className="cropTitulo">Recortar imagen OG (1200×630)</h3>
-                    <button type="button" className="cropCerrar" onClick={onClose} aria-label="Cerrar">
-                        <X size={18} />
-                    </button>
-                </div>
-
-                <div className="cropArea">
-                    <Cropper
-                        image={imageUrl}
-                        crop={crop}
-                        zoom={zoom}
-                        aspect={OG_ASPECT}
-                        onCropChange={setCrop}
-                        onZoomChange={setZoom}
-                        onCropComplete={onCropComplete}
-                    />
-                </div>
-
-                <div className="cropControles">
-                    <div className="cropZoom">
-                        <ZoomOut size={16} />
-                        <input
-                            type="range"
-                            min={1}
-                            max={3}
-                            step={0.01}
-                            value={zoom}
-                            onChange={e => setZoom(Number(e.target.value))}
-                            className="cropZoomSlider"
-                        />
-                        <ZoomIn size={16} />
-                        <span className="cropZoomValor">{zoom.toFixed(1)}×</span>
-                    </div>
-                </div>
-
-                <div className="cropFooter">
-                    <button
-                        type="button"
-                        className="cropBtn cropBtn--cancelar"
-                        onClick={onClose}
-                    >
-                        Cancelar
-                    </button>
-                    <button
-                        type="button"
-                        className="cropBtn cropBtn--aplicar"
-                        onClick={handleConfirm}
-                        disabled={processing || !croppedAreaPixels}
-                    >
-                        {processing ? 'Procesando...' : <><Check size={14} /> Aplicar recorte</>}
-                    </button>
-                </div>
-
-                {error && <div className="cropError">{error}</div>}
+        <Modal abierto onCerrar={onClose} className="modalMedio">
+            <div className="cropHeader">
+                {/* [259A-5] sentinel-disable-next-line modal-con-titulo: el canon
+                  * Modal.css (.modalTitulo) contradice la regla; precedente SeccionPagos 5a. */}
+                <h3 className="modalTitulo">Recortar imagen OG (1200×630)</h3>
+                <Button variante="texto" tamano="pequeno" onClick={onClose} aria-label="Cerrar">
+                    <X size={18} />
+                </Button>
             </div>
-        </div>
+
+            <div className="cropArea">
+                <Cropper
+                    image={imageUrl}
+                    crop={crop}
+                    zoom={zoom}
+                    aspect={OG_ASPECT}
+                    onCropChange={setCrop}
+                    onZoomChange={setZoom}
+                    onCropComplete={onCropComplete}
+                />
+            </div>
+
+            <div className="cropControles">
+                <div className="cropZoom">
+                    <ZoomOut size={16} />
+                    <input
+                        type="range"
+                        min={1}
+                        max={3}
+                        step={0.01}
+                        value={zoom}
+                        onChange={e => setZoom(Number(e.target.value))}
+                        className="cropZoomSlider"
+                    />
+                    <ZoomIn size={16} />
+                    <span className="cropZoomValor">{zoom.toFixed(1)}×</span>
+                </div>
+            </div>
+
+            <div className="modalAcciones">
+                <Button
+                    variante="texto"
+                    onClick={onClose}
+                >
+                    Cancelar
+                </Button>
+                <Button
+                    variante="secundario"
+                    onClick={handleConfirm}
+                    disabled={processing || !croppedAreaPixels}
+                >
+                    {processing ? 'Procesando...' : <><Check size={14} /> Aplicar recorte</>}
+                </Button>
+            </div>
+
+            {error && <div className="cropError">{error}</div>}
+        </Modal>
     );
 };

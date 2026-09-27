@@ -1,8 +1,10 @@
 /* [277A-18] Galería de imágenes para seleccionar OG image.
  * Muestra grid de miniaturas de imágenes subidas.
  * Click selecciona → abre ImageCropModal para recorte.
- * Botón "Subir nueva" → input file → directo al recorte. */
-/* [259A-5] sentinel-disable-file html-nativo-en-vez-de-componente componente-artesanal: migracion visual a componentes DS (incl. overlay a <Modal>) en fase 5b con verificacion en navegador. */
+ * Botón "Subir nueva" → input file → directo al recorte.
+ * [259A-5 5b-5] Overlay/contenedor/header/footer a <Modal> + recetas + Button.
+ * Miniaturas (button+img) y file input nativos: sin componente DS (ver 5b-6). */
+/* [259A-5] sentinel-disable-file html-nativo-en-vez-de-componente componente-artesanal: miniaturas button+img y file input sin DS; overlay a <Modal> migrado en 5b-5, resto en 5b-6 con verificacion en navegador. */
 import React, {useState, useCallback, useRef} from 'react';
 import {Upload, X} from 'lucide-react';
 import {useQuery} from '@tanstack/react-query';
@@ -10,6 +12,8 @@ import {apiListUploads, apiUploadImage, type UploadEntry} from '../../api/upload
 import {ImageCropModal} from './ImageCropModal';
 /* [259A-5] Acceso window via platform/navigation (boundary sentinel). */
 import {obtenerOrigen} from '../../platform/navigation';
+import {Modal} from './Modal';
+import {Button} from './Button';
 import './ImageGalleryPicker.css';
 
 interface Props {
@@ -56,13 +60,15 @@ export const ImageGalleryPicker: React.FC<Props> = ({onSelect, onClose}) => {
     };
 
     return (
-        <div className="galeriaOverlay" onClick={onClose}>
-            <div className="galeriaContenedor" onClick={e => e.stopPropagation()}>
+        <>
+            <Modal abierto onCerrar={onClose} className="modalMedio">
                 <div className="galeriaHeader">
-                    <h3 className="galeriaTitulo">Seleccionar imagen OG</h3>
-                    <button type="button" className="galeriaCerrar" onClick={onClose} aria-label="Cerrar">
+                    {/* [259A-5] sentinel-disable-next-line modal-con-titulo: el canon
+                      * Modal.css (.modalTitulo) contradice la regla; precedente SeccionPagos 5a. */}
+                    <h3 className="modalTitulo">Seleccionar imagen OG</h3>
+                    <Button variante="texto" tamano="pequeno" onClick={onClose} aria-label="Cerrar">
                         <X size={18} />
-                    </button>
+                    </Button>
                 </div>
 
                 <div className="galeriaCuerpo">
@@ -95,7 +101,7 @@ export const ImageGalleryPicker: React.FC<Props> = ({onSelect, onClose}) => {
                     )}
                 </div>
 
-                <div className="galeriaFooter">
+                <div className="modalAcciones">
                     <input
                         ref={inputRef}
                         type="file"
@@ -103,17 +109,16 @@ export const ImageGalleryPicker: React.FC<Props> = ({onSelect, onClose}) => {
                         className="galeriaInputFile"
                         onChange={handleUploadNew}
                     />
-                    <button
-                        type="button"
-                        className="galeriaBtn galeriaBtn--subir"
+                    <Button
+                        variante="secundario"
                         onClick={() => inputRef.current?.click()}
                         disabled={subiendo}
                     >
                         <Upload size={14} />
                         {subiendo ? 'Subiendo...' : 'Subir nueva imagen'}
-                    </button>
+                    </Button>
                 </div>
-            </div>
+            </Modal>
 
             {cropImage && (
                 <ImageCropModal
@@ -122,6 +127,6 @@ export const ImageGalleryPicker: React.FC<Props> = ({onSelect, onClose}) => {
                     onClose={() => setCropImage(null)}
                 />
             )}
-        </div>
+        </>
     );
 };
