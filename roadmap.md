@@ -218,7 +218,7 @@ Las siguientes tareas **estaban marcadas como pendientes pero ya están corregid
 
 ## Gate moderno (bootstrap 2026-09-25)
 
-Sentinel 0.7.13 + VarSense 2.2.4 (checkout compartido `../.quality-tools`), rama
+Sentinel 0.7.14 (b00747c) + VarSense 2.2.4 (checkout compartido `../.quality-tools`), rama
 primaria `glory-rust-nakomi`. Comandos: `npm run quality:setup|doctor|analyze|lock`,
 `npm run quality:check -- <ID>`. Baseline `.quality-reports/analyze.json`: 643
 archivos, 157 con violaciones (34 errores, 363 warnings, 6 info, 60 hints).
@@ -234,7 +234,8 @@ archivos, 157 con violaciones (34 errores, 363 warnings, 6 info, 60 hints).
   fmt 7.1s/clippy 203.1s/test 8.6s).
 - **259A-5** — Triage Glory-DS + ISP: fase 5a HECHA (platform/ x3,
   window/dom 0 restantes, ISP x6, image_proxy, disables; gate PASS
-  fmt 8.4s/clippy 36.2s/test 38.3s, commit 725cbf47). Queda fase 5b visual
-  (migracion DS + css-tokens, requiere navegador) + fix tool `reactAnalyzer`
-  disables (ver prevencion sentinel-disable-ignorado).
+   fmt 8.4s/clippy 36.2s/test 38.3s, commit 725cbf47). Queda fase 5b visual
+   (migracion DS + css-tokens, requiere navegador); fix tool `reactAnalyzer`
+   disables HECHO en sentinel 0.7.14 (token exacto + ventana sin break + guards;
+   pin NAKOMI 647b0603, prevencion sentinel-disable-ignorado RESUELTA).
   Plan: `Agente/planes/plan-259A-5-2026-09-26.md`.
