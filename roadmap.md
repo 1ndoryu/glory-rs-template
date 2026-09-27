@@ -224,7 +224,11 @@ primaria `glory-rust-nakomi`. Comandos: `npm run quality:setup|doctor|analyze|lo
 archivos, 157 con violaciones (34 errores, 363 warnings, 6 info, 60 hints).
 
 - **259A-4** — Partir 5 `god-object-rs` error (>800 líneas): ai_tools, chat_timing,
-  email, hosting_runtime, repositories/infrastructure.
+  email, hosting_runtime, repositories/infrastructure. ✅ 4a infrastructure (hub 23 +
+  servers 451 + bandwidth 375, gate PASS 4358a9e6); ✅ 4b hosting_runtime (hub 280 +
+  lifecycle 288 + backup_ops 418 + lightweight 113, gate PASS 84baf49d);
+  ✅ 4c email (hub ~140 + orders ~250 + admin ~440 + misc ~430, gate PASS);
+  en curso 4d chat_timing, pendiente 4e ai_tools.
 - **259A-5** — Triage warnings Glory-DS (html-nativo 37, window-reference 42,
   menu-contextual 23, modal ~12, css-hardcoded 105) + hints large-interface-isp 43:
   corregir o afinar `sentinel.config.json` con evidencia por regla.
