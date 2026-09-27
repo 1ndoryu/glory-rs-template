@@ -138,7 +138,7 @@ export function ModalInmueble(props: Props) {
               />
             </div>
             <div className="space-y-1">
-              <Etiqueta error={errores.precio}>Precio (€)</Etiqueta>
+              <Etiqueta error={errores.precio}>Precio ($)</Etiqueta>
               <Input
                 value={form.precio}
                 onChange={(e) => cambiar('precio', e.target.value)}

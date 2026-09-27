@@ -2,6 +2,7 @@ import { useAsk } from '../../hooks/ask/use-ask';
 import { useLogin } from '../../hooks/sesion/use-login';
 import { useSesion } from '../../hooks/sesion/use-sesion';
 import {
+  assertNunca,
   etiquetaUbicacion,
   progresoPasos,
   type ColumnasAsk,
@@ -177,7 +178,7 @@ function PreguntaActual({
   const paso = pasos[indice];
   /* Valor ya guardado (para resaltar al deshacer y corregir). */
   const valorFicha = paso?.kind === 'ficha'
-    ? paso.pregunta.clave === 'precio_minimo'
+    ? paso.pregunta.destino === 'precioMinimo'
       ? precioMinimo
       : (extras[paso.pregunta.clave] ?? null)
     : null;
@@ -200,7 +201,20 @@ function PreguntaActual({
         <div className={`${CLASE_ACTIVO} h-full`} style={{ width: `${porcentaje}%` }} />
       </div>
       <p className={`mt-1 text-xs ${CLASE_TINTA} opacity-70`}>Ficha al {porcentaje}%{faltan > 0 ? ` · faltan ${faltan}` : ' · completa'}</p>
-      {paso?.kind === 'ficha' ? (
+      {!paso ? (
+        <div className={`mt-4 border ${CLASE_BORDE} px-4 py-6 text-center`}>
+          <p className={`${CLASE_TINTA}`}>¡Listo! Respondiste todas las preguntas de esta propiedad.</p>
+          <p className={`mt-1 text-sm ${CLASE_TINTA} opacity-70`}>Ficha al {porcentaje}%.</p>
+          <button
+            type="button"
+            onClick={alOtra}
+            disabled={guardando}
+            className={`mt-3 cursor-pointer rounded-none border ${CLASE_BORDE} ${CLASE_ACTIVO} px-4 py-2 text-sm ${CLASE_TEXTO} disabled:cursor-wait disabled:opacity-60`}
+          >
+            Otra pregunta aleatoria →
+          </button>
+        </div>
+      ) : paso.kind === 'ficha' ? (
         <EntradaPregunta
           key={`ficha-${paso.pregunta.clave}-${String(valorFicha)}`}
           pregunta={paso.pregunta}
@@ -238,18 +252,7 @@ function PreguntaActual({
           alSaltar={alSaltar}
         />
       ) : (
-        <div className={`mt-4 border ${CLASE_BORDE} px-4 py-6 text-center`}>
-          <p className={`${CLASE_TINTA}`}>¡Listo! Respondiste todas las preguntas de esta propiedad.</p>
-          <p className={`mt-1 text-sm ${CLASE_TINTA} opacity-70`}>Ficha al {porcentaje}%.</p>
-          <button
-            type="button"
-            onClick={alOtra}
-            disabled={guardando}
-            className={`mt-3 cursor-pointer rounded-none border ${CLASE_BORDE} ${CLASE_ACTIVO} px-4 py-2 text-sm ${CLASE_TEXTO} disabled:cursor-wait disabled:opacity-60`}
-          >
-            Otra pregunta aleatoria →
-          </button>
-        </div>
+        assertNunca(paso)
       )}
       <div className="mt-4 flex justify-center gap-6">
         {indice > 0 && (

@@ -314,6 +314,18 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   precio arriba («35.000 € · venta», «Precio a consultar» si es 0);
   lenguaje neutral en UI/comentarios/plan (no es para el dueño): mínimo
   «¿Cuál es el precio mínimo aceptado? (privado, no se publica)».
-  Navegador: precio + m² + mínimo confirmados, solo saltos sin guardar.
+   Navegador: precio + m² + mínimo confirmados, solo saltos sin guardar.
+- 279A-6 verificado local (`tsc` 0): huecos internet («¿Posee internet?»)
+  y agua («¿Llega el agua?», `si_no`, públicos) en `SERVICIOS` para los 5
+  tipos; dólar de frente (`$ 90.000`, `Precio ($)`, IA `$`, mínimo `$`);
+  escalable: receta en `ficha-ask.ts` (dato suelto = 1 entrada, sin backend;
+  columna = migración + `COLUMNAS_POR_TIPO`), `destino: 'precioMinimo'` en
+  vez de `clave === …` regado, `COLUMNAS_POR_TIPO: Record` (un tipo nuevo
+  falla en compilación), `assertNunca` exhaustivo en `pasoRespondido`,
+  `responder` y render. Navegador: 11 pendientes, internet + agua salen en
+  el flujo, `$` arriba, solo saltos sin guardar.
+- Pendiente: cablear `extras` públicos (`privada: false`) a la ficha
+  visible y a la IA — hoy nadie los lee fuera del panel (la pública ni los
+  pide, el backend los pela con `'{}'`).
 - Requiere de usuaria: responder el cuestionario en `/ask`.
 

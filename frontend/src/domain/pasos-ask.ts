@@ -27,12 +27,26 @@ export type PasoAsk =
   | { kind: 'ubicacion' }
   | { kind: 'columna'; columna: ColumnaNumericaAsk; etiqueta: string; ayuda: string; entero: boolean; unidad: string };
 
-/* Numéricos que aplican por tipo: construcción salvo terreno, parcela en
- * casa y terreno, puestos salvo terreno (no hay dónde estacionar). */
+/* Guardia de exhaustividad (279A-6): si mañana se añade un `kind` de paso,
+ * el compilador obliga a atenderlo donde se use; en runtime nunca se llama. */
+export function assertNunca(valor: never): never {
+  throw new Error(`Paso /ask no soportado: ${JSON.stringify(valor)}`);
+}
+
+/* Numéricos por tipo (Record, no if-chain: un tipo nuevo falla en
+ * compilación en vez de heredar numéricos ajenos en silencio).
+ * Construcción salvo terreno, parcela en casa y terreno, puestos salvo
+ * terreno (no hay dónde estacionar). */
+const COLUMNAS_POR_TIPO: Record<TipoInmueble, ColumnaNumericaAsk[]> = {
+  apartamento: ['metros', 'puestos'],
+  townhouse: ['metros', 'puestos'],
+  casa: ['metros', 'metrosTerreno', 'puestos'],
+  local: ['metros', 'puestos'],
+  terreno: ['metrosTerreno'],
+};
+
 export function columnasAplicables(tipo: TipoInmueble): ColumnaNumericaAsk[] {
-  if (tipo === 'terreno') return ['metrosTerreno'];
-  if (tipo === 'casa') return ['metros', 'metrosTerreno', 'puestos'];
-  return ['metros', 'puestos'];
+  return COLUMNAS_POR_TIPO[tipo];
 }
 
 const ETIQUETAS_COLUMNA: Record<ColumnaNumericaAsk, { etiqueta: string; ayuda: string; entero: boolean; unidad: string }> = {
@@ -107,7 +121,8 @@ export function pasoRespondido(
 ): boolean {
   if (paso.kind === 'ubicacion') return ubicacionCompleta(columnas);
   if (paso.kind === 'columna') return columnas[paso.columna] > 0;
-  return preguntaRespondida(paso.pregunta, extras, precioMinimo);
+  if (paso.kind === 'ficha') return preguntaRespondida(paso.pregunta, extras, precioMinimo);
+  return assertNunca(paso);
 }
 
 /* Progreso sobre la foto de pasos (denominador estable en la sesión). */
@@ -132,9 +147,9 @@ export function extrasTrasRespuesta(
   const extras: ExtrasAsk = { ...ficha.extras };
   let precioMinimo = ficha.precioMinimo;
   if (valor === null) {
-    if (pregunta.clave === 'precio_minimo') precioMinimo = null;
+    if (pregunta.destino === 'precioMinimo') precioMinimo = null;
     else delete extras[pregunta.clave];
-  } else if (pregunta.clave === 'precio_minimo') {
+  } else if (pregunta.destino === 'precioMinimo') {
     precioMinimo = typeof valor === 'number' ? valor : Number(valor);
   } else {
     extras[pregunta.clave] = typeof valor === 'string' ? valor.trim() : valor;

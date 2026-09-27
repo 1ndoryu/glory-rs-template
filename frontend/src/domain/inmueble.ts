@@ -292,12 +292,11 @@ export function inmuebleADraft(i: Inmueble): InmuebleDraft {
   };
 }
 
+/* Dólar de frente (279A-6): `$ 43.000` con miles venezolanos, igual que
+ * pide /ask (el público usa su propio `features/publica/formato`). */
 export function formatearPrecio(precio: number): string {
-  return new Intl.NumberFormat('es-ES', {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 0,
-  }).format(precio);
+  const miles = new Intl.NumberFormat('es-VE', { maximumFractionDigits: 0 }).format(precio);
+  return `$ ${miles}`;
 }
 
 /* Fechas de creación/modificación (ISO). La creación no se puede modificar:

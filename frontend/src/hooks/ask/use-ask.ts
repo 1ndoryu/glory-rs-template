@@ -6,7 +6,7 @@ import {
   guardarFicha,
   guardarUbicacionAsk,
 } from '../../data/inmuebles/ficha-ask';
-import { extrasTrasRespuesta, mazclarPasos, pasosPara } from '../../domain/pasos-ask';
+import { assertNunca, extrasTrasRespuesta, mazclarPasos, pasosPara } from '../../domain/pasos-ask';
 import type { Inmueble } from '../../domain/inmueble';
 import {
   FICHA_VACIA,
@@ -94,16 +94,26 @@ export function useAsk() {
      * (se salta o se corrige el valor). */
     if (valor === null && paso.kind !== 'ficha') return;
     setEstado((e) => ({ ...e, guardando: true, error: null }));
+    /* Guardado por tipo de paso (ramas exhaustivas: un `kind` nuevo
+     * falla en compilación aquí, en el render y en `pasoRespondido`). */
     try {
-      if (paso.kind === 'ficha' && !esUbicacion(valor)) {
-        const guardada = await guardarFicha(seleccionado.id, extrasTrasRespuesta(ficha, paso.pregunta, valor));
-        setEstado(trasFicha(guardada));
-      } else if (paso.kind === 'ubicacion' && esUbicacion(valor)) {
-        setEstado(trasInmueble(await guardarUbicacionAsk(seleccionado, valor)));
-      } else if (paso.kind === 'columna' && typeof valor === 'number' && Number.isFinite(valor) && valor >= 0) {
-        setEstado(trasInmueble(await guardarColumnaAsk(seleccionado, paso.columna, valor)));
+      if (paso.kind === 'ficha') {
+        if (esUbicacion(valor)) setEstado((e) => ({ ...e, guardando: false }));
+        else {
+          const guardada = await guardarFicha(seleccionado.id, extrasTrasRespuesta(ficha, paso.pregunta, valor));
+          setEstado(trasFicha(guardada));
+        }
+      } else if (paso.kind === 'ubicacion') {
+        if (!esUbicacion(valor)) setEstado((e) => ({ ...e, guardando: false }));
+        else setEstado(trasInmueble(await guardarUbicacionAsk(seleccionado, valor)));
+      } else if (paso.kind === 'columna') {
+        if (typeof valor !== 'number' || !Number.isFinite(valor) || valor < 0) {
+          setEstado((e) => ({ ...e, guardando: false }));
+        } else {
+          setEstado(trasInmueble(await guardarColumnaAsk(seleccionado, paso.columna, valor)));
+        }
       } else {
-        setEstado((e) => ({ ...e, guardando: false }));
+        assertNunca(paso);
       }
     } catch (e: unknown) {
       setEstado((s) => ({ ...s, guardando: false, error: e instanceof Error ? e.message : 'No se pudo guardar.' }));

@@ -147,7 +147,7 @@ export function ModalIA(props: Props) {
                 {fila('Ubicación', ficha.ubicacion)}
 
                 {fila('Residencia', ficha.residencia)}
-                {fila('Precio', ficha.precio !== null ? `${ficha.precio.toLocaleString('es-ES')} €` : '')}
+                {fila('Precio', ficha.precio !== null ? `${ficha.precio.toLocaleString('es-ES')} $` : '')}
                 {fila('Tipo', ficha.tipo ? ETIQUETAS_TIPO[ficha.tipo] : '')}
                 {fila('Operación', ficha.operacion)}
                 {fila('Habitaciones', ficha.habitaciones !== null ? String(ficha.habitaciones) : '')}
