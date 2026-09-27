@@ -264,5 +264,7 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   con `{orden}` para reordenar sin borrar+re-subir (menos churn y sin
   cambiar urls/ids que cachea el store local de mejora).
 
-## (siguiente bloque)
+## Siguiente bloque
+
+(279A-1 cerrada 2026-09-27 ~17:10: ver `Agente/completados/tareas-2026-09-27.md`.)
 
