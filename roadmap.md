@@ -232,6 +232,9 @@ archivos, 157 con violaciones (34 errores, 363 warnings, 6 info, 60 hints).
   escalation 195, gate PASS); ✅ 4e ai_tools (hub 489 + hosting 456 +
   misc 740 + orders 269 + reports 360 + vps 404, gate 259A-4 PASS
   fmt 7.1s/clippy 203.1s/test 8.6s).
-- **259A-5** — Triage warnings Glory-DS (html-nativo 37, window-reference 42,
-  menu-contextual 23, modal ~12, css-hardcoded 105) + hints large-interface-isp 43:
-  corregir o afinar `sentinel.config.json` con evidencia por regla.
+- **259A-5** — Triage Glory-DS + ISP: fase 5a HECHA (platform/ x3,
+  window/dom 0 restantes, ISP x6, image_proxy, disables; gate PASS
+  fmt 8.4s/clippy 36.2s/test 38.3s, commit 725cbf47). Queda fase 5b visual
+  (migracion DS + css-tokens, requiere navegador) + fix tool `reactAnalyzer`
+  disables (ver prevencion sentinel-disable-ignorado).
+  Plan: `Agente/planes/plan-259A-5-2026-09-26.md`.
