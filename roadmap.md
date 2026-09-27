@@ -148,6 +148,11 @@ Conversación con 150+ mensajes, verificar que los más recientes se muestran pr
 Abrir chat, provocar escalamiento, confirmar que el CTA abre `wa.me/16084668134`.
 **Esfuerzo:** ~15 min (prueba manual).
 
+### 15. Verificación visual 5b con auth + 320px (aparcado 2026-09-27)
+
+Fase 5b verificada en landing sin auth (`http://localhost:5176/`: 13/13 botones DS, modal auth abre, consola 0 errores). Pendiente con credenciales: variantes `campana`/`avatar`/`accion` del `MenuContextual`, filtro como empleado, y resize a 320px (`@media` intactos: `Modal.css:29`, paneles chat/notif 340px).
+**Esfuerzo:** ~30 min (prueba manual).
+
 ---
 
 ## 📦 Tareas de producto — Correo para Hosting (bloqueado)
