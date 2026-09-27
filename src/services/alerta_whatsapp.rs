@@ -48,12 +48,26 @@ async fn procesar_aviso(
     url: &str,
     entry: &glory_agent::models::OutboxEntry,
 ) -> &'static str {
-    let destino = glory_agent::persistence::get_config(pool, "whatsapp_admin")
-        .await
-        .ok()
-        .flatten()
-        .map(|v| v.trim().to_string())
-        .filter(|v| !v.is_empty());
+    /* [279A-2 F3] `destino` explícito en el payload (aviso al otro número
+     * con ficha) con fallback a `whatsapp_admin` (modo completo clásico).
+     * Todo async real: sin bloqueos (`get_config_blocking` no existe). */
+    let destino_payload = entry
+        .payload
+        .get("destino")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(str::to_string);
+    let destino = if destino_payload.is_some() {
+        destino_payload
+    } else {
+        glory_agent::persistence::get_config(pool, "whatsapp_admin")
+            .await
+            .ok()
+            .flatten()
+            .map(|v| v.trim().to_string())
+            .filter(|v| !v.is_empty())
+    };
     let Some(destino) = destino else {
         tracing::warn!(
             "alerta WhatsApp {}: sin 'whatsapp_admin' en agent_config, se reintenta",
@@ -61,20 +75,7 @@ async fn procesar_aviso(
         );
         return "pending";
     };
-    let sesion_id = entry
-        .payload
-        .get("session_id")
-        .and_then(|v| v.as_str())
-        .unwrap_or("?");
-    let motivo = entry
-        .payload
-        .get("motivo")
-        .and_then(|v| v.as_str())
-        .unwrap_or("sin motivo");
-    let texto = format!(
-        "Chat inmobiliaria: la sesion {sesion_id} necesita un humano ({motivo}). \
-         Atiendela en /admin (Mensajes)."
-    );
+    let texto = texto_aviso(pool, entry).await;
     let r = http
         .post(url)
         .json(&serde_json::json!({"destino": destino, "texto": texto}))
@@ -94,6 +95,56 @@ async fn procesar_aviso(
             "failed"
         }
     }
+}
+
+/// Texto del aviso con ficha comercial (decisión usuaria 2026-09-27:
+/// nombre+teléfono+resumen+interés+presupuesto+zona). Si la sesión no deja
+/// ficha (uuid inválido o sin filas), cae al texto mínimo con sesión+motivo:
+/// mejor aviso parcial que ninguno (nunca silencio).
+async fn texto_aviso(pool: &PgPool, entry: &glory_agent::models::OutboxEntry) -> String {
+    let sesion_txt = entry
+        .payload
+        .get("session_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("?");
+    let motivo = entry
+        .payload
+        .get("motivo")
+        .and_then(|v| v.as_str())
+        .unwrap_or("sin motivo");
+    let resumen = entry
+        .payload
+        .get("resumen")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .unwrap_or("-");
+    let Ok(sesion_id) = sesion_txt.parse::<uuid::Uuid>() else {
+        return format!(
+            "Chat inmobiliaria: la sesion {sesion_txt} necesita un humano ({motivo}). \
+             Atiendela en /admin (Mensajes)."
+        );
+    };
+    let Ok(ficha) = crate::repositories::ClienteRepository::ficha_para_aviso(pool, sesion_id).await
+    else {
+        return format!(
+            "Chat inmobiliaria: la sesion {sesion_txt} necesita un humano ({motivo}). \
+             Atiendela en /admin (Mensajes)."
+        );
+    };
+    format!(
+        "Chat MN ({}): {} necesita humano ({}) — nombre: {}, tel: {}, resumen: {}, \
+         interes: {}, presupuesto: {}, zona: {}. Atiendela en /admin (Mensajes).",
+        ficha.modo,
+        sesion_txt,
+        motivo,
+        ficha.nombre.as_deref().unwrap_or("-"),
+        ficha.telefono.as_deref().unwrap_or("-"),
+        resumen,
+        ficha.interes.as_deref().unwrap_or("-"),
+        ficha.presupuesto.as_deref().unwrap_or("-"),
+        ficha.zona.as_deref().unwrap_or("-"),
+    )
 }
 
 /* [169A-4] Sin gateway real no hay E2E: estos tests verifican las ramas de

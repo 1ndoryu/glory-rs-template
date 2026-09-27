@@ -24,6 +24,7 @@ pub fn staff_routes() -> Router<AppState> {
         .route("/agent/sesiones", get(listar_sesiones))
         .route("/agent/sesiones/:id/historial", get(historial))
         .route("/agent/sesiones/:id/mensajes", post(responder))
+        .route("/agent/sesiones/:id/devolver", post(devolver_a_ia))
         .route("/agent/sesiones/:id", patch(actualizar_sesion))
         .route("/agent/config", get(leer_config).put(guardar_config))
 }
@@ -41,6 +42,10 @@ struct SesionResumen {
     contact: Option<String>,
     status: String,
     ai_enabled: bool,
+    /* [279A-2 F3] Estado propio de delegación (puede faltar en sesiones
+     * viejas: LEFT JOIN + default en el panel). */
+    estado_atencion: Option<String>,
+    modo_atencion: Option<String>,
     last_body: Option<String>,
     last_sender: Option<String>,
     #[sqlx(rename = "last_at")]
@@ -66,11 +71,13 @@ async fn listar_sesiones(
     let limit = f.limit.unwrap_or(50).clamp(1, 200);
     let filas: Vec<SesionResumen> = sqlx::query_as(
         "SELECT s.id, s.visitor_name, s.contact, s.status, s.ai_enabled, \
+         a.estado AS estado_atencion, a.modo AS modo_atencion, \
          m.body AS last_body, m.sender AS last_sender, m.created_at AS last_at, \
          (SELECT COUNT(*) FROM agent_outbox o WHERE o.status = 'pending' \
           AND o.kind = 'whatsapp' AND o.payload->>'session_id' = s.id::TEXT) AS alertas, \
          s.updated_at \
          FROM agent_sessions s \
+         LEFT JOIN atencion_sesiones a ON a.session_id = s.id \
          LEFT JOIN LATERAL (SELECT body, sender, created_at FROM agent_messages \
            WHERE session_id = s.id ORDER BY sequence_num DESC LIMIT 1) m ON true \
          WHERE ($1::TEXT IS NULL OR s.status = $1) \
@@ -136,6 +143,51 @@ async fn responder(
     glory_agent::persistence::upsert_response_cycle(&state.pool, id, "escalated")
         .await
         .map_err(|e| fail(&e))?;
+    /* [279A-2 F3] La toma humana también mueve la máquina propia a
+     * `delegada` (un solo estado de verdad, sin doble fuente). */
+    crate::repositories::ClienteRepository::marcar_atencion(&state.pool, id, "delegada")
+        .await
+        .map_err(AppError::from)?;
+    Ok(Json(serde_json::json!({"ok": true, "sequence_num": seq})))
+}
+
+#[derive(Debug, Deserialize)]
+struct DevolucionIA {
+    nota: String,
+}
+
+/// Devolver a la IA con nota (cierre de `consultar_agente`): la nota queda
+/// como mensaje `staff`, el ciclo pasa a `answered`, la IA se reactiva y la
+/// máquina propia vuelve a `activa`. Solo humanos (JWT).
+async fn devolver_a_ia(
+    _auth: AuthUser,
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(input): Json<DevolucionIA>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let nota = input.nota.trim().to_string();
+    if nota.is_empty() || nota.len() > 2000 {
+        return Err(AppError::BadRequest("nota requerida (1..2000)".to_string()));
+    }
+    glory_agent::persistence::ensure_session(&state.pool, id)
+        .await
+        .map_err(|e| fail(&e))?;
+    let seq = state.hub.next_sequence(id);
+    let msg = glory_agent::persistence::insert_message(&state.pool, id, "staff", &nota, seq)
+        .await
+        .map_err(|e| fail(&e))?;
+    let _ = state
+        .hub
+        .broadcast(id, &glory_agent::models::WsServerMessage::live(msg));
+    glory_agent::persistence::set_session_ai(&state.pool, id, true)
+        .await
+        .map_err(|e| fail(&e))?;
+    glory_agent::persistence::upsert_response_cycle(&state.pool, id, "answered")
+        .await
+        .map_err(|e| fail(&e))?;
+    crate::repositories::ClienteRepository::marcar_atencion(&state.pool, id, "activa")
+        .await
+        .map_err(AppError::from)?;
     Ok(Json(serde_json::json!({"ok": true, "sequence_num": seq})))
 }
 
@@ -176,6 +228,12 @@ async fn actualizar_sesion(
         glory_agent::persistence::set_session_ai(&state.pool, id, enabled)
             .await
             .map_err(|e| fail(&e))?;
+        /* [279A-2 F3] El toggle manual también mueve la máquina propia
+         * (una sola verdad): soltar → `activa`, tomar → `delegada`. */
+        let estado = if enabled { "activa" } else { "delegada" };
+        crate::repositories::ClienteRepository::marcar_atencion(&state.pool, id, estado)
+            .await
+            .map_err(AppError::from)?;
     }
     let sesion = glory_agent::persistence::get_session(&state.pool, id)
         .await

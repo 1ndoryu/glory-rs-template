@@ -65,7 +65,22 @@ pub fn definiciones() -> Vec<ToolDefinition> {
             "Deriva la conversacion a un humano: avisa por WhatsApp al admin y frena a la IA. Usala si el visitante pide un humano o das 2 respuestas sin resolver.",
             json!({
                 "type": "object",
-                "properties": {"motivo": {"type": "string"}},
+                "properties": {
+                    "motivo": {"type": "string"},
+                    "resumen": {"type": "string", "description": "Resumen breve para la ficha del aviso (1..500)"}
+                },
+                "required": ["motivo"]
+            }),
+        ),
+        ToolDefinition::new(
+            "consultar_agente",
+            "Duda puntual: pregunta a un humano sin delegar del todo. Congela la IA (retoma al responder) y avisa por WhatsApp con la ficha.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "motivo": {"type": "string"},
+                    "resumen": {"type": "string", "description": "Contexto breve para el humano (1..500)"}
+                },
                 "required": ["motivo"]
             }),
         ),
@@ -101,6 +116,7 @@ impl Herramientas {
             "registrar_contacto" => registrar(&pool, ctx.session_id, args).await,
             "datos_contacto" => contacto_publico(&pool, &self.contacto_defecto).await,
             "escalar_a_humano" => escalar(&pool, ctx.session_id, args).await,
+            "consultar_agente" => consultar(&pool, ctx.session_id, args).await,
             otro => Ok(json!({"error": format!("tool desconocida: {otro}")})),
         }
     }
@@ -329,6 +345,58 @@ pub async fn contacto_publico(pool: &PgPool, defecto: &str) -> Result<Value, Age
     Ok(json!({"telefono": telefono, "whatsapp": admin, "whatsapp_url": url}))
 }
 
+/* [279A-2 F3] Delegación con congelamiento (máquina `atencion_sesiones`):
+ * `consultar` = duda puntual (consultando + `ai_enabled=false` + ciclo
+ * `waiting`; el humano devuelve con nota y la IA retoma); `escalar` =
+ * delegación total (delegada + triple freno `escalated`+ciclo+`ai_enabled`;
+ * la IA no vuelve sola). Ambas encolan `whatsapp` con ficha (el worker la
+ * arma vía `ficha_para_aviso`) y `destino` explícito cuando hay
+ * `whatsapp_admin` (si no, el worker usa el fallback y queda `pending`). */
+
+async fn destino_humano(pool: &PgPool) -> Option<String> {
+    glory_agent::persistence::get_config(pool, "whatsapp_admin")
+        .await
+        .ok()
+        .flatten()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+}
+
+fn resumen_breve(args: &Value) -> String {
+    args.get("resumen")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map_or_else(|| "-".to_string(), |s| s.chars().take(500).collect())
+}
+
+async fn consultar(pool: &PgPool, session_id: Uuid, args: &Value) -> Result<Value, AgentError> {
+    let motivo = args
+        .get("motivo")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .unwrap_or_default();
+    if motivo.is_empty() || motivo.len() > 300 {
+        return Ok(json!({"error": "motivo requerido (1..300)"}));
+    }
+    let resumen = resumen_breve(args);
+    ClienteRepository::marcar_atencion(pool, session_id, "consultando")
+        .await
+        .map_err(|e| AgentError::Db(e.to_string()))?;
+    glory_agent::persistence::set_session_ai(pool, session_id, false).await?;
+    glory_agent::persistence::upsert_response_cycle(pool, session_id, "waiting").await?;
+    let mut aviso = json!({
+        "session_id": session_id.to_string(),
+        "motivo": motivo,
+        "resumen": resumen,
+    });
+    if let Some(destino) = destino_humano(pool).await {
+        aviso["destino"] = json!(destino);
+    }
+    glory_agent::persistence::enqueue_outbox(pool, "whatsapp", aviso).await?;
+    Ok(json!({"ok": true}))
+}
+
 async fn escalar(pool: &PgPool, session_id: Uuid, args: &Value) -> Result<Value, AgentError> {
     let motivo = args
         .get("motivo")
@@ -338,14 +406,22 @@ async fn escalar(pool: &PgPool, session_id: Uuid, args: &Value) -> Result<Value,
     if motivo.is_empty() || motivo.len() > 300 {
         return Ok(json!({"error": "motivo requerido (1..300)"}));
     }
+    let resumen = resumen_breve(args);
     glory_agent::persistence::set_session_status(pool, session_id, "escalated").await?;
     glory_agent::persistence::upsert_response_cycle(pool, session_id, "escalated").await?;
-    glory_agent::persistence::enqueue_outbox(
-        pool,
-        "whatsapp",
-        json!({"session_id": session_id.to_string(), "motivo": motivo}),
-    )
-    .await?;
+    glory_agent::persistence::set_session_ai(pool, session_id, false).await?;
+    ClienteRepository::marcar_atencion(pool, session_id, "delegada")
+        .await
+        .map_err(|e| AgentError::Db(e.to_string()))?;
+    let mut aviso = json!({
+        "session_id": session_id.to_string(),
+        "motivo": motivo,
+        "resumen": resumen,
+    });
+    if let Some(destino) = destino_humano(pool).await {
+        aviso["destino"] = json!(destino);
+    }
+    glory_agent::persistence::enqueue_outbox(pool, "whatsapp", aviso).await?;
     let telefono = glory_agent::persistence::get_config(pool, "contacto_telefono")
         .await
         .ok()
@@ -492,6 +568,103 @@ mod pruebas {
             .await
             .unwrap();
         sqlx::query("DELETE FROM clientes WHERE telefono = '34611111111'")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM agent_response_cycles WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM agent_sessions WHERE id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+
+    /* [279A-2 F3] Matriz mínima: consultar congela (`consultando` +
+     * `ai_enabled=false` + ciclo `waiting` + aviso con resumen) y escalar
+     * delega (`delegada` + triple freno). */
+    #[tokio::test]
+    async fn consultar_congela_y_escalar_delega() {
+        let Some(pool) = pool_si_hay() else { return };
+        let h = Herramientas::new(pool.clone(), "Test 600111222".to_string());
+        let sesion = Uuid::new_v4();
+        glory_agent::persistence::ensure_session(&pool, sesion)
+            .await
+            .unwrap();
+        let ctx = ToolCtx::new(sesion, Some(pool.clone()));
+
+        let c = h
+            .execute(
+                "consultar_agente",
+                &json!({"motivo": "duda precio", "resumen": "pregunta margen"}),
+                &ctx,
+            )
+            .await
+            .unwrap();
+        assert_eq!(c.get("ok").and_then(Value::as_bool), Some(true));
+        let fila = glory_agent::persistence::get_session(&pool, sesion)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(!fila.ai_enabled);
+        let estado_at: String =
+            sqlx::query_scalar("SELECT estado FROM atencion_sesiones WHERE session_id = $1")
+                .bind(sesion)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(estado_at, "consultando");
+        let ciclo: String =
+            sqlx::query_scalar("SELECT status FROM agent_response_cycles WHERE session_id = $1")
+                .bind(sesion)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(ciclo, "waiting");
+
+        let e = h
+            .execute(
+                "escalar_a_humano",
+                &json!({"motivo": "pide humano", "resumen": "quiere visita"}),
+                &ctx,
+            )
+            .await
+            .unwrap();
+        assert_eq!(e.get("ok").and_then(Value::as_bool), Some(true));
+        let fila2 = glory_agent::persistence::get_session(&pool, sesion)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(fila2.status, "escalated");
+        assert!(!fila2.ai_enabled);
+        let estado_at2: String =
+            sqlx::query_scalar("SELECT estado FROM atencion_sesiones WHERE session_id = $1")
+                .bind(sesion)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(estado_at2, "delegada");
+
+        sqlx::query("DELETE FROM agent_outbox WHERE payload->>'session_id' = $1")
+            .bind(sesion.to_string())
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM agent_messages WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM canal_sesiones WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM atencion_sesiones WHERE session_id = $1")
+            .bind(sesion)
             .execute(&pool)
             .await
             .unwrap();

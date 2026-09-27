@@ -91,6 +91,62 @@ impl ClienteRepository {
         Self::vincular_sesion(pool, session_id, cliente.id, &normalizado).await?;
         Ok(cliente)
     }
+
+    /// Fija el estado de atención (`activa|consultando|delegada`); el `modo`
+    /// se hereda del canal (F2) o nace `completo`. Un estado inválido lo
+    /// rechaza el CHECK (error explícito, nunca silencio).
+    pub async fn marcar_atencion(
+        pool: &PgPool,
+        session_id: Uuid,
+        estado: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "INSERT INTO atencion_sesiones (session_id, estado, modo) \
+             VALUES ($1, $2, COALESCE((SELECT modo FROM canal_sesiones WHERE session_id = $1), 'completo')) \
+             ON CONFLICT (session_id) DO UPDATE SET estado = EXCLUDED.estado, updated_at = NOW()",
+        )
+        .bind(session_id)
+        .bind(estado)
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Ficha comercial para el aviso al humano (decisión usuaria 2026-09-27):
+    /// nombre+teléfono+resumen+interés+presupuesto+zona. El resumen lo pone
+    /// la tool que avisa; el resto sale del cliente vinculado (hoy NULL
+    /// hasta F4) con fallback al contacto de la sesión.
+    pub async fn ficha_para_aviso(
+        pool: &PgPool,
+        session_id: Uuid,
+    ) -> Result<FichaAviso, sqlx::Error> {
+        sqlx::query_as::<_, FichaAviso>(
+            "SELECT COALESCE(c.nombre, s.visitor_name) AS nombre, \
+               COALESCE(c.telefono, cs.telefono, s.contact) AS telefono, \
+               c.interes, c.presupuesto, c.zona, \
+               COALESCE(cs.modo, 'completo') AS modo \
+             FROM agent_sessions s \
+             LEFT JOIN canal_sesiones cs ON cs.session_id = s.id \
+             LEFT JOIN clientes c ON c.id = cs.cliente_id \
+             WHERE s.id = $1",
+        )
+        .bind(session_id)
+        .fetch_one(pool)
+        .await
+    }
+}
+
+/// Ficha comercial de una sesión para avisar al humano (ver
+/// `ficha_para_aviso`). Todo opcional salvo `modo`: sin cliente vinculado
+/// llega lo que la sesión sepa (mejor aviso parcial que ninguno).
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct FichaAviso {
+    pub nombre: Option<String>,
+    pub telefono: Option<String>,
+    pub interes: Option<String>,
+    pub presupuesto: Option<String>,
+    pub zona: Option<String>,
+    pub modo: String,
 }
 
 /* Las consultas SQL no usan macros verificadas en compilación: estos tests
@@ -174,6 +230,59 @@ mod pruebas {
             .unwrap();
         sqlx::query("DELETE FROM clientes WHERE id = $1")
             .bind(primero.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM agent_sessions WHERE id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn atencion_y_ficha_siguen_a_la_sesion() {
+        let Some(pool) = pool_si_hay() else { return };
+        let sesion = Uuid::new_v4();
+        glory_agent::persistence::ensure_session(&pool, sesion)
+            .await
+            .unwrap();
+        glory_agent::persistence::set_session_contact(
+            &pool,
+            sesion,
+            Some("Humo Ficha"),
+            Some("+34955555555"),
+        )
+        .await
+        .unwrap();
+
+        ClienteRepository::marcar_atencion(&pool, sesion, "consultando")
+            .await
+            .unwrap();
+        let ficha = ClienteRepository::ficha_para_aviso(&pool, sesion)
+            .await
+            .unwrap();
+        assert_eq!(ficha.nombre.as_deref(), Some("Humo Ficha"));
+        assert_eq!(ficha.telefono.as_deref(), Some("+34955555555"));
+        assert_eq!(ficha.modo, "completo");
+        ClienteRepository::marcar_atencion(&pool, sesion, "delegada")
+            .await
+            .unwrap();
+        let estado: String =
+            sqlx::query_scalar("SELECT estado FROM atencion_sesiones WHERE session_id = $1")
+                .bind(sesion)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(estado, "delegada");
+
+        sqlx::query("DELETE FROM agent_messages WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM atencion_sesiones WHERE session_id = $1")
+            .bind(sesion)
             .execute(&pool)
             .await
             .unwrap();
