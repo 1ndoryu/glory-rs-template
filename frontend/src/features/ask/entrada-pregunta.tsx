@@ -1,16 +1,22 @@
 import { useState } from 'react';
 import type { PreguntaAsk } from '../../domain/ficha-ask';
+import { NO_SE } from '../../domain/ficha-ask';
+import { assertNunca } from '../../domain/pasos-ask';
 import { CLASE_ACTIVO, CLASE_BORDE, CLASE_TEXTO, CLASE_TINTA } from '../publica/disenno';
 
-/* Entrada de una pregunta /ask (279A-3 F2): Sí/No/No sé con tres botones o
- * campo de texto/número con unidad, stepper en enteros y error visible.
- * `conNoAplica` solo en ficha (`extras`): en columnas numéricas no existe.
+/* Entrada de una pregunta /ask (279A-3 F2 + 279A-7): Sí/No, opciones fijas
+ * (amoblado, agua…), o campo de texto/número con unidad, stepper y error
+ * visible. «No lo sé» (279A-7) es respuesta válida en TODAS: se guarda
+ * `NO_SE`, no vuelve a preguntarse y el dato queda vacío — por eso ya no
+ * salta como antes. `conNoAplica` solo en ficha (`extras`); las columnas
+ * guardan su «no sé» en la marca `*_nose` (ver `marcaNoSePaso`).
  * `valorActual` resalta lo ya respondido al deshacer (anterior). */
 
 export function EntradaPregunta({
   pregunta,
   guardando,
   conNoAplica,
+  conNoSe,
   valorActual,
   alResponder,
   alSaltar,
@@ -18,12 +24,17 @@ export function EntradaPregunta({
   pregunta: PreguntaAsk;
   guardando: boolean;
   conNoAplica: boolean;
+  conNoSe: boolean;
   valorActual?: string | number | boolean | null;
   alResponder: (v: string | number | boolean | null) => void;
   alSaltar: () => void;
 }) {
   const [texto, setTexto] = useState(
-    typeof valorActual === 'string' || typeof valorActual === 'number' ? String(valorActual) : '',
+    typeof valorActual === 'string' && valorActual !== NO_SE
+      ? valorActual
+      : typeof valorActual === 'number'
+        ? String(valorActual)
+        : '',
   );
   const [error, setError] = useState('');
   const esNumero = pregunta.tipo === 'entero' || pregunta.tipo === 'decimal';
@@ -51,8 +62,12 @@ export function EntradaPregunta({
     setError('');
   };
 
-  const botonSiNo = (etiqueta: string, valor: boolean) => {
+  /* Botón de opción (Sí/No, amoblado…): borde sin fondo, como los demás;
+   * activo resalta lo ya respondido. «No lo sé» nunca lleva fondo, ni
+   * seleccionado: se marca con negrita + subrayado. */
+  const botonOpcion = (etiqueta: string, valor: string | boolean) => {
     const activo = valorActual === valor;
+    const esNoSe = valor === NO_SE;
     return (
       <button
         type="button"
@@ -60,7 +75,9 @@ export function EntradaPregunta({
         aria-pressed={activo}
         onClick={() => alResponder(valor)}
         className={`flex-1 cursor-pointer rounded-none border px-4 py-3 disabled:cursor-wait disabled:opacity-60 ${
-          activo ? `${CLASE_ACTIVO} ${CLASE_TEXTO} border-transparent` : `${CLASE_BORDE} bg-transparent ${CLASE_TINTA}`
+          activo && !esNoSe
+            ? `${CLASE_ACTIVO} ${CLASE_TEXTO} border-transparent`
+            : `${CLASE_BORDE} bg-transparent ${CLASE_TINTA}${activo ? ' font-semibold underline underline-offset-4' : ''}`
         }`}
       >
         {etiqueta}
@@ -75,18 +92,19 @@ export function EntradaPregunta({
       {pregunta.ayuda && <p className={`mt-1 text-xs ${CLASE_TINTA} opacity-60`}>{pregunta.ayuda}</p>}
       {pregunta.tipo === 'si_no' ? (
         <div className="mt-4 flex gap-2">
-          {botonSiNo('Sí', true)}
-          {botonSiNo('No', false)}
-          <button
-            type="button"
-            disabled={guardando}
-            onClick={alSaltar}
-            className={`flex-1 cursor-pointer rounded-none border ${CLASE_BORDE} bg-transparent px-4 py-3 ${CLASE_TINTA} opacity-70 disabled:cursor-wait disabled:opacity-60`}
-          >
-            No sé
-          </button>
+          {botonOpcion('Sí', true)}
+          {botonOpcion('No', false)}
+          {botonOpcion('No lo sé', NO_SE)}
         </div>
-      ) : (
+      ) : pregunta.tipo === 'opciones' ? (
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          {(pregunta.opciones ?? []).map((o) => (
+            <span key={String(o.valor)} className="flex">
+              {botonOpcion(o.etiqueta, o.valor)}
+            </span>
+          ))}
+        </div>
+      ) : pregunta.tipo === 'texto_corto' || pregunta.tipo === 'entero' || pregunta.tipo === 'decimal' ? (
         <div className="mt-4 flex flex-col gap-3">
           <div className="flex items-stretch gap-2">
             {pregunta.tipo === 'entero' && (
@@ -141,10 +159,25 @@ export function EntradaPregunta({
           >
             {guardando ? 'Guardando…' : 'Guardar y seguir'}
           </button>
+          {conNoSe && (
+            <button
+              type="button"
+              disabled={guardando}
+              aria-pressed={valorActual === NO_SE}
+              onClick={() => alResponder(NO_SE)}
+              className={`cursor-pointer rounded-none border ${CLASE_BORDE} bg-transparent px-4 py-2 disabled:cursor-wait disabled:opacity-60 ${CLASE_TINTA}${
+                valorActual === NO_SE ? ' font-semibold underline underline-offset-4' : ''
+              }`}
+            >
+              No lo sé
+            </button>
+          )}
         </div>
+      ) : (
+        assertNunca(pregunta.tipo)
       )}
       <div className="mt-3 flex justify-center gap-4">
-        {pregunta.tipo !== 'si_no' && (
+        {pregunta.tipo !== 'si_no' && pregunta.tipo !== 'opciones' && (
           <button type="button" onClick={alSaltar} className={`cursor-pointer text-sm ${CLASE_TINTA} underline`}>
             Saltar por ahora
           </button>

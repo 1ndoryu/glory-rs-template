@@ -323,7 +323,16 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   vez de `clave === …` regado, `COLUMNAS_POR_TIPO: Record` (un tipo nuevo
   falla en compilación), `assertNunca` exhaustivo en `pasoRespondido`,
   `responder` y render. Navegador: 11 pendientes, internet + agua salen en
-  el flujo, `$` arriba, solo saltos sin guardar.
+   el flujo, `$` arriba, solo saltos sin guardar.
+- 279A-7 verificado local (`tsc` 0): agua con A veces («¿Llega el agua?» =
+  `opciones` Sí/No/A veces/No lo sé); `No lo sé` en TODAS (ficha, sí/no,
+  opciones con `conNoSe`, mínimo con `claveNoSe`, ubicación, numéricas con
+  marcas `*_nose`) que persiste en `extras` (no se vuelve a preguntar) y el
+  backend la borra al llegar dato real; `No lo sé` siempre sin fondo
+  (seleccionado = semibold + subrayado); amoblado con «En trato» en
+  apartamento/townhouse/casa. Navegador: mínimo→9%, puestos→10%,
+  agua A veces→30%, resaltados correctos, datos de prueba limpiados
+  (`extras={}` en ambas).
 - Pendiente: cablear `extras` públicos (`privada: false`) a la ficha
   visible y a la IA — hoy nadie los lee fuera del panel (la pública ni los
   pide, el backend los pela con `'{}'`).

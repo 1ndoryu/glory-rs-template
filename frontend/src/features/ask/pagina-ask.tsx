@@ -4,12 +4,14 @@ import { useSesion } from '../../hooks/sesion/use-sesion';
 import {
   assertNunca,
   etiquetaUbicacion,
+  marcaNoSePaso,
   progresoPasos,
   type ColumnasAsk,
   type PasoAsk,
   type ValorUbicacion,
 } from '../../domain/pasos-ask';
 import { ETIQUETAS_TIPO, formatearPrecio, portadaDe, type Inmueble } from '../../domain/inmueble';
+import { NO_SE, claveNoSe } from '../../domain/ficha-ask';
 import { EntradaPregunta } from './entrada-pregunta';
 import { EntradaUbicacion } from './entrada-ubicacion';
 import {
@@ -176,12 +178,17 @@ function PreguntaActual({
   const columnas: ColumnasAsk = inmueble;
   const { porcentaje, faltan } = progresoPasos(pasos, columnas, extras, precioMinimo);
   const paso = pasos[indice];
-  /* Valor ya guardado (para resaltar al deshacer y corregir). */
+  /* Valor ya guardado (para resaltar al deshacer y corregir). En el
+   * mínimo con marca «no sé», el valor es NO_SE para resaltar el botón. */
   const valorFicha = paso?.kind === 'ficha'
     ? paso.pregunta.destino === 'precioMinimo'
-      ? precioMinimo
+      ? (extras[claveNoSe(paso.pregunta.clave)] === NO_SE ? NO_SE : precioMinimo)
       : (extras[paso.pregunta.clave] ?? null)
     : null;
+  /* Marca «no sé» del paso actual (columnas y ubicación): para resaltar
+   * el botón al deshacer, igual que `valorFicha` en ficha. */
+  const marcaPaso = paso ? marcaNoSePaso(paso) : null;
+  const noSePaso = marcaPaso !== null && extras[marcaPaso] === NO_SE;
   const portada = portadaDe(inmueble);
   return (
     <div className="mt-4">
@@ -220,23 +227,26 @@ function PreguntaActual({
           pregunta={paso.pregunta}
           guardando={guardando}
           conNoAplica
+          conNoSe
           valorActual={valorFicha ?? undefined}
           alResponder={alResponder}
           alSaltar={alSaltar}
         />
       ) : paso?.kind === 'ubicacion' ? (
         <EntradaUbicacion
-          key={`ubicacion-${columnas.ubicacion}-${columnas.residencia}`}
+          key={`ubicacion-${columnas.ubicacion}-${columnas.residencia}-${String(noSePaso)}`}
           etiqueta={etiquetaUbicacion(columnas)}
           ubicacionActual={columnas.ubicacion}
           residenciaActual={columnas.residencia}
+          noSeActual={noSePaso}
           guardando={guardando}
           alResponder={alResponder}
+          alNoSe={() => alResponder(NO_SE)}
           alSaltar={alSaltar}
         />
       ) : paso?.kind === 'columna' ? (
         <EntradaPregunta
-          key={`columna-${paso.columna}-${columnas[paso.columna]}`}
+          key={`columna-${paso.columna}-${columnas[paso.columna]}-${String(noSePaso)}`}
           pregunta={{
             clave: paso.columna,
             etiqueta: paso.etiqueta,
@@ -247,7 +257,8 @@ function PreguntaActual({
           }}
           guardando={guardando}
           conNoAplica={false}
-          valorActual={columnas[paso.columna] > 0 ? columnas[paso.columna] : undefined}
+          conNoSe
+          valorActual={noSePaso ? NO_SE : columnas[paso.columna] > 0 ? columnas[paso.columna] : undefined}
           alResponder={alResponder}
           alSaltar={alSaltar}
         />

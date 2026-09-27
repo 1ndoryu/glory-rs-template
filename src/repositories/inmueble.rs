@@ -219,6 +219,15 @@ impl InmuebleRepository {
                   copy_modelo = COALESCE($16, copy_modelo), \
                   copy_actualizada_en = COALESCE($17, copy_actualizada_en), \
                   receta = COALESCE($18, receta), \
+                  /* [279A-7] Al llegar el dato real se borra su marca «no sé»
+                   * de `extras` (el front la borra en local al mismo tiempo).
+                   * Quitar una clave ausente es no-op, por eso el ELSE ''. */
+                  extras = extras \
+                    - CASE WHEN $3 IS NOT NULL AND btrim($3) <> '' THEN 'ubicacion_nose' ELSE '' END \
+                    - CASE WHEN $5 IS NOT NULL AND btrim($5) <> '' THEN 'ubicacion_nose' ELSE '' END \
+                    - CASE WHEN $4 IS NOT NULL AND $4 > 0 THEN 'puestos_nose' ELSE '' END \
+                    - CASE WHEN $11 IS NOT NULL AND $11 > 0 THEN 'metros_nose' ELSE '' END \
+                    - CASE WHEN $12 IS NOT NULL AND $12 > 0 THEN 'metros_terreno_nose' ELSE '' END, \
                   updated_at = NOW() \
               WHERE id = $19 \
               RETURNING {COLUMNAS}",
@@ -386,7 +395,10 @@ impl InmuebleRepository {
         precio_minimo: Option<f64>,
     ) -> Result<Option<InmuebleRow>, sqlx::Error> {
         sqlx::query_as::<_, InmuebleRow>(&format!(
-            "UPDATE inmuebles SET extras = $1, precio_minimo = $2, updated_at = NOW() \
+            /* [279A-7] Con mínimo real se borra su marca «no sé» (con `None`
+             * se conserva: es el estado pendiente o la marca recién guardada). */
+            "UPDATE inmuebles SET extras = $1 - CASE WHEN $2 IS NOT NULL AND $2 > 0 \
+              THEN 'precio_minimo_nose' ELSE '' END, precio_minimo = $2, updated_at = NOW() \
               WHERE id = $3 RETURNING {COLUMNAS}",
         ))
         .bind(extras)

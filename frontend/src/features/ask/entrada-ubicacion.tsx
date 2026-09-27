@@ -4,21 +4,27 @@ import { CLASE_ACTIVO, CLASE_BORDE, CLASE_TEXTO, CLASE_TINTA } from '../publica/
 
 /* Paso inteligente ubicación+residencia (279A-3 F2): una pregunta, dos
  * campos prellenados con lo que ya hay. Guardar rellena las columnas del
- * inmueble (no `extras`); lo que ya está bien se confirma sin reescribir. */
+ * inmueble (no `extras`); lo que ya está bien se confirma sin reescribir.
+ * «No lo sé» (279A-7, como en todas): guarda la marca `ubicacion_nose`,
+ * no vuelve a preguntarse y las columnas quedan vacías. */
 
 export function EntradaUbicacion({
   etiqueta,
   ubicacionActual,
   residenciaActual,
+  noSeActual,
   guardando,
   alResponder,
+  alNoSe,
   alSaltar,
 }: {
   etiqueta: string;
   ubicacionActual: string;
   residenciaActual: string;
+  noSeActual: boolean;
   guardando: boolean;
   alResponder: (v: ValorUbicacion) => void;
+  alNoSe: () => void;
   alSaltar: () => void;
 }) {
   const [ubicacion, setUbicacion] = useState(ubicacionActual);
@@ -72,6 +78,17 @@ export function EntradaUbicacion({
           className={`cursor-pointer rounded-none border ${CLASE_BORDE} ${CLASE_ACTIVO} px-4 py-2 ${CLASE_TEXTO} disabled:cursor-wait disabled:opacity-60`}
         >
           {guardando ? 'Guardando…' : 'Guardar y seguir'}
+        </button>
+        <button
+          type="button"
+          disabled={guardando}
+          aria-pressed={noSeActual}
+          onClick={alNoSe}
+          className={`cursor-pointer rounded-none border ${CLASE_BORDE} bg-transparent px-4 py-2 disabled:cursor-wait disabled:opacity-60 ${CLASE_TINTA}${
+            noSeActual ? ' font-semibold underline underline-offset-4' : ''
+          }`}
+        >
+          No lo sé
         </button>
       </div>
       <div className="mt-3 flex gap-4">

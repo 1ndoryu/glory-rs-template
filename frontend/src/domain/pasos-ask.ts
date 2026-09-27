@@ -1,5 +1,5 @@
 import type { ExtrasAsk, PreguntaAsk, TipoInmueble } from './ficha-ask';
-import { CHECKLIST_ASK, preguntaRespondida } from './ficha-ask';
+import { CHECKLIST_ASK, NO_SE, claveNoSe, preguntaRespondida } from './ficha-ask';
 
 /* Columnas del inmueble que /ask puede rellenar (el resto llega del import
  * o del formulario admin; habitaciones/baños ya se piden al publicar). */
@@ -77,6 +77,27 @@ function ubicacionCompleta(columnas: ColumnasAsk): boolean {
   return columnas.ubicacion.trim() !== '' && columnas.residencia.trim() !== '';
 }
 
+/* Marcas «no sé» para pasos que no guardan en `extras` (279A-7, todas las
+ * preguntas llevan No lo sé): la columna no puede guardar el
+ * desconocimiento, así que vive en `extras` con clave snake. El backend
+ * (`update`/`set_ficha`) borra la marca al llegar el dato real; el front
+ * la borra en local al responder de verdad. */
+export const CLAVE_NO_SE_UBICACION = 'ubicacion_nose';
+
+const CLAVE_NO_SE_COLUMNA: Record<ColumnaNumericaAsk, string> = {
+  metros: 'metros_nose',
+  metrosTerreno: 'metros_terreno_nose',
+  puestos: 'puestos_nose',
+};
+
+/* Marca «no sé» de un paso, o `null` si el No lo sé se guarda como valor
+ * (preguntas de ficha sin `destino`). */
+export function marcaNoSePaso(paso: PasoAsk): string | null {
+  if (paso.kind === 'ubicacion') return CLAVE_NO_SE_UBICACION;
+  if (paso.kind === 'columna') return CLAVE_NO_SE_COLUMNA[paso.columna];
+  return paso.pregunta.destino ? claveNoSe(paso.pregunta.clave) : null;
+}
+
 /* Pregunta inteligente ubicación vs residencia: confirma lo que hay y pide
  * lo que falta, nombrando los valores para reconocerlos al responder. */
 export function etiquetaUbicacion(columnas: ColumnasAsk): string {
@@ -119,8 +140,12 @@ export function pasoRespondido(
   extras: ExtrasAsk,
   precioMinimo?: number | null,
 ): boolean {
-  if (paso.kind === 'ubicacion') return ubicacionCompleta(columnas);
-  if (paso.kind === 'columna') return columnas[paso.columna] > 0;
+  if (paso.kind === 'ubicacion') {
+    return ubicacionCompleta(columnas) || extras[CLAVE_NO_SE_UBICACION] === NO_SE;
+  }
+  if (paso.kind === 'columna') {
+    return columnas[paso.columna] > 0 || extras[CLAVE_NO_SE_COLUMNA[paso.columna]] === NO_SE;
+  }
   if (paso.kind === 'ficha') return preguntaRespondida(paso.pregunta, extras, precioMinimo);
   return assertNunca(paso);
 }
@@ -138,7 +163,9 @@ export function progresoPasos(
 }
 
 /* Respuesta pura sobre la ficha (sin fetch): `null` = no aplica y borra la
- * clave para que no cuente como respondida. */
+ * clave para que no cuente como respondida. `NO_SE` en una pregunta con
+ * `destino` guarda la marca `claveNoSe` (la columna no puede guardar el
+ * desconocimiento); una respuesta real borra la marca. */
 export function extrasTrasRespuesta(
   ficha: { extras: ExtrasAsk; precioMinimo: number | null },
   pregunta: PreguntaAsk,
@@ -147,10 +174,16 @@ export function extrasTrasRespuesta(
   const extras: ExtrasAsk = { ...ficha.extras };
   let precioMinimo = ficha.precioMinimo;
   if (valor === null) {
-    if (pregunta.destino === 'precioMinimo') precioMinimo = null;
-    else delete extras[pregunta.clave];
+    if (pregunta.destino === 'precioMinimo') {
+      precioMinimo = null;
+      delete extras[claveNoSe(pregunta.clave)];
+    } else delete extras[pregunta.clave];
   } else if (pregunta.destino === 'precioMinimo') {
-    precioMinimo = typeof valor === 'number' ? valor : Number(valor);
+    if (valor === NO_SE) extras[claveNoSe(pregunta.clave)] = NO_SE;
+    else {
+      precioMinimo = typeof valor === 'number' ? valor : Number(valor);
+      delete extras[claveNoSe(pregunta.clave)];
+    }
   } else {
     extras[pregunta.clave] = typeof valor === 'string' ? valor.trim() : valor;
   }
@@ -170,9 +203,9 @@ export function calcularCompletitud(
   const lista = CHECKLIST_ASK[tipo] ?? [];
   const faltan = lista.filter((p) => !preguntaRespondida(p, extras, precioMinimo)).map((p) => p.clave);
   if (columnas) {
-    if (!ubicacionCompleta(columnas)) faltan.push('ubicacion_residencia');
+    if (!ubicacionCompleta(columnas) && extras[CLAVE_NO_SE_UBICACION] !== NO_SE) faltan.push('ubicacion_residencia');
     for (const c of columnasAplicables(tipo)) {
-      if (!(columnas[c] > 0)) faltan.push(c);
+      if (!(columnas[c] > 0) && extras[CLAVE_NO_SE_COLUMNA[c]] !== NO_SE) faltan.push(c);
     }
   }
   const total = lista.length + (columnas ? 1 + columnasAplicables(tipo).length : 0);

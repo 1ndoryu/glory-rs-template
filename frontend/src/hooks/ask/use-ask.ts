@@ -6,7 +6,8 @@ import {
   guardarFicha,
   guardarUbicacionAsk,
 } from '../../data/inmuebles/ficha-ask';
-import { assertNunca, extrasTrasRespuesta, mazclarPasos, pasosPara } from '../../domain/pasos-ask';
+import { assertNunca, extrasTrasRespuesta, marcaNoSePaso, mazclarPasos, pasosPara } from '../../domain/pasos-ask';
+import { NO_SE, type ExtrasAsk } from '../../domain/ficha-ask';
 import type { Inmueble } from '../../domain/inmueble';
 import {
   FICHA_VACIA,
@@ -94,6 +95,30 @@ export function useAsk() {
      * (se salta o se corrige el valor). */
     if (valor === null && paso.kind !== 'ficha') return;
     setEstado((e) => ({ ...e, guardando: true, error: null }));
+    /* «No lo sé» en pasos de columna (279A-7, todas las preguntas lo
+     * llevan): la columna no lo puede guardar, así que se guarda la marca
+     * `*_nose` en la ficha y el dato queda vacío. */
+    const guardarMarcaNoSe = async (): Promise<void> => {
+      const marca = marcaNoSePaso(paso);
+      if (!marca) {
+        setEstado((e) => ({ ...e, guardando: false }));
+        return;
+      }
+      const guardada = await guardarFicha(seleccionado.id, {
+        extras: { ...ficha.extras, [marca]: NO_SE },
+        precioMinimo: ficha.precioMinimo,
+      });
+      setEstado(trasFicha(guardada));
+    };
+    /* Al responder de verdad se borra la marca «no sé» en local (el
+     * backend la borra en BD al mismo tiempo: `update`/`set_ficha`). */
+    const sinMarca = (extras: ExtrasAsk): ExtrasAsk => {
+      const marca = marcaNoSePaso(paso);
+      if (!marca || extras[marca] === undefined) return extras;
+      const resto = { ...extras };
+      delete resto[marca];
+      return resto;
+    };
     /* Guardado por tipo de paso (ramas exhaustivas: un `kind` nuevo
      * falla en compilación aquí, en el render y en `pasoRespondido`). */
     try {
@@ -104,13 +129,25 @@ export function useAsk() {
           setEstado(trasFicha(guardada));
         }
       } else if (paso.kind === 'ubicacion') {
-        if (!esUbicacion(valor)) setEstado((e) => ({ ...e, guardando: false }));
-        else setEstado(trasInmueble(await guardarUbicacionAsk(seleccionado, valor)));
+        if (valor === NO_SE) await guardarMarcaNoSe();
+        else if (!esUbicacion(valor)) setEstado((e) => ({ ...e, guardando: false }));
+        else {
+          const guardado = await guardarUbicacionAsk(seleccionado, valor);
+          setEstado((e) => {
+            const base = trasInmueble(guardado)(e);
+            return { ...base, ficha: { ...base.ficha, extras: sinMarca(base.ficha.extras) } };
+          });
+        }
       } else if (paso.kind === 'columna') {
-        if (typeof valor !== 'number' || !Number.isFinite(valor) || valor < 0) {
+        if (valor === NO_SE) await guardarMarcaNoSe();
+        else if (typeof valor !== 'number' || !Number.isFinite(valor) || valor < 0) {
           setEstado((e) => ({ ...e, guardando: false }));
         } else {
-          setEstado(trasInmueble(await guardarColumnaAsk(seleccionado, paso.columna, valor)));
+          const guardado = await guardarColumnaAsk(seleccionado, paso.columna, valor);
+          setEstado((e) => {
+            const base = trasInmueble(guardado)(e);
+            return { ...base, ficha: { ...base.ficha, extras: sinMarca(base.ficha.extras) } };
+          });
         }
       } else {
         assertNunca(paso);
