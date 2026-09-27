@@ -165,9 +165,12 @@ Sin 1+2 el plan llega hasta: estima de tokens + memoria de un turno.
 
 - **Número A (completo, pruebas): 0412 0825234** → `584120825234`
   (registrado 2026-09-27).
-- **Falta**: número B (inicial, el del agente humano) + QR de ambos
-  (2 min por número) + storage de fotos (disco PC vs volumen).
-- Nada implementado de este plan; sin código hasta F0/F1.
+- **Número B (inicial, agente humano): 0424 9208855** → `584249208855`
+  (registrado 2026-09-27; es el número vivo del negocio: **no usar hasta
+  el final**).
+- **Falta**: QR de ambos (2 min por número, al final) + storage de fotos
+  (disco PC vs volumen).
+- Se adelanta sin gateway: F0/F1/F3/F2 (simulado)/F5.
 
 ## Gate / DoD por fase
 

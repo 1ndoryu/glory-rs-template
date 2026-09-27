@@ -275,9 +275,11 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   glory-agent para historial real + usage).
 - Fases: F0 pista núcleo → F1 tablas+clientes → F2 webhook 2 números →
   F3 delegación → F4 memoria+media → F5 consola dueña.
-- Requiere de usuaria: número B (inicial) + QR de ambos (2 min por
-  número) + storage de fotos. Número A (completo, pruebas): 0412 0825234
-  (`584120825234`). Sin código hasta entonces.
+- Requiere de usuaria (al final): QR de ambos números (2 min por número)
+  + storage de fotos. Número A (completo, pruebas): 0412 0825234
+  (`584120825234`). Número B (inicial, agente): 0424 9208855
+  (`584249208855`, número vivo: no usar hasta el final). Se adelanta sin
+  gateway: F0/F1/F3/F2 simulado/F5.
 
 ## 279A-3 — /ask cuestionario de ficha (F1 verificado local 2026-09-27; pendiente: respuestas usuaria)
 - Plan: `Agente/planes/plan-ask-2026-09-27.md`.
