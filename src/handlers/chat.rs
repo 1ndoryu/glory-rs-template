@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::chat_tools;
+use crate::repositories::ClienteRepository;
 use glory_agent::errors::AgentError;
 use glory_agent::session::ChatHub;
 
@@ -140,5 +141,10 @@ async fn guardar_contacto(
     }
     glory_agent::persistence::ensure_session(&pool, id).await?;
     glory_agent::persistence::set_session_contact(&pool, id, Some(nombre), Some(telefono)).await?;
+    /* [279A-2 F1] Igual que la tool: el widget también crea `clientes`
+     * (una fila por teléfono, upsert idempotente). Si falla se propaga. */
+    ClienteRepository::registrar_y_vincular(&pool, id, Some(nombre), telefono)
+        .await
+        .map_err(|e| AgentError::Db(e.to_string()))?;
     Ok(Json(serde_json::json!({"ok": true})))
 }

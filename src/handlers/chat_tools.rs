@@ -6,6 +6,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::models::{OPERACIONES, TIPOS};
+use crate::repositories::ClienteRepository;
 use glory_agent::errors::AgentError;
 use glory_agent::tools::{ToolCtx, ToolDefinition, ToolExecutor};
 
@@ -294,6 +295,12 @@ async fn registrar(pool: &PgPool, session_id: Uuid, args: &Value) -> Result<Valu
     }
     glory_agent::persistence::set_session_contact(pool, session_id, Some(nombre), Some(telefono))
         .await?;
+    /* [279A-2 F1] El contacto también vive en `clientes` (una fila por
+     * teléfono, upsert idempotente): sin este paso la IA captaría datos
+     * que nadie puede consultar. Si falla se propaga (nada silencioso). */
+    ClienteRepository::registrar_y_vincular(pool, session_id, Some(nombre), telefono)
+        .await
+        .map_err(|e| AgentError::Db(e.to_string()))?;
     Ok(json!({"ok": true}))
 }
 
@@ -434,6 +441,13 @@ mod pruebas {
             .await
             .unwrap();
         assert_eq!(r.get("ok").and_then(Value::as_bool), Some(true));
+        /* [279A-2 F1] La tool también deja la fila en `clientes`. */
+        let cliente: String =
+            sqlx::query_scalar("SELECT telefono FROM clientes WHERE telefono = '34611111111'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(cliente, "34611111111");
         let datos = contacto_publico(&pool, "Test 600111222").await.unwrap();
         assert!(datos.get("whatsapp_url").and_then(Value::as_str).is_some());
         let esc = h
@@ -464,6 +478,20 @@ mod pruebas {
             .unwrap();
         sqlx::query("DELETE FROM agent_messages WHERE session_id = $1")
             .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM canal_sesiones WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM atencion_sesiones WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM clientes WHERE telefono = '34611111111'")
             .execute(&pool)
             .await
             .unwrap();

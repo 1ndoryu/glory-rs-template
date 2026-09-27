@@ -280,6 +280,11 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   (`584120825234`). Número B (inicial, agente): 0424 9208855
   (`584249208855`, número vivo: no usar hasta el final). Se adelanta sin
   gateway: F0/F1/F3/F2 simulado/F5.
+- F1 verificado local 2026-09-27: migración `20260927000014_agente_clientes`
+  (`clientes` UNIQUE por teléfono, `canal_sesiones`, `atencion_sesiones`,
+  `uso_mensajes` + trigger estima len/4); `registrar_contacto` y
+  `POST .../contacto` crean `clientes` sin duplicar (`0412 0825234` →
+  `584120825234`); `fmt`+`check`+clippy 0, `cargo test` 20 passed.
 
 ## 279A-3 — /ask cuestionario de ficha (F1 verificado local 2026-09-27; pendiente: respuestas usuaria)
 - Plan: `Agente/planes/plan-ask-2026-09-27.md`.
@@ -350,4 +355,3 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   visible y a la IA — hoy nadie los lee fuera del panel (la pública ni los
   pide, el backend los pela con `'{}'`).
 - Requiere de usuaria: responder el cuestionario en `/ask`.
-

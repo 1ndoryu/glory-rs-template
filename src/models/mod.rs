@@ -1,9 +1,11 @@
+mod cliente;
 mod inmueble;
 mod note;
 mod solicitud;
 mod suscriptor;
 mod user;
 
+pub use cliente::{Cliente, ClienteRow, CreateClienteRequest};
 pub use inmueble::{
     validar_extras, AddFotoRequest, CopyInmueble, CreateInmuebleRequest, CreateUserRequest,
     FichaAskRequest, FichaAskResponse, FiltrosPublicos, Foto, FotoPublica, Inmueble, InmuebleRow,
