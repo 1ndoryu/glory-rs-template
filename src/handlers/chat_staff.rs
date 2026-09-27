@@ -688,8 +688,8 @@ struct UsoDia {
     tokens_out: Option<i64>,
 }
 
-/// Uso (mensajes y tokens por día×remitente; `tokens_in/out` exactos llegan
-/// con F0-núcleo, hoy casi todo es estima `len/4` del trigger).
+/// Uso (mensajes y tokens por día×remitente; `tokens_in/out` exactos del
+/// núcleo F0 en mensajes `ai`, estima `len/4` del trigger en el resto).
 async fn uso_mensajes(
     _auth: AuthUser,
     State(state): State<AppState>,

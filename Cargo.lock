@@ -807,7 +807,7 @@ dependencies = [
 [[package]]
 name = "glory-agent"
 version = "0.1.0"
-source = "git+https://github.com/1ndoryu/glory-agent.git?rev=f2f19e7#f2f19e7b33811a718fdd3017815e96a2e6e589de"
+source = "git+https://github.com/1ndoryu/glory-agent.git?rev=b235771#b23577148fa7ffd24b1bda982bd4a8f94d53dced"
 dependencies = [
  "axum",
  "chrono",

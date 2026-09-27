@@ -301,6 +301,15 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   `GET /agent/clientes/:id/sesiones`, `POST /agent/enviar`,
   `GET /agent/uso`, `GET /agent/auditoria`; `fmt`+`check`+clippy 0,
   `cargo test` 24 passed.
+- F0 verificado local 2026-09-27: núcleo `glory-agent@b235771`
+  (historial 30 turnos + `usage` exacto + ventana configurable;
+  `sentinel analyze` 0/0/0/0, `db_roundtrip -- --ignored` PASS);
+  `Cargo.toml` bump `f2f19e7`→`b235771` + migración
+  `20260927000015_agent_usage` (columnas espejo + trigger copia exacto a
+  `uso_mensajes`; prueba viva `2|120|35` con `ROLLBACK`); `fmt`+`check`+
+  clippy 0, `cargo test` 24 passed. Gotcha: `_sqlx_migrations` traía
+  checksum viejo de `...13` (aplicada de un borrador); se sincronizó
+  (sha384 del archivo = BD) antes de migrar.
 
 ## 279A-3 — /ask cuestionario de ficha (F1 verificado local 2026-09-27; pendiente: respuestas usuaria)
 - Plan: `Agente/planes/plan-ask-2026-09-27.md`.
