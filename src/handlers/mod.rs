@@ -14,6 +14,7 @@ mod solicitud;
 mod suscriptor;
 mod uploads;
 mod users;
+mod whatsapp;
 
 use std::path::{Path, PathBuf};
 

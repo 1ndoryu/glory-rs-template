@@ -292,6 +292,15 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   `POST .../devolver` (nota `staff` + `answered` + `ai_enabled=true` +
   `activa`) y bandeja con `estado_atencion/modo_atencion`;
   `fmt`+`check`+clippy 0, `cargo test` 22 passed, outbox/atención limpios.
+- F2+F5 backend verificados local 2026-09-27: `POST /agent/whatsapp/webhook`
+  simulado con reparto por `numero_destino` (A→`wa_a`/`completo`,
+  B→`wa_b`/`inicial`, `numeros_configurados` desde `agent_config` con
+  fallback env), hilo por cliente×canal reutilizado, foto como
+  `[foto] {url}`, passthrough `media_url` en outbox; consola dueña
+  `GET|POST /agent/clientes`, `PATCH /agent/clientes/:id`,
+  `GET /agent/clientes/:id/sesiones`, `POST /agent/enviar`,
+  `GET /agent/uso`, `GET /agent/auditoria`; `fmt`+`check`+clippy 0,
+  `cargo test` 24 passed.
 
 ## 279A-3 — /ask cuestionario de ficha (F1 verificado local 2026-09-27; pendiente: respuestas usuaria)
 - Plan: `Agente/planes/plan-ask-2026-09-27.md`.

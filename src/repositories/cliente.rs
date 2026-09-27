@@ -31,9 +31,21 @@ impl ClienteRepository {
         nombre: Option<&str>,
         telefono: &str,
     ) -> Result<ClienteRow, sqlx::Error> {
+        Self::registrar_con_origen(pool, nombre, telefono, "web").await
+    }
+
+    /// Alta con origen explícito (`web|wa_a|wa_b`). En conflicto solo refresca
+    /// el nombre (nunca pisa el `origen` primero: es de dónde vino primero).
+    /// El teléfono ya viene normalizado por el llamador.
+    pub async fn registrar_con_origen(
+        pool: &PgPool,
+        nombre: Option<&str>,
+        telefono: &str,
+        origen: &str,
+    ) -> Result<ClienteRow, sqlx::Error> {
         let nombre_limpio = nombre.map(str::trim).filter(|n| !n.is_empty());
         sqlx::query_as::<_, ClienteRow>(
-            "INSERT INTO clientes (id, nombre, telefono) VALUES (gen_random_uuid(), $1, $2) \
+            "INSERT INTO clientes (id, nombre, telefono, origen) VALUES (gen_random_uuid(), $1, $2, $3) \
              ON CONFLICT (telefono) DO UPDATE SET \
                nombre = COALESCE(NULLIF(EXCLUDED.nombre, ''), clientes.nombre), \
                updated_at = NOW() \
@@ -42,6 +54,7 @@ impl ClienteRepository {
         )
         .bind(nombre_limpio)
         .bind(telefono)
+        .bind(origen)
         .fetch_one(pool)
         .await
     }
@@ -73,6 +86,61 @@ impl ClienteRepository {
              ON CONFLICT (session_id) DO NOTHING",
         )
         .bind(session_id)
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Sesión ya abierta de un cliente en un canal (F2: un hilo por
+    /// cliente×canal; web y `WhatsApp` no mezclan hilos, se enlazan por
+    /// `clientes`). `None` = hay que crear sesión nueva.
+    pub async fn buscar_sesion_por_cliente_canal(
+        pool: &PgPool,
+        cliente_id: Uuid,
+        canal: &str,
+    ) -> Result<Option<Uuid>, sqlx::Error> {
+        sqlx::query_scalar(
+            "SELECT session_id FROM canal_sesiones WHERE cliente_id = $1 AND canal = $2 LIMIT 1",
+        )
+        .bind(cliente_id)
+        .bind(canal)
+        .fetch_optional(pool)
+        .await
+    }
+
+    /* [279A-2 F2] Vinculación del webhook: fija `canal`/`modo` del reparto
+     * (wa_a→completo, wa_b→inicial) y sincroniza el `modo` de la máquina
+     * propia sin tocar su `estado` (la máquina F3 es la única que lo cambia:
+     * una ráfaga de WhatsApp no debe reabrir un hilo delegado). */
+    pub async fn vincular_canal(
+        pool: &PgPool,
+        session_id: Uuid,
+        cliente_id: Uuid,
+        telefono: &str,
+        canal: &str,
+        modo: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "INSERT INTO canal_sesiones (session_id, cliente_id, canal, telefono, modo) \
+             VALUES ($1, $2, $3, $4, $5) \
+             ON CONFLICT (session_id) DO UPDATE SET \
+               cliente_id = EXCLUDED.cliente_id, telefono = EXCLUDED.telefono, \
+               canal = EXCLUDED.canal, modo = EXCLUDED.modo",
+        )
+        .bind(session_id)
+        .bind(cliente_id)
+        .bind(canal)
+        .bind(telefono)
+        .bind(modo)
+        .execute(pool)
+        .await?;
+        sqlx::query(
+            "INSERT INTO atencion_sesiones (session_id, estado, modo) \
+             VALUES ($1, 'activa', $2) \
+             ON CONFLICT (session_id) DO UPDATE SET modo = EXCLUDED.modo",
+        )
+        .bind(session_id)
+        .bind(modo)
         .execute(pool)
         .await?;
         Ok(())

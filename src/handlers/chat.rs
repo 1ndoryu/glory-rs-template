@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::chat_tools;
+use super::whatsapp;
 use crate::repositories::ClienteRepository;
 use glory_agent::errors::AgentError;
 use glory_agent::session::ChatHub;
@@ -75,6 +76,7 @@ pub fn agent_router(pool: sqlx::PgPool, hub: ChatHub) -> Router<()> {
     glory_agent::transport::routes()
         .route("/agent/info", get(info))
         .route("/agent/sesiones/:id/contacto", post(guardar_contacto))
+        .merge(whatsapp::whatsapp_routes())
         .with_state(state)
 }
 

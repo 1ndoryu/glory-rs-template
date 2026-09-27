@@ -76,11 +76,22 @@ async fn procesar_aviso(
         return "pending";
     };
     let texto = texto_aviso(pool, entry).await;
-    let r = http
-        .post(url)
-        .json(&serde_json::json!({"destino": destino, "texto": texto}))
-        .send()
-        .await;
+    /* [279A-2 F2] Passthrough de `media_url` (fotos solo-enviar con pie):
+     * si el outbox la trae (envío manual F5 o ficha con foto), el gateway
+     * Baileys la manda; si no, aviso solo-texto como siempre. */
+    let media_url = entry
+        .payload
+        .get("media_url")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(str::to_string);
+    let cuerpo = if let Some(url_media) = media_url {
+        serde_json::json!({"destino": destino, "texto": texto, "media_url": url_media})
+    } else {
+        serde_json::json!({"destino": destino, "texto": texto})
+    };
+    let r = http.post(url).json(&cuerpo).send().await;
     match r {
         Ok(resp) if resp.status().is_success() => {
             tracing::info!("alerta WhatsApp {} enviada", entry.id);
