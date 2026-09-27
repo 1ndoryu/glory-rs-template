@@ -1,8 +1,8 @@
 /* [074A-66] Tab de edición de planes dentro de EditorServicio.
  * Cada plan es una card expandible con campos editables inline.
  * Las fases se gestionan dentro de cada plan expandido.
- * sentinel-disable-file html-nativo-en-vez-de-componente: Botones de eliminar/agregar usan
- * <button> nativo porque son acciones inline donde botonBase interfiere con layout.
+ * sentinel-disable-file html-nativo-en-vez-de-componente: solo los checkboxes usan
+ * <input> nativo (sin componente Checkbox en el DS); botones ya migrados a <Button>.
  * sentinel-disable-file componente-sin-hook: Estado vive en el padre (planes prop),
  * los callbacks son wiring trivial que no justifica un hook separado.
  * sentinel-disable-file limite-lineas: Editor de planes con cards expandibles inline;

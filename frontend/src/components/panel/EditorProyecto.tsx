@@ -1,11 +1,12 @@
 /* [074A-12] Editor de proyecto CMS — Modal con tabs: General | Media | Tech | SEO.
  * Más campos que EditorBlog: cliente, categorías, tecnologías, enlaces, skills.
  * Lógica de formulario extraída a useEditorProyecto.
- * sentinel-disable-file html-nativo-en-vez-de-componente: Tabs del editor y status toggles usan
- * <button> nativo porque botonBase interfiere con estilos del tab (mismo patrón EditorBlog).
+ * sentinel-disable-file html-nativo-en-vez-de-componente: solo las tabs del editor
+ * usan <button> nativo (sin componente Tabs en el DS; mismo patron EditorBlog).
  * sentinel-disable-file limite-lineas: Editor modal con 4 tabs (General/Media/Tech/SEO) — dividir
  * cada tab en componente aparte añadiría prop-drilling sin beneficio real, el archivo es cohesivo. */
 import React, { useState, useCallback, useEffect } from 'react';
+import {X} from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Input } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
@@ -242,13 +243,15 @@ export const EditorProyecto: React.FC<EditorProyectoProps> = ({
                                         }}
                                         placeholder="https://..."
                                     />
-                                    <button
+                                    <Button
                                         type="button"
+                                        variante="texto"
                                         className="editorProyectoEnlaceEliminar"
                                         onClick={() => form.setEnlaces(form.enlaces.filter((_, i) => i !== idx))}
+                                        aria-label="Eliminar enlace"
                                     >
-                                        ×
-                                    </button>
+                                        <X size={14} />
+                                    </Button>
                                 </div>
                             ))}
                             <Button
@@ -282,13 +285,15 @@ export const EditorProyecto: React.FC<EditorProyectoProps> = ({
                                         }}
                                         placeholder="Descripción (opcional)"
                                     />
-                                    <button
+                                    <Button
                                         type="button"
+                                        variante="texto"
                                         className="editorProyectoSkillEliminar"
                                         onClick={() => form.setSkills(form.skills.filter((_, i) => i !== idx))}
+                                        aria-label="Eliminar skill"
                                     >
-                                        ×
-                                    </button>
+                                        <X size={14} />
+                                    </Button>
                                 </div>
                             ))}
                             <Button

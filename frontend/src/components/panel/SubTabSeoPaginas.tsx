@@ -2,13 +2,15 @@
  * Reutiliza patrón visual de SeccionCorreo (tabla + badges).
  * Búsqueda por texto + filtro por tipo de página.
  * [277A-13] Columna acciones: ✏️ editar (estáticas), 🔗 ir al CMS (dinámicas). */
-/* [259A-5] sentinel-disable-file html-nativo-en-vez-de-componente menu-contextual-override-diseno: migracion visual a DS en fase 5b; filtro via props API publica del DS. */
+/* [259A-5] sentinel-disable-file menu-contextual-override-diseno: filtro via props API publica del DS (5b-7). */
 import React, {useState} from 'react';
 import {Search, ChevronDown, Pencil, ExternalLink} from 'lucide-react';
 import {useQuery} from '@tanstack/react-query';
 import type {SeoPageEntry, SeoSetting} from '../../api/admin-seo';
 import {apiGetSeoSettings} from '../../api/admin-seo';
 import {MenuContextual} from '../ui/ContextMenu';
+import {Button} from '../ui/Button';
+import {Input} from '../ui/Input';
 import {ModalSeoEdit} from './ModalSeoEdit';
 
 interface Props {
@@ -94,7 +96,7 @@ export const SubTabSeoPaginas: React.FC<Props> = ({pages}) => {
             <div className="seoPaginasFiltros">
                 <div className="seoPaginasBusqueda">
                     <Search size={16} className="seoPaginasBusquedaIcono" />
-                    <input
+                    <Input
                         type="text"
                         className="seoPaginasBusquedaInput"
                         placeholder="Buscar página por nombre, ruta o title..."
@@ -166,25 +168,27 @@ export const SubTabSeoPaginas: React.FC<Props> = ({pages}) => {
                                 <td>
                                     <div className="seoPaginaAcciones">
                                         {page.page_type === 'static' ? (
-                                            <button
+                                            <Button
                                                 type="button"
-                                                className="seoPaginaAccionBtn"
+                                                variante="texto"
+                                                tamano="pequeno"
                                                 onClick={() => handleEdit(page)}
                                                 title="Editar SEO"
                                                 aria-label={`Editar SEO de ${page.label}`}
                                             >
                                                 <Pencil size={14} />
-                                            </button>
+                                            </Button>
                                         ) : (
-                                            <button
+                                            <Button
                                                 type="button"
-                                                className="seoPaginaAccionBtn"
+                                                variante="texto"
+                                                tamano="pequeno"
                                                 onClick={() => handleGoToCms(page.page_type)}
                                                 title="Ir al CMS"
                                                 aria-label={`Ir al CMS de ${page.label}`}
                                             >
                                                 <ExternalLink size={14} />
-                                            </button>
+                                            </Button>
                                         )}
                                     </div>
                                 </td>

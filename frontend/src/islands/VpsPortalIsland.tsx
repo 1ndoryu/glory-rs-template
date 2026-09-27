@@ -5,7 +5,7 @@
  * Standalone: nav y footer propios, sin LayoutPagina.
  * [i18n] Todas las cadenas hardcoded reemplazadas por t() con fallback es.
  * Features y FAQ construidos dinámicamente desde FEATURE_KEYS/FAQ_KEYS. */
-/* [259A-5] sentinel-disable-file html-nativo-en-vez-de-componente: migracion visual a componentes DS en fase 5b con verificacion en navegador. */
+/* [259A-5 5b-6] FAQ a <Button>; resto de nativos migrados a DS; disable html retirado por obsoleto. */
 import {useState, type ElementType} from 'react';
 import {useTranslation} from 'react-i18next';
 import {Cpu, Shield, HardDrive, TerminalSquare, Activity, Server, ChevronDown} from 'lucide-react';
@@ -238,15 +238,16 @@ root@nakomi-vps:~$ █`}</pre>
                     <div className="vpsFaqLista">
                         {faqItems.map((item, i) => (
                             <div key={item.q} className="vpsFaqItem">
-                                <button
+                                <Button
                                     type="button"
+                                    variante="texto"
                                     className="vpsFaqPregunta"
                                     onClick={() => setFaqAbierto(faqAbierto === i ? null : i)}
                                     aria-expanded={faqAbierto === i}
                                 >
                                     <span>{item.q}</span>
                                     <ChevronDown className={`vpsFaqChevron${faqAbierto === i ? ' vpsFaqChevronAbierto' : ''}`} size={16} />
-                                </button>
+                                </Button>
                                 {faqAbierto === i && <p className="vpsFaqRespuesta">{item.a}</p>}
                             </div>
                         ))}

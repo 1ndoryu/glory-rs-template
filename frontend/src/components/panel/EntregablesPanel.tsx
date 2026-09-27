@@ -1,7 +1,7 @@
 /* [044A-38 Fase 6] Panel de entregables dentro de cada fase.
  * [074A-53] Modal de entrega: notas opcionales + archivos opcionales.
- * sentinel-disable-file html-nativo-en-vez-de-componente: El botón de quitar archivo (X icon)
- * usa <button> nativo porque <Button> (botonBase) interfiere con layout inline de la lista. */
+ * [259A-5 5b-6] sentinel-disable-file html-nativo-en-vez-de-componente: solo el
+ * input[type=file] oculto queda nativo (sin componente DS); boton quitar migrado a <Button>. */
 import {Download, FileText, Package, Paperclip, X} from 'lucide-react';
 import {useRef} from 'react';
 import {formatFileSize} from '../../api/deliverables';
@@ -83,14 +83,15 @@ export function EntregablesPanel({orderId, phaseNumber, canDeliver}: Entregables
                                         <FileText size={12} />
                                         <span>{f.name}</span>
                                         <span className="entregablesFileSize">{formatFileSize(f.size)}</span>
-                                        <button
+                                        <Button
                                             type="button"
+                                            variante="texto"
                                             className="entregablesModalFileRemove"
                                             onClick={() => quitarArchivo(i)}
                                             aria-label={`Quitar ${f.name}`}
                                         >
                                             <X size={12} />
-                                        </button>
+                                        </Button>
                                     </li>
                                 ))}
                             </ul>

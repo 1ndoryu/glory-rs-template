@@ -2,7 +2,7 @@
  * Permite al cliente ver, crear, editar y eliminar registros DNS de su dominio.
  * Se muestra dentro de TabDominio cuando el dominio está configurado. */
 
-/* [259A-5] sentinel-disable-file html-nativo-en-vez-de-componente: migracion visual a componentes DS en fase 5b con verificacion en navegador. */
+/* [259A-5 5b-6] Nativos migrados a DS; disable html retirado por obsoleto. */
 import {useState} from 'react';
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
 import {Loader, Plus, Trash2, Edit2, Save, X} from 'lucide-react';
@@ -16,7 +16,7 @@ import {
 } from '../../api/hosting';
 import {Button} from '../ui/Button';
 import {Input} from '../ui/Input';
-import {Select} from '../ui/Select';
+import {SelectDropdown} from '../ui/SelectDropdown';
 import {toast} from '../../stores/toastStore';
 
 const DNS_TYPES = ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'SRV', 'CAA'] as const;
@@ -132,12 +132,12 @@ export function DnsManager({subscriptionId}: Props) {
                     <div className="dnsFormRow">
                         <label className="dnsFormField">
                             <span>Tipo</span>
-                            <Select
+                            <SelectDropdown
                                 value={form.type}
-                                onChange={e => setForm(f => ({...f, type: e.target.value}))}
-                            >
-                                {DNS_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                            </Select>
+                                opciones={DNS_TYPES.map(t => ({value: t, label: t}))}
+                                onChange={v => setForm(f => ({...f, type: v}))}
+                                ariaLabel="Tipo de registro DNS"
+                            />
                         </label>
                         <label className="dnsFormField dnsFormField--name">
                             <span>Nombre</span>

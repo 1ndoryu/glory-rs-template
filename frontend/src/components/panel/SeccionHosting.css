@@ -246,14 +246,7 @@
     min-width: 340px;
 }
 
-.hostingSelect {
-    padding: var(--spacing-xs) var(--spacing-sm);
-    border: 1px solid var(--bg-accent);
-    border-radius: var(--radius-md);
-    font-size: var(--text-sm);
-    background: var(--bg-primary);
-    color: var(--brand-black);
-}
+/* [259A-5 5b-6] .hostingSelect eliminado: plan migrado a <SelectDropdown> (sin clase local). */
 
 /* [084A-45] Eventos: quitado padding innecesario */
 .hostingEventos {

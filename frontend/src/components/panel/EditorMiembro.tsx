@@ -1,8 +1,8 @@
 /* [074A-13] Editor modal para miembros del equipo.
  * [084A-8] Migrado a componente base <Modal> para consistencia
  * (focus trap, Escape listener, scroll lock, overlay). */
-/* sentinel-disable-file html-nativo-en-vez-de-componente: botones e inputs del formulario del editor
- * usan elementos nativos porque botonBase/inputBase interfieren con estilos del editor modal. */
+/* [259A-5 5b-6] sentinel-disable-file html-nativo-en-vez-de-componente: inputs y textarea
+ * del formulario usan elementos nativos con clases locales (fuera de alcance 5b-6: solo botones/selects). */
 
 import React from 'react';
 import {useEditorMiembro} from '../../hooks/useEditorMiembro';

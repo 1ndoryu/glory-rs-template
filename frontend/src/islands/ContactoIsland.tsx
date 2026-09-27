@@ -3,7 +3,7 @@
  * Pagina de contacto completa con formulario.
  * Campos: nombre, email, telefono, descripcion, presupuesto.
  */
-/* [259A-5] sentinel-disable-file html-nativo-en-vez-de-componente: migracion visual a componentes DS en fase 5b con verificacion en navegador. */
+/* [259A-5 5b-6] Nativos migrados a DS; disable html retirado por obsoleto. */
 import React, {useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import '../styles/variables.css';
@@ -12,7 +12,7 @@ import {LayoutPagina} from '../components/layout/LayoutPagina';
 import {SEOHead} from '../components/seo/SEOHead';
 import {Button} from '../components/ui/Button';
 import {Input} from '../components/ui/Input';
-import {Select} from '../components/ui/Select';
+import {SelectDropdown} from '../components/ui/SelectDropdown';
 import {Textarea} from '../components/ui/Textarea';
 import {INFO_CONTACTO} from '../data/contacto';
 
@@ -144,18 +144,13 @@ export const ContactoIsland = ({titulo}: ContactoIslandProps): JSX.Element => {
 
                                 {/* Presupuesto */}
                                 <div className="campoCampo">
-                                    <label htmlFor="presupuesto" className="campoEtiqueta">{t('contact.budget_label')}</label>
-                                    <Select
-                                        id="presupuesto"
-                                        name="presupuesto"
+                                    <label className="campoEtiqueta">{t('contact.budget_label')}</label>
+                                    <SelectDropdown
                                         value={formulario.presupuesto}
-                                        onChange={handleChange}
-                                        className="campoSelect"
-                                    >
-                                        {PRESUPUESTOS_KEYS.map(p => (
-                                            <option key={p.value} value={p.value}>{t(p.key)}</option>
-                                        ))}
-                                    </Select>
+                                        opciones={PRESUPUESTOS_KEYS.map(p => ({value: p.value, label: t(p.key)}))}
+                                        onChange={v => setFormulario(prev => ({...prev, presupuesto: v}))}
+                                        ariaLabel={t('contact.budget_label')}
+                                    />
                                 </div>
                             </div>
 

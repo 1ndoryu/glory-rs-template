@@ -3,7 +3,7 @@
  * Pie de página global con newsletter y navegación.
  * Enlaces centralizados en data/navegacion.ts (DRY).
  */
-/* [259A-5] sentinel-disable-file html-nativo-en-vez-de-componente: migracion visual a componentes DS en fase 5b con verificacion en navegador. */
+/* [259A-5 5b-6] Contacto a <Button>; newsletter ya en DS; disable html retirado por obsoleto. */
 import React, {useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {spaClick} from '../../navegacionSPA';
@@ -131,14 +131,15 @@ export const Footer: React.FC = () => {
                         {ENLACES_FOOTER.map(enlace => {
                             if (enlace.label === 'Contacto') {
                                 return (
-                                    <button
+                                    <Button
                                         key={enlace.label}
                                         type="button"
+                                        variante="texto"
                                         className="footerLink footerLinkAccion"
                                         onClick={() => useChatStore.getState().abrir()}
                                     >
                                         {t(FOOTER_NAV_KEYS[enlace.label] || enlace.label)}
-                                    </button>
+                                    </Button>
                                 );
                             }
                             return (

@@ -4,7 +4,7 @@
  * [304A-3] Admin puede asignar hosting a cliente por email + generar link de pago.
  * [15A-SENT-1] Estado extraído a useHostingCard para cumplir limite de 3 useState. */
 
-/* [259A-5] sentinel-disable-file html-nativo-en-vez-de-componente: migracion visual a componentes DS en fase 5b con verificacion en navegador. */
+/* [259A-5 5b-6] Nativos migrados a DS; disable html retirado por obsoleto. */
 import {Server, ExternalLink, UserCheck, Link} from 'lucide-react';
 import {
     HOSTING_PLAN_LABELS,
@@ -16,7 +16,7 @@ import {
 } from '../../api/hosting';
 import {Modal, ModalBody} from '../ui/Modal';
 import {Input} from '../ui/Input';
-import {Select} from '../ui/Select';
+import {SelectDropdown} from '../ui/SelectDropdown';
 import {Button} from '../ui/Button';
 import {MenuContextual, type MenuContextualItem} from '../ui/ContextMenu';
 import {HOSTING_PLAN_OPTIONS} from './hostingPlanOptions';
@@ -212,15 +212,12 @@ export function HostingCard({
             {editing && (
                 <Modal abierto={editing} onCerrar={() => setEditing(false)}>
                     <ModalBody className="hostingCrearContenido">
-                        <Select
-                            className="hostingSelect"
+                        <SelectDropdown
                             value={editPlan}
-                            onChange={e => setEditPlan(e.target.value)}
-                        >
-                            {HOSTING_PLAN_OPTIONS.map(option => (
-                                <option key={option.value} value={option.value}>{option.label}</option>
-                            ))}
-                        </Select>
+                            opciones={[...HOSTING_PLAN_OPTIONS]}
+                            onChange={v => setEditPlan(v)}
+                            ariaLabel="Plan de hosting"
+                        />
                         <Input
                             type="text"
                             placeholder="Dominio (opcional)"

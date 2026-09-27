@@ -1,8 +1,8 @@
 /* [154A-10] Editor de galería de imágenes del proyecto.
  * [124A-PROJ1] Soporta GaleriaImagen con layout full/half (1/1 o 1/2 ancho).
  * [124A-GAL1] Drag-to-reorder con @dnd-kit para reorganizar imágenes.
- * sentinel-disable-file html-nativo-en-vez-de-componente: El botón × de eliminar sobre thumbnail
- * y el input[type=file] oculto no aplican a los componentes UI estándar (Button/Input). */
+ * [259A-5 5b-6] sentinel-disable-file html-nativo-en-vez-de-componente: solo el
+ * input[type=file] oculto queda nativo (sin componente DS); botones migrados a <Button>. */
 import React, { useCallback, useRef, useState } from 'react';
 import { X, Maximize2, Columns2, GripVertical } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
@@ -48,23 +48,26 @@ const GaleriaItemSortable: React.FC<{
             </div>
             <img src={img.url} alt={`Galería ${idx + 1}`} loading="lazy" />
             <div className="editorProyectoGaleriaControles">
-                <button
+                <Button
                     type="button"
+                    variante="texto"
                     className="editorProyectoGaleriaLayout"
                     onClick={() => onToggleLayout(idx)}
                     title={img.layout === 'full' ? 'Cambiar a 1/2 ancho' : 'Cambiar a ancho completo'}
                 >
                     {img.layout === 'full' ? <Maximize2 size={14} /> : <Columns2 size={14} />}
                     <span>{img.layout === 'full' ? '1/1' : '1/2'}</span>
-                </button>
-                <button
+                </Button>
+                <Button
                     type="button"
+                    variante="texto"
                     className="editorProyectoGaleriaEliminar"
                     onClick={() => onRemove(idx)}
                     title="Eliminar imagen"
+                    aria-label="Eliminar imagen"
                 >
                     <X size={14} />
-                </button>
+                </Button>
             </div>
         </div>
     );

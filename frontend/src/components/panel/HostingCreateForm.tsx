@@ -1,7 +1,7 @@
 /* [074A-63+] UserSelector y CreateHostingForm extraidos de HostingSubComponents.tsx
  * para cumplir limite de 300 lineas. UserSelector es combobox con búsqueda inline. */
 
-/* [259A-5] sentinel-disable-file html-nativo-en-vez-de-componente: migracion visual a componentes DS en fase 5b con verificacion en navegador. */
+/* [259A-5 5b-6] Nativos migrados a DS; disable html retirado por obsoleto. */
 import React, {useState, useCallback, useRef, useEffect} from 'react';
 import {useQuery} from '@tanstack/react-query';
 import {ChevronDown} from 'lucide-react';
@@ -10,7 +10,7 @@ import {
 } from '../../api/hosting';
 import {apiListUsers, type AdminUserItem} from '../../api/admin-users';
 import {Input} from '../ui/Input';
-import {Select} from '../ui/Select';
+import {SelectDropdown} from '../ui/SelectDropdown';
 import {Button} from '../ui/Button';
 import {ModalBody} from '../ui/Modal';
 import {HOSTING_PLAN_OPTIONS} from './hostingPlanOptions';
@@ -124,15 +124,12 @@ export function CreateHostingForm({
                     Cliente: <strong>{selectedUser.display_name || selectedUser.email}</strong> · {selectedUser.email}
                 </p>
             )}
-            <Select
-                className="hostingSelect"
+            <SelectDropdown
                 value={form.plan}
-                onChange={e => setForm(prev => ({...prev, plan: e.target.value}))}
-            >
-                {HOSTING_PLAN_OPTIONS.map(option => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-            </Select>
+                opciones={[...HOSTING_PLAN_OPTIONS]}
+                onChange={v => setForm(prev => ({...prev, plan: v}))}
+                ariaLabel="Plan de hosting"
+            />
             <Input
                 type="text"
                 placeholder="Dominio (opcional)"

@@ -4,7 +4,7 @@
  * [259A-5 5b-3] Modal artesanal migrado a <Modal> + recetas (modalTitulo,
  * modalAcciones) + Button. Galeria (botones nativos) pendiente de 5b-6. */
 
-/* [259A-5] sentinel-disable-file html-nativo-en-vez-de-componente componente-artesanal: migracion visual a componentes DS en fase 5b con verificacion en navegador (galeria nativa -> 5b-6). */
+/* [259A-5 5b-6] sentinel-disable-file html-nativo-en-vez-de-componente componente-artesanal: categorias (tabs sin componente Tabs en el DS) y tarjetas de seleccion (cards seleccionables, sin componente DS) quedan nativas; modal ya en <Modal>. */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, AlertCircle, Eye, X, ExternalLink, Mail } from 'lucide-react';

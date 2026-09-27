@@ -3,14 +3,14 @@
  * - "Vista previa": galería de plantillas renderizadas con datos de muestra.
  * Sigue el patrón visual de SeccionReembolsos. */
 
-/* [259A-5] sentinel-disable-file html-nativo-en-vez-de-componente: migracion visual a componentes DS en fase 5b con verificacion en navegador. */
+/* [259A-5 5b-6] sentinel-disable-file html-nativo-en-vez-de-componente: solo las pestanias usan <button> nativo (sin componente Tabs en el DS); paginacion ya en <Button>. */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, AlertCircle, Mail, ChevronLeft, ChevronRight, Filter, Eye } from 'lucide-react';
 import { apiListEmailLogs, TEMPLATE_OPTIONS, type EmailLogItem } from '../../api/admin-email';
 import { VistaPreviaCorreos } from './VistaPreviaCorreos';
 import { Button } from '../ui/Button';
-import { Select } from '../ui/Select';
+import {SelectDropdown} from '../ui/SelectDropdown';
 import './SeccionCorreo.css';
 
 type Pestaña = 'enviados' | 'preview';
@@ -62,15 +62,12 @@ function PestañaEnviados() {
             {/* Filtro por plantilla */}
             <div className="correosFiltro">
                 <Filter size={18} />
-                <Select
+                <SelectDropdown
                     value={filtroTemplate}
-                    onChange={(e) => handleFilterChange(e.target.value)}
-                >
-                    <option value="">Todas las plantillas</option>
-                    {TEMPLATE_OPTIONS.map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                </Select>
+                    opciones={[{value: '', label: 'Todas las plantillas'}, ...TEMPLATE_OPTIONS]}
+                    onChange={handleFilterChange}
+                    ariaLabel="Filtrar por plantilla"
+                />
                 <span className="correosTotal">{total} correos</span>
             </div>
 

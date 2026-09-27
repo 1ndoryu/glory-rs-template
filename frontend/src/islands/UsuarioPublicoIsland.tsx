@@ -1,8 +1,7 @@
 /* [084A-7] Island de perfil público de usuario estilo Fiverr.
  * Muestra info del usuario, ratings, y reviews recibidas/dadas.
  * Accesible sin autenticación en /usuario/:username.
- * sentinel-disable-file html-nativo-en-vez-de-componente: Los tabs y botones de paginación
- * usan <button> nativo porque Button (botonBase) interfiere con los estilos inline del tab. */
+ * [259A-5 5b-6] Tabs y paginacion migrados a <Button>; disable html retirado por obsoleto. */
 
 import {useParams} from 'react-router-dom';
 import {Star} from 'lucide-react';
