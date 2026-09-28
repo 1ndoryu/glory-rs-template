@@ -45,7 +45,9 @@ async function aPayload(msg, numeroDestino) {
   if (!texto) return null;
   return {
     numero_destino: numeroDestino,
-    remitente: jidANumero(msg.key.remoteJid),
+    /* Con direccionamiento @lid el `remoteJid` no es el teléfono:
+     * `senderPn` trae el número real cuando existe. */
+    remitente: jidANumero(msg.key.senderPn || msg.key.remoteJid),
     texto,
     ...(msg.pushName ? { nombre: msg.pushName } : {}),
     ...(mediaUrl ? { media_url: mediaUrl } : {}),
@@ -103,6 +105,12 @@ export async function conectarSesion(via, sockets) {
     if (type !== "notify") return;
     for (const msg of messages) {
       if (msg.key.fromMe || !msg.message) continue;
+      /* Grupos fuera: el producto es 1:1; el remitente sería el id del
+       * grupo y crearía clientes fantasma (caso real 2026-09-28). */
+      if (msg.key.remoteJid?.endsWith("@g.us")) continue;
+      /* Remitente @lid sin teléfono (`senderPn`): no es respondible ni
+       * registrable; procesarlo crea clientes fantasma numéricos. */
+      if (msg.key.remoteJid?.endsWith("@lid") && !msg.key.senderPn) continue;
       try {
         const payload = await aPayload(msg, sesion.numero);
         if (!payload) continue;
