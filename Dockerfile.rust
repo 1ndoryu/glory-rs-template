@@ -25,7 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git ca-certificates pkg-config \
     && rm -rf /var/lib/apt/lists/*
 ARG GLORY_AGENT_URL=https://github.com/1ndoryu/glory-agent.git
-ARG GLORY_AGENT_REF=9e357fb
+ARG GLORY_AGENT_REF=0050d08b47188da49f80414e639483a164fa617a
 WORKDIR /src/mn-inmobiliaria
 COPY . ./
 RUN git submodule update --init --depth 1 || true
