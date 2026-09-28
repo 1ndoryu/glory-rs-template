@@ -17,6 +17,13 @@ function etiquetaRemitente(remitente: string): string {
   return 'Visitante';
 }
 
+/* [289A-2] Fecha corta del mensaje (created_at ISO del servidor). */
+function formatoFecha(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
 export function HiloMensajes({
   sesion,
   hilo,
@@ -46,6 +53,8 @@ export function HiloMensajes({
           {sesion.ai_enabled ? 'IA activa' : 'IA apagada'}
         </Badge>
         {sesion.contact && <span className="text-xs text-muted-foreground">{sesion.contact}</span>}
+        {/* [289A-2] Número del cliente en la cabecera del hilo. */}
+        {sesion.telefono && <span className="text-xs font-medium">{sesion.telefono}</span>}
         <span className="ml-auto flex gap-1">
           {sesion.ai_enabled ? (
             <Button variant="outline" size="sm" title="Tomar el hilo a mano" onClick={() => void alCambiar({ aiEnabled: false })}>
@@ -67,7 +76,10 @@ export function HiloMensajes({
         {hilo.length === 0 && <p className="text-sm text-muted-foreground">Sin mensajes todavía.</p>}
         {hilo.map((m) => (
           <div key={m.id} className={cn('max-w-[85%] rounded-md border px-3 py-2 text-sm', m.sender === 'staff' ? 'ml-auto bg-primary text-primary-foreground' : 'bg-muted')}>
-            <p className="mb-0.5 text-[11px] opacity-70">{etiquetaRemitente(m.sender)}</p>
+            <p className="mb-0.5 text-[11px] opacity-70" title={m.created_at}>
+              {etiquetaRemitente(m.sender)}
+              {formatoFecha(m.created_at) && ` · ${formatoFecha(m.created_at)}`}
+            </p>
             <p className="whitespace-pre-wrap">{m.body}</p>
           </div>
         ))}

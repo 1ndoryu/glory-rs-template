@@ -350,6 +350,18 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   (falta `vite` en `node_modules`): el panel nuevo solo tuvo revisión.
   Queda: usuaria ejecuta `iniciar-pruebas.ps1`, vincula A + B temporal,
   batería real F2/F3, limpieza y deploy.
+- 289A-1 alcance 2026-09-28 (decisión usuaria tras bucle A↔B real): **solo A
+  es IA; B mudo**. El ping-pong se confirmó en BD (la respuesta `ai` de cada
+  lado entraba como `client` del otro). `gateway/src/config.mjs:respondeIA`
+  (`SESSION_A_RESPONDE_IA=1`, `SESSION_B_RESPONDE_IA=0`) +
+  `sesion.mjs` descarta inbound de vía muda antes de bajar media (outbound
+  intacto); anti-eco `eco.mjs` queda como defensa. BD de pruebas a cero.
+  Pendiente: prueba real B→A con A respondiendo y B en silencio.
+  Lección 2026-09-28: el gateway debe correr sin interrupción; matar+relanzar
+  con la misma identidad (y peor con solape) bifurca el cifrado y el teléfono
+  muestra "esperando mensaje". `mn-arrancar-gateway.ps1` ya rehúsa lanzar un
+  segundo (guardia por puerto 3102); reinicio limpio = verificar PID muerto +
+  puerto libre + 5 s antes de lanzar.
 
 ## 279A-3 — /ask cuestionario de ficha (F1 verificado local 2026-09-27; pendiente: respuestas usuaria)
 - Plan: `Agente/planes/plan-ask-2026-09-27.md`.

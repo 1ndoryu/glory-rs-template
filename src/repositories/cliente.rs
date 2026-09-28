@@ -213,6 +213,20 @@ impl ClienteRepository {
             .fetch_optional(pool)
             .await
     }
+
+    /// Hilo `WhatsApp` de la sesión (`canal`, `telefono` de `canal_sesiones`).
+    /// Lo usa Responder staff: si hay hilo, el mensaje humano también se
+    /// encola al outbox `whatsapp` para que le llegue al cliente (antes solo
+    /// quedaba en el panel). `None` = sesión web sin hilo. [289A-2]
+    pub async fn hilo_whatsapp(
+        pool: &PgPool,
+        session_id: Uuid,
+    ) -> Result<Option<(String, Option<String>)>, sqlx::Error> {
+        sqlx::query_as("SELECT canal, telefono FROM canal_sesiones WHERE session_id = $1")
+            .bind(session_id)
+            .fetch_optional(pool)
+            .await
+    }
 }
 
 /// Ficha comercial de una sesión para avisar al humano (ver

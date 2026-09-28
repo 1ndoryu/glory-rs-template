@@ -59,6 +59,9 @@ struct SesionResumen {
      * viejas: LEFT JOIN + default en el panel). */
     estado_atencion: Option<String>,
     modo_atencion: Option<String>,
+    /* [289A-2] Teléfono del cliente (`canal_sesiones`; el panel muestra el
+     * número en la conversación). */
+    telefono: Option<String>,
     last_body: Option<String>,
     last_sender: Option<String>,
     #[sqlx(rename = "last_at")]
@@ -85,16 +88,18 @@ async fn listar_sesiones(
     let filas: Vec<SesionResumen> = sqlx::query_as(
         "SELECT s.id, s.visitor_name, s.contact, s.status, s.ai_enabled, \
          a.estado AS estado_atencion, a.modo AS modo_atencion, \
+         cs.telefono AS telefono, \
          m.body AS last_body, m.sender AS last_sender, m.created_at AS last_at, \
          (SELECT COUNT(*) FROM agent_outbox o WHERE o.status = 'pending' \
           AND o.kind = 'whatsapp' AND o.payload->>'session_id' = s.id::TEXT) AS alertas, \
-         s.updated_at \
-         FROM agent_sessions s \
-         LEFT JOIN atencion_sesiones a ON a.session_id = s.id \
-         LEFT JOIN LATERAL (SELECT body, sender, created_at FROM agent_messages \
-           WHERE session_id = s.id ORDER BY sequence_num DESC LIMIT 1) m ON true \
-         WHERE ($1::TEXT IS NULL OR s.status = $1) \
-         ORDER BY s.updated_at DESC LIMIT $2",
+          s.updated_at \
+          FROM agent_sessions s \
+          LEFT JOIN atencion_sesiones a ON a.session_id = s.id \
+          LEFT JOIN canal_sesiones cs ON cs.session_id = s.id \
+          LEFT JOIN LATERAL (SELECT body, sender, created_at FROM agent_messages \
+            WHERE session_id = s.id ORDER BY sequence_num DESC LIMIT 1) m ON true \
+          WHERE ($1::TEXT IS NULL OR s.status = $1) \
+          ORDER BY s.updated_at DESC LIMIT $2",
     )
     .bind(f.estado.clone())
     .bind(limit)
@@ -128,6 +133,9 @@ struct RespuestaStaff {
 
 /// Responder como humano: persiste (sender `staff`), emite por el WS del
 /// visitante y TOMA el hilo (`ai_enabled=false` + ciclo `escalated`).
+/// [289A-2] Si la sesión tiene hilo `WhatsApp`, el mensaje también se encola
+/// al outbox `whatsapp` (`motivo: manual`): antes solo quedaba en el panel
+/// y al cliente de `WhatsApp` no le llegaba nada.
 async fn responder(
     _auth: AuthUser,
     State(state): State<AppState>,
@@ -143,13 +151,45 @@ async fn responder(
     glory_agent::persistence::ensure_session(&state.pool, id)
         .await
         .map_err(|e| fail(&e))?;
-    let seq = state.hub.next_sequence(id);
-    let msg = glory_agent::persistence::insert_message(&state.pool, id, "staff", &body, seq)
-        .await
-        .map_err(|e| fail(&e))?;
+    /* Secuencia con `insert_message_seq` (reseed + retry 23505): el contador
+     * en memoria del hub vuelve a 1 en cada reinicio y colisiona. */
+    let msg = glory_agent::persistence::insert_message_seq(
+        &state.pool,
+        &state.hub,
+        id,
+        "staff",
+        &body,
+        None,
+        None,
+    )
+    .await
+    .map_err(|e| fail(&e))?;
+    let seq = msg.sequence_num;
     let _ = state
         .hub
         .broadcast(id, &glory_agent::models::WsServerMessage::live(msg));
+    if let Some((canal, telefono)) =
+        crate::repositories::ClienteRepository::hilo_whatsapp(&state.pool, id)
+            .await
+            .map_err(AppError::from)?
+    {
+        let destino = telefono.as_deref().map(str::trim).filter(|v| !v.is_empty());
+        if let Some(destino) = destino {
+            glory_agent::persistence::enqueue_outbox(
+                &state.pool,
+                "whatsapp",
+                serde_json::json!({
+                    "session_id": id,
+                    "destino": destino,
+                    "texto": body,
+                    "via": canal,
+                    "motivo": "manual",
+                }),
+            )
+            .await
+            .map_err(|e| fail(&e))?;
+        }
+    }
     glory_agent::persistence::set_session_ai(&state.pool, id, false)
         .await
         .map_err(|e| fail(&e))?;
@@ -185,10 +225,20 @@ async fn devolver_a_ia(
     glory_agent::persistence::ensure_session(&state.pool, id)
         .await
         .map_err(|e| fail(&e))?;
-    let seq = state.hub.next_sequence(id);
-    let msg = glory_agent::persistence::insert_message(&state.pool, id, "staff", &nota, seq)
-        .await
-        .map_err(|e| fail(&e))?;
+    /* [289A-2] Igual que Responder: `insert_message_seq`, nunca el contador
+     * en memoria del hub (colisiona tras reinicio). */
+    let msg = glory_agent::persistence::insert_message_seq(
+        &state.pool,
+        &state.hub,
+        id,
+        "staff",
+        &nota,
+        None,
+        None,
+    )
+    .await
+    .map_err(|e| fail(&e))?;
+    let seq = msg.sequence_num;
     let _ = state
         .hub
         .broadcast(id, &glory_agent::models::WsServerMessage::live(msg));

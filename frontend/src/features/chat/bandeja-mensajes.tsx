@@ -62,7 +62,7 @@ export function BandejaMensajes() {
                   )}
                 >
                   <span className="flex items-center gap-2">
-                    <span className="font-medium">{s.visitor_name ?? s.contact ?? s.id.slice(0, 8)}</span>
+                    <span className="font-medium">{s.visitor_name ?? s.contact ?? s.telefono ?? s.id.slice(0, 8)}</span>
                     {s.status !== 'open' && (
                       <Badge variant={s.status === 'escalated' ? 'destructive' : 'secondary'} className="text-[10px]">
                         {s.status}
@@ -79,6 +79,8 @@ export function BandejaMensajes() {
                       </Badge>
                     )}
                   </span>
+                  {/* [289A-2] Número del cliente: identifica la conversación de WhatsApp. */}
+                  {s.telefono && <span className="mt-0.5 block text-xs font-medium text-muted-foreground">{s.telefono}</span>}
                   {s.last_body && <span className="mt-0.5 block truncate text-xs text-muted-foreground">{s.last_body}</span>}
                 </button>
               </li>

@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { config } from "./config.mjs";
 import { purgar } from "./media.mjs";
 import { listarEstados } from "./estado.mjs";
+import { registrarEnviado } from "./eco.mjs";
 
 const MIME_POR_EXT = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
 
@@ -101,6 +102,9 @@ export function arrancarServidor(sockets) {
           return;
         }
         await enviar(sock, { destino, texto, media_url: cuerpo.media_url });
+        /* Anti-eco 289A-1: este texto volverá como inbound en la sesión del
+         * otro número; registrarlo evita re-ingestarlo como `client`. */
+        registrarEnviado(destino, texto);
         res.writeHead(200, { "content-type": "application/json" }).end('{"ok":true}');
         return;
       }

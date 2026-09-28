@@ -14,6 +14,9 @@ export interface ResumenSesion {
   contact: string | null;
   status: string;
   ai_enabled: boolean;
+  /* [289A-2] Número del cliente (`canal_sesiones.telefono`): la bandeja y el
+   * hilo lo muestran. Null en web sin hilo o sin vincular. */
+  telefono: string | null;
   last_body: string | null;
   last_sender: string | null;
   last_at: string | null;

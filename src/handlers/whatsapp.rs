@@ -172,8 +172,14 @@ async fn persistir_foto(
     sesion: Uuid,
     cuerpo: String,
 ) {
-    let seq = hub.next_sequence(sesion);
-    match glory_agent::persistence::insert_message(pool, sesion, "client", &cuerpo, seq).await {
+    /* Secuencia asignada por `insert_message_seq` (reseed desde BD +
+     * retry 23505): el hub en memoria vuelve a 1 en cada reinicio y sin esto
+     * el primer mensaje post-reinicio a una sesión vieja colisiona. */
+    match glory_agent::persistence::insert_message_seq(
+        pool, hub, sesion, "client", &cuerpo, None, None,
+    )
+    .await
+    {
         Ok(msg) => {
             let _ = hub.broadcast(sesion, &glory_agent::models::WsServerMessage::live(msg));
         }
@@ -261,8 +267,12 @@ pub async fn repartir_y_vincular(
             .map_err(|e| AgentError::Db(e.to_string()))?;
         nueva
     };
-    let seq = hub.next_sequence(sesion);
-    let msg = glory_agent::persistence::insert_message(pool, sesion, "client", texto, seq).await?;
+    /* La secuencia la asigna `insert_message_seq` (reseed desde BD +
+     * retry 23505): nunca `hub.next_sequence` directo. */
+    let msg = glory_agent::persistence::insert_message_seq(
+        pool, hub, sesion, "client", texto, None, None,
+    )
+    .await?;
     let _ = hub.broadcast(
         sesion,
         &glory_agent::models::WsServerMessage::live(msg.clone()),
@@ -314,8 +324,9 @@ async fn webhook(
      * gateway; la IA (núcleo `responder_turno_persistido`, misma vía que el
      * chat web) corre aparte y su texto se encola en outbox `whatsapp` con
      * el `via` del canal, que el worker manda por la sesión Baileys que
-     * recibió. Sin IA (gate humano, sin key, sobre presupuesto, error) solo
-     * se loguea: nunca silencio y nunca 500 al gateway por fallos del LLM. */
+     * recibió. `Ok(None)` (LLM sin texto tras tools, sin key, gate humano)
+     * NO es silencio: escala la sesión a `consultando` para que el staff la
+     * tome. `Err` se loguea: nunca 500 al gateway por fallos del LLM. */
     let fondo = state.clone();
     let pool_fondo = pool.clone();
     let texto_fondo = entrada.texto.trim().to_string();
@@ -353,9 +364,21 @@ async fn webhook(
                 }
             }
             Ok(None) => {
-                tracing::info!(
-                    "webhook WhatsApp: {sesion_fondo} sin respuesta IA (gate humano o sin key)"
-                );
+                /* IA sin texto (quemó tools sin redactar, sin key, gate
+                 * humano): escalar a `consultando` en vez de soltar el
+                 * mensaje al vacío — el staff lo ve y responde. */
+                if let Err(e) =
+                    ClienteRepository::marcar_atencion(&pool_fondo, sesion_fondo, "consultando")
+                        .await
+                {
+                    tracing::error!(
+                        "webhook WhatsApp: {sesion_fondo} sin respuesta IA y no se pudo escalar: {e}"
+                    );
+                } else {
+                    tracing::warn!(
+                        "webhook WhatsApp: {sesion_fondo} sin respuesta IA, escalada a consultando"
+                    );
+                }
             }
             Err(e) => {
                 tracing::warn!("webhook WhatsApp: {sesion_fondo} turno IA falló: {e}");

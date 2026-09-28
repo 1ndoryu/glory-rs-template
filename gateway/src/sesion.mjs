@@ -11,6 +11,7 @@ import qrcode from "qrcode-terminal";
 import QRCode from "qrcode";
 import { config } from "./config.mjs";
 import { avisarBackend } from "./backend.mjs";
+import { esEco } from "./eco.mjs";
 import { guardarTemporal } from "./media.mjs";
 import { setEstado } from "./estado.mjs";
 
@@ -111,9 +112,22 @@ export async function conectarSesion(via, sockets) {
       /* Remitente @lid sin teléfono (`senderPn`): no es respondible ni
        * registrable; procesarlo crea clientes fantasma numéricos. */
       if (msg.key.remoteJid?.endsWith("@lid") && !msg.key.senderPn) continue;
+      /* [289A-1] Vía muda (B manual de la dueña): su inbound nunca va al
+       * webhook, así no crea sesiones ni dispara IA. Se descarta antes de
+       * bajar media. El outbound (/send via=wa_b) no se toca. */
+      if (!sesion.respondeIA) {
+        console.log(`[${sesion.nombre}] vía muda, inbound ignorado`);
+        continue;
+      }
       try {
         const payload = await aPayload(msg, sesion.numero);
         if (!payload) continue;
+        /* Anti-eco 289A-1: lo que /send entregó vuelve como inbound en la
+         * otra sesión; no es un mensaje del cliente, no va al webhook. */
+        if (esEco(payload.remitente, payload.texto)) {
+          console.log(`[${sesion.nombre}] eco propio descartado (${payload.remitente})`);
+          continue;
+        }
         await avisarBackend(payload);
         console.log(`[${sesion.nombre}] → webhook: ${payload.remitente} (${payload.texto.length} chars)`);
       } catch (e) {
