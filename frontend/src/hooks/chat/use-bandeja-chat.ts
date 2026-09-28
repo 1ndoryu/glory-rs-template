@@ -32,7 +32,13 @@ export function useBandejaChat() {
       const lista = await listarSesiones(conFiltro === 'todas' ? undefined : conFiltro);
       setSesiones(lista);
       setError(null);
-      if (sesionId) setHilo(await historialSesion(sesionId));
+      if (sesionId) {
+        const mensajes = await historialSesion(sesionId);
+        /* [289A-3] Nuevos arriba siempre: orden explícito por secuencia
+         * (no depende del orden implícito del backend). */
+        mensajes.sort((a, b) => b.sequence_num - a.sequence_num);
+        setHilo(mensajes);
+      }
     } catch (e) {
       setError(mensajeError(e));
     }
