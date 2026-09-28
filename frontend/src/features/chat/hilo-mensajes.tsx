@@ -17,6 +17,15 @@ function etiquetaRemitente(remitente: string): string {
   return 'Visitante';
 }
 
+/* [289A-7] Lado por remitente: el Visitante a la derecha, la IA a la
+ * izquierda, lo propio (staff) a la derecha destacado, sistema centrado. */
+function claseLado(remitente: string): string {
+  if (remitente === 'system') return 'mx-auto max-w-[90%] bg-transparent text-center text-xs text-muted-foreground';
+  if (remitente === 'ai') return 'mr-auto bg-muted';
+  if (remitente === 'staff') return 'ml-auto bg-primary text-primary-foreground';
+  return 'ml-auto border-primary/40 bg-primary/10';
+}
+
 /* [289A-2] Fecha corta del mensaje (created_at ISO del servidor). */
 function formatoFecha(iso: string): string {
   const d = new Date(iso);
@@ -40,13 +49,12 @@ export function HiloMensajes({
   const [texto, setTexto] = useState('');
   const cajaRef = useRef<HTMLDivElement>(null);
 
-  /* [289A-3] El hilo crece hacia abajo: acompaña al fondo solo si ya
-   * estabas cerca de él (no roba el scroll al releer viejos). */
+  /* [289A-7] El hilo crece hacia arriba (nuevos primero): acompaña al
+   * inicio solo si ya estabas cerca de él. */
   useEffect(() => {
     const caja = cajaRef.current;
     if (!caja) return;
-    const cercaFondo = caja.scrollHeight - caja.scrollTop - caja.clientHeight < 160;
-    if (cercaFondo) caja.scrollTop = caja.scrollHeight;
+    if (caja.scrollTop < 160) caja.scrollTop = 0;
   }, [hilo]);
 
   async function enviar(): Promise<void> {
@@ -85,7 +93,7 @@ export function HiloMensajes({
       <div ref={cajaRef} className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-3">
         {hilo.length === 0 && <p className="text-sm text-muted-foreground">Sin mensajes todavía.</p>}
         {hilo.map((m) => (
-          <div key={m.id} className={cn('max-w-[85%] rounded-md border px-3 py-2 text-sm', m.sender === 'staff' ? 'ml-auto bg-primary text-primary-foreground' : 'bg-muted')}>
+          <div key={m.id} className={cn('max-w-[85%] rounded-md border px-3 py-2 text-sm', claseLado(m.sender))}>
             <p className="mb-0.5 text-[11px] opacity-70" title={m.created_at}>
               {etiquetaRemitente(m.sender)}
               {formatoFecha(m.created_at) && ` · ${formatoFecha(m.created_at)}`}
