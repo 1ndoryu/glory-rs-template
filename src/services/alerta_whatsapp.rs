@@ -112,7 +112,21 @@ async fn procesar_aviso(
 /// nombre+teléfono+resumen+interés+presupuesto+zona). Si la sesión no deja
 /// ficha (uuid inválido o sin filas), cae al texto mínimo con sesión+motivo:
 /// mejor aviso parcial que ninguno (nunca silencio).
+/// [279A-2] El `texto` explícito del payload manda: los envíos manuales de
+/// la consola (`motivo: manual`) y las alertas de tope ya traen el mensaje
+/// listo. Sin `texto`, se construye la ficha (solo entonces se exige
+/// `session_id`). Antes de este fix el worker ignoraba el `texto` manual y
+/// habría entregado el texto de ficha al cliente al ir en vivo.
 async fn texto_aviso(pool: &PgPool, entry: &glory_agent::models::OutboxEntry) -> String {
+    if let Some(texto) = entry
+        .payload
+        .get("texto")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+    {
+        return texto.to_string();
+    }
     let sesion_txt = entry
         .payload
         .get("session_id")

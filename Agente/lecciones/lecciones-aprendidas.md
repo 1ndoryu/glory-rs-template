@@ -55,3 +55,23 @@
 - `_sqlx_migrations` puede traer checksum de un borrador (`...15`): se
   sincroniza con `UPDATE ... SET checksum=decode(sha384 archivo,'hex')`
   antes de migrar, no borrando la fila.
+## 2026-09-28 - Webhook secreto, storage WA, tope LLM (resto sin QR)
+- `uso_mensajes` no tiene columna `remitente`: es `sender` (el endpoint de
+  uso la expone como alias `remitente`). El watcher de tope falló dos
+  ciclos con `no existe la columna «remitente»` en log: el fallo ruidoso
+  cada 5 min lo delató; sin ese log habría parecido "tope que no salta".
+- El tope diario debe contar solo tokens LLM exactos (`tokens_in/out`);
+  la estima de cliente no es coste. Verificarlo E2E exige sembrar
+  `tokens_in/out` (el tráfico simulado deja 0) y esperar el ciclo real
+  del watcher (~5 min): no hay atajo sin falsear el intervalo.
+- El worker ignoraba el `texto` explícito del payload y armaba ficha
+  siempre: los envíos manuales habrían llegado con texto de escalación
+  al ir en vivo. Regla: payload con `texto` manda; ficha solo sin él.
+- Hijos del tool de terminal mueren al cerrar la llamada (servidor de
+  verificación): para esperas largas (watcher 5 min), una sola llamada
+  con arranque+espera+chequeo+stop dentro; `Start-Process` entre llamadas
+  no es fiable.
+- `check:front` (`tsc -b`) falla en este entorno por `node_modules`
+  incompleto (`vite/client`, `node` ausentes): ajeno al bloque (solo se
+  tocó `src/*.rs`); se registra como limitación, no se reinstala dentro
+  del bloque backend.

@@ -75,6 +75,7 @@ impl utoipa::Modify for SecurityAddon {
         uploads::upload_foto,
         uploads::servir_archivo,
         uploads::servir_archivo_solicitud,
+        uploads::servir_archivo_whatsapp,
         solicitud::subir_foto_solicitud,
         solicitud::create_solicitud,
         solicitud::list_solicitudes,
@@ -184,6 +185,11 @@ pub fn create_router(pool: sqlx::PgPool, config: crate::config::AppConfig) -> Ro
         .route(
             "/uploads/solicitudes/:sesion/:archivo",
             get(uploads::servir_archivo_solicitud),
+        )
+        /* [279A-2] Fotos entrantes de WhatsApp archivadas en disco local. */
+        .route(
+            "/uploads/whatsapp/:telefono/:archivo",
+            get(uploads::servir_archivo_whatsapp),
         )
         /* [249A-1] Sitemap dinámico (ruta explícita: no cae al fallback). */
         .route("/sitemap.xml", get(sitemap))

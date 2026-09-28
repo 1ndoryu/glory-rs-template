@@ -319,7 +319,20 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   (outbox `manual`/`pending`, `media_url` en payload, trigger
   `tokens_est=10`) y datos de prueba borrados; `tsc` 0 + `self-check`
   (check+clippy+test+front) verde. F4-audio fuera: sin transcripción
-  (ver plan). Queda: QR×2 + storage + gateway + deploy.
+  (ver plan).
+- Resto sin QR verificado local 2026-09-28: secreto webhook
+  `WA_WEBHOOK_SECRETO` (cabecera `X-Gateway-Secret`, 401 sin/falla, 200 con;
+  sin configurar acepta todo para el simulado) + storage de fotos decidido
+  (disco local `UPLOAD_DIR/whatsapp/<tel>/` con `guardar_archivo`,
+  servidas por `GET /uploads/whatsapp/:telefono/:archivo` con
+  `clave_whatsapp_valida`, fallback a URL remota) + tope diario LLM
+  (`ia_tope_tokens_dia` default 2M, watcher 5 min, aviso `motivo: tope`
+  una vez/día, solo alerta) + fix worker (`texto` explícito del payload
+  manda; antes habría entregado texto de ficha al cliente en vivo);
+  verificado E2E contra `:3000` (401/200, `[foto] /uploads/whatsapp/...`
+  200307 bytes servidos `image/jpeg`, traversal 404, aviso tope `pending`
+  con texto intacto) y datos de prueba borrados; `check`+clippy 0,
+  `cargo test` 27 passed. Queda: QR×2 + gateway + deploy.
 
 ## 279A-3 — /ask cuestionario de ficha (F1 verificado local 2026-09-27; pendiente: respuestas usuaria)
 - Plan: `Agente/planes/plan-ask-2026-09-27.md`.

@@ -168,8 +168,14 @@ Sin 1+2 el plan llega hasta: estima de tokens + memoria de un turno.
 - **Número B (inicial, agente humano): 0424 9208855** → `584249208855`
   (registrado 2026-09-27; es el número vivo del negocio: **no usar hasta
   el final**).
-- **Falta**: QR de ambos (2 min por número, al final) + storage de fotos
-  (disco PC vs volumen).
+- **Falta**: QR de ambos (2 min por número, al final) + gateway + deploy.
+- **Hecho 2026-09-28 (resto sin QR)**: secreto webhook (`WA_WEBHOOK_SECRETO`
+  + `X-Gateway-Secret`, 401/200 verificado); storage decidido e
+  implementado (disco local `UPLOAD_DIR/whatsapp/<tel>/`, ruta
+  `/uploads/whatsapp/:telefono/:archivo`, fallback a URL remota; E2E
+  verificado); tope diario LLM (`ia_tope_tokens_dia` default 2M, watcher
+  5 min, aviso `motivo: tope` 1 vez/día, solo alerta; E2E verificado);
+  fix worker (`texto` explícito manda sobre ficha).
 - Se adelanta sin gateway: F0/F1/F3/F2 (simulado)/F5.
 
 ## Gate / DoD por fase

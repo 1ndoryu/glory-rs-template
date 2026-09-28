@@ -175,6 +175,61 @@ pub async fn servir_archivo_solicitud(
     Ok(respuesta_archivo(bytes, mime, &cabeceras))
 }
 
+/// Servir una foto entrante de `WhatsApp` — pública, sin JWT (el panel staff
+/// y la web cuelgan de aquí; la clave la genera el servidor al archivar).
+/// Solo `whatsapp/<7..15 dígitos>/<uuid>.<ext permitida>`: el teléfono es
+/// dígitos (salida de `normalizar_telefono`, sin `..` posible) y el archivo
+/// uuid+extensión, igual que el resto de claves.
+#[utoipa::path(
+    get,
+    path = "/uploads/whatsapp/{telefono}/{archivo}",
+    params(
+        ("telefono" = String, Path, description = "Teléfono normalizado (solo dígitos)"),
+        ("archivo" = String, Path, description = "Archivo <uuid>.<ext>"),
+    ),
+    responses(
+        (status = 200, description = "Imagen", body = Vec<u8>, content_type = "image/jpeg"),
+        (status = 404, description = "No encontrada", body = crate::errors::ErrorResponse)
+    )
+)]
+pub async fn servir_archivo_whatsapp(
+    State(state): State<AppState>,
+    Path((telefono, archivo)): Path<(String, String)>,
+    cabeceras: HeaderMap,
+) -> Result<Response, AppError> {
+    let clave = clave_whatsapp_valida(&telefono, &archivo)
+        .ok_or_else(|| AppError::NotFound("No encontrado".into()))?;
+    let bytes = tokio::fs::read(InmuebleService::ruta_archivo(&state.upload_dir, &clave))
+        .await
+        .map_err(|_| AppError::NotFound("No encontrado".into()))?;
+    let mime = match std::path::Path::new(&clave)
+        .extension()
+        .and_then(|e| e.to_str())
+    {
+        Some(e) if e.eq_ignore_ascii_case("png") => "image/png",
+        Some(e) if e.eq_ignore_ascii_case("webp") => "image/webp",
+        _ => "image/jpeg",
+    };
+    Ok(respuesta_archivo(bytes, mime, &cabeceras))
+}
+
+fn clave_whatsapp_valida(telefono: &str, archivo: &str) -> Option<String> {
+    if !(7..=15).contains(&telefono.len())
+        || !telefono.bytes().all(|b| b.is_ascii_digit())
+        || archivo.contains('/')
+        || archivo.contains('\\')
+    {
+        return None;
+    }
+    let punto = archivo.rfind('.')?;
+    Uuid::parse_str(&archivo[..punto]).ok()?;
+    let extension = archivo[punto..].to_lowercase();
+    if EXTENSIONES_FOTO.iter().any(|e| *e == extension) {
+        Some(format!("whatsapp/{telefono}/{}", archivo.to_lowercase()))
+    } else {
+        None
+    }
+}
 /* [249A-1] Fotos con caché larga + ETag: las URLs llevan `?v=<updated_at>`
  * y el backend toca el inmueble al subir/borrar, así `immutable` es seguro.
  * `If-None-Match` coincidente devuelve 304 sin reenviar bytes. */
@@ -252,7 +307,7 @@ pub fn routes() -> Router<AppState> {
 
 #[cfg(test)]
 mod tests {
-    use super::{clave_solicitud_valida, clave_valida};
+    use super::{clave_solicitud_valida, clave_valida, clave_whatsapp_valida};
 
     #[test]
     fn clave_valida_acepta_y_rechaza() {
@@ -287,5 +342,23 @@ mod tests {
         assert!(clave_solicitud_valida(id, "no-uuid.jpg").is_none());
         assert!(clave_solicitud_valida(id, &format!("{id}.pdf")).is_none());
         assert!(clave_solicitud_valida("no-es-uuid", &format!("{id}.jpg")).is_none());
+    }
+
+    /* [279A-2] Fotos entrantes de WhatsApp: solo dígitos 7..15 + uuid+ext. */
+    #[test]
+    fn clave_whatsapp_solo_telefono_y_uuid() {
+        let id = "aa03ccec-c424-40e1-86ed-5f862d1bfa8f";
+        assert_eq!(
+            clave_whatsapp_valida("584120825234", &format!("{id}.jpg")),
+            Some(format!("whatsapp/584120825234/{id}.jpg"))
+        );
+        assert!(clave_whatsapp_valida("584120825234", &format!("{id}.WEBP")).is_some());
+        assert!(clave_whatsapp_valida("584120825234", "../fuga.jpg").is_none());
+        assert!(clave_whatsapp_valida("584120825234", "no-uuid.jpg").is_none());
+        assert!(clave_whatsapp_valida("584120825234", &format!("{id}.pdf")).is_none());
+        assert!(clave_whatsapp_valida("+584120825234", &format!("{id}.jpg")).is_none());
+        assert!(clave_whatsapp_valida("123456", &format!("{id}.jpg")).is_none());
+        assert!(clave_whatsapp_valida("1234567890123456", &format!("{id}.jpg")).is_none());
+        assert!(clave_whatsapp_valida("584120825234", &format!("{id}/x.jpg")).is_none());
     }
 }

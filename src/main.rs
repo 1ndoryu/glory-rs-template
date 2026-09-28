@@ -35,9 +35,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
      * Sin `GLORY_ALERT_GATEWAY_URL` avisa en logs y no itera: los avisos
      * quedan 'pending' visibles en el panel (nunca silencio). */
     tokio::spawn(glory_backend::services::vigilar_alertas_whatsapp(
-        pool,
+        pool.clone(),
         std::env::var("GLORY_ALERT_GATEWAY_URL").ok(),
     ));
+    /* [279A-2] Tope diario de tokens LLM: solo alerta (nunca apaga). */
+    tokio::spawn(glory_backend::services::vigilar_tope_uso(pool));
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     axum::serve(listener, app).await?;
 

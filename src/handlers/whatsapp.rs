@@ -1,10 +1,12 @@
 use axum::extract::State;
+use axum::http::HeaderMap;
 use axum::routing::post;
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::repositories::ClienteRepository;
+use crate::services::InmuebleService;
 use glory_agent::errors::AgentError;
 
 /* [279A-2 F2] Webhook simulado + reparto por número (sin Baileys/QR todavía).
@@ -68,6 +70,78 @@ pub fn reparto(
     }
 }
 
+/// Secreto compartido con el gateway Baileys (llega con F2 real): si
+/// `WA_WEBHOOK_SECRETO` está definido, el webhook exige la cabecera
+/// `X-Gateway-Secret` idéntica (401 si falta o difiere). Sin definir
+/// (simulado/dev local) acepta todo: ni el simulado ni los tests mandan
+/// cabecera. Comparación exacta, sin normalizar (un secreto con espacios
+/// es válido y se respeta tal cual).
+#[must_use]
+pub fn secreto_valido(esperado: Option<&str>, recibido: Option<&str>) -> bool {
+    let Some(sec) = esperado.filter(|s| !s.is_empty()) else {
+        return true;
+    };
+    recibido.is_some_and(|r| r == sec)
+}
+
+/// Storage decidido 2026-09-28: disco local `UPLOAD_DIR/whatsapp/<tel>/`
+/// (en prod el mismo volumen bind que las fotos de inmueble, sin infra
+/// nueva; se sirven por `/uploads/whatsapp/...`). Descarga la `media_url`
+/// que deja el gateway, valida el tipo real por Content-Type (nunca por la
+/// URL) y guarda con `guardar_archivo` (tope de tamaño + magic-bytes).
+/// Si algo falla se conserva la URL remota: foto a mano antes que foto
+/// perdida. Devuelve el cuerpo del mensaje `[foto]`.
+async fn cuerpo_foto(
+    http: &reqwest::Client,
+    upload_dir: &std::path::Path,
+    telefono_norm: &str,
+    url: &str,
+) -> String {
+    match descargar_y_guardar(http, upload_dir, telefono_norm, url).await {
+        Ok(clave) => format!("[foto] /uploads/{clave}"),
+        Err(e) => {
+            tracing::warn!("webhook WhatsApp: no se pudo archivar {url}: {e}; se conserva remota");
+            format!("[foto] {url}")
+        }
+    }
+}
+
+async fn descargar_y_guardar(
+    http: &reqwest::Client,
+    upload_dir: &std::path::Path,
+    telefono_norm: &str,
+    url: &str,
+) -> Result<String, String> {
+    let resp = http.get(url).send().await.map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("http {}", resp.status()));
+    }
+    let extension = match resp
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .split(';')
+        .next()
+        .unwrap_or("")
+        .trim()
+    {
+        "image/jpeg" => ".jpg",
+        "image/png" => ".png",
+        "image/webp" => ".webp",
+        _ => return Err("content-type no es imagen".to_string()),
+    };
+    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+    InmuebleService::guardar_archivo(
+        upload_dir,
+        &format!("whatsapp/{telefono_norm}"),
+        &format!("foto{extension}"),
+        &bytes,
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
 #[derive(Debug, Deserialize)]
 pub struct EntradaWhatsapp {
     numero_destino: String,
@@ -85,6 +159,25 @@ pub struct RepartoWhatsapp {
     session_id: Uuid,
     cliente_id: Uuid,
     mensaje_id: Uuid,
+}
+
+/// Persiste el `[foto]` entrante y lo emite por el hub. Best-effort con
+/// aviso: el mensaje de texto ya quedó guardado; la foto no debe tumbarlo.
+async fn persistir_foto(
+    pool: &sqlx::PgPool,
+    hub: &glory_agent::session::ChatHub,
+    sesion: Uuid,
+    cuerpo: String,
+) {
+    let seq = hub.next_sequence(sesion);
+    match glory_agent::persistence::insert_message(pool, sesion, "client", &cuerpo, seq).await {
+        Ok(msg) => {
+            let _ = hub.broadcast(sesion, &glory_agent::models::WsServerMessage::live(msg));
+        }
+        Err(e) => {
+            tracing::warn!("webhook WhatsApp: no se pudo persistir [foto]: {e}");
+        }
+    }
 }
 
 /// Entrada única del webhook (lógica testeable): reparte, registra el cliente
@@ -171,20 +264,19 @@ pub async fn repartir_y_vincular(
         sesion,
         &glory_agent::models::WsServerMessage::live(msg.clone()),
     );
-    /* Foto entrante: queda guardada como mensaje `[foto]` (decidido 2026-09-27:
-     * WhatsApp es solo-enviar; las fotos quedan para la web, no se describen). */
+    /* Foto entrante: se archiva en `UPLOAD_DIR/whatsapp/<tel>/` y queda
+     * como mensaje `[foto]` con ruta local servible (decidido 2026-09-27:
+     * WhatsApp es solo-enviar; las fotos quedan para la web, no se
+     * describen). Si el archivo no baja o no es imagen, se conserva la URL
+     * remota antes que perderla. */
     if let Some(u) = media {
-        let seq_foto = hub.next_sequence(sesion);
-        let cuerpo = format!("[foto] {u}");
-        if let Ok(msg_foto) =
-            glory_agent::persistence::insert_message(pool, sesion, "client", &cuerpo, seq_foto)
-                .await
-        {
-            let _ = hub.broadcast(
-                sesion,
-                &glory_agent::models::WsServerMessage::live(msg_foto),
-            );
-        }
+        let dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
+        let http = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(20))
+            .build()
+            .unwrap_or_default();
+        let cuerpo = cuerpo_foto(&http, std::path::Path::new(&dir), &remitente_norm, u).await;
+        persistir_foto(pool, hub, sesion, cuerpo).await;
     }
     Ok(RepartoWhatsapp {
         ok: true,
@@ -198,8 +290,16 @@ pub async fn repartir_y_vincular(
 
 async fn webhook(
     State(state): State<glory_agent::transport::AgentState>,
+    cabeceras: HeaderMap,
     Json(entrada): Json<EntradaWhatsapp>,
 ) -> Result<Json<RepartoWhatsapp>, AgentError> {
+    let esperado = std::env::var("WA_WEBHOOK_SECRETO").ok();
+    let recibido = cabeceras
+        .get("x-gateway-secret")
+        .and_then(|v| v.to_str().ok());
+    if !secreto_valido(esperado.as_deref(), recibido) {
+        return Err(AgentError::Unauthorized);
+    }
     let pool = state
         .pool
         .clone()
@@ -235,6 +335,19 @@ mod pruebas {
             Some(("wa_a", "completo"))
         );
         assert_eq!(reparto("584120825234", "584249208855", "04120000000"), None);
+    }
+
+    /* [279A-2] Secreto del gateway: sin configurar acepta todo (simulado);
+     * configurado exige coincidencia exacta (falla cerrado). */
+    #[test]
+    fn secreto_solo_exige_si_esta_configurado() {
+        assert!(secreto_valido(None, None));
+        assert!(secreto_valido(None, Some("x")));
+        assert!(secreto_valido(Some(""), None));
+        assert!(secreto_valido(Some("s3cr3to"), Some("s3cr3to")));
+        assert!(!secreto_valido(Some("s3cr3to"), None));
+        assert!(!secreto_valido(Some("s3cr3to"), Some("otro")));
+        assert!(!secreto_valido(Some("s3cr3to"), Some(" s3cr3to")));
     }
 
     fn pool_si_hay() -> Option<sqlx::PgPool> {
