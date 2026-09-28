@@ -132,14 +132,6 @@
     max-height: 400px;
 }
 
-.chatWidgetEmpty {
-    color: var(--text-muted);
-    font-size: var(--text-xs);
-    text-align: center;
-    padding: var(--spacing-lg) var(--spacing-sm);
-    margin: auto;
-}
-
 .chatWidgetMsg {
     display: flex;
     flex-direction: column;
@@ -156,20 +148,9 @@
     align-items: flex-start;
 }
 
-.chatWidgetMsgSender {
-    font-size: var(--text-xs);
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    margin-bottom: 2px;
-    opacity: 0.8;
-}
-
-.chatWidgetSender--client  { color: var(--color-info); }
-.chatWidgetSender--visitor { color: var(--color-info); }
-.chatWidgetSender--ai      { color: var(--color-purple); }
-.chatWidgetSender--employee { color: var(--color-success); }
-.chatWidgetSender--admin   { color: var(--color-warning); }
+/* [279A-5] CSS muerto eliminado: chatWidgetMsgSender + chatWidgetSender--*
+ * (client/visitor/ai/employee/admin). Sin uso en TSX 2026-09-28: el remitente
+ * se renderiza con el layout AiRow, sin etiqueta de nombre coloreada. */
 
 /* [064A-52] Row layout para mensajes de AI: avatar al lado del bubble */
 .chatWidgetAiRow {
@@ -386,9 +367,7 @@
     gap: var(--spacing-xs);
 }
 
-.chatWidgetInvoiceIcon {
-    font-size: var(--text-lg);
-}
+/* [279A-5] CSS muerto eliminado: chatWidgetInvoiceIcon (sin uso en TSX 2026-09-28). */
 
 .chatWidgetInvoiceTitle {
     

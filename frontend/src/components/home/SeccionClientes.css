@@ -31,34 +31,8 @@
 
 /* [064A-1] CSS muerto eliminado: clientesBotonBox (no se usa en TSX). */
 
-.clientesBotonIcono {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    background-color: var(--text-primary);
-    color: var(--bg-primary);
-    border-radius: var(--radius-sm);
-}
-
-.clientesBotonTexto {
-    display: flex;
-    flex-direction: column;
-}
-
-.clientesBotonTitulo {
-    font-family: var(--font-sans-alt);
-    font-size: var(--text-base);
-    font-weight: 500;
-    line-height: 1.2;
-}
-
-.clientesBotonSubtitulo {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    color: var(--text-dark);
-}
+/* [279A-5] CSS muerto eliminado: clientesBotonIcono, clientesBotonTexto,
+ * clientesBotonTitulo, clientesBotonSubtitulo (sin uso en TSX 2026-09-28). */
 
 /* Grid de Logos */
 .clientesGrid {

@@ -120,13 +120,7 @@
     color: var(--text-tertiary);
 }
 
-.proyectoSubtitulo {
-    font-family: var(--font-primary);
-    font-size: var(--text-xs);
-    color: var(--text-dark);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
+/* [279A-5] CSS muerto eliminado: proyectoSubtitulo (sin uso en TSX 2026-09-28). */
 
 .proyectoTags {
     display: flex;

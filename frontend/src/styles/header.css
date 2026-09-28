@@ -185,9 +185,7 @@
     color: var(--brand-black);
 }
 
-.accionHeaderPrincipal {
-    gap: 8px;
-}
+/* [279A-5] CSS muerto eliminado: accionHeaderPrincipal (sin uso en TSX 2026-09-28). */
 
 /* [074A-22] Avatar con MenuContextual para logout.
  * [259A-5 5b-7] Trigger e imagen migrados a variante canon 'avatar' de MenuContextual. */
@@ -217,8 +215,8 @@
     }
 
     /* [074A-25] En mobile, ocultar enlaces/CTAs pero mantener avatar visible */
-    .accionCabecera .enlaceAcceder,
-    .accionCabecera .accionHeaderPrincipal {
+    /* [279A-5] .accionHeaderPrincipal eliminado de la lista (sin uso en TSX). */
+    .accionCabecera .enlaceAcceder {
         display: none;
     }
 }

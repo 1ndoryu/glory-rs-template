@@ -17,7 +17,7 @@ Rama: glory-rust-nakomi
 
 # Nakomi Studio — Roadmap
 
-## 🟡 279A-5 — Auditar `claseHuerfana` VarSense (129) [PENDIENTE]
+## 🟡 279A-5 — Auditar `claseHuerfana` VarSense (129) [EN CURSO]
 
 > **Última verificación:** 2026-07-27 — todo verificado contra código fuente real.
 > **Rama:** `glory-rust-nakomi`
