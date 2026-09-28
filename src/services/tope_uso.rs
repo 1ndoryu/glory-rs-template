@@ -73,7 +73,8 @@ pub async fn revisar_tope(pool: &PgPool) -> Result<bool, String> {
     glory_agent::persistence::enqueue_outbox(
         pool,
         "whatsapp",
-        serde_json::json!({"motivo": "tope", "texto": texto}),
+        /* [289A-1] `via` explícito: el tope no tiene hilo, sale por A. */
+        serde_json::json!({"motivo": "tope", "texto": texto, "via": "wa_a"}),
     )
     .await
     .map_err(|e| e.to_string())?;

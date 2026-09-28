@@ -390,6 +390,12 @@ async fn consultar(pool: &PgPool, session_id: Uuid, args: &Value) -> Result<Valu
         "motivo": motivo,
         "resumen": resumen,
     });
+    /* [289A-1] `via` = canal de la sesión para que el gateway Baileys
+     * responda por el mismo número que escribió el cliente. Sin vínculo,
+     * el worker cae a `wa_a` (aviso parcial antes que ninguno). */
+    if let Ok(canal) = ClienteRepository::canal_de(pool, session_id).await {
+        aviso["via"] = json!(canal.as_deref().unwrap_or("wa_a"));
+    }
     if let Some(destino) = destino_humano(pool).await {
         aviso["destino"] = json!(destino);
     }
@@ -418,6 +424,11 @@ async fn escalar(pool: &PgPool, session_id: Uuid, args: &Value) -> Result<Value,
         "motivo": motivo,
         "resumen": resumen,
     });
+    /* [289A-1] `via` como en `consultar`: el gateway responde por el
+     * número que escribió el cliente. */
+    if let Ok(canal) = ClienteRepository::canal_de(pool, session_id).await {
+        aviso["via"] = json!(canal.as_deref().unwrap_or("wa_a"));
+    }
     if let Some(destino) = destino_humano(pool).await {
         aviso["destino"] = json!(destino);
     }

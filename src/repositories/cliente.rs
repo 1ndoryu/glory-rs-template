@@ -202,6 +202,17 @@ impl ClienteRepository {
         .fetch_one(pool)
         .await
     }
+
+    /// Canal de la sesión (`wa_a|wa_b|web`, ...). Lo usa el worker de avisos
+    /// para elegir la sesión Baileys de salida (`via`); `None` si la sesión
+    /// no está vinculada (el worker cae a `wa_a`, nunca falla el aviso).
+    /// [289A-1]
+    pub async fn canal_de(pool: &PgPool, session_id: Uuid) -> Result<Option<String>, sqlx::Error> {
+        sqlx::query_scalar("SELECT canal FROM canal_sesiones WHERE session_id = $1")
+            .bind(session_id)
+            .fetch_optional(pool)
+            .await
+    }
 }
 
 /// Ficha comercial de una sesión para avisar al humano (ver

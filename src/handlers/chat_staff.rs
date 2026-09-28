@@ -1,4 +1,5 @@
 use axum::extract::{Path, Query, State};
+use axum::http::header;
 use axum::routing::{get, patch, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
@@ -35,6 +36,10 @@ pub fn staff_routes() -> Router<AppState> {
         .route("/agent/enviar", post(enviar_manual))
         .route("/agent/uso", get(uso_mensajes))
         .route("/agent/auditoria", get(auditoria))
+        /* [289A-1] Vinculación desde la consola: proxy de estado+QR del
+         * gateway (el navegador nunca habla con el gateway directo). */
+        .route("/agent/whatsapp/sesiones", get(sesiones_whatsapp))
+        .route("/agent/whatsapp/sesiones/:canal/qr", get(qr_whatsapp))
 }
 
 #[derive(Debug, Deserialize)]
@@ -662,6 +667,11 @@ async fn enviar_manual(
         "texto": texto,
         "motivo": "manual",
     });
+    /* [289A-1] `via` = canal del hilo resuelto (única fuente de verdad,
+     * cubre las 3 ramas de resolución). El gateway envía por esa sesión. */
+    if let Ok(canal) = crate::repositories::ClienteRepository::canal_de(&state.pool, sesion).await {
+        payload["via"] = serde_json::Value::String(canal.unwrap_or_else(|| "wa_a".to_string()));
+    }
     if let Some(u) = media {
         payload["media_url"] = serde_json::Value::String(u);
     }
@@ -752,4 +762,101 @@ async fn auditoria(
     .fetch_all(&state.pool)
     .await?;
     Ok(Json(filas))
+}
+
+/// Base del gateway Baileys: `GATEWAY_BASE_URL` explícita, o derivada de
+/// `GLORY_ALERT_GATEWAY_URL` (`.../send` → base), o default local.
+fn gateway_base() -> String {
+    if let Ok(b) = std::env::var("GATEWAY_BASE_URL") {
+        let b = b.trim().trim_end_matches('/').to_string();
+        if !b.is_empty() {
+            return b;
+        }
+    }
+    let envio = std::env::var("GLORY_ALERT_GATEWAY_URL").unwrap_or_default();
+    let base = envio
+        .trim()
+        .strip_suffix("/send")
+        .unwrap_or(envio.trim())
+        .trim_end_matches('/');
+    if base.is_empty() {
+        "http://127.0.0.1:3102".to_string()
+    } else {
+        base.to_string()
+    }
+}
+
+fn cliente_gateway() -> reqwest::Client {
+    reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .unwrap_or_default()
+}
+
+/// Estado de las sesiones Baileys (`via|nombre|numero|estado`) para la
+/// consola. El gateway caído es error explícito (nunca lista vacía
+/// silenciosa que parezca "sin sesiones").
+async fn sesiones_whatsapp(_auth: AuthUser) -> Result<Json<serde_json::Value>, AppError> {
+    let mut peticion = cliente_gateway().get(format!("{}/sesiones", gateway_base()));
+    if let Ok(s) = std::env::var("GATEWAY_SEND_SECRET") {
+        if !s.trim().is_empty() {
+            peticion = peticion.header("X-Gateway-Secret", s);
+        }
+    }
+    let resp = peticion
+        .send()
+        .await
+        .map_err(|e| AppError::Internal(format!("gateway WhatsApp no responde: {e}")))?;
+    if !resp.status().is_success() {
+        return Err(AppError::Internal(format!(
+            "gateway WhatsApp devolvió {}",
+            resp.status()
+        )));
+    }
+    let cuerpo: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| AppError::Internal(format!("gateway WhatsApp ilegible: {e}")))?;
+    Ok(Json(cuerpo))
+}
+
+/// QR pendiente de una sesión para vincular desde la consola. `canal`
+/// validado en el boundary; sin QR pendiente (ya vinculada o gateway sin
+/// esa sesión) devuelve 404 explícito, no imagen vacía.
+async fn qr_whatsapp(
+    _auth: AuthUser,
+    Path(canal): Path<String>,
+) -> Result<impl axum::response::IntoResponse, AppError> {
+    if !matches!(canal.as_str(), "wa_a" | "wa_b") {
+        return Err(AppError::BadRequest("canal debe ser wa_a|wa_b".to_string()));
+    }
+    let mut peticion = cliente_gateway().get(format!("{}/sesiones/{canal}/qr", gateway_base()));
+    if let Ok(s) = std::env::var("GATEWAY_SEND_SECRET") {
+        if !s.trim().is_empty() {
+            peticion = peticion.header("X-Gateway-Secret", s);
+        }
+    }
+    let resp = peticion
+        .send()
+        .await
+        .map_err(|e| AppError::Internal(format!("gateway WhatsApp no responde: {e}")))?;
+    if resp.status() == axum::http::StatusCode::NOT_FOUND {
+        return Err(AppError::NotFound(
+            "sin QR pendiente (sesión ya vinculada o gateway sin esa sesión)".to_string(),
+        ));
+    }
+    if !resp.status().is_success() {
+        return Err(AppError::Internal(format!(
+            "gateway WhatsApp devolvió {}",
+            resp.status()
+        )));
+    }
+    let png = resp
+        .bytes()
+        .await
+        .map_err(|e| AppError::Internal(format!("QR ilegible: {e}")))?;
+    axum::response::Response::builder()
+        .header(header::CONTENT_TYPE, "image/png")
+        .body(axum::body::Body::from(png))
+        .map_err(|e| AppError::Internal(format!("no se pudo armar el QR: {e}")))
 }

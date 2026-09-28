@@ -23,6 +23,14 @@
 Thumbs.db
 desktop.ini
 
+# Gateway Baileys (289A-1): dependencias, auth de sesiones y media temporal
+/gateway/node_modules/
+/gateway/sesiones/*/
+!/gateway/sesiones/.gitkeep
+/gateway/media/*/
+!/gateway/media/.gitkeep
+/gateway/qr-*.png
+
 # Logs
 *.log
 /logs/

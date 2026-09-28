@@ -277,9 +277,12 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   F3 delegación → F4 memoria+media → F5 consola dueña.
 - Requiere de usuaria (al final): QR de ambos números (2 min por número)
   + storage de fotos. Número A (completo, pruebas): 0412 0825234
-  (`584120825234`). Número B (inicial, agente): 0424 9208855
-  (`584249208855`, número vivo: no usar hasta el final). Se adelanta sin
-  gateway: F0/F1/F3/F2 simulado/F5.
+  (`584120825234`). Número B real (inicial, agente): 0424 9208855
+  (`584249208855`, número vivo: no usar hasta el final); para las pruebas
+  se usa el +1 (814) 957-5416 (`18149575416`) como B temporal
+  (`wa_numero_b`/`whatsapp_admin` ya configurados en `agent_config`).
+  F0/F1/F3/F2 simulado/F5/restos sin QR ya verificados; el gateway real
+  existe (ver 289A-1 abajo).
 - F1 verificado local 2026-09-27: migración `20260927000014_agente_clientes`
   (`clientes` UNIQUE por teléfono, `canal_sesiones`, `atencion_sesiones`,
   `uso_mensajes` + trigger estima len/4); `registrar_contacto` y
@@ -332,7 +335,21 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   verificado E2E contra `:3000` (401/200, `[foto] /uploads/whatsapp/...`
   200307 bytes servidos `image/jpeg`, traversal 404, aviso tope `pending`
   con texto intacto) y datos de prueba borrados; `check`+clippy 0,
-  `cargo test` 27 passed. Queda: QR×2 + gateway + deploy.
+  `cargo test` 27 passed.
+- 289A-1 gateway real + vinculación desde admin (código listo 2026-09-28,
+  sin vincular físico todavía): `gateway/` (Baileys 6.7.24, sesiones
+  `wa_a`=A + `wa_b`=B temporal, inbound→webhook con `numero_destino`,
+  fotos→`media/` temporal, `POST /send` con `via`, QR en terminal +
+  `gateway/qr-wa_a.png`/`qr-wa_b.png`, arranque
+  `gateway/iniciar-pruebas.ps1`); backend `via` en todo outbox `whatsapp`
+  (`canal_de`, default `wa_a`) + proxy admin
+  `GET /api/admin/agent/whatsapp/sesiones` y
+  `GET .../sesiones/:canal/qr` (401 sin JWT, 400 canal malo, 500 gateway
+  caído; E2E contra `:3000` OK) + pestaña «WhatsApp» en Mensajes con QR y
+  auto-recarga 20 s; `clippy` 0, `cargo test` 27 passed. Front sin `tsc`
+  (falta `vite` en `node_modules`): el panel nuevo solo tuvo revisión.
+  Queda: usuaria ejecuta `iniciar-pruebas.ps1`, vincula A + B temporal,
+  batería real F2/F3, limpieza y deploy.
 
 ## 279A-3 — /ask cuestionario de ficha (F1 verificado local 2026-09-27; pendiente: respuestas usuaria)
 - Plan: `Agente/planes/plan-ask-2026-09-27.md`.

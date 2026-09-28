@@ -16,6 +16,9 @@ pub async fn vigilar(pool: PgPool, gateway: Option<String>) {
         return;
     };
     tracing::info!("alerta WhatsApp activa hacia gateway configurado");
+    let secreto = std::env::var("GATEWAY_SEND_SECRET")
+        .ok()
+        .filter(|s| !s.trim().is_empty());
     let http = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(20))
         .build()
@@ -30,7 +33,7 @@ pub async fn vigilar(pool: PgPool, gateway: Option<String>) {
             }
         };
         for entry in pendientes.into_iter().filter(|e| e.kind == "whatsapp") {
-            let estado = procesar_aviso(&pool, &http, &url, &entry).await;
+            let estado = procesar_aviso(&pool, &http, &url, secreto.as_deref(), &entry).await;
             if let Err(e) = glory_agent::persistence::mark_outbox(&pool, entry.id, estado).await {
                 tracing::error!(
                     "alerta WhatsApp: no se pudo marcar outbox {}: {e}",
@@ -46,6 +49,7 @@ async fn procesar_aviso(
     pool: &PgPool,
     http: &reqwest::Client,
     url: &str,
+    secreto: Option<&str>,
     entry: &glory_agent::models::OutboxEntry,
 ) -> &'static str {
     /* [279A-2 F3] `destino` explícito en el payload (aviso al otro número
@@ -86,12 +90,28 @@ async fn procesar_aviso(
         .map(str::trim)
         .filter(|v| !v.is_empty())
         .map(str::to_string);
+    /* [289A-1] `via` = sesión Baileys de salida (`wa_a|wa_b`, default
+     * `wa_a`): consultar/escalar/manual lo ponen desde el canal del hilo;
+     * el tope (sin hilo) cae al default. Valores ajenos se ignoran. */
+    let via = entry
+        .payload
+        .get("via")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|v| matches!(*v, "wa_a" | "wa_b"))
+        .unwrap_or("wa_a");
     let cuerpo = if let Some(url_media) = media_url {
-        serde_json::json!({"destino": destino, "texto": texto, "media_url": url_media})
+        serde_json::json!({"destino": destino, "texto": texto, "media_url": url_media, "via": via})
     } else {
-        serde_json::json!({"destino": destino, "texto": texto})
+        serde_json::json!({"destino": destino, "texto": texto, "via": via})
     };
-    let r = http.post(url).json(&cuerpo).send().await;
+    /* [289A-1] Secreto worker→gateway (`GATEWAY_SEND_SECRET`; si está vacío
+     * el gateway local lo acepta sin cabecera, igual que el webhook). */
+    let mut peticion = http.post(url).json(&cuerpo);
+    if let Some(s) = secreto {
+        peticion = peticion.header("X-Gateway-Secret", s);
+    }
+    let r = peticion.send().await;
     match r {
         Ok(resp) if resp.status().is_success() => {
             tracing::info!("alerta WhatsApp {} enviada", entry.id);
@@ -205,7 +225,14 @@ mod pruebas {
             .timeout(std::time::Duration::from_secs(5))
             .build()
             .unwrap();
-        let estado = procesar_aviso(&pool, &http, "http://127.0.0.1:9/inexistente", &entrada).await;
+        let estado = procesar_aviso(
+            &pool,
+            &http,
+            "http://127.0.0.1:9/inexistente",
+            None,
+            &entrada,
+        )
+        .await;
         assert_eq!(estado, "failed");
         glory_agent::persistence::mark_outbox(&pool, id, estado)
             .await

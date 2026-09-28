@@ -2,7 +2,7 @@
 // auditoría. Reutiliza `apiFetch` (JWT + 401); tipos en snake_case como los
 // devuelve el backend (`chat_staff.rs`).
 
-import { apiFetch } from '../inmuebles/api';
+import { API_URL, ErrorApi, apiFetch, leerToken } from '../inmuebles/api';
 
 /* Fila de `GET /api/admin/agent/clientes` (con nº de sesiones). */
 export interface ClienteDuena {
@@ -100,4 +100,32 @@ export function leerUso(dias = 7): Promise<UsoDia[]> {
 
 export function leerAuditoria(limit = 50): Promise<AuditoriaFila[]> {
   return apiFetch<AuditoriaFila[]>(`/api/admin/agent/auditoria?limit=${limit}`);
+}
+
+/* Sesiones Baileys (289A-1): estado para vincular desde la consola.
+ * `estado`: iniciando|esperando_qr|abierta|cerrada. */
+export interface SesionWhatsapp {
+  via: string;
+  nombre: string;
+  numero: string;
+  estado: string;
+}
+
+export function sesionesWhatsapp(): Promise<SesionWhatsapp[]> {
+  return apiFetch<SesionWhatsapp[]>('/api/admin/agent/whatsapp/sesiones');
+}
+
+/* QR pendiente como object URL (`<img src>` no puede mandar el JWT, así
+ * que se baja como blob con `apiFetch` manual). 404 = ya vinculada o sin
+ * QR pendiente (nunca imagen vacía). El llamador revoca con
+ * `URL.revokeObjectURL` al recargar o desmontar. */
+export async function descargarQr(canal: string): Promise<string> {
+  const token = leerToken();
+  const respuesta = await fetch(
+    `${API_URL}/api/admin/agent/whatsapp/sesiones/${encodeURIComponent(canal)}/qr`,
+    { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+  );
+  if (respuesta.status === 404) return '';
+  if (!respuesta.ok) throw new ErrorApi(`La API devolvió ${respuesta.status}.`, respuesta.status);
+  return URL.createObjectURL(await respuesta.blob());
 }
