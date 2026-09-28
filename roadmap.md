@@ -387,6 +387,17 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   (`GLORY_AGENT_REF`) en `0050d08b47`; clippy 0, tests 27+27+5+1.
   Sesión `739bb63e` quedó `consultando` con el preámbulo parcial: reintentar
   con `devolver_a_ia` tras este fix.
+- 289A-6 techo IA 8192 (pedido usuaria "súbelo bastante", commit `e4ad5d7` en
+  `glory-agent` + `24281773` aquí, push 2026-09-28): `standard()` 4096→8192 +
+  test; `Cargo.toml`+`Dockerfile.rust` en `e4ad5d78`; backend reiniciado
+  (health `ok`) con ese binario.
+  Gotcha: el backend NO arranca si el cwd no es la raíz del repo (`.env` con
+  `DATABASE_URL` vive ahí); lanzar siempre con cwd del repo.
+- 289A-7 hilo nuevos-arriba + lado por remitente (commit `dd8fe64e`, `tsc`
+  limpio, push 2026-09-28): se revierte el ASC de 289A-3 — lo acordado era
+  nuevos arriba, viejos abajo (`sort` DESC por `sequence_num`); `claseLado()`
+  en `hilo-mensajes.tsx`: Visitante derecha, IA izquierda, staff derecha
+  destacado, sistema centrado; el auto-scroll acompaña al inicio.
 
 ## 279A-3 — /ask cuestionario de ficha (F1 verificado local 2026-09-27; pendiente: respuestas usuaria)
 - Plan: `Agente/planes/plan-ask-2026-09-27.md`.
