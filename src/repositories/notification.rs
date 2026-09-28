@@ -41,29 +41,31 @@ impl NotificationRepository {
     /* [237A-7d] Versión transaccional: inserta dentro de un tx existente.
      * Se usa cuando el mensaje y la notificación deben persistir juntos.
      * ON CONFLICT DO NOTHING previene duplicados por constraint único.
-     * Usa query_as runtime (sin macro) porque el índice parcial se crea en
-     * la migración 20260723100000 y no existe en la BD local de compilación. */
+     * [279A-4] Migrado a macro query_as!: nakomi_dev tiene aplicadas todas
+     * las migraciones (incluido el índice parcial 20260723100000), así que
+     * la verificación en compilación ya resuelve el arbiter del constraint. */
     pub async fn create_tx(
         conn: &mut sqlx::PgConnection,
         params: &CreateNotification,
     ) -> Result<Option<Notification>, AppError> {
-        let row = sqlx::query_as::<_, Notification>(
-            "INSERT INTO notifications
+        let row = sqlx::query_as!(
+            Notification,
+            r#"INSERT INTO notifications
                 (user_id, notification_type, title, body, link, reference_type, reference_id)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             ON CONFLICT (user_id, notification_type, reference_type, reference_id)
                 WHERE reference_type IS NOT NULL AND reference_id IS NOT NULL
                 DO NOTHING
             RETURNING id, user_id, notification_type, title, body, link,
-                      read, reference_type, reference_id, created_at",
+                      read, reference_type, reference_id, created_at"#,
+            params.user_id,
+            params.notification_type,
+            params.title,
+            params.body,
+            params.link,
+            params.reference_type,
+            params.reference_id
         )
-        .bind(params.user_id)
-        .bind(&params.notification_type)
-        .bind(&params.title)
-        .bind(&params.body)
-        .bind(&params.link)
-        .bind(&params.reference_type)
-        .bind(params.reference_id)
         .fetch_optional(&mut *conn)
         .await
         .map_err(|e| AppError::Internal(format!("Error creando notificación (tx): {e}")))?;

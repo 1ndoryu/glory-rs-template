@@ -1,0 +1,62 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO seo_settings (path, label, title, description, og_image_url, json_ld_type)\n             VALUES ($1, $1, $2, $3, $4, $5)\n             ON CONFLICT (path) DO UPDATE SET\n                 title = EXCLUDED.title,\n                 description = EXCLUDED.description,\n                 og_image_url = EXCLUDED.og_image_url,\n                 json_ld_type = EXCLUDED.json_ld_type,\n                 updated_at = NOW()\n             RETURNING path, label, title, description, og_image_url, json_ld_type, updated_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "path",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "label",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "og_image_url",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "json_ld_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar",
+        "Text",
+        "Varchar",
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "3f75e9087aebc0b7dddb3b2ba25c1c4cde3ec6b593ca17b8c2ec3f3876830b58"
+}

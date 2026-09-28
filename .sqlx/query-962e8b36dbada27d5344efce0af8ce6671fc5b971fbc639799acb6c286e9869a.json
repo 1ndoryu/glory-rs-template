@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO bandwidth_usage (subscription_id, month_start, bytes_rx, bytes_tx, updated_at)\n               VALUES ($1, $2, $3, $4, NOW())\n               ON CONFLICT (subscription_id, month_start)\n               DO UPDATE SET bytes_rx = bandwidth_usage.bytes_rx + EXCLUDED.bytes_rx,\n                             bytes_tx = bandwidth_usage.bytes_tx + EXCLUDED.bytes_tx,\n                             updated_at = NOW()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "962e8b36dbada27d5344efce0af8ce6671fc5b971fbc639799acb6c286e9869a"
+}

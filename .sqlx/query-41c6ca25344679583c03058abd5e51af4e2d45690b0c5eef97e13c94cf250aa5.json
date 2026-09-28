@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_alert_outbox SET status = 'cancelled', locked_at = NULL,\n             updated_at = NOW(), last_error = 'visitor_reconnected'\n         WHERE event_type = 'chat.continuation' AND reference_id = $1\n           AND status IN ('pending','processing')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "41c6ca25344679583c03058abd5e51af4e2d45690b0c5eef97e13c94cf250aa5"
+}

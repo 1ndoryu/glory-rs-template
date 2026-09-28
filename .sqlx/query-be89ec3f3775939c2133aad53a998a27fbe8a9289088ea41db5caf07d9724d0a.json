@@ -1,0 +1,92 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT hs.id AS subscription_id,\n                                            COALESCE(hs.deployment_id, hs.server_uuid) AS \"deployment_uuid!\",\n                                            hs.coolify_site_name AS \"coolify_site_name!\",\n                                            hs.server_ip AS \"server_ip!\",\n                                            s.id AS server_id,\n                                            cap.cpu_cores AS server_cpu_cores,\n                                            server_sample.cpu_percent AS server_cpu_percent,\n                                            server_sample.sampled_at AS server_sampled_at,\n                                            plan.wp_cpu_millicores::float8 / 1000.0 AS \"baseline_site_cpu_cores!\",\n                                            plan.cpu_scaling_policy,\n                                            deploy_sample.site_cpu_limit_cores AS current_site_cpu_limit_cores,\n                                            deploy_sample.cpu_percent AS deployment_cpu_percent,\n                                            deploy_sample.sampled_at AS deployment_sampled_at\n                             FROM hosting_subscriptions hs\n                             JOIN infrastructure_servers s\n                                 ON s.server_ip = hs.server_ip\n                                AND s.is_active = TRUE\n                             JOIN hosting_plan_configs plan\n                                 ON plan.plan_name = hs.plan\n                             LEFT JOIN LATERAL (\n                                     SELECT cpu_cores::float8 AS cpu_cores\n                                     FROM server_capacity\n                                     WHERE server_id = s.id OR server_uuid = s.coolify_server_uuid\n                                     ORDER BY updated_at DESC\n                                     LIMIT 1\n                             ) cap ON TRUE\n                             LEFT JOIN LATERAL (\n                                     SELECT cpu_percent, sampled_at\n                                     FROM infrastructure_resource_samples\n                                     WHERE entity_kind = 'server'\n                                         AND server_id = s.id\n                                     ORDER BY sampled_at DESC\n                                     LIMIT 1\n                             ) server_sample ON TRUE\n                             LEFT JOIN LATERAL (\n                                     SELECT cpu_percent, site_cpu_limit_cores, sampled_at\n                                     FROM infrastructure_resource_samples\n                                     WHERE entity_kind = 'deployment'\n                                         AND deployment_uuid = COALESCE(hs.deployment_id, hs.server_uuid)\n                                     ORDER BY sampled_at DESC\n                                     LIMIT 1\n                             ) deploy_sample ON TRUE\n                             WHERE hs.status = 'active'\n                                 AND hs.coolify_site_name IS NOT NULL\n                                 AND hs.server_ip IS NOT NULL\n                                 AND COALESCE(hs.deployment_id, hs.server_uuid) IS NOT NULL\n                                 AND COALESCE(NULLIF(lower(hs.runtime_kind), ''), 'coolify') = 'coolify'\n                              ORDER BY s.id ASC, hs.created_at ASC",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "subscription_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "deployment_uuid!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "coolify_site_name!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "server_ip!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "server_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "server_cpu_cores",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 6,
+        "name": "server_cpu_percent",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 7,
+        "name": "server_sampled_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "baseline_site_cpu_cores!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 9,
+        "name": "cpu_scaling_policy",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 10,
+        "name": "current_site_cpu_limit_cores",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 11,
+        "name": "deployment_cpu_percent",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 12,
+        "name": "deployment_sampled_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      null,
+      true,
+      true,
+      false,
+      null,
+      true,
+      false,
+      null,
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "be89ec3f3775939c2133aad53a998a27fbe8a9289088ea41db5caf07d9724d0a"
+}

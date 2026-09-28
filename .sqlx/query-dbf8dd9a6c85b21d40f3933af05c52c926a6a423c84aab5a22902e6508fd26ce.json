@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_sessions SET visitor_disconnected_at = NOW(),\n             visitor_disconnect_epoch = visitor_disconnect_epoch + 1\n         WHERE id = $1 AND status <> 'closed'\n         RETURNING visitor_disconnect_epoch, COALESCE(visitor_disconnected_at, NOW()) AS \"connected_at!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "visitor_disconnect_epoch",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "connected_at!",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "dbf8dd9a6c85b21d40f3933af05c52c926a6a423c84aab5a22902e6508fd26ce"
+}

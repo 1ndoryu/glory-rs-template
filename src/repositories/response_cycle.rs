@@ -3,8 +3,8 @@
  * (human_priority) y el cliente envía un mensaje, se crea un ciclo con deadline.
  * Si nadie responde antes del deadline, el worker genera fallback IA.
  *
- * Todas las queries usan runtime (sin macros compile-time) porque la tabla
- * se crea en la migración 20260723100000. */
+ * [279A-4] Migrado a macros compile-time: nakomi_dev tiene aplicadas todas
+ * las migraciones (incluida la tabla 20260723100000). */
 
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -31,12 +31,12 @@ impl ResponseCycleRepository {
             AppError::Internal(format!("Error iniciando fallback transaccional: {error}"))
         })?;
 
-        let status = sqlx::query_scalar::<_, String>(
-            "SELECT status FROM chat_response_cycles \
-             WHERE id = $1 AND session_id = $2 FOR UPDATE",
+        let status: Option<String> = sqlx::query_scalar!(
+            r#"SELECT status FROM chat_response_cycles
+             WHERE id = $1 AND session_id = $2 FOR UPDATE"#,
+            cycle_id,
+            session_id
         )
-        .bind(cycle_id)
-        .bind(session_id)
         .fetch_optional(&mut *tx)
         .await
         .map_err(|error| AppError::Internal(format!("Error validando fallback: {error}")))?;
@@ -46,25 +46,27 @@ impl ResponseCycleRepository {
             return Ok(None);
         }
 
-        let human_answered = sqlx::query_scalar::<_, bool>(
-            "SELECT EXISTS( \
-               SELECT 1 FROM chat_response_cycles cycle \
-               JOIN chat_messages opening_message ON opening_message.id = cycle.opened_by_message_id \
-               JOIN chat_messages human_message ON human_message.session_id = cycle.session_id \
-               WHERE cycle.id = $1 \
-                 AND human_message.created_at >= opening_message.created_at \
-                 AND human_message.sender_type IN ('admin', 'employee', 'staff') \
-             )",
+        let human_answered: bool = sqlx::query_scalar!(
+            r#"SELECT EXISTS(
+               SELECT 1 FROM chat_response_cycles cycle
+               JOIN chat_messages opening_message ON opening_message.id = cycle.opened_by_message_id
+               JOIN chat_messages human_message ON human_message.session_id = cycle.session_id
+               WHERE cycle.id = $1
+                 AND human_message.created_at >= opening_message.created_at
+                 AND human_message.sender_type IN ('admin', 'employee', 'staff')
+             ) AS "human_answered!""#,
+            cycle_id
         )
-        .bind(cycle_id)
         .fetch_one(&mut *tx)
         .await
         .map_err(|error| AppError::Internal(format!("Error buscando respuesta humana: {error}")))?;
 
         if human_answered {
-            sqlx::query("UPDATE chat_response_cycles SET status = 'answered_human' WHERE id = $1")
-                .bind(cycle_id)
-                .execute(&mut *tx)
+            sqlx::query!(
+                r#"UPDATE chat_response_cycles SET status = 'answered_human' WHERE id = $1"#,
+                cycle_id
+            )
+            .execute(&mut *tx)
                 .await
                 .map_err(|error| {
                     AppError::Internal(format!("Error cerrando ciclo humano: {error}"))
@@ -75,24 +77,25 @@ impl ResponseCycleRepository {
             return Ok(None);
         }
 
-        let message = sqlx::query_as::<_, crate::models::ChatMessage>(
-            "INSERT INTO chat_messages (session_id, sender_type, sender_id, content) \
-             VALUES ($1, 'ai', 'ai', $2) \
-             RETURNING id, session_id, sender_type, sender_id, content, created_at, \
-                       message_type, metadata",
+        let message = sqlx::query_as!(
+            crate::models::ChatMessage,
+            r#"INSERT INTO chat_messages (session_id, sender_type, sender_id, content)
+             VALUES ($1, 'ai', 'ai', $2)
+             RETURNING id, session_id, sender_type, sender_id, content, created_at,
+                       message_type, metadata, sequence_num"#,
+            session_id,
+            content
         )
-        .bind(session_id)
-        .bind(content)
         .fetch_one(&mut *tx)
         .await
         .map_err(|error| AppError::Internal(format!("Error guardando fallback: {error}")))?;
 
-        sqlx::query(
-            "UPDATE chat_response_cycles SET status = 'answered_ai', answered_message_id = $2 \
-             WHERE id = $1 AND status = 'claimed'",
+        sqlx::query!(
+            r#"UPDATE chat_response_cycles SET status = 'answered_ai', answered_message_id = $2
+             WHERE id = $1 AND status = 'claimed'"#,
+            cycle_id,
+            message.id
         )
-        .bind(cycle_id)
-        .bind(message.id)
         .execute(&mut *tx)
         .await
         .map_err(|error| AppError::Internal(format!("Error cerrando fallback: {error}")))?;
@@ -111,16 +114,16 @@ impl ResponseCycleRepository {
         session_id: Uuid,
         opened_by_message_id: Uuid,
     ) -> Result<Option<Uuid>, AppError> {
-        let row = sqlx::query_scalar::<_, Uuid>(
-            "INSERT INTO chat_response_cycles \
-               (session_id, opened_by_message_id, deadline_at) \
-             VALUES ($1, $2, NOW() + make_interval(mins => $3)) \
-             ON CONFLICT (session_id) WHERE status = 'waiting' DO NOTHING \
-             RETURNING id",
+        let row = sqlx::query_scalar!(
+            r#"INSERT INTO chat_response_cycles
+               (session_id, opened_by_message_id, deadline_at)
+             VALUES ($1, $2, NOW() + make_interval(mins => $3))
+             ON CONFLICT (session_id) WHERE status = 'waiting' DO NOTHING
+             RETURNING id"#,
+            session_id,
+            opened_by_message_id,
+            RESPONSE_DEADLINE_MINS as i32
         )
-        .bind(session_id)
-        .bind(opened_by_message_id)
-        .bind(RESPONSE_DEADLINE_MINS as i32)
         .fetch_optional(pool)
         .await
         .map_err(|e| AppError::Internal(format!("Error creando response cycle: {e}")))?;
@@ -132,23 +135,25 @@ impl ResponseCycleRepository {
     /// Usa FOR UPDATE SKIP LOCKED para concurrencia segura entre workers.
     /// Retorna los `session_ids` que necesitan fallback IA.
     pub async fn claim_expired(pool: &PgPool) -> Result<Vec<(Uuid, Uuid)>, AppError> {
-        let rows = sqlx::query_as::<_, (Uuid, Uuid)>(
-            "UPDATE chat_response_cycles \
-             SET status = 'claimed', claimed_at = NOW() \
-             WHERE id IN ( \
-               SELECT id FROM chat_response_cycles \
-               WHERE status = 'waiting' AND deadline_at <= NOW() \
-               ORDER BY deadline_at \
-               FOR UPDATE SKIP LOCKED \
-               LIMIT 10 \
-             ) \
-             RETURNING id, session_id",
+        /* query_as! no acepta tuplas: query! + map manual
+         * (id/session_id son UUID NOT NULL). */
+        let rows = sqlx::query!(
+            r#"UPDATE chat_response_cycles
+             SET status = 'claimed', claimed_at = NOW()
+             WHERE id IN (
+               SELECT id FROM chat_response_cycles
+               WHERE status = 'waiting' AND deadline_at <= NOW()
+               ORDER BY deadline_at
+               FOR UPDATE SKIP LOCKED
+               LIMIT 10
+             )
+             RETURNING id, session_id"#,
         )
         .fetch_all(pool)
         .await
         .map_err(|e| AppError::Internal(format!("Error reclamando response cycles: {e}")))?;
 
-        Ok(rows)
+        Ok(rows.into_iter().map(|r| (r.id, r.session_id)).collect())
     }
 
     /// Marcar ciclo como respondido por humano (cuando staff/client envía mensaje).
@@ -157,13 +162,13 @@ impl ResponseCycleRepository {
         session_id: Uuid,
         answered_message_id: Uuid,
     ) -> Result<(), AppError> {
-        sqlx::query(
-            "UPDATE chat_response_cycles \
-             SET status = 'answered_human', answered_message_id = $2 \
-             WHERE session_id = $1 AND status IN ('waiting', 'claimed')",
+        sqlx::query!(
+            r#"UPDATE chat_response_cycles
+             SET status = 'answered_human', answered_message_id = $2
+             WHERE session_id = $1 AND status IN ('waiting', 'claimed')"#,
+            session_id,
+            answered_message_id
         )
-        .bind(session_id)
-        .bind(answered_message_id)
         .execute(pool)
         .await
         .map_err(|e| AppError::Internal(format!("Error marcando cycle answered: {e}")))?;
@@ -176,13 +181,13 @@ impl ResponseCycleRepository {
         cycle_id: Uuid,
         ai_message_id: Uuid,
     ) -> Result<(), AppError> {
-        sqlx::query(
-            "UPDATE chat_response_cycles \
-             SET status = 'answered_ai', answered_message_id = $2 \
-             WHERE id = $1 AND status = 'claimed'",
+        sqlx::query!(
+            r#"UPDATE chat_response_cycles
+             SET status = 'answered_ai', answered_message_id = $2
+             WHERE id = $1 AND status = 'claimed'"#,
+            cycle_id,
+            ai_message_id
         )
-        .bind(cycle_id)
-        .bind(ai_message_id)
         .execute(pool)
         .await
         .map_err(|e| AppError::Internal(format!("Error marcando cycle answered_ai: {e}")))?;
@@ -191,12 +196,12 @@ impl ResponseCycleRepository {
 
     /// Cancelar ciclos activos de una sesión (cuando se cierra o se reactiva IA).
     pub async fn cancel_for_session(pool: &PgPool, session_id: Uuid) -> Result<(), AppError> {
-        sqlx::query(
-            "UPDATE chat_response_cycles \
-             SET status = 'cancelled' \
-             WHERE session_id = $1 AND status IN ('waiting', 'claimed')",
+        sqlx::query!(
+            r#"UPDATE chat_response_cycles
+             SET status = 'cancelled'
+             WHERE session_id = $1 AND status IN ('waiting', 'claimed')"#,
+            session_id
         )
-        .bind(session_id)
         .execute(pool)
         .await
         .map_err(|e| AppError::Internal(format!("Error cancelando cycles: {e}")))?;
@@ -206,13 +211,13 @@ impl ResponseCycleRepository {
     /// Verificar si la sesión tiene `ai_mode`='`human_priority`' y hay ciclo waiting.
     /// Retorna true si la IA NO debe responder automáticamente.
     pub async fn is_in_human_window(pool: &PgPool, session_id: Uuid) -> Result<bool, AppError> {
-        let exists = sqlx::query_scalar::<_, bool>(
-            "SELECT EXISTS( \
-               SELECT 1 FROM chat_response_cycles \
-               WHERE session_id = $1 AND status = 'waiting' \
-             )",
+        let exists = sqlx::query_scalar!(
+            r#"SELECT EXISTS(
+               SELECT 1 FROM chat_response_cycles
+               WHERE session_id = $1 AND status = 'waiting'
+             ) AS "exists!""#,
+            session_id
         )
-        .bind(session_id)
         .fetch_one(pool)
         .await
         .map_err(|e| AppError::Internal(format!("Error verificando human window: {e}")))?;

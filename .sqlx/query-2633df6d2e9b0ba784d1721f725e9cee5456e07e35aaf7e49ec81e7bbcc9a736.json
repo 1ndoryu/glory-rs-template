@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT net_input_mb, net_output_mb\n               FROM bandwidth_snapshots\n               WHERE subscription_id = $1 AND deployment_uuid = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "net_input_mb",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 1,
+        "name": "net_output_mb",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "2633df6d2e9b0ba784d1721f725e9cee5456e07e35aaf7e49ec81e7bbcc9a736"
+}

@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO bandwidth_snapshots\n                    (subscription_id, deployment_uuid, server_id, net_input_mb, net_output_mb, sampled_at)\n               VALUES ($1, $2, $3, $4, $5, $6)\n               ON CONFLICT (subscription_id, deployment_uuid)\n               DO UPDATE SET server_id = EXCLUDED.server_id,\n                             net_input_mb = EXCLUDED.net_input_mb,\n                             net_output_mb = EXCLUDED.net_output_mb,\n                             sampled_at = EXCLUDED.sampled_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Float8",
+        "Float8",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "550a9235c626a220b2f56964549f2a3c490fafe9dcaab3fd60adf79488cb403b"
+}

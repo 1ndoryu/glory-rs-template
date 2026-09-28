@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE infrastructure_servers\n                     SET label = $2,\n                         server_ip = $3,\n                         coolify_base_url = $4,\n                         coolify_project_uuid = $5,\n                         secret_ref = $6,\n                         ssh_secret_ref = $7,\n                         is_active = TRUE,\n                         updated_at = NOW()\n                   WHERE coolify_server_uuid = $1\n                  RETURNING id, label, server_ip, coolify_server_uuid",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "label",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "server_ip",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "coolify_server_uuid",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Varchar",
+        "Varchar",
+        "Text",
+        "Varchar",
+        "Varchar",
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "6f6eea3b112ce8cef16df5c417239a5d5bb522893b31c4792cbbf360cfefdeda"
+}

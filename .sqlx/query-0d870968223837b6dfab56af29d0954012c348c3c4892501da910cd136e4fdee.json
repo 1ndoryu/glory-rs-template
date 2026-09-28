@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS(\n               SELECT 1 FROM chat_response_cycles cycle\n               JOIN chat_messages opening_message ON opening_message.id = cycle.opened_by_message_id\n               JOIN chat_messages human_message ON human_message.session_id = cycle.session_id\n               WHERE cycle.id = $1\n                 AND human_message.created_at >= opening_message.created_at\n                 AND human_message.sender_type IN ('admin', 'employee', 'staff')\n             ) AS \"human_answered!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "human_answered!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "0d870968223837b6dfab56af29d0954012c348c3c4892501da910cd136e4fdee"
+}

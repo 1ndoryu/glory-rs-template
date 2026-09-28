@@ -1,0 +1,88 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT latest.sampled_at,\n                      latest.cpu_percent,\n                      latest.ram_used_mb,\n                      latest.ram_limit_mb,\n                      COALESCE(latest.disk_used_mb, latest_storage_used.disk_used_mb) AS disk_used_mb,\n                      COALESCE(latest.disk_limit_mb, latest_storage_limit.disk_limit_mb) AS disk_limit_mb,\n                      latest.site_cpu_limit_cores,\n                      latest.site_ram_limit_mb,\n                      latest.db_cpu_limit_cores,\n                      latest.db_ram_limit_mb,\n                      latest.ssh_cpu_limit_cores,\n                      latest.ssh_ram_limit_mb\n               FROM LATERAL (\n                   SELECT sampled_at, cpu_percent, ram_used_mb, ram_limit_mb, disk_used_mb, disk_limit_mb,\n                          site_cpu_limit_cores, site_ram_limit_mb, db_cpu_limit_cores,\n                          db_ram_limit_mb, ssh_cpu_limit_cores, ssh_ram_limit_mb\n                   FROM infrastructure_resource_samples\n                   WHERE entity_kind = 'deployment' AND deployment_uuid = $1\n                   ORDER BY sampled_at DESC\n                   LIMIT 1\n               ) latest\n               LEFT JOIN LATERAL (\n                   SELECT disk_used_mb\n                   FROM infrastructure_resource_samples\n                   WHERE entity_kind = 'deployment'\n                     AND deployment_uuid = $1\n                     AND disk_used_mb IS NOT NULL\n                   ORDER BY sampled_at DESC\n                   LIMIT 1\n               ) latest_storage_used ON TRUE\n               LEFT JOIN LATERAL (\n                   SELECT disk_limit_mb\n                   FROM infrastructure_resource_samples\n                   WHERE entity_kind = 'deployment'\n                     AND deployment_uuid = $1\n                     AND disk_limit_mb IS NOT NULL\n                   ORDER BY sampled_at DESC\n                   LIMIT 1\n                ) latest_storage_limit ON TRUE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "sampled_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 1,
+        "name": "cpu_percent",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 2,
+        "name": "ram_used_mb",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 3,
+        "name": "ram_limit_mb",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 4,
+        "name": "disk_used_mb",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 5,
+        "name": "disk_limit_mb",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 6,
+        "name": "site_cpu_limit_cores",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 7,
+        "name": "site_ram_limit_mb",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 8,
+        "name": "db_cpu_limit_cores",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 9,
+        "name": "db_ram_limit_mb",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 10,
+        "name": "ssh_cpu_limit_cores",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 11,
+        "name": "ssh_ram_limit_mb",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true,
+      null,
+      null,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "80e90294f55c08de44ccc9d49687958abe1795192949dad3536cb62be2186f36"
+}

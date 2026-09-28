@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_alert_outbox SET status = 'cancelled', last_error = $2,\n             updated_at = NOW(), locked_at = NULL WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "830cba495bd5cc3a269b1d941ea5068b91667a3166bb8662c731c55b53484e83"
+}

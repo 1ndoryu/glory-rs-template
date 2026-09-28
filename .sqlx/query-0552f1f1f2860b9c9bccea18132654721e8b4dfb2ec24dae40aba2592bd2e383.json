@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_response_cycles SET status = 'answered_ai', answered_message_id = $2\n             WHERE id = $1 AND status = 'claimed'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0552f1f1f2860b9c9bccea18132654721e8b4dfb2ec24dae40aba2592bd2e383"
+}

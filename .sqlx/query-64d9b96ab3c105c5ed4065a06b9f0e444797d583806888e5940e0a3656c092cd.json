@@ -1,0 +1,100 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, plan_name, monthly_price_cents,\n                      wp_cpu_millicores, wp_memory_mb, db_cpu_millicores, db_memory_mb,\n                      ssh_cpu_millicores, ssh_memory_mb, storage_limit_mb, bandwidth_limit_gb,\n                      cpu_scaling_policy, created_at, updated_at\n               FROM hosting_plan_configs\n               WHERE plan_name = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "plan_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "monthly_price_cents",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "wp_cpu_millicores",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "wp_memory_mb",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "db_cpu_millicores",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "db_memory_mb",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
+        "name": "ssh_cpu_millicores",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
+        "name": "ssh_memory_mb",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 9,
+        "name": "storage_limit_mb",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 10,
+        "name": "bandwidth_limit_gb",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 11,
+        "name": "cpu_scaling_policy",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 12,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "64d9b96ab3c105c5ed4065a06b9f0e444797d583806888e5940e0a3656c092cd"
+}

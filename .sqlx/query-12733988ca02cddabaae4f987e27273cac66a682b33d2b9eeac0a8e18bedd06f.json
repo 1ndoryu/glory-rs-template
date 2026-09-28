@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO email_logs (to_email, subject, template, reference_type, reference_id, status, error_msg)\n               VALUES ($1, $2, $3, $4, $5, $6, $7)\n               RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "12733988ca02cddabaae4f987e27273cac66a682b33d2b9eeac0a8e18bedd06f"
+}

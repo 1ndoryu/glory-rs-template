@@ -94,17 +94,18 @@ pub async fn send_message_with_alerts(
         .await
         .map_err(|e| AppError::Internal(format!("Error iniciando transacción de alertas: {e}")))?;
 
-    /* 1. Persistir mensaje (runtime query: no depende de BD local para compilar) */
-    let msg = sqlx::query_as::<_, crate::models::ChatMessage>(
-        "INSERT INTO chat_messages (session_id, sender_type, sender_id, content)
+    /* 1. Persistir mensaje ([279A-4] macro compile-time verificado en nakomi_dev) */
+    let msg = sqlx::query_as!(
+        crate::models::ChatMessage,
+        r#"INSERT INTO chat_messages (session_id, sender_type, sender_id, content)
         VALUES ($1, $2, $3, $4)
         RETURNING id, session_id, sender_type, sender_id, content, created_at,
-                  message_type, metadata",
+                  message_type, metadata, sequence_num"#,
+        session_id,
+        sender_type,
+        sender_id,
+        content
     )
-    .bind(session_id)
-    .bind(sender_type)
-    .bind(sender_id)
-    .bind(content)
     .fetch_one(&mut *tx)
     .await
     .map_err(|e| AppError::Internal(format!("Error guardando mensaje: {e}")))?;

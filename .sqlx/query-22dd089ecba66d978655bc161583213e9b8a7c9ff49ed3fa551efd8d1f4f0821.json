@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_continuation_tokens\n         SET revoked_at = NOW()\n         WHERE session_id = $1\n           AND used_at IS NULL\n           AND revoked_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "22dd089ecba66d978655bc161583213e9b8a7c9ff49ed3fa551efd8d1f4f0821"
+}

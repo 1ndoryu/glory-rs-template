@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_alert_outbox SET status = 'accepted_by_gateway', updated_at = $2, locked_at = NULL WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "31acd7d8744432ad94435d88f503b03ddc1d8d6b1a8e37e569b480812a9eb0bc"
+}

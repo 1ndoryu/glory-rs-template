@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE server_capacity\n               SET cpu_allocated = GREATEST(0, cpu_allocated - $2::float8),\n                   ram_allocated = GREATEST(0, ram_allocated - $3),\n                   disk_allocated = GREATEST(0, disk_allocated - $4),\n                   updated_at = NOW()\n               WHERE server_uuid = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Float8",
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "89e49966014d61e9d0e8da7f2cf362a0c47d8860f845cc620e2a11650f906dfa"
+}

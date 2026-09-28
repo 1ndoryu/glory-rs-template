@@ -1,0 +1,80 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT hs.id AS subscription_id,\n                      hs.client_name,\n                      hs.domain,\n                      hs.plan,\n                      hs.status,\n                      hs.storage_limit_mb,\n                      latest_storage.disk_used_mb AS storage_used_mb,\n                      hs.bandwidth_limit_gb,\n                      ((bu.bytes_rx + bu.bytes_tx)::float8 / 1000000000.0) AS bandwidth_used_gb,\n                      CASE WHEN hs.storage_limit_mb > 0 AND latest_storage.disk_used_mb IS NOT NULL\n                           THEN latest_storage.disk_used_mb / hs.storage_limit_mb * 100.0 END AS storage_usage_pct,\n                      CASE WHEN hs.bandwidth_limit_gb > 0 AND bu.bytes_rx IS NOT NULL\n                           THEN ((bu.bytes_rx + bu.bytes_tx)::float8 / 1000000000.0) / hs.bandwidth_limit_gb * 100.0 END AS bandwidth_usage_pct\n               FROM hosting_subscriptions hs\n               LEFT JOIN LATERAL (\n                   SELECT disk_used_mb\n                   FROM infrastructure_resource_samples sample\n                   WHERE sample.entity_kind = 'deployment'\n                     AND sample.deployment_uuid = hs.server_uuid\n                     AND sample.disk_used_mb IS NOT NULL\n                   ORDER BY sampled_at DESC\n                   LIMIT 1\n               ) latest_storage ON TRUE\n               LEFT JOIN bandwidth_usage bu\n                      ON bu.subscription_id = hs.id\n                     AND bu.month_start = date_trunc('month', NOW())::date\n               ORDER BY GREATEST(\n                   COALESCE(CASE WHEN hs.storage_limit_mb > 0 THEN latest_storage.disk_used_mb / hs.storage_limit_mb * 100.0 ELSE 0 END, 0),\n                   COALESCE(CASE WHEN hs.bandwidth_limit_gb > 0 THEN ((bu.bytes_rx + bu.bytes_tx)::float8 / 1000000000.0) / hs.bandwidth_limit_gb * 100.0 ELSE 0 END, 0)\n                ) DESC",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "subscription_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "client_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "domain",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "plan",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "storage_limit_mb",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "storage_used_mb",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 7,
+        "name": "bandwidth_limit_gb",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 8,
+        "name": "bandwidth_used_gb",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 9,
+        "name": "storage_usage_pct",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 10,
+        "name": "bandwidth_usage_pct",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "e7498b90b38c1031c7f1480c96a6ed207ccc707415a960a85f7e190b50711668"
+}

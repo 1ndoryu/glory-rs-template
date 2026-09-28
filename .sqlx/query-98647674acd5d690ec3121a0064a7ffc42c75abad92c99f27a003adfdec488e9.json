@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT bytes_rx + bytes_tx AS \"total_bytes!\"\n               FROM bandwidth_usage\n               WHERE subscription_id = $1 AND month_start = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "total_bytes!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "98647674acd5d690ec3121a0064a7ffc42c75abad92c99f27a003adfdec488e9"
+}

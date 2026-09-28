@@ -1,0 +1,82 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO notifications\n                (user_id, notification_type, title, body, link, reference_type, reference_id)\n            VALUES ($1, $2, $3, $4, $5, $6, $7)\n            ON CONFLICT (user_id, notification_type, reference_type, reference_id)\n                WHERE reference_type IS NOT NULL AND reference_id IS NOT NULL\n                DO NOTHING\n            RETURNING id, user_id, notification_type, title, body, link,\n                      read, reference_type, reference_id, created_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "notification_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "body",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "link",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "read",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 7,
+        "name": "reference_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "reference_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 9,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Text",
+        "Varchar",
+        "Varchar",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "ea2ebbce59fde3c6c3ec147b0a808d659a090e82d3cae6b99278b40b659d8d80"
+}

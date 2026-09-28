@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_response_cycles\n             SET status = 'claimed', claimed_at = NOW()\n             WHERE id IN (\n               SELECT id FROM chat_response_cycles\n               WHERE status = 'waiting' AND deadline_at <= NOW()\n               ORDER BY deadline_at\n               FOR UPDATE SKIP LOCKED\n               LIMIT 10\n             )\n             RETURNING id, session_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "session_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "0e195cbd0910a8197a40e6cfddaecbbecab140f628dc2b7f64eefb8a2461448c"
+}

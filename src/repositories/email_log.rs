@@ -6,9 +6,9 @@ use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-/* [311A-1] Este repositorio usa query_as/query_scalar sin macro (sqlx::query_as::<_, T>)
- * en lugar de query_as! para evitar dependencia de tabla existente en compilación.
- * La tabla email_logs se crea vía migración, no por chequeo compile-time. */
+/* [311A-1] Este repositorio usa macros compile-time (query_as!/query_scalar!).
+ * [279A-4] Migrado: nakomi_dev tiene aplicadas todas las migraciones, así que
+ * la verificación en compilación ya resuelve la tabla email_logs. */
 
 #[derive(sqlx::FromRow, Debug, Clone)]
 pub struct EmailLogRow {
@@ -72,18 +72,18 @@ impl EmailLogRepository {
         status: &str,
         error_msg: Option<&str>,
     ) -> Result<Uuid, sqlx::Error> {
-        let rec = sqlx::query_scalar::<_, Uuid>(
+        let rec = sqlx::query_scalar!(
             r#"INSERT INTO email_logs (to_email, subject, template, reference_type, reference_id, status, error_msg)
                VALUES ($1, $2, $3, $4, $5, $6, $7)
                RETURNING id"#,
+            to_email,
+            subject,
+            template,
+            reference_type,
+            reference_id,
+            status,
+            error_msg
         )
-        .bind(to_email)
-        .bind(subject)
-        .bind(template)
-        .bind(reference_type)
-        .bind(reference_id)
-        .bind(status)
-        .bind(error_msg)
         .fetch_one(pool)
         .await?;
         Ok(rec)
@@ -99,29 +99,31 @@ impl EmailLogRepository {
         let limit = std::cmp::min(limit.max(1), 100) as i64;
 
         if let Some(tpl) = template {
-            sqlx::query_as::<_, EmailLogRow>(
+            sqlx::query_as!(
+                EmailLogRow,
                 r#"SELECT id, to_email, subject, template, reference_type, reference_id,
                           status, error_msg, sent_at, created_at
                    FROM email_logs
                    WHERE template = $1
                    ORDER BY created_at DESC
                    LIMIT $2 OFFSET $3"#,
+                tpl,
+                limit,
+                offset as i64
             )
-            .bind(tpl)
-            .bind(limit)
-            .bind(offset as i64)
             .fetch_all(pool)
             .await
         } else {
-            sqlx::query_as::<_, EmailLogRow>(
+            sqlx::query_as!(
+                EmailLogRow,
                 r#"SELECT id, to_email, subject, template, reference_type, reference_id,
                           status, error_msg, sent_at, created_at
                    FROM email_logs
                    ORDER BY created_at DESC
                    LIMIT $1 OFFSET $2"#,
+                limit,
+                offset as i64
             )
-            .bind(limit)
-            .bind(offset as i64)
             .fetch_all(pool)
             .await
         }
@@ -130,12 +132,14 @@ impl EmailLogRepository {
     /// Cuenta total con filtro opcional por template.
     pub async fn count(pool: &PgPool, template: Option<&str>) -> Result<i64, sqlx::Error> {
         if let Some(tpl) = template {
-            sqlx::query_scalar::<_, i64>(r#"SELECT COUNT(*) FROM email_logs WHERE template = $1"#)
-                .bind(tpl)
-                .fetch_one(pool)
-                .await
+            sqlx::query_scalar!(
+                r#"SELECT COUNT(*) AS "count!" FROM email_logs WHERE template = $1"#,
+                tpl
+            )
+            .fetch_one(pool)
+            .await
         } else {
-            sqlx::query_scalar::<_, i64>(r#"SELECT COUNT(*) FROM email_logs"#)
+            sqlx::query_scalar!(r#"SELECT COUNT(*) AS "count!" FROM email_logs"#)
                 .fetch_one(pool)
                 .await
         }

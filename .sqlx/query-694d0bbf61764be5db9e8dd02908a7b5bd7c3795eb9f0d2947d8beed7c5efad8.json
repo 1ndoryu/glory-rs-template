@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS(\n            SELECT 1 FROM chat_continuation_tokens\n            WHERE session_id = $1\n              AND used_at IS NULL\n              AND revoked_at IS NULL\n              AND expires_at > NOW()\n        ) AS \"exists!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "exists!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "694d0bbf61764be5db9e8dd02908a7b5bd7c3795eb9f0d2947d8beed7c5efad8"
+}

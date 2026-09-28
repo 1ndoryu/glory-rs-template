@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_alert_outbox SET status = 'pending', last_error = $2, available_at = $3, updated_at = $3, locked_at = NULL WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f93e4182525432b8d6b152a0e25fada6cdd177d744a950d77b6f4b3dbaca33bf"
+}

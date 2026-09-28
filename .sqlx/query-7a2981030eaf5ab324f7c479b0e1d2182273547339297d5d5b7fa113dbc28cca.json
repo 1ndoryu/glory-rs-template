@@ -1,0 +1,89 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT to_timestamp(floor(extract(epoch from sampled_at) / 600) * 600) AS \"sampled_at!\",\n                      AVG(cpu_percent) AS cpu_percent,\n                      AVG(ram_used_mb) AS ram_used_mb,\n                      MAX(ram_limit_mb) AS ram_limit_mb,\n                      MAX(disk_used_mb) AS disk_used_mb,\n                                            MAX(disk_limit_mb) AS disk_limit_mb,\n                                            MAX(site_cpu_limit_cores) AS site_cpu_limit_cores,\n                                            MAX(site_ram_limit_mb) AS site_ram_limit_mb,\n                                            MAX(db_cpu_limit_cores) AS db_cpu_limit_cores,\n                                            MAX(db_ram_limit_mb) AS db_ram_limit_mb,\n                                            MAX(ssh_cpu_limit_cores) AS ssh_cpu_limit_cores,\n                                            MAX(ssh_ram_limit_mb) AS ssh_ram_limit_mb\n               FROM infrastructure_resource_samples\n               WHERE entity_kind = 'deployment'\n                 AND deployment_uuid = $1\n                 AND sampled_at > NOW() - ($2::text || ' hours')::interval\n               GROUP BY 1\n               ORDER BY 1 ASC",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "sampled_at!",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 1,
+        "name": "cpu_percent",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 2,
+        "name": "ram_used_mb",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 3,
+        "name": "ram_limit_mb",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 4,
+        "name": "disk_used_mb",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 5,
+        "name": "disk_limit_mb",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 6,
+        "name": "site_cpu_limit_cores",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 7,
+        "name": "site_ram_limit_mb",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 8,
+        "name": "db_cpu_limit_cores",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 9,
+        "name": "db_ram_limit_mb",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 10,
+        "name": "ssh_cpu_limit_cores",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 11,
+        "name": "ssh_ram_limit_mb",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "7a2981030eaf5ab324f7c479b0e1d2182273547339297d5d5b7fa113dbc28cca"
+}

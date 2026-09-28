@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM infrastructure_resource_samples WHERE sampled_at < NOW() - INTERVAL '7 days'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "90a83d429aaaa8a2b01e12d19ac3efcc164a5f217801f8f3b32fc595ada6aebe"
+}

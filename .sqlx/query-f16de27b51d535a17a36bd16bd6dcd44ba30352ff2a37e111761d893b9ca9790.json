@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO chat_response_cycles\n               (session_id, opened_by_message_id, deadline_at)\n             VALUES ($1, $2, NOW() + make_interval(mins => $3))\n             ON CONFLICT (session_id) WHERE status = 'waiting' DO NOTHING\n             RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f16de27b51d535a17a36bd16bd6dcd44ba30352ff2a37e111761d893b9ca9790"
+}

@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COUNT(*) AS \"count!\"\n               FROM hosting_subscriptions\n               WHERE user_id = $1 AND status IN ('active', 'provisioning', 'pending')",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "1995d00a7fe00de06edaae5496f1d950068c5a48a20eaffc3caa70481a413dc9"
+}

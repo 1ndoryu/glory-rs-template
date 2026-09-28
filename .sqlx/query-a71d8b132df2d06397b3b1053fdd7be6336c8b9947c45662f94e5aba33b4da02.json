@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO vps_monitor_state\n                    (subscription_id, provider_status, failure_count, checked_at, updated_at)\n               VALUES ($1, $2, $3, NOW(), NOW())\n               ON CONFLICT (subscription_id)\n               DO UPDATE SET provider_status = EXCLUDED.provider_status,\n                             failure_count = EXCLUDED.failure_count,\n                             checked_at = NOW(),\n                             updated_at = NOW()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a71d8b132df2d06397b3b1053fdd7be6336c8b9947c45662f94e5aba33b4da02"
+}

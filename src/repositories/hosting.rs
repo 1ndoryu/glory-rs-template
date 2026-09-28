@@ -435,15 +435,16 @@ impl HostingRepository {
         pool: &PgPool,
         plan_name: &str,
     ) -> Result<Option<HostingPlanConfig>, AppError> {
-        let row = sqlx::query_as::<_, HostingPlanConfig>(
+        let row = sqlx::query_as!(
+            HostingPlanConfig,
             r"SELECT id, plan_name, monthly_price_cents,
                       wp_cpu_millicores, wp_memory_mb, db_cpu_millicores, db_memory_mb,
                       ssh_cpu_millicores, ssh_memory_mb, storage_limit_mb, bandwidth_limit_gb,
                       cpu_scaling_policy, created_at, updated_at
                FROM hosting_plan_configs
                WHERE plan_name = $1",
+            plan_name
         )
-        .bind(plan_name)
         .fetch_optional(pool)
         .await?;
         Ok(row)
@@ -451,7 +452,8 @@ impl HostingRepository {
 
     /* [114A-3] Listar todas las configuraciones de planes */
     pub async fn list_plan_configs(pool: &PgPool) -> Result<Vec<HostingPlanConfig>, AppError> {
-        let rows = sqlx::query_as::<_, HostingPlanConfig>(
+        let rows = sqlx::query_as!(
+            HostingPlanConfig,
             r"SELECT id, plan_name, monthly_price_cents,
                       wp_cpu_millicores, wp_memory_mb, db_cpu_millicores, db_memory_mb,
                       ssh_cpu_millicores, ssh_memory_mb, storage_limit_mb, bandwidth_limit_gb,
@@ -472,7 +474,8 @@ impl HostingRepository {
         req: &UpdatePlanConfigRequest,
     ) -> Result<HostingPlanConfig, AppError> {
         let cpu_scaling_policy = validated_cpu_scaling_policy(req.cpu_scaling_policy.as_deref())?;
-        let row = sqlx::query_as::<_, HostingPlanConfig>(
+        let row = sqlx::query_as!(
+            HostingPlanConfig,
             r"UPDATE hosting_plan_configs SET
                   monthly_price_cents = COALESCE($1, monthly_price_cents),
                   wp_cpu_millicores = COALESCE($2, wp_cpu_millicores),
@@ -490,18 +493,18 @@ impl HostingRepository {
                          wp_cpu_millicores, wp_memory_mb, db_cpu_millicores, db_memory_mb,
                          ssh_cpu_millicores, ssh_memory_mb, storage_limit_mb, bandwidth_limit_gb,
                          cpu_scaling_policy, created_at, updated_at",
+            req.monthly_price_cents,
+            req.wp_cpu_millicores,
+            req.wp_memory_mb,
+            req.db_cpu_millicores,
+            req.db_memory_mb,
+            req.ssh_cpu_millicores,
+            req.ssh_memory_mb,
+            req.storage_limit_mb,
+            req.bandwidth_limit_gb,
+            cpu_scaling_policy,
+            plan_name
         )
-        .bind(req.monthly_price_cents)
-        .bind(req.wp_cpu_millicores)
-        .bind(req.wp_memory_mb)
-        .bind(req.db_cpu_millicores)
-        .bind(req.db_memory_mb)
-        .bind(req.ssh_cpu_millicores)
-        .bind(req.ssh_memory_mb)
-        .bind(req.storage_limit_mb)
-        .bind(req.bandwidth_limit_gb)
-        .bind(cpu_scaling_policy)
-        .bind(plan_name)
         .fetch_one(pool)
         .await
         .map_err(|e| match e {

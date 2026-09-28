@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO infrastructure_servers\n                    (label, provider, server_ip, coolify_base_url, coolify_server_uuid,\n                     coolify_project_uuid, secret_ref, ssh_secret_ref, is_active, updated_at)\n               VALUES ($1, 'coolify', $2, $3, $4, $5, $6, $7, TRUE, NOW())\n               ON CONFLICT (server_ip, coolify_base_url)\n               DO UPDATE SET label = EXCLUDED.label,\n                             coolify_server_uuid = EXCLUDED.coolify_server_uuid,\n                             coolify_project_uuid = EXCLUDED.coolify_project_uuid,\n                             secret_ref = EXCLUDED.secret_ref,\n                             ssh_secret_ref = EXCLUDED.ssh_secret_ref,\n                             is_active = TRUE,\n                             updated_at = NOW()\n               RETURNING id, label, server_ip, coolify_server_uuid",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "label",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "server_ip",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "coolify_server_uuid",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar",
+        "Text",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "c45589e33392777cfecb413ed98f19aefef29162c96f0c948b1a68225acbd65e"
+}

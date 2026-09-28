@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE server_capacity\n               SET cpu_cores = COALESCE($2::float8, cpu_cores),\n                   ram_mb = COALESCE($3, ram_mb),\n                   disk_mb = COALESCE($4, disk_mb),\n                   updated_at = NOW()\n               WHERE server_uuid = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Float8",
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8c37741136c79d97e03abff3a319416236ea2fb7e3231d891a79d217e3f3f486"
+}

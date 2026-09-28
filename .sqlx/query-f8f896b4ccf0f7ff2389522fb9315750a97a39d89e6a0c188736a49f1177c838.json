@@ -1,0 +1,114 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_alert_outbox\n            SET status = 'processing',\n                attempts = attempts + 1,\n                locked_at = $1,\n                updated_at = $1\n            WHERE id IN (\n                SELECT id FROM chat_alert_outbox\n                WHERE (status = 'pending' AND available_at <= $1)\n                   OR (status = 'processing' AND locked_at < $2)\n                ORDER BY available_at\n                FOR UPDATE SKIP LOCKED\n                LIMIT $3\n            )\n            RETURNING id, idempotency_key, event_type, channel, recipient,\n                      reference_type, reference_id, payload,\n                      status, attempts, available_at, locked_at,\n                      last_error, created_at, updated_at, sent_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "idempotency_key",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "event_type",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "channel",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "recipient",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "reference_type",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "reference_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 7,
+        "name": "payload",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 8,
+        "name": "status",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "attempts",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 10,
+        "name": "available_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 11,
+        "name": "locked_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "last_error",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 13,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 14,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 15,
+        "name": "sent_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "f8f896b4ccf0f7ff2389522fb9315750a97a39d89e6a0c188736a49f1177c838"
+}

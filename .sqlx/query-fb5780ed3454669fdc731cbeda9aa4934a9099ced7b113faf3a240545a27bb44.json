@@ -1,0 +1,62 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT hs.id AS subscription_id,\n                      hs.server_uuid AS deployment_uuid,\n                      hs.coolify_site_name,\n                      hs.server_ip,\n                      s.id AS server_id,\n                      s.port_speed_mbps,\n                      COALESCE(bs.net_input_mb, 0.0) AS \"net_input_mb!\",\n                      COALESCE(bs.net_output_mb, 0.0) AS \"net_output_mb!\"\n               FROM hosting_subscriptions hs\n               JOIN infrastructure_servers s ON s.server_ip = hs.server_ip AND s.is_active = TRUE\n               LEFT JOIN bandwidth_snapshots bs\n                      ON bs.subscription_id = hs.id\n                     AND bs.deployment_uuid = hs.server_uuid\n                WHERE hs.status = 'active'\n                  AND hs.server_uuid IS NOT NULL\n                  AND hs.server_ip IS NOT NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "subscription_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "deployment_uuid",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "coolify_site_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "server_ip",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "server_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "port_speed_mbps",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "net_input_mb!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 7,
+        "name": "net_output_mb!",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "fb5780ed3454669fdc731cbeda9aa4934a9099ced7b113faf3a240545a27bb44"
+}

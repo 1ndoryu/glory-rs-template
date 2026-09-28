@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_response_cycles SET status = 'answered_human' WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "05cb1bac2b27f2199e321669297c03f04019ecd84f5f1f49d094d3f5c3cb0808"
+}

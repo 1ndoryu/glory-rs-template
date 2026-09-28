@@ -1,6 +1,7 @@
 /* [237A-7d] Repositorio de chat_alert_outbox.
- * Todas las operaciones usan prepared statements runtime (sin macros compile-time)
- * porque la tabla se crea en la migración 20260723100000 y no existe en BD local.
+ * [279A-4] Migrado a macros compile-time (query!/query_as!/query_scalar!):
+ * nakomi_dev tiene aplicadas todas las migraciones (incluida la tabla
+ * 20260723100000), así que la verificación en compilación ya resuelve.
  * insert_tx() se llama dentro de la transacción del mensaje.
  * claim() usa FOR UPDATE SKIP LOCKED para concurrencia segura. */
 
@@ -32,21 +33,21 @@ impl ChatAlertRepository {
         reference_id: Option<Uuid>,
         payload: &serde_json::Value,
     ) -> Result<bool, AppError> {
-        let row = sqlx::query_scalar::<_, Uuid>(
-            "INSERT INTO chat_alert_outbox
+        let row = sqlx::query_scalar!(
+            r#"INSERT INTO chat_alert_outbox
                 (idempotency_key, event_type, channel, recipient,
                  reference_type, reference_id, payload)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             ON CONFLICT (idempotency_key) DO NOTHING
-            RETURNING id",
+            RETURNING id"#,
+            idempotency_key,
+            event_type,
+            channel,
+            recipient,
+            reference_type,
+            reference_id,
+            payload
         )
-        .bind(idempotency_key)
-        .bind(event_type)
-        .bind(channel)
-        .bind(recipient)
-        .bind(reference_type)
-        .bind(reference_id)
-        .bind(payload)
         .fetch_optional(&mut *tx)
         .await
         .map_err(|e| AppError::Internal(format!("Error insertando outbox alert: {e}")))?;
@@ -59,8 +60,9 @@ impl ChatAlertRepository {
         let now = Utc::now();
         let stale_cutoff = now - Duration::seconds(STALE_PROCESSING_SECS);
 
-        let rows = sqlx::query_as::<_, ChatAlertOutbox>(
-            "UPDATE chat_alert_outbox
+        let rows = sqlx::query_as!(
+            ChatAlertOutbox,
+            r#"UPDATE chat_alert_outbox
             SET status = 'processing',
                 attempts = attempts + 1,
                 locked_at = $1,
@@ -76,11 +78,11 @@ impl ChatAlertRepository {
             RETURNING id, idempotency_key, event_type, channel, recipient,
                       reference_type, reference_id, payload,
                       status, attempts, available_at, locked_at,
-                      last_error, created_at, updated_at, sent_at",
+                      last_error, created_at, updated_at, sent_at"#,
+            now,
+            stale_cutoff,
+            limit
         )
-        .bind(now)
-        .bind(stale_cutoff)
-        .bind(limit)
         .fetch_all(pool)
         .await
         .map_err(|e| AppError::Internal(format!("Error reclamando outbox: {e}")))?;
@@ -91,11 +93,11 @@ impl ChatAlertRepository {
     /// Marca una entrada como 'sent' después de confirmación exitosa.
     pub async fn mark_sent(pool: &PgPool, id: Uuid) -> Result<(), AppError> {
         let now = Utc::now();
-        sqlx::query(
-            "UPDATE chat_alert_outbox SET status = 'sent', sent_at = $2, updated_at = $2, locked_at = NULL WHERE id = $1",
+        sqlx::query!(
+            r#"UPDATE chat_alert_outbox SET status = 'sent', sent_at = $2, updated_at = $2, locked_at = NULL WHERE id = $1"#,
+            id,
+            now
         )
-        .bind(id)
-        .bind(now)
         .execute(pool)
         .await
         .map_err(|e| AppError::Internal(format!("Error marcando outbox sent: {e}")))?;
@@ -105,11 +107,11 @@ impl ChatAlertRepository {
     /// Marca como '`accepted_by_gateway`' (encolada en el gateway remoto).
     pub async fn mark_accepted_by_gateway(pool: &PgPool, id: Uuid) -> Result<(), AppError> {
         let now = Utc::now();
-        sqlx::query(
-            "UPDATE chat_alert_outbox SET status = 'accepted_by_gateway', updated_at = $2, locked_at = NULL WHERE id = $1",
+        sqlx::query!(
+            r#"UPDATE chat_alert_outbox SET status = 'accepted_by_gateway', updated_at = $2, locked_at = NULL WHERE id = $1"#,
+            id,
+            now
         )
-        .bind(id)
-        .bind(now)
         .execute(pool)
         .await
         .map_err(|e| AppError::Internal(format!("Error marcando outbox accepted: {e}")))?;
@@ -127,12 +129,12 @@ impl ChatAlertRepository {
         let truncated_error: String = error.chars().take(500).collect();
 
         if attempt >= MAX_ATTEMPTS {
-            sqlx::query(
-                "UPDATE chat_alert_outbox SET status = 'dead', last_error = $2, updated_at = $3, locked_at = NULL WHERE id = $1",
+            sqlx::query!(
+                r#"UPDATE chat_alert_outbox SET status = 'dead', last_error = $2, updated_at = $3, locked_at = NULL WHERE id = $1"#,
+                id,
+                &truncated_error,
+                now
             )
-            .bind(id)
-            .bind(&truncated_error)
-            .bind(now)
             .execute(pool)
             .await
             .map_err(|e| AppError::Internal(format!("Error marcando outbox dead: {e}")))?;
@@ -142,12 +144,12 @@ impl ChatAlertRepository {
             let idx = usize::try_from(attempt.saturating_sub(1).max(0)).unwrap_or(0);
             let backoff_secs = BACKOFF_SEQUENCE.get(idx).copied().unwrap_or(1800);
             let available_at = now + Duration::seconds(backoff_secs);
-            sqlx::query(
-                "UPDATE chat_alert_outbox SET status = 'pending', last_error = $2, available_at = $3, updated_at = $3, locked_at = NULL WHERE id = $1",
+            sqlx::query!(
+                r#"UPDATE chat_alert_outbox SET status = 'pending', last_error = $2, available_at = $3, updated_at = $3, locked_at = NULL WHERE id = $1"#,
+                id,
+                &truncated_error,
+                available_at
             )
-            .bind(id)
-            .bind(&truncated_error)
-            .bind(available_at)
             .execute(pool)
             .await
             .map_err(|e| AppError::Internal(format!("Error marcando outbox retry: {e}")))?;
@@ -159,12 +161,12 @@ impl ChatAlertRepository {
     pub async fn mark_dead(pool: &PgPool, id: Uuid, error: &str) -> Result<(), AppError> {
         let now = Utc::now();
         let truncated_error: String = error.chars().take(500).collect();
-        sqlx::query(
-            "UPDATE chat_alert_outbox SET status = 'dead', last_error = $2, updated_at = $3, locked_at = NULL WHERE id = $1",
+        sqlx::query!(
+            r#"UPDATE chat_alert_outbox SET status = 'dead', last_error = $2, updated_at = $3, locked_at = NULL WHERE id = $1"#,
+            id,
+            &truncated_error,
+            now
         )
-        .bind(id)
-        .bind(&truncated_error)
-        .bind(now)
         .execute(pool)
         .await
         .map_err(|e| AppError::Internal(format!("Error marcando outbox dead: {e}")))?;
@@ -173,12 +175,12 @@ impl ChatAlertRepository {
 
     pub async fn mark_cancelled(pool: &PgPool, id: Uuid, reason: &str) -> Result<(), AppError> {
         let truncated_reason: String = reason.chars().take(500).collect();
-        sqlx::query(
-            "UPDATE chat_alert_outbox SET status = 'cancelled', last_error = $2,
-             updated_at = NOW(), locked_at = NULL WHERE id = $1",
+        sqlx::query!(
+            r#"UPDATE chat_alert_outbox SET status = 'cancelled', last_error = $2,
+             updated_at = NOW(), locked_at = NULL WHERE id = $1"#,
+            id,
+            truncated_reason
         )
-        .bind(id)
-        .bind(truncated_reason)
         .execute(pool)
         .await
         .map_err(|e| AppError::Internal(format!("Error cancelando outbox: {e}")))?;
@@ -187,20 +189,22 @@ impl ChatAlertRepository {
 
     /// Métricas: conteo por estado.
     pub async fn counts_by_status(pool: &PgPool) -> Result<Vec<(String, i64)>, AppError> {
-        let rows = sqlx::query_as::<_, (String, i64)>(
-            "SELECT status, COUNT(*) FROM chat_alert_outbox GROUP BY status",
+        /* query_as! no acepta tuplas como tipo de salida: query! + map
+         * manual. COUNT(*) nunca es nulo (i64); status es NOT NULL. */
+        let rows = sqlx::query!(
+            r#"SELECT status, COUNT(*) AS "count!" FROM chat_alert_outbox GROUP BY status"#
         )
         .fetch_all(pool)
         .await
         .map_err(|e| AppError::Internal(format!("Error contando outbox: {e}")))?;
-        Ok(rows)
+        Ok(rows.into_iter().map(|r| (r.status, r.count)).collect())
     }
 
     /// Edad del evento más antiguo pendiente (en segundos).
     pub async fn oldest_pending_age_secs(pool: &PgPool) -> Result<Option<i64>, AppError> {
-        let row: Option<i64> = sqlx::query_scalar(
-            "SELECT EXTRACT(EPOCH FROM (now() - MIN(created_at)))::bigint
-            FROM chat_alert_outbox WHERE status IN ('pending', 'processing')",
+        let row: Option<i64> = sqlx::query_scalar!(
+            r#"SELECT EXTRACT(EPOCH FROM (now() - MIN(created_at)))::bigint
+            FROM chat_alert_outbox WHERE status IN ('pending', 'processing')"#,
         )
         .fetch_one(pool)
         .await

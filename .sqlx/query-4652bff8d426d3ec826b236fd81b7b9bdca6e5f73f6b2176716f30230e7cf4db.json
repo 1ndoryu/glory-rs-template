@@ -1,0 +1,110 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.id,\n                      s.label,\n                      s.provider,\n                      s.server_ip,\n                      s.status,\n                      s.is_active,\n                      s.coolify_server_uuid,\n                      c.cpu_cores::float8 AS cpu_cores,\n                      c.ram_mb,\n                      c.disk_mb,\n                      m.cpu_avg_1h,\n                      latest.ram_used_mb,\n                      latest.ram_limit_mb,\n                      latest.disk_used_mb,\n                      latest.disk_limit_mb,\n                      latest.sampled_at\n               FROM infrastructure_servers s\n               LEFT JOIN server_capacity c ON c.server_id = s.id OR c.server_uuid = s.coolify_server_uuid\n               LEFT JOIN LATERAL (\n                   SELECT AVG(cpu_percent) AS cpu_avg_1h\n                   FROM infrastructure_resource_samples sample\n                   WHERE sample.entity_kind = 'server'\n                     AND sample.server_id = s.id\n                     AND sample.sampled_at > NOW() - INTERVAL '1 hour'\n               ) m ON TRUE\n               LEFT JOIN LATERAL (\n                   SELECT ram_used_mb, ram_limit_mb, disk_used_mb, disk_limit_mb, sampled_at\n                   FROM infrastructure_resource_samples sample\n                   WHERE sample.entity_kind = 'server'\n                     AND sample.server_id = s.id\n                   ORDER BY sampled_at DESC\n                   LIMIT 1\n               ) latest ON TRUE\n               WHERE s.is_active = TRUE\n               ORDER BY s.label ASC",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "label",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "provider",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "server_ip",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "is_active",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "coolify_server_uuid",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "cpu_cores",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 8,
+        "name": "ram_mb",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 9,
+        "name": "disk_mb",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 10,
+        "name": "cpu_avg_1h",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 11,
+        "name": "ram_used_mb",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 12,
+        "name": "ram_limit_mb",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 13,
+        "name": "disk_used_mb",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 14,
+        "name": "disk_limit_mb",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 15,
+        "name": "sampled_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      null,
+      false,
+      false,
+      null,
+      true,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "4652bff8d426d3ec826b236fd81b7b9bdca6e5f73f6b2176716f30230e7cf4db"
+}

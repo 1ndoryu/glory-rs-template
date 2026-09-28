@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT hs.id AS subscription_id,\n                      hs.server_uuid AS deployment_uuid,\n                      hs.server_ip,\n                      hs.status,\n                      hs.bandwidth_limit_gb,\n                      COALESCE((bu.bytes_rx + bu.bytes_tx)::float8 / 1000000000.0, 0.0) AS \"bandwidth_used_gb!\"\n               FROM hosting_subscriptions hs\n               LEFT JOIN bandwidth_usage bu\n                      ON bu.subscription_id = hs.id\n                     AND bu.month_start = date_trunc('month', NOW())::date\n               WHERE hs.status IN ('active', 'suspended_bandwidth')\n                 AND hs.server_uuid IS NOT NULL\n               ORDER BY \"bandwidth_used_gb!\" DESC",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "subscription_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "deployment_uuid",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "server_ip",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "bandwidth_limit_gb",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "bandwidth_used_gb!",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "86cf71e5f574e2d3eced394459c4899dc73ad96b1fcb168e6c6531f730b79196"
+}

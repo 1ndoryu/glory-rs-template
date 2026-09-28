@@ -21,7 +21,8 @@ pub struct SeoSettingsRepository;
 impl SeoSettingsRepository {
     /// Listar todos los SEO settings ordenados por path
     pub async fn list_all(pool: &PgPool) -> Result<Vec<SeoSetting>, sqlx::Error> {
-        sqlx::query_as::<_, SeoSetting>(
+        sqlx::query_as!(
+            SeoSetting,
             "SELECT path, label, title, description, og_image_url, json_ld_type, updated_at
              FROM seo_settings ORDER BY path",
         )
@@ -34,11 +35,12 @@ impl SeoSettingsRepository {
         pool: &PgPool,
         path: &str,
     ) -> Result<Option<SeoSetting>, sqlx::Error> {
-        sqlx::query_as::<_, SeoSetting>(
+        sqlx::query_as!(
+            SeoSetting,
             "SELECT path, label, title, description, og_image_url, json_ld_type, updated_at
              FROM seo_settings WHERE path = $1",
+            path
         )
-        .bind(path)
         .fetch_optional(pool)
         .await
     }
@@ -52,7 +54,8 @@ impl SeoSettingsRepository {
         og_image_url: Option<&str>,
         json_ld_type: Option<&str>,
     ) -> Result<SeoSetting, sqlx::Error> {
-        sqlx::query_as::<_, SeoSetting>(
+        sqlx::query_as!(
+            SeoSetting,
             "INSERT INTO seo_settings (path, label, title, description, og_image_url, json_ld_type)
              VALUES ($1, $1, $2, $3, $4, $5)
              ON CONFLICT (path) DO UPDATE SET
@@ -62,12 +65,12 @@ impl SeoSettingsRepository {
                  json_ld_type = EXCLUDED.json_ld_type,
                  updated_at = NOW()
              RETURNING path, label, title, description, og_image_url, json_ld_type, updated_at",
+            path,
+            title,
+            description,
+            og_image_url,
+            json_ld_type
         )
-        .bind(path)
-        .bind(title)
-        .bind(description)
-        .bind(og_image_url)
-        .bind(json_ld_type)
         .fetch_one(pool)
         .await
     }

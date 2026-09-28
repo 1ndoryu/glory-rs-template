@@ -29,8 +29,8 @@ pub async fn generate_token(
     let token_hex = hex::encode(raw_bytes);
     let token_hash = hash_token(&token_hex);
 
-    sqlx::query(
-        "INSERT INTO chat_continuation_tokens
+    sqlx::query!(
+        r#"INSERT INTO chat_continuation_tokens
              (session_id, visitor_id, token_hash, email, disconnect_epoch)
          VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (session_id, disconnect_epoch) DO UPDATE SET
@@ -40,13 +40,13 @@ pub async fn generate_token(
              expires_at = NOW() + INTERVAL '7 days',
              used_at = NULL,
              revoked_at = NULL,
-             created_at = NOW()",
+             created_at = NOW()"#,
+        session_id,
+        visitor_id,
+        &token_hash,
+        email,
+        disconnect_epoch
     )
-    .bind(session_id)
-    .bind(visitor_id)
-    .bind(&token_hash)
-    .bind(email)
-    .bind(disconnect_epoch)
     .execute(pool)
     .await?;
 
@@ -57,28 +57,31 @@ pub async fn generate_token(
  * que todavía no haya sido entregado para esta sesión. */
 pub async fn mark_connected(pool: &PgPool, session_id: Uuid) -> Result<DateTime<Utc>, sqlx::Error> {
     let mut tx = pool.begin().await?;
-    let connected_at: DateTime<Utc> = sqlx::query_scalar(
-        "UPDATE chat_sessions
+    /* COALESCE en RETURNING: la columna es nulable en el esquema pero el
+     * UPDATE la acaba de fijar a NOW() en la misma sentencia, así que el
+     * valor es no-nulo por construcción y el macro lo verifica como tal. */
+    let connected_at: DateTime<Utc> = sqlx::query_scalar!(
+        r#"UPDATE chat_sessions
          SET visitor_last_connected_at = NOW(), visitor_disconnected_at = NULL
-         WHERE id = $1 RETURNING visitor_last_connected_at",
+         WHERE id = $1 RETURNING COALESCE(visitor_last_connected_at, NOW()) AS "connected_at!""#,
+        session_id
     )
-    .bind(session_id)
     .fetch_one(&mut *tx)
     .await?;
-    sqlx::query(
-        "UPDATE chat_alert_outbox SET status = 'cancelled', locked_at = NULL,
+    sqlx::query!(
+        r#"UPDATE chat_alert_outbox SET status = 'cancelled', locked_at = NULL,
              updated_at = NOW(), last_error = 'visitor_reconnected'
          WHERE event_type = 'chat.continuation' AND reference_id = $1
-           AND status IN ('pending','processing')",
+           AND status IN ('pending','processing')"#,
+        session_id
     )
-    .bind(session_id)
     .execute(&mut *tx)
     .await?;
-    sqlx::query(
-        "UPDATE chat_continuation_tokens SET revoked_at = NOW()
-         WHERE session_id = $1 AND used_at IS NULL AND revoked_at IS NULL",
+    sqlx::query!(
+        r#"UPDATE chat_continuation_tokens SET revoked_at = NOW()
+         WHERE session_id = $1 AND used_at IS NULL AND revoked_at IS NULL"#,
+        session_id
     )
-    .bind(session_id)
     .execute(&mut *tx)
     .await?;
     tx.commit().await?;
@@ -89,30 +92,38 @@ pub async fn mark_connected(pool: &PgPool, session_id: Uuid) -> Result<DateTime<
  * Si falta email, consentimiento o historial, solo persiste presencia. */
 pub async fn schedule_after_disconnect(pool: &PgPool, session_id: Uuid) -> Result<(), sqlx::Error> {
     let mut tx = pool.begin().await?;
-    let row: (i64, DateTime<Utc>) = sqlx::query_as(
-        "UPDATE chat_sessions SET visitor_disconnected_at = NOW(),
+    /* query_as! no acepta tuplas: query! con alias + override `!`
+     * (COALESCE con NOW() nunca es nulo; epoch es BIGINT NOT NULL). */
+    let row = sqlx::query!(
+        r#"UPDATE chat_sessions SET visitor_disconnected_at = NOW(),
              visitor_disconnect_epoch = visitor_disconnect_epoch + 1
          WHERE id = $1 AND status <> 'closed'
-         RETURNING visitor_disconnect_epoch, visitor_disconnected_at",
+         RETURNING visitor_disconnect_epoch, COALESCE(visitor_disconnected_at, NOW()) AS "connected_at!""#,
+        session_id
     )
-    .bind(session_id)
     .fetch_one(&mut *tx)
     .await?;
 
-    sqlx::query(
-        "INSERT INTO chat_alert_outbox
+    /* CAST($2 AS bigint): CONCAT/jsonb_build_object dejan el parámetro como
+     * unknown en DESCRIBE; el cast fija su tipo para el macro sin cambiar
+     * el valor (número JSON igual que antes).
+     * CAST($3 AS timestamptz): `$3 + INTERVAL` con $3 unknown resolvía $3
+     * como interval; el cast restaura timestamptz+interval = timestamptz
+     * (en runtime sqlx ya enviaba $3 tipado como timestamptz). */
+    sqlx::query!(
+        r#"INSERT INTO chat_alert_outbox
             (idempotency_key, event_type, channel, recipient, reference_type,
              reference_id, payload, available_at)
-         SELECT CONCAT('chat-continuation:', s.id, ':', $2),
+         SELECT CONCAT('chat-continuation:', s.id, ':', CAST($2 AS bigint)),
                 'chat.continuation', 'email', p.email_normalized,
                 'chat_session', s.id,
                 jsonb_build_object(
                     'session_id', s.id,
                     'visitor_id', s.visitor_id,
                     'visitor_name', COALESCE(p.display_name, s.visitor_name, 'Visitante'),
-                    'disconnect_epoch', $2
+                    'disconnect_epoch', CAST($2 AS bigint)
                 ),
-                $3 + INTERVAL '2 minutes'
+                CAST($3 AS timestamptz) + INTERVAL '2 minutes'
          FROM chat_sessions s
          JOIN visitor_profiles p ON p.visitor_id = s.visitor_id
          WHERE s.id = $1
@@ -121,11 +132,11 @@ pub async fn schedule_after_disconnect(pool: &PgPool, session_id: Uuid) -> Resul
            AND (p.continuation_declined_at IS NULL
                 OR p.continuation_declined_at < p.continuation_consent_at)
            AND EXISTS (SELECT 1 FROM chat_messages m WHERE m.session_id = s.id)
-         ON CONFLICT (idempotency_key) DO NOTHING",
+         ON CONFLICT (idempotency_key) DO NOTHING"#,
+        session_id,
+        row.visitor_disconnect_epoch,
+        row.connected_at
     )
-    .bind(session_id)
-    .bind(row.0)
-    .bind(row.1)
     .execute(&mut *tx)
     .await?;
     tx.commit().await
@@ -136,8 +147,8 @@ pub async fn is_disconnect_cycle_current(
     session_id: Uuid,
     disconnect_epoch: i64,
 ) -> Result<bool, sqlx::Error> {
-    sqlx::query_scalar(
-        "SELECT EXISTS(
+    sqlx::query_scalar!(
+        r#"SELECT EXISTS(
             SELECT 1 FROM chat_sessions s
             JOIN visitor_profiles p ON p.visitor_id = s.visitor_id
             WHERE s.id = $1 AND s.visitor_disconnect_epoch = $2
@@ -145,10 +156,10 @@ pub async fn is_disconnect_cycle_current(
               AND p.continuation_consent_at IS NOT NULL
               AND (p.continuation_declined_at IS NULL
                    OR p.continuation_declined_at < p.continuation_consent_at)
-        )",
+        ) AS "exists!""#,
+        session_id,
+        disconnect_epoch
     )
-    .bind(session_id)
-    .bind(disconnect_epoch)
     .fetch_one(pool)
     .await
 }
@@ -161,15 +172,16 @@ pub async fn validate_token(
 ) -> Result<Option<ContinuationTokenInfo>, sqlx::Error> {
     let token_hash = hash_token(token);
 
-    let row = sqlx::query_as::<_, TokenRow>(
-        "SELECT session_id, visitor_id, email, expires_at
+    let row = sqlx::query_as!(
+        TokenRow,
+        r#"SELECT session_id, visitor_id, email, expires_at
          FROM chat_continuation_tokens
          WHERE token_hash = $1
            AND used_at IS NULL
            AND revoked_at IS NULL
-           AND expires_at > NOW()",
+           AND expires_at > NOW()"#,
+        &token_hash
     )
-    .bind(&token_hash)
     .fetch_optional(pool)
     .await?;
 
@@ -189,16 +201,17 @@ pub async fn redeem_token(
 ) -> Result<Option<ContinuationTokenInfo>, sqlx::Error> {
     let token_hash = hash_token(token);
 
-    let row = sqlx::query_as::<_, TokenRow>(
-        "UPDATE chat_continuation_tokens
+    let row = sqlx::query_as!(
+        TokenRow,
+        r#"UPDATE chat_continuation_tokens
          SET used_at = NOW()
          WHERE token_hash = $1
            AND used_at IS NULL
            AND revoked_at IS NULL
            AND expires_at > NOW()
-         RETURNING session_id, visitor_id, email, expires_at",
+         RETURNING session_id, visitor_id, email, expires_at"#,
+        &token_hash
     )
-    .bind(&token_hash)
     .fetch_optional(pool)
     .await?;
 
@@ -212,14 +225,14 @@ pub async fn redeem_token(
 
 /// Revoca todos los tokens activos de una sesión (al cerrar conversación, etc.).
 pub async fn revoke_for_session(pool: &PgPool, session_id: Uuid) -> Result<u64, sqlx::Error> {
-    let result = sqlx::query(
-        "UPDATE chat_continuation_tokens
+    let result = sqlx::query!(
+        r#"UPDATE chat_continuation_tokens
          SET revoked_at = NOW()
          WHERE session_id = $1
            AND used_at IS NULL
-           AND revoked_at IS NULL",
+           AND revoked_at IS NULL"#,
+        session_id
     )
-    .bind(session_id)
     .execute(pool)
     .await?;
 
@@ -229,16 +242,16 @@ pub async fn revoke_for_session(pool: &PgPool, session_id: Uuid) -> Result<u64, 
 /// Verifica si ya existe un token activo (no usado, no revocado, no expirado) para esta sesión.
 /// Esto evita enviar múltiples emails de continuación para la misma desconexión.
 pub async fn has_active_token(pool: &PgPool, session_id: Uuid) -> Result<bool, sqlx::Error> {
-    let exists: bool = sqlx::query_scalar(
-        "SELECT EXISTS(
+    let exists: bool = sqlx::query_scalar!(
+        r#"SELECT EXISTS(
             SELECT 1 FROM chat_continuation_tokens
             WHERE session_id = $1
               AND used_at IS NULL
               AND revoked_at IS NULL
               AND expires_at > NOW()
-        )",
+        ) AS "exists!""#,
+        session_id
     )
-    .bind(session_id)
     .fetch_one(pool)
     .await?;
 

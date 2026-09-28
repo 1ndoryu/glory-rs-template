@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE hosting_subscriptions SET bandwidth_limit_gb = $1, updated_at = NOW() WHERE id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4d33e7ded52eb00d2e8cbf9d90956c30ed48e25861a6e87fe7664ff77d363a0e"
+}

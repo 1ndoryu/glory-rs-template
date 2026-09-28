@@ -126,12 +126,13 @@ impl GoogleAuthService {
         let google_user = Self::get_user_from_code(http, code).await?;
 
         /* 1. ¿google_id ya vinculado a un usuario? */
-        let existing_user_id: Option<Uuid> =
-            sqlx::query_scalar("SELECT user_id FROM user_google_accounts WHERE google_id = $1")
-                .bind(&google_user.id)
-                .fetch_optional(pool)
-                .await
-                .map_err(|e| AppError::Internal(e.to_string()))?;
+        let existing_user_id: Option<Uuid> = sqlx::query_scalar!(
+            r#"SELECT user_id FROM user_google_accounts WHERE google_id = $1"#,
+            &google_user.id
+        )
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
         let user = if let Some(uid) = existing_user_id {
             /* Cuenta Google ya vinculada → cargar usuario */
@@ -154,13 +155,13 @@ impl GoogleAuthService {
                     .await
                     .map_err(|e| AppError::Internal(e.to_string()))?;
 
-                /* [sentinel-disable-line sqlx-query-sin-macro: UPDATE display_name con name opcional de Google] */
+                /* [279A-4] Macro compile-time: columna display_name nulable. */
                 if let Some(name) = &google_user.name {
-                    sqlx::query(
+                    sqlx::query!(
                         "UPDATE users SET display_name = $2 WHERE id = $1 AND display_name IS NULL",
+                        u.id,
+                        name
                     )
-                    .bind(u.id)
-                    .bind(name)
                     .execute(pool)
                     .await
                     .map_err(|e| AppError::Internal(e.to_string()))?;
@@ -168,17 +169,21 @@ impl GoogleAuthService {
                 u
             };
 
-            /* [sentinel-disable-line sqlx-query-sin-macro: INSERT google_account con ON CONFLICT dinámico] */
-            sqlx::query(
-                "INSERT INTO user_google_accounts (user_id, google_id, email, name, picture)
+            /* [279A-4] Macro compile-time: ON CONFLICT DO NOTHING sin arbiter
+             * no requiere inferencia de índice en PREPARE. Los binds $4/$5 se
+             * infieren como &str no-nulo; name/picture de Google son opcionales
+             * (None solo sin scope profile) y estas columnas son solo-escritura
+             * (nadie las lee), asi que '' es equivalente observable a NULL. */
+            sqlx::query!(
+                r#"INSERT INTO user_google_accounts (user_id, google_id, email, name, picture)
                  VALUES ($1, $2, $3, $4, $5)
-                 ON CONFLICT DO NOTHING",
+                 ON CONFLICT DO NOTHING"#,
+                user.id,
+                &google_user.id,
+                &google_user.email,
+                google_user.name.as_deref().unwrap_or(""),
+                google_user.picture.as_deref().unwrap_or("")
             )
-            .bind(user.id)
-            .bind(&google_user.id)
-            .bind(&google_user.email)
-            .bind(&google_user.name)
-            .bind(&google_user.picture)
             .execute(pool)
             .await
             .map_err(|e| AppError::Internal(e.to_string()))?;

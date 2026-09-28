@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO infrastructure_resource_samples\n                    (entity_kind, server_id, deployment_uuid, sampled_at, cpu_percent,\n                     ram_used_mb, ram_limit_mb, disk_used_mb, disk_limit_mb,\n                     site_cpu_limit_cores, site_ram_limit_mb, db_cpu_limit_cores,\n                     db_ram_limit_mb, ssh_cpu_limit_cores, ssh_ram_limit_mb)\n               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid",
+        "Text",
+        "Timestamptz",
+        "Float8",
+        "Float8",
+        "Float8",
+        "Float8",
+        "Float8",
+        "Float8",
+        "Float8",
+        "Float8",
+        "Float8",
+        "Float8",
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "22cb5f64b1909dd7f747ab87effff987f894cefe5bfd3b842825079c58438cde"
+}

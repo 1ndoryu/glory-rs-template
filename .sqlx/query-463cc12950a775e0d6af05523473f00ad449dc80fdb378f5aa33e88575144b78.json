@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO chat_continuation_tokens\n             (session_id, visitor_id, token_hash, email, disconnect_epoch)\n         VALUES ($1, $2, $3, $4, $5)\n         ON CONFLICT (session_id, disconnect_epoch) DO UPDATE SET\n             visitor_id = EXCLUDED.visitor_id,\n             token_hash = EXCLUDED.token_hash,\n             email = EXCLUDED.email,\n             expires_at = NOW() + INTERVAL '7 days',\n             used_at = NULL,\n             revoked_at = NULL,\n             created_at = NOW()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "463cc12950a775e0d6af05523473f00ad449dc80fdb378f5aa33e88575144b78"
+}

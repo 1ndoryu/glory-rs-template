@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT server_uuid,\n                      cpu_cores::float8 AS \"cpu_cores!\",\n                      ram_mb,\n                      disk_mb,\n                      cpu_allocated::float8 AS \"cpu_allocated!\",\n                      ram_allocated,\n                      disk_allocated\n               FROM server_capacity\n               WHERE server_uuid = $1\n               FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "server_uuid",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "cpu_cores!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 2,
+        "name": "ram_mb",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "disk_mb",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "cpu_allocated!",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 5,
+        "name": "ram_allocated",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "disk_allocated",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      false,
+      false,
+      null,
+      false,
+      false
+    ]
+  },
+  "hash": "20114217a666cf3b0c3dc930c48fb17dae525c549877913b0efc89572a0e976d"
+}

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO server_capacity (server_uuid, server_id)\n               VALUES ($1, $2)\n               ON CONFLICT (server_uuid)\n               DO UPDATE SET server_id = EXCLUDED.server_id, updated_at = NOW()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c1b7624f14c351a684e84c11ddeca9e83d2a3ff85a9a5214bd65be05e95709d1"
+}

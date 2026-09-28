@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_response_cycles\n             SET status = 'cancelled'\n             WHERE session_id = $1 AND status IN ('waiting', 'claimed')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bc5da317c025c90598ad7443838487eab38e0f28ee72e9f91b466529c2fdfdca"
+}

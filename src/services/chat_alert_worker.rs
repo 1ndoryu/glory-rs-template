@@ -62,12 +62,12 @@ pub async fn run_chat_alert_worker(
 async fn recover_stale_processing(pool: &PgPool) {
     let now = chrono::Utc::now();
     let cutoff = now - chrono::Duration::seconds(300);
-    let result = sqlx::query(
-        "UPDATE chat_alert_outbox SET status = 'pending', locked_at = NULL, updated_at = $1
-         WHERE status = 'processing' AND locked_at < $2",
+    let result = sqlx::query!(
+        r#"UPDATE chat_alert_outbox SET status = 'pending', locked_at = NULL, updated_at = $1
+         WHERE status = 'processing' AND locked_at < $2"#,
+        now,
+        cutoff
     )
-    .bind(now)
-    .bind(cutoff)
     .execute(pool)
     .await;
 

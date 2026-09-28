@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE chat_alert_outbox SET status = 'pending', locked_at = NULL, updated_at = $1\n         WHERE status = 'processing' AND locked_at < $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "99d19f5b01d9d4a500fa05970105ed5f2264f080d7645f3ab0d2df1f6f98bfc1"
+}
