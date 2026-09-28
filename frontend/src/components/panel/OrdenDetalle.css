@@ -15,12 +15,7 @@
     justify-content: flex-start;
 }
 
-.ordenDetalleHeader {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--spacing-md);
-    flex-wrap: wrap;
-}
+/* [279A-5] CSS muerto eliminado: ordenDetalleHeader (sin uso en TSX 2026-09-28). */
 
 .ordenDetalleVolver {
     font-family: var(--font-primary);
@@ -38,98 +33,18 @@
     color: var(--brand-black);
 }
 
-.ordenDetalleAcciones {
-    display: flex;
-    align-items: flex-start;
-    justify-content: flex-end;
-    gap: var(--spacing-sm);
-    margin-left: auto;
-}
-
-.ordenDetalleResumen {
-    flex: 1;
-    min-width: 0;
-}
-
-.ordenDetalleTitulo {
-    font-family: var(--font-primary);
-    font-size: var(--text-xl);
-    
-    color: var(--brand-black);
-    margin: 0;
-}
-
-.ordenDetalleMetaRow {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    margin-top: var(--spacing-xs);
-    flex-wrap: wrap;
-}
+/* [279A-5] CSS muerto eliminado: ordenDetalleAcciones/Resumen/Titulo/MetaRow
+ * (sin uso en TSX 2026-09-28; el header actual usa .ordenDetalleTopbar/.ordenDetalleBadge). */
 
 /* [064A-24] .ordenDetalleMeta eliminado — los meta migraron a .ordenDetalleBadge */
 
-.ordenDetalleMenu {
-    position: relative;
-}
-
-/* [064A-38] Botón 3 puntos: mismo tamaño que botón Pagar (tamano=pequeño).
- * [259A-5 5b-7] Migrado a variante canon 'accion' de MenuContextual. */
-
-/* sentinel-disable-next-line css-especificacion-diseno-local */
-.ordenDetalleMenuPanel {
-    position: absolute;
-    top: calc(100% + 8px);
-    right: 0;
-    min-width: 200px;
-    padding: var(--spacing-xs);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border-default);
-    background: var(--bg-primary);
-    z-index: 3;
-}
-
-/* sentinel-disable-next-line css-especificacion-diseno-local */
-.ordenDetalleMenuItem {
-    width: 100%;
-    justify-content: flex-start;
-    gap: var(--spacing-xs);
-    padding: var(--spacing-sm) var(--spacing-md);
-    border-radius: var(--radius-md);
-    text-decoration: none;
-}
-
-.ordenDetalleMenuItemPeligro {
-    color: var(--color-error-text);
-    background: var(--color-error-bg-soft);
-}
-
-.ordenDetalleMenuItemPeligro:hover {
-    background: var(--color-error-bg);
-}
-
-.ordenDetalleMenuItem:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
+/* [279A-5] CSS muerto eliminado: ordenDetalleMenu/MenuPanel/MenuItem(+Peligro/+:hover/:disabled),
+ * sin uso en TSX 2026-09-28 (el menu migro a variante canon 'accion' de MenuContextual).
 
 /* [064A-22] .ordenDetalleNotas eliminado */
 
 /*    TIMELINE DE FASES */
-
-.ordenDetalleFases {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-md);
-}
-
-.ordenDetalleFasesTitulo {
-    font-family: var(--font-primary);
-    font-size: var(--text-lg);
-    font-weight: 500;
-    color: var(--brand-black);
-    margin: 0;
-}
+/* [279A-5] CSS muerto eliminado: ordenDetalleFases/FasesTitulo (sin uso en TSX 2026-09-28). */
 
 .fasesTimeline {
     display: flex;
@@ -479,20 +394,8 @@
         margin-left: 0;
     }
 
-    .ordenDetalleHeader {
-        flex-direction: column;
-    }
-
-    .ordenDetalleAcciones {
-        width: 100%;
-        justify-content: flex-start;
-        margin-left: 0;
-    }
-
-    .ordenDetalleMetaRow {
-        flex-direction: column;
-        align-items: flex-start;
-    }
+    /* [279A-5] Overrides muertos eliminados: ordenDetalleHeader/Acciones/MetaRow
+     * (clases base eliminadas, sin uso en TSX 2026-09-28). */
 
     .faseCardHeader {
         flex-direction: column;
@@ -528,12 +431,7 @@
 /*    [044A-38 Fase 3] Botones de pago */
 
 /* [064A-1] Botón de pago: ahora usa variante="exito" del Button.
- * Solo queda .ordenDetallePagar para ajuste de layout (gap con icono). */
-.ordenDetallePagar {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-}
+ * [279A-5] .ordenDetallePagar eliminado (sin uso en TSX 2026-09-28). */
 
 .ordenDetalleModal {
     max-width: 460px;

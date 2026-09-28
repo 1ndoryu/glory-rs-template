@@ -131,10 +131,8 @@
     font-weight: 500;
 }
 
-.hostingCardDominio {
-    font-size: var(--text-sm);
-    color: var(--text-tertiary);
-}
+/* [279A-5] CSS muerto eliminado: hostingCardDominio (sin uso en TSX 2026-09-28). */
+
 
 /* [104A-24] Sin italic según indicación del usuario. */
 .hostingCardCliente {
@@ -299,15 +297,6 @@
 }
 
 /* ── Responsive ────────────────────────────── */
-@media (max-width: 768px) {
-    .hostingTablaHeader {
-        display: none;
-    }
+/* [279A-5] Media query muerto eliminado: hostingTablaHeader/hostingFila
+ * (sin uso en TSX 2026-09-28; la tabla migro a otro layout). */
 
-    .hostingFila {
-        display: flex;
-        flex-direction: column;
-        gap: var(--spacing-xs);
-        padding: var(--spacing-md);
-    }
-}

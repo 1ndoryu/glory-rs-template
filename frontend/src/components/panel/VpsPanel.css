@@ -8,35 +8,8 @@
     gap: var(--spacing-md);
 }
 
-.vpsDeploymentsSummary {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: var(--spacing-sm);
-}
-
-/* [304A-2] Alineado con tokens de hostingCard: brand-white, bg-item-active, radius-lg */
-.vpsDeploymentsSummaryCard {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding: var(--spacing-sm) var(--spacing-md);
-    background: var(--brand-white);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-md);
-}
-
-.vpsDeploymentsSummaryLabel {
-    font-size: var(--text-xs);
-    color: var(--text-tertiary);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-.vpsDeploymentsSummaryValue {
-    font-size: var(--text-sm);
-    color: var(--brand-black);
-    font-weight: 400;
-}
+/* [279A-5] CSS muerto eliminado: vpsDeploymentsSummary(+Card/Label/Value),
+ * sin uso en TSX 2026-09-28 (el resumen migro a otro layout). */
 
 .vpsLista {
     display: grid;
@@ -74,15 +47,8 @@
     flex: 1;
 }
 
-/* Etiqueta discreta que indica de qué VPS proviene el despliegue */
-.vpsServerLabel {
-    font-size: var(--text-xs);
-    color: var(--text-tertiary);
-    background: var(--bg-item-active);
-    border-radius: var(--radius-sm);
-    padding: 1px 6px;
-    white-space: nowrap;
-}
+/* [279A-5] CSS muerto eliminado: vpsServerLabel (sin uso en TSX 2026-09-28;
+ * la etiqueta de origen VPS ahora es .infraServerBadge en DeploymentRow). */
 
 .vpsStatus {
     font-size: var(--text-xs);
@@ -131,75 +97,10 @@
     overflow-wrap: anywhere;
 }
 
-.vpsStatLink {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    color: var(--brand-black);
-    text-decoration: none;
-    overflow-wrap: anywhere;
-}
-
-.vpsStatLink:hover {
-    opacity: 0.72;
-}
-
-.vpsDeploymentAudit {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--spacing-xs);
-    padding: var(--spacing-md);
-    border-radius: var(--radius-md);
-    font-size: var(--text-sm);
-}
-
-.vpsDeploymentAudit p {
-    margin: 0;
-}
-
-.vpsDeploymentAudit--linked {
-    background: var(--color-success-bg-soft);
-    color: var(--color-success-text);
-}
-
-.vpsDeploymentAudit--orphan {
-    color: var(--color-warning-text);
-    flex-wrap: wrap;
-    gap: var(--spacing-sm);
-    border: 1px solid var(--border-default);
-}
-
-/* [304A-3] vpsOrphanLinkBtn usa <Button variante="secundario"> como base.
- * Solo override de color warning contextual. */
-.vpsOrphanLinkBtn {
-    background: var(--color-warning-text);
-    color: var(--brand-white);
-    white-space: nowrap;
-}
-
-.vpsOrphanActions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--spacing-sm);
-    margin-left: auto;
-    justify-content: flex-end;
-}
-
-.vpsOrphanDeleteBtn {
-    white-space: nowrap;
-}
-
-.vpsDeleteConfirmMeta {
-    font-size: var(--text-sm);
-    overflow-wrap: anywhere;
-}
-
-/* [304A-3] Contenedor del formulario de creación inline bajo la card huérfana */
-.vpsOrphanCreateForm {
-    padding: var(--spacing-md);
-    border-top: 1px solid var(--border-color);
-    background: var(--bg-card-subtle);
-}
+/* [279A-5] CSS muerto eliminado (bloque auditoria/huerfanos, sin uso en TSX 2026-09-28):
+ * vpsStatLink(+:hover), vpsDeploymentAudit(+p/--linked/--orphan), vpsOrphanLinkBtn,
+ * vpsOrphanActions, vpsOrphanDeleteBtn, vpsDeleteConfirmMeta, vpsOrphanCreateForm.
+ * La auditoria de despliegues ahora vive en DeploymentRow (infraFila--huerfana). */
 
 /* [304A-3] Estilos del selector de usuario en CreateHostingForm */
 .userSelectorContenedor {
@@ -343,9 +244,8 @@
     background: var(--bg-item-hover);
 }
 
-.infraFila--expandida {
-    background: var(--bg-item-active);
-}
+/* [279A-5] .infraFila--expandida eliminado (sin uso en TSX 2026-09-28).
+ * .infraFila--huerfana SE CONSERVA: uso dinamico en DeploymentRow.tsx:171. */
 
 .infraFila--huerfana {
     border-left: 2px solid var(--color-warning);
@@ -548,17 +448,13 @@
 /* ── Responsive ── */
 
 @media (max-width: 768px) {
-    .vpsDeploymentsSummary {
-        grid-template-columns: 1fr;
-    }
+    /* [279A-5] Override muerto eliminado: vpsDeploymentsSummary (clase base eliminada). */
 
     .vpsLista {
         grid-template-columns: 1fr;
     }
 
-    .infraResumen {
-        flex-direction: column;
-    }
+    /* [279A-5] Override muerto eliminado: infraResumen (sin regla base ni uso en TSX 2026-09-28). */
 
     .infraNombreTexto {
         max-width: 120px;

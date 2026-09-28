@@ -15,12 +15,7 @@
     box-sizing: border-box;
 }
 
-.correosTitulo {
-    margin: 0 0 var(--espaciado-sm);
-    font-size: var(--text-xl);
-    font-weight: 600;
-    color: var(--text-primary);
-}
+/* [279A-5] CSS muerto eliminado: correosTitulo (sin uso en TSX 2026-09-28). */
 
 /* Pestañas: Vista previa / Enviados */
 .correosPestanias {

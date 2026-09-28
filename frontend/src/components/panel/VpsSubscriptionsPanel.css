@@ -45,8 +45,4 @@
     color: var(--text-tertiary);
 }
 
-@media (max-width: 767px) {
-    .vpsSubscriptionStatus {
-        align-self: flex-start;
-    }
-}
+/* [279A-5] CSS muerto eliminado: media query con .vpsSubscriptionStatus (sin uso en TSX 2026-09-28). */

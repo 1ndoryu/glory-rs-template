@@ -204,25 +204,7 @@
     justify-content: center;
 }
 
-.seoPaginaAccionBtn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius-sm);
-    background: var(--bg-primary);
-    color: var(--text-tertiary);
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
-}
-
-.seoPaginaAccionBtn:hover {
-    background: var(--bg-item-hover);
-    color: var(--text-primary);
-    border-color: var(--border-default);
-}
+/* [279A-5] CSS muerto eliminado: seoPaginaAccionBtn (+:hover, sin uso en TSX 2026-09-28). */
 
 /* GEO checklist */
 .seoGeoLista {

@@ -9,13 +9,7 @@
     gap: var(--spacing-lg);
 }
 
-.perfilDescripcionIntro {
-    font-family: var(--font-serif);
-    font-size: var(--text-base);
-    color: var(--text-muted);
-    line-height: 1.6;
-    margin: 0;
-}
+/* [279A-5] CSS muerto eliminado: perfilDescripcionIntro (sin uso en TSX 2026-09-28). */
 
 /* Avatar */
 .perfilAvatarSeccion {

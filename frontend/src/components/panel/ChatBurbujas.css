@@ -41,17 +41,7 @@
     flex-shrink: 0;
 }
 
-.chatBurbujaAvatarFallback {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: var(--bg-item-active);
-    flex-shrink: 0;
-    color: var(--text-muted);
-}
+/* [279A-5] CSS muerto eliminado: chatBurbujaAvatarFallback (sin uso en TSX 2026-09-28). */
 
 /* [064A-37] Header de burbuja propia: texto oscuro (ya no fondo negro). */
 .chatBurbujaPropia .chatBurbujaHeader {
