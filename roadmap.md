@@ -373,6 +373,20 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   muestra "esperando mensaje". `mn-arrancar-gateway.ps1` ya rehúsa lanzar un
   segundo (guardia por puerto 3102); reinicio limpio = verificar PID muerto +
   puerto libre + 5 s antes de lanzar.
+- 289A-4 logs de tools y cierre de turno (commit `138b71f5`): `ejecutar()` en
+  `chat_tools.rs` loguea tool+sesión+ms+chars/error y el webhook el cierre del
+  turno (chars+via); lo pedido por usuaria ("todo debe tener logs").
+- 289A-5 techo IA 4096 (causa raíz del "no respondió más", verificado crudo y
+  E2E 2026-09-28, commits `0050d08` en `glory-agent` + `04491ec3` aquí):
+  muse-spark razona ~600-800 tokens y con `max_output_tokens=800` el turno
+  post-tool moría `incomplete` sin texto ni calls (800→incomplete+0 items,
+  2000→completed+3 `detalle_inmueble`); `ChatApiOptions::standard()` ahora
+  4096 + WARN `AI incompleta (motivo)` en `call_provider`. E2E sesión
+  `3fd474ee`: buscar(826)+3×detalle→`ai|4` listado 858 chars con tono 289A-2
+  →outbox `sent motivo:ia via wa_a`. `Cargo.toml`+`Dockerfile.rust`
+  (`GLORY_AGENT_REF`) en `0050d08b47`; clippy 0, tests 27+27+5+1.
+  Sesión `739bb63e` quedó `consultando` con el preámbulo parcial: reintentar
+  con `devolver_a_ia` tras este fix.
 
 ## 279A-3 — /ask cuestionario de ficha (F1 verificado local 2026-09-27; pendiente: respuestas usuaria)
 - Plan: `Agente/planes/plan-ask-2026-09-27.md`.
