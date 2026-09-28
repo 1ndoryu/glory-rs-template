@@ -54,7 +54,9 @@ async function aPayload(msg, numeroDestino) {
 
 export async function conectarSesion(via, sockets) {
   const sesion = config.sesiones[via];
-  const dirAuth = new URL(`../sesiones/${via}/`, import.meta.url);
+  /* `useMultiFileAuthState` exige ruta string (un URL revienta en
+   * `saveCreds` tras el pairing y tumba el gateway): convertir aquí. */
+  const dirAuth = fileURLToPath(new URL(`../sesiones/${via}/`, import.meta.url));
   const { state, saveCreds } = await useMultiFileAuthState(dirAuth);
   const sock = makeWASocket({
     auth: state,
