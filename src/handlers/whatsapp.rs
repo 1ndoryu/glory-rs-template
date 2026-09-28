@@ -159,6 +159,9 @@ pub struct RepartoWhatsapp {
     session_id: Uuid,
     cliente_id: Uuid,
     mensaje_id: Uuid,
+    /* [289A-1] Secuencia del `client` recién persistido: el turno IA la
+     * excluye del historial y la re-anexa como actual. */
+    secuencia: i64,
 }
 
 /// Persiste el `[foto]` entrante y lo emite por el hub. Best-effort con
@@ -285,6 +288,7 @@ pub async fn repartir_y_vincular(
         session_id: sesion,
         cliente_id: cliente.id,
         mensaje_id: msg.id,
+        secuencia: msg.sequence_num,
     })
 }
 
@@ -305,9 +309,60 @@ async fn webhook(
         .clone()
         .ok_or_else(|| AgentError::Internal("sin BD".to_string()))?;
     let (a, b) = numeros_configurados(&pool).await;
-    repartir_y_vincular(&pool, &state.hub, &a, &b, &entrada)
+    let rep = repartir_y_vincular(&pool, &state.hub, &a, &b, &entrada).await?;
+    /* [289A-1] Turno IA en background: el webhook responde 2xx rápido al
+     * gateway; la IA (núcleo `responder_turno_persistido`, misma vía que el
+     * chat web) corre aparte y su texto se encola en outbox `whatsapp` con
+     * el `via` del canal, que el worker manda por la sesión Baileys que
+     * recibió. Sin IA (gate humano, sin key, sobre presupuesto, error) solo
+     * se loguea: nunca silencio y nunca 500 al gateway por fallos del LLM. */
+    let fondo = state.clone();
+    let pool_fondo = pool.clone();
+    let texto_fondo = entrada.texto.trim().to_string();
+    let remitente_fondo = ClienteRepository::normalizar_telefono(entrada.remitente.trim());
+    let canal_fondo = rep.canal.clone();
+    let sesion_fondo = rep.session_id;
+    let secuencia_fondo = rep.secuencia;
+    if !fondo.timing.check_budget(&remitente_fondo) {
+        tracing::warn!("webhook WhatsApp: {sesion_fondo} sobre presupuesto, sin turno IA");
+        return Ok(Json(rep));
+    }
+    tokio::spawn(async move {
+        match glory_agent::transport::responder_turno_persistido(
+            &fondo,
+            sesion_fondo,
+            &texto_fondo,
+            secuencia_fondo,
+        )
         .await
-        .map(Json)
+        {
+            Ok(Some(respuesta)) => {
+                let payload = serde_json::json!({
+                    "session_id": sesion_fondo.to_string(),
+                    "destino": remitente_fondo,
+                    "texto": respuesta,
+                    "via": canal_fondo,
+                    "motivo": "ia",
+                });
+                if let Err(e) =
+                    glory_agent::persistence::enqueue_outbox(&pool_fondo, "whatsapp", payload).await
+                {
+                    tracing::error!(
+                        "webhook WhatsApp: {sesion_fondo} no se pudo encolar respuesta IA: {e}"
+                    );
+                }
+            }
+            Ok(None) => {
+                tracing::info!(
+                    "webhook WhatsApp: {sesion_fondo} sin respuesta IA (gate humano o sin key)"
+                );
+            }
+            Err(e) => {
+                tracing::warn!("webhook WhatsApp: {sesion_fondo} turno IA falló: {e}");
+            }
+        }
+    });
+    Ok(Json(rep))
 }
 
 /// Ruta pública del gateway (simulado hoy, Baileys mañana): el secreto del
