@@ -178,76 +178,12 @@
     color: var(--brand-black);
 }
 
-/* Sección Marcas */
-.nosotrosMarcas {
-    padding: var(--spacing-2xl) 0;
-    border-top: 1px solid var(--border-default);
-}
+/* [279A-5] Seccion Marcas eliminada (sin uso en TSX 2026-09-28): nosotrosMarcas(+Contenedor),
+ * marcasHeader, marcasGrid, marcaLogo(+a/img/:hover), marcaNombreTexto(+:hover).
+ * Resto del bloque (marcasGrid, marcaLogo, marcaNombreTexto) eliminado abajo. */
 
-.nosotrosMarcasContenedor {
-    max-width: var(--container-width);
-    margin: 0 auto;
-    padding: 0 var(--spacing-lg);
-    width: 100%;
-}
-
-.marcasHeader {
-    font-family: var(--font-primary);
-    font-size: var(--text-sm);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-tertiary);
-    margin: 0 0 var(--spacing-xl);
-    text-align: center;
-}
-
-.marcasGrid {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: var(--spacing-xl);
-}
-
-.marcaLogo {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 120px;
-}
-
-.marcaLogo a {
-    text-decoration: none;
-    color: inherit;
-}
-
-.marcaLogo img {
-    max-height: 40px;
-    width: auto;
-    filter: grayscale(100%);
-    opacity: 0.6;
-    transition:
-        filter var(--transicion-media),
-        opacity var(--transicion-media);
-}
-
-.marcaLogo:hover img {
-    filter: grayscale(0%);
-    opacity: 1;
-}
-
-.marcaNombreTexto {
-    font-family: var(--font-primary);
-    font-size: var(--text-xl);
-    font-weight: 500;
-    color: var(--text-muted);
-    opacity: 0.6;
-    transition: opacity var(--transicion-media);
-}
-
-.marcaLogo:hover .marcaNombreTexto {
-    opacity: 1;
-}
+/* [279A-5] Resto de la seccion Marcas eliminado: marcasGrid, marcaLogo(+a/img/:hover),
+ * marcaNombreTexto(+:hover). Ver tombstone sobre .miembroRedes a:hover. */
 
 @media (max-width: 768px) {
     .nosotrosHeroContenido {

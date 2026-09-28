@@ -63,11 +63,8 @@
     letter-spacing: 0.05em;
 }
 
-.tarjetaProyectoCategorias {
-    font-family: var(--font-primary);
-    font-size: var(--text-sm);
-    color: var(--text-muted);
-}
+/* [279A-5] CSS muerto eliminado: tarjetaProyectoCategorias (sin uso en TSX 2026-09-28;
+ * las categorias actuales usan .tarjetaProyectoTags). */
 
 .tarjetaProyectoTags {
     display: flex;

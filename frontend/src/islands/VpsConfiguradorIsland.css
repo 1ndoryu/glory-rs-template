@@ -6,60 +6,10 @@
     background: var(--bg-primary);
 }
 
-.vpsConfiguradorNavBar {
-    max-width: var(--container-width);
-    margin: 0 auto;
-    /* 4.5rem compensa el header fixed (~64px) + spacing de diseño */
-    padding: calc(4.5rem + var(--spacing-md)) var(--spacing-lg) 0;
-}
-
-.vpsConfiguradorVolver.botonBase {
-    align-self: flex-start;
-    border: 0;
-    background: transparent;
-    color: var(--text-muted);
-    cursor: pointer;
-    font-family: var(--font-primary);
-    font-size: var(--text-sm);
-}
-
-.vpsConfiguradorVolver.botonBase:hover {
-    color: var(--text-primary);
-}
-
-.vpsConfiguradorHero {
-    max-width: var(--container-width);
-    margin: 0 auto;
-    padding: var(--spacing-md) var(--spacing-lg) var(--spacing-lg);
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-sm);
-}
-
-.vpsConfiguradorEtiqueta {
-    color: var(--text-tertiary);
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-}
-
-.vpsConfiguradorTitulo {
-    color: var(--brand-black);
-    font-family: var(--font-primary);
-    font-size: var(--text-4xl);
-    font-weight: 500;
-    line-height: 1;
-    margin: 0;
-}
-
-.vpsConfiguradorSubtitulo {
-    color: var(--text-muted);
-    font-family: var(--font-serif);
-    font-size: var(--text-lg);
-    line-height: 1.55;
-    margin: 0;
-    max-width: 760px;
-}
+/* [279A-5] Bloque hero/nav del configurador eliminado (sin uso en TSX 2026-09-28):
+ * vpsConfiguradorNavBar, vpsConfiguradorVolver(+:hover), vpsConfiguradorHero,
+ * vpsConfiguradorEtiqueta, vpsConfiguradorTitulo, vpsConfiguradorSubtitulo.
+ * El layout actual usa .vpsConfiguradorLayout/.vpsConfiguradorPagina. */
 
 .vpsConfiguradorLayout {
     max-width: var(--container-width);
@@ -102,15 +52,11 @@
     margin: 0;
 }
 
-.vpsConfiguradorPlanes {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--spacing-sm);
-}
+/* [279A-5] .vpsConfiguradorPlanes eliminado (sin uso en TSX 2026-09-28). */
 
 /* [205A-2] .vpsConfiguradorSelect.selectBase eliminado — se usa SelectDropdown (MenuContextual). */
 
-.vpsConfiguradorPlanSpecs,
+/* [279A-5] .vpsConfiguradorPlanSpecs eliminado del selector (sin uso en TSX 2026-09-28). */
 .vpsConfiguradorMuted,
 .vpsConfiguradorResumenNota {
     color: var(--text-muted);
@@ -252,23 +198,13 @@
 }
 
 @media (max-width: 640px) {
-    .vpsConfiguradorNavBar {
-        padding: var(--spacing-md) var(--spacing-md) 0;
-    }
-
-    .vpsConfiguradorHero {
-        padding: var(--spacing-sm) var(--spacing-md) var(--spacing-md);
-    }
-
-    .vpsConfiguradorTitulo {
-        font-size: var(--text-3xl);
-    }
-
+    /* [279A-5] Overrides responsive eliminados (clases base sin uso en TSX 2026-09-28):
+     * vpsConfiguradorNavBar, vpsConfiguradorHero, vpsConfiguradorTitulo,
+     * vpsConfiguradorPlanes (se conserva .vpsConfiguradorSpecsGrid). */
     .vpsConfiguradorLayout {
         padding: 0 var(--spacing-md) var(--spacing-xl);
     }
 
-    .vpsConfiguradorPlanes,
     .vpsConfiguradorSpecsGrid {
         grid-template-columns: 1fr;
     }

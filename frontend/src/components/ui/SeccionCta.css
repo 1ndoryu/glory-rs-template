@@ -11,10 +11,8 @@
     border-top: none;
 }
 
-/* Variante compacta: para cuando el contenedor padre ya tiene gap */
-.seccionCtaCompacta {
-    padding-bottom: var(--spacing-xl);
-}
+/* Variante compacta: para cuando el contenedor padre ya tiene gap
+ * [279A-5] .seccionCtaCompacta eliminado (sin uso en TSX 2026-09-28). */
 
 .ctaContenedor {
     max-width: var(--container-width);

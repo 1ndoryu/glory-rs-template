@@ -158,10 +158,8 @@
     color: var(--color-success-text);
 }
 
-.correosBadge.badgeError {
-    background: var(--color-error-bg-claro);
-    color: var(--color-error-text);
-}
+/* [279A-5] .correosBadge.badgeError eliminado (badgeError sin uso en TSX 2026-09-28;
+ * se conserva .correosBadge base + .badgeNeutral/.badgeExito en uso). */
 
 .correosBadge.badgeNeutral {
     background: var(--color-gris-claro);

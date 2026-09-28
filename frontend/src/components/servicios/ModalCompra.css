@@ -6,22 +6,8 @@
 
 /* [084A-8] .modalCompraTitulo reemplazado por .modalTitulo (Modal.css) */
 
-.modalCompraPrecio {
-    display: flex;
-    align-items: baseline;
-    justify-content: center;
-    gap: 4px;
-}
-
-.modalCompraPrecioCifra {
-    font-size: var(--text-2xl);
-    font-weight: 700;
-}
-
-.modalCompraPrecioPeriodo {
-    font-size: var(--text-sm);
-    color: var(--text-dark);
-}
+/* [279A-5] CSS muerto eliminado: modalCompraPrecio/PrecioCifra/PrecioPeriodo
+ * (sin uso en TSX 2026-09-28; el resumen actual usa .modalCompraPrecioResumen). */
 
 .modalCompraPaso {
     display: flex;
@@ -49,10 +35,7 @@
     text-align: left;
 }
 
-.modalCompraBriefInput {
-    min-height: 116px;
-    resize: vertical;
-}
+/* [279A-5] CSS muerto eliminado: modalCompraBriefInput (sin uso en TSX 2026-09-28). */
 
 .modalCompraAviso {
     font-size: var(--text-xs);
@@ -129,51 +112,9 @@
     color: var(--color-success);
 }
 
-/* [084A-28] Selector de meses para hosting */
-.modalCompraMeses {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-md) 0;
-}
-
-.modalCompraMesesLabel {
-    font-size: var(--text-sm);
-    font-weight: 500;
-    margin: 0;
-}
-
-.modalCompraMesesStepper {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-md);
-}
-
-.modalCompraMesesValor {
-    font-size: var(--text-xl);
-    font-weight: 700;
-    min-width: 40px;
-    text-align: center;
-}
-
-.modalCompraMesesDetalle {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-}
-
-.modalCompraMesesCalculo {
-    font-size: var(--text-xs);
-    color: var(--text-dark);
-}
-
-.modalCompraMesesDescuento {
-    font-size: var(--text-xs);
-    
-    color: var(--color-success);
-}
+/* [084A-28] Selector de meses para hosting
+ * [279A-5] Bloque eliminado: modalCompraMeses(+Label/Stepper/Valor/Detalle/Calculo/Descuento),
+ * sin uso en TSX 2026-09-28. */
 
 /* [084A-12] Resumen de precio dinámico con descuento */
 .modalCompraPrecioResumen {

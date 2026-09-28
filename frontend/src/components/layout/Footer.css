@@ -155,31 +155,9 @@
 }
 
 /* [044A-27] Selector de idioma en footer — colores invertidos para fondo oscuro,
- * dropdown abre hacia arriba y muestra nombres completos. */
-.footer .selectorIdiomaBoton {
-    color: var(--bg-primary);
-    opacity: 0.6;
-}
-
-.footer .selectorIdiomaBoton:hover {
-    opacity: 1;
-}
-
-.footer .selectorIdiomaLista {
-    top: auto;
-    bottom: 100%;
-    padding-top: 0;
-    padding-bottom: var(--spacing-xs);
-}
-
-.footer .selectorIdiomaLista::before {
-    top: 0;
-    bottom: var(--spacing-xs);
-}
-
-.footer .selectorIdiomaOpcion {
-    text-align: left;
-}
+ * dropdown abre hacia arriba y muestra nombres completos.
+ * [279A-5] Reglas eliminadas (.footer .selectorIdiomaBoton/:hover/Lista/Lista::before/Opcion):
+ * el componente SelectorIdioma ya no se renderiza en el footer (sin uso en TSX 2026-09-28). */
 
 /* Responsive */
 @media (max-width: 768px) {
