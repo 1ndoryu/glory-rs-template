@@ -356,7 +356,18 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   (`SESSION_A_RESPONDE_IA=1`, `SESSION_B_RESPONDE_IA=0`) +
   `sesion.mjs` descarta inbound de vía muda antes de bajar media (outbound
   intacto); anti-eco `eco.mjs` queda como defensa. BD de pruebas a cero.
-  Pendiente: prueba real B→A con A respondiendo y B en silencio.
+  Verificado 2026-09-28: B→A real responde la IA (client|1→ai|2, outbox
+  `sent via wa_a`) y la vía B queda muda (`[B] vía muda` en log, sin bucle).
+- 289A-2 panel + tono IA (verificado en vivo 2026-09-28, commit `998d4036`):
+  Responder staff persiste `staff|3` con `insert_message_seq` (adiós 500 por
+  clave duplicada), emite WS, encola `whatsapp motivo: manual` con
+  `destino+via` del hilo y el worker lo entrega (`sent`); `devolver_a_ia`
+  igual; tomar/soltar (`PATCH aiEnabled` true/false) OK. Panel: fecha corta
+  en cada mensaje + teléfono del cliente en bandeja y cabecera del hilo.
+  Prompt IA reescrito: identidad `Asistente de IA de MN Inmobiliaria`,
+  saludo según hora de Venezuela, máx 3 opciones con palabras propias (sin
+  copiar títulos ni listas largas), cierre ofreciendo fotos/info.
+  `clippy` 0, `cargo test` 27 passed, `tsc` limpio.
   Lección 2026-09-28: el gateway debe correr sin interrupción; matar+relanzar
   con la misma identidad (y peor con solape) bifurca el cifrado y el teléfono
   muestra "esperando mensaje". `mn-arrancar-gateway.ps1` ya rehúsa lanzar un
