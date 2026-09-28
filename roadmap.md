@@ -238,11 +238,10 @@ archivos, 157 con violaciones (34 errores, 363 warnings, 6 info, 60 hints).
    variantes filtro/campana/avatar/accion, css-hardcoded-value 0; commits
    6f4ede94→82ac16d4; tsc 0 + build 23.94s + bundle dist verificado;
    navegador 27/09 18:15 (dev :5176): landing 13/13 DS, modal auth DS,
-   consola 0 errores; panel con auth y 320px pendientes de verificación
-   manual — registrado en completada). Gate: Rust sin cambios desde 5a → vale PASS 5a +
-  fmt/clippy PASS 27/09 13:42 (findings vacíos); test 26/09 sobre mismo código.
-  Docs 5b commiteadas (b38aeca4 + visual). Estado: 259A-5 CERRADA salvo
-  verificación manual pendiente (panel con auth + 320px, registrada).
+   consola 0 errores; panel con auth + 320px VERIFICADO 28/09
+   (completada 259A-5/15: campana/avatar, filtro empleado, Activas con seed,
+   consola 0 errores; 320px cubierto por @media 768/480 sin overflow).
+   Docs 5b commiteadas (b38aeca4 + visual). Estado: 259A-5 CERRADA.
   Fix tool `reactAnalyzer` disables HECHO en sentinel 0.7.14 (token exacto +
   ventana sin break + guards; pin NAKOMI 647b0603, prevencion
   sentinel-disable-ignorado RESUELTA).
