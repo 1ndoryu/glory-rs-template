@@ -348,6 +348,13 @@ async fn webhook(
         .await
         {
             Ok(Some(respuesta)) => {
+                /* [289A-4] Log de cierre de turno: sin esto un turno que
+                 * termina con texto parcial (preámbulo sin listado tras
+                 * tools) es indistinguible de un turno sano. */
+                tracing::info!(
+                    "webhook WhatsApp: {sesion_fondo} turno IA ok ({} chars), encolando via {canal_fondo}",
+                    respuesta.chars().count()
+                );
                 let payload = serde_json::json!({
                     "session_id": sesion_fondo.to_string(),
                     "destino": remitente_fondo,

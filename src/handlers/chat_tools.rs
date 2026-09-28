@@ -106,11 +106,17 @@ impl Herramientas {
     }
 
     async fn ejecutar(&self, name: &str, args: &Value, ctx: &ToolCtx) -> Result<Value, AgentError> {
+        let inicio = std::time::Instant::now();
         let pool = self.pool(ctx);
         if deshabilitada(&pool, name).await {
+            tracing::warn!(
+                "tool {name} sesion={} bloqueada por admin ({} ms)",
+                ctx.session_id,
+                inicio.elapsed().as_millis()
+            );
             return Ok(json!({"error": "herramienta deshabilitada por el administrador"}));
         }
-        match name {
+        let salida = match name {
             "buscar_inmuebles" => buscar(&pool, args).await,
             "detalle_inmueble" => detalle(&pool, args).await,
             "registrar_contacto" => registrar(&pool, ctx.session_id, args).await,
@@ -118,7 +124,21 @@ impl Herramientas {
             "escalar_a_humano" => escalar(&pool, ctx.session_id, args).await,
             "consultar_agente" => consultar(&pool, ctx.session_id, args).await,
             otro => Ok(json!({"error": format!("tool desconocida: {otro}")})),
+        };
+        match &salida {
+            Ok(v) => tracing::info!(
+                "tool {name} sesion={} ok ({} ms, {} chars)",
+                ctx.session_id,
+                inicio.elapsed().as_millis(),
+                v.to_string().len()
+            ),
+            Err(e) => tracing::warn!(
+                "tool {name} sesion={} ERROR tras {} ms: {e}",
+                ctx.session_id,
+                inicio.elapsed().as_millis()
+            ),
         }
+        salida
     }
 }
 
