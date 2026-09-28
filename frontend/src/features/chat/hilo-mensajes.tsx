@@ -1,7 +1,7 @@
 // Hilo abierto (169A-5): historial + responder como humano + tomar/soltar
 // la IA + cerrar. Responder toma el hilo (lo hace el backend).
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Bot, BotOff, CheckCheck } from 'lucide-react';
 import type { MensajeServidor } from '../../data/chat/cliente-chat';
 import type { ResumenSesion } from '../../data/chat/cliente-admin';
@@ -38,6 +38,16 @@ export function HiloMensajes({
   alCambiar: (cambio: { aiEnabled?: boolean; status?: 'open' | 'escalated' | 'closed' }) => Promise<void>;
 }) {
   const [texto, setTexto] = useState('');
+  const cajaRef = useRef<HTMLDivElement>(null);
+
+  /* [289A-3] El hilo crece hacia abajo: acompaña al fondo solo si ya
+   * estabas cerca de él (no roba el scroll al releer viejos). */
+  useEffect(() => {
+    const caja = cajaRef.current;
+    if (!caja) return;
+    const cercaFondo = caja.scrollHeight - caja.scrollTop - caja.clientHeight < 160;
+    if (cercaFondo) caja.scrollTop = caja.scrollHeight;
+  }, [hilo]);
 
   async function enviar(): Promise<void> {
     if (await alResponder(texto)) setTexto('');
@@ -72,7 +82,7 @@ export function HiloMensajes({
           )}
         </span>
       </div>
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-3">
+      <div ref={cajaRef} className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-3">
         {hilo.length === 0 && <p className="text-sm text-muted-foreground">Sin mensajes todavía.</p>}
         {hilo.map((m) => (
           <div key={m.id} className={cn('max-w-[85%] rounded-md border px-3 py-2 text-sm', m.sender === 'staff' ? 'ml-auto bg-primary text-primary-foreground' : 'bg-muted')}>

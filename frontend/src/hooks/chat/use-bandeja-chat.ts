@@ -34,9 +34,9 @@ export function useBandejaChat() {
       setError(null);
       if (sesionId) {
         const mensajes = await historialSesion(sesionId);
-        /* [289A-3] Nuevos arriba siempre: orden explícito por secuencia
-         * (no depende del orden implícito del backend). */
-        mensajes.sort((a, b) => b.sequence_num - a.sequence_num);
+        /* [289A-3] Estilo chat (WhatsApp): viejos arriba, nuevos abajo; la
+         * conversación crece hacia abajo. Orden explícito, no implícito. */
+        mensajes.sort((a, b) => a.sequence_num - b.sequence_num);
         setHilo(mensajes);
       }
     } catch (e) {
