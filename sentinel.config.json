@@ -87,6 +87,24 @@
           "src/repositories",
           "src/services"
         ],
+        "portableBoundaries": {
+          "dom": [
+            "/platform/"
+          ],
+          "window": [
+            "/platform/"
+          ],
+          "services": [
+            "/services/",
+            "/adapters/",
+            "/api/",
+            "/repositories/"
+          ],
+          "loggerModules": [
+            "/logger.",
+            "/logging/"
+          ]
+        },
         "rules": {
           "barras-decorativas": {
             "severidad": "warning"
