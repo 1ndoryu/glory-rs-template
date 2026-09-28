@@ -1,5 +1,6 @@
 // Sesión Baileys: conexión, QR, inbound → webhook (289A-1).
 import { rm } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import makeWASocket, {
   useMultiFileAuthState,
   DisconnectReason,
@@ -68,11 +69,15 @@ export async function conectarSesion(via, sockets) {
       console.log(`\n=== QR sesión ${sesion.nombre} (${sesion.numero}): escanéalo con ese número ===`);
       qrcode.generate(qr, { small: true });
       /* PNG para escanear desde el explorador (el QR caduca en ~1 min;
-       * si vence, el gateway genera otro y sobrescribe el archivo). */
-      const png = new URL(`../qr-${via}.png`, import.meta.url);
-      await QRCode.toFile(png, qr, { width: 512 }).catch((e) => {
+       * si vence, el gateway genera otro y sobrescribe el archivo).
+       * `toFile` exige ruta string (un URL lanza `Invalid argument`
+       * síncrono y tumbaría el gateway): convertir + try/catch. */
+      const png = fileURLToPath(new URL(`../qr-${via}.png`, import.meta.url));
+      try {
+        await QRCode.toFile(png, qr, { width: 512 });
+      } catch (e) {
         console.error(`[${sesion.nombre}] no se pudo escribir QR png:`, e.message);
-      });
+      }
     }
     if (connection === "open") {
       setEstado(via, "abierta");
