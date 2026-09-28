@@ -305,11 +305,21 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   (historial 30 turnos + `usage` exacto + ventana configurable;
   `sentinel analyze` 0/0/0/0, `db_roundtrip -- --ignored` PASS);
   `Cargo.toml` bump `f2f19e7`→`b235771` + migración
-  `20260927000015_agent_usage` (columnas espejo + trigger copia exacto a
-  `uso_mensajes`; prueba viva `2|120|35` con `ROLLBACK`); `fmt`+`check`+
-  clippy 0, `cargo test` 24 passed. Gotcha: `_sqlx_migrations` traía
-  checksum viejo de `...13` (aplicada de un borrador); se sincronizó
-  (sha384 del archivo = BD) antes de migrar.
+   `20260927000015_agent_usage` (columnas espejo + trigger copia exacto a
+   `uso_mensajes`; prueba viva `2|120|35` con `ROLLBACK`); `fmt`+`check`+
+   clippy 0, `cargo test` 24 passed. Gotcha: `_sqlx_migrations` traía
+   checksum viejo de `...13` (aplicada de un borrador); se sincronizó
+   (sha384 del archivo = BD) antes de migrar.
+- F5-UI + F4-parcial verificados local 2026-09-28: pestañas
+  `Bandeja|Clientes|Uso y auditoría|Config` en `vista-mensajes.tsx`
+  (montadas siempre + `hidden` para no perder selección); `clientes-duena`
+  (buscar, alta con normalización, ficha, hilos, «Dime y lo envío» con pie
+  de foto opcional), `uso-auditoria` (tokens día×remitente + tomas
+  humanas); alta/ficha/envío/uso probados en navegador contra `:3000`
+  (outbox `manual`/`pending`, `media_url` en payload, trigger
+  `tokens_est=10`) y datos de prueba borrados; `tsc` 0 + `self-check`
+  (check+clippy+test+front) verde. F4-audio fuera: sin transcripción
+  (ver plan). Queda: QR×2 + storage + gateway + deploy.
 
 ## 279A-3 — /ask cuestionario de ficha (F1 verificado local 2026-09-27; pendiente: respuestas usuaria)
 - Plan: `Agente/planes/plan-ask-2026-09-27.md`.

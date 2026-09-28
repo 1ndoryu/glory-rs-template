@@ -37,7 +37,6 @@ export function EntradaPregunta({
         : '',
   );
   const [error, setError] = useState('');
-  const esNumero = pregunta.tipo === 'entero' || pregunta.tipo === 'decimal';
 
   const numeroValido = (): number | null => {
     const n = Number(texto.replace(',', '.'));

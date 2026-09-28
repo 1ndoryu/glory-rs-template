@@ -1,4 +1,5 @@
-import type { ExtrasAsk, PreguntaAsk, TipoInmueble } from './ficha-ask';
+import type { ExtrasAsk, PreguntaAsk } from './ficha-ask';
+import type { TipoInmueble } from './inmueble';
 import { CHECKLIST_ASK, NO_SE, claveNoSe, preguntaRespondida } from './ficha-ask';
 
 /* Columnas del inmueble que /ask puede rellenar (el resto llega del import

@@ -32,6 +32,26 @@
   El `edit` que no encuentra `oldString` es fail-closed y actua como
   detector: ante un fallo de match, no reintentar variantes a ciegas;
   confirmar con bytes crudos, `git status`/`git diff` y releer el archivo.
-- `useEffect` solo para clampar paginacion suma warning
-  `set-state-in-effect`: derivar la pagina vigente durante el render
-  (`Math.min(pagina, total)`) es mas simple y sin efecto.
+## 2026-09-28 - Consola dueña F5: automatización de navegador y gotchas locales
+- Los inputs controlados de React no responden a `fill` sintético: hay que
+  usar el setter nativo (`Object.getOwnPropertyDescriptor(...,'value').set`
+  + evento `input` burbujeante). El error `Illegal invocation` casi siempre
+  es selector nulo (pestaña equivocada), no sintaxis.
+- `agent_outbox` no tiene columnas `destino`/`canal`: todo vive en `payload`
+  (`destino`, `texto`, `media_url`, `motivo`) + `kind`/`status`. El vínculo
+  cliente↔sesión vive en `canal_sesiones` (`telefono`, `canal`, `modo`);
+  `agent_sessions` no tiene `cliente_id` (borrar por `canal_sesiones`
+  arrastra por `ON DELETE CASCADE` mensajes, uso, atención y canal).
+- El frontend usa `apiFetch` con base directa a `:3000`: el proxy
+  `vite /api→:3122` no afecta a la app; no tocarlo para depurar la API.
+- Cambiar de pestaña desmonta el hook y pierde selección/borrador: montar
+  las pestañas siempre y ocultar con `hidden` lo evita (vigilar polling
+  en segundo plano).
+- `curl.exe -d '{...}'` en PowerShell deforma comillas: para JSON usar
+  `Invoke-WebRequest` con hashtable → `ConvertTo-Json`.
+- `cargo test` no puede reemplazar el exe mientras el servidor de pruebas
+  corre desde ese mismo path: detener el proceso (`Stop-Process`) antes
+  del self-check, o falla con `os error 5`.
+- `_sqlx_migrations` puede traer checksum de un borrador (`...15`): se
+  sincroniza con `UPDATE ... SET checksum=decode(sha384 archivo,'hex')`
+  antes de migrar, no borrando la fila.

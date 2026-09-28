@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { ValorUbicacion } from '../../domain/ficha-ask';
+import type { ValorUbicacion } from '../../domain/pasos-ask';
 import { CLASE_ACTIVO, CLASE_BORDE, CLASE_TEXTO, CLASE_TINTA } from '../publica/disenno';
 
 /* Paso inteligente ubicación+residencia (279A-3 F2): una pregunta, dos

@@ -84,7 +84,7 @@ export function FichaFormulario(props: {
                 {(p.opciones ?? [])
                   .filter((o) => typeof o.valor === 'string')
                   .map((o) => (
-                    <option key={o.valor} value={o.valor}>
+                    <option key={String(o.valor)} value={String(o.valor)}>
                       {o.etiqueta}
                     </option>
                   ))}
