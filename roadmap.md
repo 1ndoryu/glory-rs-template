@@ -406,6 +406,9 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   + sigue-fondo; los lados de 289A-8 no cambian. Lección: "antiguo/nuevo"
   es ambiguo — pedir siempre anclas concretas (ej. "el de las 06:13
   primero").
+- 289A-10 texto plano para `WhatsApp` (commit `0b7e6241`, clippy 0, tests 27,
+  push 2026-09-28): el prompt ordena sin `**`/encabezados/tablas, listas
+  1. 2. 3., emojis sí; verificado en vivo (cero `**`, emojis 🏡😊).
 
 ## 279A-3 — /ask cuestionario de ficha (F1 verificado local 2026-09-27; pendiente: respuestas usuaria)
 - Plan: `Agente/planes/plan-ask-2026-09-27.md`.
