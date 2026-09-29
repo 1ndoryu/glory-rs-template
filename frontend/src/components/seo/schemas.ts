@@ -5,8 +5,8 @@
 const SITE_URL = 'https://nakomi.studio';
 const LOGO_URL = `${SITE_URL}/favicon.svg`;
 /* [277A-14] OG image: usar Kamples portada como placeholder hasta crear og-nakomi.jpg (1200×630).
- * PENDIENTE (299A-2): crear og-nakomi.jpg con logo + tagline y actualizar aquí y en SEOHead.tsx. */
-const OG_IMAGE = `${SITE_URL}/assets/Proyectos%20portadas/Kamples%20portada.jpg`;
+ * [299A-2] og-nakomi.jpg creado en frontend/public/ y referenciado aquí y en SEOHead.tsx. */
+const OG_IMAGE = `${SITE_URL}/og-nakomi.jpg`;
 
 export const organizationSchema = {
     '@context': 'https://schema.org',

@@ -147,13 +147,6 @@ Conversación con 150+ mensajes, verificar que los más recientes se muestran pr
 Abrir chat, provocar escalamiento, confirmar que el CTA abre `wa.me/16084668134`.
 **Esfuerzo:** ~15 min (prueba manual).
 
-### 15. SEO: crear og-nakomi.jpg (299A-2)
-
-Crear `og-nakomi.jpg` (1200×630) con logo + tagline de Nakomi y usarla como
-`DEFAULT_IMAGE` en `frontend/src/components/seo/SEOHead.tsx` y `OG_IMAGE` en
-`frontend/src/components/seo/schemas.ts` (hoy placeholder Kamples, ref [277A-14]).
-**Esfuerzo:** ~30 min (diseño + reemplazo).
-
 ---
 
 ## 📦 Tareas de producto — Correo para Hosting (bloqueado)
