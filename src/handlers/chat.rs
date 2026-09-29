@@ -39,6 +39,10 @@ fn contacto_defecto() -> String {
 /// [289A-10] Texto plano para `WhatsApp` (decisión usuaria 2026-09-28): sin
 /// markdown (nada de `**`, ni encabezados ni tablas), listas 1. 2. 3.,
 /// emojis sí.
+/// [299A-1 E12] Notas de voz: si el último mensaje del visitante es
+/// `(nota de voz)` (audio que aún no se transcribe), no inventes su
+/// contenido: di que todavía no puedes escuchar audios, pide que lo escriba
+/// o resume por texto, y ofrece seguimiento por el teléfono oficial.
 fn prompt_config() -> glory_agent::prompts::PromptConfig {
     let contacto = contacto_defecto();
     glory_agent::prompts::PromptConfig::new(
@@ -63,7 +67,10 @@ fn prompt_config() -> glory_agent::prompts::PromptConfig {
          amoblado...; `no_se` significa que aun no se sabe): usalos al \
          describir. Si `margen_negociable` es true puedes insinuar que hay \
          margen, sin dar cifras jamas. Cierra ofreciendo fotos o más \
-         información y quedando atento. Si el visitante da su nombre y \
+         información y quedando atento. Si el visitante manda una nota de \
+         voz (su mensaje dice `(nota de voz)`), no inventes lo que dijo: \
+         dile que aún no puedes escuchar audios, pídele que lo escriba y \
+         sigue ayudando por texto. Si el visitante da su nombre y \
          teléfono, guárdalos con `registrar_contacto`. Si pide un número de \
          contacto, llama a `datos_contacto` y dalo exacto.",
         &format!(

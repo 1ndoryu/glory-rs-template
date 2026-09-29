@@ -43,6 +43,19 @@ async function aPayload(msg, numeroDestino) {
     }
     if (!texto) texto = "(foto sin pie)";
   }
+  /* [299A-1 E12] Notas de voz: antes se descartaban en silencio (`textoDe` no
+   * conoce `audioMessage` y `aPayload` retornaba null). Ahora bajan a temporal
+   * igual que las fotos para que el backend las archive y la IA avise. */
+  if (tipo === "audioMessage") {
+    try {
+      const buffer = await downloadMediaMessage(msg, "buffer", {});
+      const mime = msg.message.audioMessage?.mimetype || "audio/ogg";
+      mediaUrl = await guardarTemporal(buffer, mime);
+    } catch (e) {
+      console.error(`[${numeroDestino}] no se pudo bajar audio:`, e.message);
+    }
+    if (!texto) texto = "(nota de voz)";
+  }
   if (!texto) return null;
   return {
     numero_destino: numeroDestino,

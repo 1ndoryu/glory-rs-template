@@ -89,19 +89,20 @@ pub fn secreto_valido(esperado: Option<&str>, recibido: Option<&str>) -> bool {
 /// nueva; se sirven por `/uploads/whatsapp/...`). Descarga la `media_url`
 /// que deja el gateway, valida el tipo real por Content-Type (nunca por la
 /// URL) y guarda con `guardar_archivo` (tope de tamaño + magic-bytes).
-/// Si algo falla se conserva la URL remota: foto a mano antes que foto
-/// perdida. Devuelve el cuerpo del mensaje `[foto]`.
-async fn cuerpo_foto(
+/// Si algo falla se conserva la URL remota: media a mano antes que media
+/// perdida. Devuelve el cuerpo del mensaje (`[foto]` o `[audio]`).
+/// [299A-1 E12] Audios: `audio/ogg` (notas de voz), `audio/mpeg`, `audio/mp4`.
+async fn cuerpo_media(
     http: &reqwest::Client,
     upload_dir: &std::path::Path,
     telefono_norm: &str,
     url: &str,
 ) -> String {
     match descargar_y_guardar(http, upload_dir, telefono_norm, url).await {
-        Ok(clave) => format!("[foto] /uploads/{clave}"),
+        Ok((clase, clave)) => format!("[{clase}] /uploads/{clave}"),
         Err(e) => {
             tracing::warn!("webhook WhatsApp: no se pudo archivar {url}: {e}; se conserva remota");
-            format!("[foto] {url}")
+            format!("[media] {url}")
         }
     }
 }
@@ -111,12 +112,12 @@ async fn descargar_y_guardar(
     upload_dir: &std::path::Path,
     telefono_norm: &str,
     url: &str,
-) -> Result<String, String> {
+) -> Result<(String, String), String> {
     let resp = http.get(url).send().await.map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
         return Err(format!("http {}", resp.status()));
     }
-    let extension = match resp
+    let (clase, extension) = match resp
         .headers()
         .get(reqwest::header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
@@ -126,20 +127,24 @@ async fn descargar_y_guardar(
         .unwrap_or("")
         .trim()
     {
-        "image/jpeg" => ".jpg",
-        "image/png" => ".png",
-        "image/webp" => ".webp",
-        _ => return Err("content-type no es imagen".to_string()),
+        "image/jpeg" => ("foto", ".jpg"),
+        "image/png" => ("foto", ".png"),
+        "image/webp" => ("foto", ".webp"),
+        "audio/ogg" => ("audio", ".ogg"),
+        "audio/mpeg" => ("audio", ".mp3"),
+        "audio/mp4" => ("audio", ".m4a"),
+        _ => return Err("content-type no soportado".to_string()),
     };
     let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
-    InmuebleService::guardar_archivo(
+    let clave = InmuebleService::guardar_archivo(
         upload_dir,
         &format!("whatsapp/{telefono_norm}"),
-        &format!("foto{extension}"),
+        &format!("{clase}{extension}"),
         &bytes,
     )
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| e.to_string())?;
+    Ok((clase.to_string(), clave))
 }
 
 #[derive(Debug, Deserialize)]
@@ -164,9 +169,10 @@ pub struct RepartoWhatsapp {
     secuencia: i64,
 }
 
-/// Persiste el `[foto]` entrante y lo emite por el hub. Best-effort con
-/// aviso: el mensaje de texto ya quedó guardado; la foto no debe tumbarlo.
-async fn persistir_foto(
+/// Persiste la media entrante (`[foto]`/`[audio]`) y la emite por el hub.
+/// Best-effort con aviso: el mensaje de texto ya quedó guardado; la media no
+/// debe tumbarlo.
+async fn persistir_media(
     pool: &sqlx::PgPool,
     hub: &glory_agent::session::ChatHub,
     sesion: Uuid,
@@ -184,14 +190,14 @@ async fn persistir_foto(
             let _ = hub.broadcast(sesion, &glory_agent::models::WsServerMessage::live(msg));
         }
         Err(e) => {
-            tracing::warn!("webhook WhatsApp: no se pudo persistir [foto]: {e}");
+            tracing::warn!("webhook WhatsApp: no se pudo persistir media: {e}");
         }
     }
 }
 
 /// Entrada única del webhook (lógica testeable): reparte, registra el cliente
 /// con origen del canal, reutiliza su hilo o crea uno, persiste el mensaje
-/// como `client` (+ segundo mensaje `[foto]` si trae `media_url`) y emite por
+/// como `client` (+ segundo mensaje `[foto]`/`[audio]` si trae `media_url`) y emite por
 /// el hub para que el panel staff lo vea en realtime.
 pub async fn repartir_y_vincular(
     pool: &sqlx::PgPool,
@@ -277,19 +283,18 @@ pub async fn repartir_y_vincular(
         sesion,
         &glory_agent::models::WsServerMessage::live(msg.clone()),
     );
-    /* Foto entrante: se archiva en `UPLOAD_DIR/whatsapp/<tel>/` y queda
-     * como mensaje `[foto]` con ruta local servible (decidido 2026-09-27:
-     * WhatsApp es solo-enviar; las fotos quedan para la web, no se
-     * describen). Si el archivo no baja o no es imagen, se conserva la URL
-     * remota antes que perderla. */
+    /* Media entrante (foto o nota de voz): se archiva en
+     * `UPLOAD_DIR/whatsapp/<tel>/` y queda como mensaje `[foto]` o `[audio]`
+     * con ruta local servible para el staff. Si el archivo no baja o el tipo
+     * no es soportado, se conserva la URL remota antes que perderla. */
     if let Some(u) = media {
         let dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
         let http = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(20))
             .build()
             .unwrap_or_default();
-        let cuerpo = cuerpo_foto(&http, std::path::Path::new(&dir), &remitente_norm, u).await;
-        persistir_foto(pool, hub, sesion, cuerpo).await;
+        let cuerpo = cuerpo_media(&http, std::path::Path::new(&dir), &remitente_norm, u).await;
+        persistir_media(pool, hub, sesion, cuerpo).await;
     }
     Ok(RepartoWhatsapp {
         ok: true,

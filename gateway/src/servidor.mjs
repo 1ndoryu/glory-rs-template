@@ -6,7 +6,7 @@ import { purgar } from "./media.mjs";
 import { listarEstados } from "./estado.mjs";
 import { registrarEnviado } from "./eco.mjs";
 
-const MIME_POR_EXT = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
+const MIME_POR_EXT = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", ogg: "audio/ogg", mp3: "audio/mpeg", m4a: "audio/mp4" };
 
 async function leerJson(req) {
   const trozos = [];
@@ -70,7 +70,7 @@ export function arrancarServidor(sockets) {
       }
       if (req.method === "GET" && url.pathname.startsWith("/media/")) {
         const nombre = url.pathname.slice("/media/".length);
-        if (!/^[\w-]+\.(jpg|jpeg|png|webp)$/.test(nombre)) {
+        if (!/^[\w-]+\.(jpg|jpeg|png|webp|ogg|mp3|m4a)$/.test(nombre)) {
           res.writeHead(404).end();
           return;
         }

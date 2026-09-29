@@ -3,7 +3,7 @@
 import { mkdir, writeFile, readdir, unlink, stat } from "node:fs/promises";
 import { config } from "./config.mjs";
 
-const EXT_POR_MIME = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+const EXT_POR_MIME = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "audio/ogg": "ogg", "audio/mpeg": "mp3", "audio/mp4": "m4a" };
 
 export async function guardarTemporal(buffer, mime) {
   const ext = EXT_POR_MIME[mime] ?? "bin";
