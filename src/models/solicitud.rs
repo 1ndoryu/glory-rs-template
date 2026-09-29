@@ -38,7 +38,8 @@ pub const ESTADOS_SOLICITUD: &[&str] = &["pendiente", "revisada", "aceptada", "d
 /// Tope de fotos por solicitud (defensa + UX del modal)
 pub const MAX_FOTOS_SOLICITUD: usize = 10;
 /// Orígenes de contacto aceptados (allowlist cerrada, extensible)
-pub const ORIGENES_CONTACTO: &[&str] = &["web", "telefono", "email", "presencial", "otro"];
+pub const ORIGENES_CONTACTO: &[&str] =
+    &["web", "telefono", "email", "presencial", "whatsapp", "otro"];
 
 /// Fila de `solicitudes` tal cual la devuelve Postgres
 #[derive(Debug, Clone, FromRow)]

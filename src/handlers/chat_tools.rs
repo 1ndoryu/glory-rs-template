@@ -5,8 +5,10 @@ use serde_json::{json, Value};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::models::{OPERACIONES, TIPOS};
+use crate::errors::AppError;
+use crate::models::{CreateSolicitudRequest, OPERACIONES, TIPOS};
 use crate::repositories::ClienteRepository;
+use crate::services::SolicitudService;
 use glory_agent::errors::AgentError;
 use glory_agent::tools::{ToolCtx, ToolDefinition, ToolExecutor};
 
@@ -16,90 +18,140 @@ use glory_agent::tools::{ToolCtx, ToolDefinition, ToolExecutor};
  * de `datos_contacto` y el humano de `escalar_a_humano`. */
 
 /// Definiciones para el provider (schemas cortos, en español).
+/// Una fn por tool: el `vec!` monolítico superó el tope de líneas.
 pub fn definiciones() -> Vec<ToolDefinition> {
     vec![
-        ToolDefinition::new(
-            "buscar_inmuebles",
-            "Busca inmuebles publicados y disponibles. Usala siempre antes de hablar de oferta concreta.",
-            json!({
-                "type": "object",
-                "properties": {
-                    "texto": {"type": "string", "description": "Palabra en titulo o ubicacion"},
-                    "tipo": {"type": "string", "enum": ["apartamento", "casa", "local", "terreno", "townhouse"]},
-                    "operacion": {"type": "string", "enum": ["venta", "alquiler"]},
-                    "precio_max": {"type": "number"},
-                    "limite": {"type": "integer", "default": 5}
-                }
-            }),
-        ),
-        ToolDefinition::new(
-            "detalle_inmueble",
-            "Ficha completa de un inmueble por su id (sale de buscar_inmuebles). \
-             Trae `extras` con lo respondido en /ask (internet, agua, amoblado...) \
-             y `margen_negociable` (bool, sin cifras: el minimo nunca se dice).",
-            json!({
-                "type": "object",
-                "properties": {"id": {"type": "string", "format": "uuid"}},
-                "required": ["id"]
-            }),
-        ),
-        ToolDefinition::new(
-            "registrar_contacto",
-            "Guarda nombre y telefono del visitante cuando los da.",
-            json!({
-                "type": "object",
-                "properties": {
-                    "nombre": {"type": "string"},
-                    "telefono": {"type": "string"}
-                },
-                "required": ["nombre", "telefono"]
-            }),
-        ),
-        ToolDefinition::new(
-            "enviar_fotos_inmueble",
-            "Envia hasta 3 fotos del catalogo al visitante por WhatsApp (con el titulo como pie). \
-             Usala cuando el visitante pida fotos de un inmueble o cuando ofrezcas enviarselas y acepte. \
-             El id sale de buscar_inmuebles/detalle_inmueble. Tras llamarla, confirma en tu respuesta \
-             que ya se las enviaste; no pegues URLs de fotos en el texto.",
-            json!({
-                "type": "object",
-                "properties": {
-                    "id": {"type": "string", "format": "uuid"},
-                    "max": {"type": "integer", "minimum": 1, "maximum": 3, "default": 3}
-                },
-                "required": ["id"]
-            }),
-        ),
-        ToolDefinition::new(
-            "datos_contacto",
-            "Telefono y WhatsApp oficiales de la inmobiliaria. Llamala antes de dar un numero.",
-            json!({"type": "object", "properties": {}}),
-        ),
-        ToolDefinition::new(
-            "escalar_a_humano",
-            "Deriva la conversacion a un humano: avisa por WhatsApp al admin y frena a la IA. Usala si el visitante pide un humano o das 2 respuestas sin resolver.",
-            json!({
-                "type": "object",
-                "properties": {
-                    "motivo": {"type": "string"},
-                    "resumen": {"type": "string", "description": "Resumen breve para la ficha del aviso (1..500)"}
-                },
-                "required": ["motivo"]
-            }),
-        ),
-        ToolDefinition::new(
-            "consultar_agente",
-            "Duda puntual: pregunta a un humano sin delegar del todo. Congela la IA (retoma al responder) y avisa por WhatsApp con la ficha.",
-            json!({
-                "type": "object",
-                "properties": {
-                    "motivo": {"type": "string"},
-                    "resumen": {"type": "string", "description": "Contexto breve para el humano (1..500)"}
-                },
-                "required": ["motivo"]
-            }),
-        ),
+        def_buscar(),
+        def_detalle(),
+        def_registrar_contacto(),
+        def_enviar_fotos(),
+        def_datos_contacto(),
+        def_escalar(),
+        def_consultar(),
+        def_captacion(),
     ]
+}
+
+fn def_buscar() -> ToolDefinition {
+    ToolDefinition::new(
+        "buscar_inmuebles",
+        "Busca inmuebles publicados y disponibles. Usala siempre antes de hablar de oferta concreta.",
+        json!({
+            "type": "object",
+            "properties": {
+                "texto": {"type": "string", "description": "Palabra en titulo o ubicacion"},
+                "tipo": {"type": "string", "enum": ["apartamento", "casa", "local", "terreno", "townhouse"]},
+                "operacion": {"type": "string", "enum": ["venta", "alquiler"]},
+                "precio_max": {"type": "number"},
+                "limite": {"type": "integer", "default": 5}
+            }
+        }),
+    )
+}
+
+fn def_detalle() -> ToolDefinition {
+    ToolDefinition::new(
+        "detalle_inmueble",
+        "Ficha completa de un inmueble por su id (sale de buscar_inmuebles). \
+         Trae `extras` con lo respondido en /ask (internet, agua, amoblado...) \
+         y `margen_negociable` (bool, sin cifras: el minimo nunca se dice).",
+        json!({
+            "type": "object",
+            "properties": {"id": {"type": "string", "format": "uuid"}},
+            "required": ["id"]
+        }),
+    )
+}
+
+fn def_registrar_contacto() -> ToolDefinition {
+    ToolDefinition::new(
+        "registrar_contacto",
+        "Guarda nombre y telefono del visitante cuando los da.",
+        json!({
+            "type": "object",
+            "properties": {
+                "nombre": {"type": "string"},
+                "telefono": {"type": "string"}
+            },
+            "required": ["nombre", "telefono"]
+        }),
+    )
+}
+
+fn def_enviar_fotos() -> ToolDefinition {
+    ToolDefinition::new(
+        "enviar_fotos_inmueble",
+        "Envia hasta 3 fotos del catalogo al visitante por WhatsApp (con el titulo como pie). \
+         Usala cuando el visitante pida fotos de un inmueble o cuando ofrezcas enviarselas y acepte. \
+         El id sale de buscar_inmuebles/detalle_inmueble. Tras llamarla, confirma en tu respuesta \
+         que ya se las enviaste; no pegues URLs de fotos en el texto.",
+        json!({
+            "type": "object",
+            "properties": {
+                "id": {"type": "string", "format": "uuid"},
+                "max": {"type": "integer", "minimum": 1, "maximum": 3, "default": 3}
+            },
+            "required": ["id"]
+        }),
+    )
+}
+
+fn def_datos_contacto() -> ToolDefinition {
+    ToolDefinition::new(
+        "datos_contacto",
+        "Telefono y WhatsApp oficiales de la inmobiliaria. Llamala antes de dar un numero.",
+        json!({"type": "object", "properties": {}}),
+    )
+}
+
+/* Esquema compartido `motivo+resumen` de `escalar_a_humano`/`consultar_agente`. */
+fn esquema_motivo() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "motivo": {"type": "string"},
+            "resumen": {"type": "string", "description": "Resumen breve para la ficha del aviso (1..500)"}
+        },
+        "required": ["motivo"]
+    })
+}
+
+fn def_escalar() -> ToolDefinition {
+    ToolDefinition::new(
+        "escalar_a_humano",
+        "Deriva la conversacion a un humano: avisa por WhatsApp al admin y frena a la IA. Usala si el visitante pide un humano o das 2 respuestas sin resolver.",
+        esquema_motivo(),
+    )
+}
+
+fn def_consultar() -> ToolDefinition {
+    ToolDefinition::new(
+        "consultar_agente",
+        "Duda puntual: pregunta a un humano sin delegar del todo. Congela la IA (retoma al responder) y avisa por WhatsApp con la ficha.",
+        esquema_motivo(),
+    )
+}
+
+fn def_captacion() -> ToolDefinition {
+    ToolDefinition::new(
+        "registrar_captacion",
+        "El visitante quiere VENDER o ALQUILAR su propiedad: registra la captacion (queda `pendiente` para el captador) y le avisa por WhatsApp. Pide antes nombre, telefono, operacion, ubicacion y detalles; llama solo con esos datos.",
+        json!({
+            "type": "object",
+            "properties": {
+                "nombre": {"type": "string"},
+                "telefono": {"type": "string"},
+                "operacion": {"type": "string", "enum": ["venta", "alquiler"]},
+                "ubicacion": {"type": "string"},
+                "descripcion": {"type": "string", "description": "Detalles de la propiedad (1..2000)"},
+                "puestos": {"type": "integer"},
+                "residencia": {"type": "string"},
+                "precio_estimado": {"type": "number"},
+                "email": {"type": "string"}
+            },
+            "required": ["nombre", "telefono", "ubicacion", "descripcion"]
+        }),
+    )
 }
 
 /// Executor con acceso a BD y al contacto por defecto (`AGENTE_CONTACTO`).
@@ -136,6 +188,7 @@ impl Herramientas {
             "detalle_inmueble" => detalle(&pool, args).await,
             "registrar_contacto" => registrar(&pool, ctx.session_id, args).await,
             "enviar_fotos_inmueble" => enviar_fotos(&pool, ctx.session_id, args).await,
+            "registrar_captacion" => captar(&pool, ctx.session_id, args).await,
             "datos_contacto" => contacto_publico(&pool, &self.contacto_defecto).await,
             "escalar_a_humano" => escalar(&pool, ctx.session_id, args).await,
             "consultar_agente" => consultar(&pool, ctx.session_id, args).await,
@@ -487,6 +540,32 @@ fn resumen_breve(args: &Value) -> String {
         .map_or_else(|| "-".to_string(), |s| s.chars().take(500).collect())
 }
 
+/* [E14] Aviso al humano compartido por `consultar`/`escalar`/`captar`:
+ * `via` = canal de la sesión (el gateway responde por el mismo número
+ * que escribió el cliente; sin vínculo cae a `wa_a`) y `destino`
+ * explícito cuando hay `whatsapp_admin` (si no, el worker usa el
+ * fallback y queda `pending`: aviso parcial antes que ninguno). */
+async fn aviso_humano(
+    pool: &PgPool,
+    session_id: Uuid,
+    motivo: &str,
+    resumen: &str,
+) -> Result<(), AgentError> {
+    let mut aviso = json!({
+        "session_id": session_id.to_string(),
+        "motivo": motivo,
+        "resumen": resumen,
+    });
+    if let Ok(canal) = ClienteRepository::canal_de(pool, session_id).await {
+        aviso["via"] = json!(canal.as_deref().unwrap_or("wa_a"));
+    }
+    if let Some(destino) = destino_humano(pool).await {
+        aviso["destino"] = json!(destino);
+    }
+    glory_agent::persistence::enqueue_outbox(pool, "whatsapp", aviso).await?;
+    Ok(())
+}
+
 async fn consultar(pool: &PgPool, session_id: Uuid, args: &Value) -> Result<Value, AgentError> {
     let motivo = args
         .get("motivo")
@@ -502,21 +581,7 @@ async fn consultar(pool: &PgPool, session_id: Uuid, args: &Value) -> Result<Valu
         .map_err(|e| AgentError::Db(e.to_string()))?;
     glory_agent::persistence::set_session_ai(pool, session_id, false).await?;
     glory_agent::persistence::upsert_response_cycle(pool, session_id, "waiting").await?;
-    let mut aviso = json!({
-        "session_id": session_id.to_string(),
-        "motivo": motivo,
-        "resumen": resumen,
-    });
-    /* [289A-1] `via` = canal de la sesión para que el gateway Baileys
-     * responda por el mismo número que escribió el cliente. Sin vínculo,
-     * el worker cae a `wa_a` (aviso parcial antes que ninguno). */
-    if let Ok(canal) = ClienteRepository::canal_de(pool, session_id).await {
-        aviso["via"] = json!(canal.as_deref().unwrap_or("wa_a"));
-    }
-    if let Some(destino) = destino_humano(pool).await {
-        aviso["destino"] = json!(destino);
-    }
-    glory_agent::persistence::enqueue_outbox(pool, "whatsapp", aviso).await?;
+    aviso_humano(pool, session_id, motivo, &resumen).await?;
     Ok(json!({"ok": true}))
 }
 
@@ -536,26 +601,134 @@ async fn escalar(pool: &PgPool, session_id: Uuid, args: &Value) -> Result<Value,
     ClienteRepository::marcar_atencion(pool, session_id, "delegada")
         .await
         .map_err(|e| AgentError::Db(e.to_string()))?;
-    let mut aviso = json!({
-        "session_id": session_id.to_string(),
-        "motivo": motivo,
-        "resumen": resumen,
-    });
-    /* [289A-1] `via` como en `consultar`: el gateway responde por el
-     * número que escribió el cliente. */
-    if let Ok(canal) = ClienteRepository::canal_de(pool, session_id).await {
-        aviso["via"] = json!(canal.as_deref().unwrap_or("wa_a"));
-    }
-    if let Some(destino) = destino_humano(pool).await {
-        aviso["destino"] = json!(destino);
-    }
-    glory_agent::persistence::enqueue_outbox(pool, "whatsapp", aviso).await?;
+    aviso_humano(pool, session_id, motivo, &resumen).await?;
     let telefono = glory_agent::persistence::get_config(pool, "contacto_telefono")
         .await
         .ok()
         .flatten()
         .filter(|v| !v.trim().is_empty());
     Ok(json!({"ok": true, "telefono": telefono.unwrap_or_default()}))
+}
+
+/* [E14] Captación: el visitante quiere vender/alquilar SU propiedad.
+ * Crea la `solicitud` (origen `whatsapp`, siempre `pendiente`: la crea
+ * el visitante, nunca la IA) con el mismo servicio del formulario web,
+ * marca `captacion` (la IA confirma y sigue disponible; el captador
+ * llama por teléfono fuera del chat) y avisa al humano con la ficha. */
+fn arg_texto(args: &Value, clave: &str) -> String {
+    args.get(clave)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .unwrap_or_default()
+        .to_string()
+}
+
+fn mapear_error_solicitud(e: AppError) -> AgentError {
+    match e {
+        AppError::Validation(m) | AppError::BadRequest(m) => AgentError::BadRequest(m),
+        AppError::NotFound(m) => AgentError::Internal(format!("solicitud no encontrada: {m}")),
+        AppError::Conflict(m) | AppError::Forbidden(m) => {
+            AgentError::Internal(format!("rechazada: {m}"))
+        }
+        AppError::Unauthorized => AgentError::Internal("no autorizado".to_string()),
+        AppError::PayloadMuyGrande => AgentError::Internal("carga demasiado grande".to_string()),
+        AppError::Internal(m) => AgentError::Internal(m),
+        AppError::Database(e) => AgentError::Db(e.to_string()),
+        AppError::Io(e) => AgentError::Internal(e.to_string()),
+    }
+}
+
+/* Valida los args de `registrar_captacion` y arma el pedido para el
+ * servicio web. `Err` = `{"error": ...}` para que la IA se corrija. */
+fn pedido_captacion(args: &Value) -> Result<(CreateSolicitudRequest, String, String), Value> {
+    let nombre = arg_texto(args, "nombre");
+    let telefono = arg_texto(args, "telefono");
+    let ubicacion = arg_texto(args, "ubicacion");
+    let descripcion = arg_texto(args, "descripcion");
+    if nombre.is_empty() || nombre.len() > 200 {
+        return Err(json!({"error": "nombre requerido (1..200)"}));
+    }
+    if !telefono_valido(&telefono) {
+        return Err(json!({"error": "telefono invalido"}));
+    }
+    if ubicacion.is_empty() || ubicacion.len() > 300 {
+        return Err(json!({"error": "ubicacion requerida (1..300)"}));
+    }
+    if descripcion.is_empty() || descripcion.len() > 2000 {
+        return Err(json!({"error": "descripcion requerida (1..2000)"}));
+    }
+    let operacion = arg_texto(args, "operacion");
+    let operacion = if operacion.is_empty() {
+        "venta".to_string()
+    } else {
+        operacion
+    };
+    if !OPERACIONES.contains(&operacion.as_str()) {
+        return Err(json!({"error": "operacion invalida (venta|alquiler)"}));
+    }
+    let req = CreateSolicitudRequest {
+        nombre: nombre.clone(),
+        telefono,
+        email: {
+            let e = arg_texto(args, "email");
+            if e.is_empty() {
+                None
+            } else {
+                Some(e)
+            }
+        },
+        descripcion,
+        ubicacion,
+        puestos: args
+            .get("puestos")
+            .and_then(Value::as_i64)
+            .and_then(|p| i32::try_from(p).ok())
+            .unwrap_or(0)
+            .max(0),
+        residencia: arg_texto(args, "residencia"),
+        precio_estimado: args.get("precio_estimado").and_then(Value::as_f64),
+        operacion: operacion.clone(),
+        fotos: vec![],
+        origen_contacto: Some("whatsapp".to_string()),
+    };
+    Ok((req, operacion, nombre))
+}
+
+async fn captar(pool: &PgPool, session_id: Uuid, args: &Value) -> Result<Value, AgentError> {
+    let (req, operacion, nombre) = match pedido_captacion(args) {
+        Ok(v) => v,
+        Err(e) => return Ok(e),
+    };
+    let telefono = req.telefono.clone();
+    let ubicacion = req.ubicacion.clone();
+    let descripcion = req.descripcion.clone();
+    let solicitud = match SolicitudService::create(
+        pool,
+        req,
+        None,
+        Some("glory-ia/whatsapp".to_string()),
+    )
+    .await
+    {
+        Ok(s) => s,
+        /* Fallo de validación del servicio = la IA pasó algo mal:
+         * se devuelve como `error` para que se corrija en el turno. */
+        Err(AppError::Validation(m) | AppError::BadRequest(m)) => {
+            return Ok(json!({"error": m}));
+        }
+        Err(e) => return Err(mapear_error_solicitud(e)),
+    };
+    ClienteRepository::marcar_atencion(pool, session_id, "captacion")
+        .await
+        .map_err(|e| AgentError::Db(e.to_string()))?;
+    let mut resumen =
+        format!("Captación {operacion} en {ubicacion} — {nombre} {telefono}: {descripcion}");
+    if let Some(p) = solicitud.precio_estimado {
+        resumen = format!("{resumen} (estima {p})");
+    }
+    let resumen: String = resumen.chars().take(500).collect();
+    aviso_humano(pool, session_id, "captacion", &resumen).await?;
+    Ok(json!({"ok": true, "solicitud_id": solicitud.id}))
 }
 
 /* [169A-4] Las consultas SQL no usan macros verificadas en compilación:
@@ -887,6 +1060,111 @@ mod pruebas {
             .await
             .unwrap();
         sqlx::query("DELETE FROM clientes WHERE telefono = '34622222222'")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM agent_response_cycles WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM agent_sessions WHERE id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+
+    /* [E14] `registrar_captacion`: valida args, crea la solicitud con el
+     * servicio web (origen `whatsapp`, `pendiente`), marca `captacion`
+     * y encola el aviso al captador. */
+    #[tokio::test]
+    async fn captacion_registra_y_avisa() {
+        let Some(pool) = pool_si_hay() else { return };
+        let h = Herramientas::new(pool.clone(), "Test 600111222".to_string());
+        let sesion = Uuid::new_v4();
+        glory_agent::persistence::ensure_session(&pool, sesion)
+            .await
+            .unwrap();
+        let ctx = ToolCtx::new(sesion, Some(pool.clone()));
+
+        let mala = h
+            .execute(
+                "registrar_captacion",
+                &json!({"nombre": "Vende Casas", "telefono": "abc"}),
+                &ctx,
+            )
+            .await
+            .unwrap();
+        assert!(mala.get("error").is_some());
+
+        let r = h
+            .execute(
+                "registrar_captacion",
+                &json!({
+                    "nombre": "Vende Casas",
+                    "telefono": "+34633333333",
+                    "operacion": "venta",
+                    "ubicacion": "Chacao",
+                    "descripcion": "Apartamento 80m2, 2 hab",
+                    "precio_estimado": 95000.0
+                }),
+                &ctx,
+            )
+            .await
+            .unwrap();
+        assert_eq!(r.get("ok").and_then(Value::as_bool), Some(true));
+        let sid = r
+            .get("solicitud_id")
+            .and_then(Value::as_str)
+            .expect("solicitud_id");
+        let fila: (String, String) =
+            sqlx::query_as("SELECT estado, origen_contacto FROM solicitudes WHERE id = $1::UUID")
+                .bind(sid)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(fila, ("pendiente".to_string(), "whatsapp".to_string()));
+        let estado: String =
+            sqlx::query_scalar("SELECT estado FROM atencion_sesiones WHERE session_id = $1")
+                .bind(sesion)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(estado, "captacion");
+        let avisos: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM agent_outbox WHERE status = 'pending' \
+             AND kind = 'whatsapp' AND payload->>'session_id' = $1 \
+             AND payload->>'motivo' = 'captacion'",
+        )
+        .bind(sesion.to_string())
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(avisos, 1);
+
+        sqlx::query("DELETE FROM solicitudes WHERE id = $1::UUID")
+            .bind(sid)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM agent_outbox WHERE payload->>'session_id' = $1")
+            .bind(sesion.to_string())
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM agent_messages WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM canal_sesiones WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM atencion_sesiones WHERE session_id = $1")
+            .bind(sesion)
             .execute(&pool)
             .await
             .unwrap();

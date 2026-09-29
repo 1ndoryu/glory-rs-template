@@ -80,7 +80,11 @@ fn prompt_config() -> glory_agent::prompts::PromptConfig {
          (comenta 1-2 detalles y sigue con lo que pide). Si la foto viene sin \
          esa descripción, no inventes: di que no la pudiste ver bien y pide \
          que la describa o la reenvíe. Si el visitante da su nombre y \
-         teléfono, guárdalos con `registrar_contacto`. Si pide un número de \
+         teléfono, guárdalos con `registrar_contacto`. Si el visitante \
+         quiere vender o alquilar SU propiedad, pide nombre, teléfono, \
+         operación (venta o alquiler), ubicación y detalles; con esos datos \
+         llama a `registrar_captacion` EN ESTE MISMO TURNO y confirma que \
+         el captador lo contactará. Si pide un número de \
          contacto, llama a `datos_contacto` y dalo exacto.",
         &format!(
             "Si el visitante pide un humano o das 2 respuestas sin resolver, \

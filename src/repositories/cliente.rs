@@ -160,7 +160,7 @@ impl ClienteRepository {
         Ok(cliente)
     }
 
-    /// Fija el estado de atención (`activa|consultando|delegada`); el `modo`
+    /// Fija el estado de atención (`activa|consultando|delegada|captacion`); el `modo`
     /// se hereda del canal (F2) o nace `completo`. Un estado inválido lo
     /// rechaza el CHECK (error explícito, nunca silencio).
     pub async fn marcar_atencion(
