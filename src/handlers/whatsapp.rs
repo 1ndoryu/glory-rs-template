@@ -373,7 +373,24 @@ async fn webhook(
             Ok(None) => {
                 /* IA sin texto (quemó tools sin redactar, sin key, gate
                  * humano): escalar a `consultando` en vez de soltar el
-                 * mensaje al vacío — el staff lo ve y responde. */
+                 * mensaje al vacío — el staff lo ve y responde.
+                 * [299A-1 E16] Pero un hipo transitorio (respuesta vacía
+                 * aislada) no puede congelar una conversación sana: si el
+                 * ciclo es `answered` (el staff ya respondió y la IA venía
+                 * conversando, caso 739bb63e) se mantiene `activa` y solo
+                 * se deja WARN en el log. */
+                let ciclo = glory_agent::persistence::get_response_cycle(&pool_fondo, sesion_fondo)
+                    .await
+                    .ok()
+                    .flatten();
+                /* [299A-1 E16] Hipo transitorio con ciclo `answered`: se
+                 * mantiene `activa` y solo se deja WARN en el log. */
+                if !debe_escalar_consultando(ciclo.as_ref().map(|c| c.status.as_str())) {
+                    tracing::warn!(
+                        "webhook WhatsApp: {sesion_fondo} sin respuesta IA pero ciclo answered, se mantiene activa"
+                    );
+                    return;
+                }
                 if let Err(e) =
                     ClienteRepository::marcar_atencion(&pool_fondo, sesion_fondo, "consultando")
                         .await
@@ -399,6 +416,14 @@ async fn webhook(
 /// gateway llegará con F2 real; hoy la frontera es la validación estricta.
 pub fn whatsapp_routes() -> Router<glory_agent::transport::AgentState> {
     Router::new().route("/agent/whatsapp/webhook", post(webhook))
+}
+
+/* [299A-1 E16] Decisión pura: un turno vacío escala a `consultando` salvo
+ * ciclo `answered` (el staff ya respondió y la IA venía conversando: un hipo
+ * del LLM no congela una conversación sana, caso 739bb63e). */
+#[must_use]
+fn debe_escalar_consultando(ciclo: Option<&str>) -> bool {
+    ciclo != Some("answered")
 }
 
 #[cfg(test)]
@@ -433,6 +458,16 @@ mod pruebas {
         assert!(!secreto_valido(Some("s3cr3to"), None));
         assert!(!secreto_valido(Some("s3cr3to"), Some("otro")));
         assert!(!secreto_valido(Some("s3cr3to"), Some(" s3cr3to")));
+    }
+
+    /* [299A-1 E16] Un turno vacío solo congela sin ciclo `answered`. */
+    #[test]
+    fn turno_vacio_no_congela_ciclo_respondido() {
+        assert!(debe_escalar_consultando(None));
+        assert!(debe_escalar_consultando(Some("waiting")));
+        assert!(debe_escalar_consultando(Some("escalated")));
+        assert!(debe_escalar_consultando(Some("open")));
+        assert!(!debe_escalar_consultando(Some("answered")));
     }
 
     fn pool_si_hay() -> Option<sqlx::PgPool> {
