@@ -9,7 +9,7 @@ import {useTranslation} from 'react-i18next';
 const SITE_NAME = 'Nakomi Studio';
 const SITE_URL = 'https://nakomi.studio';
 /* [277A-14] OG image por defecto: Kamples portada como placeholder.
- * TODO: Crear og-nakomi.jpg (1200×630) con logo + tagline de Nakomi. */
+ * PENDIENTE (299A-2): crear og-nakomi.jpg (1200×630) con logo + tagline de Nakomi. */
 const DEFAULT_IMAGE = `${SITE_URL}/assets/Proyectos%20portadas/Kamples%20portada.jpg`;
 
 interface SEOHeadProps {
