@@ -35,6 +35,19 @@ cada escenario parte de conversación virgen.
 3. Worker outbox (`mod.rs:471` zona + `/send`): confirmar que `media_url` nunca se encola.
 4. Webhook: ¿acepta `media_url` sintético para simular foto sin teléfono físico?
 
+### Hallazgos Fase 0 (2026-09-29, verificado en código)
+- `solicitudes` es formulario web (tiene `email,ip_origen,user_agent`) con
+  `operacion/ubicacion/precio_estimado`: sirve como tabla de captación con
+  `origen_contacto='ia'` (`repositories/solicitud.rs:44`). `fotos` es catálogo
+  (`inmueble_id,storage_key,orden,origen`). `notes` es notas de usuario interno.
+- Descarte de audio confirmado al 100%: `textoDe` no conoce `audioMessage`/`ptt`
+  → `aPayload` retorna `null` → ni llega al backend (`sesion.mjs:21-46`).
+- Salida con foto YA existe: staff puede (`chat_staff.rs:706-726`, outbox
+  `whatsapp` con `destino+media_url`) y `alerta_whatsapp.rs:83` hace passthrough;
+  solo el turno IA nunca encola `media_url`. E13 = tool + prompt, sin plomería.
+- Webhook SÍ acepta `media_url` sintética (`whatsapp.rs:151`, valida http(s)
+  ≤2048, `persistir_foto` la descarga): foto entrante testeable sin teléfono físico.
+
 ## Fase 1 — Escenarios que YA deberían funcionar (solo batería, sin código)
 | # | Escenario | Disparo | Verificación en BD |
 |---|-----------|---------|--------------------|
