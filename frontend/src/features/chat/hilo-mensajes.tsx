@@ -17,13 +17,14 @@ function etiquetaRemitente(remitente: string): string {
   return 'Visitante';
 }
 
-/* [289A-7] Lado por remitente: el Visitante a la derecha, la IA a la
- * izquierda, lo propio (staff) a la derecha destacado, sistema centrado. */
+/* [289A-8] Lado por remitente: el Visitante a la izquierda, la IA y lo
+ * propio (staff) a la derecha (la IA en gris, lo propio destacado),
+ * sistema centrado. */
 function claseLado(remitente: string): string {
   if (remitente === 'system') return 'mx-auto max-w-[90%] bg-transparent text-center text-xs text-muted-foreground';
-  if (remitente === 'ai') return 'mr-auto bg-muted';
+  if (remitente === 'ai') return 'ml-auto bg-muted';
   if (remitente === 'staff') return 'ml-auto bg-primary text-primary-foreground';
-  return 'ml-auto border-primary/40 bg-primary/10';
+  return 'mr-auto border-primary/40 bg-primary/10';
 }
 
 /* [289A-2] Fecha corta del mensaje (created_at ISO del servidor). */
