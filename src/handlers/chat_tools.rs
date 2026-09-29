@@ -56,6 +56,21 @@ pub fn definiciones() -> Vec<ToolDefinition> {
             }),
         ),
         ToolDefinition::new(
+            "enviar_fotos_inmueble",
+            "Envia hasta 3 fotos del catalogo al visitante por WhatsApp (con el titulo como pie). \
+             Usala cuando el visitante pida fotos de un inmueble o cuando ofrezcas enviarselas y acepte. \
+             El id sale de buscar_inmuebles/detalle_inmueble. Tras llamarla, confirma en tu respuesta \
+             que ya se las enviaste; no pegues URLs de fotos en el texto.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string", "format": "uuid"},
+                    "max": {"type": "integer", "minimum": 1, "maximum": 3, "default": 3}
+                },
+                "required": ["id"]
+            }),
+        ),
+        ToolDefinition::new(
             "datos_contacto",
             "Telefono y WhatsApp oficiales de la inmobiliaria. Llamala antes de dar un numero.",
             json!({"type": "object", "properties": {}}),
@@ -120,6 +135,7 @@ impl Herramientas {
             "buscar_inmuebles" => buscar(&pool, args).await,
             "detalle_inmueble" => detalle(&pool, args).await,
             "registrar_contacto" => registrar(&pool, ctx.session_id, args).await,
+            "enviar_fotos_inmueble" => enviar_fotos(&pool, ctx.session_id, args).await,
             "datos_contacto" => contacto_publico(&pool, &self.contacto_defecto).await,
             "escalar_a_humano" => escalar(&pool, ctx.session_id, args).await,
             "consultar_agente" => consultar(&pool, ctx.session_id, args).await,
@@ -301,6 +317,87 @@ async fn detalle(pool: &PgPool, args: &Value) -> Result<Value, AgentError> {
               "resumen": f.copy_corta.unwrap_or_default(),
               "extras": f.extras, "margen_negociable": f.margen_negociable}),
     )
+}
+
+/* [299A-1 E13] La IA envía fotos del catálogo por WhatsApp: hasta 3
+ * `image+caption` (pie = título) vía outbox `whatsapp` con `media_url`
+ * absoluta (`/uploads/<storage_key>` bajo `PUBLIC_BASE_URL`). `destino` =
+ * teléfono del visitante (ficha) y `via` = canal de la sesión, igual que
+ * `consultar`. Sin fotos o sin teléfono responde `error` (la IA lo dice). */
+async fn enviar_fotos(pool: &PgPool, session_id: Uuid, args: &Value) -> Result<Value, AgentError> {
+    let id: Uuid = args
+        .get("id")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .parse()
+        .map_err(|_| AgentError::BadRequest("id de inmueble invalido".to_string()))?;
+    let max = args
+        .get("max")
+        .and_then(Value::as_i64)
+        .unwrap_or(3)
+        .clamp(1, 3);
+    let titulo: Option<String> =
+        sqlx::query_scalar("SELECT titulo FROM inmuebles WHERE id = $1 AND publicado")
+            .bind(id)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| AgentError::Db(e.to_string()))?;
+    let Some(titulo) = titulo.filter(|t| !t.trim().is_empty()) else {
+        return Ok(json!({"error": "inmueble no disponible"}));
+    };
+    let claves: Vec<String> = sqlx::query_scalar(
+        "SELECT storage_key FROM fotos WHERE inmueble_id = $1 ORDER BY orden LIMIT $2",
+    )
+    .bind(id)
+    .bind(max)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| AgentError::Db(e.to_string()))?;
+    if claves.is_empty() {
+        return Ok(json!({"error": "ese inmueble aún no tiene fotos"}));
+    }
+    let ficha = ClienteRepository::ficha_para_aviso(pool, session_id)
+        .await
+        .map_err(|e| AgentError::Db(e.to_string()))?;
+    let Some(telefono) = ficha
+        .telefono
+        .map(|t| t.trim().to_string())
+        .filter(|t| !t.is_empty())
+    else {
+        return Ok(json!({"error": "sin teléfono del visitante"}));
+    };
+    let via = ClienteRepository::canal_de(pool, session_id)
+        .await
+        .ok()
+        .flatten()
+        .filter(|v| v == "wa_a" || v == "wa_b")
+        .unwrap_or_else(|| "wa_a".to_string());
+    /* Base pública para `media_url`: en local el gateway descarga de este
+     * mismo backend; en producción `PUBLIC_BASE_URL` lleva el dominio
+     * (los servidores de WhatsApp deben alcanzarla). */
+    let base = std::env::var("PUBLIC_BASE_URL")
+        .ok()
+        .map(|b| b.trim().trim_end_matches('/').to_string())
+        .filter(|b| !b.is_empty())
+        .unwrap_or_else(|| "http://127.0.0.1:3000".to_string());
+    let total = claves.len();
+    for (i, clave) in claves.iter().enumerate() {
+        let pie = if total > 1 {
+            format!("{} ({}/{})", titulo.trim(), i + 1, total)
+        } else {
+            titulo.trim().to_string()
+        };
+        let aviso = json!({
+            "session_id": session_id.to_string(),
+            "destino": telefono,
+            "texto": pie,
+            "media_url": format!("{base}/uploads/{clave}"),
+            "via": via,
+            "motivo": "ia_foto",
+        });
+        glory_agent::persistence::enqueue_outbox(pool, "whatsapp", aviso).await?;
+    }
+    Ok(json!({"ok": true, "enviadas": total, "titulo": titulo}))
 }
 
 /// Teléfono 6..24 chars de `+0123456789 ()-.` con al menos 6 dígitos.
@@ -696,6 +793,100 @@ mod pruebas {
             .unwrap();
         sqlx::query("DELETE FROM atencion_sesiones WHERE session_id = $1")
             .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM agent_response_cycles WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM agent_sessions WHERE id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+
+    /* [299A-1 E13] Enviar fotos encola un outbox `whatsapp` con `media_url`
+     * por foto (tope `max`) y rechaza id inválido/ausente sin tocar BD. */
+    #[tokio::test]
+    async fn enviar_fotos_encola_media_url() {
+        let Some(pool) = pool_si_hay() else { return };
+        let h = Herramientas::new(pool.clone(), "Test 600111222".to_string());
+        let sesion = Uuid::new_v4();
+        glory_agent::persistence::ensure_session(&pool, sesion)
+            .await
+            .unwrap();
+        let ctx = ToolCtx::new(sesion, Some(pool.clone()));
+
+        let mala = h
+            .execute("enviar_fotos_inmueble", &json!({"id": "no-uuid"}), &ctx)
+            .await;
+        assert!(mala.is_err());
+        let ausente = h
+            .execute(
+                "enviar_fotos_inmueble",
+                &json!({"id": Uuid::new_v4().to_string()}),
+                &ctx,
+            )
+            .await
+            .unwrap();
+        assert!(ausente.get("error").is_some());
+
+        h.execute(
+            "registrar_contacto",
+            &json!({"nombre": "Foto Test", "telefono": "+34622222222"}),
+            &ctx,
+        )
+        .await
+        .unwrap();
+        /* Inmueble semilla con fotos (solo lectura; no se toca). */
+        let id: String = sqlx::query_scalar(
+            "SELECT id::TEXT FROM inmuebles WHERE publicado \
+             AND (SELECT COUNT(*) FROM fotos WHERE inmueble_id = inmuebles.id) > 0 LIMIT 1",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let r = h
+            .execute("enviar_fotos_inmueble", &json!({"id": id, "max": 2}), &ctx)
+            .await
+            .unwrap();
+        assert_eq!(r.get("ok").and_then(Value::as_bool), Some(true));
+        assert_eq!(r.get("enviadas").and_then(Value::as_i64), Some(2));
+        let fotos: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM agent_outbox WHERE status = 'pending' \
+             AND kind = 'whatsapp' AND payload->>'session_id' = $1 \
+             AND payload->>'motivo' = 'ia_foto' AND payload ? 'media_url'",
+        )
+        .bind(sesion.to_string())
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(fotos, 2);
+
+        sqlx::query("DELETE FROM agent_outbox WHERE payload->>'session_id' = $1")
+            .bind(sesion.to_string())
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM agent_messages WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM canal_sesiones WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM atencion_sesiones WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM clientes WHERE telefono = '34622222222'")
             .execute(&pool)
             .await
             .unwrap();
