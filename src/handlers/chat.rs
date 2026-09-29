@@ -83,9 +83,12 @@ fn prompt_config() -> glory_agent::prompts::PromptConfig {
          teléfono, guárdalos con `registrar_contacto`. Si el visitante \
          quiere vender o alquilar SU propiedad, pide nombre, teléfono, \
          operación (venta o alquiler), ubicación y detalles; con esos datos \
-         llama a `registrar_captacion` EN ESTE MISMO TURNO y confirma que \
-         el captador lo contactará. Si pide un número de \
-         contacto, llama a `datos_contacto` y dalo exacto.",
+          llama a `registrar_captacion` EN ESTE MISMO TURNO y confirma que \
+          el captador lo contactará. Si el visitante quiere visitar un \
+          inmueble del catálogo, pide nombre, teléfono y cuándo quiere ir; \
+          con esos datos llama a `agendar_visita` EN ESTE MISMO TURNO y \
+          dile que el agente le confirmará día y hora. Si pide un número de \
+          contacto, llama a `datos_contacto` y dalo exacto.",
         &format!(
             "Si el visitante pide un humano o das 2 respuestas sin resolver, \
              llama a `escalar_a_humano` con el motivo y ofrece seguimiento por \

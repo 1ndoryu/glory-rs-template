@@ -14,6 +14,7 @@ mod solicitud;
 mod suscriptor;
 mod uploads;
 mod users;
+mod visita;
 mod whatsapp;
 
 use std::path::{Path, PathBuf};
@@ -80,6 +81,8 @@ impl utoipa::Modify for SecurityAddon {
         solicitud::create_solicitud,
         solicitud::list_solicitudes,
         solicitud::revisar_solicitud,
+        visita::list_visitas,
+        visita::revisar_visita,
         public::list_public,
         public::get_public,
         suscriptor::suscribir,
@@ -112,6 +115,9 @@ impl utoipa::Modify for SecurityAddon {
         crate::models::CreateSolicitudRequest,
         crate::models::UpdateEstadoSolicitud,
         crate::models::PaginatedSolicitudes,
+        crate::models::Visita,
+        crate::models::PaginatedVisitas,
+        crate::models::UpdateEstadoVisita,
         crate::models::CreateSuscriptorRequest,
         crate::models::Suscriptor,
         crate::errors::ErrorResponse,
@@ -243,6 +249,7 @@ fn admin_routes() -> Router<AppState> {
         /* [279A-3] Ficha /ask de la dueña (rutas bajo /api/admin/...). */
         .merge(ask::routes())
         .merge(solicitud::admin_routes())
+        .merge(visita::admin_routes())
         .merge(uploads::routes())
         .merge(users::routes())
         /* [169A-4] Atención del chat: bandeja, hilo, responder, tomar/soltar

@@ -4,6 +4,7 @@ mod note;
 mod solicitud;
 mod suscriptor;
 mod user;
+mod visita;
 
 pub use cliente::{Cliente, ClienteRow, CreateClienteRequest};
 pub use inmueble::{
@@ -21,3 +22,7 @@ pub use solicitud::{
 };
 pub use suscriptor::{CreateSuscriptorRequest, Suscriptor, SuscriptorRow};
 pub use user::{AuthResponse, LoginRequest, RegisterRequest, User, UserResponse};
+pub use visita::{
+    PaginatedVisitas, UpdateEstadoVisita, Visita, VisitaAdmin, VisitaRow, VisitasAdminParams,
+    ESTADOS_VISITA,
+};

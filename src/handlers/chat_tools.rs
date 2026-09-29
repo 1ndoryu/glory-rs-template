@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::errors::AppError;
 use crate::models::{CreateSolicitudRequest, OPERACIONES, TIPOS};
-use crate::repositories::ClienteRepository;
+use crate::repositories::{ClienteRepository, NuevaVisita, VisitaRepository};
 use crate::services::SolicitudService;
 use glory_agent::errors::AgentError;
 use glory_agent::tools::{ToolCtx, ToolDefinition, ToolExecutor};
@@ -29,6 +29,7 @@ pub fn definiciones() -> Vec<ToolDefinition> {
         def_escalar(),
         def_consultar(),
         def_captacion(),
+        def_visita(),
     ]
 }
 
@@ -154,6 +155,24 @@ fn def_captacion() -> ToolDefinition {
     )
 }
 
+fn def_visita() -> ToolDefinition {
+    ToolDefinition::new(
+        "agendar_visita",
+        "El visitante quiere VISITAR un inmueble del catalogo: agenda la visita (queda `pendiente`: el agente confirma dia y hora) y congela la IA hasta que el humano confirme. Pide antes nombre, telefono y cuando quiere ir (texto libre, ej. 'el sabado en la manana'); el id sale de buscar_inmuebles/detalle_inmueble; llama solo con esos datos.",
+        json!({
+            "type": "object",
+            "properties": {
+                "id": {"type": "string", "format": "uuid"},
+                "nombre": {"type": "string"},
+                "telefono": {"type": "string"},
+                "cuando": {"type": "string", "description": "Lo que dijo el visitante sobre cuando ir (1..200)"},
+                "fecha": {"type": "string", "description": "Dia exacto YYYY-MM-DD, solo si lo dio el visitante"}
+            },
+            "required": ["id", "nombre", "telefono", "cuando"]
+        }),
+    )
+}
+
 /// Executor con acceso a BD y al contacto por defecto (`AGENTE_CONTACTO`).
 pub struct Herramientas {
     pool: PgPool,
@@ -189,6 +208,7 @@ impl Herramientas {
             "registrar_contacto" => registrar(&pool, ctx.session_id, args).await,
             "enviar_fotos_inmueble" => enviar_fotos(&pool, ctx.session_id, args).await,
             "registrar_captacion" => captar(&pool, ctx.session_id, args).await,
+            "agendar_visita" => agendar(&pool, ctx.session_id, args).await,
             "datos_contacto" => contacto_publico(&pool, &self.contacto_defecto).await,
             "escalar_a_humano" => escalar(&pool, ctx.session_id, args).await,
             "consultar_agente" => consultar(&pool, ctx.session_id, args).await,
@@ -731,6 +751,81 @@ async fn captar(pool: &PgPool, session_id: Uuid, args: &Value) -> Result<Value, 
     Ok(json!({"ok": true, "solicitud_id": solicitud.id}))
 }
 
+/* [E15] Visita: el visitante quiere ver un inmueble del catálogo. Valida
+ * que el inmueble exista y esté publicado, abre la fila en `pendiente`
+ * (el agente confirma día/hora) y congela la IA como `consultar` (el
+ * humano confirma con nota y la IA retoma): la cita sin día cerrado no
+ * es una delegación total. `fecha` solo viaja si el visitante dio un
+ * día exacto; si no, el humano la fija al confirmar. */
+async fn agendar(pool: &PgPool, session_id: Uuid, args: &Value) -> Result<Value, AgentError> {
+    let id: Uuid = args
+        .get("id")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .parse()
+        .map_err(|_| AgentError::BadRequest("id de inmueble invalido".to_string()))?;
+    /* Barato primero: sin nombre/teléfono/cuándo/fecha válidos no se toca
+     * la BD (la IA se corrige en el turno sin costo de consulta). */
+    let nombre = arg_texto(args, "nombre");
+    let telefono = arg_texto(args, "telefono");
+    let cuando = arg_texto(args, "cuando");
+    if nombre.is_empty() || nombre.len() > 200 {
+        return Ok(json!({"error": "nombre requerido (1..200)"}));
+    }
+    if !telefono_valido(&telefono) {
+        return Ok(json!({"error": "telefono invalido"}));
+    }
+    if cuando.is_empty() || cuando.len() > 200 {
+        return Ok(json!({"error": "cuando requerido (1..200)"}));
+    }
+    let fecha = match arg_texto(args, "fecha") {
+        f if f.is_empty() => None,
+        f => match chrono::NaiveDate::parse_from_str(&f, "%Y-%m-%d") {
+            Ok(d) => Some(d),
+            Err(_) => return Ok(json!({"error": "fecha invalida (YYYY-MM-DD)"})),
+        },
+    };
+    let titulo: Option<String> =
+        sqlx::query_scalar("SELECT titulo FROM inmuebles WHERE id = $1 AND publicado")
+            .bind(id)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| AgentError::Db(e.to_string()))?;
+    let Some(titulo) = titulo.filter(|t| !t.trim().is_empty()) else {
+        return Ok(json!({"error": "inmueble no disponible"}));
+    };
+    let visita = VisitaRepository::crear(
+        pool,
+        NuevaVisita {
+            inmueble_id: id,
+            session_id,
+            nombre: nombre.clone(),
+            telefono: telefono.clone(),
+            cuando: cuando.clone(),
+            fecha,
+        },
+    )
+    .await
+    .map_err(|e| AgentError::Db(e.to_string()))?;
+    /* Congelar como `consultar`: el humano confirma día/hora y la IA
+     * retoma con la nota (una cita no es delegación total). */
+    ClienteRepository::marcar_atencion(pool, session_id, "consultando")
+        .await
+        .map_err(|e| AgentError::Db(e.to_string()))?;
+    glory_agent::persistence::set_session_ai(pool, session_id, false).await?;
+    glory_agent::persistence::upsert_response_cycle(pool, session_id, "waiting").await?;
+    let resumen: String = format!(
+        "Visita {} — {cuando} — {nombre} {telefono} (cita {})",
+        titulo.trim(),
+        visita.id
+    )
+    .chars()
+    .take(500)
+    .collect();
+    aviso_humano(pool, session_id, "visita", &resumen).await?;
+    Ok(json!({"ok": true, "visita_id": visita.id}))
+}
+
 /* [169A-4] Las consultas SQL no usan macros verificadas en compilación:
  * estos tests las ejecutan contra la BD real de rama (`DATABASE_URL`).
  * Sin `DATABASE_URL` se omiten (gate local sin BD sigue verde). */
@@ -1178,5 +1273,178 @@ mod pruebas {
             .execute(&pool)
             .await
             .unwrap();
+    }
+
+    /* [E15] Matriz mínima de visitas: rechazo de args malos sin tocar
+     * la BD; agenda feliz (fila `pendiente` + congelar como `consultar`
+     * + aviso `visita`) y confirmación del admin con fecha. */
+    /* [E15] Limpieza de los rastros de sesión que dejan estos tests
+     * (outbox, mensajes, canal, atención, ciclo y sesión sintética). */
+    async fn limpiar_rastros(pool: &PgPool, sesion: Uuid) {
+        for (sql, texto) in [
+            (
+                "DELETE FROM agent_outbox WHERE payload->>'session_id' = $1",
+                true,
+            ),
+            ("DELETE FROM agent_messages WHERE session_id = $1", false),
+            ("DELETE FROM canal_sesiones WHERE session_id = $1", false),
+            ("DELETE FROM atencion_sesiones WHERE session_id = $1", false),
+            (
+                "DELETE FROM agent_response_cycles WHERE session_id = $1",
+                false,
+            ),
+            ("DELETE FROM agent_sessions WHERE id = $1", false),
+        ] {
+            if texto {
+                sqlx::query(sql)
+                    .bind(sesion.to_string())
+                    .execute(pool)
+                    .await
+                    .unwrap();
+            } else {
+                sqlx::query(sql).bind(sesion).execute(pool).await.unwrap();
+            }
+        }
+    }
+
+    /* [E15] `agendar_visita` rechaza args malos sin tocar la BD (salvo el
+     * uuid inexistente, que solo lee): la IA se corrige en el turno. */
+    #[tokio::test]
+    async fn visita_rechaza_args_malos() {
+        let Some(pool) = pool_si_hay() else { return };
+        let h = Herramientas::new(pool.clone(), "Test 600111222".to_string());
+        let sesion = Uuid::new_v4();
+        glory_agent::persistence::ensure_session(&pool, sesion)
+            .await
+            .unwrap();
+        let ctx = ToolCtx::new(sesion, Some(pool.clone()));
+        let id = Uuid::new_v4().to_string();
+
+        let mala = h
+            .execute("agendar_visita", &json!({"id": "no-uuid"}), &ctx)
+            .await;
+        assert!(mala.is_err());
+        for args in [
+            json!({"id": id, "telefono": "+34633333333", "cuando": "hoy"}),
+            json!({"id": id, "nombre": "T", "telefono": "abc", "cuando": "hoy"}),
+            json!({"id": id, "nombre": "T", "telefono": "+34633333333"}),
+            json!({"id": id, "nombre": "T", "telefono": "+34633333333", "cuando": "hoy", "fecha": "ayer"}),
+        ] {
+            let r = h.execute("agendar_visita", &args, &ctx).await.unwrap();
+            assert!(r.get("error").is_some(), "args: {args}");
+        }
+        let ausente = h
+            .execute(
+                "agendar_visita",
+                &json!({
+                    "id": id,
+                    "nombre": "Nadie",
+                    "telefono": "+34633333333",
+                    "cuando": "mañana"
+                }),
+                &ctx,
+            )
+            .await
+            .unwrap();
+        assert!(ausente.get("error").is_some());
+
+        limpiar_rastros(&pool, sesion).await;
+    }
+
+    /* [E15] Matriz mínima feliz: abre la fila en `pendiente`, congela
+     * como `consultar` y avisa con motivo `visita`; el admin confirma
+     * con fecha desde el repo. */
+    #[tokio::test]
+    async fn visita_agenda_y_avisa() {
+        let Some(pool) = pool_si_hay() else { return };
+        let h = Herramientas::new(pool.clone(), "Test 600111222".to_string());
+        let sesion = Uuid::new_v4();
+        glory_agent::persistence::ensure_session(&pool, sesion)
+            .await
+            .unwrap();
+        let ctx = ToolCtx::new(sesion, Some(pool.clone()));
+
+        /* Inmueble semilla publicado (solo lectura; no se toca). */
+        let Some(id): Option<String> =
+            sqlx::query_scalar("SELECT id::TEXT FROM inmuebles WHERE publicado LIMIT 1")
+                .fetch_optional(&pool)
+                .await
+                .unwrap()
+        else {
+            limpiar_rastros(&pool, sesion).await;
+            return;
+        };
+
+        let r = h
+            .execute(
+                "agendar_visita",
+                &json!({
+                    "id": id,
+                    "nombre": "Visita Test",
+                    "telefono": "+34633333333",
+                    "cuando": "el sábado en la mañana"
+                }),
+                &ctx,
+            )
+            .await
+            .unwrap();
+        assert_eq!(r.get("ok").and_then(Value::as_bool), Some(true));
+        let vid = r
+            .get("visita_id")
+            .and_then(Value::as_str)
+            .expect("visita_id");
+        let fila: (String, String, Option<chrono::NaiveDate>) =
+            sqlx::query_as("SELECT estado, cuando, fecha FROM visitas WHERE id = $1::UUID")
+                .bind(vid)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(fila.0, "pendiente".to_string());
+        assert_eq!(fila.1, "el sábado en la mañana".to_string());
+        assert_eq!(fila.2, None);
+        let estado: String =
+            sqlx::query_scalar("SELECT estado FROM atencion_sesiones WHERE session_id = $1")
+                .bind(sesion)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(estado, "consultando");
+        let fila_sesion = glory_agent::persistence::get_session(&pool, sesion)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(!fila_sesion.ai_enabled);
+        let avisos: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM agent_outbox WHERE status = 'pending' \
+             AND kind = 'whatsapp' AND payload->>'session_id' = $1 \
+             AND payload->>'motivo' = 'visita'",
+        )
+        .bind(sesion.to_string())
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(avisos, 1);
+        /* El admin confirma con fecha: cierra el ciclo de la cita. */
+        let conf = VisitaRepository::cambiar_estado(
+            &pool,
+            vid.parse().unwrap(),
+            "confirmada",
+            Some(chrono::NaiveDate::from_ymd_opt(2026, 10, 4).unwrap()),
+        )
+        .await
+        .unwrap()
+        .expect("visita confirmada");
+        assert_eq!(conf.estado, "confirmada");
+        assert_eq!(
+            conf.fecha,
+            Some(chrono::NaiveDate::from_ymd_opt(2026, 10, 4).unwrap())
+        );
+
+        sqlx::query("DELETE FROM visitas WHERE id = $1::UUID")
+            .bind(vid)
+            .execute(&pool)
+            .await
+            .unwrap();
+        limpiar_rastros(&pool, sesion).await;
     }
 }
