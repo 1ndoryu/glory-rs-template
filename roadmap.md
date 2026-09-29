@@ -415,6 +415,13 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   Fase 1 diez escenarios que ya deberían funcionar, Fase 2 builds E11–E16
   (visión, audio, envío fotos, captación, citas, bug consultando→activa),
   Fase 3 batería completa con criterio de aceptación.
+- 299A-2 correctivo Fase3-v2 (verificado 2026-09-29, H1-H6 cerrados F1-F10):
+  `registrar_sin_vincular` (ficha sin re-clavear), filtros exactos
+  `habitaciones`/`zona` en BD, `sencilla()` (migración `...18`),
+  regla no-afirmar-sin-tool, sin oficina física (delegar a asesor), acuse
+  6 s con triple guarda; batería paralela `scripts/bateria-ia.ps1`; tests
+  41/41 con BD real + prevención H9. Detalle en
+  `Agente/completados/fase3-bateria-resultados-2026-09-29.md` (§Batería v2).
 
 ## 279A-3 — /ask cuestionario de ficha (F1 verificado local 2026-09-27; pendiente: respuestas usuaria)
 - Plan: `Agente/planes/plan-ask-2026-09-27.md`.

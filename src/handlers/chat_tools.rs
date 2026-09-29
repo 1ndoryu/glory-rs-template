@@ -37,8 +37,11 @@ fn def_buscar() -> ToolDefinition {
     ToolDefinition::new(
         "buscar_inmuebles",
         "Busca inmuebles publicados y disponibles. Usala siempre antes de hablar de oferta concreta. \
+         Pasa `habitaciones` (numero exacto) y `zona` siempre que el visitante los mencione: \
+         son filtros exactos en BD, nunca filtres a ojo lo devuelto. \
          Las primeras tarjetas YA se envian solas como mensajes separados (mira `tarjetas_enviadas`): \
-         no las repitas ni las listes en tu respuesta, solo intro de una linea + cierre breve.",
+         no las repitas ni las listes en tu respuesta, solo intro de una linea + cierre breve. \
+         Si `total` es 0, dilo claro y pide otro filtro (no inventes oferta).",
         json!({
             "type": "object",
             "properties": {
@@ -46,6 +49,8 @@ fn def_buscar() -> ToolDefinition {
                 "tipo": {"type": "string", "enum": ["apartamento", "casa", "local", "terreno", "townhouse"]},
                 "operacion": {"type": "string", "enum": ["venta", "alquiler"]},
                 "precio_max": {"type": "number"},
+                "habitaciones": {"type": "integer", "description": "Numero exacto de habitaciones"},
+                "zona": {"type": "string", "description": "Zona o sector (filtra por ubicacion)"},
                 "limite": {"type": "integer", "default": 5}
             }
         }),
@@ -69,7 +74,9 @@ fn def_detalle() -> ToolDefinition {
 fn def_registrar_contacto() -> ToolDefinition {
     ToolDefinition::new(
         "registrar_contacto",
-        "Guarda nombre y telefono del visitante cuando los da.",
+        "Guarda nombre y telefono del visitante cuando los da (ficha comercial; \
+         no cambia el hilo actual). Solo di que quedo registrado si ESTA llamada \
+         respondio exito en este turno: prohibido afirmarlo sin haberla llamado.",
         json!({
             "type": "object",
             "properties": {
@@ -282,22 +289,43 @@ async fn buscar(pool: &PgPool, session_id: Uuid, args: &Value) -> Result<Value, 
         .get("precio_max")
         .and_then(Value::as_f64)
         .filter(|p| *p > 0.0);
+    /* [Fase3-H3] Habitaciones exactas en BD (antes el modelo filtraba a ojo
+     * y colaba 3 hab cuando pedían 2). Solo enteros positivos; NULL/0 = sin
+     * filtro. Ojo: filas con `habitaciones` NULL quedan fuera si se filtra. */
+    let habitaciones = args
+        .get("habitaciones")
+        .and_then(Value::as_i64)
+        .filter(|h| *h > 0);
+    /* [Fase3-H4] Zona aparte de `texto`: el ILIKE sobre `ubicacion` no cubre
+     * zonas que no aparecen literales ("norte" vs "Guayana Country Club").
+     * Filtra lo que sí coincide y el prompt ordena reconocer el vacío. */
+    let zona = args
+        .get("zona")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
     let limite = args
         .get("limite")
         .and_then(Value::as_i64)
         .unwrap_or(5)
         .clamp(1, 10);
     /* [229A-1] Struct en vez de tupla de 9 (mismo patrón que `Ficha`):
-     * legible y evita el lint de tipos complejos. */
+     * legible y evita el lint de tipos complejos.
+     * [Fase3-v2] `texto`/`zona` pasan por `sencilla()` (migración
+     * `20260929000018`: minúsculas sin tildes): el visitante escribe
+     * "Caroni" y la BD guarda "Caroní" (el ILIKE directo daba 0 filas y
+     * la IA negaba oferta existente). */
     let filas: Vec<Tarjeta> =
         sqlx::query_as(
-            "SELECT id, titulo, tipo, operacion, precio, ubicacion, slug, puestos, residencia \
+            "SELECT id, titulo, tipo, operacion, precio, ubicacion, slug, puestos, residencia, habitaciones \
              FROM inmuebles \
              WHERE publicado AND estado = 'disponible' \
-             AND ($1::TEXT IS NULL OR titulo ILIKE '%' || $1 || '%' OR ubicacion ILIKE '%' || $1 || '%') \
+             AND ($1::TEXT IS NULL OR sencilla(titulo) LIKE '%' || sencilla($1) || '%' OR sencilla(ubicacion) LIKE '%' || sencilla($1) || '%') \
              AND ($2::TEXT IS NULL OR tipo = $2) \
              AND ($3::TEXT IS NULL OR operacion = $3) \
              AND ($4::FLOAT8 IS NULL OR precio <= $4) \
+             AND ($6::BIGINT IS NULL OR habitaciones = $6) \
+             AND ($7::TEXT IS NULL OR sencilla(ubicacion) LIKE '%' || sencilla($7) || '%') \
              ORDER BY updated_at DESC LIMIT $5",
         )
         .bind(texto)
@@ -305,6 +333,8 @@ async fn buscar(pool: &PgPool, session_id: Uuid, args: &Value) -> Result<Value, 
         .bind(operacion)
         .bind(precio_max)
         .bind(limite)
+        .bind(habitaciones)
+        .bind(zona)
         .fetch_all(pool)
         .await
         .map_err(|e| AgentError::Db(e.to_string()))?;
@@ -322,7 +352,7 @@ async fn buscar(pool: &PgPool, session_id: Uuid, args: &Value) -> Result<Value, 
         .map(|t| {
             json!({"id": t.id, "titulo": t.titulo, "tipo": t.tipo, "operacion": t.operacion,
                    "precio": t.precio, "ubicacion": t.ubicacion, "slug": t.slug,
-                   "puestos": t.puestos, "residencia": t.residencia})
+                   "puestos": t.puestos, "residencia": t.residencia, "habitaciones": t.habitaciones})
         })
         .collect();
     Ok(json!({"inmuebles": items, "total": total, "tarjetas_enviadas": enviadas}))
@@ -412,7 +442,8 @@ async fn encolar_tarjetas(pool: &PgPool, session_id: Uuid, filas: &[Tarjeta]) ->
 
 /// Tarjeta breve de un inmueble para `buscar_inmuebles` (struct en vez de
 /// tupla de 9: legible y evita el lint de tipos complejos). Incluye
-/// `puestos` y `residencia` para que el agente responda con esos datos.
+/// `puestos`, `residencia` y `habitaciones` para que el agente responda con
+/// esos datos exactos (Fase3-H3: sin este campo filtraba a ojo).
 #[derive(Debug, sqlx::FromRow)]
 struct Tarjeta {
     id: Uuid,
@@ -424,6 +455,7 @@ struct Tarjeta {
     slug: String,
     puestos: i32,
     residencia: String,
+    habitaciones: i32,
 }
 
 /// Ficha completa de un inmueble para `detalle_inmueble` (struct en vez de
@@ -595,8 +627,11 @@ async fn registrar(pool: &PgPool, session_id: Uuid, args: &Value) -> Result<Valu
         .await?;
     /* [279A-2 F1] El contacto también vive en `clientes` (una fila por
      * teléfono, upsert idempotente): sin este paso la IA captaría datos
-     * que nadie puede consultar. Si falla se propaga (nada silencioso). */
-    ClienteRepository::registrar_y_vincular(pool, session_id, Some(nombre), telefono)
+     * que nadie puede consultar. Si falla se propaga (nada silencioso).
+     * [Fase3-H1] Ficha SIN re-vincular: el hilo pertenece al remitente real
+     * y un número dictado no lo re-clavea (antes partía el hilo: segunda
+     * vuelta sin historial). */
+    ClienteRepository::registrar_sin_vincular(pool, Some(nombre), telefono)
         .await
         .map_err(|e| AgentError::Db(e.to_string()))?;
     Ok(json!({"ok": true}))
@@ -961,6 +996,7 @@ mod pruebas {
             slug: "x".to_string(),
             puestos: 3,
             residencia: "2".to_string(),
+            habitaciones: 2,
         };
         let texto = tarjeta_texto(&t);
         assert!(texto.contains("Apartamento Residencias Caroní Plaza"));
@@ -980,6 +1016,7 @@ mod pruebas {
                 slug: String::new(),
                 puestos: 1,
                 residencia: String::new(),
+                habitaciones: 1,
             }
         };
         assert!(tarjeta_texto(&larga).chars().count() < 300);
@@ -1012,6 +1049,127 @@ mod pruebas {
         .await
         .unwrap();
         assert_eq!(encoladas, 0);
+        limpiar_sesion(&pool, sesion).await;
+    }
+
+    /* [Fase3-H3] El filtro de habitaciones es exacto en BD: pedir 2 nunca
+     * trae 3 (antes el modelo filtraba a ojo y colaba de más). */
+    #[tokio::test]
+    async fn buscar_filtra_habitaciones_exactas() {
+        let Some(pool) = pool_si_hay() else { return };
+        let h = Herramientas::new(pool.clone(), "Test 600111222".to_string());
+        let sesion = Uuid::new_v4();
+        glory_agent::persistence::ensure_session(&pool, sesion)
+            .await
+            .unwrap();
+        let ctx = ToolCtx::new(sesion, Some(pool.clone()));
+        let salida = h
+            .execute("buscar_inmuebles", &json!({"habitaciones": 2}), &ctx)
+            .await
+            .unwrap();
+        let items = salida
+            .get("inmuebles")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+        assert!(!items.is_empty());
+        assert!(items
+            .iter()
+            .all(|i| i.get("habitaciones").and_then(Value::as_i64) == Some(2)));
+        limpiar_sesion(&pool, sesion).await;
+    }
+
+    /* [Fase3-v2] Sin tildes también encuentra: "caroni" localiza el local
+     * de "Riberas del Caroní" (antes 0 filas y la IA negaba la oferta). */
+    #[tokio::test]
+    async fn buscar_sin_tilde_encuentra_igual() {
+        let Some(pool) = pool_si_hay() else { return };
+        let h = Herramientas::new(pool.clone(), "Test 600111222".to_string());
+        let sesion = Uuid::new_v4();
+        glory_agent::persistence::ensure_session(&pool, sesion)
+            .await
+            .unwrap();
+        let ctx = ToolCtx::new(sesion, Some(pool.clone()));
+        let salida = h
+            .execute("buscar_inmuebles", &json!({"zona": "caroni"}), &ctx)
+            .await
+            .unwrap();
+        let items = salida
+            .get("inmuebles")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+        assert!(!items.is_empty());
+        assert!(items.iter().all(|i| i
+            .get("ubicacion")
+            .and_then(Value::as_str)
+            .is_some_and(|u| u.contains("Caron"))));
+        limpiar_sesion(&pool, sesion).await;
+    }
+
+    /* [Fase3-H1] Un número dictado no re-clavea el hilo: la sesión sigue
+     * atada al remitente real y el número nuevo queda como ficha en
+     * `clientes` (antes partía el hilo y la segunda vuelta perdía el
+     * historial). */
+    #[tokio::test]
+    async fn registrar_no_reclavea_hilo() {
+        let Some(pool) = pool_si_hay() else { return };
+        let h = Herramientas::new(pool.clone(), "Test 600111222".to_string());
+        let sesion = Uuid::new_v4();
+        glory_agent::persistence::ensure_session(&pool, sesion)
+            .await
+            .unwrap();
+        let dueno = ClienteRepository::registrar(&pool, Some("Dueno Hilo"), "34111111111")
+            .await
+            .unwrap();
+        ClienteRepository::vincular_canal(
+            &pool,
+            sesion,
+            dueno.id,
+            "34111111111",
+            "wa_b",
+            "inicial",
+        )
+        .await
+        .unwrap();
+        let ctx = ToolCtx::new(sesion, Some(pool.clone()));
+        let salida = h
+            .execute(
+                "registrar_contacto",
+                &json!({"nombre": "Otro Numero", "telefono": "34222222222"}),
+                &ctx,
+            )
+            .await
+            .unwrap();
+        assert_eq!(salida.get("ok").and_then(Value::as_bool), Some(true));
+        let canal: (String, Uuid) =
+            sqlx::query_as("SELECT telefono, cliente_id FROM canal_sesiones WHERE session_id = $1")
+                .bind(sesion)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(canal.0, "34111111111");
+        assert_eq!(canal.1, dueno.id);
+        let ficha: (String,) =
+            sqlx::query_as("SELECT nombre FROM clientes WHERE telefono = '34222222222'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(ficha.0, "Otro Numero");
+        sqlx::query("DELETE FROM clientes WHERE telefono IN ('34111111111','34222222222')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM canal_sesiones WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM atencion_sesiones WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
         limpiar_sesion(&pool, sesion).await;
     }
 

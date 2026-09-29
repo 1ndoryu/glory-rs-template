@@ -92,3 +92,47 @@ precio en miles, intro + cierre partidas siempre, acuse solo en turnos >10 s
 (F1,F2,F5,F6,F8,F10), ningún silencio, ningún turno colgado. El envoltorio
 funciona; lo que falla es criterio del modelo (filtros, ficha, zona), no el
 formato.
+
+## Batería v2 — correctivos H1-H6 verificados (2026-09-29, ~19:00–19:40 VET)
+
+Script `scripts/bateria-ia.ps1`: 10 jobs en paralelo, polling al outbox
+(`motivo='ia'`) por turno en vez de sleeps fijos; remitentes vírgenes por
+escenario (`18149575561–70`); re-corridas puntuales F1/F3/F4 (`...581/583/584`).
+Cambios vs v1: `registrar_sin_vincular` (ficha sin re-clavear, H1),
+`habitaciones`+`zona` exactos en SQL + campo en items (H3/H4),
+`función sencilla()` migración `20260929000018` (tildes, v2-bis),
+regla "solo afirma registro con tool exitosa" + `consultar_agente` si piden
+oficina (H2/H5; decisión usuaria: no hay oficina física), acuse a 6 s que se
+omite si ya hay `ia`/`tarjeta` encolados (H6).
+Tests nuevos: `registrar_no_reclavea_hilo`, `buscar_filtra_habitaciones_exactas`,
+`buscar_sin_tilde_encuentra_igual` (41/41 con `DATABASE_URL` real; ver H9).
+
+- **F1** (`fd527ebe`, re-corrida `...581`): OK. 1 tarjeta exacta (Alta Vista 2
+  hab $35k ≤90k), ficha Luis/34611111111 creada, canal intacto (remitente),
+  "registrados" verdadero. Orden v2-bis: acuse → tarjeta → cierre (H6 cerrado).
+- **F2** (`c4bdc043`): OK. "En el norte con 3 habitaciones no tengo nada
+  ahorita. ¿Venta o alquiler, otra zona y presupuesto?" Honesto + redirect (H4).
+- **F3** (`7bb35f3f`, re-corrida `...583`): OK con matiz de premisa. No existe
+  local en Riberas (la propiedad es casa; el único local está en Puerto
+  Ordaz): la IA dijo "no tengo locales ahí" + pidió otra zona (honesto; la
+  calificación OK de v1 estaba mal dada — respondió puestos de la casa a una
+  pregunta por un local). `sencilla()` probada en unit + el modelo ya escribe
+  "Riberas del Caroni" y el filtro casa igual.
+- **F4** (`db582739`, re-corrida `...584`): OK. 2 tarjetas ambas 2 hab (H3),
+  ficha Ana/34622222222, canal intacto, "quedó registrado" verdadero (H1/H2).
+- **F5** (`dba930a0`): OK (chiste + redirect, sin congelar).
+- **F6** (`7a47648b`): OK (1 tarjeta alquiler).
+- **F7** (`d3a46654`): OK (`delegada`, aviso + teléfono oficial).
+- **F8** (`f5e542ce`): OK. "No tenemos oficina física, un asesor va a
+  coordinar el punto de encuentro" vía `consultando` (H5; sin dirección
+  inventada). Pidió nombre para la ficha.
+- **F9** (`082790fd`): OK (pivote venta→alquiler, misma sesión).
+- **F10** (`54baa601`): OK (saludo + pide criterios).
+- Limpieza total v2: 68 outbox + 24 sesiones (cascada: mensajes, canal,
+  atención, ciclos, uso) + 15 clientes; `solicitudes`/`visitas` en 0.
+- **H9 (nuevo, harness) — tests BD se saltan en silencio sin `DATABASE_URL`.**
+  `pool_si_hay()` retorna `None` y el test "pasa" sin probar: 41/41 en 0.01 s
+  sin BD. Con `DATABASE_URL` real salieron 5 fallos de verdad (4×`sin_tilde`
+  por renombre a medias + CHECK `canal` en test nuevo). Prevención en
+  `Agente/prevencion/prevencion-tests-bd-silenciosos-2026-09-29.md`: correr
+  siempre vía `scripts/run-with-db.mjs` o con `DATABASE_URL` exportado.

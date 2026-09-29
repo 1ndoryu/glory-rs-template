@@ -50,6 +50,7 @@ desktop.ini
 !/scripts/check-roadmap.mjs
 !/scripts/self-check.ps1
 !/scripts/importar-rescate.mjs
+!/scripts/bateria-ia.ps1
 /backups/
 /clients/
 /frontend/public/legacy-assets/

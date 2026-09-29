@@ -6,8 +6,9 @@ use crate::models::ClienteRow;
 /* [279A-2 F1] Acceso a `clientes` + `canal_sesiones` + `atencion_sesiones`
  * con prepared statements. El alta es un upsert atómico por teléfono
  * (sin buscar-crear secuencial): repetir no duplica, solo refresca nombre
- * y `updated_at`. `registrar_y_vincular` es el único punto de entrada
- * (tool `registrar_contacto` y `POST .../contacto` pasan por aquí). */
+ * y `updated_at`. Dos entradas: `registrar_sin_vincular` (tool `registrar_contacto`:
+ * ficha sin tocar el hilo) y `registrar_y_vincular` (`POST .../contacto` staff:
+ * re-claveo explícito). */
 
 pub struct ClienteRepository;
 
@@ -57,6 +58,21 @@ impl ClienteRepository {
         .bind(origen)
         .fetch_one(pool)
         .await
+    }
+
+    /* [Fase3-H1] Ficha sin re-vincular: la usa la tool `registrar_contacto`.
+     * El canal de una sesión entrante identifica al remitente real; si el
+     * visitante dicta OTRO número, ese dato es ficha comercial (upsert en
+     * `clientes`), jamás una orden de re-clavear el hilo. Re-vincular aquí
+     * partió el hilo F1/F4 (segunda vuelta sin historial). El re-claveo
+     * explícito sigue viviendo solo en `registrar_y_vincular` (staff). */
+    pub async fn registrar_sin_vincular(
+        pool: &PgPool,
+        nombre: Option<&str>,
+        telefono: &str,
+    ) -> Result<ClienteRow, sqlx::Error> {
+        let tel = Self::normalizar_telefono(telefono);
+        Self::registrar(pool, nombre, &tel).await
     }
 
     /// Vincula sesión↔cliente sin pisar `canal`/`modo` ya fijados (los pone
@@ -146,8 +162,11 @@ impl ClienteRepository {
         Ok(())
     }
 
-    /// Entrada única: normaliza → upsert → vincula. Sin duplicados por
-    /// teléfono aunque la IA llame dos veces (upserts idempotentes).
+    /* [Fase3-H1] Uso staff/explícito (POST /contacto, widget): aquí el
+     * humano SÍ ordena el re-claveo. La IA conversacional usa
+     * `registrar_sin_vincular` (ficha sin tocar el hilo). Entrada única:
+     * normaliza → upsert → vincula. Sin duplicados por teléfono aunque la
+     * IA llame dos veces (upserts idempotentes). */
     pub async fn registrar_y_vincular(
         pool: &PgPool,
         session_id: Uuid,

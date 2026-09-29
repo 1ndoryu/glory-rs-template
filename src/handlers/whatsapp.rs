@@ -36,9 +36,12 @@ use glory_agent::errors::AgentError;
  * - El texto final se parte por líneas en blanco (máx `MAX_PARTES`): el modelo
  *   separa intro y cierre con línea en blanco (ver prompt en `chat.rs`).
  * - F4 Fallback: un turno fallido tras acuse no puede ser silencio total. */
-/// Espera antes del acuse: un turno normal con tools tarda 20-60s; uno simple
-/// baja de 10s y no necesita acuse.
-const ESPERA_ACUSE_MS: u64 = 10_000;
+/// Espera antes del acuse: la mayoría de turnos con tools cierra en 5-15 s;
+/// a los 6 s sin respuesta vale un "ya voy"; antes es ruido.
+/* [Fase3-H6] Además el acuse se omite si el turno ya encoló texto IA: en F1
+ * salía DESPUÉS de las tarjetas y se leía como cierre ("dame un momentico"
+ * tras la oferta). Ver `hay_avance_turno`. */
+const ESPERA_ACUSE_MS: u64 = 6_000;
 /// Máx de partes de texto por turno (intro + cierre; el resto se funde).
 const MAX_PARTES: usize = 3;
 const ACUSE_TEXTO: &str = "Ya lo estoy revisando, dame un momentico 👀";
@@ -568,7 +571,10 @@ async fn webhook(
 }
 
 /* [E-fluido F1] El acuse vive fuera de `webhook` (el lint no deja pasar la
- * función de 100 líneas): programa el aviso de turno lento en background. */
+ * función de 100 líneas): programa el aviso de turno lento en background.
+ * [Fase3-v2] Triple guarda: turno vivo + IA al mando + SIN avance encolado
+ * (`ia` o `tarjeta`). Si el turno ya mostró producto (tarjetas) el acuse
+ * "dame un momentico" tras la oferta se leía como cierre raro (H6 v2). */
 fn programar_acuse(
     pool: sqlx::PgPool,
     sesion: Uuid,
@@ -589,9 +595,27 @@ fn programar_acuse(
         if !sigue_ia {
             return;
         }
+        if hay_avance_turno(&pool, sesion).await {
+            return;
+        }
         tracing::info!("webhook WhatsApp: {sesion} turno lento, encolando acuse");
         encolar_texto_ia(&pool, sesion, &destino, &canal, "acuse", ACUSE_TEXTO).await;
     });
+}
+
+/// ¿El turno ya encoló texto IA o tarjetas en los últimos 2 min? Evita el
+/// acuse tardío (tras las tarjetas confundía). `false` ante error de BD:
+/// mejor un acuse de más que romper el turno por una consulta auxiliar.
+async fn hay_avance_turno(pool: &sqlx::PgPool, session_id: Uuid) -> bool {
+    sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM agent_outbox \
+         WHERE payload->>'session_id' = $1 AND payload->>'motivo' IN ('ia', 'tarjeta') \
+         AND created_at > NOW() - INTERVAL '2 minutes')",
+    )
+    .bind(session_id.to_string())
+    .fetch_one(pool)
+    .await
+    .unwrap_or(false)
 }
 
 /// Atiende el resultado del turno IA (extraída de `webhook` por el lint):
