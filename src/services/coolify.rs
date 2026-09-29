@@ -1142,7 +1142,7 @@ fn build_compose_static_backup(cadence: HostingBackupCadence) -> String {
 
 impl CoolifyService {
     /* [164A-19] Lista despliegues reales visibles en Coolify para un target configurado.
-     * La tarea original confundía "instancia VPS" con "servicio desplegado"; este método
+     * La tarea original confundía "instancia VPS" con "servicio desplegado"; esta función
      * corrige esa frontera leyendo directamente `/api/v1/services` y filtrando por target. */
     pub async fn list_services(
         http_client: &Client,

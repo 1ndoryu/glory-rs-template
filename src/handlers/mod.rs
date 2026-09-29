@@ -450,7 +450,7 @@ pub fn create_router(pool: sqlx::PgPool, config: crate::config::AppConfig) -> Ro
         pool,
         jwt_secret: config.jwt_secret,
         static_dir: config.static_dir.clone(),
-        /* [114A-6] Timeout global 30s para todo request HTTP saliente.
+        /* [114A-6] Timeout global 30s para cada request HTTP saliente.
          * Previene deadlocks cuando APIs externas se cuelgan y retienen
          * conexiones DB, agotando el pool (max 10) y congelando la app. */
         http_client: reqwest::Client::builder()

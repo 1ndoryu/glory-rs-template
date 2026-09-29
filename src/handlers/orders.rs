@@ -89,7 +89,7 @@ pub async fn list_orders(
     auth: AuthUser,
 ) -> Result<Json<Vec<OrderResponse>>, AppError> {
     /* [084A-1] Con impersonación, effective_role refleja el rol real del usuario
-     * impersonado. Admin sin impersonar tiene effective_role=admin → ve todo.
+     * impersonado. Admin sin impersonar tiene effective_role=admin → visibilidad completa.
      * Impersonando como client → filtra por client_id. Como employee → por assigned. */
     let orders =
         OrderService::list_orders_for_user(&state.pool, auth.user_id, auth.effective_role).await?;

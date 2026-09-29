@@ -45,7 +45,7 @@ pub struct DashboardRepository;
 
 impl DashboardRepository {
     /// Revenue: total capturado, mensual, retenido, reembolsado.
-    /// Usa CTE para calcular todo en una sola query.
+    /// Usa CTE para calcular los totales en una sola query.
     pub async fn get_revenue(pool: &PgPool) -> Result<RevenueRow, AppError> {
         let row = sqlx::query_as!(
             RevenueRow,

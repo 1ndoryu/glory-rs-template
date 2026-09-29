@@ -77,7 +77,7 @@ impl EmailService {
     ) -> Result<(), String> {
         let from = format!("{} <{}>", config.from_name, config.from_email);
         /* [311A-1] BCC configurable via SMTP_BCC para que el admin reciba copia
-         * de TODO correo enviado desde la plataforma. Non-fatal: si la dirección
+         * de cada correo enviado desde la plataforma. Non-fatal: si la dirección
          * es inválida o no está configurada, el email se envía sin BCC. */
         let mut builder = Message::builder()
             .from(from.parse().map_err(|e| format!("From inválido: {e}"))?)

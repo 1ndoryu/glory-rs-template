@@ -198,7 +198,7 @@ pub async fn send_message_with_alerts(
         .await?;
     }
 
-    /* 5. Commit: todo o nada */
+    /* 5. Commit atómico: se aplica completo o se revierte */
     tx.commit()
         .await
         .map_err(|e| AppError::Internal(format!("Error en commit de alertas: {e}")))?;
