@@ -409,6 +409,12 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 - 289A-10 texto plano para `WhatsApp` (commit `0b7e6241`, clippy 0, tests 27,
   push 2026-09-28): el prompt ordena sin `**`/encabezados/tablas, listas
   1. 2. 3., emojis sí; verificado en vivo (cero `**`, emojis 🏡😊).
+- 299A-1 batería de escenarios IA (plan
+  `Agente/planes/plan-bateria-escenarios-ia-2026-09-29.md`, BD a cero): Fase 0
+  auditoría (solicitudes/fotos/notes, descarte audio, media_url saliente),
+  Fase 1 diez escenarios que ya deberían funcionar, Fase 2 builds E11–E16
+  (visión, audio, envío fotos, captación, citas, bug consultando→activa),
+  Fase 3 batería completa con criterio de aceptación.
 
 ## 279A-3 — /ask cuestionario de ficha (F1 verificado local 2026-09-27; pendiente: respuestas usuaria)
 - Plan: `Agente/planes/plan-ask-2026-09-27.md`.
