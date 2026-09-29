@@ -430,6 +430,74 @@ impl InmuebleService {
         Ok(format!("{carpeta}/{nombre}"))
     }
 
+    /* [299A-1 E12] Las notas de voz se archivan igual que las fotos pero
+     * con su propia validación: `guardar_archivo` solo acepta imágenes y
+     * todo audio caía al fallback `[media]` (la IA pedía el texto sin que el
+     * staff pudiera oír nada). Misma carpeta y mismo tope de tamaño. */
+    pub async fn guardar_audio(
+        upload_dir: &Path,
+        carpeta: &str,
+        filename: &str,
+        bytes: &[u8],
+    ) -> Result<String, AppError> {
+        if bytes.is_empty() {
+            return Err(AppError::BadRequest("Archivo vacío".into()));
+        }
+        if bytes.len() > MAX_FOTO_BYTES {
+            return Err(AppError::PayloadMuyGrande);
+        }
+        let extension = Self::extension_audio_valida(filename)?;
+        Self::magia_audio_valida(bytes, extension)?;
+
+        let dir = upload_dir.join(carpeta);
+        tokio::fs::create_dir_all(&dir)
+            .await
+            .map_err(AppError::from)?;
+        let nombre = format!("{}.{}", Uuid::new_v4(), &extension[1..]);
+        tokio::fs::write(dir.join(&nombre), bytes)
+            .await
+            .map_err(AppError::from)?;
+        Ok(format!("{carpeta}/{nombre}"))
+    }
+
+    fn extension_audio_valida(filename: &str) -> Result<&'static str, AppError> {
+        let minusculas = filename.to_lowercase();
+        let punto = minusculas.rfind('.').ok_or_else(|| {
+            AppError::BadRequest("El audio necesita extensión (.ogg, .mp3, .m4a)".into())
+        })?;
+        let extension = &minusculas[punto..];
+        [".ogg", ".mp3", ".m4a"]
+            .iter()
+            .find(|e| ***e == *extension)
+            .copied()
+            .ok_or_else(|| {
+                AppError::BadRequest("Extensión no permitida (solo .ogg, .mp3, .m4a)".into())
+            })
+    }
+
+    /* Firmas mínimas: `OggS` (ogg), `ID3` o sync de trama `0xFF 0xE_` (mp3),
+     * `....ftyp` (m4a/mp4). No es un parser completo: solo evita guardar
+     * HTML de error o texto con extensión de audio. */
+    fn magia_audio_valida(bytes: &[u8], extension: &str) -> Result<(), AppError> {
+        let es_ogg = bytes.starts_with(b"OggS");
+        let es_mp3 = bytes.starts_with(b"ID3")
+            || (bytes.len() >= 2 && bytes[0] == 0xFF && bytes[1] & 0xE0 == 0xE0);
+        let es_m4a = bytes.len() >= 8 && bytes[4..8] == *b"ftyp";
+        let valido = match extension {
+            ".ogg" => es_ogg,
+            ".mp3" => es_mp3,
+            ".m4a" => es_m4a,
+            _ => false,
+        };
+        if valido {
+            Ok(())
+        } else {
+            Err(AppError::BadRequest(
+                "El contenido no coincide con un audio válido".into(),
+            ))
+        }
+    }
+
     /// Borra un archivo del volumen; los fallos se registran pero no rompen la operación
     async fn borrar_archivo(upload_dir: &Path, storage_key: &str) {
         let ruta = upload_dir.join(storage_key);
@@ -508,6 +576,22 @@ mod tests {
         assert!(InmuebleService::magia_valida(&png, ".png").is_ok());
         assert!(InmuebleService::magia_valida(b"RIFFxxxxWEBP", ".webp").is_ok());
         assert!(InmuebleService::magia_valida(&[], ".jpg").is_err());
+    }
+
+    /* [299A-3] Notas de voz: extensiones + firmas mínimas por formato. */
+    #[test]
+    fn extension_y_magia_audio() {
+        assert!(InmuebleService::extension_audio_valida("nota.OGG").is_ok());
+        assert!(InmuebleService::extension_audio_valida("nota.mp3").is_ok());
+        assert!(InmuebleService::extension_audio_valida("nota.m4a").is_ok());
+        assert!(InmuebleService::extension_audio_valida("nota.wav").is_err());
+        assert!(InmuebleService::extension_audio_valida("nota.jpg").is_err());
+        assert!(InmuebleService::magia_audio_valida(b"OggSxyz", ".ogg").is_ok());
+        assert!(InmuebleService::magia_audio_valida(b"ID3xyz", ".mp3").is_ok());
+        assert!(InmuebleService::magia_audio_valida(&[0xFF, 0xFB, 0x90], ".mp3").is_ok());
+        assert!(InmuebleService::magia_audio_valida(b"xxxxftypm4a ", ".m4a").is_ok());
+        assert!(InmuebleService::magia_audio_valida(b"OggSxyz", ".mp3").is_err());
+        assert!(InmuebleService::magia_audio_valida(&[], ".ogg").is_err());
     }
 }
 

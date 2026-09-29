@@ -25,6 +25,13 @@ export default defineConfig({
         target: 'http://127.0.0.1:3122',
         changeOrigin: true,
       },
+      /* [299A-3] Media del backend Rust (:3000): el hilo muestra
+       * `/uploads/...` relativo (en prod es mismo origen); en dev el
+       * proxy lo lleva al backend para que `<img>`/`<audio>` carguen. */
+      '/uploads': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+      },
     },
   },
   preview: {

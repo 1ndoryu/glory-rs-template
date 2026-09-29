@@ -8,6 +8,7 @@ import type { ResumenSesion } from '../../data/chat/cliente-admin';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { MessageMedia } from './message-media';
 import { cn } from '@/lib/utils';
 
 function etiquetaRemitente(remitente: string): string {
@@ -100,7 +101,8 @@ export function HiloMensajes({
               {etiquetaRemitente(m.sender)}
               {formatoFecha(m.created_at) && ` · ${formatoFecha(m.created_at)}`}
             </p>
-            <p className="whitespace-pre-wrap">{m.body}</p>
+            {/* [299A-3] `[foto]`/`[audio]` se ven como imagen/audio, no como texto. */}
+            <MessageMedia body={m.body} />
           </div>
         ))}
       </div>

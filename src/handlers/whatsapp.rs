@@ -237,13 +237,15 @@ async fn descargar_y_guardar(
         _ => return Err("content-type no soportado".to_string()),
     };
     let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
-    let clave = InmuebleService::guardar_archivo(
-        upload_dir,
-        &format!("whatsapp/{telefono_norm}"),
-        &format!("{kind}{extension}"),
-        &bytes,
-    )
-    .await
+    /* [299A-3] El audio NO pasa por `guardar_archivo` (solo valida fotos y
+     * toda nota de voz caía al fallback `[media]`): usa `guardar_audio`. */
+    let carpeta = format!("whatsapp/{telefono_norm}");
+    let nombre = format!("{kind}{extension}");
+    let clave = if kind == "audio" {
+        InmuebleService::guardar_audio(upload_dir, &carpeta, &nombre, &bytes).await
+    } else {
+        InmuebleService::guardar_archivo(upload_dir, &carpeta, &nombre, &bytes).await
+    }
     .map_err(|e| e.to_string())?;
     Ok((kind.to_string(), clave, tipo))
 }

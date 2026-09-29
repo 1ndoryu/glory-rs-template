@@ -421,7 +421,22 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   regla no-afirmar-sin-tool, sin oficina física (delegar a asesor), acuse
   6 s con triple guarda; batería paralela `scripts/bateria-ia.ps1`; tests
   41/41 con BD real + prevención H9. Detalle en
-  `Agente/completados/fase3-bateria-resultados-2026-09-29.md` (§Batería v2).
+   `Agente/completados/fase3-bateria-resultados-2026-09-29.md` (§Batería v2).
+- 299A-3 demo fotos/audio en el hilo + render media (verificado 2026-09-29):
+  webhook archiva foto y voz (`guardar_audio` ogg/mp3/m4a con magia, mismo tope
+  10 MiB), sirve audio con su mime, front renderiza `<img>`/`— se ve:`/
+  `<audio controls>`/link adjunto + proxy `/uploads` en vite dev; demo viva via
+  `wa_b` (E11 foto archivada y descrita, E12 `[audio]` archivado 200
+  `audio/mpeg`, E13 3 `ia_foto` 200 `image/jpeg`), panel verificado por DOM,
+  BD a cero. Detalle en `Agente/completados/tareas-2026-09-29.md` (## 299A-3).
+  Gotchas: start-script apuntaba a target viejo, mp3 8.9 MB supera timeout 20 s
+  (usar audios pequenos), la IA escala tras 2 notas de voz.
+- 299A-4 visibilidad outbound en el hilo (nuevo 2026-09-29): lo que la IA ENVIA
+  (outbox `tarjeta`/`ia_foto` con `media_url`) no existe en `historial` y el
+  panel Mensajes no lo muestra (solo se ve el texto "ya te envie las fotos").
+  Disenar espejo en el hilo (persistir `ai` `[foto] <url>` al encolar o
+  fusionar outbox en `historial`) sin romper la disciplina de secuencias
+  (`insert_message_seq` exige `&ChatHub` y las tools solo reciben `pool`).
 
 ## 279A-3 — /ask cuestionario de ficha (F1 verificado local 2026-09-27; pendiente: respuestas usuaria)
 - Plan: `Agente/planes/plan-ask-2026-09-27.md`.

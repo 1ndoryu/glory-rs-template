@@ -202,16 +202,27 @@ pub async fn servir_archivo_whatsapp(
     let bytes = tokio::fs::read(InmuebleService::ruta_archivo(&state.upload_dir, &clave))
         .await
         .map_err(|_| AppError::NotFound("No encontrado".into()))?;
+    /* [299A-3] Las notas de voz se archivan como `.ogg/.mp3/.m4a`
+     * (`descargar_y_guardar` en `whatsapp.rs`, E12): sin estas ramas el
+     * `<audio>` del hilo pedía `image/jpeg` y el navegador no reproducía. */
     let mime = match std::path::Path::new(&clave)
         .extension()
         .and_then(|e| e.to_str())
     {
         Some(e) if e.eq_ignore_ascii_case("png") => "image/png",
         Some(e) if e.eq_ignore_ascii_case("webp") => "image/webp",
+        Some(e) if e.eq_ignore_ascii_case("ogg") => "audio/ogg",
+        Some(e) if e.eq_ignore_ascii_case("mp3") => "audio/mpeg",
+        Some(e) if e.eq_ignore_ascii_case("m4a") => "audio/mp4",
         _ => "image/jpeg",
     };
     Ok(respuesta_archivo(bytes, mime, &cabeceras))
 }
+
+/* [299A-3] Audio que archiva el webhook (`descargar_y_guardar` en
+ * `whatsapp.rs`: `audio/ogg`→`.ogg`, `audio/mpeg`→`.mp3`, `audio/mp4`→`.m4a`).
+ * Antes solo valían fotos y el `<audio>` del hilo devolvía 404. */
+const EXTENSIONES_AUDIO_WHATSAPP: &[&str] = &[".ogg", ".mp3", ".m4a"];
 
 fn clave_whatsapp_valida(telefono: &str, archivo: &str) -> Option<String> {
     if !(7..=15).contains(&telefono.len())
@@ -224,7 +235,9 @@ fn clave_whatsapp_valida(telefono: &str, archivo: &str) -> Option<String> {
     let punto = archivo.rfind('.')?;
     Uuid::parse_str(&archivo[..punto]).ok()?;
     let extension = archivo[punto..].to_lowercase();
-    if EXTENSIONES_FOTO.iter().any(|e| *e == extension) {
+    if EXTENSIONES_FOTO.iter().any(|e| *e == extension)
+        || EXTENSIONES_AUDIO_WHATSAPP.iter().any(|e| *e == extension)
+    {
         Some(format!("whatsapp/{telefono}/{}", archivo.to_lowercase()))
     } else {
         None
@@ -353,6 +366,11 @@ mod tests {
             Some(format!("whatsapp/584120825234/{id}.jpg"))
         );
         assert!(clave_whatsapp_valida("584120825234", &format!("{id}.WEBP")).is_some());
+        /* [299A-3] Notas de voz (E12): `.ogg/.mp3/.m4a` valen, otros no. */
+        assert!(clave_whatsapp_valida("584120825234", &format!("{id}.ogg")).is_some());
+        assert!(clave_whatsapp_valida("584120825234", &format!("{id}.mp3")).is_some());
+        assert!(clave_whatsapp_valida("584120825234", &format!("{id}.m4a")).is_some());
+        assert!(clave_whatsapp_valida("584120825234", &format!("{id}.wav")).is_none());
         assert!(clave_whatsapp_valida("584120825234", "../fuga.jpg").is_none());
         assert!(clave_whatsapp_valida("584120825234", "no-uuid.jpg").is_none());
         assert!(clave_whatsapp_valida("584120825234", &format!("{id}.pdf")).is_none());
