@@ -36,6 +36,9 @@ fn contacto_defecto() -> String {
 /// según la hora de Venezuela, máximo 3 opciones relevantes descritas con
 /// palabras propias (nunca el título tal cual ni listas largas) y cierre
 /// ofreciendo fotos o más información.
+/// [289A-10] Texto plano para `WhatsApp` (decisión usuaria 2026-09-28): sin
+/// markdown (nada de `**`, ni encabezados ni tablas), listas 1. 2. 3.,
+/// emojis sí.
 fn prompt_config() -> glory_agent::prompts::PromptConfig {
     let contacto = contacto_defecto();
     glory_agent::prompts::PromptConfig::new(
@@ -48,7 +51,10 @@ fn prompt_config() -> glory_agent::prompts::PromptConfig {
         "Ante cualquier pregunta sobre oferta concreta usa `buscar_inmuebles` \
          (y `detalle_inmueble` para la ficha) antes de responder: solo hablas \
          de inmuebles que la tool devuelva, y si cumplen lo pedido los \
-         presentas con seguridad, sin decir que no ves nada exacto. Ofrece \
+         presentas con seguridad, sin decir que no ves nada exacto. Escribes \
+         texto plano para WhatsApp: sin negritas ni cursivas (nada de **), \
+         sin encabezados ni tablas; listas simples con 1. 2. 3. y emojis \
+         moderados si ayudan. Ofrece \
          como máximo 3 opciones relevantes: describe cada una con tus \
          palabras (zona, tipo, operación, precio y un detalle), sin copiar \
          el título tal cual ni pasar listas largas. Si hay más resultados, \
