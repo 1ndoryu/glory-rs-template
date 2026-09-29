@@ -23,9 +23,49 @@ use crate::repositories::ClienteRepository;
 use glory_agent::errors::AgentError;
 use glory_agent::session::ChatHub;
 
+use chrono::Timelike as _;
+
 fn contacto_defecto() -> String {
     std::env::var("AGENTE_CONTACTO")
         .unwrap_or_else(|_| "el WhatsApp de la inmobiliaria".to_string())
+}
+
+/* [E17] Reloj de Venezuela (UTC-4 fijo, sin horario de verano): el modelo
+ * no recibe reloj y el saludo salía no determinista (Fase 1: "buenos días"
+ * y "buenas tardes" a las 23:35). Se inyecta la hora real en el prompt y
+ * el saludo queda atado a ella. Pura para testear los bordes. */
+fn periodo_venezuela(hora: u32) -> (&'static str, &'static str) {
+    match hora {
+        5..=11 => ("de mañana", "buenos días"),
+        12..=18 => ("de tarde", "buenas tardes"),
+        _ => ("de noche", "buenas noches"),
+    }
+}
+
+fn linea_hora_venezuela() -> String {
+    use chrono::Datelike as _;
+    let ahora = chrono::Utc::now() - chrono::Duration::hours(4);
+    let dias = [
+        "lunes",
+        "martes",
+        "miércoles",
+        "jueves",
+        "viernes",
+        "sábado",
+        "domingo",
+    ];
+    let (periodo, saludo) = periodo_venezuela(ahora.hour());
+    format!(
+        "Hora actual en Venezuela: {} {:02}/{:02}/{} {:02}:{:02} (es {}: saluda \"{}\").",
+        dias[ahora.weekday().num_days_from_monday() as usize],
+        ahora.day(),
+        ahora.month(),
+        ahora.year(),
+        ahora.hour(),
+        ahora.minute(),
+        periodo,
+        saludo
+    )
 }
 
 /// Identidad del producto: la IA se presenta como tal, consulta inmuebles
@@ -47,11 +87,14 @@ fn prompt_config() -> glory_agent::prompts::PromptConfig {
     let contacto = contacto_defecto();
     glory_agent::prompts::PromptConfig::new(
         "Asistente de IA de MN Inmobiliaria",
-        "Eres el Asistente de IA de MN Inmobiliaria. Te identificas como IA \
-         siempre y respondes en español, con tono cálido y natural, como una \
-         persona atenta por chat o WhatsApp. La primera vez que hablas en la \
-         conversación saludas según la hora de Venezuela (buenos días de \
-         mañana, buenas tardes de tarde, buenas noches de noche).",
+        &format!(
+            "Eres el Asistente de IA de MN Inmobiliaria. Te identificas como IA \
+             siempre y respondes en español, con tono cálido y natural, como una \
+             persona atenta por chat o WhatsApp. {} La primera vez que hablas \
+             en la conversación saludas según esa hora (nunca la inventes ni \
+             uses otra).",
+            linea_hora_venezuela()
+        ),
         "Ante cualquier pregunta sobre oferta concreta usa `buscar_inmuebles` \
          (y `detalle_inmueble` para la ficha) antes de responder: solo hablas \
          de inmuebles que la tool devuelva, y si cumplen lo pedido los \
@@ -191,4 +234,29 @@ async fn guardar_contacto(
         .await
         .map_err(|e| AgentError::Db(e.to_string()))?;
     Ok(Json(serde_json::json!({"ok": true})))
+}
+
+#[cfg(test)]
+mod pruebas {
+    use super::{linea_hora_venezuela, periodo_venezuela};
+
+    /* [E17] Bordes del saludo determinista (el prompt lleva la hora real). */
+    #[test]
+    fn periodo_cubre_las_24_horas() {
+        for h in 0..5 {
+            assert_eq!(periodo_venezuela(h), ("de noche", "buenas noches"));
+        }
+        for h in 5..12 {
+            assert_eq!(periodo_venezuela(h), ("de mañana", "buenos días"));
+        }
+        for h in 12..19 {
+            assert_eq!(periodo_venezuela(h), ("de tarde", "buenas tardes"));
+        }
+        for h in 19..24 {
+            assert_eq!(periodo_venezuela(h), ("de noche", "buenas noches"));
+        }
+        let linea = linea_hora_venezuela();
+        assert!(linea.starts_with("Hora actual en Venezuela: "));
+        assert!(linea.contains("saluda"));
+    }
 }
