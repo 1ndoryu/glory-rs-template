@@ -50,12 +50,13 @@ export function HiloMensajes({
   const [texto, setTexto] = useState('');
   const cajaRef = useRef<HTMLDivElement>(null);
 
-  /* [289A-7] El hilo crece hacia arriba (nuevos primero): acompaña al
-   * inicio solo si ya estabas cerca de él. */
+  /* [289A-9] Orden normal: el hilo crece hacia abajo; acompaña al fondo
+   * solo si ya estabas cerca de él (no roba el scroll al releer arriba). */
   useEffect(() => {
     const caja = cajaRef.current;
     if (!caja) return;
-    if (caja.scrollTop < 160) caja.scrollTop = 0;
+    const cercaFondo = caja.scrollHeight - caja.scrollTop - caja.clientHeight < 160;
+    if (cercaFondo) caja.scrollTop = caja.scrollHeight;
   }, [hilo]);
 
   async function enviar(): Promise<void> {
