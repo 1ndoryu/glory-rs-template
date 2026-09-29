@@ -547,6 +547,36 @@ async fn completar_opencode(
         .ok_or_else(|| "OpenCode Go devolvio una respuesta sin texto".to_string())
 }
 
+/// [299A-1 E11] La IA del turno de `WhatsApp` es texto puro (el transporte de
+/// `glory-agent` arma `input` Responses solo con strings, sin `input_image`):
+/// para que "vea" la foto entrante se describe aquí con visión real
+/// (`completar_opencode`, probado con `input_image`) y el llamador anexa el
+/// texto al mensaje `[foto]` ANTES del turno. Best-effort: cualquier `Err` y
+/// el llamador conserva el `[foto]` pelado + el prompt pide que la describan.
+pub(crate) async fn describir_foto(data_url: &str, pie: &str) -> Result<String, String> {
+    let pie = pie.trim();
+    let texto = if pie.is_empty() || pie == "(foto sin pie)" {
+        "Describe lo que se ve en esta foto en 2-3 frases: qué tipo de ambiente \
+         o lugar es, su estado y los detalles visibles relevantes para alguien \
+         que busca inmueble."
+            .to_string()
+    } else {
+        format!(
+            "El visitante envió esta foto con el pie: \"{pie}\". Describe lo que \
+             se ve en 2-3 frases (ambiente, estado, detalles visibles para \
+             alguien que busca inmueble)."
+        )
+    };
+    let (texto, _) = completar_opencode(
+        "Eres el ojo del Asistente de IA de MN Inmobiliaria. Respondes solo con \
+         la descripción de la foto, texto plano, sin adornos.",
+        &texto,
+        &[data_url.to_string()],
+    )
+    .await?;
+    Ok(texto.chars().take(1200).collect())
+}
+
 async fn completar(
     _auth: AuthUser,
     State(state): State<AppState>,

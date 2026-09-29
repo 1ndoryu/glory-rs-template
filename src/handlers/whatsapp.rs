@@ -84,27 +84,63 @@ pub fn secreto_valido(esperado: Option<&str>, recibido: Option<&str>) -> bool {
     recibido.is_some_and(|r| r == sec)
 }
 
+/// Foto local pendiente de descripción visual (E11): el turno IA es texto
+/// puro, así que la foto se describe con visión real y el texto se anexa al
+/// mensaje ANTES del turno. `clave` es relativa a `UPLOAD_DIR`
+/// (`whatsapp/<tel>/<archivo>`), `mime` el Content-Type validado.
+/// `pub` porque la devuelve `repartir_y_vincular` (también `pub`).
+pub struct FotoPendiente {
+    mensaje_id: Uuid,
+    cuerpo_base: String,
+    clave: String,
+    mime: String,
+    pie: String,
+}
+
 /// Storage decidido 2026-09-28: disco local `UPLOAD_DIR/whatsapp/<tel>/`
 /// (en prod el mismo volumen bind que las fotos de inmueble, sin infra
 /// nueva; se sirven por `/uploads/whatsapp/...`). Descarga la `media_url`
 /// que deja el gateway, valida el tipo real por Content-Type (nunca por la
 /// URL) y guarda con `guardar_archivo` (tope de tamaño + magic-bytes).
 /// Si algo falla se conserva la URL remota: media a mano antes que media
-/// perdida. Devuelve el cuerpo del mensaje (`[foto]` o `[audio]`).
+/// perdida. Devuelve el cuerpo del mensaje (`[foto]` o `[audio]`) y, solo
+/// para fotos archivadas en local, el pendiente de descripción (E11).
 /// [299A-1 E12] Audios: `audio/ogg` (notas de voz), `audio/mpeg`, `audio/mp4`.
 async fn cuerpo_media(
     http: &reqwest::Client,
     upload_dir: &std::path::Path,
     telefono_norm: &str,
     url: &str,
-) -> String {
+    pie: &str,
+) -> (String, Option<FotoPendienteSinId>) {
     match descargar_y_guardar(http, upload_dir, telefono_norm, url).await {
-        Ok((clase, clave)) => format!("[{clase}] /uploads/{clave}"),
+        Ok((kind, clave, mime)) => {
+            let cuerpo = format!("[{kind}] /uploads/{clave}");
+            let foto = if kind == "foto" {
+                Some(FotoPendienteSinId {
+                    cuerpo_base: cuerpo.clone(),
+                    clave,
+                    mime,
+                    pie: pie.to_string(),
+                })
+            } else {
+                None
+            };
+            (cuerpo, foto)
+        }
         Err(e) => {
             tracing::warn!("webhook WhatsApp: no se pudo archivar {url}: {e}; se conserva remota");
-            format!("[media] {url}")
+            (format!("[media] {url}"), None)
         }
     }
+}
+
+/// Foto archivada aún sin `mensaje_id` (se conoce tras persistir).
+struct FotoPendienteSinId {
+    cuerpo_base: String,
+    clave: String,
+    mime: String,
+    pie: String,
 }
 
 async fn descargar_y_guardar(
@@ -112,12 +148,12 @@ async fn descargar_y_guardar(
     upload_dir: &std::path::Path,
     telefono_norm: &str,
     url: &str,
-) -> Result<(String, String), String> {
+) -> Result<(String, String, String), String> {
     let resp = http.get(url).send().await.map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
         return Err(format!("http {}", resp.status()));
     }
-    let (clase, extension) = match resp
+    let tipo = resp
         .headers()
         .get(reqwest::header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
@@ -126,7 +162,8 @@ async fn descargar_y_guardar(
         .next()
         .unwrap_or("")
         .trim()
-    {
+        .to_string();
+    let (kind, extension) = match tipo.as_str() {
         "image/jpeg" => ("foto", ".jpg"),
         "image/png" => ("foto", ".png"),
         "image/webp" => ("foto", ".webp"),
@@ -139,12 +176,12 @@ async fn descargar_y_guardar(
     let clave = InmuebleService::guardar_archivo(
         upload_dir,
         &format!("whatsapp/{telefono_norm}"),
-        &format!("{clase}{extension}"),
+        &format!("{kind}{extension}"),
         &bytes,
     )
     .await
     .map_err(|e| e.to_string())?;
-    Ok((clase.to_string(), clave))
+    Ok((kind.to_string(), clave, tipo))
 }
 
 #[derive(Debug, Deserialize)]
@@ -171,13 +208,13 @@ pub struct RepartoWhatsapp {
 
 /// Persiste la media entrante (`[foto]`/`[audio]`) y la emite por el hub.
 /// Best-effort con aviso: el mensaje de texto ya quedó guardado; la media no
-/// debe tumbarlo.
+/// debe tumbarlo. Devuelve el id del mensaje para anexar la descripción (E11).
 async fn persistir_media(
     pool: &sqlx::PgPool,
     hub: &glory_agent::session::ChatHub,
     sesion: Uuid,
     cuerpo: String,
-) {
+) -> Option<Uuid> {
     /* Secuencia asignada por `insert_message_seq` (reseed desde BD +
      * retry 23505): el hub en memoria vuelve a 1 en cada reinicio y sin esto
      * el primer mensaje post-reinicio a una sesión vieja colisiona. */
@@ -187,25 +224,115 @@ async fn persistir_media(
     .await
     {
         Ok(msg) => {
+            let id = msg.id;
             let _ = hub.broadcast(sesion, &glory_agent::models::WsServerMessage::live(msg));
+            Some(id)
         }
         Err(e) => {
             tracing::warn!("webhook WhatsApp: no se pudo persistir media: {e}");
+            None
         }
     }
 }
 
+/// [299A-1 E11] Describe la foto con visión real y anexa el texto al mensaje
+/// ANTES del turno IA, para que el historial la "vea". Corre en el spawn del
+/// webhook (no en el camino rápido del 2xx). Best-effort total: cualquier
+/// fallo deja el `[foto]` pelado y solo queda WARN. Sin rebroadcast: el
+/// `WsServerMessage` solo conoce `live/history` y re-emitir duplicaría la
+/// burbuja en el panel; el staff la ve al recargar y la IA en el turno.
+async fn describir_y_anexar(pool: &sqlx::PgPool, foto: FotoPendiente) {
+    const TOPE_BYTES: u64 = 4_000_000;
+    let dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
+    let ruta = std::path::Path::new(&dir).join(&foto.clave);
+    let bytes = match tokio::fs::read(&ruta).await {
+        Ok(b) => b,
+        Err(e) => {
+            tracing::warn!(
+                "webhook WhatsApp: foto sin bytes para describir {}: {e}",
+                foto.clave
+            );
+            return;
+        }
+    };
+    if bytes.len() as u64 > TOPE_BYTES {
+        tracing::warn!(
+            "webhook WhatsApp: foto {} pesa {} bytes, se describe a mano",
+            foto.clave,
+            bytes.len()
+        );
+        return;
+    }
+    let data_url = format!(
+        "data:{};base64,{}",
+        foto.mime,
+        base64::engine::Engine::encode(&base64::engine::general_purpose::STANDARD, &bytes)
+    );
+    let descripcion = match super::ia::describir_foto(&data_url, &foto.pie).await {
+        Ok(d) => d,
+        Err(e) => {
+            tracing::warn!("webhook WhatsApp: no se pudo describir {}: {e}", foto.clave);
+            return;
+        }
+    };
+    let cuerpo = format!("{} — se ve: {descripcion}", foto.cuerpo_base);
+    if let Err(e) = sqlx::query("UPDATE agent_messages SET body = $1 WHERE id = $2")
+        .bind(&cuerpo)
+        .bind(foto.mensaje_id)
+        .execute(pool)
+        .await
+    {
+        tracing::warn!("webhook WhatsApp: no se pudo anexar descripción: {e}");
+    }
+}
+
+/// [299A-1 E11] Archiva la media entrante y devuelve la foto pendiente de
+/// descripción (extraído de `repartir_y_vincular` por tope de líneas).
+async fn archivar_media_entrante(
+    pool: &sqlx::PgPool,
+    hub: &glory_agent::session::ChatHub,
+    sesion: Uuid,
+    remitente_norm: &str,
+    texto: &str,
+    url: &str,
+) -> Option<FotoPendiente> {
+    let dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
+    let http = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(20))
+        .build()
+        .unwrap_or_default();
+    let (cuerpo, foto) = cuerpo_media(
+        &http,
+        std::path::Path::new(&dir),
+        remitente_norm,
+        url,
+        texto,
+    )
+    .await;
+    let mensaje_id = persistir_media(pool, hub, sesion, cuerpo).await;
+    mensaje_id.and_then(|id| {
+        foto.map(|f| FotoPendiente {
+            mensaje_id: id,
+            cuerpo_base: f.cuerpo_base,
+            clave: f.clave,
+            mime: f.mime,
+            pie: f.pie,
+        })
+    })
+}
 /// Entrada única del webhook (lógica testeable): reparte, registra el cliente
 /// con origen del canal, reutiliza su hilo o crea uno, persiste el mensaje
 /// como `client` (+ segundo mensaje `[foto]`/`[audio]` si trae `media_url`) y emite por
-/// el hub para que el panel staff lo vea en realtime.
+/// el hub para que el panel staff lo vea en realtime. Además del reparto
+/// devuelve la foto pendiente de descripción (E11, `None` si no hay foto
+/// local): el webhook la describe en background antes del turno IA.
 pub async fn repartir_y_vincular(
     pool: &sqlx::PgPool,
     hub: &glory_agent::session::ChatHub,
     numero_a: &str,
     numero_b: &str,
     entrada: &EntradaWhatsapp,
-) -> Result<RepartoWhatsapp, AgentError> {
+) -> Result<(RepartoWhatsapp, Option<FotoPendiente>), AgentError> {
     let destino_txt = entrada.numero_destino.trim();
     let remitente_txt = entrada.remitente.trim();
     let texto = entrada.texto.trim();
@@ -287,24 +414,23 @@ pub async fn repartir_y_vincular(
      * `UPLOAD_DIR/whatsapp/<tel>/` y queda como mensaje `[foto]` o `[audio]`
      * con ruta local servible para el staff. Si el archivo no baja o el tipo
      * no es soportado, se conserva la URL remota antes que perderla. */
+    let mut foto_pendiente: Option<FotoPendiente> = None;
     if let Some(u) = media {
-        let dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
-        let http = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(20))
-            .build()
-            .unwrap_or_default();
-        let cuerpo = cuerpo_media(&http, std::path::Path::new(&dir), &remitente_norm, u).await;
-        persistir_media(pool, hub, sesion, cuerpo).await;
+        foto_pendiente =
+            archivar_media_entrante(pool, hub, sesion, &remitente_norm, texto, u).await;
     }
-    Ok(RepartoWhatsapp {
-        ok: true,
-        canal: canal.to_string(),
-        modo: modo.to_string(),
-        session_id: sesion,
-        cliente_id: cliente.id,
-        mensaje_id: msg.id,
-        secuencia: msg.sequence_num,
-    })
+    Ok((
+        RepartoWhatsapp {
+            ok: true,
+            canal: canal.to_string(),
+            modo: modo.to_string(),
+            session_id: sesion,
+            cliente_id: cliente.id,
+            mensaje_id: msg.id,
+            secuencia: msg.sequence_num,
+        },
+        foto_pendiente,
+    ))
 }
 
 async fn webhook(
@@ -324,7 +450,9 @@ async fn webhook(
         .clone()
         .ok_or_else(|| AgentError::Internal("sin BD".to_string()))?;
     let (a, b) = numeros_configurados(&pool).await;
-    let rep = repartir_y_vincular(&pool, &state.hub, &a, &b, &entrada).await?;
+    let (rep, foto) = repartir_y_vincular(&pool, &state.hub, &a, &b, &entrada).await?;
+    /* [299A-1 E11] La foto se describe en background ANTES del turno para que
+     * el historial ya traiga el `— se ve:`. El 2xx al gateway no espera. */
     /* [289A-1] Turno IA en background: el webhook responde 2xx rápido al
      * gateway; la IA (núcleo `responder_turno_persistido`, misma vía que el
      * chat web) corre aparte y su texto se encola en outbox `whatsapp` con
@@ -344,6 +472,9 @@ async fn webhook(
         return Ok(Json(rep));
     }
     tokio::spawn(async move {
+        if let Some(f) = foto {
+            describir_y_anexar(&pool_fondo, f).await;
+        }
         match glory_agent::transport::responder_turno_persistido(
             &fondo,
             sesion_fondo,
@@ -499,11 +630,11 @@ mod pruebas {
             nombre: Some("Humo WA".to_string()),
             media_url: None,
         };
-        let r1 = repartir_y_vincular(&pool, &hub, numero_a, numero_b, &entrada_a)
+        let (r1, _) = repartir_y_vincular(&pool, &hub, numero_a, numero_b, &entrada_a)
             .await
             .unwrap();
         assert_eq!((r1.canal.as_str(), r1.modo.as_str()), ("wa_a", "completo"));
-        let r2 = repartir_y_vincular(&pool, &hub, numero_a, numero_b, &entrada_a)
+        let (r2, _) = repartir_y_vincular(&pool, &hub, numero_a, numero_b, &entrada_a)
             .await
             .unwrap();
         assert_eq!(r1.session_id, r2.session_id);
@@ -514,7 +645,7 @@ mod pruebas {
             nombre: None,
             media_url: Some("https://example.com/foto.jpg".to_string()),
         };
-        let r3 = repartir_y_vincular(&pool, &hub, numero_a, numero_b, &entrada_b)
+        let (r3, _) = repartir_y_vincular(&pool, &hub, numero_a, numero_b, &entrada_b)
             .await
             .unwrap();
         assert_eq!((r3.canal.as_str(), r3.modo.as_str()), ("wa_b", "inicial"));

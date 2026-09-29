@@ -46,6 +46,9 @@ argon2 = "0.5"
 # Utils
 uuid = { version = "1", features = ["serde", "v4"] }
 chrono = { version = "0.4", features = ["serde"] }
+# [299A-1 E11] data-URL base64 de fotos entrantes para `describir_foto`
+# (version ya en el arbol como transitiva: sin descarga nueva).
+base64 = "0.22"
 
 # Chat visitante con IA (169A-1): git-dep pineado (el build de prod del
 # manager clona el repo dentro de la imagen en /build y el path-dep
