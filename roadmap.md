@@ -401,6 +401,11 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 - 289A-8 lados finales (commit `cd0fce3a`, `tsc` limpio, push 2026-09-28):
   orden nuevos-arriba confirmado por usuaria (se mantiene); lados
   invertidos: Visitante izquierda, IA + staff a la derecha.
+- 289A-9 orden normal de lectura (commit `a944795c`, `tsc` limpio, push
+  2026-09-28): ASC por `sequence_num` (el primero arriba, el último abajo)
+  + sigue-fondo; los lados de 289A-8 no cambian. Lección: "antiguo/nuevo"
+  es ambiguo — pedir siempre anclas concretas (ej. "el de las 06:13
+  primero").
 
 ## 279A-3 — /ask cuestionario de ficha (F1 verificado local 2026-09-27; pendiente: respuestas usuaria)
 - Plan: `Agente/planes/plan-ask-2026-09-27.md`.
