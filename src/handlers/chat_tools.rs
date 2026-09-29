@@ -36,7 +36,9 @@ pub fn definiciones() -> Vec<ToolDefinition> {
 fn def_buscar() -> ToolDefinition {
     ToolDefinition::new(
         "buscar_inmuebles",
-        "Busca inmuebles publicados y disponibles. Usala siempre antes de hablar de oferta concreta.",
+        "Busca inmuebles publicados y disponibles. Usala siempre antes de hablar de oferta concreta. \
+         Las primeras tarjetas YA se envian solas como mensajes separados (mira `tarjetas_enviadas`): \
+         no las repitas ni las listes en tu respuesta, solo intro de una linea + cierre breve.",
         json!({
             "type": "object",
             "properties": {
@@ -203,7 +205,7 @@ impl Herramientas {
             return Ok(json!({"error": "herramienta deshabilitada por el administrador"}));
         }
         let salida = match name {
-            "buscar_inmuebles" => buscar(&pool, args).await,
+            "buscar_inmuebles" => buscar(&pool, ctx.session_id, args).await,
             "detalle_inmueble" => detalle(&pool, args).await,
             "registrar_contacto" => registrar(&pool, ctx.session_id, args).await,
             "enviar_fotos_inmueble" => enviar_fotos(&pool, ctx.session_id, args).await,
@@ -252,7 +254,7 @@ async fn deshabilitada(pool: &PgPool, name: &str) -> bool {
     csv.split(',').map(str::trim).any(|t| t == name)
 }
 
-async fn buscar(pool: &PgPool, args: &Value) -> Result<Value, AgentError> {
+async fn buscar(pool: &PgPool, session_id: Uuid, args: &Value) -> Result<Value, AgentError> {
     let texto = args
         .get("texto")
         .and_then(Value::as_str)
@@ -306,6 +308,15 @@ async fn buscar(pool: &PgPool, args: &Value) -> Result<Value, AgentError> {
         .fetch_all(pool)
         .await
         .map_err(|e| AgentError::Db(e.to_string()))?;
+    let total = filas.len();
+    /* [E-fluido F2] Tarjetas 1-propiedad-por-mensaje: el modelo tiende a soltar
+     * la lista entera en un bloque (molesto de leer en WhatsApp), asi que el
+     * backend encola hasta `MAX_TARJETAS` con formato fijo y devuelve
+     * `tarjetas_enviadas` para que NO las repita: solo intro + cierre. Sin
+     * telefono o sin canal WhatsApp no hay a donde enviarlas: `0` y el modelo
+     * lista como antes (widget web).
+     * Ojo: `filas` se consume abajo para `items`; las tarjetas van primero. */
+    let enviadas = encolar_tarjetas(pool, session_id, &filas).await;
     let items: Vec<Value> = filas
         .into_iter()
         .map(|t| {
@@ -314,8 +325,89 @@ async fn buscar(pool: &PgPool, args: &Value) -> Result<Value, AgentError> {
                    "puestos": t.puestos, "residencia": t.residencia})
         })
         .collect();
-    let total = items.len();
-    Ok(json!({"inmuebles": items, "total": total}))
+    Ok(json!({"inmuebles": items, "total": total, "tarjetas_enviadas": enviadas}))
+}
+
+/// Tope de tarjetas por turno (regla usuaria: con mas de 5 resultados se
+/// muestran 5 + cierre "tengo N mas").
+const MAX_TARJETAS: usize = 5;
+
+/// Tarjeta breve de texto (una propiedad por mensaje, menos de 300 chars).
+fn tarjeta_texto(t: &Tarjeta) -> String {
+    let titulo: String = t.titulo.trim().chars().take(120).collect();
+    let ubicacion: String = t.ubicacion.trim().chars().take(80).collect();
+    format!(
+        "🏠 {titulo}\n{} en {} · {}\n📍 {ubicacion}",
+        t.tipo,
+        t.operacion,
+        formato_precio(t.precio)
+    )
+}
+
+/// Precio en dolares con miles (`$150.000`): legible en una tarjeta breve.
+/// Sin casts (el redondeo va por formato): `abs` + `{:.0}` + agrupar.
+fn formato_precio(precio: f64) -> String {
+    let entero: String = format!("{:.0}", precio.abs())
+        .chars()
+        .filter(char::is_ascii_digit)
+        .collect();
+    let entero = if entero.is_empty() {
+        "0".to_string()
+    } else {
+        entero
+    };
+    let digitos: Vec<char> = entero.chars().collect();
+    let mut grupos: Vec<String> = Vec::new();
+    let mut resto = digitos.as_slice();
+    while resto.len() > 3 {
+        let (cabeza, cola) = resto.split_at(resto.len() - 3);
+        grupos.push(cola.iter().collect());
+        resto = cabeza;
+    }
+    grupos.push(resto.iter().collect());
+    grupos.reverse();
+    format!("${}", grupos.join("."))
+}
+
+/// Encola una tarjeta por propiedad (hasta `MAX_TARJETAS`) en outbox
+/// `whatsapp`. Devuelve cuantas se enviaron (`0` = el modelo lista a mano).
+async fn encolar_tarjetas(pool: &PgPool, session_id: Uuid, filas: &[Tarjeta]) -> usize {
+    if filas.is_empty() {
+        return 0;
+    }
+    let telefono = match ClienteRepository::ficha_para_aviso(pool, session_id).await {
+        Ok(f) => f
+            .telefono
+            .map(|t| t.trim().to_string())
+            .filter(|t| !t.is_empty()),
+        Err(e) => {
+            tracing::warn!("tarjetas sesion={session_id}: sin ficha ({e}), no se encolan");
+            return 0;
+        }
+    };
+    let Some(destino) = telefono else { return 0 };
+    let via = match ClienteRepository::canal_de(pool, session_id).await {
+        Ok(Some(v)) if v == "wa_a" || v == "wa_b" => v,
+        _ => return 0,
+    };
+    let mut enviadas = 0;
+    for t in filas.iter().take(MAX_TARJETAS) {
+        let tarjeta = json!({
+            "session_id": session_id.to_string(),
+            "destino": destino,
+            "texto": tarjeta_texto(t),
+            "via": via,
+            "motivo": "tarjeta",
+        });
+        match glory_agent::persistence::enqueue_outbox(pool, "whatsapp", tarjeta).await {
+            Ok(_) => enviadas += 1,
+            Err(e) => {
+                tracing::warn!("tarjetas sesion={session_id}: no se pudo encolar ({e})");
+                break;
+            }
+        }
+    }
+    enviadas
 }
 
 /// Tarjeta breve de un inmueble para `buscar_inmuebles` (struct en vez de
@@ -850,6 +942,90 @@ mod pruebas {
         assert!(!telefono_valido("abc"));
         assert!(!telefono_valido("12345"));
         assert!(!telefono_valido(""));
+    }
+
+    /* [E-fluido F2] Tarjeta breve: una propiedad por mensaje, menos de 300
+     * chars, precio con miles. */
+    #[test]
+    fn tarjeta_breve_con_precio_legible() {
+        assert_eq!(formato_precio(150_000.0), "$150.000");
+        assert_eq!(formato_precio(2_500.5), "$2.500");
+        assert_eq!(formato_precio(900.0), "$900");
+        let t = Tarjeta {
+            id: Uuid::new_v4(),
+            titulo: "Apartamento Residencias Caroní Plaza".to_string(),
+            tipo: "apartamento".to_string(),
+            operacion: "venta".to_string(),
+            precio: 85_000.0,
+            ubicacion: "Puerto Ordaz".to_string(),
+            slug: "x".to_string(),
+            puestos: 3,
+            residencia: "2".to_string(),
+        };
+        let texto = tarjeta_texto(&t);
+        assert!(texto.contains("Apartamento Residencias Caroní Plaza"));
+        assert!(texto.contains("apartamento en venta"));
+        assert!(texto.contains("$85.000"));
+        assert!(texto.chars().count() < 300);
+        let larga = Tarjeta {
+            titulo: "x".repeat(500),
+            ubicacion: "y".repeat(500),
+            ..Tarjeta {
+                id: Uuid::new_v4(),
+                titulo: String::new(),
+                tipo: "casa".to_string(),
+                operacion: "alquiler".to_string(),
+                precio: 1_200_000.0,
+                ubicacion: String::new(),
+                slug: String::new(),
+                puestos: 1,
+                residencia: String::new(),
+            }
+        };
+        assert!(tarjeta_texto(&larga).chars().count() < 300);
+    }
+
+    /* [E-fluido F2] Sin teléfono del visitante no hay a donde enviar tarjetas:
+     * `tarjetas_enviadas` 0, nada en outbox y el modelo lista a mano. */
+    #[tokio::test]
+    async fn buscar_sin_telefono_no_encola_tarjetas() {
+        let Some(pool) = pool_si_hay() else { return };
+        let h = Herramientas::new(pool.clone(), "Test 600111222".to_string());
+        let sesion = Uuid::new_v4();
+        glory_agent::persistence::ensure_session(&pool, sesion)
+            .await
+            .unwrap();
+        let ctx = ToolCtx::new(sesion, Some(pool.clone()));
+        let salida = h
+            .execute("buscar_inmuebles", &json!({}), &ctx)
+            .await
+            .unwrap();
+        assert_eq!(
+            salida.get("tarjetas_enviadas").and_then(Value::as_u64),
+            Some(0)
+        );
+        let encoladas: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM agent_outbox WHERE payload->>'session_id' = $1",
+        )
+        .bind(sesion.to_string())
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(encoladas, 0);
+        limpiar_sesion(&pool, sesion).await;
+    }
+
+    async fn limpiar_sesion(pool: &PgPool, sesion: Uuid) {
+        sqlx::query("DELETE FROM agent_messages WHERE session_id = $1")
+            .bind(sesion)
+            .execute(pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM agent_sessions WHERE id = $1")
+            .bind(sesion)
+            .execute(pool)
+            .await
+            .unwrap();
     }
 
     #[tokio::test]

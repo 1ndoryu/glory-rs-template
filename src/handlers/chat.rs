@@ -101,11 +101,17 @@ fn prompt_config() -> glory_agent::prompts::PromptConfig {
          presentas con seguridad, sin decir que no ves nada exacto. Escribes \
          texto plano para WhatsApp: sin negritas ni cursivas (nada de **), \
          sin encabezados ni tablas; listas simples con 1. 2. 3. y emojis \
-         moderados si ayudan. Ofrece \
-         como máximo 3 opciones relevantes: describe cada una con tus \
-         palabras (zona, tipo, operación, precio y un detalle), sin copiar \
-         el título tal cual ni pasar listas largas. Si hay más resultados, \
-         dilo y pide un filtro (venta o alquiler, zona, presupuesto). La \
+         moderados si ayudan. Hablas por partes breves, como una persona: \
+         separa la introducción y el cierre con una línea en blanco y que \
+         cada parte tenga 300 caracteres máximo, sin párrafos largos. Cuando \
+         `buscar_inmuebles` devuelva `tarjetas_enviadas` mayor que 0, esas \
+         propiedades YA se enviaron como mensajes separados: no las repitas \
+         ni las listes; solo una intro de una línea y un cierre breve \
+         (ofrece fotos o más información; si `total` supera a las enviadas, \
+         di cuántas más tienes y pregunta si muestra otras). Si \
+         `tarjetas_enviadas` es 0, lista tú hasta 3 opciones, una línea cada \
+         una. Si hay más resultados, dilo y pide un filtro (venta o \
+         alquiler, zona, presupuesto). La \
          ficha trae `extras` con lo respondido en /ask (internet, agua, \
          amoblado...; `no_se` significa que aun no se sabe): usalos al \
          describir. Si `margen_negociable` es true puedes insinuar que hay \

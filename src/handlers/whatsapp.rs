@@ -1,3 +1,7 @@
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
+
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::routing::post;
@@ -21,6 +25,63 @@ use glory_agent::errors::AgentError;
  * simulado persiste + vincula + devuelve el reparto (verificable por HTTP).
  * Gotcha: el `modo` de `atencion_sesiones` sigue al canal sin tocar el
  * `estado` (una ráfaga no reabre un hilo delegado: ver `vincular_canal`). */
+
+/* [E-fluido] Conversación por partes (decisión usuaria 2026-09-29): la IA
+ * habla como persona en WhatsApp (acuse breve → piezas → cierre), no en un
+ * solo bloque tras 30-60s de silencio.
+ * - F1 Acuse diferido: si el turno supera `ESPERA_ACUSE` se encola un acuse
+ *   breve (sin hook del núcleo: el loop F6 descarta el texto intermedio y el
+ *   núcleo es agnóstico; el acuse es comportamiento del producto WhatsApp).
+ *   Si el turno termina antes, no se envía nada (cero ruido en turnos rápidos).
+ * - El texto final se parte por líneas en blanco (máx `MAX_PARTES`): el modelo
+ *   separa intro y cierre con línea en blanco (ver prompt en `chat.rs`).
+ * - F4 Fallback: un turno fallido tras acuse no puede ser silencio total. */
+/// Espera antes del acuse: un turno normal con tools tarda 20-60s; uno simple
+/// baja de 10s y no necesita acuse.
+const ESPERA_ACUSE_MS: u64 = 10_000;
+/// Máx de partes de texto por turno (intro + cierre; el resto se funde).
+const MAX_PARTES: usize = 3;
+const ACUSE_TEXTO: &str = "Ya lo estoy revisando, dame un momentico 👀";
+const FALLBACK_TEXTO: &str = "Se me complicó con eso, ¿me lo repites en un momentico? 🙏";
+const AVISO_ASESOR_TEXTO: &str = "Dame un momentico que ya te atiende un asesor 🙏";
+
+/// Parte el texto final en mensajes breves (por líneas en blanco, máx
+/// `MAX_PARTES`; el sobrante se funde en la última parte). Pura para testear.
+fn partir_respuesta(texto: &str) -> Vec<String> {
+    let partes: Vec<String> = texto
+        .split("\n\n")
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .map(str::to_string)
+        .collect();
+    if partes.len() <= MAX_PARTES {
+        return partes;
+    }
+    let mut cortadas = partes[..MAX_PARTES - 1].to_vec();
+    cortadas.push(partes[MAX_PARTES - 1..].join(" "));
+    cortadas
+}
+
+/// Encola un texto IA en outbox `whatsapp` (misma forma que el turno normal).
+async fn encolar_texto_ia(
+    pool: &sqlx::PgPool,
+    sesion: Uuid,
+    destino: &str,
+    via: &str,
+    motivo: &str,
+    texto: &str,
+) {
+    let payload = serde_json::json!({
+        "session_id": sesion.to_string(),
+        "destino": destino,
+        "texto": texto,
+        "via": via,
+        "motivo": motivo,
+    });
+    if let Err(e) = glory_agent::persistence::enqueue_outbox(pool, "whatsapp", payload).await {
+        tracing::error!("webhook WhatsApp: {sesion} no se pudo encolar {motivo}: {e}");
+    }
+}
 
 /// Números MN por defecto (E.164 sin `+`; se normalizan igual que el resto).
 /// El B es el vivo del negocio: no usar hasta el final (plan §Estado).
@@ -471,81 +532,141 @@ async fn webhook(
         tracing::warn!("webhook WhatsApp: {sesion_fondo} sobre presupuesto, sin turno IA");
         return Ok(Json(rep));
     }
+    /* [E-fluido F1] Acuse diferido: si el turno sigue vivo tras
+     * `ESPERA_ACUSE_MS` y la IA sigue al mando, se avisa que ya se está
+     * revisando. Turno rápido = sin acuse. */
+    let turno_vivo = Arc::new(AtomicBool::new(true));
+    programar_acuse(
+        pool_fondo.clone(),
+        sesion_fondo,
+        remitente_fondo.clone(),
+        canal_fondo.clone(),
+        turno_vivo.clone(),
+    );
     tokio::spawn(async move {
         if let Some(f) = foto {
             describir_y_anexar(&pool_fondo, f).await;
         }
-        match glory_agent::transport::responder_turno_persistido(
+        let resultado = glory_agent::transport::responder_turno_persistido(
             &fondo,
             sesion_fondo,
             &texto_fondo,
             secuencia_fondo,
         )
-        .await
-        {
-            Ok(Some(respuesta)) => {
-                /* [289A-4] Log de cierre de turno: sin esto un turno que
-                 * termina con texto parcial (preámbulo sin listado tras
-                 * tools) es indistinguible de un turno sano. */
-                tracing::info!(
-                    "webhook WhatsApp: {sesion_fondo} turno IA ok ({} chars), encolando via {canal_fondo}",
-                    respuesta.chars().count()
-                );
-                let payload = serde_json::json!({
-                    "session_id": sesion_fondo.to_string(),
-                    "destino": remitente_fondo,
-                    "texto": respuesta,
-                    "via": canal_fondo,
-                    "motivo": "ia",
-                });
-                if let Err(e) =
-                    glory_agent::persistence::enqueue_outbox(&pool_fondo, "whatsapp", payload).await
-                {
-                    tracing::error!(
-                        "webhook WhatsApp: {sesion_fondo} no se pudo encolar respuesta IA: {e}"
-                    );
-                }
-            }
-            Ok(None) => {
-                /* IA sin texto (quemó tools sin redactar, sin key, gate
-                 * humano): escalar a `consultando` en vez de soltar el
-                 * mensaje al vacío — el staff lo ve y responde.
-                 * [299A-1 E16] Pero un hipo transitorio (respuesta vacía
-                 * aislada) no puede congelar una conversación sana: si el
-                 * ciclo es `answered` (el staff ya respondió y la IA venía
-                 * conversando, caso 739bb63e) se mantiene `activa` y solo
-                 * se deja WARN en el log. */
-                let ciclo = glory_agent::persistence::get_response_cycle(&pool_fondo, sesion_fondo)
-                    .await
-                    .ok()
-                    .flatten();
-                /* [299A-1 E16] Hipo transitorio con ciclo `answered`: se
-                 * mantiene `activa` y solo se deja WARN en el log. */
-                if !debe_escalar_consultando(ciclo.as_ref().map(|c| c.status.as_str())) {
-                    tracing::warn!(
-                        "webhook WhatsApp: {sesion_fondo} sin respuesta IA pero ciclo answered, se mantiene activa"
-                    );
-                    return;
-                }
-                if let Err(e) =
-                    ClienteRepository::marcar_atencion(&pool_fondo, sesion_fondo, "consultando")
-                        .await
-                {
-                    tracing::error!(
-                        "webhook WhatsApp: {sesion_fondo} sin respuesta IA y no se pudo escalar: {e}"
-                    );
-                } else {
-                    tracing::warn!(
-                        "webhook WhatsApp: {sesion_fondo} sin respuesta IA, escalada a consultando"
-                    );
-                }
-            }
-            Err(e) => {
-                tracing::warn!("webhook WhatsApp: {sesion_fondo} turno IA falló: {e}");
-            }
-        }
+        .await;
+        atender_resultado_turno(
+            &pool_fondo,
+            sesion_fondo,
+            &remitente_fondo,
+            &canal_fondo,
+            resultado,
+            &turno_vivo,
+        )
+        .await;
     });
     Ok(Json(rep))
+}
+
+/* [E-fluido F1] El acuse vive fuera de `webhook` (el lint no deja pasar la
+ * función de 100 líneas): programa el aviso de turno lento en background. */
+fn programar_acuse(
+    pool: sqlx::PgPool,
+    sesion: Uuid,
+    destino: String,
+    canal: String,
+    vivo: Arc<AtomicBool>,
+) {
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(ESPERA_ACUSE_MS)).await;
+        if !vivo.load(Ordering::Relaxed) {
+            return;
+        }
+        let sigue_ia = glory_agent::persistence::get_session(&pool, sesion)
+            .await
+            .ok()
+            .flatten()
+            .is_some_and(|s| s.ai_enabled);
+        if !sigue_ia {
+            return;
+        }
+        tracing::info!("webhook WhatsApp: {sesion} turno lento, encolando acuse");
+        encolar_texto_ia(&pool, sesion, &destino, &canal, "acuse", ACUSE_TEXTO).await;
+    });
+}
+
+/// Atiende el resultado del turno IA (extraída de `webhook` por el lint):
+/// parte el texto final en mensajes, escala con aviso al asesor o cae al
+/// fallback. Nunca deja al visitante en silencio tras un acuse.
+async fn atender_resultado_turno(
+    pool: &sqlx::PgPool,
+    sesion: Uuid,
+    destino: &str,
+    canal: &str,
+    resultado: Result<Option<String>, AgentError>,
+    vivo: &AtomicBool,
+) {
+    match resultado {
+        Ok(Some(respuesta)) => {
+            /* [289A-4] Log de cierre de turno: sin esto un turno que
+             * termina con texto parcial (preámbulo sin listado tras
+             * tools) es indistinguible de un turno sano.
+             * [E-fluido] El texto final viaja por partes (intro + cierre
+             * por separado): cada parte es un mensaje WhatsApp. */
+            vivo.store(false, Ordering::Relaxed);
+            let partes = partir_respuesta(&respuesta);
+            tracing::info!(
+                "webhook WhatsApp: {sesion} turno IA ok ({} chars, {} partes), encolando via {canal}",
+                respuesta.chars().count(),
+                partes.len()
+            );
+            for parte in &partes {
+                encolar_texto_ia(pool, sesion, destino, canal, "ia", parte).await;
+            }
+        }
+        Ok(None) => {
+            vivo.store(false, Ordering::Relaxed);
+            /* IA sin texto (quemó tools sin redactar, sin key, gate
+             * humano): escalar a `consultando` en vez de soltar el
+             * mensaje al vacío — el staff lo ve y responde.
+             * [299A-1 E16] Pero un hipo transitorio (respuesta vacía
+             * aislada) no puede congelar una conversación sana: si el
+             * ciclo es `answered` (el staff ya respondió y la IA venía
+             * conversando, caso 739bb63e) se mantiene `activa` y solo
+             * se deja WARN en el log. */
+            let ciclo = glory_agent::persistence::get_response_cycle(pool, sesion)
+                .await
+                .ok()
+                .flatten();
+            /* [299A-1 E16] Hipo transitorio con ciclo `answered`: se
+             * mantiene `activa` y solo se deja WARN en el log. */
+            if !debe_escalar_consultando(ciclo.as_ref().map(|c| c.status.as_str())) {
+                tracing::warn!(
+                    "webhook WhatsApp: {sesion} sin respuesta IA pero ciclo answered, se mantiene activa"
+                );
+                return;
+            }
+            /* [E-fluido F4] La escalada ya no es silencio para el
+             * visitante: se le dice que viene un asesor. */
+            encolar_texto_ia(pool, sesion, destino, canal, "asesor", AVISO_ASESOR_TEXTO).await;
+            if let Err(e) = ClienteRepository::marcar_atencion(pool, sesion, "consultando").await {
+                tracing::error!(
+                    "webhook WhatsApp: {sesion} sin respuesta IA y no se pudo escalar: {e}"
+                );
+            } else {
+                tracing::warn!(
+                    "webhook WhatsApp: {sesion} sin respuesta IA, escalada a consultando"
+                );
+            }
+        }
+        Err(e) => {
+            /* [E-fluido F4] Turno fallido (el acuse ya pudo salir): nunca
+             * silencio total; la sesión sigue activa y la IA retoma en el
+             * próximo mensaje. */
+            vivo.store(false, Ordering::Relaxed);
+            tracing::warn!("webhook WhatsApp: {sesion} turno IA falló: {e}");
+            encolar_texto_ia(pool, sesion, destino, canal, "fallback", FALLBACK_TEXTO).await;
+        }
+    }
 }
 
 /// Ruta pública del gateway (simulado hoy, Baileys mañana): el secreto del
@@ -606,12 +727,74 @@ mod pruebas {
         assert!(!debe_escalar_consultando(Some("answered")));
     }
 
+    /* [E-fluido] El texto final viaja por partes (intro + cierre por separado);
+     * el sobrante se funde en la última parte, nunca se pierde. */
+    #[test]
+    fn respuesta_se_parte_por_lineas_en_blanco() {
+        assert_eq!(partir_respuesta("hola"), vec!["hola".to_string()]);
+        assert_eq!(
+            partir_respuesta("Mira lo que hay:\n\nTe mando fotos si quieres"),
+            vec![
+                "Mira lo que hay:".to_string(),
+                "Te mando fotos si quieres".to_string()
+            ]
+        );
+        assert!(partir_respuesta("  \n\n  ").is_empty());
+        let cinco = partir_respuesta("a\n\nb\n\nc\n\nd\n\ne");
+        assert_eq!(cinco.len(), MAX_PARTES);
+        assert_eq!(cinco[..MAX_PARTES - 1], ["a".to_string(), "b".to_string()]);
+        assert!(cinco[MAX_PARTES - 1].contains('c'));
+        assert!(cinco[MAX_PARTES - 1].contains('e'));
+    }
+
     fn pool_si_hay() -> Option<sqlx::PgPool> {
         let url = std::env::var("DATABASE_URL").ok()?;
         sqlx::postgres::PgPoolOptions::new()
             .max_connections(1)
             .connect_lazy(&url)
             .ok()
+    }
+
+    /* [E-fluido F4] Un turno fallido encola el fallback (nunca silencio tras
+     * un acuse) y no congela la sesión. Sin `DATABASE_URL` se omite. */
+    #[tokio::test]
+    async fn turno_fallido_encola_fallback() {
+        let Some(pool) = pool_si_hay() else { return };
+        let sesion = Uuid::new_v4();
+        glory_agent::persistence::ensure_session(&pool, sesion)
+            .await
+            .unwrap();
+        let vivo = AtomicBool::new(true);
+        atender_resultado_turno(
+            &pool,
+            sesion,
+            "34600000000",
+            "wa_b",
+            Err(glory_agent::errors::AgentError::Internal(
+                "boom".to_string(),
+            )),
+            &vivo,
+        )
+        .await;
+        assert!(!vivo.load(Ordering::Relaxed));
+        let texto: String = sqlx::query_scalar(
+            "SELECT payload->>'texto' FROM agent_outbox WHERE payload->>'session_id' = $1",
+        )
+        .bind(sesion.to_string())
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(texto, FALLBACK_TEXTO);
+        sqlx::query("DELETE FROM agent_outbox WHERE payload->>'session_id' = $1")
+            .bind(sesion.to_string())
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM agent_sessions WHERE id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
     }
 
     /* [279A-2 F2] El mismo cliente×canal reutiliza hilo; otro canal abre otro
