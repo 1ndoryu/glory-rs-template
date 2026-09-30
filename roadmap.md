@@ -431,12 +431,12 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   BD a cero. Detalle en `Agente/completados/tareas-2026-09-29.md` (## 299A-3).
   Gotchas: start-script apuntaba a target viejo, mp3 8.9 MB supera timeout 20 s
   (usar audios pequenos), la IA escala tras 2 notas de voz.
-- 299A-4 visibilidad outbound en el hilo (nuevo 2026-09-29): lo que la IA ENVIA
-  (outbox `tarjeta`/`ia_foto` con `media_url`) no existe en `historial` y el
-  panel Mensajes no lo muestra (solo se ve el texto "ya te envie las fotos").
-  Disenar espejo en el hilo (persistir `ai` `[foto] <url>` al encolar o
-  fusionar outbox en `historial`) sin romper la disciplina de secuencias
-  (`insert_message_seq` exige `&ChatHub` y las tools solo reciben `pool`).
+- 299A-4 espejo outbound en el hilo (verificado 2026-09-30): `Herramientas`
+  lleva `hub` opcional (`with_hub`, sin romper `new` ni los tests sin hub);
+  tras cada enqueue al visitante se persiste el mismo contenido como `ai`
+  (`tarjeta_texto` tal cual; foto como `[foto] url — se ve: pie`, que ya
+  renderiza `MessageMedia`); `aviso_humano` no se espeja (destino staff, no
+  visitante). Detalle en `Agente/completados/tareas-2026-09-29.md` (## 299A-4).
 
 ## 279A-3 — /ask cuestionario de ficha (F1 verificado local 2026-09-27; pendiente: respuestas usuaria)
 - Plan: `Agente/planes/plan-ask-2026-09-27.md`.

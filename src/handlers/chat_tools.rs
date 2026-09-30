@@ -10,6 +10,7 @@ use crate::models::{CreateSolicitudRequest, OPERACIONES, TIPOS};
 use crate::repositories::{ClienteRepository, NuevaVisita, VisitaRepository};
 use crate::services::SolicitudService;
 use glory_agent::errors::AgentError;
+use glory_agent::session::ChatHub;
 use glory_agent::tools::{ToolCtx, ToolDefinition, ToolExecutor};
 
 /* [169A-4] Tools de la inmobiliaria (las ejecuta el loop F6 del núcleo).
@@ -186,6 +187,10 @@ fn def_visita() -> ToolDefinition {
 pub struct Herramientas {
     pool: PgPool,
     contacto_defecto: String,
+    /* [299A-4] Hub opcional para espejar en el hilo lo enviado al visitante
+     * (tarjeta/foto): `ToolCtx` no trae hub y el núcleo es dependencia
+     * externa, así que viaja en el executor que sí construimos nosotros. */
+    hub: Option<ChatHub>,
 }
 
 impl Herramientas {
@@ -193,7 +198,15 @@ impl Herramientas {
         Self {
             pool,
             contacto_defecto,
+            hub: None,
         }
+    }
+
+    /// Hub para el espejo 299A-4. Sin hub (tests) se encola igual pero no
+    /// se espeja: el envío al visitante nunca depende del espejo.
+    pub fn with_hub(mut self, hub: ChatHub) -> Self {
+        self.hub = Some(hub);
+        self
     }
 
     fn pool(&self, ctx: &ToolCtx) -> PgPool {
@@ -212,10 +225,12 @@ impl Herramientas {
             return Ok(json!({"error": "herramienta deshabilitada por el administrador"}));
         }
         let salida = match name {
-            "buscar_inmuebles" => buscar(&pool, ctx.session_id, args).await,
+            "buscar_inmuebles" => buscar(&pool, ctx.session_id, args, self.hub.as_ref()).await,
             "detalle_inmueble" => detalle(&pool, args).await,
             "registrar_contacto" => registrar(&pool, ctx.session_id, args).await,
-            "enviar_fotos_inmueble" => enviar_fotos(&pool, ctx.session_id, args).await,
+            "enviar_fotos_inmueble" => {
+                enviar_fotos(&pool, ctx.session_id, args, self.hub.as_ref()).await
+            }
             "registrar_captacion" => captar(&pool, ctx.session_id, args).await,
             "agendar_visita" => agendar(&pool, ctx.session_id, args).await,
             "datos_contacto" => contacto_publico(&pool, &self.contacto_defecto).await,
@@ -261,7 +276,12 @@ async fn deshabilitada(pool: &PgPool, name: &str) -> bool {
     csv.split(',').map(str::trim).any(|t| t == name)
 }
 
-async fn buscar(pool: &PgPool, session_id: Uuid, args: &Value) -> Result<Value, AgentError> {
+async fn buscar(
+    pool: &PgPool,
+    session_id: Uuid,
+    args: &Value,
+    hub: Option<&ChatHub>,
+) -> Result<Value, AgentError> {
     let texto = args
         .get("texto")
         .and_then(Value::as_str)
@@ -346,7 +366,7 @@ async fn buscar(pool: &PgPool, session_id: Uuid, args: &Value) -> Result<Value, 
      * telefono o sin canal WhatsApp no hay a donde enviarlas: `0` y el modelo
      * lista como antes (widget web).
      * Ojo: `filas` se consume abajo para `items`; las tarjetas van primero. */
-    let enviadas = encolar_tarjetas(pool, session_id, &filas).await;
+    let enviadas = encolar_tarjetas(pool, session_id, &filas, hub).await;
     let items: Vec<Value> = filas
         .into_iter()
         .map(|t| {
@@ -401,7 +421,12 @@ fn formato_precio(precio: f64) -> String {
 
 /// Encola una tarjeta por propiedad (hasta `MAX_TARJETAS`) en outbox
 /// `whatsapp`. Devuelve cuantas se enviaron (`0` = el modelo lista a mano).
-async fn encolar_tarjetas(pool: &PgPool, session_id: Uuid, filas: &[Tarjeta]) -> usize {
+async fn encolar_tarjetas(
+    pool: &PgPool,
+    session_id: Uuid,
+    filas: &[Tarjeta],
+    hub: Option<&ChatHub>,
+) -> usize {
     if filas.is_empty() {
         return 0;
     }
@@ -422,15 +447,19 @@ async fn encolar_tarjetas(pool: &PgPool, session_id: Uuid, filas: &[Tarjeta]) ->
     };
     let mut enviadas = 0;
     for t in filas.iter().take(MAX_TARJETAS) {
+        let texto = tarjeta_texto(t);
         let tarjeta = json!({
             "session_id": session_id.to_string(),
             "destino": destino,
-            "texto": tarjeta_texto(t),
+            "texto": texto.clone(),
             "via": via,
             "motivo": "tarjeta",
         });
         match glory_agent::persistence::enqueue_outbox(pool, "whatsapp", tarjeta).await {
-            Ok(_) => enviadas += 1,
+            Ok(_) => {
+                enviadas += 1;
+                espejar_en_hilo(pool, hub, session_id, &texto).await;
+            }
             Err(e) => {
                 tracing::warn!("tarjetas sesion={session_id}: no se pudo encolar ({e})");
                 break;
@@ -438,6 +467,24 @@ async fn encolar_tarjetas(pool: &PgPool, session_id: Uuid, filas: &[Tarjeta]) ->
         }
     }
     enviadas
+}
+
+/// [299A-4] Espejo de envíos `WhatsApp` en el hilo: `agent_outbox` es cola
+/// transitoria (el worker BORRA la fila tras enviar) y `historial` solo lee
+/// `agent_messages`, así que tarjeta/foto nunca aparecían en /admin aunque
+/// el visitante sí las recibía. Tras cada enqueue al visitante se persiste
+/// el mismo contenido como `ai` (la foto en marca `[foto] url — se ve: pie`,
+/// que `MessageMedia` ya renderiza). Si el espejo falla se avisa y se sigue:
+/// el envío ya está encolado y tumbar la tool duplicaría el envío al
+/// reintentar el modelo. Sin hub no hay espejo (tests y widget web).
+async fn espejar_en_hilo(pool: &PgPool, hub: Option<&ChatHub>, session_id: Uuid, body: &str) {
+    let Some(hub) = hub else { return };
+    if let Err(e) =
+        glory_agent::persistence::insert_message_seq(pool, hub, session_id, "ai", body, None, None)
+            .await
+    {
+        tracing::warn!("espejo sesion={session_id}: envío sin reflejar en el hilo ({e})");
+    }
 }
 
 /// Tarjeta breve de un inmueble para `buscar_inmuebles` (struct en vez de
@@ -521,7 +568,12 @@ async fn detalle(pool: &PgPool, args: &Value) -> Result<Value, AgentError> {
  * absoluta (`/uploads/<storage_key>` bajo `PUBLIC_BASE_URL`). `destino` =
  * teléfono del visitante (ficha) y `via` = canal de la sesión, igual que
  * `consultar`. Sin fotos o sin teléfono responde `error` (la IA lo dice). */
-async fn enviar_fotos(pool: &PgPool, session_id: Uuid, args: &Value) -> Result<Value, AgentError> {
+async fn enviar_fotos(
+    pool: &PgPool,
+    session_id: Uuid,
+    args: &Value,
+    hub: Option<&ChatHub>,
+) -> Result<Value, AgentError> {
     let id: Uuid = args
         .get("id")
         .and_then(Value::as_str)
@@ -584,15 +636,20 @@ async fn enviar_fotos(pool: &PgPool, session_id: Uuid, args: &Value) -> Result<V
         } else {
             titulo.trim().to_string()
         };
+        /* [299A-4] La misma foto que viaja por WhatsApp queda en el hilo
+         * (`[foto] url — se ve: pie` la renderiza `MessageMedia`). */
+        let url = format!("{base}/uploads/{clave}");
+        let espejo = format!("[foto] {url} — se ve: {}", pie.trim());
         let aviso = json!({
             "session_id": session_id.to_string(),
             "destino": telefono,
             "texto": pie,
-            "media_url": format!("{base}/uploads/{clave}"),
+            "media_url": url,
             "via": via,
             "motivo": "ia_foto",
         });
         glory_agent::persistence::enqueue_outbox(pool, "whatsapp", aviso).await?;
+        espejar_en_hilo(pool, hub, session_id, &espejo).await;
     }
     Ok(json!({"ok": true, "enviadas": total, "titulo": titulo}))
 }
@@ -1489,6 +1546,84 @@ mod pruebas {
             .await
             .unwrap();
         sqlx::query("DELETE FROM clientes WHERE telefono = '34622222222'")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM agent_response_cycles WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM agent_sessions WHERE id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+
+    /* [299A-4] Con hub, cada `ia_foto` persiste su espejo `ai [foto] ...`
+     * en el hilo (sin hub no hay espejo: el resto de tests lo confirma). */
+    #[tokio::test]
+    async fn enviar_fotos_espeja_hilo_con_hub() {
+        let Some(pool) = pool_si_hay() else { return };
+        let h = Herramientas::new(pool.clone(), "Test 600111222".to_string())
+            .with_hub(ChatHub::default());
+        let sesion = Uuid::new_v4();
+        glory_agent::persistence::ensure_session(&pool, sesion)
+            .await
+            .unwrap();
+        let ctx = ToolCtx::new(sesion, Some(pool.clone()));
+
+        h.execute(
+            "registrar_contacto",
+            &json!({"nombre": "Espejo Test", "telefono": "+34633333333"}),
+            &ctx,
+        )
+        .await
+        .unwrap();
+        let id: String = sqlx::query_scalar(
+            "SELECT id::TEXT FROM inmuebles WHERE publicado \
+             AND (SELECT COUNT(*) FROM fotos WHERE inmueble_id = inmuebles.id) > 0 LIMIT 1",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let r = h
+            .execute("enviar_fotos_inmueble", &json!({"id": id, "max": 2}), &ctx)
+            .await
+            .unwrap();
+        assert_eq!(r.get("enviadas").and_then(Value::as_i64), Some(2));
+        let espejos: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM agent_messages WHERE session_id = $1 \
+             AND sender = 'ai' AND body LIKE '[foto] %'",
+        )
+        .bind(sesion)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(espejos, 2);
+
+        sqlx::query("DELETE FROM agent_outbox WHERE payload->>'session_id' = $1")
+            .bind(sesion.to_string())
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM agent_messages WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM canal_sesiones WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM atencion_sesiones WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM clientes WHERE telefono = '34633333333'")
             .execute(&pool)
             .await
             .unwrap();
