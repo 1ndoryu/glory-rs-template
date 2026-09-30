@@ -167,8 +167,9 @@ pub struct FotoPendiente {
 /// que deja el gateway, valida el tipo real por Content-Type (nunca por la
 /// URL) y guarda con `guardar_archivo` (tope de tamaño + magic-bytes).
 /// Si algo falla se conserva la URL remota: media a mano antes que media
-/// perdida. Devuelve el cuerpo del mensaje (`[foto]` o `[audio]`) y, solo
-/// para fotos archivadas en local, el pendiente de descripción (E11).
+/// perdida. Devuelve el cuerpo del mensaje (`[foto]` o `[audio]`) y los
+/// pendientes de enriquecimiento: foto a describir (E11) y/o audio a
+/// transcribir ([309A-4], `None` si no aplica).
 /// [299A-1 E12] Audios: `audio/ogg` (notas de voz), `audio/mpeg`, `audio/mp4`.
 async fn cuerpo_media(
     http: &reqwest::Client,
@@ -176,25 +177,40 @@ async fn cuerpo_media(
     telefono_norm: &str,
     url: &str,
     pie: &str,
-) -> (String, Option<FotoPendienteSinId>) {
+) -> (
+    String,
+    Option<FotoPendienteSinId>,
+    Option<AudioPendienteSinId>,
+) {
     match descargar_y_guardar(http, upload_dir, telefono_norm, url).await {
         Ok((kind, clave, mime)) => {
             let cuerpo = format!("[{kind}] /uploads/{clave}");
             let foto = if kind == "foto" {
                 Some(FotoPendienteSinId {
                     cuerpo_base: cuerpo.clone(),
-                    clave,
-                    mime,
+                    clave: clave.clone(),
+                    mime: mime.clone(),
                     pie: pie.to_string(),
                 })
             } else {
                 None
             };
-            (cuerpo, foto)
+            /* [309A-4] El audio sí deja pendiente (antes `None`): el
+             * `mime` ya validado decide el `multipart` del STT. */
+            let audio = if kind == "audio" {
+                Some(AudioPendienteSinId {
+                    cuerpo_base: cuerpo.clone(),
+                    clave,
+                    mime,
+                })
+            } else {
+                None
+            };
+            (cuerpo, foto, audio)
         }
         Err(e) => {
             tracing::warn!("webhook WhatsApp: no se pudo archivar {url}: {e}; se conserva remota");
-            (format!("[media] {url}"), None)
+            (format!("[media] {url}"), None, None)
         }
     }
 }
@@ -205,6 +221,32 @@ struct FotoPendienteSinId {
     clave: String,
     mime: String,
     pie: String,
+}
+
+/// [309A-4] Audio archivado aún sin `mensaje_id`: se transcribe con Groq
+/// Whisper y el texto se anexa al mensaje ANTES del turno (espejo del flujo
+/// E11 de fotos). `mime` decide el `filename`/tipo del `multipart`.
+struct AudioPendienteSinId {
+    cuerpo_base: String,
+    clave: String,
+    mime: String,
+}
+
+/// [309A-4] Medios pendientes del turno: foto (E11) y/o audio (STT). Va como
+/// segundo elemento de `repartir_y_vincular` para que el webhook los procese
+/// en background antes del turno IA.
+pub struct MediosPendientes {
+    pub foto: Option<FotoPendiente>,
+    pub audio: Option<AudioPendiente>,
+}
+
+/// [309A-4] Audio local pendiente de transcripción (ver `AudioPendienteSinId`).
+/// `pub` porque viaja en `MediosPendientes` (también `pub`).
+pub struct AudioPendiente {
+    mensaje_id: Uuid,
+    cuerpo_base: String,
+    clave: String,
+    mime: String,
 }
 
 async fn descargar_y_guardar(
@@ -352,8 +394,69 @@ async fn describir_y_anexar(pool: &sqlx::PgPool, foto: FotoPendiente) {
     }
 }
 
-/// [299A-1 E11] Archiva la media entrante y devuelve la foto pendiente de
-/// descripción (extraído de `repartir_y_vincular` por tope de líneas).
+/// Arma el cuerpo con la transcripción anexada (pura para testear).
+#[must_use]
+fn cuerpo_audio_con_texto(cuerpo_base: &str, texto: &str) -> String {
+    let dicho = texto.trim();
+    if dicho.is_empty() {
+        return cuerpo_base.trim_end().to_string();
+    }
+    format!("{} — dice: {dicho}", cuerpo_base.trim_end())
+}
+
+/// [309A-4] Transcribe la nota de voz con Groq Whisper y anexa el texto al
+/// mensaje ANTES del turno IA, para que el historial la "oiga" (espejo de
+/// `describir_y_anexar`). Corre en el spawn del webhook (no en el camino
+/// rápido del 2xx). Best-effort total: cualquier fallo deja el `[audio]`
+/// pelado y solo queda WARN. Sin rebroadcast (misma razón que E11).
+async fn transcribir_y_anexar(pool: &sqlx::PgPool, audio: AudioPendiente) {
+    /* Mismo tope que `guardar_audio` (10 MiB): Groq acepta 25 MB, pero lo
+     * que ya se archivó en local es lo que hay. */
+    const TOPE_BYTES: usize = 10 * 1024 * 1024;
+    let dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
+    let ruta = std::path::Path::new(&dir).join(&audio.clave);
+    let bytes = match tokio::fs::read(&ruta).await {
+        Ok(b) => b,
+        Err(e) => {
+            tracing::warn!(
+                "webhook WhatsApp: audio sin bytes para transcribir {}: {e}",
+                audio.clave
+            );
+            return;
+        }
+    };
+    if bytes.len() > TOPE_BYTES {
+        tracing::warn!(
+            "webhook WhatsApp: audio {} pesa {} bytes, se transcribe a mano",
+            audio.clave,
+            bytes.len()
+        );
+        return;
+    }
+    let nombre = ruta.file_name().and_then(|n| n.to_str()).unwrap_or("nota");
+    let texto = match super::ia::transcribir_audio(&bytes, nombre, &audio.mime).await {
+        Ok(t) => t,
+        Err(e) => {
+            tracing::warn!(
+                "webhook WhatsApp: no se pudo transcribir {}: {e}",
+                audio.clave
+            );
+            return;
+        }
+    };
+    let cuerpo = cuerpo_audio_con_texto(&audio.cuerpo_base, &texto);
+    if let Err(e) = sqlx::query("UPDATE agent_messages SET body = $1 WHERE id = $2")
+        .bind(&cuerpo)
+        .bind(audio.mensaje_id)
+        .execute(pool)
+        .await
+    {
+        tracing::warn!("webhook WhatsApp: no se pudo anexar transcripción: {e}");
+    }
+}
+
+/// [299A-1 E11] Archiva la media entrante y devuelve los pendientes de
+/// enriquecimiento (extraído de `repartir_y_vincular` por tope de líneas).
 async fn archivar_media_entrante(
     pool: &sqlx::PgPool,
     hub: &glory_agent::session::ChatHub,
@@ -361,13 +464,13 @@ async fn archivar_media_entrante(
     remitente_norm: &str,
     texto: &str,
     url: &str,
-) -> Option<FotoPendiente> {
+) -> MediosPendientes {
     let dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
     let http = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(20))
         .build()
         .unwrap_or_default();
-    let (cuerpo, foto) = cuerpo_media(
+    let (cuerpo, foto, audio) = cuerpo_media(
         &http,
         std::path::Path::new(&dir),
         remitente_norm,
@@ -376,29 +479,39 @@ async fn archivar_media_entrante(
     )
     .await;
     let mensaje_id = persistir_media(pool, hub, sesion, cuerpo).await;
-    mensaje_id.and_then(|id| {
-        foto.map(|f| FotoPendiente {
-            mensaje_id: id,
-            cuerpo_base: f.cuerpo_base,
-            clave: f.clave,
-            mime: f.mime,
-            pie: f.pie,
-        })
-    })
+    let (foto, audio) = match mensaje_id {
+        Some(id) => (
+            foto.map(|f| FotoPendiente {
+                mensaje_id: id,
+                cuerpo_base: f.cuerpo_base,
+                clave: f.clave,
+                mime: f.mime,
+                pie: f.pie,
+            }),
+            audio.map(|a| AudioPendiente {
+                mensaje_id: id,
+                cuerpo_base: a.cuerpo_base,
+                clave: a.clave,
+                mime: a.mime,
+            }),
+        ),
+        None => (None, None),
+    };
+    MediosPendientes { foto, audio }
 }
 /// Entrada única del webhook (lógica testeable): reparte, registra el cliente
 /// con origen del canal, reutiliza su hilo o crea uno, persiste el mensaje
 /// como `client` (+ segundo mensaje `[foto]`/`[audio]` si trae `media_url`) y emite por
 /// el hub para que el panel staff lo vea en realtime. Además del reparto
-/// devuelve la foto pendiente de descripción (E11, `None` si no hay foto
-/// local): el webhook la describe en background antes del turno IA.
+/// devuelve los medios pendientes de enriquecimiento (E11 foto,
+/// [309A-4] audio): el webhook los procesa en background antes del turno IA.
 pub async fn repartir_y_vincular(
     pool: &sqlx::PgPool,
     hub: &glory_agent::session::ChatHub,
     numero_a: &str,
     numero_b: &str,
     entrada: &EntradaWhatsapp,
-) -> Result<(RepartoWhatsapp, Option<FotoPendiente>), AgentError> {
+) -> Result<(RepartoWhatsapp, MediosPendientes), AgentError> {
     let destino_txt = entrada.numero_destino.trim();
     let remitente_txt = entrada.remitente.trim();
     let texto = entrada.texto.trim();
@@ -480,11 +593,14 @@ pub async fn repartir_y_vincular(
      * `UPLOAD_DIR/whatsapp/<tel>/` y queda como mensaje `[foto]` o `[audio]`
      * con ruta local servible para el staff. Si el archivo no baja o el tipo
      * no es soportado, se conserva la URL remota antes que perderla. */
-    let mut foto_pendiente: Option<FotoPendiente> = None;
-    if let Some(u) = media {
-        foto_pendiente =
-            archivar_media_entrante(pool, hub, sesion, &remitente_norm, texto, u).await;
-    }
+    let medios = if let Some(u) = media {
+        archivar_media_entrante(pool, hub, sesion, &remitente_norm, texto, u).await
+    } else {
+        MediosPendientes {
+            foto: None,
+            audio: None,
+        }
+    };
     Ok((
         RepartoWhatsapp {
             ok: true,
@@ -495,7 +611,7 @@ pub async fn repartir_y_vincular(
             mensaje_id: msg.id,
             secuencia: msg.sequence_num,
         },
-        foto_pendiente,
+        medios,
     ))
 }
 
@@ -516,9 +632,11 @@ async fn webhook(
         .clone()
         .ok_or_else(|| AgentError::Internal("sin BD".to_string()))?;
     let (a, b) = numeros_configurados(&pool).await;
-    let (rep, foto) = repartir_y_vincular(&pool, &state.hub, &a, &b, &entrada).await?;
+    let (rep, medios) = repartir_y_vincular(&pool, &state.hub, &a, &b, &entrada).await?;
     /* [299A-1 E11] La foto se describe en background ANTES del turno para que
-     * el historial ya traiga el `— se ve:`. El 2xx al gateway no espera. */
+     * el historial ya traiga el `— se ve:`.
+     * [309A-4] El audio se transcribe igual (`— dice:`). El 2xx al gateway
+     * no espera a ninguno. */
     /* [289A-1] Turno IA en background: el webhook responde 2xx rápido al
      * gateway; la IA (núcleo `responder_turno_persistido`, misma vía que el
      * chat web) corre aparte y su texto se encola en outbox `whatsapp` con
@@ -549,8 +667,11 @@ async fn webhook(
         turno_vivo.clone(),
     );
     tokio::spawn(async move {
-        if let Some(f) = foto {
+        if let Some(f) = medios.foto {
             describir_y_anexar(&pool_fondo, f).await;
+        }
+        if let Some(a) = medios.audio {
+            transcribir_y_anexar(&pool_fondo, a).await;
         }
         let resultado = glory_agent::transport::responder_turno_persistido(
             &fondo,
@@ -771,6 +892,73 @@ mod pruebas {
         assert_eq!(cinco[..MAX_PARTES - 1], ["a".to_string(), "b".to_string()]);
         assert!(cinco[MAX_PARTES - 1].contains('c'));
         assert!(cinco[MAX_PARTES - 1].contains('e'));
+    }
+
+    /* [309A-4] La transcripción se anexa tras `— dice:` igual que la
+     * descripción de foto tras `— se ve:`; el front la muestra como `Dice:`. */
+    #[test]
+    fn audio_anexa_transcripcion_tras_dice() {
+        assert_eq!(
+            cuerpo_audio_con_texto("[audio] /uploads/whatsapp/18149575613/a.mp3", "¡Hola!"),
+            "[audio] /uploads/whatsapp/18149575613/a.mp3 — dice: ¡Hola!".to_string()
+        );
+        assert_eq!(
+            cuerpo_audio_con_texto("[audio] /u/a.mp3", "  "),
+            "[audio] /u/a.mp3".to_string()
+        );
+    }
+
+    /* [309A-4] Verificación viva con el mp3 real: solo corre con
+     * `GROQ_LIVE_TEST=1` (necesita `GROQ_API_KEY` + red sin bloqueo a Groq,
+     * hoy VPN). Confirma el camino completo: leer disco → Whisper → UPDATE
+     * con `— dice:` en el hilo. Sin el opt-in se omite como `pool_si_hay`. */
+    #[tokio::test]
+    async fn audio_vivo_transcribe_y_anexa_dice() {
+        if std::env::var("GROQ_LIVE_TEST").is_err() {
+            return;
+        }
+        let Some(pool) = pool_si_hay() else { return };
+        let hub = glory_agent::session::ChatHub::new();
+        let sesion = Uuid::new_v4();
+        glory_agent::persistence::ensure_session(&pool, sesion)
+            .await
+            .unwrap();
+        let cuerpo =
+            "[audio] /uploads/whatsapp/18149575613/4353d43d-b676-41f9-9df3-9c7f241c783f.mp3";
+        let msg = glory_agent::persistence::insert_message_seq(
+            &pool, &hub, sesion, "client", cuerpo, None, None,
+        )
+        .await
+        .unwrap();
+        transcribir_y_anexar(
+            &pool,
+            AudioPendiente {
+                mensaje_id: msg.id,
+                cuerpo_base: cuerpo.to_string(),
+                clave: "whatsapp/18149575613/4353d43d-b676-41f9-9df3-9c7f241c783f.mp3".to_string(),
+                mime: "audio/mpeg".to_string(),
+            },
+        )
+        .await;
+        let final_: String = sqlx::query_scalar("SELECT body FROM agent_messages WHERE id = $1")
+            .bind(msg.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert!(
+            final_.contains("— dice:"),
+            "el hilo debe traer la transcripción, quedó: {final_}"
+        );
+        sqlx::query("DELETE FROM agent_messages WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM agent_sessions WHERE id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
     }
 
     fn pool_si_hay() -> Option<sqlx::PgPool> {

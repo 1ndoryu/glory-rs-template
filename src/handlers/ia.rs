@@ -547,6 +547,69 @@ async fn completar_opencode(
         .ok_or_else(|| "OpenCode Go devolvio una respuesta sin texto".to_string())
 }
 
+/// [309A-4] Transcribe una nota de voz con Groq Whisper
+/// (`whisper-large-v3-turbo`, endpoint OpenAI-compatible). Opencode Go no
+/// pasa audio por ninguna vía (verificado: Responses pela `input_audio`,
+/// chat pela `audio_url`, sin endpoint `/audio/transcriptions`), así que el
+/// STT sale por aquí. Best-effort: cualquier `Err` y el llamador conserva el
+/// `[audio]` pelado + el prompt pide que lo escriban. La clave vive solo en
+/// `.env` (`GROQ_API_KEY`) y nunca se loguea.
+pub(crate) async fn transcribir_audio(
+    bytes: &[u8],
+    nombre: &str,
+    mime: &str,
+) -> Result<String, String> {
+    const GROQ_URL: &str = "https://api.groq.com/openai/v1/audio/transcriptions";
+    const MODELO: &str = "whisper-large-v3-turbo";
+    const MAX_TEXTO: usize = 2000;
+    let key = leer_env("GROQ_API_KEY");
+    if key.is_empty() {
+        return Err("Sin GROQ_API_KEY en .env".to_string());
+    }
+    let parte = reqwest::multipart::Part::bytes(bytes.to_vec())
+        .file_name(nombre.to_string())
+        .mime_str(mime)
+        .map_err(|e| format!("Groq audio invalido: {e}"))?;
+    let forma = reqwest::multipart::Form::new()
+        .part("file", parte)
+        .text("model", MODELO)
+        .text("language", "es")
+        .text("response_format", "text");
+    let cliente = cliente_http(120).map_err(|e| e.to_string())?;
+    let resp = cliente
+        .post(GROQ_URL)
+        .header("Authorization", format!("Bearer {key}"))
+        .multipart(forma)
+        .send()
+        .await
+        .map_err(|e| format!("Groq red: {e}"))?;
+    if resp.status() == 401 || resp.status() == 403 {
+        return Err("Groq rechazo la clave (revisa GROQ_API_KEY o la VPN)".to_string());
+    }
+    if !resp.status().is_success() {
+        let trozo: String = resp
+            .text()
+            .await
+            .unwrap_or_default()
+            .chars()
+            .take(200)
+            .collect();
+        return Err(format!("Groq HTTP: {trozo}"));
+    }
+    let texto: String = resp
+        .text()
+        .await
+        .map_err(|e| format!("Groq respuesta no texto: {e}"))?
+        .trim()
+        .chars()
+        .take(MAX_TEXTO)
+        .collect();
+    if texto.is_empty() {
+        return Err("Groq devolvio transcripcion vacia".to_string());
+    }
+    Ok(texto)
+}
+
 /// [299A-1 E11] La IA del turno de `WhatsApp` es texto puro (el transporte de
 /// `glory-agent` arma `input` Responses solo con strings, sin `input_image`):
 /// para que "vea" la foto entrante se describe aquí con visión real

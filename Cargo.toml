@@ -55,11 +55,12 @@ base64 = "0.22"
 # `../glory-agent` no existe alli; el pin hace el build hermetico).
 glory-agent = { git = "https://github.com/1ndoryu/glory-agent.git", rev = "e4ad5d787a80dc39be2b7449b6904dc535c4b0b4" }
 
-# Avisos WhatsApp del chat (169A-4): POST al gateway desde el worker
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+# Avisos WhatsApp del chat (169A-4): POST al gateway desde el worker.
+# [309A-4] `multipart` para STT de notas de voz (Groq transcriptions).
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "multipart"] }
 
 [dev-dependencies]
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "multipart"] }
 tokio-test = "0.4"
 
 [lints.clippy]

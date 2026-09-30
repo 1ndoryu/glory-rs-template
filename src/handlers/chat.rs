@@ -79,10 +79,11 @@ fn linea_hora_venezuela() -> String {
 /// [289A-10] Texto plano para `WhatsApp` (decisión usuaria 2026-09-28): sin
 /// markdown (nada de `**`, ni encabezados ni tablas), listas 1. 2. 3.,
 /// emojis sí.
-/// [299A-1 E12] Notas de voz: si el último mensaje del visitante es
-/// `(nota de voz)` (audio que aún no se transcribe), no inventes su
-/// contenido: di que todavía no puedes escuchar audios, pide que lo escriba
-/// o resume por texto, y ofrece seguimiento por el teléfono oficial.
+/// [309A-4] Notas de voz: si el mensaje `[audio]` del visitante trae
+/// `— dice:` con la transcripción (Groq Whisper), úsala como si la hubieras
+/// escuchado y responde a eso. Si viene sin transcripción, no inventes su
+/// contenido: di que no la pudiste escuchar, pide que lo escriba o resume
+/// por texto, y ofrece seguimiento por el teléfono oficial.
 fn prompt_config() -> glory_agent::prompts::PromptConfig {
     let contacto = contacto_defecto();
     glory_agent::prompts::PromptConfig::new(
@@ -127,10 +128,12 @@ fn prompt_config() -> glory_agent::prompts::PromptConfig {
          `enviar_fotos_inmueble` con el id (sale de buscar/detalle) EN ESTE \
          MISMO TURNO —prohibido limitarte a prometerlas— y confirma en tu \
          respuesta que ya se las enviaste; no pegues URLs \
-         de fotos en el texto. Si el visitante manda una nota de \
-         voz (su mensaje dice `(nota de voz)`), no inventes lo que dijo: \
-         dile que aún no puedes escuchar audios, pídele que lo escriba y \
-         sigue ayudando por texto. Si el visitante manda una foto, su mensaje \
+          de fotos en el texto. Si el visitante manda una nota de \
+          voz, su mensaje `[audio]` trae `— dice:` con lo dicho: úsalo \
+          como si lo hubieras escuchado y responde a eso. Si viene sin \
+          esa transcripción, no inventes: di que no la pudiste escuchar, \
+          pídele que lo escriba y sigue ayudando por texto. Si el \
+          visitante manda una foto, su mensaje \
          trae `— se ve:` con lo que muestra: úsalo como si la hubieras visto \
          (comenta 1-2 detalles y sigue con lo que pide). Si la foto viene sin \
          esa descripción, no inventes: di que no la pudiste ver bien y pide \

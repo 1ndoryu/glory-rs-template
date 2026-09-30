@@ -1,5 +1,19 @@
 # Lecciones aprendidas
 
+## 2026-09-30 - Groq 403 es red, no keys; Opencode Go no transcribe audio
+- `403 {"error":{"message":"Forbidden"}}` de Groq hasta en `/models` y en el
+  login web con keys válidas = IP/red bloqueada, no keys revocadas: con VPN
+  todo pasó a 200 sin tocar keys. Ante un 403 global, probar otra red/VPN
+  antes de rotar claves.
+- Opencode Go (zen) no tiene vía de STT: ni `input_audio` en Responses ni
+  `audio_url` en chat ni endpoint `/audio/transcriptions` ni modelos
+  whisper/gemini en el catálogo. Si un proveedor "IA" pela el adjunto en
+  silencio (200 con "no audio attached"), el probe debe mirar el contenido
+  de la respuesta, no solo el HTTP.
+- `main.rs` carga `.env` vía `dotenvy`, pero `cargo test --lib` no pasa por
+  `main`: los tests vivos que necesiten secretos los reciben por entorno
+  explícito + flag opt-in (`GROQ_LIVE_TEST=1`) y se omiten sin él.
+
 ## 2026-05-08 — Core editor-agnostico en extensiones
 - Para extraer un core real no basta cambiar tipos: hay que eliminar imports indirectos de servicios del editor, como `configService`, `vscode.workspace` o registries que lean settings globales.
 - Si una regla aun necesita workspace/watchers, aislarla como callback/adaptador permite avanzar el core sin romper el provider existente.

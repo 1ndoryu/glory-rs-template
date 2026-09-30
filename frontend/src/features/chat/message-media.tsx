@@ -1,7 +1,8 @@
 /* [299A-3] La burbuja del hilo mostraba `[foto] /uploads/...` y `[audio]
  * ...` como texto plano: el staff no veía la foto ni podía oír la nota de
  * voz. Este componente renderiza esas marcas (las escribe el webhook en
- * `whatsapp.rs:cuerpo_media`, con descripción E11 anexada tras `— se ve:`).
+ * `whatsapp.rs:cuerpo_media`, con descripción E11 anexada tras `— se ve:`
+ * y transcripción [309A-4] tras `— dice:`).
  * Solo acepta `src` local `/uploads/...` o remoto `http(s)://`; cualquier
  * otra cosa se muestra como texto (nada de `innerHTML`: React escapa).
  * La URL relativa funciona en prod (mismo origen) y en dev vía proxy
@@ -10,7 +11,7 @@
 type MediaLine =
   | { kind: 'text'; text: string }
   | { kind: 'photo'; src: string; caption: string | null }
-  | { kind: 'audio'; src: string }
+  | { kind: 'audio'; src: string; caption: string | null }
   | { kind: 'remote'; url: string };
 
 function srcValido(src: string): boolean {
@@ -28,8 +29,12 @@ function parseLine(linea: string): MediaLine {
       return { kind: 'photo', src: src.trim(), caption };
     }
   } else if (lineaRecortada.startsWith('[audio] ')) {
-    const src = lineaRecortada.slice('[audio] '.length);
-    if (srcValido(src)) return { kind: 'audio', src: src.trim() };
+    const resto = lineaRecortada.slice('[audio] '.length);
+    const [src, ...dicho] = resto.split(' — dice: ');
+    if (srcValido(src)) {
+      const caption = dicho.length > 0 ? dicho.join(' — dice: ').trim() || null : null;
+      return { kind: 'audio', src: src.trim(), caption };
+    }
   } else if (lineaRecortada.startsWith('[media] ')) {
     const url = lineaRecortada.slice('[media] '.length).trim();
     if (url.startsWith('https://') || url.startsWith('http://')) return { kind: 'remote', url };
@@ -60,9 +65,12 @@ export function MessageMedia({ body }: { body: string }) {
         }
         if (linea.kind === 'audio') {
           return (
-            <audio key={i} controls preload="none" src={linea.src} className="w-full max-w-65">
-              Tu navegador no reproduce este audio.
-            </audio>
+            <figure key={i}>
+              <audio controls preload="none" src={linea.src} className="w-full max-w-65">
+                Tu navegador no reproduce este audio.
+              </audio>
+              {linea.caption && <figcaption className="mt-1 text-xs opacity-70">Dice: {linea.caption}</figcaption>}
+            </figure>
           );
         }
         if (linea.kind === 'remote') {
