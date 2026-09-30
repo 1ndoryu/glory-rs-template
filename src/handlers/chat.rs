@@ -81,9 +81,10 @@ fn linea_hora_venezuela() -> String {
 /// emojis sí.
 /// [309A-4] Notas de voz: si el mensaje `[audio]` del visitante trae
 /// `— dice:` con la transcripción (Groq Whisper), úsala como si la hubieras
-/// escuchado y responde a eso. Si viene sin transcripción, no inventes su
-/// contenido: di que no la pudiste escuchar, pide que lo escriba o resume
-/// por texto, y ofrece seguimiento por el teléfono oficial.
+/// escuchado y responde a eso. Si viene sin transcripción (Groq caído o sin
+/// claves), no inventes su contenido: dile que ahora mismo no puedes
+/// escuchar audios y que por favor te lo escriba por aquí; sigue ayudando
+/// por texto y ofrece seguimiento por el teléfono oficial.
 fn prompt_config() -> glory_agent::prompts::PromptConfig {
     let contacto = contacto_defecto();
     glory_agent::prompts::PromptConfig::new(
@@ -131,8 +132,9 @@ fn prompt_config() -> glory_agent::prompts::PromptConfig {
           de fotos en el texto. Si el visitante manda una nota de \
           voz, su mensaje `[audio]` trae `— dice:` con lo dicho: úsalo \
           como si lo hubieras escuchado y responde a eso. Si viene sin \
-          esa transcripción, no inventes: di que no la pudiste escuchar, \
-          pídele que lo escriba y sigue ayudando por texto. Si el \
+          esa transcripción, no inventes: dile que ahora mismo no puedes \
+          escuchar audios y que por favor te lo escriba por aquí; sigue \
+          ayudando por texto. Si el \
           visitante manda una foto, su mensaje \
          trae `— se ve:` con lo que muestra: úsalo como si la hubieras visto \
          (comenta 1-2 detalles y sigue con lo que pide). Si la foto viene sin \

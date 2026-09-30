@@ -552,62 +552,102 @@ async fn completar_opencode(
 /// pasa audio por ninguna vía (verificado: Responses pela `input_audio`,
 /// chat pela `audio_url`, sin endpoint `/audio/transcriptions`), así que el
 /// STT sale por aquí. Best-effort: cualquier `Err` y el llamador conserva el
-/// `[audio]` pelado + el prompt pide que lo escriban. La clave vive solo en
-/// `.env` (`GROQ_API_KEY`) y nunca se loguea.
+/// `[audio]` pelado + el prompt pide que lo escriban.
+/// [309A-5] Rotación: prueba `GROQ_API_KEY` + respaldos `_2..=_9` en orden;
+/// ante 401/403/429/5xx/red rota a la siguiente (WARN con el # de clave,
+/// nunca la clave). Agotadas todas → `Err` y fail-open en el hilo.
 pub(crate) async fn transcribir_audio(
     bytes: &[u8],
     nombre: &str,
     mime: &str,
 ) -> Result<String, String> {
     const GROQ_URL: &str = "https://api.groq.com/openai/v1/audio/transcriptions";
+    transcribir_audio_con(bytes, nombre, mime, &claves_groq(), GROQ_URL).await
+}
+
+/// [309A-5] Claves STT en orden (primaria + respaldos no vacíos).
+fn claves_groq() -> Vec<String> {
+    let mut todas = vec![leer_env("GROQ_API_KEY")];
+    for n in 2..=9 {
+        todas.push(leer_env(&format!("GROQ_API_KEY_{n}")));
+    }
+    todas.into_iter().filter(|k| !k.is_empty()).collect()
+}
+
+/// [309A-5] Núcleo con claves+URL inyectables (testeable con mock local).
+/// 400 no rota (petición malformada: reintentar no ayuda); 200 vacío sí rota
+/// (puede ser flakiness del modelo). Timeout 120 s por intento: corre en el
+/// spawn del webhook, nunca en el camino del 2xx ni del turno.
+async fn transcribir_audio_con(
+    bytes: &[u8],
+    nombre: &str,
+    mime: &str,
+    claves: &[String],
+    url: &str,
+) -> Result<String, String> {
     const MODELO: &str = "whisper-large-v3-turbo";
     const MAX_TEXTO: usize = 2000;
-    let key = leer_env("GROQ_API_KEY");
-    if key.is_empty() {
+    if claves.is_empty() {
         return Err("Sin GROQ_API_KEY en .env".to_string());
     }
-    let parte = reqwest::multipart::Part::bytes(bytes.to_vec())
-        .file_name(nombre.to_string())
-        .mime_str(mime)
-        .map_err(|e| format!("Groq audio invalido: {e}"))?;
-    let forma = reqwest::multipart::Form::new()
-        .part("file", parte)
-        .text("model", MODELO)
-        .text("language", "es")
-        .text("response_format", "text");
-    let cliente = cliente_http(120).map_err(|e| e.to_string())?;
-    let resp = cliente
-        .post(GROQ_URL)
-        .header("Authorization", format!("Bearer {key}"))
-        .multipart(forma)
-        .send()
-        .await
-        .map_err(|e| format!("Groq red: {e}"))?;
-    if resp.status() == 401 || resp.status() == 403 {
-        return Err("Groq rechazo la clave (revisa GROQ_API_KEY o la VPN)".to_string());
-    }
-    if !resp.status().is_success() {
-        let trozo: String = resp
+    let mut ultimo = "sin intentos".to_string();
+    for (i, key) in claves.iter().enumerate() {
+        let parte = reqwest::multipart::Part::bytes(bytes.to_vec())
+            .file_name(nombre.to_string())
+            .mime_str(mime)
+            .map_err(|e| format!("Groq audio invalido: {e}"))?;
+        let forma = reqwest::multipart::Form::new()
+            .part("file", parte)
+            .text("model", MODELO)
+            .text("language", "es")
+            .text("response_format", "text");
+        let cliente = cliente_http(120).map_err(|e| e.to_string())?;
+        let resp = match cliente
+            .post(url)
+            .header("Authorization", format!("Bearer {key}"))
+            .multipart(forma)
+            .send()
+            .await
+        {
+            Ok(r) => r,
+            Err(e) => {
+                ultimo = format!("Groq red: {e}");
+                tracing::warn!("STT: clave #{} sin red, roto a la siguiente", i + 1);
+                continue;
+            }
+        };
+        let estado = resp.status();
+        if estado == 401 || estado == 403 || estado == 429 || estado.is_server_error() {
+            ultimo = format!("Groq HTTP {estado} con clave #{}", i + 1);
+            tracing::warn!("STT: {ultimo}, roto a la siguiente");
+            continue;
+        }
+        if !estado.is_success() {
+            let trozo: String = resp
+                .text()
+                .await
+                .unwrap_or_default()
+                .chars()
+                .take(200)
+                .collect();
+            return Err(format!("Groq HTTP {estado}: {trozo}"));
+        }
+        let texto: String = resp
             .text()
             .await
-            .unwrap_or_default()
+            .map_err(|e| format!("Groq respuesta no texto: {e}"))?
+            .trim()
             .chars()
-            .take(200)
+            .take(MAX_TEXTO)
             .collect();
-        return Err(format!("Groq HTTP: {trozo}"));
+        if texto.is_empty() {
+            ultimo = "Groq devolvio transcripcion vacia".to_string();
+            tracing::warn!("STT: {ultimo}, roto a la siguiente");
+            continue;
+        }
+        return Ok(texto);
     }
-    let texto: String = resp
-        .text()
-        .await
-        .map_err(|e| format!("Groq respuesta no texto: {e}"))?
-        .trim()
-        .chars()
-        .take(MAX_TEXTO)
-        .collect();
-    if texto.is_empty() {
-        return Err("Groq devolvio transcripcion vacia".to_string());
-    }
-    Ok(texto)
+    Err(ultimo)
 }
 
 /// [299A-1 E11] La IA del turno de `WhatsApp` es texto puro (el transporte de
@@ -745,6 +785,114 @@ mod pruebas {
             ..base.clone()
         };
         assert!(validar_entrada(&muchas).is_err());
+    }
+
+    /* [309A-5] Sin claves no hay red: falla antes de mirar la URL. */
+    #[test]
+    fn transcribir_sin_claves_no_toca_red() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let r = rt.block_on(super::transcribir_audio_con(
+            &[1, 2, 3],
+            "a.mp3",
+            "audio/mpeg",
+            &[],
+            "http://127.0.0.1:9/",
+        ));
+        assert!(r.is_err());
+    }
+
+    /* [309A-5] Come una petición HTTP/1.1 completa del mock (cabeceras +
+     * cuerpo multipart) para que el cliente no vea un RST. */
+    async fn comer_peticion(zocalo: &mut tokio::net::TcpStream) {
+        use tokio::io::AsyncReadExt;
+        let mut todo = Vec::new();
+        let mut buf = [0u8; 8192];
+        let (cab, largo) = loop {
+            let n = zocalo.read(&mut buf).await.expect("mock lee");
+            assert!(n > 0, "el cliente cerro sin pedir");
+            todo.extend_from_slice(&buf[..n]);
+            if let Some(pos) = todo.windows(4).position(|w| w == b"\r\n\r\n") {
+                let cabecera = String::from_utf8_lossy(&todo[..pos]).to_string();
+                let largo = cabecera
+                    .lines()
+                    .find_map(|l| {
+                        l.to_ascii_lowercase()
+                            .strip_prefix("content-length: ")
+                            .map(|v: &str| v.trim().parse().unwrap_or(0))
+                    })
+                    .unwrap_or(0);
+                break (pos + 4, largo);
+            }
+        };
+        while todo.len() < cab + largo {
+            let n = zocalo.read(&mut buf).await.expect("mock lee cuerpo");
+            assert!(n > 0, "cuerpo cortado");
+            todo.extend_from_slice(&buf[..n]);
+        }
+    }
+
+    /* [309A-5] Rotación contra mock local: 401 con la 1ª → la 2ª transcribe.
+     * Certeza sin depender de Groq real ni de VPN. */
+    #[tokio::test]
+    async fn transcribir_rota_clave_tras_401() {
+        use tokio::io::AsyncWriteExt;
+        let oyente = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!(
+            "http://127.0.0.1:{}/audio/transcriptions",
+            oyente.local_addr().unwrap().port()
+        );
+        let servo = tokio::spawn(async move {
+            let mut usadas = 0;
+            for (estado, cuerpo) in [(401, "no"), (200, "hola rotacion")] {
+                let (mut zocalo, _) = oyente.accept().await.unwrap();
+                comer_peticion(&mut zocalo).await;
+                let resp = format!(
+                    "HTTP/1.1 {estado} X\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{cuerpo}",
+                    cuerpo.len()
+                );
+                zocalo.write_all(resp.as_bytes()).await.unwrap();
+                usadas += 1;
+            }
+            usadas
+        });
+        let claves = vec!["mala".to_string(), "buena".to_string()];
+        let texto = super::transcribir_audio_con(&[1, 2, 3], "a.mp3", "audio/mpeg", &claves, &url)
+            .await
+            .unwrap();
+        assert_eq!(texto, "hola rotacion");
+        assert_eq!(servo.await.unwrap(), 2, "debió probar ambas claves");
+    }
+
+    /* [309A-5] Groq caído (401 en todas) → Err: el llamador deja el `[audio]`
+     * pelado y el prompt pide el texto (fail-open garantizado). */
+    #[tokio::test]
+    async fn transcribir_caido_en_todas_falla_cerrado_util() {
+        use tokio::io::AsyncWriteExt;
+        let oyente = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!(
+            "http://127.0.0.1:{}/audio/transcriptions",
+            oyente.local_addr().unwrap().port()
+        );
+        let servo = tokio::spawn(async move {
+            for _ in 0..2 {
+                let (mut zocalo, _) = oyente.accept().await.unwrap();
+                comer_peticion(&mut zocalo).await;
+                zocalo
+                    .write_all(
+                        b"HTTP/1.1 401 X\r\nContent-Length: 2\r\nConnection: close\r\n\r\nno",
+                    )
+                    .await
+                    .unwrap();
+            }
+        });
+        let claves = vec!["una".to_string(), "otra".to_string()];
+        let r =
+            super::transcribir_audio_con(&[1, 2, 3], "a.mp3", "audio/mpeg", &claves, &url).await;
+        assert!(r.is_err());
+        servo.await.unwrap();
     }
 
     /* [199A-1] El diagnostico `ok|epoch|ms|modelo` se rehidrata; el error no. */
