@@ -86,8 +86,10 @@ export function BandejaMensajes() {
               </li>
             ))}
           </ul>
-          {/* Hilo (en móvil con botón volver). */}
-          <div className={cn('min-h-[50dvh] flex-1 flex-col rounded-md border', b.seleccionada ? 'flex' : 'hidden lg:flex')}>
+          {/* Hilo (en móvil con botón volver). [309A-2] Altura acotada: sin
+              `max-h` la página crecía sin fin con hilos largos; el scroll vive
+              en la caja de mensajes (`overflow-y-auto` en `HiloMensajes`). */}
+          <div className={cn('min-h-[50dvh] max-h-[75dvh] flex-1 flex-col overflow-hidden rounded-md border', b.seleccionada ? 'flex' : 'hidden lg:flex')}>
             {!b.seleccionada ? (
               <p className="m-auto px-6 py-16 text-center text-sm text-muted-foreground">Elige una conversación.</p>
             ) : (
@@ -100,6 +102,9 @@ export function BandejaMensajes() {
                 <HiloMensajes
                   sesion={b.seleccionada}
                   hilo={b.hilo}
+                  hayMas={b.hayMas}
+                  cargandoMas={b.cargandoMas}
+                  alCargarAnteriores={b.cargarAnteriores}
                   respondiendo={b.respondiendo}
                   alResponder={b.responder}
                   alCambiar={b.cambiarSesion}

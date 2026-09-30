@@ -113,16 +113,38 @@ struct Limite {
     limit: Option<i64>,
 }
 
-/// Hilo completo para el panel (reutiliza el repo del núcleo).
+#[derive(Debug, Deserialize)]
+struct HistorialQuery {
+    limit: Option<i64>,
+    before_seq: Option<i64>,
+}
+
+/// Hilo para el panel (paginado por cursor).
+/// [309A-3] `before_seq` trae mensajes anteriores a esa secuencia (el panel
+/// los antepone al hacer scroll arriba); `limit` acota la página (el panel
+/// pide `PAGINA+1` y si llegan todas hay más). Sin cursor trae lo último.
+/// Orden ASC de lectura; `list_messages` del núcleo no acepta cursor, así
+/// que la consulta es propia (columnas en el orden de `ChatMessage`).
 async fn historial(
     _auth: AuthUser,
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
-    Query(q): Query<Limite>,
+    Query(q): Query<HistorialQuery>,
 ) -> Result<Json<Vec<glory_agent::models::ChatMessage>>, AppError> {
-    let msgs = glory_agent::persistence::list_messages(&state.pool, id, q.limit.unwrap_or(100))
-        .await
-        .map_err(|e| fail(&e))?;
+    let limit = q.limit.unwrap_or(100).clamp(1, 200);
+    let mut msgs: Vec<glory_agent::models::ChatMessage> = sqlx::query_as(
+        "SELECT id, session_id, sender, body, sequence_num, input_tokens, output_tokens, created_at \
+         FROM agent_messages WHERE session_id = $1 \
+         AND ($2::BIGINT IS NULL OR sequence_num < $2) \
+         ORDER BY sequence_num DESC LIMIT $3",
+    )
+    .bind(id)
+    .bind(q.before_seq)
+    .bind(limit)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(AppError::from)?;
+    msgs.reverse();
     Ok(Json(msgs))
 }
 

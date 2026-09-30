@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::future::Future;
 use std::pin::Pin;
 
@@ -42,6 +43,8 @@ fn def_buscar() -> ToolDefinition {
          son filtros exactos en BD, nunca filtres a ojo lo devuelto. \
          Las primeras tarjetas YA se envian solas como mensajes separados (mira `tarjetas_enviadas`): \
          no las repitas ni las listes en tu respuesta, solo intro de una linea + cierre breve. \
+         Si llamas de nuevo con el mismo filtro, las tarjetas ya enviadas NO se reenvian \
+         (mira `repetidas`): no las anuncies otra vez. \
          Si `total` es 0, dilo claro y pide otro filtro (no inventes oferta).",
         json!({
             "type": "object",
@@ -95,7 +98,9 @@ fn def_enviar_fotos() -> ToolDefinition {
         "Envia hasta 3 fotos del catalogo al visitante por WhatsApp (con el titulo como pie). \
          Usala cuando el visitante pida fotos de un inmueble o cuando ofrezcas enviarselas y acepte. \
          El id sale de buscar_inmuebles/detalle_inmueble. Tras llamarla, confirma en tu respuesta \
-         que ya se las enviaste; no pegues URLs de fotos en el texto.",
+         que ya se las enviaste; no pegues URLs de fotos en el texto. \
+         Las fotos ya enviadas en este hilo NO se reenvian (mira `repetidas`): \
+         no las anuncies otra vez.",
         json!({
             "type": "object",
             "properties": {
@@ -366,7 +371,7 @@ async fn buscar(
      * telefono o sin canal WhatsApp no hay a donde enviarlas: `0` y el modelo
      * lista como antes (widget web).
      * Ojo: `filas` se consume abajo para `items`; las tarjetas van primero. */
-    let enviadas = encolar_tarjetas(pool, session_id, &filas, hub).await;
+    let (enviadas, repetidas) = encolar_tarjetas(pool, session_id, &filas, hub).await;
     let items: Vec<Value> = filas
         .into_iter()
         .map(|t| {
@@ -375,7 +380,9 @@ async fn buscar(
                    "puestos": t.puestos, "residencia": t.residencia, "habitaciones": t.habitaciones})
         })
         .collect();
-    Ok(json!({"inmuebles": items, "total": total, "tarjetas_enviadas": enviadas}))
+    Ok(
+        json!({"inmuebles": items, "total": total, "tarjetas_enviadas": enviadas, "repetidas": repetidas}),
+    )
 }
 
 /// Tope de tarjetas por turno (regla usuaria: con mas de 5 resultados se
@@ -420,15 +427,23 @@ fn formato_precio(precio: f64) -> String {
 }
 
 /// Encola una tarjeta por propiedad (hasta `MAX_TARJETAS`) en outbox
-/// `whatsapp`. Devuelve cuantas se enviaron (`0` = el modelo lista a mano).
+/// `whatsapp`. Devuelve `(nuevas, repetidas)`: `0` nuevas = el modelo lista
+/// a mano o todo ya se había enviado.
+/// [309A-1] Dedup entre turnos: el modelo re-llama `buscar` en el turno
+/// siguiente ("mándame las fotos") y antes re-encolaba la misma tarjeta
+/// (el visitante la recibía 2 veces). Se compara el texto exacto contra los
+/// últimos 30 mensajes `ai` del hilo (incluye los espejos 299A-4): lo ya
+/// enviado se salta y se cuenta en `repetidas`. Best-effort: si la lectura
+/// falla se envía como antes (fail-open, nunca se bloquea un envío por un
+/// fallo de lectura) y se avisa con WARN.
 async fn encolar_tarjetas(
     pool: &PgPool,
     session_id: Uuid,
     filas: &[Tarjeta],
     hub: Option<&ChatHub>,
-) -> usize {
+) -> (usize, usize) {
     if filas.is_empty() {
-        return 0;
+        return (0, 0);
     }
     let telefono = match ClienteRepository::ficha_para_aviso(pool, session_id).await {
         Ok(f) => f
@@ -437,17 +452,25 @@ async fn encolar_tarjetas(
             .filter(|t| !t.is_empty()),
         Err(e) => {
             tracing::warn!("tarjetas sesion={session_id}: sin ficha ({e}), no se encolan");
-            return 0;
+            return (0, 0);
         }
     };
-    let Some(destino) = telefono else { return 0 };
+    let Some(destino) = telefono else {
+        return (0, 0);
+    };
     let via = match ClienteRepository::canal_de(pool, session_id).await {
         Ok(Some(v)) if v == "wa_a" || v == "wa_b" => v,
-        _ => return 0,
+        _ => return (0, 0),
     };
+    let mut ya_enviadas = cuerpos_ai_recientes(pool, session_id).await;
     let mut enviadas = 0;
+    let mut repetidas = 0;
     for t in filas.iter().take(MAX_TARJETAS) {
         let texto = tarjeta_texto(t);
+        if ya_enviadas.contains(&texto) {
+            repetidas += 1;
+            continue;
+        }
         let tarjeta = json!({
             "session_id": session_id.to_string(),
             "destino": destino,
@@ -458,6 +481,9 @@ async fn encolar_tarjetas(
         match glory_agent::persistence::enqueue_outbox(pool, "whatsapp", tarjeta).await {
             Ok(_) => {
                 enviadas += 1;
+                /* Se registra en el set para que dos filas con el mismo
+                 * texto en el mismo lote tampoco se dupliquen. */
+                ya_enviadas.insert(texto.clone());
                 espejar_en_hilo(pool, hub, session_id, &texto).await;
             }
             Err(e) => {
@@ -466,7 +492,25 @@ async fn encolar_tarjetas(
             }
         }
     }
-    enviadas
+    (enviadas, repetidas)
+}
+
+/// Cuerpos de los últimos mensajes `ai` del hilo (ventana de 30): base del
+/// dedup 309A-1 (tarjetas y fotos ya enviadas). Vacío + WARN si falla.
+async fn cuerpos_ai_recientes(pool: &PgPool, session_id: Uuid) -> HashSet<String> {
+    match glory_agent::persistence::list_messages(pool, session_id, 30).await {
+        Ok(msgs) => msgs
+            .into_iter()
+            .filter(|m| m.sender == "ai")
+            .map(|m| m.body)
+            .collect(),
+        Err(e) => {
+            tracing::warn!(
+                "dedup sesion={session_id}: sin historial reciente ({e}), se envía todo"
+            );
+            HashSet::new()
+        }
+    }
 }
 
 /// [299A-4] Espejo de envíos `WhatsApp` en el hilo: `agent_outbox` es cola
@@ -630,6 +674,12 @@ async fn enviar_fotos(
         .filter(|b| !b.is_empty())
         .unwrap_or_else(|| "http://127.0.0.1:3000".to_string());
     let total = claves.len();
+    /* [309A-1] Dedup de fotos entre turnos (misma causa que las tarjetas:
+     * re-llamar con el mismo id re-enviaba las 3 fotos). Se compara la URL
+     * contra los espejos `[foto] url ...` ya presentes en el hilo. */
+    let ya_enviadas = cuerpos_ai_recientes(pool, session_id).await;
+    let mut enviadas = 0;
+    let mut repetidas = 0;
     for (i, clave) in claves.iter().enumerate() {
         let pie = if total > 1 {
             format!("{} ({}/{})", titulo.trim(), i + 1, total)
@@ -639,6 +689,10 @@ async fn enviar_fotos(
         /* [299A-4] La misma foto que viaja por WhatsApp queda en el hilo
          * (`[foto] url — se ve: pie` la renderiza `MessageMedia`). */
         let url = format!("{base}/uploads/{clave}");
+        if ya_enviadas.iter().any(|b| b.contains(&url)) {
+            repetidas += 1;
+            continue;
+        }
         let espejo = format!("[foto] {url} — se ve: {}", pie.trim());
         let aviso = json!({
             "session_id": session_id.to_string(),
@@ -650,8 +704,9 @@ async fn enviar_fotos(
         });
         glory_agent::persistence::enqueue_outbox(pool, "whatsapp", aviso).await?;
         espejar_en_hilo(pool, hub, session_id, &espejo).await;
+        enviadas += 1;
     }
-    Ok(json!({"ok": true, "enviadas": total, "titulo": titulo}))
+    Ok(json!({"ok": true, "enviadas": enviadas, "repetidas": repetidas, "titulo": titulo}))
 }
 
 /// Teléfono 6..24 chars de `+0123456789 ()-.` con al menos 6 dígitos.
@@ -1624,6 +1679,199 @@ mod pruebas {
             .await
             .unwrap();
         sqlx::query("DELETE FROM clientes WHERE telefono = '34633333333'")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM agent_response_cycles WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM agent_sessions WHERE id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+
+    /* [309A-1] Segunda vuelta de `buscar` con el mismo filtro no re-encola
+     * tarjetas ya enviadas (antes el visitante recibía la tarjeta 2 veces:
+     * turno 1 `buscar` + turno 2 `buscar` de nuevo al pedir fotos). */
+    #[tokio::test]
+    async fn buscar_no_repite_tarjetas_ya_enviadas() {
+        let Some(pool) = pool_si_hay() else { return };
+        let h = Herramientas::new(pool.clone(), "Test 600111222".to_string())
+            .with_hub(ChatHub::default());
+        let sesion = Uuid::new_v4();
+        glory_agent::persistence::ensure_session(&pool, sesion)
+            .await
+            .unwrap();
+        let ctx = ToolCtx::new(sesion, Some(pool.clone()));
+        h.execute(
+            "registrar_contacto",
+            &json!({"nombre": "Dedup Test", "telefono": "+34644444444"}),
+            &ctx,
+        )
+        .await
+        .unwrap();
+        /* `registrar` no vincula canal (Fase3-H1): se fija `wa_b` directo
+         * para que `encolar_tarjetas` tenga vía de salida. */
+        sqlx::query(
+            "INSERT INTO canal_sesiones (session_id, cliente_id, canal, telefono, modo) \
+             VALUES ($1, NULL, 'wa_b', '34644444444', 'completo')",
+        )
+        .bind(sesion)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let primera = h
+            .execute("buscar_inmuebles", &json!({}), &ctx)
+            .await
+            .unwrap();
+        assert!(
+            primera
+                .get("tarjetas_enviadas")
+                .and_then(Value::as_u64)
+                .unwrap_or(0)
+                > 0
+        );
+        let outbox_1: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM agent_outbox WHERE payload->>'session_id' = $1",
+        )
+        .bind(sesion.to_string())
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        let segunda = h
+            .execute("buscar_inmuebles", &json!({}), &ctx)
+            .await
+            .unwrap();
+        assert_eq!(
+            segunda.get("tarjetas_enviadas").and_then(Value::as_u64),
+            Some(0)
+        );
+        assert!(
+            segunda
+                .get("repetidas")
+                .and_then(Value::as_u64)
+                .unwrap_or(0)
+                > 0
+        );
+        let outbox_2: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM agent_outbox WHERE payload->>'session_id' = $1",
+        )
+        .bind(sesion.to_string())
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(outbox_1, outbox_2);
+
+        sqlx::query("DELETE FROM agent_outbox WHERE payload->>'session_id' = $1")
+            .bind(sesion.to_string())
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM agent_messages WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM canal_sesiones WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM atencion_sesiones WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM clientes WHERE telefono = '34644444444'")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM agent_response_cycles WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM agent_sessions WHERE id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+
+    /* [309A-1] Re-llamar `enviar_fotos` con el mismo id no reenvía las fotos
+     * ya presentes en el hilo (mismo dedup que las tarjetas). */
+    #[tokio::test]
+    async fn enviar_fotos_no_repite_fotos_ya_enviadas() {
+        let Some(pool) = pool_si_hay() else { return };
+        let h = Herramientas::new(pool.clone(), "Test 600111222".to_string())
+            .with_hub(ChatHub::default());
+        let sesion = Uuid::new_v4();
+        glory_agent::persistence::ensure_session(&pool, sesion)
+            .await
+            .unwrap();
+        let ctx = ToolCtx::new(sesion, Some(pool.clone()));
+        h.execute(
+            "registrar_contacto",
+            &json!({"nombre": "Dedup Foto", "telefono": "+34655555555"}),
+            &ctx,
+        )
+        .await
+        .unwrap();
+        let id: String = sqlx::query_scalar(
+            "SELECT id::TEXT FROM inmuebles WHERE publicado \
+             AND (SELECT COUNT(*) FROM fotos WHERE inmueble_id = inmuebles.id) > 0 LIMIT 1",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let primera = h
+            .execute("enviar_fotos_inmueble", &json!({"id": id, "max": 2}), &ctx)
+            .await
+            .unwrap();
+        assert_eq!(primera.get("enviadas").and_then(Value::as_i64), Some(2));
+        let segunda = h
+            .execute("enviar_fotos_inmueble", &json!({"id": id, "max": 2}), &ctx)
+            .await
+            .unwrap();
+        assert_eq!(segunda.get("enviadas").and_then(Value::as_i64), Some(0));
+        assert_eq!(segunda.get("repetidas").and_then(Value::as_i64), Some(2));
+        let espejos: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM agent_messages WHERE session_id = $1 \
+             AND sender = 'ai' AND body LIKE '[foto] %'",
+        )
+        .bind(sesion)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(espejos, 2);
+
+        sqlx::query("DELETE FROM agent_outbox WHERE payload->>'session_id' = $1")
+            .bind(sesion.to_string())
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM agent_messages WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM canal_sesiones WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM atencion_sesiones WHERE session_id = $1")
+            .bind(sesion)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM clientes WHERE telefono = '34655555555'")
             .execute(&pool)
             .await
             .unwrap();

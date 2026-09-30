@@ -40,8 +40,13 @@ export function listarSesiones(estado?: EstadoSesionChat): Promise<ResumenSesion
   return apiFetch<ResumenSesion[]>(`/api/admin/agent/sesiones${q}`);
 }
 
-export function historialSesion(id: string): Promise<MensajeServidor[]> {
-  return apiFetch<MensajeServidor[]>(`/api/admin/agent/sesiones/${encodeURIComponent(id)}/historial?limit=100`);
+/* [309A-3] Página del hilo: `beforeSeq` trae lo anterior a esa secuencia
+ * (scroll arriba); sin cursor trae lo último. */
+export function historialSesion(id: string, opts?: { limit?: number; beforeSeq?: number }): Promise<MensajeServidor[]> {
+  const q = new URLSearchParams();
+  q.set('limit', String(opts?.limit ?? 100));
+  if (opts?.beforeSeq !== undefined) q.set('before_seq', String(opts.beforeSeq));
+  return apiFetch<MensajeServidor[]>(`/api/admin/agent/sesiones/${encodeURIComponent(id)}/historial?${q.toString()}`);
 }
 
 /* Responder toma el hilo (backend apaga la IA y marca `escalated`). */
