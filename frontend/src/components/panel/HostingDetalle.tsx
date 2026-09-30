@@ -18,9 +18,11 @@ import {
 import {Button} from '../ui/Button';
 import {useChatStore} from '../../stores/chatStore';
 import {
-    TabGeneral, TabRecursos, TabDominio,
-    TabAcceso, TabEventos,
+    TabGeneral, TabRecursos, TabEventos,
 } from './HostingDetalleTabs';
+/* [higiene] TabDominio/TabAcceso se importan de su módulo propio: HostingDetalleTabs
+ * ya no los re-exporta (mezclaba re-export y lógica ejecutable: mixed-barrel-logic). */
+import {TabDominio, TabAcceso} from './HostingDetalleAccess';
 import {TabFacturacion} from './TabFacturacion';
 import {TabBackups} from './TabBackups';
 import {TabCorreo} from './TabCorreo';

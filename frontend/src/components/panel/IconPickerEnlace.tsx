@@ -54,8 +54,10 @@ export const TIPOS_ENLACE = [
     { id: 'otro', label: 'Otro', icon: Pen, keywords: ['custom', 'personalizado'] },
 ] as const satisfies TipoEnlace[];
 
-/* Mapa para lookup rápido por id. Typed con string key para aceptar valores dinámicos. */
-export const TIPO_ENLACE_MAP = new Map<string, TipoEnlace>(TIPOS_ENLACE.map(t => [t.id, t]));
+/* Mapa para lookup rápido por id. Typed con string key para aceptar valores dinámicos.
+ * [higiene] Sin `export`: solo se usa en este módulo (.get en el render) y el
+ * estado mutable exportado a nivel de módulo lo marcaba singleton-mutable-state. */
+const TIPO_ENLACE_MAP = new Map<string, TipoEnlace>(TIPOS_ENLACE.map(t => [t.id, t]));
 
 interface IconPickerEnlaceProps {
     value: string;
@@ -128,7 +130,7 @@ export const IconPickerEnlace: React.FC<IconPickerEnlaceProps> = ({ value, onCha
                                 <button
                                     key={tipo.id}
                                     type="button"
-                                    className={`iconPickerEnlaceItem ${value === tipo.id ? 'iconPickerEnlaceItem--activo' : ''}`}
+                                    className={`iconPickerEnlaceFila ${value === tipo.id ? 'iconPickerEnlaceFila--activo' : ''}`}
                                     onClick={() => handleSelect(tipo.id)}
                                     title={tipo.label}
                                 >

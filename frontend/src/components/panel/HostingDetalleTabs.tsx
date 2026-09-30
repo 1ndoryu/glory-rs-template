@@ -164,9 +164,6 @@ export function TabRecursos({sub}: {sub: Subscription}) {
     );
 }
 
-/* ── Re-exports de tabs extraídas ─────── */
-export {TabDominio, TabAcceso} from './HostingDetalleAccess';
-
 /* ── Tab: Eventos ────────────────────────── */
 export function TabEventos({hostingId}: {
     hostingId: string;
