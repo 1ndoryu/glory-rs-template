@@ -49,6 +49,10 @@ chrono = { version = "0.4", features = ["serde"] }
 # [299A-1 E11] data-URL base64 de fotos entrantes para `describir_foto`
 # (version ya en el arbol como transitiva: sin descarga nueva).
 base64 = "0.22"
+# [011A-5 Fase1] `idempotency_key` determinista (sha256 hex, puro Rust):
+# `sha256("{ambito}:{motivo}:{texto}")`, sin secreto (no es HMAC).
+# `0.10`: ya estaba en el arbol como transitiva (0.10.9), sin descarga.
+sha2 = "0.10"
 
 # Chat visitante con IA (169A-1): git-dep pineado (el build de prod del
 # manager clona el repo dentro de la imagen en /build y el path-dep

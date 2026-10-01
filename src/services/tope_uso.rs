@@ -16,6 +16,7 @@
  * `evaluar_tope` es puro para testear la decisión sin BD. El `vigilar`
  * corre cada 5 min en segundo plano junto al watcher de alertas. */
 
+use super::outbox_idempotency::{clave_idempotencia, corte_cubre, debe_usar_clave, encolar};
 use sqlx::PgPool;
 
 const CLAVE_TOPE: &str = "ia_tope_tokens_dia";
@@ -70,11 +71,21 @@ pub async fn revisar_tope(pool: &PgPool) -> Result<bool, String> {
         "Tope diario LLM superado: {uso_hoy} tokens (tope {tope}). Top: {detalle}. \
          Revisa /admin (Uso) y ajusta {CLAVE_TOPE} si el gasto es legítimo."
     );
-    glory_agent::persistence::enqueue_outbox(
+    /* [011A-5 Fase1] Clave idempotente bajo corte (ámbito `global`: el
+     * tope no tiene sesión). El guard `ia_tope_alertado` ya limita a 1/día;
+     * la clave cubre reintentos concurrentes del watcher. */
+    let clave_tope = clave_idempotencia("global", "tope", &texto);
+    let clave_tope_ref = if debe_usar_clave("tope") && corte_cubre(pool, "wa_a").await {
+        Some(clave_tope.as_str())
+    } else {
+        None
+    };
+    encolar(
         pool,
         "whatsapp",
         /* [289A-1] `via` explícito: el tope no tiene hilo, sale por A. */
         serde_json::json!({"motivo": "tope", "texto": texto, "via": "wa_a"}),
+        clave_tope_ref,
     )
     .await
     .map_err(|e| e.to_string())?;

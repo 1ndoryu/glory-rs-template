@@ -1,3 +1,4 @@
+use super::outbox_idempotency::{marcar as marcar_outbox, purgar_resueltos};
 use sqlx::PgPool;
 
 /* [169A-4] Avisos WhatsApp por escalacion (patron Nakomi `chat_alert_worker`,
@@ -28,6 +29,13 @@ pub async fn vigilar(pool: PgPool, gateway: Option<String>) {
         .unwrap_or_default();
     loop {
         tokio::time::sleep(std::time::Duration::from_secs(INTERVALO_VIGILANCIA_SECS)).await;
+        /* [011A-5 Fase1] Purga TTL (sent/failed +7d) en cada vuelta: la
+         * tabla ya no crece sin cota y las claves liberadas no colisionan. */
+        match purgar_resueltos(&pool).await {
+            Ok(0) => {}
+            Ok(n) => tracing::info!("alerta WhatsApp: purga outbox {n} resueltos"),
+            Err(e) => tracing::warn!("alerta WhatsApp: purga outbox fallida ({e})"),
+        }
         let pendientes = match glory_agent::persistence::fetch_pending_outbox(&pool, 10).await {
             Ok(list) => list,
             Err(e) => {
@@ -37,7 +45,9 @@ pub async fn vigilar(pool: PgPool, gateway: Option<String>) {
         };
         for entry in pendientes.into_iter().filter(|e| e.kind == "whatsapp") {
             let estado = procesar_aviso(&pool, &http, &url, secreto.as_deref(), &entry).await;
-            if let Err(e) = glory_agent::persistence::mark_outbox(&pool, entry.id, estado).await {
+            /* [011A-5 Fase1] `marcar` libera la `idempotency_key` al salir
+             * de `pending` (un texto idéntico futuro es mensaje nuevo). */
+            if let Err(e) = marcar_outbox(&pool, entry.id, estado).await {
                 tracing::error!(
                     "alerta WhatsApp: no se pudo marcar outbox {}: {e}",
                     entry.id

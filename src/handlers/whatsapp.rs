@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 use crate::repositories::ClienteRepository;
 use crate::services::InmuebleService;
+use crate::services::{clave_idempotencia, corte_cubre, debe_usar_clave, encolar_outbox_idem};
 use glory_agent::errors::AgentError;
 
 /* [279A-2 F2] Webhook simulado + reparto por número (sin Baileys/QR todavía).
@@ -66,6 +67,10 @@ fn partir_respuesta(texto: &str) -> Vec<String> {
 }
 
 /// Encola un texto IA en outbox `whatsapp` (misma forma que el turno normal).
+/* [011A-5 Fase1] Encolado idempotente: bajo corte (`corte_whatsapp` cubre
+ * `via`) la fila lleva `idempotency_key = sha256(sesion:motivo:texto)`;
+ * un duplicado en vuelo retorna `None` y se registra (no es error).
+ * `manual` nunca lleva clave (lo excluye `debe_usar_clave`). */
 async fn encolar_texto_ia(
     pool: &sqlx::PgPool,
     sesion: Uuid,
@@ -81,8 +86,19 @@ async fn encolar_texto_ia(
         "via": via,
         "motivo": motivo,
     });
-    if let Err(e) = glory_agent::persistence::enqueue_outbox(pool, "whatsapp", payload).await {
-        tracing::error!("webhook WhatsApp: {sesion} no se pudo encolar {motivo}: {e}");
+    let clave;
+    let clave_ref = if debe_usar_clave(motivo) && corte_cubre(pool, via).await {
+        clave = clave_idempotencia(&sesion.to_string(), motivo, texto);
+        Some(clave.as_str())
+    } else {
+        None
+    };
+    match encolar_outbox_idem(pool, "whatsapp", payload, clave_ref).await {
+        Ok(None) => tracing::info!(
+            "webhook WhatsApp: {sesion} duplicado {motivo} tragado por idempotency_key"
+        ),
+        Err(e) => tracing::error!("webhook WhatsApp: {sesion} no se pudo encolar {motivo}: {e}"),
+        Ok(Some(_)) => {}
     }
 }
 

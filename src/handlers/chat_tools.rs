@@ -10,6 +10,7 @@ use crate::errors::AppError;
 use crate::models::{CreateSolicitudRequest, OPERACIONES, TIPOS};
 use crate::repositories::{ClienteRepository, NuevaVisita, VisitaRepository};
 use crate::services::SolicitudService;
+use crate::services::{clave_idempotencia, corte_cubre, debe_usar_clave, encolar_outbox_idem};
 use glory_agent::errors::AgentError;
 use glory_agent::session::ChatHub;
 use glory_agent::tools::{ToolCtx, ToolDefinition, ToolExecutor};
@@ -471,6 +472,16 @@ async fn encolar_tarjetas(
             repetidas += 1;
             continue;
         }
+        /* [011A-5 Fase1] Clave idempotente bajo corte: un reintento con el
+         * mismo texto no duplica (el gemelo en vuelo ya espejó en hilo).
+         * Se calcula antes del `json!` porque este mueve `via`. */
+        let clave_tarjeta;
+        let clave_tarjeta_ref = if debe_usar_clave("tarjeta") && corte_cubre(pool, &via).await {
+            clave_tarjeta = clave_idempotencia(&session_id.to_string(), "tarjeta", &texto);
+            Some(clave_tarjeta.as_str())
+        } else {
+            None
+        };
         let tarjeta = json!({
             "session_id": session_id.to_string(),
             "destino": destino,
@@ -478,13 +489,16 @@ async fn encolar_tarjetas(
             "via": via,
             "motivo": "tarjeta",
         });
-        match glory_agent::persistence::enqueue_outbox(pool, "whatsapp", tarjeta).await {
-            Ok(_) => {
+        match encolar_outbox_idem(pool, "whatsapp", tarjeta, clave_tarjeta_ref).await {
+            Ok(Some(_)) => {
                 enviadas += 1;
                 /* Se registra en el set para que dos filas con el mismo
                  * texto en el mismo lote tampoco se dupliquen. */
                 ya_enviadas.insert(texto.clone());
                 espejar_en_hilo(pool, hub, session_id, &texto).await;
+            }
+            Ok(None) => {
+                repetidas += 1;
             }
             Err(e) => {
                 tracing::warn!("tarjetas sesion={session_id}: no se pudo encolar ({e})");
@@ -697,6 +711,16 @@ async fn enviar_fotos(
             continue;
         }
         let espejo = format!("[foto] {url} — se ve: {}", pie.trim());
+        /* [011A-5 Fase1] Igual que tarjetas: clave bajo corte, duplicado
+         * en vuelo cuenta como repetida (el gemelo ya espejó). Se calcula
+         * antes del `json!` porque este mueve `pie` y `via`. */
+        let clave_foto;
+        let clave_foto_ref = if debe_usar_clave("ia_foto") && corte_cubre(pool, &via).await {
+            clave_foto = clave_idempotencia(&session_id.to_string(), "ia_foto", &pie);
+            Some(clave_foto.as_str())
+        } else {
+            None
+        };
         let aviso = json!({
             "session_id": session_id.to_string(),
             "destino": telefono,
@@ -705,7 +729,14 @@ async fn enviar_fotos(
             "via": via,
             "motivo": "ia_foto",
         });
-        glory_agent::persistence::enqueue_outbox(pool, "whatsapp", aviso).await?;
+        match encolar_outbox_idem(pool, "whatsapp", aviso, clave_foto_ref).await {
+            Ok(None) => {
+                repetidas += 1;
+                continue;
+            }
+            Err(e) => return Err(e.into()),
+            Ok(Some(_)) => {}
+        }
         espejar_en_hilo(pool, hub, session_id, &espejo).await;
         enviadas += 1;
     }
@@ -824,7 +855,24 @@ async fn aviso_humano(
     if let Some(destino) = destino_humano(pool).await {
         aviso["destino"] = json!(destino);
     }
-    glory_agent::persistence::enqueue_outbox(pool, "whatsapp", aviso).await?;
+    /* [011A-5 Fase1] Clave bajo corte (motivos consultar/escalar/captar…);
+     * `manual` queda excluido por `debe_usar_clave`. */
+    let canal_aviso = aviso.get("via").and_then(|v| v.as_str()).unwrap_or("wa_a");
+    let clave_aviso;
+    let clave_aviso_ref = if debe_usar_clave(motivo) && corte_cubre(pool, canal_aviso).await {
+        clave_aviso = clave_idempotencia(&session_id.to_string(), motivo, resumen);
+        Some(clave_aviso.as_str())
+    } else {
+        None
+    };
+    if encolar_outbox_idem(pool, "whatsapp", aviso, clave_aviso_ref)
+        .await?
+        .is_none()
+    {
+        tracing::info!(
+            "aviso humano sesion={session_id} motivo={motivo}: duplicado tragado por idempotency_key"
+        );
+    }
     Ok(())
 }
 
