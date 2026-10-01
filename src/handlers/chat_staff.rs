@@ -40,6 +40,8 @@ pub fn staff_routes() -> Router<AppState> {
          * gateway (el navegador nunca habla con el gateway directo). */
         .route("/agent/whatsapp/sesiones", get(sesiones_whatsapp))
         .route("/agent/whatsapp/sesiones/:canal/qr", get(qr_whatsapp))
+        /* [011A-2] Sombra F5-Paso1: huella solo-lectura tras GLORY_SHADOW=1. */
+        .merge(super::sombra::sombra_routes())
 }
 
 #[derive(Debug, Deserialize)]

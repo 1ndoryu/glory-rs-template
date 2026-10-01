@@ -11,6 +11,7 @@ mod inmuebles;
 mod notes;
 mod public;
 mod solicitud;
+mod sombra;
 mod suscriptor;
 mod uploads;
 mod users;

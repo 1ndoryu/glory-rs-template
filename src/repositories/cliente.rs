@@ -226,6 +226,19 @@ impl ClienteRepository {
     /// para elegir la sesión Baileys de salida (`via`); `None` si la sesión
     /// no está vinculada (el worker cae a `wa_a`, nunca falla el aviso).
     /// [289A-1]
+    /* [011A-2] Id del cliente por teléfono normalizado (`None` si no
+     * existe). Solo lectura: la usa la sombra F5-Paso1 para resolver la
+     * sesión ya vinculada sin crear nada. */
+    pub async fn id_por_telefono(
+        pool: &PgPool,
+        telefono: &str,
+    ) -> Result<Option<Uuid>, sqlx::Error> {
+        sqlx::query_scalar("SELECT id FROM clientes WHERE telefono = $1")
+            .bind(telefono)
+            .fetch_optional(pool)
+            .await
+    }
+
     pub async fn canal_de(pool: &PgPool, session_id: Uuid) -> Result<Option<String>, sqlx::Error> {
         sqlx::query_scalar("SELECT canal FROM canal_sesiones WHERE session_id = $1")
             .bind(session_id)

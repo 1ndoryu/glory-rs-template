@@ -98,7 +98,7 @@ fn numero_b_defecto() -> String {
 
 /// Números configurados: `agent_config` (`wa_numero_a`/`wa_numero_b`, editables
 /// en consola F5) con fallback a env (`WA_NUMERO_A`/`WA_NUMERO_B`).
-async fn numeros_configurados(pool: &sqlx::PgPool) -> (String, String) {
+pub(crate) async fn numeros_configurados(pool: &sqlx::PgPool) -> (String, String) {
     let a = glory_agent::persistence::get_config(pool, "wa_numero_a")
         .await
         .ok()
