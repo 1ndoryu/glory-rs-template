@@ -262,7 +262,7 @@ librería uplot/u-legend/tiptap, gap sin allowlist). VarSense 2.2.9 (pin
   2026-10-01 en completadas).
 - **01AA-4** — L4: `funcion-larga-rs` x17 + `god-object-rs` x18 +
   `limite-lineas` x9 (+1 nivel-2). Plan multi-fase en
-  `Agente/planes/plan-01AA-4-2026-10-01.md` (Fase 1 en curso: 3 extracciones
-  mecánicas; extraer helpers no baja god-object — solo partir archivos).
+  `Agente/planes/plan-01AA-4-2026-10-01.md` (Fase 1 cerrada 59W→56W;
+  sigue Fase 2: order_lifecycle).
 - Fuera de alcance (observado, sin autorización): `large-interface-isp` x37,
   `parametros-excesivos-rs` x17, `css-especificacion-diseno-local` x1.
