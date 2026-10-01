@@ -187,8 +187,11 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   (`GLORY_API_URL`, `GLORY_API_KEY`, `OPENCODE_GO_API_KEY`).
   Codigo completo 2026-09-19: `fmt` + `check` + `clippy -D warnings` +
   `test --lib` 14/14 (3 nuevos `handlers::ia::pruebas`).
-  Pendiente humo HTTP: el dev-server vivo (otra sesion) usa binario anterior;
-  reiniciarlo y probar `estado` + `completar` antes de 199A-2.
+   Pendiente humo HTTP: el dev-server vivo (otra sesion) usa binario anterior;
+   reiniciarlo y probar `estado` + `completar` antes de 199A-2.
+   Humo CERRADO 2026-10-01 (011A-4, ver `Agente/completados/tareas-2026-10-01.md`):
+   sin servidor vivo, se arranco el binario actual y `completar` devolvio
+   `ok:true` via OpenCode Go (gloryapi sigue `sin-clave` por falta de key).
 - 199A-2 (repo `INMOBILIARIA`): redaccion y copy via `completar` (activo
   manual + fallback); pestana `ia` en Config con estado, habilitar/elegir
   activo y probar por proveedor.
