@@ -25,7 +25,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git ca-certificates pkg-config \
     && rm -rf /var/lib/apt/lists/*
 ARG GLORY_AGENT_URL=https://github.com/1ndoryu/glory-agent.git
-ARG GLORY_AGENT_REF=e4ad5d787a80dc39be2b7449b6904dc535c4b0b4
+# [011A-5 Fase0] Núcleo F1-F4 con gate PASS (ver Cargo.toml).
+ARG GLORY_AGENT_REF=856026948d18bc17d6b68ebc4cfdddbc9e90ffca
 WORKDIR /src/mn-inmobiliaria
 COPY . ./
 RUN git submodule update --init --depth 1 || true

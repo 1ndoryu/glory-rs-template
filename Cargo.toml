@@ -53,7 +53,9 @@ base64 = "0.22"
 # Chat visitante con IA (169A-1): git-dep pineado (el build de prod del
 # manager clona el repo dentro de la imagen en /build y el path-dep
 # `../glory-agent` no existe alli; el pin hace el build hermetico).
-glory-agent = { git = "https://github.com/1ndoryu/glory-agent.git", rev = "e4ad5d787a80dc39be2b7449b6904dc535c4b0b4" }
+# [011A-5 Fase0] `8560269`: nucleo F1-F4 (channels + outbox idempotente +
+# adapter + handoff) con gate PASS; desciende de `e4ad5d7` (incluye 289A-5/6).
+glory-agent = { git = "https://github.com/1ndoryu/glory-agent.git", rev = "856026948d18bc17d6b68ebc4cfdddbc9e90ffca" }
 
 # Avisos WhatsApp del chat (169A-4): POST al gateway desde el worker.
 # [309A-4] `multipart` para STT de notas de voz (Groq transcriptions).

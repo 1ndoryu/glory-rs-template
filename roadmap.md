@@ -510,3 +510,11 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   visible y a la IA — hoy nadie los lee fuera del panel (la pública ni los
   pide, el backend los pela con `'{}'`).
 - Requiere de usuaria: responder el cuestionario en `/ask`.
+
+## 011A-5 — F5 consumidor delgado MN (en curso 2026-10-01)
+
+- Plan: `Agente/planes/plan-f5-consumidor-2026-10-01.md`.
+- MN como primer consumidor de `glory-agent@8560269`: pin bump,
+  `idempotency_key` en `agent_outbox` + TTL 7d, sombra con diff real
+  contra el núcleo, corte sticky `wa_b`→`total` con rollback, y humo
+  de todo al cierre. Sin romper el WhatsApp actual.
