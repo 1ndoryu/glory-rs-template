@@ -3,30 +3,23 @@ use sqlx::PgPool;
 
 /* [169A-4] Avisos WhatsApp por escalacion (patron Nakomi `chat_alert_worker`,
  * solo lectura como referencia). Poll cada 15 s sobre `agent_outbox`
- * (`kind='whatsapp'`): POST al gateway y marca `sent|failed`. Sin gateway
- * configurado avisa una vez en logs y no itera: los avisos quedan
- * `pending` y visibles en el panel staff (nunca silencio). */
+ * (`kind='whatsapp'`): POST al gateway y marca `sent|failed`.
+ * [011A-5 Fase3] Sin gateway NO se sale: se duerme la vuelta completa
+ * (sin busy-loop) y los avisos quedan `pending` visibles en el panel
+ * (sin pérdida); si el gateway aparece luego (env o reinicio con var),
+ * el worker lo toma solo. La purga TTL corre siempre, con o sin gateway
+ * (antes el `return` temprano la saltaba para siempre). */
 
 /// Bucle del worker. No retorna (tarea de fondo; ver `main.rs`).
 /* [011A-1] Foto F5-Paso0: el poll cada 15 s queda en const con nombre para
  * que la sombra detecte si cambia (era literal suelto). */
 const INTERVALO_VIGILANCIA_SECS: u64 = 15;
 pub async fn vigilar(pool: PgPool, gateway: Option<String>) {
-    let Some(url) = gateway.filter(|u| !u.trim().is_empty()) else {
-        tracing::warn!(
-            "alerta WhatsApp sin gateway (GLORY_ALERT_GATEWAY_URL vacio): \
-             las escalaciones quedan 'pending' en agent_outbox hasta configurar"
-        );
-        return;
-    };
-    tracing::info!("alerta WhatsApp activa hacia gateway configurado");
-    let secreto = std::env::var("GATEWAY_SEND_SECRET")
-        .ok()
-        .filter(|s| !s.trim().is_empty());
     let http = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(20))
         .build()
         .unwrap_or_default();
+    let mut avisado_sin_gateway = false;
     loop {
         tokio::time::sleep(std::time::Duration::from_secs(INTERVALO_VIGILANCIA_SECS)).await;
         /* [011A-5 Fase1] Purga TTL (sent/failed +7d) en cada vuelta: la
@@ -36,6 +29,33 @@ pub async fn vigilar(pool: PgPool, gateway: Option<String>) {
             Ok(n) => tracing::info!("alerta WhatsApp: purga outbox {n} resueltos"),
             Err(e) => tracing::warn!("alerta WhatsApp: purga outbox fallida ({e})"),
         }
+        /* [011A-5 Fase3] Gateway efectivo por vuelta: parámetro de arranque
+         * o env (permite configurarlo sin redesplegar el binario). */
+        let url = gateway
+            .clone()
+            .filter(|u| !u.trim().is_empty())
+            .or_else(|| {
+                std::env::var("GLORY_ALERT_GATEWAY_URL")
+                    .ok()
+                    .filter(|u| !u.trim().is_empty())
+            });
+        let Some(url) = url else {
+            if !avisado_sin_gateway {
+                tracing::warn!(
+                    "alerta WhatsApp sin gateway (GLORY_ALERT_GATEWAY_URL vacio): \
+                     las escalaciones quedan 'pending' en agent_outbox hasta configurar"
+                );
+                avisado_sin_gateway = true;
+            }
+            continue;
+        };
+        if avisado_sin_gateway {
+            tracing::info!("alerta WhatsApp: gateway configurado, reanudando envios");
+            avisado_sin_gateway = false;
+        }
+        let secreto = std::env::var("GATEWAY_SEND_SECRET")
+            .ok()
+            .filter(|s| !s.trim().is_empty());
         let pendientes = match glory_agent::persistence::fetch_pending_outbox(&pool, 10).await {
             Ok(list) => list,
             Err(e) => {
@@ -45,8 +65,9 @@ pub async fn vigilar(pool: PgPool, gateway: Option<String>) {
         };
         for entry in pendientes.into_iter().filter(|e| e.kind == "whatsapp") {
             let estado = procesar_aviso(&pool, &http, &url, secreto.as_deref(), &entry).await;
-            /* [011A-5 Fase1] `marcar` libera la `idempotency_key` al salir
-             * de `pending` (un texto idéntico futuro es mensaje nuevo). */
+            /* [011A-5 Fase3] `marcar` libera la clave solo en `sent`;
+             * en `failed` la conserva para que el reintento reviva el
+             * gemelo en vez de duplicarlo. */
             if let Err(e) = marcar_outbox(&pool, entry.id, estado).await {
                 tracing::error!(
                     "alerta WhatsApp: no se pudo marcar outbox {}: {e}",

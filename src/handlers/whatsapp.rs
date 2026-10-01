@@ -11,7 +11,9 @@ use uuid::Uuid;
 
 use crate::repositories::ClienteRepository;
 use crate::services::InmuebleService;
-use crate::services::{clave_idempotencia, corte_cubre, debe_usar_clave, encolar_outbox_idem};
+use crate::services::{
+    clave_idempotencia, corte_cubre, debe_usar_clave, encolar_outbox_idem, Encolado,
+};
 use glory_agent::errors::AgentError;
 
 /* [279A-2 F2] Webhook simulado + reparto por número (sin Baileys/QR todavía).
@@ -96,11 +98,16 @@ async fn encolar_texto_ia(
         None
     };
     match encolar_outbox_idem(pool, "whatsapp", payload, clave_ref).await {
-        Ok(None) => tracing::info!(
+        Ok(Encolado::Duplicado) => tracing::info!(
             "webhook WhatsApp: {sesion} duplicado {motivo} tragado por idempotency_key"
         ),
+        /* [011A-5 Fase3] Revivido = el gemelo estaba `failed` (el envío
+         * anterior nunca llegó) y vuelve a `pending`: se enviará. */
+        Ok(Encolado::Revivido(id)) => {
+            tracing::info!("webhook WhatsApp: {sesion} {motivo} revivido de failed ({id})");
+        }
         Err(e) => tracing::error!("webhook WhatsApp: {sesion} no se pudo encolar {motivo}: {e}"),
-        Ok(Some(_)) => {}
+        Ok(Encolado::Nuevo(_)) => {}
     }
 }
 

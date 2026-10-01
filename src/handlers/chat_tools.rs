@@ -10,7 +10,9 @@ use crate::errors::AppError;
 use crate::models::{CreateSolicitudRequest, OPERACIONES, TIPOS};
 use crate::repositories::{ClienteRepository, NuevaVisita, VisitaRepository};
 use crate::services::SolicitudService;
-use crate::services::{clave_idempotencia, corte_cubre, debe_usar_clave, encolar_outbox_idem};
+use crate::services::{
+    clave_idempotencia, corte_cubre, debe_usar_clave, encolar_outbox_idem, Encolado,
+};
 use glory_agent::errors::AgentError;
 use glory_agent::session::ChatHub;
 use glory_agent::tools::{ToolCtx, ToolDefinition, ToolExecutor};
@@ -490,14 +492,22 @@ async fn encolar_tarjetas(
             "motivo": "tarjeta",
         });
         match encolar_outbox_idem(pool, "whatsapp", tarjeta, clave_tarjeta_ref).await {
-            Ok(Some(_)) => {
+            Ok(Encolado::Nuevo(_)) => {
                 enviadas += 1;
                 /* Se registra en el set para que dos filas con el mismo
                  * texto en el mismo lote tampoco se dupliquen. */
                 ya_enviadas.insert(texto.clone());
                 espejar_en_hilo(pool, hub, session_id, &texto).await;
             }
-            Ok(None) => {
+            /* [011A-5 Fase3] Revivido = el gemelo estaba `failed` y vuelve
+             * a `pending` con este payload: cuenta como enviada y entra al
+             * set del lote, pero NO se espeja (el primer encolado ya dejó
+             * el texto en el hilo). */
+            Ok(Encolado::Revivido(_)) => {
+                enviadas += 1;
+                ya_enviadas.insert(texto.clone());
+            }
+            Ok(Encolado::Duplicado) => {
                 repetidas += 1;
             }
             Err(e) => {
@@ -730,14 +740,19 @@ async fn enviar_fotos(
             "motivo": "ia_foto",
         });
         match encolar_outbox_idem(pool, "whatsapp", aviso, clave_foto_ref).await {
-            Ok(None) => {
+            Ok(Encolado::Duplicado) => {
                 repetidas += 1;
                 continue;
             }
+            /* [011A-5 Fase3] Revivido: el gemelo `failed` vuelve a
+             * `pending`; no se espeja (el primer encolado ya dejó la
+             * foto en el hilo). */
+            Ok(Encolado::Revivido(_)) => {}
             Err(e) => return Err(e.into()),
-            Ok(Some(_)) => {}
+            Ok(Encolado::Nuevo(_)) => {
+                espejar_en_hilo(pool, hub, session_id, &espejo).await;
+            }
         }
-        espejar_en_hilo(pool, hub, session_id, &espejo).await;
         enviadas += 1;
     }
     Ok(json!({"ok": true, "enviadas": enviadas, "repetidas": repetidas, "titulo": titulo}))
@@ -865,10 +880,12 @@ async fn aviso_humano(
     } else {
         None
     };
-    if encolar_outbox_idem(pool, "whatsapp", aviso, clave_aviso_ref)
-        .await?
-        .is_none()
-    {
+    /* [011A-5 Fase3] `Revivido` también envía (gemelo `failed` que vuelve
+     * a `pending`): solo `Duplicado` se reporta como tragado. */
+    if matches!(
+        encolar_outbox_idem(pool, "whatsapp", aviso, clave_aviso_ref).await?,
+        Encolado::Duplicado
+    ) {
         tracing::info!(
             "aviso humano sesion={session_id} motivo={motivo}: duplicado tragado por idempotency_key"
         );

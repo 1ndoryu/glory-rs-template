@@ -13,7 +13,7 @@ pub use inmueble::InmuebleService;
 pub use note::NoteService;
 pub use outbox_idempotency::{
     clave_idempotencia, corte_cubre, debe_usar_clave, encolar as encolar_outbox_idem,
-    marcar as marcar_outbox, purgar_resueltos,
+    marcar as marcar_outbox, purgar_resueltos, reencolar_fallidos, Encolado,
 };
 pub use solicitud::SolicitudService;
 pub use suscriptor::SuscriptorService;
