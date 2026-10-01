@@ -3,6 +3,10 @@
  * columnas nuevas (attempts, max_attempts, next_retry_at) aún no tienen cache
  * en .sqlx/. Tras deploy + `cargo sqlx prepare`, se puede migrar de vuelta a
  * query_as! si se desea verificación en compilación.
+ * [01AA-2] El gate pedía query_as! x13; se conserva runtime porque el SQL usa
+ * format! con SELECT_COLS compartido (la macro exige literal; inlinear x13
+ * duplicaría) y se corrige el disable al token vigente (dual, como
+ * billing/blog/chat).
  * CRUD sobre order_refunds: crear solicitud, listar, aprobar/rechazar/completar.
  * Solo un reembolso activo por orden (constraint en handler). */
 
@@ -11,7 +15,7 @@ use uuid::Uuid;
 
 use crate::models::OrderRefund;
 
-/* sentinel-disable-file sqlx-query-sin-macro: columnas nuevas sin cache .sqlx requieren queries runtime */
+/* sentinel-disable-file sqlx-query-sin-macro sqlx-query-as-sin-macro: columnas nuevas sin cache .sqlx requieren queries runtime */
 
 const SELECT_COLS: &str = r#"id, order_id, payment_id, requested_by, reviewed_by,
     amount_cents, reason, admin_response,
