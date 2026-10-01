@@ -51,7 +51,9 @@ const AVISO_ASESOR_TEXTO: &str = "Dame un momentico que ya te atiende un asesor 
 
 /// Parte el texto final en mensajes breves (por líneas en blanco, máx
 /// `MAX_PARTES`; el sobrante se funde en la última parte). Pura para testear.
-fn partir_respuesta(texto: &str) -> Vec<String> {
+/* [011A-5 Fase2] `pub(crate)`: la sombra compara este partido contra el
+ * del núcleo (`partir_respuesta` de `channels::adapters`). */
+pub(crate) fn partir_respuesta(texto: &str) -> Vec<String> {
     let partes: Vec<String> = texto
         .split("\n\n")
         .map(str::trim)
