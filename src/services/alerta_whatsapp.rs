@@ -7,6 +7,9 @@ use sqlx::PgPool;
  * `pending` y visibles en el panel staff (nunca silencio). */
 
 /// Bucle del worker. No retorna (tarea de fondo; ver `main.rs`).
+/* [011A-1] Foto F5-Paso0: el poll cada 15 s queda en const con nombre para
+ * que la sombra detecte si cambia (era literal suelto). */
+const INTERVALO_VIGILANCIA_SECS: u64 = 15;
 pub async fn vigilar(pool: PgPool, gateway: Option<String>) {
     let Some(url) = gateway.filter(|u| !u.trim().is_empty()) else {
         tracing::warn!(
@@ -24,7 +27,7 @@ pub async fn vigilar(pool: PgPool, gateway: Option<String>) {
         .build()
         .unwrap_or_default();
     loop {
-        tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(INTERVALO_VIGILANCIA_SECS)).await;
         let pendientes = match glory_agent::persistence::fetch_pending_outbox(&pool, 10).await {
             Ok(list) => list,
             Err(e) => {
@@ -204,6 +207,12 @@ mod pruebas {
             .max_connections(1)
             .connect_lazy(&url)
             .ok()
+    }
+
+    /* [011A-1] Foto F5-Paso0: el worker revisa outbox cada 15 s. */
+    #[test]
+    fn foto_poll_cada_15_segundos() {
+        assert_eq!(INTERVALO_VIGILANCIA_SECS, 15);
     }
 
     #[tokio::test]

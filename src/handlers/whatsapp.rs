@@ -1094,4 +1094,117 @@ mod pruebas {
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(12345, |d| (d.subsec_nanos() % 90000) + 10000)
     }
+
+    /* [011A-1] Foto F5-Paso0: constantes del flujo WhatsApp congeladas. Si
+     * alguna cambia, el strangler debe enterarse (acuse 6s, partes, textos). */
+    #[test]
+    fn foto_constantes_flujo_whatsapp() {
+        assert_eq!(ESPERA_ACUSE_MS, 6_000);
+        assert_eq!(MAX_PARTES, 3);
+        assert_eq!(ACUSE_TEXTO, "Ya lo estoy revisando, dame un momentico 👀");
+        assert_eq!(
+            FALLBACK_TEXTO,
+            "Se me complicó con eso, ¿me lo repites en un momentico? 🙏"
+        );
+        assert_eq!(
+            AVISO_ASESOR_TEXTO,
+            "Dame un momentico que ya te atiende un asesor 🙏"
+        );
+    }
+
+    /* [011A-1] Foto F5-Paso0: el acuse solo se salta si el turno ya encoló
+     * texto IA (`ia`) o tarjetas en los últimos 2 min; el acuse previo u
+     * otros motivos no cuentan como avance. Sin `DATABASE_URL` se omite. */
+    #[tokio::test]
+    async fn foto_acuse_solo_si_no_hay_avance() {
+        let Some(pool) = pool_si_hay() else { return };
+        let sid = Uuid::new_v4();
+        assert!(!hay_avance_turno(&pool, sid).await);
+        for motivo in ["acuse", "fallback", "manual"] {
+            glory_agent::persistence::enqueue_outbox(
+                &pool,
+                "whatsapp",
+                serde_json::json!({"session_id": sid.to_string(), "motivo": motivo}),
+            )
+            .await
+            .unwrap();
+            assert!(!hay_avance_turno(&pool, sid).await, "motivo {motivo}");
+        }
+        for motivo in ["ia", "tarjeta"] {
+            glory_agent::persistence::enqueue_outbox(
+                &pool,
+                "whatsapp",
+                serde_json::json!({"session_id": sid.to_string(), "motivo": motivo}),
+            )
+            .await
+            .unwrap();
+            assert!(hay_avance_turno(&pool, sid).await, "motivo {motivo}");
+        }
+        sqlx::query("DELETE FROM agent_outbox WHERE payload->>'session_id' = $1")
+            .bind(sid.to_string())
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+
+    /* [011A-1] Foto F5-Paso0: `trg_uso_mensajes` copia el `usage` exacto del
+     * núcleo a `uso_mensajes` y estima `GREATEST(1,(len+3)/4)` cuando no hay
+     * exacto. La sombra comparará contra esto. Sin `DATABASE_URL` se omite. */
+    #[tokio::test]
+    async fn foto_trigger_uso_mide_exacto_y_estima() {
+        let Some(pool) = pool_si_hay() else { return };
+        let hub = glory_agent::session::ChatHub::new();
+        let sid = Uuid::new_v4();
+        glory_agent::persistence::ensure_session(&pool, sid)
+            .await
+            .unwrap();
+        let cuerpo = "Hola, busco apartamento"; // 23 chars → estima (23+3)/4 = 6
+        let msg = glory_agent::persistence::insert_message_seq(
+            &pool,
+            &hub,
+            sid,
+            "ai",
+            cuerpo,
+            Some(11),
+            Some(23),
+        )
+        .await
+        .unwrap();
+        let (est, tin, tout): (i32, Option<i32>, Option<i32>) = sqlx::query_as(
+            "SELECT tokens_est, tokens_in, tokens_out FROM uso_mensajes WHERE message_id = $1",
+        )
+        .bind(msg.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!((est, tin, tout), (6, Some(11), Some(23)));
+        let msg2 = glory_agent::persistence::insert_message_seq(
+            &pool, &hub, sid, "client", "ok", None, None,
+        )
+        .await
+        .unwrap();
+        let (est2, tin2, tout2): (i32, Option<i32>, Option<i32>) = sqlx::query_as(
+            "SELECT tokens_est, tokens_in, tokens_out FROM uso_mensajes WHERE message_id = $1",
+        )
+        .bind(msg2.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!((est2, tin2, tout2), (1, None, None));
+        sqlx::query("DELETE FROM uso_mensajes WHERE session_id = $1")
+            .bind(sid)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM agent_messages WHERE session_id = $1")
+            .bind(sid)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM agent_sessions WHERE id = $1")
+            .bind(sid)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
 }

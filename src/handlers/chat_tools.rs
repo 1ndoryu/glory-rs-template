@@ -497,8 +497,11 @@ async fn encolar_tarjetas(
 
 /// Cuerpos de los últimos mensajes `ai` del hilo (ventana de 30): base del
 /// dedup 309A-1 (tarjetas y fotos ya enviadas). Vacío + WARN si falla.
+/* [011A-1] Foto F5-Paso0: la ventana de 30 queda en const con nombre para
+ * que la sombra detecte si cambia (era literal suelto). */
+const VENTANA_DEDUP_TARJETAS: i64 = 30;
 async fn cuerpos_ai_recientes(pool: &PgPool, session_id: Uuid) -> HashSet<String> {
-    match glory_agent::persistence::list_messages(pool, session_id, 30).await {
+    match glory_agent::persistence::list_messages(pool, session_id, VENTANA_DEDUP_TARJETAS).await {
         Ok(msgs) => msgs
             .into_iter()
             .filter(|m| m.sender == "ai")
@@ -1089,6 +1092,13 @@ mod pruebas {
         assert!(!telefono_valido("abc"));
         assert!(!telefono_valido("12345"));
         assert!(!telefono_valido(""));
+    }
+
+    /* [011A-1] Foto F5-Paso0: el dedup de tarjetas mira los últimos 30
+     * mensajes `ai` del hilo. */
+    #[test]
+    fn foto_dedup_mira_ultimos_30() {
+        assert_eq!(VENTANA_DEDUP_TARJETAS, 30);
     }
 
     /* [E-fluido F2] Tarjeta breve: una propiedad por mensaje, menos de 300
