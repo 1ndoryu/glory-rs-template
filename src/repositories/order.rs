@@ -756,6 +756,15 @@ impl OrderRepository {
             .await
     }
 
+    /* [01AA-3] Conteo de órdenes de un cliente — usado en
+     * handlers/orders.rs (first-order-discount). runtime query (sin macro). */
+    pub async fn count_for_client(pool: &PgPool, client_id: Uuid) -> Result<i64, sqlx::Error> {
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM orders WHERE client_id = $1")
+            .bind(client_id)
+            .fetch_one(pool)
+            .await
+    }
+
     /* [124A-SENT-R1] Participantes de una orden (client_id + assigned_employee_id).
      * Devuelve (client_id, assigned_employee_id) para verificar acceso en chat.
      * runtime query (sin macro). */

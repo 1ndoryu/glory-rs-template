@@ -347,9 +347,9 @@ async fn check_first_order_discount(
     auth: AuthUser,
 ) -> Result<Json<serde_json::Value>, AppError> {
     auth.require_role(&[UserRole::Client, UserRole::Admin])?;
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM orders WHERE client_id = $1")
-        .bind(auth.user_id)
-        .fetch_one(&state.pool)
+    /* [01AA-3] Query movida a OrderRepository::count_for_client (DIP:
+     * el handler no accede a BD directamente). */
+    let count: i64 = OrderRepository::count_for_client(&state.pool, auth.user_id)
         .await
         .map_err(|e| AppError::Internal(format!("Error verificando órdenes: {e}")))?;
 

@@ -254,11 +254,11 @@ librería uplot/u-legend/tiptap, gap sin allowlist). VarSense 2.2.9 (pin
 8f5eac2) ya propagado a los 13 consumidores, lote cerrado 18/18 ALINEADO.
 
 - **01AA-2** — ✅ CERRADA 2026-10-01 (gate 79W→66W, regla en 0; ver completadas).
-- **01AA-3** — L3: `handler-accede-bd-rs` x5 (`admin_client_bootstrap.rs`
-  x4 + `orders.rs` x1, mover queries a repositorios) + `sqlite-carga-N-consultas`
-  x11 en 8 archivos (agrupar con join!/try_join si independientes).
-  Bloqueo parcial: `admin_client_bootstrap.rs` tiene cambios ajenos sin
-  commitear — no tocar hasta que su sesión lo commitee.
+- **01AA-3** — L3 (parcial 2026-10-01): `orders.rs:349` movido a
+  `OrderRepository::count_for_client` (gate `quality:check 01AA-3` PASS, 0
+  errores). Pendiente: `admin_client_bootstrap.rs` x4 — BLOQUEADO (cambios
+  ajenos sin commitear, no tocar) + `sqlite-carga-N-consultas` x11 en 8
+  archivos (requiere revisar independencia por sitio antes de join!/try_join).
 - **01AA-4** — L4: `funcion-larga-rs` x17 + `god-object-rs` x18 +
   `limite-lineas` x9 (+1 nivel-2). Requiere plan multi-fase antes de picar.
 - Fuera de alcance (observado, sin autorización): `large-interface-isp` x37,
