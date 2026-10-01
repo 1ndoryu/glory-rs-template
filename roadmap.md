@@ -497,7 +497,7 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
    (`extras={}` en ambas).
 - 279A-8 verificado local (`cargo check` + clippy 0 en `inmobiliaria` con la
   BD de rama; en `main` el check no compila por `agent_outbox` ausente en
-  `glory_backend`, preexistente): la IA ve todo lo rellenable —
+  `glory_backend`, preexistente — RESUELTO 2026-10-01 en 011A-3 (BD reconstruida, check verde en `main`)): la IA ve todo lo rellenable —
   `detalle_inmueble` devuelve `extras` tal cual (incluidos `no_se`/`a_veces`)
   + `margen_negociable` calculado en SQL; la cifra del mínimo jamás sale
   (frontera 279A-3); prompt + descripción de la tool instruyen insinuar sin
