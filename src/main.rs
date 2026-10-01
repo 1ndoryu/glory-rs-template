@@ -344,6 +344,57 @@ async fn setup_and_run_fixtures(pool: &sqlx::PgPool) -> Result<(), Box<dyn std::
  * Inicia todas las tareas de background: asignación, cleanup chat, storage
  * enforcement, métricas, bandwidth throttle y monitor VPS. */
 #[allow(clippy::too_many_lines)]
+/* [01AA-4-F1] Loops dependientes de Coolify fuera de spawn_background_services
+ * (~40 líneas): metrics/throttle/cpu-burst solo arrancan si hay config. */
+fn spawn_coolify_loops(
+    pool: &sqlx::PgPool,
+    coolify_config: Option<CoolifyConfig>,
+    coolify_config_vps1: Option<CoolifyConfig>,
+) {
+    if coolify_config.is_some() || coolify_config_vps1.is_some() {
+        let metrics_pool = pool.clone();
+        /* [259A-1] build() falla solo con configuracion invalida (fija aqui):
+         * salida explicita en arranque, nunca panic. */
+        let metrics_client = match reqwest::Client::builder()
+            .timeout(Duration::from_secs(30))
+            .build()
+        {
+            Ok(client) => client,
+            Err(e) => {
+                eprintln!("[fatal] metrics HTTP client: {e}");
+                std::process::exit(1);
+            }
+        };
+        let metrics_vps1 = coolify_config_vps1.clone();
+        let metrics_default = coolify_config.clone();
+        tokio::spawn(async move {
+            infrastructure_metrics_loop(
+                metrics_pool,
+                metrics_client,
+                metrics_vps1,
+                metrics_default,
+            )
+            .await;
+        });
+
+        let throttle_pool = pool.clone();
+        let throttle_vps1 = coolify_config_vps1.clone();
+        let throttle_default = coolify_config.clone();
+        tokio::spawn(async move {
+            bandwidth_throttle_loop(throttle_pool, throttle_vps1, throttle_default).await;
+        });
+
+        let cpu_burst_pool = pool.clone();
+        let cpu_burst_vps1 = coolify_config_vps1.clone();
+        let cpu_burst_default = coolify_config.clone();
+        tokio::spawn(async move {
+            cpu_burst_loop(cpu_burst_pool, cpu_burst_vps1, cpu_burst_default).await;
+        });
+    } else {
+        tracing::warn!("[infra-metrics] Coolify no configurado — sampler desactivado");
+    }
+}
+
 fn spawn_background_services(pool: &sqlx::PgPool, _config: &AppConfig) {
     let bg_pool = pool.clone();
     tokio::spawn(async move {
@@ -407,48 +458,7 @@ fn spawn_background_services(pool: &sqlx::PgPool, _config: &AppConfig) {
         );
     }
 
-    if coolify_config.is_some() || coolify_config_vps1.is_some() {
-        let metrics_pool = pool.clone();
-        /* [259A-1] build() falla solo con configuracion invalida (fija aqui):
-         * salida explicita en arranque, nunca panic. */
-        let metrics_client = match reqwest::Client::builder()
-            .timeout(Duration::from_secs(30))
-            .build()
-        {
-            Ok(client) => client,
-            Err(e) => {
-                eprintln!("[fatal] metrics HTTP client: {e}");
-                std::process::exit(1);
-            }
-        };
-        let metrics_vps1 = coolify_config_vps1.clone();
-        let metrics_default = coolify_config.clone();
-        tokio::spawn(async move {
-            infrastructure_metrics_loop(
-                metrics_pool,
-                metrics_client,
-                metrics_vps1,
-                metrics_default,
-            )
-            .await;
-        });
-
-        let throttle_pool = pool.clone();
-        let throttle_vps1 = coolify_config_vps1.clone();
-        let throttle_default = coolify_config.clone();
-        tokio::spawn(async move {
-            bandwidth_throttle_loop(throttle_pool, throttle_vps1, throttle_default).await;
-        });
-
-        let cpu_burst_pool = pool.clone();
-        let cpu_burst_vps1 = coolify_config_vps1.clone();
-        let cpu_burst_default = coolify_config.clone();
-        tokio::spawn(async move {
-            cpu_burst_loop(cpu_burst_pool, cpu_burst_vps1, cpu_burst_default).await;
-        });
-    } else {
-        tracing::warn!("[infra-metrics] Coolify no configurado — sampler desactivado");
-    }
+    spawn_coolify_loops(pool, coolify_config, coolify_config_vps1);
 
     /* [277A-7] Background task: worker de retry de reembolsos fallidos (backoff exponencial) */
     let refund_pool = pool.clone();

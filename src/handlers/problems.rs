@@ -14,8 +14,8 @@ use validator::Validate;
 use crate::errors::AppError;
 use crate::middleware::AuthUser;
 use crate::models::{
-    CreateNotification, ProblemAction, ProblemResponse, ProblemStatus, ReportProblemRequest,
-    ResolveProblemRequest, UserRole,
+    CreateNotification, Order, OrderProblem, ProblemAction, ProblemResponse, ProblemStatus,
+    ReportProblemRequest, ResolveProblemRequest, UserRole,
 };
 use crate::repositories::{OrderRepository, ProblemRepository, UserRepository};
 use crate::AppState;
@@ -38,42 +38,16 @@ REPORTAR PROBLEMA
     security(("bearer_auth" = [])),
     tag = "problems"
 )]
-pub async fn report_problem(
-    State(state): State<AppState>,
-    auth: AuthUser,
-    Path(order_id): Path<Uuid>,
-    Json(req): Json<ReportProblemRequest>,
-) -> Result<(StatusCode, Json<ProblemResponse>), AppError> {
-    req.validate()
-        .map_err(|e| AppError::Validation(e.to_string()))?;
-
-    let order = OrderRepository::find_order_by_id(&state.pool, order_id)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Orden no encontrada".into()))?;
-
-    /* Verificar que el usuario tiene relación con la orden */
-    let role_str = match auth.effective_role {
-        UserRole::Client => {
-            if order.client_id != auth.user_id {
-                return Err(AppError::Forbidden(
-                    "No eres el cliente de esta orden".into(),
-                ));
-            }
-            "client"
-        }
-        UserRole::Employee => {
-            if order.assigned_employee_id != Some(auth.user_id) {
-                return Err(AppError::Forbidden("No estás asignado a esta orden".into()));
-            }
-            "employee"
-        }
-        UserRole::Admin => "admin",
-    };
-
-    let problem =
-        ProblemRepository::create(&state.pool, order_id, auth.user_id, role_str, &req.reason)
-            .await?;
-
+/* [01AA-4-F1] Notificaciones post-reporte fuera del handler (~80 líneas):
+ * hub de admins + nombre del reportero + emails non-fatal a cliente y admins.
+ * Retorna el nombre del reportero para la respuesta. */
+async fn notify_problem_reported(
+    state: &AppState,
+    order: &Order,
+    problem: &OrderProblem,
+    reason: &str,
+    reporter_id: Uuid,
+) -> String {
     /* Notificar a todos los admins */
     let admins = UserRepository::admin_ids(&state.pool)
         .await
@@ -83,7 +57,7 @@ pub async fn report_problem(
         user_id: Uuid::nil(),
         notification_type: "problem_reported".to_string(),
         title: format!("Problema reportado en orden #{}", order.order_number),
-        body: Some(req.reason.chars().take(100).collect()),
+        body: Some(reason.chars().take(100).collect()),
         link: Some(format!("/panel?seccion=problemas&id={}", problem.id)),
         reference_type: Some("order_problem".to_string()),
         reference_id: Some(problem.id),
@@ -93,7 +67,7 @@ pub async fn report_problem(
         .notify_many(&admins, &base_notif)
         .await;
 
-    let reporter_name = UserRepository::display_name_or_email(&state.pool, auth.user_id)
+    let reporter_name = UserRepository::display_name_or_email(&state.pool, reporter_id)
         .await
         .unwrap_or_else(|_| "Desconocido".to_string());
 
@@ -111,8 +85,8 @@ pub async fn report_problem(
                 .ok()
                 .flatten()
                 .unwrap_or_else(|| "Cliente".to_string());
-            let ptitle = req.reason.chars().take(80).collect::<String>();
-            let pdesc = req.reason.clone();
+            let ptitle = reason.chars().take(80).collect::<String>();
+            let pdesc = reason.to_string();
             let site_url =
                 std::env::var("SITE_URL").unwrap_or_else(|_| "https://nakomi.studio".to_string());
             tokio::spawn(async move {
@@ -149,8 +123,8 @@ pub async fn report_problem(
                     .ok()
                     .flatten()
                     .unwrap_or_else(|| "desconocido@email.com".to_string());
-                let ptitle = req.reason.chars().take(80).collect::<String>();
-                let pdesc = req.reason.clone();
+                let ptitle = reason.chars().take(80).collect::<String>();
+                let pdesc = reason.to_string();
                 let site_url = std::env::var("SITE_URL")
                     .unwrap_or_else(|_| "https://nakomi.studio".to_string());
                 tokio::spawn(async move {
@@ -171,6 +145,48 @@ pub async fn report_problem(
             }
         }
     }
+    reporter_name
+}
+
+pub async fn report_problem(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(order_id): Path<Uuid>,
+    Json(req): Json<ReportProblemRequest>,
+) -> Result<(StatusCode, Json<ProblemResponse>), AppError> {
+    req.validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+
+    let order = OrderRepository::find_order_by_id(&state.pool, order_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Orden no encontrada".into()))?;
+
+    /* Verificar que el usuario tiene relación con la orden */
+    let role_str = match auth.effective_role {
+        UserRole::Client => {
+            if order.client_id != auth.user_id {
+                return Err(AppError::Forbidden(
+                    "No eres el cliente de esta orden".into(),
+                ));
+            }
+            "client"
+        }
+        UserRole::Employee => {
+            if order.assigned_employee_id != Some(auth.user_id) {
+                return Err(AppError::Forbidden("No estás asignado a esta orden".into()));
+            }
+            "employee"
+        }
+        UserRole::Admin => "admin",
+    };
+
+    let problem =
+        ProblemRepository::create(&state.pool, order_id, auth.user_id, role_str, &req.reason)
+            .await?;
+
+    let reporter_name =
+        notify_problem_reported(&state, &order, &problem, &req.reason, auth.user_id).await;
+
     let resp = ProblemResponse {
         id: problem.id,
         order_id: problem.order_id,

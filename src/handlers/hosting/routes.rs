@@ -1,6 +1,6 @@
 use axum::routing::get;
 use axum::Router;
-use tower_governor::governor::GovernorConfigBuilder;
+use tower_governor::governor::{GovernorConfig, GovernorConfigBuilder};
 use tower_governor::key_extractor::SmartIpKeyExtractor;
 use tower_governor::GovernorLayer;
 
@@ -24,15 +24,12 @@ use super::subscriptions::{
 use super::vps::{get_vps, list_vps};
 use crate::AppState;
 
-fn subscription_routes() -> Router<AppState> {
-    /* [255A-1] Checkout/suscripción también debe usar la IP real del cliente.
-     * Si se limita por la IP interna del proxy, un pico ajeno puede bloquear compras.
-     *
-     * [176A-1] Corregido: per_second(N) = 1 token cada N segundos.
-     * Checkout: 1 req/s, burst 5 — prevenir abuso sin bloquear compras legítimas. */
+/* [01AA-4-F1] Los dos limiters de checkout/subscribe comparten config
+ * (1 req/s, burst 5): un solo builder para no duplicar ~18 líneas. */
+fn rate_limit_governor() -> GovernorConfig<SmartIpKeyExtractor> {
     /* [259A-1] Config fija valida por construccion; si falla es error de
      * programacion en arranque: salida explicita, nunca panic en produccion. */
-    let subscribe_gov = GovernorConfigBuilder::default()
+    GovernorConfigBuilder::default()
         .key_extractor(SmartIpKeyExtractor)
         .per_second(1)
         .burst_size(5)
@@ -40,16 +37,17 @@ fn subscription_routes() -> Router<AppState> {
         .unwrap_or_else(|| {
             eprintln!("[fatal] subscribe rate limit config invalida");
             std::process::exit(1);
-        });
-    let checkout_gov = GovernorConfigBuilder::default()
-        .key_extractor(SmartIpKeyExtractor)
-        .per_second(1)
-        .burst_size(5)
-        .finish()
-        .unwrap_or_else(|| {
-            eprintln!("[fatal] checkout rate limit config invalida");
-            std::process::exit(1);
-        });
+        })
+}
+
+fn subscription_routes() -> Router<AppState> {
+    /* [255A-1] Checkout/suscripción también debe usar la IP real del cliente.
+     * Si se limita por la IP interna del proxy, un pico ajeno puede bloquear compras.
+     *
+     * [176A-1] Corregido: per_second(N) = 1 token cada N segundos.
+     * Checkout: 1 req/s, burst 5 — prevenir abuso sin bloquear compras legítimas. */
+    let subscribe_gov = rate_limit_governor();
+    let checkout_gov = rate_limit_governor();
 
     Router::new()
         .route(
