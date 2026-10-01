@@ -293,13 +293,17 @@ pub(crate) async fn exec_admin_operational_summary(
             return tool_status("error", "No se pudo consultar el resumen operativo");
         }
     };
-    let report_stats = query_admin_report_stats(pool)
-        .await
-        .unwrap_or(AdminReportStats {
-            open_reports: 0,
-            in_review_reports: 0,
-        });
-    let hosting_by_status = query_hosting_status_counts(pool).await.unwrap_or_default();
+    /* [01AA-3] stats de reportes y hosting son independientes entre sí
+     * (ambas toleran error con fallback) → una sola ronda con join!. */
+    let (report_stats_result, hosting_counts_result) = tokio::join!(
+        query_admin_report_stats(pool),
+        query_hosting_status_counts(pool)
+    );
+    let report_stats = report_stats_result.unwrap_or(AdminReportStats {
+        open_reports: 0,
+        in_review_reports: 0,
+    });
+    let hosting_by_status = hosting_counts_result.unwrap_or_default();
 
     tool_json(json!({
         "status": "ok",

@@ -294,26 +294,30 @@ async fn process_continuation_email(
             let _ = ChatAlertRepository::mark_sent(pool, entry.id).await;
         }
         Ok(Err(error)) => {
-            let _ = crate::repositories::continuation_token::revoke_for_session(
-                pool,
-                payload.session_id,
-            )
-            .await;
-            let _ = ChatAlertRepository::mark_retry(pool, entry.id, &error, entry.attempts).await;
+            /* [01AA-3] revocar token y marcar reintento son independientes
+             * (fire-and-forget sobre tablas distintas) → una sola ronda. */
+            let _ = tokio::join!(
+                crate::repositories::continuation_token::revoke_for_session(
+                    pool,
+                    payload.session_id,
+                ),
+                ChatAlertRepository::mark_retry(pool, entry.id, &error, entry.attempts)
+            );
         }
         Err(_) => {
-            let _ = crate::repositories::continuation_token::revoke_for_session(
-                pool,
-                payload.session_id,
-            )
-            .await;
-            let _ = ChatAlertRepository::mark_retry(
-                pool,
-                entry.id,
-                "Timeout SMTP de continuación",
-                entry.attempts,
-            )
-            .await;
+            /* [01AA-3] igual que arriba: revocar + marcar reintento en paralelo. */
+            let _ = tokio::join!(
+                crate::repositories::continuation_token::revoke_for_session(
+                    pool,
+                    payload.session_id,
+                ),
+                ChatAlertRepository::mark_retry(
+                    pool,
+                    entry.id,
+                    "Timeout SMTP de continuación",
+                    entry.attempts,
+                )
+            );
         }
     }
 }
