@@ -79,12 +79,14 @@ Diseño base: `glory-agent/Agente/planes/plan-extraccion-whatsapp-2026-10-01.md`
 ## Estado
 
 - [x] Preflight (doctor sin policy en MN: vale wrapper+self-check)
-- [ ] Fase 0 pin bump
-- [ ] Fase 1 outbox idempotente
-- [ ] Fase 2 sombra completa
-- [ ] Fase 3 corte sticky
-- [ ] Fase 4 pruebas + humo
-- [ ] Cierre (roadmap, completada, commit, push)
+- [x] Fase 0 pin bump (`c4c30adb`)
+- [x] Fase 1 outbox idempotente (`66b1fed0`)
+- [x] Fase 2 sombra completa (`1a4e4096`)
+- [x] Fase 3 corte sticky (`f3e0bc8d`)
+- [x] Fase 4 pruebas + humo (2026-10-01: self-check verde 16 pendientes
+  esperados + `cargo test` 74 passed + humo `:3000` VERDE 13/13 con
+  turno IA real, 5 filas `sent` por sumidero, rollback y limpieza total)
+- [x] Cierre (roadmap, completada, commit, push)
 
 ## Decisiones
 
@@ -93,3 +95,11 @@ Diseño base: `glory-agent/Agente/planes/plan-extraccion-whatsapp-2026-10-01.md`
 - `manual` sin clave (ver Fase 1).
 - Mitad `agent_messages` de 0004 fuera (canal ya vive en
   `canal_sesiones`; no duplicar esquema).
+- Hallazgos del humo Fase4 (2026-10-01, solo documentan, sin código):
+  sesión fresca trae `ai_enabled=true` (default del núcleo;
+  `vincular_canal` no lo toca) y el adapter global default es `"1"`,
+  así que la sombra `wa_b` coincide sin intervención; `CambioSesion`
+  usa `aiEnabled` camelCase; `agent_config` tiene columnas
+  `(key, value)`; defaults `wa_a=584120825234` / `wa_b=584249208855`
+  (B es el vivo: el humo nunca marcó al gateway real, solo al
+  sumidero local).
