@@ -4,11 +4,11 @@
 # re-claveo H1 y aisla estados). Los jobs corren en paralelo y cada turno
 # espera con polling al outbox (motivo='ia') en vez de sleeps fijos: la v1
 # secuencial con esperas 120-150 s tardo ~70 min.
-# Requiere backend en http://127.0.0.1:3000 (ver C:\tmp\mn-arrancar-backend.ps1).
+# Requiere backend en http://127.0.0.1:3110 ([03AA-1]).
 param(
     [string[]]$Solo = @(),
     [string]$Base = "18149575561",
-    [string]$Backend = "http://127.0.0.1:3000",
+    [string]$Backend = "http://127.0.0.1:3110",
     [int]$TopeTurnoSeg = 150
 )
 

@@ -11,7 +11,7 @@ const flag = (v, def) => {
 
 export const config = {
   puerto: num(process.env.GATEWAY_PORT, 3102),
-  backendWebhook: process.env.BACKEND_WEBHOOK_URL || "http://127.0.0.1:3000/api/agent/whatsapp/webhook",
+  backendWebhook: process.env.BACKEND_WEBHOOK_URL || "http://127.0.0.1:3110/api/agent/whatsapp/webhook", // [03AA-1] local en 3110: el 3000 lo ocupa glory-pulse.
   webhookSecreto: process.env.WA_WEBHOOK_SECRETO || "",
   sendSecreto: process.env.GATEWAY_SEND_SECRET || "",
   sesiones: {

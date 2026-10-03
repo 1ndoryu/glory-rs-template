@@ -6,7 +6,7 @@
  * Solo acepta `src` local `/uploads/...` o remoto `http(s)://`; cualquier
  * otra cosa se muestra como texto (nada de `innerHTML`: React escapa).
  * La URL relativa funciona en prod (mismo origen) y en dev vía proxy
- * `/uploads` → :3000 en `vite.config.ts`. */
+ * `/uploads` → :3110 en `vite.config.ts`. */
 
 type MediaLine =
   | { kind: 'text'; text: string }

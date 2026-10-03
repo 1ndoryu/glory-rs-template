@@ -14,7 +14,7 @@ const args = Object.fromEntries(
   process.argv.slice(2).map((a, i, arr) => (a.startsWith('--') ? [a.slice(2), arr[i + 1] ?? 'true'] : [])).filter((p) => p.length),
 );
 
-const API = args.api ?? 'http://127.0.0.1:3000';
+const API = args.api ?? 'http://127.0.0.1:3110'; // [03AA-1] local en 3110.
 const EMAIL = args.email ?? 'import@example.com';
 const PASSWORD = args.password ?? 'import-secreto-123';
 const RESCATE = args.rescate ?? join(RAIZ, '..', '..', 'INMOBILIARIA', 'rescates', 'inmobiliaria-rescate-20260915-1205.json');

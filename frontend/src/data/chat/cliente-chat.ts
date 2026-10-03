@@ -34,7 +34,7 @@ const CLAVE_SESION = 'inmobiliaria:chat-sesion';
 
 export function baseApi(): string {
   const env = import.meta.env as Record<string, string | undefined>;
-  return (env['VITE_API_URL'] as string | undefined)?.trim().replace(/\/$/, '') || 'http://127.0.0.1:3000';
+  return (env['VITE_API_URL'] as string | undefined)?.trim().replace(/\/$/, '') || 'http://127.0.0.1:3110'; // [03AA-1] local en 3110: el 3000 lo ocupa glory-pulse.
 }
 
 export function urlWs(sesion: string): string {

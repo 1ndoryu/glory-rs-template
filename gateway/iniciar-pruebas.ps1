@@ -12,7 +12,7 @@ $env:GATEWAY_SEND_SECRET = $secreto
 $env:GLORY_ALERT_GATEWAY_URL = "http://127.0.0.1:3102/send"
 $env:RUST_LOG = "info"
 $env:GATEWAY_PORT = "3102"
-$env:BACKEND_WEBHOOK_URL = "http://127.0.0.1:3000/api/agent/whatsapp/webhook"
+$env:BACKEND_WEBHOOK_URL = "http://127.0.0.1:3110/api/agent/whatsapp/webhook"
 $env:SESSION_A_NUMBER = "584120825234"
 $env:SESSION_B_NUMBER = "18149575416"
 
@@ -22,12 +22,12 @@ Start-Process -FilePath "node" -ArgumentList "src/index.mjs" -WorkingDirectory $
 for ($i = 0; $i -lt 15; $i++) {
     Start-Sleep 2
     try {
-        $h = Invoke-WebRequest -Uri "http://127.0.0.1:3000/api/health" -TimeoutSec 3 -UseBasicParsing | ConvertFrom-Json
+        $h = Invoke-WebRequest -Uri "http://127.0.0.1:3110/api/health" -TimeoutSec 3 -UseBasicParsing | ConvertFrom-Json
         if ($h.status -eq "ok") { break }
     } catch { }
 }
 Write-Host ""
-Write-Host "Backend: http://127.0.0.1:3000  Gateway: http://127.0.0.1:3102"
+Write-Host "Backend: http://127.0.0.1:3110  Gateway: http://127.0.0.1:3102"
 Write-Host "1) En la ventana del gateway saldran 2 QR (o abre estos PNG):"
 Write-Host "   $PSScriptRoot\qr-wa_a.png  <- escanear con el telefono A (0412 0825234)"
 Write-Host "   $PSScriptRoot\qr-wa_b.png  <- escanear con el +1 (814) 957-5416 (B temporal)"

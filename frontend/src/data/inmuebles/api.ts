@@ -9,7 +9,7 @@ import type { CopyInmueble, Inmueble, MejoraServidor } from '../../domain/inmueb
 import { PRESETS_EXPORTACION, type RecetaPublicidad } from '../../domain/plantilla-publicidad';
 
 export const API_URL =
-  ((import.meta.env.VITE_API_URL as string | undefined)?.trim().replace(/\/$/, '')) || 'http://127.0.0.1:3000';
+  ((import.meta.env.VITE_API_URL as string | undefined)?.trim().replace(/\/$/, '')) || 'http://127.0.0.1:3110'; // [03AA-1] local en 3110: el 3000 lo ocupa glory-pulse.
 
 const CLAVE_TOKEN = 'inmobiliaria:token';
 const CLAVE_EMAIL = 'inmobiliaria:email';
