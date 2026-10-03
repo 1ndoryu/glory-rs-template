@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Gateway Baileys MN Inmobiliaria: 2 sesiones (A pruebas, B) entre WhatsApp y el backend (289A-1)",
   "scripts": {
-    "start": "node src/index.mjs"
+    "start": "node src/index.mjs --gateway-mn"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.18",

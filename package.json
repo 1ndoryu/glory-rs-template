@@ -12,6 +12,7 @@
     "fmt:check": "cargo fmt --check",
     "dev:back": "node scripts/run-with-db.mjs run",
     "dev:front": "npm --prefix frontend run dev",
+    "dev:gateway": "npm --prefix gateway start",
     "codegen": "npm --prefix frontend run codegen",
     "test": "node scripts/run-with-db.mjs test",
     "roadmap": "node scripts/check-roadmap.mjs",
