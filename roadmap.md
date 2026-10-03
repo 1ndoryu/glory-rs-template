@@ -265,7 +265,8 @@ librería uplot/u-legend/tiptap, gap sin allowlist). VarSense 2.2.9 (pin
    `Agente/planes/plan-01AA-4-2026-10-01.md` (Fases 1-2 cerradas 59W→52W;
    Fase 3 en curso (9/9 splits grandes 52W→39W: infrastructure_metrics, payment,
    order-svc, seed, chat-repo, order-repo, ai_chat, email_templates, hosting_stripe;
-   + resto en curso F3j cpu_burst 39W→38W + F3k hosting-repo 38W→36W); no se parten coolify/
+   + resto en curso F3j cpu_burst 39W→38W + F3k hosting-repo 38W→36W
+   + F3l contabo_domains 36W→36W higiene); no se parten coolify/
    handlers-mod/vps por waiver válido; pendiente resto 500-650 +
    Fase 4 frontend con verificación visual).
 - Fuera de alcance (observado, sin autorización): `large-interface-isp` x37,
