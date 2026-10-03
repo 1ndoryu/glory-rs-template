@@ -25,7 +25,16 @@ import { Input } from '@/components/ui/input';
  * `React.lazy` solo bajo `/admin*`, así el visitante público no descarga el
  * código de gestión (tabla, mejora IA, publicidad en canvas). */
 export function AppAdmin() {
-  const { email, alEntrar, salir } = useSesion();
+  const { email, alEntrar, salir, autoEntrando } = useSesion();
+  /* [03AA-2] Mientras la auto-entrada local intenta el login no se muestra
+   * el formulario (evita el parpadeo login→dentro en cada recarga). */
+  if (!email && autoEntrando) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-background p-4">
+        <p className="text-sm text-muted-foreground">Entrando automáticamente…</p>
+      </div>
+    );
+  }
   if (!email) return <PantallaLogin alEntrar={alEntrar} />;
   return <ContenidoApp key={email} email={email} alSalir={salir} />;
 }
