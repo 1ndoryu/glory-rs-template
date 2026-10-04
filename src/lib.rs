@@ -14,6 +14,7 @@
 #![allow(clippy::format_in_format_args)]
 #![allow(clippy::must_use_candidate)]
 
+pub mod bootstrap;
 pub mod config;
 pub mod errors;
 pub mod handlers;
