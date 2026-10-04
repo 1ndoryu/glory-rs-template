@@ -267,8 +267,8 @@ librería uplot/u-legend/tiptap, gap sin allowlist). VarSense 2.2.9 (pin
    order-svc, seed, chat-repo, order-repo, ai_chat, email_templates, hosting_stripe;
    + resto en curso F3j cpu_burst 39W→38W + F3k hosting-repo 38W→36W
    + F3l contabo_domains 36W→36W higiene + F3m prerender 36W→36W higiene
-   + F3n payments 36W→34W    + F3o deployments 34W estable    + F3p hosting_domains 34W estable + F3q ai_tools_misc 34W→33W higiene); no se parten coolify/
-   handlers-mod/vps por waiver válido; pendiente resto 500-650 +
+   + F3n payments 36W→34W    + F3o deployments 34W estable    + F3p hosting_domains 34W estable + F3q ai_tools_misc 34W→33W + F3r main.rs 33W→30W (bootstrap lib, main en 0 findings)); no se parten coolify/
+   handlers-mod/vps por waiver válido; pendiente resto F3s (largas/DIP/N-consultas) +
    Fase 4 frontend con verificación visual).
 - Fuera de alcance (observado, sin autorización): `large-interface-isp` x37,
   `parametros-excesivos-rs` x17, `css-especificacion-diseno-local` x1.
