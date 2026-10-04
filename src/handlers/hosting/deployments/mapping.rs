@@ -1,22 +1,19 @@
-use axum::extract::{Path, State};
-use axum::http::StatusCode;
-use axum::Json;
+/* [01AA-4-f3o] Inventario mínimo de despliegues (extraido de deployments.rs).
+ * Mapea resúmenes de runtime a CoolifyDeploymentResponse, reconstruye el
+ * inventario desde suscripciones cuando un runtime falla ([255A-2]) y
+ * enriquece con snapshots del sampler en vez de SSH en render ([225A-4]). */
+
 use std::collections::{HashMap, HashSet};
 
-use super::deployment_helpers::{
-    build_subscription_lookups, collect_pending_deployment_batches, deployments_cache,
-    duplicate_name_keys, invalidate_deployments_cache, locate_runtime_deployment,
-    resolve_server_label, runtime_link_key, FailedRuntimeLookup,
+use super::super::deployment_helpers::{
+    resolve_server_label, runtime_link_key, FailedRuntimeLookup, PendingRuntimeDeployments,
 };
-use crate::errors::AppError;
-use crate::middleware::AuthUser;
-use crate::models::{CoolifyDeploymentResponse, HostingSubscription, UserRole};
-use crate::repositories::{HostingRepository, InfrastructureRepository};
-use crate::services::infrastructure::coolify_server_targets;
-use crate::services::{HostingRuntimeDeploymentSummary, HostingRuntimeKind, HostingRuntimeService};
+use crate::models::{CoolifyDeploymentResponse, HostingSubscription};
+use crate::repositories::InfrastructureRepository;
+use crate::services::{HostingRuntimeDeploymentSummary, HostingRuntimeKind};
 use crate::AppState;
 
-fn map_runtime_deployments(
+pub(super) fn map_runtime_deployments(
     services: Vec<HostingRuntimeDeploymentSummary>,
     fallback_label: &str,
     duplicate_name_keys: &HashSet<String>,
@@ -88,19 +85,22 @@ fn map_runtime_deployments(
         .collect()
 }
 
-fn f64_to_i64_rounded(value: f64) -> Option<i64> {
+pub(super) fn f64_to_i64_rounded(value: f64) -> Option<i64> {
     if !value.is_finite() {
         return None;
     }
     format!("{value:.0}").parse::<i64>().ok()
 }
 
-fn should_include_subscription_fallback(subscription: &HostingSubscription) -> bool {
+pub(super) fn should_include_subscription_fallback(subscription: &HostingSubscription) -> bool {
     subscription.deployment_id_or_legacy().is_some()
         && !subscription.status.trim().eq_ignore_ascii_case("cancelled")
 }
 
-fn subscription_fallback_name(subscription: &HostingSubscription, deployment_id: &str) -> String {
+pub(super) fn subscription_fallback_name(
+    subscription: &HostingSubscription,
+    deployment_id: &str,
+) -> String {
     subscription
         .coolify_site_name
         .as_deref()
@@ -142,10 +142,10 @@ fn subscription_matches_failed_lookup(
 /* [255A-2] Cuando Coolify responde 500, el panel no debe degradar a "cero despliegues".
  * Si un runtime concreto falla, reconstruimos un inventario mínimo desde suscripciones
  * persistidas para conservar la tabla utilizable hasta que el proveedor vuelva. */
-fn build_failed_runtime_fallback_batches(
+pub(super) fn build_failed_runtime_fallback_batches(
     subscriptions: &[HostingSubscription],
     failed_lookups: &[FailedRuntimeLookup],
-) -> Vec<super::deployment_helpers::PendingRuntimeDeployments> {
+) -> Vec<PendingRuntimeDeployments> {
     failed_lookups
         .iter()
         .filter_map(|failed_lookup| {
@@ -186,7 +186,7 @@ fn build_failed_runtime_fallback_batches(
                 })
                 .collect();
 
-            (!services.is_empty()).then_some(super::deployment_helpers::PendingRuntimeDeployments {
+            (!services.is_empty()).then_some(PendingRuntimeDeployments {
                 fallback_label: failed_lookup.fallback_label.clone(),
                 services,
             })
@@ -194,7 +194,7 @@ fn build_failed_runtime_fallback_batches(
         .collect()
 }
 
-fn dedupe_deployments(
+pub(super) fn dedupe_deployments(
     deployments: Vec<CoolifyDeploymentResponse>,
 ) -> Vec<CoolifyDeploymentResponse> {
     let mut seen = HashSet::new();
@@ -210,7 +210,7 @@ fn dedupe_deployments(
         .collect()
 }
 
-fn failed_runtime_labels(failed_lookups: &[FailedRuntimeLookup]) -> String {
+pub(super) fn failed_runtime_labels(failed_lookups: &[FailedRuntimeLookup]) -> String {
     let mut seen = HashSet::new();
 
     failed_lookups
@@ -230,7 +230,7 @@ fn failed_runtime_labels(failed_lookups: &[FailedRuntimeLookup]) -> String {
 /* [225A-4] Enriquece despliegues desde snapshots del sampler, no desde SSH en render.
  * Si aún no hay muestras, el panel muestra guiones hasta que el loop background
  * capture el primer promedio. */
-async fn enrich_deployment_resources(
+pub(super) async fn enrich_deployment_resources(
     state: &AppState,
     deployments: &mut [CoolifyDeploymentResponse],
 ) {
@@ -258,228 +258,6 @@ async fn enrich_deployment_resources(
             ),
         }
     }
-}
-
-/// Listar despliegues reales de infraestructura por runtime (admin only)
-#[utoipa::path(
-    get,
-    path = "/api/hosting/deployments",
-    responses(
-        (status = 200, description = "Lista de despliegues reales de infraestructura", body = Vec<CoolifyDeploymentResponse>),
-        (status = 403, description = "Sin permisos"),
-        (status = 503, description = "Ningun runtime configurado"),
-    ),
-    security(("bearer_auth" = [])),
-    tag = "hosting"
-)]
-#[allow(clippy::too_many_lines)]
-pub(super) async fn list_deployments(
-    State(state): State<AppState>,
-    auth: AuthUser,
-) -> Result<Json<Vec<CoolifyDeploymentResponse>>, AppError> {
-    auth.require_role(&[UserRole::Admin])?;
-
-    if coolify_server_targets(
-        state.coolify_config_vps1.as_ref(),
-        state.coolify_config.as_ref(),
-    )
-    .is_empty()
-        && !HostingRuntimeService::lightweight_manager_configured()
-    {
-        return Err(AppError::ServiceUnavailable(
-            "No hay runtimes configurados para listar despliegues".into(),
-        ));
-    }
-
-    let cache = deployments_cache();
-
-    let needs_refresh;
-    let mut current_deployments = Vec::new();
-    {
-        let cache_guard = cache.read().await;
-        if cache_guard.deployments.is_empty() {
-            needs_refresh = true;
-        } else {
-            current_deployments = cache_guard.deployments.clone();
-            // Stale-while-revalidate: cache dura 30 segundos, pero devolvemos viejo mientras carga el nuevo
-            needs_refresh = cache_guard.fetched_at.elapsed() > std::time::Duration::from_secs(30);
-        }
-    }
-
-    if needs_refresh {
-        if current_deployments.is_empty() {
-            tracing::info!("[deployments] Primer carga, esperando datos...");
-            current_deployments = build_deployments(state.clone()).await?;
-            let mut cache_guard = cache.write().await;
-            cache_guard.deployments.clone_from(&current_deployments);
-            cache_guard.fetched_at = std::time::Instant::now();
-        } else {
-            tracing::info!(
-                "[deployments] Devolviendo de caché (stale), refrescando en background..."
-            );
-            let state_clone = state.clone();
-            tokio::spawn(async move {
-                if let Ok(new_deployments) = build_deployments(state_clone).await {
-                    let cache = deployments_cache();
-                    let mut cache_guard = cache.write().await;
-                    cache_guard.deployments = new_deployments;
-                    cache_guard.fetched_at = std::time::Instant::now();
-                    tracing::info!("[deployments] Caché refrescado en background");
-                } else {
-                    tracing::warn!("[deployments] Falló el refresco en background");
-                }
-            });
-        }
-    } else {
-        tracing::info!("[deployments] Devolviendo de caché (fresco)");
-    }
-
-    Ok(Json(current_deployments))
-}
-
-async fn build_deployments(state: AppState) -> Result<Vec<CoolifyDeploymentResponse>, AppError> {
-    tracing::info!("[deployments] -> Inicio build_deployments");
-
-    tracing::info!("[deployments] Consultando repositorios...");
-    let subscriptions = HostingRepository::list_all(&state.pool).await?;
-    let (subscriptions_by_uuid, subscriptions_by_name) = build_subscription_lookups(&subscriptions);
-
-    let plan_configs = HostingRepository::list_plan_configs(&state.pool).await?;
-    let plan_configs_by_name: HashMap<String, _> = plan_configs
-        .into_iter()
-        .map(|config| (config.plan_name.clone(), config))
-        .collect();
-
-    let batch_collection = collect_pending_deployment_batches(&state).await;
-    let mut pending_batches = batch_collection.pending_batches;
-
-    if !batch_collection.failed_lookups.is_empty() {
-        let fallback_batches =
-            build_failed_runtime_fallback_batches(&subscriptions, &batch_collection.failed_lookups);
-        let fallback_count: usize = fallback_batches
-            .iter()
-            .map(|batch| batch.services.len())
-            .sum();
-        if fallback_count > 0 {
-            tracing::warn!(
-                "[deployments] {} runtime(s) fallaron; usando {} despliegue(s) persistidos como fallback.",
-                batch_collection.failed_lookups.len(),
-                fallback_count
-            );
-            pending_batches.extend(fallback_batches);
-        }
-    }
-
-    let duplicate_name_keys = duplicate_name_keys(&pending_batches);
-    let mut deployments = dedupe_deployments(
-        pending_batches
-            .into_iter()
-            .flat_map(|batch| {
-                map_runtime_deployments(
-                    batch.services,
-                    &batch.fallback_label,
-                    &duplicate_name_keys,
-                    &subscriptions_by_uuid,
-                    &subscriptions_by_name,
-                    &plan_configs_by_name,
-                )
-            })
-            .collect(),
-    );
-
-    if deployments.is_empty() && !batch_collection.failed_lookups.is_empty() {
-        return Err(AppError::ServiceUnavailable(format!(
-            "No se pudo consultar la infraestructura para listar despliegues reales. Fallaron: {}.",
-            failed_runtime_labels(&batch_collection.failed_lookups)
-        )));
-    }
-
-    tracing::info!("[deployments] Iniciando enrich_deployment_resources...");
-    enrich_deployment_resources(&state, &mut deployments).await;
-    tracing::info!("[deployments] Finalizó enrich_deployment_resources");
-
-    deployments.sort_by(|left, right| {
-        right
-            .linked_subscription_id
-            .is_some()
-            .cmp(&left.linked_subscription_id.is_some())
-            .then(left.name.cmp(&right.name))
-            .then(left.uuid.cmp(&right.uuid))
-    });
-
-    tracing::info!("[deployments] -> Fin build_deployments");
-    Ok(deployments)
-}
-
-/* [165A-4] Permite limpiar despliegues huérfanos desde el panel admin.
- * Solo borra stacks sin vínculo en BD para evitar desalinear suscripciones reales.
- * [245A-8] Ahora resuelve el runtime antes de borrar para soportar coexistencia
- * entre Coolify legacy y runtime lightweight sin mezclar identidades. */
-#[utoipa::path(
-    delete,
-    path = "/api/hosting/deployments/{deployment_uuid}",
-    params(("deployment_uuid" = String, Path, description = "UUID del despliegue en Coolify")),
-    responses(
-        (status = 204, description = "Despliegue eliminado"),
-        (status = 403, description = "Sin permisos"),
-        (status = 404, description = "Despliegue no encontrado"),
-        (status = 409, description = "El despliegue ya está vinculado a una suscripción"),
-        (status = 503, description = "Runtime no configurado o no disponible"),
-    ),
-    security(("bearer_auth" = [])),
-    tag = "hosting"
-)]
-#[allow(clippy::too_many_lines)]
-pub(super) async fn delete_deployment(
-    State(state): State<AppState>,
-    auth: AuthUser,
-    Path(deployment_uuid): Path<String>,
-) -> Result<StatusCode, AppError> {
-    auth.require_role(&[UserRole::Admin])?;
-
-    let subscriptions = HostingRepository::list_all(&state.pool).await?;
-    let located = locate_runtime_deployment(&state, &deployment_uuid).await?;
-
-    let can_link_by_name = located
-        .deployment_name_counts
-        .get(&runtime_link_key(
-            located.runtime_kind,
-            &located.target_name,
-        ))
-        .copied()
-        .unwrap_or(0)
-        <= 1;
-    let linked_subscription = subscriptions.iter().find(|subscription| {
-        HostingRuntimeKind::from_persisted(&subscription.runtime_kind) == located.runtime_kind
-            && (subscription.deployment_id_or_legacy() == Some(deployment_uuid.as_str())
-                || (can_link_by_name
-                    && subscription.coolify_site_name.as_deref()
-                        == Some(located.target_name.as_str())))
-    });
-
-    if let Some(subscription) = linked_subscription {
-        return Err(AppError::Conflict(format!(
-            "El despliegue {} ya está vinculado a la suscripción {}. Elimínalo desde la suscripción para no dejar datos huérfanos.",
-            located.target_name, subscription.id
-        )));
-    }
-
-    HostingRuntimeService::delete_deployment(
-        &state.http_client,
-        located.target_config,
-        Some(located.runtime_kind),
-        &deployment_uuid,
-        true,
-    )
-    .await?;
-    invalidate_deployments_cache(Some(&deployment_uuid)).await;
-    tracing::info!(
-        "[deployments] Despliegue huérfano {} ({}) eliminado desde el panel admin.",
-        located.target_name,
-        deployment_uuid
-    );
-
-    Ok(StatusCode::NO_CONTENT)
 }
 
 #[cfg(test)]
