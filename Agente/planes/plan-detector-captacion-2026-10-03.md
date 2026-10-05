@@ -18,15 +18,18 @@ login automatizado, publicación, mensajes, convertir aprobado a inmueble del
 sistema (fase futura), scrapear a escala.
 
 ## Riesgo (mínimo, no 0)
-Reglas duras: solo-lectura del DOM de páginas abiertas por ella; red desde
-content-script prohibida (todo vía `background` con throttle + jitter);
-cero clipboard automático en este plugin; límites: máx 60 avisos/hora y
-200/día (a calibrar; por encima el lector se pausa solo = kill-switch
-automático); si Meta cambia el markup se registra y recalibra. Nota honesta:
-leer DOM + exfiltrar a backend local es detectable por comportamiento; el
-teléfono oculto se obtiene solo por vía manual (ella lo ve y lo pega). ToS de
-Meta prohíbe scraping a escala: este diseño es asistencia a navegación
-humana real, no extracción masiva.
+Abrir un aviso lo guardas automáticamente para gestionarlo después: ese es
+el flujo, sin fricción. Corrección 2026-10-03 (usuaria): si ella abre cada
+aviso a ritmo humano, ese ritmo YA es el límite — leer el DOM no genera ni
+una petición extra hacia Meta (todo va al backend local, invisible para
+ellos). Se elimina el throttle por hora/día en la vía pasiva; en su lugar el
+admin muestra `avisos/día` como métrica visible, sin bloquear. Reglas que sí
+quedan: solo-lectura del DOM de páginas abiertas por ella; red desde
+content-script prohibida (todo vía `background`); cero clipboard automático;
+cero clics/navegación automática/login automatizado, hoy y en toda fase
+futura (cualquier propuesta que los pida se rechaza en diseño). Nota honesta:
+el riesgo real no es leer, es la escala automatizada — y esa no existe aquí.
+El teléfono oculto se obtiene solo por vía manual (ella lo ve y lo pega).
 
 ## Adenda conjunta 03AA-3 / 03AA-5 (repo `plugins-opencode`)
 Un solo repo, un solo `watch`/lector en `nucleo/` (agnóstico: observa,
