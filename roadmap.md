@@ -513,4 +513,10 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 
 ## 011A-5 — F5 consumidor delgado MN (cerrada 2026-10-01: ver `Agente/completados/tareas-2026-10-01.md`)
 
+## 03AA-3 — Asistente Marketplace a repo propio + respuestas IA (plan activo 2026-10-03)
+- Plan: `Agente/planes/plan-asistente-marketplace-separacion-2026-10-03.md`.
+- Decisiones usuaria: repo nuevo `plugins-opencode`, caché en backend MN, panel
+  que se oculta al minimizar/burbuja, strip lateral eliminado del código.
+- Pendiente: puntos restantes que la usuaria anunciará; luego E1 (repo + Sentinel + núcleo).
+
 ## 05AA-1 — MN adopta `Resolver` del núcleo (cerrada 2026-10-05: ver `Agente/completados/tareas-2026-10-05.md`)
