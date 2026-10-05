@@ -520,7 +520,9 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   2º reto: freeze+timebox E0, allowlist extras, modelo pineado, matriz fuga,
   caché por terna+TTL, host dueño núcleo, Regenerar sin tope por
   decisión usuaria 2026-10-05; 3er reto: P0 seguridad/PII/rollback/
-  concurrentes + 8 contradicciones cerradas, fases secuenciales).
+  concurrentes + 8 contradicciones; 4º reto: E0 checklist ejecutable,
+  frase canónica de ficha, schema publicado, rollback por repo, números
+  con origen, orden E1→E2→M3→M2→E3→M4→M1).
 - E0 en curso (solo lectura, timebox 3 días). E1 bloqueado hasta E0 real;
   E2+ espera tus puntos restantes.
 
