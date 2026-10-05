@@ -526,8 +526,11 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   freeze cifrado, token endpoint con spec, HMAC audit, restore con dueño,
   strip allowlist, CLI 8h, scopes separados, 429 exime a ella, store en
   memoria, doctrina referenciada a 03AA-5).
-- E0 en curso (solo lectura, timebox 3 días). E1 bloqueado hasta E0 real;
-  E2+ espera tus puntos restantes.
+- E0 ejecutado 2026-10-05 (día 1 de 3, solo lectura): freeze cifrado en
+  `%MP_PRIVADO%` + inventario + firma-v1 + anonimizar/verificador + fixture
+  sintética. Falta de tu parte para cerrar E0: 3 hilos (precio/disponibilidad/
+  visita), remoto del repo, fecha de viva 30min; sin eso E0 no cierra. E1
+  bloqueado hasta E0 real; E2+ espera tus puntos restantes.
 
 ## 03AA-4 — WhatsApp un solo número + triage + config + escenarios (plan activo 2026-10-03)
 - Plan: `Agente/planes/plan-whatsapp-numero-unico-2026-10-03.md`.

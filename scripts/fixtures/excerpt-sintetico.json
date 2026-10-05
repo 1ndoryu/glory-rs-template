@@ -1,0 +1,13 @@
+{
+  "_nota": "Fixture 100% sintética [03AA-3 E0.6]: ningún dato real. Forma del excerpt que usará el corpus (plan §E0.4).",
+  "threadId": "hilo-sintetico-001",
+  "firma_version": "firma-v1",
+  "lang": "es",
+  "excerpt": {
+    "remitente_hash": "hmac-sintetico-ejemplo-no-real",
+    "texto": "Hola, buenas tardes. ¿Sigue disponible? ¿Acepta vehículo como parte de pago?",
+    "hora": "2026-10-05T18:00:00-04:00",
+    "leido": true
+  },
+  "avisoId": null
+}
