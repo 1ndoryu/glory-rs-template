@@ -516,8 +516,10 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 ## 03AA-3 — Asistente Marketplace (REPLANTEADO 2026-10-03)
 - Plan: `Agente/planes/plan-asistente-marketplace-separacion-2026-10-03.md`
   (reto aplicado: E0 inventario+corpus, strip con flag, doctrina Meta común
-  con 03AA-5, caché con spec, test anti-fuga del mínimo, DoD con números).
-- E0 pendiente (inventario fork + 3 hilos Messenger). E1-mínimo desbloqueado;
+  con 03AA-5, caché con spec, test anti-fuga del mínimo, DoD con números;
+  2º reto: freeze+timebox E0, allowlist extras, modelo pineado, matriz fuga,
+  caché por terna+TTL, host dueño núcleo, tope Regenerar 20/día).
+- E0 en curso (solo lectura, timebox 3 días). E1 bloqueado hasta E0 real;
   E2+ espera tus puntos restantes.
 
 ## 03AA-4 — WhatsApp un solo número + triage + config + escenarios (plan activo 2026-10-03)
@@ -532,7 +534,7 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 - Plan: `Agente/planes/plan-detector-captacion-2026-10-03.md` (incorpora reto
   hostil: riesgo mínimo —no 0—, C0 corpus+dataset+DDL primero, adenda con
   03AA-3, métricas por fase).
-- Bloqueado hasta C0 (corpus 5+2+1, dataset 30–50, DDL) y E1-mínimo de 03AA-3
-  (repo + núcleo lector). Nada de código antes.
+- Bloqueado hasta C0 (corpus 5+2+1, dataset 30–50, DDL) y E1 de 03AA-3
+  (repo + núcleo lector; a su vez bloqueado hasta E0). Nada de código antes.
 
 ## 05AA-1 — MN adopta `Resolver` del núcleo (cerrada 2026-10-05: ver `Agente/completados/tareas-2026-10-05.md`)
