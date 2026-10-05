@@ -512,3 +512,5 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 - Requiere de usuaria: responder el cuestionario en `/ask`.
 
 ## 011A-5 — F5 consumidor delgado MN (cerrada 2026-10-01: ver `Agente/completados/tareas-2026-10-01.md`)
+
+## 05AA-1 — MN adopta `Resolver` del núcleo (cerrada 2026-10-05: ver `Agente/completados/tareas-2026-10-05.md`)

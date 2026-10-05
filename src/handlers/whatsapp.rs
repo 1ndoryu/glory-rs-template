@@ -12,8 +12,10 @@ use uuid::Uuid;
 use crate::repositories::ClienteRepository;
 use crate::services::InmuebleService;
 use crate::services::{
-    clave_idempotencia, corte_cubre, debe_usar_clave, encolar_outbox_idem, Encolado,
+    clave_idempotencia, corte_cubre, debe_usar_clave, encolar_outbox_idem, modo_por_canal,
+    CanalResolver, Encolado,
 };
+use glory_agent::channels::Resolver;
 use glory_agent::errors::AgentError;
 
 /* [279A-2 F2] Webhook simulado + reparto por número (sin Baileys/QR todavía).
@@ -143,6 +145,7 @@ pub(crate) async fn numeros_configurados(pool: &sqlx::PgPool) -> (String, String
 }
 
 /// Reparto puro por destino (testeable sin BD): `wa_a`/`completo`, `wa_b`/`inicial`.
+/// El `modo` sale de `modo_por_canal` (fuente única, compartida con el resolutor).
 #[must_use]
 pub fn reparto(
     numero_a: &str,
@@ -150,13 +153,14 @@ pub fn reparto(
     numero_destino: &str,
 ) -> Option<(&'static str, &'static str)> {
     let destino = ClienteRepository::normalizar_telefono(numero_destino);
-    if destino == ClienteRepository::normalizar_telefono(numero_a) {
-        Some(("wa_a", "completo"))
+    let canal = if destino == ClienteRepository::normalizar_telefono(numero_a) {
+        "wa_a"
     } else if destino == ClienteRepository::normalizar_telefono(numero_b) {
-        Some(("wa_b", "inicial"))
+        "wa_b"
     } else {
-        None
-    }
+        return None;
+    };
+    Some((canal, modo_por_canal(canal)?))
 }
 
 /// Secreto compartido con el gateway Baileys (llega con F2 real): si
@@ -587,23 +591,14 @@ pub async fn repartir_y_vincular(
     let cliente = ClienteRepository::registrar_con_origen(pool, nombre, &remitente_norm, canal)
         .await
         .map_err(|e| AgentError::Db(e.to_string()))?;
-    let sesion = if let Some(previa) =
-        ClienteRepository::buscar_sesion_por_cliente_canal(pool, cliente.id, canal)
-            .await
-            .map_err(|e| AgentError::Db(e.to_string()))?
-    {
-        ClienteRepository::vincular_canal(pool, previa, cliente.id, &remitente_norm, canal, modo)
-            .await
-            .map_err(|e| AgentError::Db(e.to_string()))?;
-        previa
-    } else {
-        let nueva = Uuid::new_v4();
-        glory_agent::persistence::ensure_session(pool, nueva).await?;
-        ClienteRepository::vincular_canal(pool, nueva, cliente.id, &remitente_norm, canal, modo)
-            .await
-            .map_err(|e| AgentError::Db(e.to_string()))?;
-        nueva
-    };
+    /* [05AA-1] La resolución va por el `Resolver` del núcleo (mismo
+     * resultado: reutiliza el hilo o crea uno con `ensure_session` +
+     * `vincular_canal`). Fallo de BD → 500 igual que antes (`Db` e
+     * `Internal` responden 500 en el núcleo). */
+    let resolutor = CanalResolver::new(pool.clone());
+    let sesion = resolutor
+        .sesion_por_canal(&cliente.id.to_string(), canal, &remitente_norm)
+        .await?;
     /* La secuencia la asigna `insert_message_seq` (reseed desde BD +
      * retry 23505): nunca `hub.next_sequence` directo. */
     let msg = glory_agent::persistence::insert_message_seq(

@@ -1,5 +1,6 @@
 mod alerta_whatsapp;
 mod auth;
+mod canal_resolver;
 mod inmueble;
 mod note;
 mod outbox_idempotency;
@@ -9,6 +10,7 @@ mod tope_uso;
 
 pub use alerta_whatsapp::vigilar as vigilar_alertas_whatsapp;
 pub use auth::{AuthService, Claims};
+pub use canal_resolver::{modo_por_canal, CanalResolver};
 pub use inmueble::InmuebleService;
 pub use note::NoteService;
 pub use outbox_idempotency::{
