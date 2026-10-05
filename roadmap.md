@@ -519,4 +519,12 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   que se oculta al minimizar/burbuja, strip lateral eliminado del código.
 - Pendiente: puntos restantes que la usuaria anunciará; luego E1 (repo + Sentinel + núcleo).
 
+## 03AA-4 — WhatsApp un solo número + triage + config + escenarios (plan activo 2026-10-03)
+- Plan: `Agente/planes/plan-whatsapp-numero-unico-2026-10-03.md`.
+- Un asistente general en el 0412 0825234 (el mismo de la web); se jubila el
+  modo dual completo/inicial y el `wa_b` temporal; multi-número por config.
+- Triage con regla de oro (por defecto se atiende; cada `no` con motivo),
+  matriz público vs autorizado, config todo-controlable, harness de
+  escenarios multi-paso sin WhatsApp (stub + vivo). Próximo: F1.
+
 ## 05AA-1 — MN adopta `Resolver` del núcleo (cerrada 2026-10-05: ver `Agente/completados/tareas-2026-10-05.md`)
