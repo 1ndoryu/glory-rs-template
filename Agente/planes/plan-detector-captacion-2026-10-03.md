@@ -1,63 +1,111 @@
 # Plan 03AA-5 — Detector de captación en Marketplace (plugin unificado)
 
+> Revisado por reto hostil 2026-10-03: veredicto REPLANTEAR. Este documento
+> ya incorpora las correcciones exigidas. Estado: **bloqueado hasta C0**.
+
 ## Objetivo
 Detectar inmuebles de **contacto directo** (particulares) en Marketplace para
-captarlos, con **riesgo 0 de baneo**: sistema semimanual donde la usuaria abre
-lo que haya que abrir y el plugin guarda lo que ella ve. Cero automatización
-contra Meta. Vive en el repo `plugins-opencode` junto al asistente (03AA-3),
-orden interno por plugin, todo bajo Sentinel.
+captarlos. Sistema semimanual: la usuaria abre lo que haya que abrir, el
+plugin guarda lo que ella ve. Riesgo **mínimo** ante Meta (no existe riesgo 0
+real; ver §Riesgo). Vive en el repo `plugins-opencode` junto al asistente
+(03AA-3), todo bajo Sentinel.
 
-## Riesgo 0 (reglas duras)
-Solo-lectura del DOM de páginas que **ella** abrió (aviso, perfil, búsqueda);
-cero clics, cero auto-scroll masivo, cero navegación automática, cero login
-automatizado, red solo hacia el backend local. Si Meta cambia el markup, el
-lector lo registra y se recalibra (igual que el float).
+## Alcance / no-alcance
+Sí: leer avisos/perfiles/búsquedas que ella abre, extraer, clasificar
+(inmueble/no, particular/asesor/desconocido), persistir, cola de revisión
+humana con aprobar/descartar. No: clics, auto-scroll, navegación automática,
+login automatizado, publicación, mensajes, convertir aprobado a inmueble del
+sistema (fase futura), scrapear a escala.
 
-## Pipeline por página vista
-1. **Detectar qué es:** página de aviso vs perfil vs búsqueda (por URL+DOM).
-2. **Extraer aviso:** id FB, url, título, precio, descripción, ubicación,
-   publicador (nombre + url perfil), fecha, urls de fotos (no se descargan).
-3. **¿Es inmueble?** (no todo lo publicado lo es): heurística
-   (precio + m²/hab/ubicación/zona conocida) + `jev` como juez; lo dudoso se
-   guarda como `revisar`, nunca se descarta solo.
-4. **¿Particular o asesor?** patrones en descripción (asesor, inmobiliaria,
-   agencia, nombre comercial, "contáctame al equipo") + si ella abre el perfil:
-   nº de avisos publicados (varios = asesor). Sin evidencia = `desconocido`.
-5. **Guardar todo en backend** (tablas `mp_avisos`, `mp_publicadores`,
-   `mp_busquedas`): descripciones completas, fotos solo url; las fotos se
-   descargan a disco **solo** si el candidato se aprueba.
-6. **Teléfono:** regex venezolano en descripción; si FB lo oculta, campo
-   manual en la ficha (truco incógnito lo hace ella y lo pega).
-7. **Dedupe:** por id FB; re-visitas actualizan, no duplican.
-8. **Búsquedas que ella ejecuta** se guardan (texto + filtros + N + urls) para
-   aprender repertorio de cacería.
+## Riesgo (mínimo, no 0)
+Reglas duras: solo-lectura del DOM de páginas abiertas por ella; red desde
+content-script prohibida (todo vía `background` con throttle + jitter);
+cero clipboard automático en este plugin; límites: máx 60 avisos/hora y
+200/día (a calibrar; por encima el lector se pausa solo = kill-switch
+automático); si Meta cambia el markup se registra y recalibra. Nota honesta:
+leer DOM + exfiltrar a backend local es detectable por comportamiento; el
+teléfono oculto se obtiene solo por vía manual (ella lo ve y lo pega). ToS de
+Meta prohíbe scraping a escala: este diseño es asistencia a navegación
+humana real, no extracción masiva.
 
-## Cola de revisión humana
-Candidatos = particulares (+desconocidos con buena pinta). Nueva pestaña
-"Captación" en admin MN: aprobar (descarga fotos, ficha completa) / descartar
-(con motivo, alimenta patrones). Convertir a inmueble real queda fuera (fase
-futura).
+## Adenda conjunta 03AA-3 / 03AA-5 (repo `plugins-opencode`)
+Un solo repo, un solo `watch`/lector en `nucleo/` (agnóstico: observa,
+extrae texto, firma). `asistente-respuestas/` y `detector-captacion/` son
+plugins que consumen el núcleo; cada uno su adaptador y tests. Una sola
+caché de firmas en backend MN. Endpoints separados: `/mp/respuestas/*` vs
+`/mp/captacion/*`. Orden: primero existe E1 (repo + Sentinel + núcleo),
+después C1. Sin E1 no hay C1.
 
-## Fases
-C1 lector pasivo + extractor del aviso; C2 clasificador inmueble/no con jev;
-C3 particular/asesor + perfil; C4 tablas backend + dedupe; C5 pestaña
-Captación + aprobar/descartar; C6 búsquedas guardadas. Cada fase: tests +
-viva riesgo-0 (ninguna acción ante Meta).
+## C0 — Corpus + dataset (pre-requisito, sin código de producto)
+1. Corpus DOM: 5 avisos + 2 perfiles + 1 búsqueda guardados como HTML
+   anonimizados + URLs canónicas + lista de campos obligatorios/opcionales.
+   Sin corpus no se escribe extractor.
+2. Dataset semilla: 30–50 avisos etiquetados (inmueble/no ×
+   particular/asesor/desconocido) con casos trampa (asesor con cuenta
+   particular, curioso, no-inmueble con precio). Es la verdad contra la que
+   miden C2/C3.
+3. Salida C0: `corpus/` + `dataset.csv` + DDL borrador (§Datos). DoD: corpus
+   versionado, dataset con ≥30 filas y ≥5 trampas.
 
-## `jev`: verificado en vivo 2026-10-03
-Modelo de decisiones de TypeSafe AI en tu Zen (no es chat): recibe `state` +
-preguntas tipadas y devuelve valores + probabilidades. Mismo `OPENCODE_GO_API_KEY`,
-`POST https://opencode.ai/zen/v1/systemone`, `model: jev-1.13-free` (gratis,
-tiempo limitado; `jev-1.13` pago $0.042/1M in como respaldo). Probado con un
-aviso real: `es_inmueble noul 0.93`, `origen particular p=1.0`. Preguntas por
-aviso en una sola llamada: `es_inmueble` (noul), `origen`
-(choice particular/asesor/desconocido), opcional `urgencia` (score). Si jev
-falla o la confianza < umbral (a calibrar en C2): heurística y estado
-`revisar` — nunca se descarta solo.
+## Datos (borrador DDL, a fijar en C0)
+`mp_avisos(fb_id UNIQUE PK, url, titulo, precio_num, moneda, descripcion,
+ubicacion_txt, publicador_id FK, estado, jev_cache_hash, visto_en,
+actualizado_en)`; estados: `nuevo|revisar|candidato|aprobado|descartado`.
+`mp_publicadores(fb_perfil UNIQUE, nombre, n_avisos_vistos, veredicto)`.
+`mp_busquedas(id, texto, filtros, n_resultados, creada_en)`.
+`mp_revisiones(aviso_id, decision, motivo, revisada_en)` (el descartar con
+motivo alimenta patrones). Precio: numérico + moneda (no string). Re-visita =
+UPDATE + fila de historial de precio (tabla `mp_precios`). Teléfono: columna
+separada, normalizado E.164, **enmascarado en admin** (solo últimos 4
+visibles; ver completo con clic registrado). Fotos: solo url + `url_caduca_en`
+(las CDN de FB firman con expiración; al aprobar se re-intenta descarga y si
+caducó se marca `foto_perdida`, no se finge).
+
+## `jev` (verificado n=1 el 2026-10-03, pendiente validar en dataset)
+TypeSafe AI en Zen: `POST https://opencode.ai/zen/v1/systemone` con el mismo
+`OPENCODE_GO_API_KEY`, `model: jev-1.13-free` (gratis temporal;
+`jev-1.13` $0.042/1M in de respaldo). Corre **solo en backend**, nunca en el
+plugin: se envía texto truncado (título+descripción, máx 1500 caracteres),
+**jamás teléfono, fotos ni URLs de perfil**. Una llamada por aviso con
+`es_inmueble` (noul) + `origen` (choice). Caché backend por
+`fb_id+hash(descripción)` con TTL 30 días: re-visitas = 0 tokens. Umbral a
+fijar contra dataset (propuesta inicial: `es_inmueble<0.6` → `revisar`;
+`origen` con `confidence<0.7` → `desconocido`). Si jev falla: heurística +
+`revisar`. Nada se descarta solo jamás.
+
+## Clasificador particular/asesor (anti-ruido)
+`particular` exige 2+ señales independientes (p.ej. lenguaje en primera
+persona + sin marca comercial + perfil con ≤2 avisos). Señales de asesor:
+palabras (asesor/agencia/inmobiliaria/equipo), marca comercial, teléfono
+corporativo repetido, perfil con 3+ avisos. Conteo de perfil: solo si ella
+abre el perfil (sin auto-scroll; se guarda lo visible). `desconocido` con
+tope: más de 50 sin resolver en cola → se pausan nuevos hasta revisar
+(cola inundable = fallo). Descartar exige motivo (lista cerrada).
+
+## Teléfonos (spec)
+Acepta `+58`, `04xx/0212` con separadores, y ofuscados simples
+(`0412 123 4567`, `0412-1234567`); NO adivina `cero cuatro doce` (queda a
+campo manual). Normaliza a E.164 `58xxxxxxxxxx`. Quién ve: admin con
+enmascarado por defecto.
+
+## Fases reordenadas (cada una con DoD medible)
+- C0 corpus + dataset + DDL (DoD arriba).
+- C1 lector pasivo + persistencia + dedupe (DoD: 5/5 avisos del corpus
+  extraídos campo a campo, re-visita = UPDATE sin duplicar, 0 llamadas de
+  red desde content-script salvo a `background`).
+- C2/C3 clasificadores contra dataset (DoD: precisión ≥90% inmueble/no,
+  `particular` sin falsos-positivos en trampas-asesor, % `revisar` <25%).
+- C4 cola "Captación" en admin MN (DoD: aprobar/descartar con motivo,
+  teléfono enmascarado, fotos con estado `ok|perdida`).
+- C5 búsquedas guardadas + caché jev con TTL (DoD: re-visita 0 tokens).
+- Cada fase: tests + Sentinel PASS; viva = usuaria abre avisos reales y lo
+  guardado coincide con lo visto.
 
 ## Estado
-Duda `jev` resuelta (ver arriba). Próximo: C1 lector pasivo + extractor.
+Bloqueado hasta C0 (corpus + dataset 30–50 + DDL) y E1 de 03AA-3 (repo +
+núcleo). Nada de código de producto antes.
 
-## Gate y DoD
-Sentinel PASS en el plugin; backend MN con su gate; verificación viva con la
-usuaria abriendo avisos reales; ni un clic automático en ninguna fase.
+## Gate y DoD global
+Sentinel PASS en el plugin; backend MN con su gate; métricas C2/C3 sobre
+dataset cumplidas; verificación viva final; ni una acción automática ante
+Meta en ninguna fase.

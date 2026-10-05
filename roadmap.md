@@ -527,11 +527,11 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   matriz público vs autorizado, config todo-controlable, harness de
   escenarios multi-paso sin WhatsApp (stub + vivo). Próximo: F1.
 
-## 03AA-5 — Detector de captación Marketplace (plan activo 2026-10-03)
-- Plan: `Agente/planes/plan-detector-captacion-2026-10-03.md`.
-- Semimanual riesgo-0 (ella abre, el plugin guarda lo visto);   clasifica
-  inmueble/no + particular/asesor con `jev` (verificado en vivo con tu key,
-  `jev-1.13-free` gratis); fotos solo-url hasta aprobar;
-  cola "Captación" en admin. Próximo: C1 lector pasivo + extractor.
+## 03AA-5 — Detector de captación Marketplace (REPLANTEADO 2026-10-03, bloqueado)
+- Plan: `Agente/planes/plan-detector-captacion-2026-10-03.md` (incorpora reto
+  hostil: riesgo mínimo —no 0—, C0 corpus+dataset+DDL primero, adenda con
+  03AA-3, métricas por fase).
+- Bloqueado hasta C0 (corpus 5+2+1, dataset 30–50, DDL) y E1 de 03AA-3
+  (repo + núcleo). Nada de código antes.
 
 ## 05AA-1 — MN adopta `Resolver` del núcleo (cerrada 2026-10-05: ver `Agente/completados/tareas-2026-10-05.md`)
