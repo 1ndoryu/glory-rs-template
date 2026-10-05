@@ -26,10 +26,9 @@ export function useFixtureSync(): UseFixtureSyncReturn {
             .then(data => {
                 if (!ctrl.signal.aborted) setStatusData(data);
             })
-            .catch(e => {
+            .catch(() => {
                 if (!ctrl.signal.aborted) {
                     /* Si la tabla _glory_fixtures no existe aún, simplemente no mostramos status */
-                    console.warn('[fixtures] No se pudo cargar status:', e);
                 }
             });
         return () => ctrl.abort();

@@ -12,7 +12,7 @@
     "fmt:check": "cargo fmt --check",
     "clean:cargo": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/clean-cargo-target.ps1",
     "setup:cargo-cleanup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/register-cargo-cleanup.ps1",
-    "dev:back": "cargo run",
+    "dev:back": "cargo run --bin glory-backend",
     "dev:front": "npm --prefix frontend run dev",
     "codegen": "npm --prefix frontend run codegen",
     "test": "cargo test",

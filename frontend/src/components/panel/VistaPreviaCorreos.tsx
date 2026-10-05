@@ -30,10 +30,10 @@ function agruparPorCategoria(templates: TemplateMeta[]): Map<string, TemplateMet
 }
 
 export function VistaPreviaCorreos() {
-    const [selectedTemplate, setSelectedTemplate] = useState<TemplateMeta | null>(null);
-    const [previewHtml, setPreviewHtml] = useState<string | null>(null);
-    const [previewLoading, setPreviewLoading] = useState(false);
-    const [previewError, setPreviewError] = useState<string | null>(null);
+    /* Estado de vista previa agrupado (usestate-excesivo: 5 -> 2). */
+    const [vista, setVista] = useState<{plantilla: TemplateMeta | null; html: string | null; cargando: boolean; error: string | null}>({
+        plantilla: null, html: null, cargando: false, error: null,
+    });
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
     const { data, isLoading, error } = useQuery({
@@ -45,24 +45,19 @@ export function VistaPreviaCorreos() {
     const grupos = agruparPorCategoria(templates);
 
     const handleSelectTemplate = async (tmpl: TemplateMeta) => {
-        setSelectedTemplate(tmpl);
-        setPreviewLoading(true);
-        setPreviewHtml(null);
-        setPreviewError(null);
+        setVista({plantilla: tmpl, html: null, cargando: true, error: null});
         try {
             const html = await apiRenderTemplate(tmpl.id);
-            setPreviewHtml(html);
+            setVista(v => ({...v, html}));
         } catch (err) {
-            setPreviewError((err as Error).message);
+            setVista(v => ({...v, error: (err as Error).message}));
         } finally {
-            setPreviewLoading(false);
+            setVista(v => ({...v, cargando: false}));
         }
     };
 
     const handleCloseModal = () => {
-        setSelectedTemplate(null);
-        setPreviewHtml(null);
-        setPreviewError(null);
+        setVista(v => ({...v, plantilla: null, html: null, error: null}));
     };
 
     if (isLoading) {
@@ -128,7 +123,7 @@ export function VistaPreviaCorreos() {
                                     {items.map(tmpl => (
                                         <button
                                             key={tmpl.id}
-                                            className={`previewTarjeta ${selectedTemplate?.id === tmpl.id ? 'previewTarjetaActiva' : ''}`}
+                                            className={`previewTarjeta ${vista.plantilla?.id === tmpl.id ? 'previewTarjetaActiva' : ''}`}
                                             onClick={() => handleSelectTemplate(tmpl)}
                                         >
                                             <div className="previewTarjetaIcono">
@@ -152,20 +147,20 @@ export function VistaPreviaCorreos() {
             )}
 
             {/* Modal de previsualización */}
-            {selectedTemplate && (
+            {vista.plantilla && (
                 <Modal abierto onCerrar={handleCloseModal} className="modalGrande">
                     <div className="previewModalHeader">
                         <div className="previewModalEncabezado">
                             {/* [259A-5] sentinel-disable-next-line modal-con-titulo: el canon
                               * Modal.css (.modalTitulo) contradice la regla; precedente SeccionPagos 5a. */}
-                            <h3 className="modalTitulo">{selectedTemplate.label}</h3>
-                            <span className="previewModalId">{selectedTemplate.id}</span>
+                            <h3 className="modalTitulo">{vista.plantilla.label}</h3>
+                            <span className="previewModalId">{vista.plantilla.id}</span>
                         </div>
                         <div className="modalAcciones">
-                            {previewHtml && (
+                            {vista.html && (
                                 <a
-                                    href={`data:text/html;charset=utf-8,${encodeURIComponent(previewHtml)}`}
-                                    download={`${selectedTemplate.id}.html`}
+                                    href={`data:text/html;charset=utf-8,${encodeURIComponent(vista.html)}`}
+                                    download={`${vista.plantilla.id}.html`}
                                     className="previewDescargarBtn"
                                     title="Descargar HTML"
                                 >
@@ -184,21 +179,21 @@ export function VistaPreviaCorreos() {
                         </div>
                     </div>
                     <div className="previewModalCuerpo">
-                        {previewLoading ? (
+                        {vista.cargando ? (
                             <div className="previewModalCarga">
                                 <Loader2 className="previewSpinner" size={32} />
                                 <p>Renderizando plantilla...</p>
                             </div>
-                        ) : previewError ? (
+                        ) : vista.error ? (
                             <div className="previewModalError">
                                 <AlertCircle size={20} />
-                                <span>{previewError}</span>
+                                <span>{vista.error}</span>
                             </div>
-                        ) : previewHtml ? (
+                        ) : vista.html ? (
                             <iframe
                                 className="previewIframe"
-                                srcDoc={previewHtml}
-                                title={selectedTemplate.label}
+                                srcDoc={vista.html}
+                                title={vista.plantilla.label}
                                 sandbox="allow-same-origin"
                             />
                         ) : null}

@@ -36,10 +36,8 @@
 
     /* Colors - Brand */
     --primary-500: #6366f1;
-    --secondary-500: #a855f7;
     --brand-black: #151411;
     --accent-primary: var(--primary-500);
-    --border-primary: var(--border-color);
 
     /* Fonts */
     --font-primary: 'Neue Montreal', system-ui, -apple-system, sans-serif;
@@ -155,10 +153,8 @@
 
     /* Status - Orange (revision) */
     --color-orange-text: #c2410c;
-    --color-orange-bg: #fff7ed;
 
     /* Neutral (cancelled, inactive) */
-    --color-neutral-bg: #f3f4f6;
     --color-neutral: #95a5a6;
 
     /* Overlays */
@@ -173,7 +169,6 @@
     --text-mini: 0.6875rem;
     --text-caption: 0.75rem;
     --text-md: 0.9375rem;
-    --text-body-lg: 1.0625rem;
 
     /* Spacing extras */
     --spacing-2xs: 0.25rem;
@@ -197,7 +192,6 @@
     /* [259A-5 5b] Tokens nuevos para migrar css-hardcoded a variables.
      * Cada valor es IDENTICO al literal que reemplaza (cero cambio visual).
      * Los fallbacks muertos de var() se eliminan porque la variable ya existe. */
-    --overlay-fuerte: rgba(0, 0, 0, 0.7);
     --white-3: rgba(255, 255, 255, 0.03);
     --white-6: rgba(255, 255, 255, 0.06);
     --white-8: rgba(255, 255, 255, 0.08);
@@ -215,15 +209,12 @@
     --color-warning-text-solido: #92400e;
     /* [279A-3] --color-success-bg-claro eliminado: 1 uso migrado a --fondo-insignia-cliente. */
     --color-primario-alfa-04: rgba(201, 168, 76, 0.04);
-    --color-primario-alfa-12: rgba(201, 168, 76, 0.12);
     --color-gris-claro: #f0f0f0;
     --color-gris-medio: #666666;
     --ventana-punto-rojo: #ff5f57;
     --ventana-punto-ambar: #febc2e;
     --ventana-punto-verde: #28c840;
     --chat-whatsapp: #25d366;
-    --sombra-suave: 0 4px 12px rgba(0, 0, 0, 0.05);
-    --anillo-foco-primario: 0 0 0 3px rgba(99, 102, 241, 0.15);
 
     /* [259A-6] Aliases canonicos para 24 variables usadas pero nunca definidas
      * (varsense variableNoDefinida 107 -> 0). Cada alias conserva el valor del
@@ -245,7 +236,6 @@
     --espaciado-md: var(--spacing-md);
     --espaciado-lg: 24px;
     --radio-borde: var(--radius-md);
-    --sombra-tarjeta: 0 2px 8px rgba(0, 0, 0, 0.06);
     /* [279A-3] --surface-primary eliminado: 2 usos migrados a --color-fondo. */
     --surface-secondary: #f9fafb;
     --font-size-xs: var(--text-xs);
@@ -255,7 +245,6 @@
     --text-secondary: var(--text-tertiary);
     --bg-item: var(--bg-card-subtle);
     --bg-secondary: var(--bg-warm);
-    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.18);
     /* [259A-5 5b-3] Insignias Admin/Cliente de VistaPreviaCorreos: sin
      * equivalente en el DS; valores identicos a los que ya se renderizaban. */
     --fondo-insignia-admin: #e8eaf6;

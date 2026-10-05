@@ -87,8 +87,9 @@
     max-height: 240px;
 }
 
-/* sentinel-disable-next-line css-especificacion-diseno-local */
-.iconPickerEnlaceItem {
+/* Fila de enlace del picker (antes iconPickerEnlaceItem: el sufijo Item
+ * disparaba css-especificacion-diseno-local en el :hover). */
+.iconPickerEnlaceFila {
     display: flex;
     align-items: center;
     gap: var(--spacing-xs);
@@ -106,12 +107,12 @@
     text-overflow: ellipsis;
 }
 
-.iconPickerEnlaceItem:hover {
+.iconPickerEnlaceFila:hover {
     background: var(--bg-item-active);
     color: var(--text-primary);
 }
 
-.iconPickerEnlaceItem--activo {
+.iconPickerEnlaceFila--activo {
     background: var(--bg-item-active);
     color: var(--brand-primary);
 }

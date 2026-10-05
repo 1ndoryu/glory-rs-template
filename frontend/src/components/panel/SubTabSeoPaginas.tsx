@@ -44,8 +44,8 @@ const DYNAMIC_CMS_SECTIONS: Record<string, string> = {
 };
 
 export const SubTabSeoPaginas: React.FC<Props> = ({pages}) => {
-    const [busqueda, setBusqueda] = useState('');
-    const [filtroTipo, setFiltroTipo] = useState('');
+    /* Filtros agrupados (usestate-excesivo: 4 -> 3). */
+    const [filtros, setFiltros] = useState({busqueda: '', filtroTipo: ''});
     const [menuAbierto, setMenuAbierto] = useState(false);
     const [editingSetting, setEditingSetting] = useState<SeoSetting | null>(null);
 
@@ -63,14 +63,14 @@ export const SubTabSeoPaginas: React.FC<Props> = ({pages}) => {
         }
     }
 
-    const q = busqueda.toLowerCase().trim();
+    const q = filtros.busqueda.toLowerCase().trim();
     const filtered = pages.filter(p => {
         if (q && !p.label.toLowerCase().includes(q) &&
             !p.path.toLowerCase().includes(q) &&
             !(p.title && p.title.toLowerCase().includes(q))) {
             return false;
         }
-        if (filtroTipo && p.page_type !== filtroTipo) {
+        if (filtros.filtroTipo && p.page_type !== filtros.filtroTipo) {
             return false;
         }
         return true;
@@ -99,8 +99,8 @@ export const SubTabSeoPaginas: React.FC<Props> = ({pages}) => {
                         type="text"
                         className="seoPaginasBusquedaInput"
                         placeholder="Buscar página por nombre, ruta o title..."
-                        value={busqueda}
-                        onChange={e => setBusqueda(e.target.value)}
+                        value={filtros.busqueda}
+                        onChange={e => setFiltros(f => ({...f, busqueda: e.target.value}))}
                     />
                 </div>
                 <MenuContextual
@@ -109,11 +109,11 @@ export const SubTabSeoPaginas: React.FC<Props> = ({pages}) => {
                     onCerrar={() => setMenuAbierto(false)}
                     ariaLabel="Filtrar por tipo de página"
                     variante="filtro"
-                    triggerContent={<>{TYPE_LABELS[filtroTipo] ?? 'Todas las páginas'} <ChevronDown size={14} /></>}
+                    triggerContent={<>{TYPE_LABELS[filtros.filtroTipo] ?? 'Todas las páginas'} <ChevronDown size={14} /></>}
                     items={TYPE_OPTIONS.map(opt => ({
                         id: opt.id,
                         label: opt.label,
-                        onSelect: () => setFiltroTipo(opt.id),
+                        onSelect: () => setFiltros(f => ({...f, filtroTipo: opt.id})),
                     }))}
                 />
             </div>

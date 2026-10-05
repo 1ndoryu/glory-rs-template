@@ -66,22 +66,21 @@ function createImage(url: string): Promise<HTMLImageElement> {
 }
 
 export const ImageCropModal: React.FC<Props> = ({imageUrl, onCropped, onClose}) => {
-    const [crop, setCrop] = useState({x: 0, y: 0});
-    const [zoom, setZoom] = useState(1);
-    const [croppedAreaPixels, setCroppedAreaPixels] = useState<AreaPixels | null>(null);
+    /* Estado del recorte agrupado (usestate-excesivo: 5 -> 3). */
+    const [recorte, setRecorte] = useState({crop: {x: 0, y: 0}, zoom: 1, areaPixels: null as AreaPixels | null});
     const [processing, setProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const onCropComplete = useCallback((_area: AreaPixels, pixels: AreaPixels) => {
-        setCroppedAreaPixels(pixels);
+        setRecorte(r => ({...r, areaPixels: pixels}));
     }, []);
 
     const handleConfirm = useCallback(async () => {
-        if (!croppedAreaPixels) return;
+        if (!recorte.areaPixels) return;
         setProcessing(true);
         setError(null);
         try {
-            const blob = await getCroppedImg(imageUrl, croppedAreaPixels);
+            const blob = await getCroppedImg(imageUrl, recorte.areaPixels);
             const file = new File([blob], 'og-crop.jpg', {type: 'image/jpeg'});
             const res = await apiUploadImage(file);
             onCropped(res.url);
@@ -90,7 +89,7 @@ export const ImageCropModal: React.FC<Props> = ({imageUrl, onCropped, onClose}) 
         } finally {
             setProcessing(false);
         }
-    }, [croppedAreaPixels, imageUrl, onCropped]);
+    }, [recorte.areaPixels, imageUrl, onCropped]);
 
     return (
         <Modal abierto onCerrar={onClose} className="modalMedio">
@@ -106,11 +105,11 @@ export const ImageCropModal: React.FC<Props> = ({imageUrl, onCropped, onClose}) 
             <div className="cropArea">
                 <Cropper
                     image={imageUrl}
-                    crop={crop}
-                    zoom={zoom}
+                    crop={recorte.crop}
+                    zoom={recorte.zoom}
                     aspect={OG_ASPECT}
-                    onCropChange={setCrop}
-                    onZoomChange={setZoom}
+                    onCropChange={crop => setRecorte(r => ({...r, crop}))}
+                    onZoomChange={zoom => setRecorte(r => ({...r, zoom}))}
                     onCropComplete={onCropComplete}
                 />
             </div>
@@ -123,12 +122,12 @@ export const ImageCropModal: React.FC<Props> = ({imageUrl, onCropped, onClose}) 
                         min={1}
                         max={3}
                         step={0.01}
-                        value={zoom}
-                        onChange={e => setZoom(Number(e.target.value))}
+                        value={recorte.zoom}
+                        onChange={e => setRecorte(r => ({...r, zoom: Number(e.target.value)}))}
                         className="cropZoomSlider"
                     />
                     <ZoomIn size={16} />
-                    <span className="cropZoomValor">{zoom.toFixed(1)}×</span>
+                    <span className="cropZoomValor">{recorte.zoom.toFixed(1)}×</span>
                 </div>
             </div>
 
@@ -142,7 +141,7 @@ export const ImageCropModal: React.FC<Props> = ({imageUrl, onCropped, onClose}) 
                 <Button
                     variante="secundario"
                     onClick={handleConfirm}
-                    disabled={processing || !croppedAreaPixels}
+                    disabled={processing || !recorte.areaPixels}
                 >
                     {processing ? 'Procesando...' : <><Check size={14} /> Aplicar recorte</>}
                 </Button>

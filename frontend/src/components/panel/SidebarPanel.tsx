@@ -136,7 +136,6 @@ export const SidebarPanel: React.FC<SidebarPanelProps> = ({seccionActiva, onCamb
             }
 
             toast.error(message);
-            console.error('[SidebarPanel] Error al cambiar rol', error);
         } finally {
             setSwitchingRole(false);
         }

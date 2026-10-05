@@ -16,6 +16,7 @@ import {
     type WsServerMessage,
 } from '../api/chat';
 import {useAuthStore} from '../stores/authStore';
+import {toast} from '../stores/toastStore';
 
 export function useOrderChat(orderId: string) {
     const queryClient = useQueryClient();
@@ -39,8 +40,9 @@ export function useOrderChat(orderId: string) {
             setSession(s);
             /* [20CA-9] Marcar como vista al iniciar */
             apiMarkSessionViewed(s.id).catch(() => {});
-        } catch (err) {
-            console.error('Error creando sesión de chat de orden:', err);
+        } catch {
+            /* Error visible (antes console.error); se permite reintento. */
+            toast.error('No se pudo crear la sesión de chat');
             inicializado.current = false;
         } finally {
             setCreando(false);

@@ -7,6 +7,7 @@
 import {useState, useCallback, useRef, useEffect} from 'react';
 import {buildVisitorWsUrl, apiUploadChatFile, type WsServerMessage, type ChatMessage} from '../api/chat';
 import {useAuthStore} from '../stores/authStore';
+import {toast} from '../stores/toastStore';
 import {handleChatWidgetServerMessage} from './chatWidgetServerMessages';
 import {
     clearChatWidgetStorage,
@@ -289,15 +290,17 @@ export function useChatWidget() {
     const [uploading, setUploading] = useState(false);
     const uploadFile = useCallback(async (file: File) => {
         if (!sessionId) {
-            console.warn('[ChatWidget] Upload ignorado: sesión aún no confirmada');
+            /* Sesion aun no confirmada: aviso visible en vez de console.warn. */
+            toast.warning('Sesión aún no confirmada, intenta de nuevo en unos segundos');
             return;
         }
         setUploading(true);
         try {
             await apiUploadChatFile(sessionId, file);
             /* El mensaje aparece via WS broadcast — no necesitamos actualizar state local */
-        } catch (err) {
-            console.error('[ChatWidget] Upload error:', err);
+        } catch {
+            /* Subida fallida con feedback visible (antes console.error). */
+            toast.error('Error al subir archivo');
         } finally {
             setUploading(false);
         }

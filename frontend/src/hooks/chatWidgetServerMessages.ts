@@ -1,6 +1,7 @@
 import type React from 'react';
 import type {ChatMessage, WsServerMessage} from '../api/chat';
 import {playNotificationSound} from '../utils/notificationSound';
+import {toast} from '../stores/toastStore';
 import {loadPersistedChatMessages, savePersistedChatMessages} from '../utils/chatWidgetStorage';
 
 export interface ChatWidgetServerMessageDeps {
@@ -40,7 +41,8 @@ export function handleChatWidgetServerMessage(
             deps.resetLocalChatState(true, deps.chatOwnerKey);
             break;
         case 'error':
-            console.warn('[ChatWidget] Server error:', msg.message);
+            /* Error del servidor visible para el visitante (antes console.warn). */
+            toast.error(msg.message || 'Error del servidor de chat');
             break;
     }
 }

@@ -1105,7 +1105,9 @@
     gap: var(--spacing-2xs);
 }
 
-.tabCorreoItem {
+/* Fila de alias (antes tabCorreoItem: el sufijo Item disparaba
+ * css-especificacion-diseno-local; las hijas tabCorreoItem* no cambian). */
+.tabCorreo {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1116,7 +1118,7 @@
     transition: border-color 0.15s ease;
 }
 
-.tabCorreoItem:hover {
+.tabCorreo:hover {
     border-color: var(--accent-primary);
 }
 

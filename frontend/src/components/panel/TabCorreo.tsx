@@ -35,9 +35,8 @@ function getPlanAliasLimit(plan: string): number {
 export function TabCorreo({sub}: {sub: Subscription}) {
     const queryClient = useQueryClient();
     const [error, setError] = useState<string | null>(null);
-    const [alias, setAlias] = useState('');
-    const [domain, setDomain] = useState(sub.domain || '');
-    const [destination, setDestination] = useState(sub.client_email || '');
+    /* Campos del form agrupados (usestate-excesivo: 5 -> 3). */
+    const [formulario, setFormulario] = useState({alias: '', domain: sub.domain || '', destination: sub.client_email || ''});
     const [showForm, setShowForm] = useState(false);
 
     const aliasLimit = getPlanAliasLimit(sub.plan);
@@ -53,8 +52,7 @@ export function TabCorreo({sub}: {sub: Subscription}) {
             apiCreateEmailAlias(sub.id, req),
         onMutate: () => { setError(null); },
         onSuccess: () => {
-            setAlias('');
-            setDestination(sub.client_email || '');
+            setFormulario(f => ({...f, alias: '', destination: sub.client_email || ''}));
             setShowForm(false);
             queryClient.invalidateQueries({queryKey: ['hosting-email', sub.id]});
         },
@@ -71,13 +69,13 @@ export function TabCorreo({sub}: {sub: Subscription}) {
     });
 
     const handleCreate = useCallback(() => {
-        if (!alias.trim() || !domain.trim() || !destination.trim()) return;
+        if (!formulario.alias.trim() || !formulario.domain.trim() || !formulario.destination.trim()) return;
         createMutation.mutate({
-            alias: alias.trim().toLowerCase(),
-            domain: domain.trim().toLowerCase(),
-            destination: destination.trim(),
+            alias: formulario.alias.trim().toLowerCase(),
+            domain: formulario.domain.trim().toLowerCase(),
+            destination: formulario.destination.trim(),
         });
-    }, [alias, domain, destination, createMutation]);
+    }, [formulario, createMutation]);
 
     const handleDelete = useCallback((aliasId: string) => {
         if (window.confirm('¿Eliminar este alias de correo?')) {
@@ -175,8 +173,8 @@ export function TabCorreo({sub}: {sub: Subscription}) {
                     <div className="tabCorreoFormRow">
                         <input
                             type="text"
-                            value={alias}
-                            onChange={e => setAlias(e.target.value)}
+                            value={formulario.alias}
+                            onChange={e => setFormulario(f => ({...f, alias: e.target.value}))}
                             placeholder="Ej: info"
                             className="tabCorreoInput tabCorreoInputAlias"
                             disabled={createMutation.isPending}
@@ -184,8 +182,8 @@ export function TabCorreo({sub}: {sub: Subscription}) {
                         <span className="tabCorreoArroba">@</span>
                         <input
                             type="text"
-                            value={domain}
-                            onChange={e => setDomain(e.target.value)}
+                            value={formulario.domain}
+                            onChange={e => setFormulario(f => ({...f, domain: e.target.value}))}
                             placeholder="tudominio.com"
                             className="tabCorreoInput tabCorreoInputDomain"
                             disabled={createMutation.isPending}
@@ -194,8 +192,8 @@ export function TabCorreo({sub}: {sub: Subscription}) {
                     <div className="tabCorreoFormRow">
                         <input
                             type="email"
-                            value={destination}
-                            onChange={e => setDestination(e.target.value)}
+                            value={formulario.destination}
+                            onChange={e => setFormulario(f => ({...f, destination: e.target.value}))}
                             placeholder="Correo destino (ej: cliente@gmail.com)"
                             className="tabCorreoInput tabCorreoInputDest"
                             disabled={createMutation.isPending}
@@ -214,7 +212,7 @@ export function TabCorreo({sub}: {sub: Subscription}) {
                             onClick={handleCreate}
                             variante="primario"
                             tamano="pequeno"
-                            disabled={!alias.trim() || !domain.trim() || !destination.trim() || createMutation.isPending}
+                            disabled={!formulario.alias.trim() || !formulario.domain.trim() || !formulario.destination.trim() || createMutation.isPending}
                         >
                             {createMutation.isPending ? (
                                 <Loader2 size={16} className="tabCorreoSpinner" />
@@ -240,7 +238,7 @@ export function TabCorreo({sub}: {sub: Subscription}) {
             ) : (
                 <div className="tabCorreoList">
                     {aliases.map(a => (
-                        <div key={a.id} className="tabCorreoItem">
+                        <div key={a.id} className="tabCorreo">
                             <div className="tabCorreoItemInfo">
                                 <span className="tabCorreoItemEmail">
                                     {a.full_email}

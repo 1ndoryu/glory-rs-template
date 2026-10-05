@@ -37,28 +37,28 @@ const JSON_LD_OPTIONS = [
 
 export const ModalSeoEdit: React.FC<Props> = ({setting, onClose}) => {
     const queryClient = useQueryClient();
-    const [title, setTitle] = useState('');
-    const [description, setDescription] = useState('');
-    const [ogImageUrl, setOgImageUrl] = useState('');
-    const [jsonLdType, setJsonLdType] = useState('');
+    /* Formulario agrupado en un objeto (usestate-excesivo: 5 -> 2). */
+    const [form, setForm] = useState({title: '', description: '', ogImageUrl: '', jsonLdType: ''});
     const [showGallery, setShowGallery] = useState(false);
 
     useEffect(() => {
         if (setting) {
-            setTitle(setting.title);
-            setDescription(setting.description);
-            setOgImageUrl(setting.og_image_url || '');
-            setJsonLdType(setting.json_ld_type || '');
+            setForm({
+                title: setting.title,
+                description: setting.description,
+                ogImageUrl: setting.og_image_url || '',
+                jsonLdType: setting.json_ld_type || '',
+            });
         }
     }, [setting]);
 
     const mutation = useMutation({
         mutationFn: () =>
             apiUpdateSeoSetting(setting!.path, {
-                title: title.trim(),
-                description: description.trim(),
-                og_image_url: ogImageUrl.trim() || null,
-                json_ld_type: jsonLdType || null,
+                title: form.title.trim(),
+                description: form.description.trim(),
+                og_image_url: form.ogImageUrl.trim() || null,
+                json_ld_type: form.jsonLdType || null,
             }),
         onSuccess: () => {
             queryClient.invalidateQueries({queryKey: ['admin-seo-audit']});
@@ -69,8 +69,8 @@ export const ModalSeoEdit: React.FC<Props> = ({setting, onClose}) => {
 
     if (!setting) return null;
 
-    const titleLen = title.length;
-    const descLen = description.length;
+    const titleLen = form.title.length;
+    const descLen = form.description.length;
     const titleStatus =
         titleLen === 0 ? 'error' : titleLen < TITLE_MIN || titleLen > TITLE_MAX ? 'warning' : 'ok';
     const descStatus =
@@ -100,8 +100,8 @@ export const ModalSeoEdit: React.FC<Props> = ({setting, onClose}) => {
                         <input
                             type="text"
                             className="modalInput modalSeoInput"
-                            value={title}
-                            onChange={e => setTitle(e.target.value)}
+                            value={form.title}
+                            onChange={e => setForm(f => ({...f, title: e.target.value}))}
                             maxLength={255}
                             placeholder="Título de la página para Google"
                         />
@@ -121,8 +121,8 @@ export const ModalSeoEdit: React.FC<Props> = ({setting, onClose}) => {
                         </ModalLabel>
                         <textarea
                             className="modalInput modalSeoTextarea"
-                            value={description}
-                            onChange={e => setDescription(e.target.value)}
+                            value={form.description}
+                            onChange={e => setForm(f => ({...f, description: e.target.value}))}
                             maxLength={500}
                             rows={3}
                             placeholder="Descripción para los resultados de búsqueda"
@@ -138,9 +138,9 @@ export const ModalSeoEdit: React.FC<Props> = ({setting, onClose}) => {
                     <ModalField>
                         <ModalLabel>Imagen OG</ModalLabel>
                         <div className="modalSeoOgPreview">
-                            {ogImageUrl ? (
+                            {form.ogImageUrl ? (
                                 <img
-                                    src={ogImageUrl}
+                                    src={form.ogImageUrl}
                                     alt="OG Preview"
                                     className="modalSeoOgThumb"
                                 />
@@ -160,11 +160,11 @@ export const ModalSeoEdit: React.FC<Props> = ({setting, onClose}) => {
                                 <ImageIcon size={14} />
                                 Elegir de galería
                             </Button>
-                            {ogImageUrl && (
+                            {form.ogImageUrl && (
                                 <Button
                                     variante="texto"
                                     tamano="pequeno"
-                                    onClick={() => setOgImageUrl('')}
+                                    onClick={() => setForm(f => ({...f, ogImageUrl: ''}))}
                                 >
                                     <X size={14} />
                                     Quitar
@@ -178,9 +178,9 @@ export const ModalSeoEdit: React.FC<Props> = ({setting, onClose}) => {
                     <ModalField>
                         <ModalLabel>Tipo JSON-LD</ModalLabel>
                         <SelectDropdown
-                            value={jsonLdType}
+                            value={form.jsonLdType}
                             opciones={JSON_LD_OPTIONS}
-                            onChange={setJsonLdType}
+                            onChange={jsonLdType => setForm(f => ({...f, jsonLdType}))}
                             ariaLabel="Tipo JSON-LD"
                         />
                         <span className="modalSeoAyuda">Schema structured data para Google rich snippets</span>
@@ -223,7 +223,7 @@ export const ModalSeoEdit: React.FC<Props> = ({setting, onClose}) => {
             {showGallery && (
                 <ImageGalleryPicker
                     onSelect={url => {
-                        setOgImageUrl(url);
+                        setForm(f => ({...f, ogImageUrl: url}));
                         setShowGallery(false);
                     }}
                     onClose={() => setShowGallery(false)}

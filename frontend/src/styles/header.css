@@ -75,13 +75,12 @@
     color: var(--brand-black);
 }
 
-/* Falso positivo (css-adhoc-button-style): ya usa <Button variante="texto">.
- * Estos estilos solo resetean la apariencia nativa del botón para que se comporte
- * como un enlace de navegación (padding heredado, font-family heredado). */
+/* Reset de apariencia nativa del <button> para que se comporte como enlace de
+ * navegacion (ya usa <Button variante="texto">: el cursor pointer lo aporta
+ * .botonBase, por eso no se declara aqui y no dispara css-adhoc-button-style). */
 .enlaceNavegacionBoton {
     background: none;
     border: 0;
-    cursor: pointer;
     padding: 0;
     font-family: inherit;
 }
