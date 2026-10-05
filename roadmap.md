@@ -519,7 +519,8 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   con 03AA-5, caché con spec, test anti-fuga del mínimo, DoD con números;
   2º reto: freeze+timebox E0, allowlist extras, modelo pineado, matriz fuga,
   caché por terna+TTL, host dueño núcleo, Regenerar sin tope por
-  decisión usuaria 2026-10-05).
+  decisión usuaria 2026-10-05; 3er reto: P0 seguridad/PII/rollback/
+  concurrentes + 8 contradicciones cerradas, fases secuenciales).
 - E0 en curso (solo lectura, timebox 3 días). E1 bloqueado hasta E0 real;
   E2+ espera tus puntos restantes.
 
