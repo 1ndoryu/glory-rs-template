@@ -529,8 +529,9 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 
 ## 03AA-5 — Detector de captación Marketplace (plan activo 2026-10-03)
 - Plan: `Agente/planes/plan-detector-captacion-2026-10-03.md`.
-- Semimanual riesgo-0 (ella abre, el plugin guarda lo visto); clasifica
-  inmueble/no + particular/asesor con `jev`; fotos solo-url hasta aprobar;
-  cola "Captación" en admin. Duda abierta: qué es `jev` y cómo se invoca.
+- Semimanual riesgo-0 (ella abre, el plugin guarda lo visto);   clasifica
+  inmueble/no + particular/asesor con `jev` (verificado en vivo con tu key,
+  `jev-1.13-free` gratis); fotos solo-url hasta aprobar;
+  cola "Captación" en admin. Próximo: C1 lector pasivo + extractor.
 
 ## 05AA-1 — MN adopta `Resolver` del núcleo (cerrada 2026-10-05: ver `Agente/completados/tareas-2026-10-05.md`)
