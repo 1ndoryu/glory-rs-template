@@ -44,9 +44,19 @@ C3 particular/asesor + perfil; C4 tablas backend + dedupe; C5 pestaña
 Captación + aprobar/descartar; C6 búsquedas guardadas. Cada fase: tests +
 viva riesgo-0 (ninguna acción ante Meta).
 
+## `jev`: verificado en vivo 2026-10-03
+Modelo de decisiones de TypeSafe AI en tu Zen (no es chat): recibe `state` +
+preguntas tipadas y devuelve valores + probabilidades. Mismo `OPENCODE_GO_API_KEY`,
+`POST https://opencode.ai/zen/v1/systemone`, `model: jev-1.13-free` (gratis,
+tiempo limitado; `jev-1.13` pago $0.042/1M in como respaldo). Probado con un
+aviso real: `es_inmueble noul 0.93`, `origen particular p=1.0`. Preguntas por
+aviso en una sola llamada: `es_inmueble` (noul), `origen`
+(choice particular/asesor/desconocido), opcional `urgencia` (score). Si jev
+falla o la confianza < umbral (a calibrar en C2): heurística y estado
+`revisar` — nunca se descarta solo.
+
 ## Estado
-Plan escrito 2026-10-03. Duda abierta: qué es `jev` exactamente y cómo se
-invoca (ver nota a usuaria). Próximo: C1 al aclararse.
+Duda `jev` resuelta (ver arriba). Próximo: C1 lector pasivo + extractor.
 
 ## Gate y DoD
 Sentinel PASS en el plugin; backend MN con su gate; verificación viva con la
