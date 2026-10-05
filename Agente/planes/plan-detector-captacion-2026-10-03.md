@@ -95,6 +95,29 @@ Acepta `+58`, `04xx/0212` con separadores, y ofuscados simples
 campo manual). Normaliza a E.164 `58xxxxxxxxxx`. Quién ve: admin con
 enmascarado por defecto.
 
+## Front revisión humana (C4, estilo shadcn existente)
+Nueva pestaña "Captación" en admin MN. Espeja el patrón probado de
+inmuebles (`tabla-inmuebles.tsx` + `modal-ver-inmueble.tsx`): nada nuevo de
+diseño, solo shadcn ya instalado (`@/components/ui/*`).
+- `features/captacion/tabla-captacion.tsx`: shadcn `Table` con columnas foto
+  (thumb o placeholder), título, precio, zona, origen (`Badge`: particular /
+  asesor / desconocido), viabilidad % (`Badge` verde ≥80, ámbar 60–79, rojo
+  <60), estado, visto-en; filtros por estado+origen (shadcn `Select`) +
+  buscador (shadcn `Input`); escritorio tabla, móvil cards (igual que
+  inmuebles); paginación backend (`limit`+`offset`, 25/pág).
+- `features/captacion/modal-ver-aviso.tsx`: shadcn `Dialog` con ficha
+  completa — galería (urls FB o descargadas tras aprobar), descripción
+  íntegra, publicador + nº avisos, viabilidad % con su base auditable, qué
+  falta, historial de precio; teléfono enmascarado con botón revelar
+  (registrado); link "ver en FB" (nueva pestaña); acciones Aprobar
+  (descarga fotos, pasa a `aprobado`) / Descartar (motivo obligatorio de
+  lista cerrada, pasa a `descartado` + alimenta patrones).
+- Endpoints: `GET /mp/captacion/avisos?estado=&origen=&q=&limit=&offset=`,
+  `GET /mp/captacion/avisos/:id`, `POST /:id/aprobar`, `POST /:id/descartar`,
+  `GET /mp/captacion/hoy` (para el Radar).
+- DoD C4: tabla filtra/pagina contra datos reales, aprobar descarga fotos
+  (`ok|perdida`), descartar exige motivo, teléfono enmascarado, `tsc` 0.
+
 ## Panel en tiempo real ("Radar")
 Cuadro **flotante dentro del navegador** (misma técnica del float 03AA-3:
 overlay que se **minimiza a burbuja y maximiza** al panel completo).
@@ -116,9 +139,9 @@ visto, el % coincide con backend, y "qué falta" detecta ≥3 tipos de hueco.
 - C2/C3 clasificadores contra dataset (DoD: precisión ≥90% inmueble/no,
   `particular` sin falsos-positivos en trampas-asesor, viabilidad <60% siempre
   a `revisar`, % `revisar` total <25%).
-- C4 cola "Captación" en admin MN + panel Radar + endpoint stats (DoD:
-  aprobar/descartar con motivo, teléfono enmascarado, fotos con estado
-  `ok|perdida`, panel con % auditable y ≥3 huecos detectados).
+- C4 cola "Captación" + panel Radar + endpoints (DoD: tabla shadcn con
+  filtros/paginación reales, aprobar/descartar con motivo, teléfono
+  enmascarado, fotos `ok|perdida`, panel con % auditable).
 - C5 búsquedas guardadas (DoD: re-visita 0 tokens).
 - Cada fase: tests + Sentinel PASS; viva = usuaria abre avisos reales y lo
   guardado coincide con lo visto.
