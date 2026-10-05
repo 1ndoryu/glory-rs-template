@@ -1,0 +1,4 @@
+SHA256(corpus-e0.json anonimizado en %MP_PRIVADO%) = 593786FA1AFFC2A7E33212EE173E72ED3215621E0B65DEE5094F1112F8ED1A7D
+hilos: hilo-01 (disponibilidad+precio), hilo-02 (disponibilidad), hilo-03 (precio+disponibilidad+cierre), hilo-04 (visita, dictado por la dueña, no literal)
+verificacion: ANON_OK (nombres, 7+digitos, wa.me, email, perfil FB)
+crudos: NO persistidos en ningun lado (solo conversacion con la dueña)
