@@ -518,7 +518,8 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   (reto aplicado: E0 inventario+corpus, strip con flag, doctrina Meta común
   con 03AA-5, caché con spec, test anti-fuga del mínimo, DoD con números;
   2º reto: freeze+timebox E0, allowlist extras, modelo pineado, matriz fuga,
-  caché por terna+TTL, host dueño núcleo, tope Regenerar 20/día).
+  caché por terna+TTL, host dueño núcleo, Regenerar sin tope por
+  decisión usuaria 2026-10-05).
 - E0 en curso (solo lectura, timebox 3 días). E1 bloqueado hasta E0 real;
   E2+ espera tus puntos restantes.
 

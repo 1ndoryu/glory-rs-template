@@ -80,14 +80,17 @@ Ritmo humano = límite (sin throttles); métrica `borradores/día` visible.
   (ficha cambiante no colisiona, historia por filas); writer nombrado
   `hashFicha()` calcula los hash al guardar; purga de vencidas programada.
   Firma conocida y válida = 0 tokens; Regenerar = bypass lectura + invalida
-  esa firma, con **tope 20/día** y contador visible en admin
-  (`GET /mp/respuestas/uso-hoy`). DoD: hit-rate medido, precio correcto
-  10/10 tras cambio de ficha, hit con ficha vieja = 0, tope corta el loop.
+  esa firma, sin tope (decisión usuaria 2026-10-05; el loop lo frena el ritmo
+  humano, no un contador). Contador visible en admin
+  (`GET /mp/respuestas/uso-hoy`) como métrica. DoD: hit-rate medido, precio
+  correcto 10/10 tras cambio de ficha, hit con ficha vieja = 0, contador
+  visible.
 
 ## IA y coste (unificado con 03AA-5)
 Texto lo genera el modelo del chat MN vía backend (nunca en el plugin ni en
 `jev`, que solo decide en 03AA-5). Latencia p95 <8s medida en M3. Caché manda
-antes que IA; Regenerar con tope 20/día + contador admin.
+antes que IA; Regenerar sin tope (decisión usuaria), contador admin de
+métrica.
 
 ## Estado
 E0 en curso (solo lectura, timebox 3 días, fallback sintético). E1 bloqueado
