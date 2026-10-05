@@ -68,13 +68,17 @@ caducó se marca `foto_perdida`, no se finge).
 TypeSafe AI en Zen: `POST https://opencode.ai/zen/v1/systemone` con el mismo
 `OPENCODE_GO_API_KEY`, `model: jev-1.13-free` (gratis temporal;
 `jev-1.13` $0.042/1M in de respaldo). Corre **solo en backend**, nunca en el
-plugin: se envía texto truncado (título+descripción, máx 1500 caracteres),
-**jamás teléfono, fotos ni URLs de perfil**. Una llamada por aviso con
-`es_inmueble` (noul) + `origen` (choice). Caché backend por
-`fb_id+hash(descripción)` con TTL 30 días: re-visitas = 0 tokens. Umbral a
-fijar contra dataset (propuesta inicial: `es_inmueble<0.6` → `revisar`;
-`origen` con `confidence<0.7` → `desconocido`). Si jev falla: heurística +
-`revisar`. Nada se descarta solo jamás.
+plugin. Analiza con la información comercial **completa**: título, precio,
+descripción íntegra, ubicación, datos del publicador y nº de avisos en su
+perfil; lo único que NO viaja es PII (teléfono, fotos, URLs de perfil) porque
+para decidir no hace falta. Una llamada por aviso con 3 preguntas:
+`es_inmueble` (noul), `origen` (choice particular/asesor/desconocido),
+`viable_captacion` (noul → **% viabilidad = round(p*100)**). Regla de oro:
+**viabilidad <60% → `revisar` humano siempre**, aunque todo lo demás cuadre;
+`origen` con `confidence<0.7` → `desconocido`. Caché backend por
+`fb_id+hash(descripción)` TTL 30 días: re-visitas = 0 tokens. Si jev falla:
+heurística + `revisar`. Nada se descarta solo jamás. Umbrales se calibran
+contra el dataset en C2/C3 (60% es el piso propuesto por la usuaria).
 
 ## Clasificador particular/asesor (anti-ruido)
 `particular` exige 2+ señales independientes (p.ej. lenguaje en primera
@@ -91,16 +95,29 @@ Acepta `+58`, `04xx/0212` con separadores, y ofuscados simples
 campo manual). Normaliza a E.164 `58xxxxxxxxxx`. Quién ve: admin con
 enmascarado por defecto.
 
+## Panel en tiempo real ("Radar")
+Mientras ella navega, un cuadro visible muestra: **aviso actual** (título,
+precio, veredicto particular/asesor/desconocido, **viabilidad %** con color,
+qué campos faltan: ej. "sin ubicación", "sin teléfono"); **hoy** (vistos,
+candidatos, en revisión, descartados); **cola** (pendientes por revisar).
+Fuente: backend (`GET /mp/captacion/hoy` + estado del aviso abierto, polling
+5s desde el host; sin websockets nuevos). El % se muestra siempre con su
+base ("viable 82% · particular, 2 señales") para que el número sea
+auditable, nunca una caja negra. DoD en C4: lo guardado coincide con lo
+visto, el % coincide con backend, y "qué falta" detecta ≥3 tipos de hueco.
+
 ## Fases reordenadas (cada una con DoD medible)
 - C0 corpus + dataset + DDL (DoD arriba).
 - C1 lector pasivo + persistencia + dedupe (DoD: 5/5 avisos del corpus
   extraídos campo a campo, re-visita = UPDATE sin duplicar, 0 llamadas de
   red desde content-script salvo a `background`).
 - C2/C3 clasificadores contra dataset (DoD: precisión ≥90% inmueble/no,
-  `particular` sin falsos-positivos en trampas-asesor, % `revisar` <25%).
-- C4 cola "Captación" en admin MN (DoD: aprobar/descartar con motivo,
-  teléfono enmascarado, fotos con estado `ok|perdida`).
-- C5 búsquedas guardadas + caché jev con TTL (DoD: re-visita 0 tokens).
+  `particular` sin falsos-positivos en trampas-asesor, viabilidad <60% siempre
+  a `revisar`, % `revisar` total <25%).
+- C4 cola "Captación" en admin MN + panel Radar + endpoint stats (DoD:
+  aprobar/descartar con motivo, teléfono enmascarado, fotos con estado
+  `ok|perdida`, panel con % auditable y ≥3 huecos detectados).
+- C5 búsquedas guardadas (DoD: re-visita 0 tokens).
 - Cada fase: tests + Sentinel PASS; viva = usuaria abre avisos reales y lo
   guardado coincide con lo visto.
 
