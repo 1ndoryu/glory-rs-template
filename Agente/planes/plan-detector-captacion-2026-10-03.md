@@ -96,7 +96,9 @@ campo manual). Normaliza a E.164 `58xxxxxxxxxx`. Quién ve: admin con
 enmascarado por defecto.
 
 ## Panel en tiempo real ("Radar")
-Mientras ella navega, un cuadro visible muestra: **aviso actual** (título,
+Cuadro **flotante dentro del navegador** (misma técnica del float 03AA-3:
+overlay que se **minimiza a burbuja y maximiza** al panel completo).
+Mientras ella navega muestra: **aviso actual** (título,
 precio, veredicto particular/asesor/desconocido, **viabilidad %** con color,
 qué campos faltan: ej. "sin ubicación", "sin teléfono"); **hoy** (vistos,
 candidatos, en revisión, descartados); **cola** (pendientes por revisar).
