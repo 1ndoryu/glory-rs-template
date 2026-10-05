@@ -34,6 +34,17 @@ número propio del negocio, vacío sin media, retrasado (>X min del gateway).
 Regla de oro: **por defecto se atiende**; ignorar solo cae en la lista
 explícita de arriba (cada `no` deja `motivo` en log/auditoría).
 
+## No-cliente sin falsos positivos
+Sospechar que no es cliente **nunca silencia**: cambia el trato, no el
+triage. Tres tratos: `cliente` (flujo completo), `neutral` (respuesta breve
+y educada + pregunta que califica sin acusar: "¿buscas comprar o alquilar?"),
+`no-atender` (solo la lista de arriba). Señales (heurística + IA, ninguna
+decide sola): número equivocado, vendedor/spam, troleo, mensajes de prueba.
+Anti-falsos-positivos: 1 señal débil no mueve el trato (mínimo 2
+independientes o 1 explícita); aperturas típicas (`hola`, `precio`, `sí`)
+siempre = cliente; cada mensaje re-evalúa (reversible); la duda reincidente
+se marca a humano, jamás se bloquea solo.
+
 ## Público vs autorizado
 - Público (cualquiera): buscar, detalle, fotos, precio/disponibilidad,
   coordinar visita (deriva a asesor), registrarse como interesado, dudas.
@@ -59,6 +70,11 @@ Dos modos: `stub` (respuestas IA fijas, rápido, para gate) y `vivo`
 búsqueda→detalle→foto→precio→visita; fuera de tema; cliente que pide humano;
 autorizado pide ficha; no autorizado pide clientes (debe negar); duplicados;
 hilo delegado que no debe responder; audio; foto.
+Suite anti-falsos-positivos (todos deben quedar `cliente`): `hola` seco,
+`precio?`, `sí` solo, apertura con errores de tipeo, cliente que pregunta por
+tercero, curioso que pide fotos sin más datos. Suite no-cliente (todos
+`neutral`, ninguno silenciado): vendedor de servicios, número equivocado
+admitido, troleo leve, "solo probaba". Cada caso con señales esperadas.
 
 ## Fases
 F1 triage + tests; F2 política público/autorizado + allowlist; F3 partir
