@@ -513,11 +513,12 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 
 ## 011A-5 — F5 consumidor delgado MN (cerrada 2026-10-01: ver `Agente/completados/tareas-2026-10-01.md`)
 
-## 03AA-3 — Asistente Marketplace a repo propio + respuestas IA (plan activo 2026-10-03)
-- Plan: `Agente/planes/plan-asistente-marketplace-separacion-2026-10-03.md`.
-- Decisiones usuaria: repo nuevo `plugins-opencode`, caché en backend MN, panel
-  que se oculta al minimizar/burbuja, strip lateral eliminado del código.
-- Pendiente: puntos restantes que la usuaria anunciará; luego E1 (repo + Sentinel + núcleo).
+## 03AA-3 — Asistente Marketplace (REPLANTEADO 2026-10-03)
+- Plan: `Agente/planes/plan-asistente-marketplace-separacion-2026-10-03.md`
+  (reto aplicado: E0 inventario+corpus, strip con flag, doctrina Meta común
+  con 03AA-5, caché con spec, test anti-fuga del mínimo, DoD con números).
+- E0 pendiente (inventario fork + 3 hilos Messenger). E1-mínimo desbloqueado;
+  E2+ espera tus puntos restantes.
 
 ## 03AA-4 — WhatsApp un solo número + triage + config + escenarios (plan activo 2026-10-03)
 - Plan: `Agente/planes/plan-whatsapp-numero-unico-2026-10-03.md`.
@@ -531,7 +532,7 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 - Plan: `Agente/planes/plan-detector-captacion-2026-10-03.md` (incorpora reto
   hostil: riesgo mínimo —no 0—, C0 corpus+dataset+DDL primero, adenda con
   03AA-3, métricas por fase).
-- Bloqueado hasta C0 (corpus 5+2+1, dataset 30–50, DDL) y E1 de 03AA-3
-  (repo + núcleo). Nada de código antes.
+- Bloqueado hasta C0 (corpus 5+2+1, dataset 30–50, DDL) y E1-mínimo de 03AA-3
+  (repo + núcleo lector). Nada de código antes.
 
 ## 05AA-1 — MN adopta `Resolver` del núcleo (cerrada 2026-10-05: ver `Agente/completados/tareas-2026-10-05.md`)
