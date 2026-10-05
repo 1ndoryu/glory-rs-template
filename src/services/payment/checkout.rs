@@ -277,29 +277,8 @@ impl PaymentService {
         .await?;
 
         /* Generar fases de la orden desde plantillas del plan */
-        let plan_phases = ServiceRepository::list_plan_phases(pool, plan.id).await?;
-        for tmpl in &plan_phases {
-            let phase_price = final_price * tmpl.percentage_of_total / 100;
-            let status = if tmpl.phase_number == 1 {
-                crate::services::OrderService::initial_phase_status(payment_mode)
-            } else {
-                PhaseStatus::Locked
-            };
-            OrderRepository::create_order_phase(
-                pool,
-                CreatePhaseParams {
-                    order_id: order.id,
-                    phase_number: tmpl.phase_number,
-                    title: &tmpl.title,
-                    description: tmpl.description.as_deref(),
-                    price_cents: phase_price,
-                    status,
-                    max_revisions: tmpl.max_revisions,
-                    estimated_days: tmpl.estimated_days,
-                },
-            )
+        Self::create_order_phases_from_templates(pool, order.id, plan.id, final_price, payment_mode)
             .await?;
-        }
 
         /* Crear registro de pago en order_payments y marcarlo como held */
         let phase_1_id = if payment_mode == PaymentMode::Phased {
@@ -357,6 +336,42 @@ impl PaymentService {
             order.id
         );
 
+        Ok(())
+    }
+
+    /* [01AA-4-f3s] Genera las fases de la orden desde las plantillas del plan
+     * (extraído de handle_checkout_payment_succeeded). La fase 1 hereda el
+     * estado inicial según el modo de pago; el resto nace Locked. */
+    async fn create_order_phases_from_templates(
+        pool: &PgPool,
+        order_id: Uuid,
+        plan_id: Uuid,
+        final_price: i32,
+        payment_mode: PaymentMode,
+    ) -> Result<(), AppError> {
+        let plan_phases = ServiceRepository::list_plan_phases(pool, plan_id).await?;
+        for tmpl in &plan_phases {
+            let phase_price = final_price * tmpl.percentage_of_total / 100;
+            let status = if tmpl.phase_number == 1 {
+                crate::services::OrderService::initial_phase_status(payment_mode)
+            } else {
+                PhaseStatus::Locked
+            };
+            OrderRepository::create_order_phase(
+                pool,
+                CreatePhaseParams {
+                    order_id,
+                    phase_number: tmpl.phase_number,
+                    title: &tmpl.title,
+                    description: tmpl.description.as_deref(),
+                    price_cents: phase_price,
+                    status,
+                    max_revisions: tmpl.max_revisions,
+                    estimated_days: tmpl.estimated_days,
+                },
+            )
+            .await?;
+        }
         Ok(())
     }
 

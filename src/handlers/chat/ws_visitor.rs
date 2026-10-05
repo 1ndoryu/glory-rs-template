@@ -237,6 +237,75 @@ async fn link_authenticated_visitor_context(
 /* [035A-21] Orquestador WS legacy: handshake, anti-bot, spawn de tareas y cleanup final.
  * Se documenta la excepción hasta dividir el flujo por fases sin cambiar comportamiento. */
 #[allow(clippy::too_many_lines)]
+/* [01AA-4-f3s] Establece sesión del visitante + suscripción broadcast (extraído
+ * de handle_visitor_ws). Retorna None si la sesión no pudo crearse. */
+async fn establish_visitor_session(
+    state: &AppState,
+    params: &VisitorWsParams,
+    visitor_ip: Option<&str>,
+    visitor_ua: Option<&str>,
+    visitor_country: Option<&str>,
+) -> Option<(
+    crate::models::ChatSession,
+    tokio::sync::mpsc::UnboundedReceiver<WsServerMessage>,
+)> {
+    let session = match state
+        .chat_hub
+        .get_or_create_visitor_session(
+            &params.visitor_id,
+            params.session_id,
+            params.visitor_name.as_deref(),
+            visitor_ip,
+            visitor_ua,
+            visitor_country,
+        )
+        .await
+    {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::error!("Error creando sesión visitor: {e}");
+            return None;
+        }
+    };
+
+    let session_id = session.id;
+    tracing::info!(%session_id, visitor_id = %params.visitor_id, "WS session obtenida/creada");
+    let rx = state.chat_hub.subscribe_visitor(session_id);
+    Some((session, rx))
+}
+
+/* [01AA-4-f3s] Anuncia presencia online del visitante: timestamp durable +
+ * notificación al staff + broadcast de sesión nueva (extraído de
+ * handle_visitor_ws). Retorna el timestamp registrado. */
+async fn announce_visitor_online(
+    state: &AppState,
+    session_id: Uuid,
+    session: &crate::models::ChatSession,
+) -> chrono::DateTime<chrono::Utc> {
+    /* [104A-40] Registrar timestamp de conexión y notificar al staff que el visitante está online.
+     * Sirve como confirmación de lectura: si el visitante está online, vio los mensajes. */
+    let visitor_online_at: chrono::DateTime<chrono::Utc> =
+        crate::repositories::continuation_token::mark_connected(&state.pool, session_id)
+            .await
+            .unwrap_or_else(|e| {
+                tracing::warn!("Error actualizando visitor_last_connected_at: {e}");
+                chrono::Utc::now()
+            });
+    state
+        .chat_hub
+        .notify_visitor_online(session_id, visitor_online_at)
+        .await;
+
+    /* Notificar a staff de nueva sesión */
+    state.chat_hub.broadcast(
+        session_id,
+        &WsServerMessage::SessionNew {
+            session: session.clone(),
+        },
+    );
+    visitor_online_at
+}
+
 async fn handle_visitor_ws(
     socket: WebSocket,
     state: AppState,
@@ -264,28 +333,19 @@ async fn handle_visitor_ws(
         );
     }
 
-    let session = match state
-        .chat_hub
-        .get_or_create_visitor_session(
-            &params.visitor_id,
-            params.session_id,
-            params.visitor_name.as_deref(),
-            visitor_ip.as_deref(),
-            visitor_ua.as_deref(),
-            visitor_country.as_deref(),
-        )
-        .await
-    {
-        Ok(s) => s,
-        Err(e) => {
-            tracing::error!("Error creando sesión visitor: {e}");
-            return;
-        }
+    let Some((session, rx)) = establish_visitor_session(
+        &state,
+        &params,
+        visitor_ip.as_deref(),
+        visitor_ua.as_deref(),
+        visitor_country.as_deref(),
+    )
+    .await
+    else {
+        return;
     };
 
     let session_id = session.id;
-    tracing::info!(%session_id, visitor_id = %params.visitor_id, "WS session obtenida/creada");
-    let rx = state.chat_hub.subscribe_visitor(session_id);
     let (mut sender, mut receiver) = socket.split();
 
     /* [T-3] Upsert visitor_profile: crea o actualiza perfil persistente.
@@ -319,27 +379,7 @@ async fn handle_visitor_ws(
      * en cuanto el visitante envía su primer mensaje. */
     let _ = had_messages; /* variable usada para suprimir unused warning */
 
-    /* [104A-40] Registrar timestamp de conexión y notificar al staff que el visitante está online.
-     * Sirve como confirmación de lectura: si el visitante está online, vio los mensajes. */
-    let visitor_online_at: chrono::DateTime<chrono::Utc> =
-        crate::repositories::continuation_token::mark_connected(&state.pool, session_id)
-            .await
-            .unwrap_or_else(|e| {
-                tracing::warn!("Error actualizando visitor_last_connected_at: {e}");
-                chrono::Utc::now()
-            });
-    state
-        .chat_hub
-        .notify_visitor_online(session_id, visitor_online_at)
-        .await;
-
-    /* Notificar a staff de nueva sesión */
-    state.chat_hub.broadcast(
-        session_id,
-        &WsServerMessage::SessionNew {
-            session: session.clone(),
-        },
-    );
+    let visitor_online_at = announce_visitor_online(&state, session_id, &session).await;
 
     /* Task: enviar mensajes del broadcast al WS del visitante */
     let send_task = spawn_visitor_send_task(sender, rx);

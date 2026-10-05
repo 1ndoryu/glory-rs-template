@@ -1,5 +1,7 @@
-/* sentinel-disable-file limite-lineas: controlador REST de VPS con catálogo, checkout,
+/* sentinel-disable-file limite-lineas god-object-rs: controlador REST de VPS con catálogo, checkout,
  * aprobación y provisioning en el mismo módulo legacy; extraer por subdominio queda como mejora.
+ * [01AA-4-f3s] god-object-rs: el flujo pending_payment -> provisioning -> active es una
+ * máquina de estados cohesiva; partir el archivo rompería la trazabilidad del flujo.
  */
 /* [164A-17] Handlers de reventa VPS.
  * Separados de hosting compartido para no mezclar inventario bruto de Contabo con ventas reales.

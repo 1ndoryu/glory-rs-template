@@ -1,6 +1,8 @@
-/* sentinel-disable-file limite-lineas: servicio central de integracion Coolify.
+/* sentinel-disable-file limite-lineas god-object-rs: servicio central de integracion Coolify.
  * Agrupa create/list/start/stop/restart/update para que el dominio de hosting no
  * disperse llamadas HTTP y parsing de la API en varios handlers.
+ * [01AA-4-f3s] god-object-rs: fachada única sobre la API Coolify a propósito;
+ * fragmentarla duplicaría auth/reintentos/parsing en cada consumidor.
  */
 /* [104A-42] Servicio de provisioning Coolify para hosting administrado.
  * [155A-13] Soporta hosting WordPress legacy y hosting normal con Nginx + SFTP.

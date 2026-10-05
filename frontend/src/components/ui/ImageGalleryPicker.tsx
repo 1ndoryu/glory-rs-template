@@ -14,6 +14,7 @@ import {ImageCropModal} from './ImageCropModal';
 import {obtenerOrigen} from '../../platform/navigation';
 import {Modal} from './Modal';
 import {Button} from './Button';
+import './Thumbnail.css';
 import './ImageGalleryPicker.css';
 
 interface Props {
@@ -82,7 +83,7 @@ export const ImageGalleryPicker: React.FC<Props> = ({onSelect, onClose}) => {
                                 <button
                                     key={img.url}
                                     type="button"
-                                    className="galeriaItem"
+                                    className="miniaturaClicable galeriaItem"
                                     onClick={() => handlePickFromGallery(img.url)}
                                     title={img.file_name}
                                 >

@@ -5,7 +5,8 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::services::AiChatConfig;
+use crate::models::ChatSession;
+use crate::services::{AiChatConfig, AiResponse};
 
 use super::ai_providers::{call_ai_api_with_options, ChatApiOptions};
 use super::chat_timing::{
@@ -36,7 +37,8 @@ pub(crate) async fn ai_generation_is_current(
 /* Genera respuesta IA con el buffer combinado.
  * Verifica sesión activa, clasifica relevancia, genera respuesta y escala si necesario.
  * [T-2] Envía rich_messages (service_cards, invoices) como mensajes separados.
- * Retorna el nuevo valor de irrelevant_count. */
+ * Retorna el nuevo valor de irrelevant_count.
+ * [01AA-4-f3s] Orquestador: guards → relevancia → llamada IA → publicación. */
 pub(crate) async fn generate_ai_response(
     session_id: Uuid,
     visitor_name: Option<&str>,
@@ -44,48 +46,87 @@ pub(crate) async fn generate_ai_response(
     mut irrelevant_count: u32,
     deps: &TimingSessionDeps,
 ) -> u32 {
-    /* Verificar que la sesión sigue con IA activa.
-     * [237A-9] Respetar ai_mode: manual_pause bloquea IA completamente;
-     * human_priority con ciclo waiting también bloquea (el worker genera fallback). */
+    let Some((_session, generation_epoch)) = fetch_generation_session(&deps.pool, session_id).await
+    else {
+        return irrelevant_count;
+    };
+
+    if !ensure_ai_request_allowed(session_id, combined, deps).await {
+        return irrelevant_count;
+    }
+
+    if let Some(updated) =
+        handle_irrelevant_message(deps, session_id, combined, irrelevant_count, generation_epoch)
+            .await
+    {
+        return updated;
+    }
+    irrelevant_count = 0;
+
+    let ai_resp = call_ai_with_fallback(deps, session_id, combined).await;
+
+    tracing::info!(%session_id, has_escalation = ai_resp.needs_escalation, rich_count = ai_resp.rich_messages.len(), "Respuesta IA recibida, enviando...");
+
+    publish_ai_response(deps, session_id, visitor_name, &ai_resp, generation_epoch).await;
+
+    irrelevant_count
+}
+
+/* [01AA-4-f3s] Guards de sesión (extraído de generate_ai_response).
+ * Retorna la sesión + epoch capturado antes de cualquier llamada lenta, o
+ * None si la IA no debe generar (sesión ausente/inactiva/pausada/en ventana humana).
+ * [237A-9] Respetar ai_mode: manual_pause bloquea IA completamente;
+ * human_priority con ciclo waiting también bloquea (el worker genera fallback). */
+async fn fetch_generation_session(
+    pool: &PgPool,
+    session_id: Uuid,
+) -> Option<(ChatSession, i64)> {
     /* [259A-1] let-else en vez de match de un solo patron (clippy manual_let_else). */
     let Ok(Some(session)) =
-        crate::repositories::ChatRepository::find_session_by_id(&deps.pool, session_id).await
+        crate::repositories::ChatRepository::find_session_by_id(pool, session_id).await
     else {
         tracing::info!(%session_id, "generate_ai_response: sesión no encontrada");
-        return irrelevant_count;
+        return None;
     };
 
     if !session.ai_enabled || session.assigned_staff_id.is_some() {
         tracing::info!(%session_id, "generate_ai_response: sesión no activa, saltando IA");
-        return irrelevant_count;
+        return None;
     }
 
     /* [237A-9] manual_pause: IA desactivada por staff explícitamente */
     if session.ai_mode == "manual_pause" {
         tracing::debug!(%session_id, "generate_ai_response: ai_mode=manual_pause, saltando IA");
-        return irrelevant_count;
+        return None;
     }
 
     /* [237A-9] human_priority con ciclo waiting: dejar que el humano responda.
      * El worker de response cycles generará fallback si expira el deadline. */
     if session.ai_mode == "human_priority" {
         if let Ok(true) =
-            crate::repositories::ResponseCycleRepository::is_in_human_window(&deps.pool, session_id)
-                .await
+            crate::repositories::ResponseCycleRepository::is_in_human_window(pool, session_id).await
         {
             tracing::debug!(%session_id, "generate_ai_response: human_priority + ciclo waiting, saltando IA");
-            return irrelevant_count;
+            return None;
         }
     }
 
     /* [257A-9] Capturar la versión antes de cualquier llamada lenta. Un toggle
      * o mensaje humano la incrementa en BD y vuelve obsoleta esta generación. */
     let generation_epoch = session.ai_generation_epoch;
+    Some((session, generation_epoch))
+}
 
-    if !ensure_ai_request_allowed(session_id, combined, deps).await {
-        return irrelevant_count;
-    }
-
+/* [01AA-4-f3s] Clasificador de relevancia + streak off-topic (extraído de
+ * generate_ai_response). Retorna Some(nuevo irrelevant_count) si el mensaje
+ * fue irrelevante (ya respondido), None si es relevante y hay que continuar. */
+async fn handle_irrelevant_message(
+    deps: &TimingSessionDeps,
+    session_id: Uuid,
+    combined: &str,
+    mut irrelevant_count: u32,
+    generation_epoch: i64,
+) -> Option<u32> {
     /* Clasificador de relevancia: filtrar off-topic con modelo pequeño */
     if let Ok(false) =
         check_relevance(&deps.pool, &deps.ai_config, combined, &deps.http_client).await
@@ -107,15 +148,21 @@ pub(crate) async fn generate_ai_response(
                 .send_message(session_id, "ai", Some("ai"), msg)
                 .await;
         }
-        return irrelevant_count;
+        return Some(irrelevant_count);
     }
+    None
+}
 
-    /* Relevante: reset streak y generar respuesta principal */
-    irrelevant_count = 0;
-
-    /* [114A-6] Timeout global 90s para toda la cadena de retries de IA.
-     * Sin esto, la cadena Groq (3 keys × 3 modelos) + Gemini (6 modelos)
-     * podría bloquear hasta 7+ minutos reteniendo conexión DB. */
+/* [01AA-4-f3s] Llamada al modelo con timeout global + fallbacks (extraído de
+ * generate_ai_response).
+ * [114A-6] Timeout global 90s para toda la cadena de retries de IA.
+ * Sin esto, la cadena Groq (3 keys × 3 modelos) + Gemini (6 modelos)
+ * podría bloquear hasta 7+ minutos reteniendo conexión DB. */
+async fn call_ai_with_fallback(
+    deps: &TimingSessionDeps,
+    session_id: Uuid,
+    combined: &str,
+) -> AiResponse {
     tracing::info!(%session_id, "Llamando a IA para generar respuesta...");
     let ai_result = tokio::time::timeout(
         std::time::Duration::from_secs(90),
@@ -136,10 +183,10 @@ pub(crate) async fn generate_ai_response(
     )
     .await;
 
-    let ai_resp = if let Ok(result) = ai_result {
+    if let Ok(result) = ai_result {
         result.unwrap_or_else(|e| {
             tracing::warn!(%session_id, error = %e, "Error en respuesta IA");
-            crate::services::AiResponse {
+            AiResponse {
                 text: format!("Error IA: {e}"),
                 needs_escalation: true,
                 rich_messages: Vec::new(),
@@ -147,27 +194,35 @@ pub(crate) async fn generate_ai_response(
         })
     } else {
         tracing::error!("AI response timeout (90s) para sesión {session_id}");
-        crate::services::AiResponse {
+        AiResponse {
             text: "Disculpa, estoy tardando más de lo normal. Un miembro del equipo \
                    te asistirá en breve."
                 .to_string(),
             needs_escalation: true,
             rich_messages: Vec::new(),
         }
-    };
+    }
+}
 
-    tracing::info!(%session_id, has_escalation = ai_resp.needs_escalation, rich_count = ai_resp.rich_messages.len(), "Respuesta IA recibida, enviando...");
-
+/* [01AA-4-f3s] Publicación con revalidación de epoch + escalamiento (extraído
+ * de generate_ai_response). Descarta la respuesta si un humano intervino. */
+async fn publish_ai_response(
+    deps: &TimingSessionDeps,
+    session_id: Uuid,
+    visitor_name: Option<&str>,
+    ai_resp: &AiResponse,
+    generation_epoch: i64,
+) {
     if !ai_generation_is_current(&deps.pool, session_id, generation_epoch).await {
         tracing::info!(%session_id, generation_epoch, "Respuesta IA descartada por intervención humana");
-        return irrelevant_count;
+        return;
     }
 
     /* [T-2] Enviar rich messages (service_cards, invoices) antes del texto */
     for rm in &ai_resp.rich_messages {
         if !ai_generation_is_current(&deps.pool, session_id, generation_epoch).await {
             tracing::info!(%session_id, generation_epoch, "Rich messages IA interrumpidos por intervención humana");
-            return irrelevant_count;
+            return;
         }
         let _ = deps
             .hub
@@ -199,8 +254,6 @@ pub(crate) async fn generate_ai_response(
         )
         .await;
     }
-
-    irrelevant_count
 }
 
 pub(crate) async fn ensure_ai_request_allowed(

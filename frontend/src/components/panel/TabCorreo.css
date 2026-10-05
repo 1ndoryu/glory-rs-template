@@ -1,0 +1,247 @@
+/* [01AA-4-f3s] Tab Correo del detalle de hosting (split de HostingDetalle.css):
+ * alias, cuota, formulario, lista y buzones. */
+
+/* ── Tab Correo ────────────────────────── */
+
+.tabCorreoHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-sm);
+}
+
+.tabCorreoQuota {
+    margin-bottom: var(--spacing-md);
+}
+
+.tabCorreoQuotaLabel {
+    font-size: var(--font-size-xs);
+    color: var(--text-tertiary);
+}
+
+.tabCorreoQuotaBar {
+    height: 6px;
+    background: var(--border-default);
+    border-radius: 4px;
+    margin-top: var(--spacing-2xs);
+    overflow: hidden;
+}
+
+.tabCorreoQuotaFill {
+    height: 100%;
+    background: var(--accent-primary);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    /* [259A-6] Progreso via --var inyectada por React (varsense-fix).
+     * [279A-1] Valor inicial: el objeto style nunca entra al indice de vars. */
+    --tabCorreo-cuota-uso: 0%;
+    width: var(--tabCorreo-cuota-uso);
+}
+
+.tabCorreoError {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2xs);
+    padding: var(--spacing-sm);
+    background: var(--color-error-bg);
+    border: 1px solid var(--color-error);
+    border-radius: var(--radius-md);
+    color: var(--color-error);
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--spacing-md);
+}
+
+.tabCorreoForm {
+    background: var(--surface-secondary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.tabCorreoFormRow {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2xs);
+    margin-bottom: var(--spacing-sm);
+}
+
+.tabCorreoInput {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--border-default);
+    /* [279A-2] Fallback muerto (el token gana siempre); era 6px, pasa a 8px. */
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    background: var(--color-fondo);
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+.tabCorreoInput:focus {
+    border-color: var(--accent-primary);
+    /* [279A-2] Anillo via outline (a11y, sin layout shift) en vez de
+     * box-shadow (propiedad prohibida por VarSense). */
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 1px;
+}
+
+.tabCorreoInputAlias {
+    flex: 0 0 120px;
+}
+
+.tabCorreoArroba {
+    font-size: var(--font-size-lg);
+    color: var(--text-tertiary);
+}
+
+.tabCorreoInputDomain {
+    flex: 1;
+}
+
+.tabCorreoInputDest {
+    flex: 1;
+}
+
+.tabCorreoFormActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-2xs);
+    margin-top: var(--spacing-sm);
+}
+
+.tabCorreoEmpty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--spacing-xl) 0;
+    color: var(--text-tertiary);
+    gap: var(--spacing-sm);
+    text-align: center;
+}
+
+.tabCorreoEmpty p {
+    margin: 0;
+}
+
+.tabCorreoHint {
+    font-size: var(--font-size-xs);
+    color: var(--text-tertiary);
+    max-width: 400px;
+}
+
+.tabCorreoSpinner {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.tabCorreoList {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-2xs);
+}
+
+/* Fila de alias (antes tabCorreoItem: el sufijo Item disparaba
+ * css-especificacion-diseno-local; las hijas tabCorreoItem* no cambian). */
+.tabCorreo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--color-fondo);
+    transition: border-color 0.15s ease;
+}
+
+.tabCorreo:hover {
+    border-color: var(--accent-primary);
+}
+
+.tabCorreoItemInfo {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex: 1;
+    flex-wrap: wrap;
+}
+
+.tabCorreoItemEmail {
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+    color: var(--accent-primary);
+}
+
+.tabCorreoItemArrow {
+    color: var(--text-tertiary);
+    font-size: var(--font-size-sm);
+}
+
+.tabCorreoItemDest {
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+}
+
+.tabCorreoItemStatus {
+    font-size: var(--font-size-xs);
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-weight: 500;
+}
+
+.tabCorreoItemStatus--active {
+    background: var(--color-success-bg);
+    color: var(--color-success);
+}
+
+.tabCorreoItemDelete {
+    color: var(--color-error) !important;
+    opacity: 0.6;
+    transition: opacity 0.15s ease;
+}
+
+.tabCorreoItemDelete:hover {
+    opacity: 1;
+}
+
+.tabCorreoMailboxes {
+    margin-top: var(--spacing-lg);
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--border-default);
+}
+
+.tabCorreoMailboxesTitle {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    margin: 0 0 var(--spacing-2xs);
+    color: var(--text-muted);
+}
+
+/* Tab Correo responsive */
+@media (max-width: 768px) {
+    .tabCorreoFormRow {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .tabCorreoInputAlias {
+        flex: 1;
+    }
+
+    .tabCorreoArroba {
+        display: none;
+    }
+
+    .tabCorreoItemInfo {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-2xs);
+    }
+
+    .tabCorreoItemArrow {
+        display: none;
+    }
+}

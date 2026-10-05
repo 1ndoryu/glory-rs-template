@@ -1,6 +1,8 @@
 /* [277A-18] Estilos del picker de galería de imágenes OG.
  * [259A-5 5b-5] Overlay/contenedor/titulo/footer a <Modal> + recetas + Button;
- * aqui solo layout especifico (header, grid miniaturas, vacio, input file). */
+ * aqui solo layout especifico (header, grid miniaturas, vacio, input file).
+ * [01AA-4-f3s] Spec visual de .galeriaItem a receta .miniaturaClicable
+ * (ui/Thumbnail.css); aqui solo layout contextual (position, aspect-ratio). */
 
 .galeriaHeader {
     display: flex;
@@ -33,18 +35,6 @@
 .galeriaItem {
     position: relative;
     aspect-ratio: 1;
-    border: 2px solid var(--border-light);
-    border-radius: var(--radius-md);
-    overflow: hidden;
-    cursor: pointer;
-    padding: 0;
-    background: var(--bg-item-hover);
-    transition: border-color 0.15s, transform 0.15s;
-}
-
-.galeriaItem:hover {
-    border-color: var(--brand-black);
-    transform: scale(1.02);
 }
 
 .galeriaItem img {

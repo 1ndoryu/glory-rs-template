@@ -66,6 +66,76 @@ async fn staff_can_access_session(
     session.assigned_staff_id == Some(staff_id)
 }
 
+/* [01AA-4-f3s] Despacho de un mensaje del cliente WS staff (extraído de
+ * handle_staff_ws). Retorna false si la conexión debe cerrarse (Close). */
+async fn dispatch_staff_message(
+    state: &AppState,
+    hub: &crate::services::ChatHub,
+    tx: &tokio::sync::mpsc::Sender<WsServerMessage>,
+    subscriptions: &mut Vec<tokio::task::JoinHandle<()>>,
+    staff_id: Uuid,
+    role: UserRole,
+    ws_msg: WsClientMessage,
+) -> bool {
+    match ws_msg {
+        WsClientMessage::Join { session_id } => {
+            if !staff_can_access_session(state, staff_id, role, session_id).await {
+                tracing::warn!(%staff_id, %session_id, "Join de chat staff rechazado");
+                return true;
+            }
+
+            /* Suscribirse al canal de esta sesión → reenviar al mpsc
+             * [096A-13] subscribe() devuelve mpsc::UnboundedReceiver. */
+            let mut session_rx = hub.subscribe(session_id);
+            let tx_clone = tx.clone();
+            let handle = tokio::spawn(async move {
+                while let Some(server_msg) = session_rx.recv().await {
+                    if tx_clone.send(server_msg).await.is_err() {
+                        break;
+                    }
+                }
+            });
+            subscriptions.push(handle);
+        }
+        WsClientMessage::Message { content } => {
+            tracing::debug!(
+                "Staff message (sin session_id en WsClientMessage::Message): {content}"
+            );
+        }
+        WsClientMessage::Typing {
+            content,
+            session_id,
+        } => {
+            /* [104A-40] Broadcast typing del staff al visitante de la sesión indicada.
+             * session_id es obligatorio para staff (puede estar en varias sesiones).
+             * Gotcha: WsClientMessage::Typing no lo tenía antes → fix aquí. */
+            if let Some(sid) = session_id {
+                if staff_can_access_session(state, staff_id, role, sid).await {
+                    hub.send_typing(sid, "staff", &content);
+                }
+            }
+        }
+        WsClientMessage::ToggleAi {
+            session_id,
+            enabled,
+        } => {
+            if staff_can_access_session(state, staff_id, role, session_id).await {
+                if let Err(error) = hub.toggle_ai(session_id, enabled).await {
+                    tracing::error!(%session_id, %staff_id, %error, "No se pudo cambiar estado IA");
+                }
+            } else {
+                tracing::warn!(%staff_id, %session_id, "Toggle IA de chat rechazado");
+            }
+        }
+        WsClientMessage::Close => {
+            return false;
+        }
+        /* [T-2] Action no aplica a staff — ignorar */
+        WsClientMessage::Action { .. } => {}
+    }
+    true
+}
+
 async fn handle_staff_ws(socket: WebSocket, state: AppState, staff_id: Uuid, role: UserRole) {
     let (mut ws_sender, mut receiver) = socket.split();
 
@@ -144,61 +214,8 @@ async fn handle_staff_ws(socket: WebSocket, state: AppState, staff_id: Uuid, rol
             continue;
         };
 
-        match ws_msg {
-            WsClientMessage::Join { session_id } => {
-                if !staff_can_access_session(&state, staff_id, role, session_id).await {
-                    tracing::warn!(%staff_id, %session_id, "Join de chat staff rechazado");
-                    continue;
-                }
-
-                /* Suscribirse al canal de esta sesión → reenviar al mpsc
-                 * [096A-13] subscribe() devuelve mpsc::UnboundedReceiver. */
-                let mut session_rx = hub.subscribe(session_id);
-                let tx_clone = tx.clone();
-                let handle = tokio::spawn(async move {
-                    while let Some(server_msg) = session_rx.recv().await {
-                        if tx_clone.send(server_msg).await.is_err() {
-                            break;
-                        }
-                    }
-                });
-                subscriptions.push(handle);
-            }
-            WsClientMessage::Message { content } => {
-                tracing::debug!(
-                    "Staff message (sin session_id en WsClientMessage::Message): {content}"
-                );
-            }
-            WsClientMessage::Typing {
-                content,
-                session_id,
-            } => {
-                /* [104A-40] Broadcast typing del staff al visitante de la sesión indicada.
-                 * session_id es obligatorio para staff (puede estar en varias sesiones).
-                 * Gotcha: WsClientMessage::Typing no lo tenía antes → fix aquí. */
-                if let Some(sid) = session_id {
-                    if staff_can_access_session(&state, staff_id, role, sid).await {
-                        hub.send_typing(sid, "staff", &content);
-                    }
-                }
-            }
-            WsClientMessage::ToggleAi {
-                session_id,
-                enabled,
-            } => {
-                if staff_can_access_session(&state, staff_id, role, session_id).await {
-                    if let Err(error) = hub.toggle_ai(session_id, enabled).await {
-                        tracing::error!(%session_id, %staff_id, %error, "No se pudo cambiar estado IA");
-                    }
-                } else {
-                    tracing::warn!(%staff_id, %session_id, "Toggle IA de chat rechazado");
-                }
-            }
-            WsClientMessage::Close => {
-                break;
-            }
-            /* [T-2] Action no aplica a staff — ignorar */
-            WsClientMessage::Action { .. } => {}
+        if !dispatch_staff_message(&state, &hub, &tx, &mut subscriptions, staff_id, role, ws_msg).await {
+            break;
         }
     }
 

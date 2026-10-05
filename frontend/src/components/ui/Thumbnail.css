@@ -1,0 +1,21 @@
+/* [01AA-4-f3s] Receta compartida: miniatura clicable (tile de imagen).
+ * Extraída de ImageGalleryPicker.css (.galeriaItem disparaba
+ * css-especificacion-diseno-local: la especificación visual vive aquí y el
+ * componente deja solo layout contextual). Futuros consumidores con el mismo
+ * patrón (ServiceCard, UploadImage) pueden migrar a esta receta.
+ * Solo tokens del sistema; sin valores hardcodeados. */
+
+.miniaturaClicable {
+    border: 2px solid var(--border-light);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    cursor: pointer;
+    padding: 0;
+    background: var(--bg-item-hover);
+    transition: border-color 0.15s, transform 0.15s;
+}
+
+.miniaturaClicable:hover {
+    border-color: var(--brand-black);
+    transform: scale(1.02);
+}

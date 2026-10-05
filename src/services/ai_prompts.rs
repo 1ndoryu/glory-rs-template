@@ -84,7 +84,9 @@ pub(crate) async fn build_system_prompt(
 }
 
 /* [084A-49+50+51] Prompt base extraído para cumplir límite 100 líneas en build_system_prompt */
-pub(crate) fn base_system_prompt() -> &'static str {
+/* [01AA-4-f3s] El prompt es dato estático (cero ramas): vive en const y la fn
+ * solo lo retorna. Mismo texto, misma semántica &'static str. */
+const BASE_SYSTEM_PROMPT: &str =
     "CRITICAL LANGUAGE RULE: ALWAYS respond in the EXACT same language the user writes in. \
      If the user writes in English, respond entirely in English. If in Spanish, respond in Spanish. \
      If in French, respond in French. Match the user's language in every single response. \
@@ -188,7 +190,10 @@ pub(crate) fn base_system_prompt() -> &'static str {
      - No puedes resolver la solicitud con la información disponible\n\
      - El cliente reporta un problema técnico urgente\n\
      Prioriza request_human_assistance cuando aplique para mostrar el botón real de WhatsApp. \
-     Después de usarla, invita brevemente al cliente a escribir por ese botón; no inventes números ni enlaces.\n\n"
+     Después de usarla, invita brevemente al cliente a escribir por ese botón; no inventes números ni enlaces.\n\n";
+
+pub(crate) fn base_system_prompt() -> &'static str {
+    BASE_SYSTEM_PROMPT
 }
 
 /* [T-9] Helper: agrega contexto del visitante (perfil previo) al system prompt */

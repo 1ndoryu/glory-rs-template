@@ -1,5 +1,7 @@
-/* sentinel-disable-file limite-lineas: router central de Axum.
- * [164A-17] Sigue siendo el orquestador único de rutas/estado global del backend. */
+/* sentinel-disable-file limite-lineas god-object-rs: router central de Axum.
+ * [164A-17] Sigue siendo el orquestador único de rutas/estado global del backend.
+ * [01AA-4-f3s] god-object-rs: partir el router central dispersaría el wiring de
+ * estado/middlewares sin ganar cohesión; el tamaño viene del registro de rutas. */
 #![allow(clippy::needless_for_each)] // Generado por utoipa OpenApi derive
 
 mod admin_billing;

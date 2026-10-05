@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use crate::errors::AppError;
 use crate::models::{
-    AlertEventType, AlertPayload, ChatMessage, CreateNotification, NOTIF_NEW_MESSAGE,
+    AlertEventType, AlertPayload, ChatMessage, ChatSession, CreateNotification, NOTIF_NEW_MESSAGE,
 };
 use crate::repositories::{
     ChatAlertRepository, ChatRepository, NotificationRepository, UserRepository,
@@ -59,6 +59,103 @@ fn site_url() -> String {
 /// Los mensajes de IA, admin, employee se persisten sin outbox.
 ///
 /// Después del commit, el caller debe hacer broadcast WS y `notification_hub`.
+/* [01AA-4-f3s] Contexto de alerta derivado de la sesión (puro): preview,
+ * etiqueta del remitente y URL del panel. Extraído de send_message_with_alerts. */
+fn alert_context(session: &ChatSession, session_id: Uuid, content: &str) -> (String, String, String) {
+    let preview: String = content.chars().take(80).collect();
+    let sender_label = session
+        .visitor_name
+        .as_deref()
+        .unwrap_or("Visitante")
+        .to_string();
+    let base = site_url();
+    let panel_url = if let Some(order_id) = session.order_id {
+        format!("{base}/panel?order={order_id}")
+    } else {
+        format!("{base}/panel?seccion=mensajes&chat={session_id}")
+    };
+    (preview, sender_label, panel_url)
+}
+
+/* [01AA-4-f3s] Outbox email (paso 3): override de staging > primer email admin.
+ * Extraído de send_message_with_alerts. */
+async fn enqueue_email_outbox(
+    tx: &mut sqlx::PgConnection,
+    msg: &ChatMessage,
+    session_id: Uuid,
+    sender_label: &str,
+    preview: &str,
+    panel_url: &str,
+    admin_emails: &[String],
+) -> Result<(), AppError> {
+    /* Resolver email del admin: override de staging > primer email admin de BD */
+    let email_recipient = alert_email_override().or_else(|| admin_emails.first().cloned());
+
+    if let Some(to_email) = email_recipient {
+        let idempotency_key = format!("chat:{}:email:{}", msg.id, to_email);
+        let payload = serde_json::to_value(AlertPayload {
+            message_id: msg.id,
+            session_id,
+            sender_label: sender_label.to_string(),
+            preview: preview.to_string(),
+            panel_url: panel_url.to_string(),
+            occurred_at: msg.created_at,
+        })
+        .map_err(|error| {
+            AppError::Internal(format!("Error serializando alerta email: {error}"))
+        })?;
+
+        ChatAlertRepository::insert_tx(
+            tx,
+            &idempotency_key,
+            AlertEventType::ClientMessage.as_str(),
+            "email",
+            &to_email,
+            Some("chat_message"),
+            Some(msg.id),
+            &payload,
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+/* [01AA-4-f3s] Outbox WhatsApp (paso 4). Extraído de send_message_with_alerts. */
+async fn enqueue_whatsapp_outbox(
+    tx: &mut sqlx::PgConnection,
+    msg: &ChatMessage,
+    session_id: Uuid,
+    sender_label: &str,
+    preview: &str,
+    panel_url: &str,
+) -> Result<(), AppError> {
+    let idempotency_key = format!("chat:{}:whatsapp:admin", msg.id);
+    let payload = serde_json::to_value(AlertPayload {
+        message_id: msg.id,
+        session_id,
+        sender_label: sender_label.to_string(),
+        preview: preview.to_string(),
+        panel_url: panel_url.to_string(),
+        occurred_at: msg.created_at,
+    })
+    .map_err(|error| {
+        AppError::Internal(format!("Error serializando alerta WhatsApp: {error}"))
+    })?;
+
+    ChatAlertRepository::insert_tx(
+        tx,
+        &idempotency_key,
+        AlertEventType::ClientMessage.as_str(),
+        "whatsapp",
+        "admin",
+        Some("chat_message"),
+        Some(msg.id),
+        &payload,
+    )
+    .await?;
+    Ok(())
+}
+
 pub async fn send_message_with_alerts(
     pool: &PgPool,
     session_id: Uuid,
@@ -110,18 +207,7 @@ pub async fn send_message_with_alerts(
     .await
     .map_err(|e| AppError::Internal(format!("Error guardando mensaje: {e}")))?;
 
-    let preview: String = content.chars().take(80).collect();
-    let sender_label = session
-        .visitor_name
-        .as_deref()
-        .unwrap_or("Visitante")
-        .to_string();
-    let base = site_url();
-    let panel_url = if let Some(order_id) = session.order_id {
-        format!("{base}/panel?order={order_id}")
-    } else {
-        format!("{base}/panel?seccion=mensajes&chat={session_id}")
-    };
+    let (preview, sender_label, panel_url) = alert_context(&session, session_id, content);
 
     /* 2. Notificaciones in-app para cada admin (deduplicadas por constraint) */
     for &admin_id in &admin_ids {
@@ -139,63 +225,22 @@ pub async fn send_message_with_alerts(
 
     /* 3. Outbox email */
     if email_delivery_enabled() {
-        /* Resolver email del admin: override de staging > primer email admin de BD */
-        let email_recipient = alert_email_override().or_else(|| admin_emails.first().cloned());
-
-        if let Some(to_email) = email_recipient {
-            let idempotency_key = format!("chat:{}:email:{}", msg.id, to_email);
-            let payload = serde_json::to_value(AlertPayload {
-                message_id: msg.id,
-                session_id,
-                sender_label: sender_label.clone(),
-                preview: preview.clone(),
-                panel_url: panel_url.clone(),
-                occurred_at: msg.created_at,
-            })
-            .map_err(|error| {
-                AppError::Internal(format!("Error serializando alerta email: {error}"))
-            })?;
-
-            ChatAlertRepository::insert_tx(
-                &mut tx,
-                &idempotency_key,
-                AlertEventType::ClientMessage.as_str(),
-                "email",
-                &to_email,
-                Some("chat_message"),
-                Some(msg.id),
-                &payload,
-            )
-            .await?;
-        }
+        enqueue_email_outbox(
+            &mut tx,
+            &msg,
+            session_id,
+            &sender_label,
+            &preview,
+            &panel_url,
+            &admin_emails,
+        )
+        .await?;
     }
 
     /* 4. Outbox WhatsApp */
     if whatsapp_delivery_enabled() && std::env::var("GLORY_ALERT_GATEWAY_URL").is_ok() {
-        let idempotency_key = format!("chat:{}:whatsapp:admin", msg.id);
-        let payload = serde_json::to_value(AlertPayload {
-            message_id: msg.id,
-            session_id,
-            sender_label: sender_label.clone(),
-            preview: preview.clone(),
-            panel_url: panel_url.clone(),
-            occurred_at: msg.created_at,
-        })
-        .map_err(|error| {
-            AppError::Internal(format!("Error serializando alerta WhatsApp: {error}"))
-        })?;
-
-        ChatAlertRepository::insert_tx(
-            &mut tx,
-            &idempotency_key,
-            AlertEventType::ClientMessage.as_str(),
-            "whatsapp",
-            "admin",
-            Some("chat_message"),
-            Some(msg.id),
-            &payload,
-        )
-        .await?;
+        enqueue_whatsapp_outbox(&mut tx, &msg, session_id, &sender_label, &preview, &panel_url)
+            .await?;
     }
 
     /* 5. Commit atómico: se aplica completo o se revierte */

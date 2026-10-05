@@ -12,9 +12,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::errors::AppError;
 use crate::middleware::AuthUser;
-use crate::models::UserRole;
+use crate::models::{BlogPost, Project, ServiceRecord, UserRole};
 use crate::repositories::{
-    BlogRepository, ProjectRepository, SeoSettingsRepository, ServiceRepository,
+    BlogRepository, ProjectRepository, SeoSetting, SeoSettingsRepository, ServiceRepository,
 };
 use crate::AppState;
 
@@ -172,12 +172,45 @@ async fn seo_audit(
         .unwrap_or_default();
     let blog_posts = BlogRepository::list_all(pool).await.unwrap_or_default();
 
-    let mut pages: Vec<SeoPageEntry> = Vec::new();
-
     /* Páginas estáticas: leer de DB (seo_settings) con fallback a hardcoded */
     let db_settings = SeoSettingsRepository::list_all(pool)
         .await
         .unwrap_or_default();
+    let mut pages = audit_static_pages(&db_settings);
+
+    /* Secciones dinámicas */
+    pages.extend(audit_service_pages(&services));
+    pages.extend(audit_project_pages(&projects));
+    let (blog_entries, blog_published_count) = audit_blog_entries(&blog_posts);
+
+    /* GEO checks */
+    let geo_checks = audit_geo_checks(&services, blog_published_count);
+
+    /* Summary */
+    let ok = pages.iter().filter(|p| p.status == "ok").count();
+    let warnings = pages.iter().filter(|p| p.status == "warning").count();
+    let errors = pages.iter().filter(|p| p.status == "error").count();
+
+    Ok(Json(SeoAuditResponse {
+        summary: SeoAuditSummary {
+            total_pages: pages.len(),
+            ok,
+            warnings,
+            errors,
+            blog_published: blog_published_count,
+            services_active: services.len(),
+            projects_published: projects.len(),
+        },
+        pages,
+        blog_posts: blog_entries,
+        geo_checks,
+    }))
+}
+
+/* [01AA-4-f3s] Páginas estáticas: DB (seo_settings) con fallback a hardcoded
+ * si la tabla está vacía (migración no aplicada). Extraído de seo_audit. */
+fn audit_static_pages(db_settings: &[SeoSetting]) -> Vec<SeoPageEntry> {
+    let mut pages: Vec<SeoPageEntry> = Vec::new();
     if db_settings.is_empty() {
         /* Fallback: si la tabla está vacía (migración no aplicada), usar hardcoded */
         for (path, label, title, desc, og_custom, json_type) in static_pages() {
@@ -230,8 +263,12 @@ async fn seo_audit(
             });
         }
     }
+    pages
+}
 
-    /* Servicios dinámicos */
+/* [01AA-4-f3s] Servicios dinámicos. Extraído de seo_audit. */
+fn audit_service_pages(services: &[ServiceRecord]) -> Vec<SeoPageEntry> {
+    let mut pages: Vec<SeoPageEntry> = Vec::new();
     for svc in &services {
         let title = Some(svc.title.clone());
         let desc = svc.description.clone();
@@ -256,8 +293,12 @@ async fn seo_audit(
             issues,
         });
     }
+    pages
+}
 
-    /* Proyectos dinámicos */
+/* [01AA-4-f3s] Proyectos dinámicos. Extraído de seo_audit. */
+fn audit_project_pages(projects: &[Project]) -> Vec<SeoPageEntry> {
+    let mut pages: Vec<SeoPageEntry> = Vec::new();
     for proj in &projects {
         let title = Some(
             proj.meta_title
@@ -290,7 +331,11 @@ async fn seo_audit(
             issues,
         });
     }
+    pages
+}
 
+/* [01AA-4-f3s] Blog entries + conteo de publicados. Extraído de seo_audit. */
+fn audit_blog_entries(blog_posts: &[BlogPost]) -> (Vec<SeoBlogEntry>, usize) {
     /* Blog entries */
     let mut blog_entries: Vec<SeoBlogEntry> = Vec::new();
     let mut blog_published_count = 0usize;
@@ -322,9 +367,12 @@ async fn seo_audit(
             issues: blog_issues,
         });
     }
+    (blog_entries, blog_published_count)
+}
 
-    /* GEO checks */
-    let geo_checks = vec![
+/* [01AA-4-f3s] GEO checks. Extraído de seo_audit. */
+fn audit_geo_checks(services: &[ServiceRecord], blog_published_count: usize) -> Vec<GeoCheck> {
+    vec![
         GeoCheck {
             id: "sitemap-dynamic".into(),
             label: "Sitemap incluye rutas dinámicas".into(),
@@ -389,27 +437,7 @@ async fn seo_audit(
             passed: true,
             detail: Some("Campo fechaModificacion añadido a blogPostSchema".into()),
         },
-    ];
-
-    /* Summary */
-    let ok = pages.iter().filter(|p| p.status == "ok").count();
-    let warnings = pages.iter().filter(|p| p.status == "warning").count();
-    let errors = pages.iter().filter(|p| p.status == "error").count();
-
-    Ok(Json(SeoAuditResponse {
-        summary: SeoAuditSummary {
-            total_pages: pages.len(),
-            ok,
-            warnings,
-            errors,
-            blog_published: blog_published_count,
-            services_active: services.len(),
-            projects_published: projects.len(),
-        },
-        pages,
-        blog_posts: blog_entries,
-        geo_checks,
-    }))
+    ]
 }
 
 /* [277A-13] GET /api/admin/seo/settings — lista todos los SEO settings editables */

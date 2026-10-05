@@ -5,10 +5,12 @@ use uuid::Uuid;
 use validator::Validate;
 
 use super::domain::{build_domain_verification_state, normalize_domain};
+use super::self_service::{persist_self_hosting_subscription, SelfHostingDraft};
 use crate::errors::AppError;
 use crate::middleware::AuthUser;
 use crate::models::{
-    HostingSubscriptionResponse, SelfSubscribeRequest, SelfSubscribeResponse, UserRole,
+    HostingSubscription, HostingSubscriptionResponse, SelfSubscribeRequest, SelfSubscribeResponse,
+    UserRole,
 };
 use crate::repositories::{
     CreateHostingParams, HostingRepository, InfrastructureRepository, UserRepository,
@@ -183,29 +185,23 @@ pub(super) async fn subscribe_self(
     let (domain_verification_status, domain_verification_token, domain_verified_at) =
         build_domain_verification_state(requested_domain.as_deref());
 
-    let sub = HostingRepository::create(
+    let runtime_kind = HostingStripeService::runtime_kind_for_plan(&req.plan);
+    let sub = persist_self_hosting_subscription(
         &state.pool,
-        CreateHostingParams {
-            user_id: Some(auth.user_id),
+        SelfHostingDraft {
+            user_id: auth.user_id,
             client_name: &client_name,
             client_email: &client_email,
             plan: &req.plan,
-            domain: requested_domain.as_deref(),
+            requested_domain: &requested_domain,
             domain_verification_status: &domain_verification_status,
-            domain_verification_token: domain_verification_token.as_deref(),
+            domain_verification_token: &domain_verification_token,
             domain_verified_at,
-            runtime_kind: HostingStripeService::runtime_kind_for_plan(&req.plan).as_str(),
-            deployment_id: None,
-            coolify_site_name: None,
-            monthly_price_cents: price,
-            storage_limit_mb: storage,
+            runtime_kind: runtime_kind.as_str(),
+            price,
+            storage,
+            bandwidth_limit_gb: plan_config.bandwidth_limit_gb,
         },
-    )
-    .await?;
-    InfrastructureRepository::set_subscription_bandwidth_limit(
-        &state.pool,
-        sub.id,
-        plan_config.bandwidth_limit_gb,
     )
     .await?;
 
@@ -248,22 +244,14 @@ pub(super) async fn subscribe_self(
         .as_deref()
         .ok_or_else(|| AppError::ServiceUnavailable("Stripe no configurado".into()))?;
 
-    let success_url =
-        format!("{base_url}/panel?hosting=success&session_id={{CHECKOUT_SESSION_ID}}");
-    let cancel_url = format!("{base_url}/panel?hosting=cancelled");
-
-    let checkout_url = crate::services::HostingStripeService::create_checkout_session(
-        &crate::services::CheckoutParams {
-            http_client: &state.http_client,
-            stripe_key,
-            subscription_id: sub.id,
-            plan: &sub.plan,
-            amount_cents: period_amount_cents + hosting_stripe_fee_cents(period_amount_cents),
-            customer_email: &client_email,
-            success_url: &success_url,
-            cancel_url: &cancel_url,
-            billing_cycle_months,
-        },
+    let checkout_url = create_self_hosting_stripe_checkout(
+        &state.http_client,
+        stripe_key,
+        &sub,
+        &client_email,
+        &base_url,
+        billing_cycle_months,
+        period_amount_cents,
     )
     .await?;
 
@@ -274,6 +262,37 @@ pub(super) async fn subscribe_self(
             checkout_url,
         }),
     ))
+}
+
+/* [01AA-4-f3s] Crea la Stripe Checkout Session del self-service (extraído de
+ * subscribe_self). Arma URLs de éxito/cancelación y delega en HostingStripeService. */
+async fn create_self_hosting_stripe_checkout(
+    http_client: &reqwest::Client,
+    stripe_key: &str,
+    sub: &crate::models::HostingSubscription,
+    client_email: &str,
+    base_url: &str,
+    billing_cycle_months: i32,
+    period_amount_cents: i32,
+) -> Result<String, AppError> {
+    let success_url =
+        format!("{base_url}/panel?hosting=success&session_id={{CHECKOUT_SESSION_ID}}");
+    let cancel_url = format!("{base_url}/panel?hosting=cancelled");
+
+    crate::services::HostingStripeService::create_checkout_session(
+        &crate::services::CheckoutParams {
+            http_client,
+            stripe_key,
+            subscription_id: sub.id,
+            plan: &sub.plan,
+            amount_cents: period_amount_cents + hosting_stripe_fee_cents(period_amount_cents),
+            customer_email: client_email,
+            success_url: &success_url,
+            cancel_url: &cancel_url,
+            billing_cycle_months,
+        },
+    )
+    .await
 }
 
 async fn complete_test_hosting_checkout(

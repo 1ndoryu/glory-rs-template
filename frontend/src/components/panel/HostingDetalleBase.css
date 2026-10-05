@@ -1,0 +1,179 @@
+/* [094A-2] Estilos de la página de detalle individual de hosting.
+ * Layout tipo panel de hosting: header fijo, tabs, contenido scrollable.
+ * [01AA-4-f3s] Base del split de HostingDetalle.css (1208L → limite-lineas):
+ * raíz, header, loading, tabs, contenido + su bloque responsive (movido desde
+ * el cuerpo del archivo para no separarlo de sus selectores). Secciones, DNS,
+ * backups y correo viven en sus propios archivos (ver HostingDetalle.css). */
+
+.hostingDetalle {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+}
+
+/* ── Header ──────────────────────────────── */
+
+.hostingDetalleHeader {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+/* [094A-11] Estilo consistente con ordenDetalleVolver */
+.hostingDetalleBack {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    align-self: flex-start;
+    font-family: var(--font-primary);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: var(--spacing-xs) 0;
+    transition: color var(--transicion-rapida);
+}
+
+.hostingDetalleBack:hover {
+    color: var(--brand-black);
+}
+
+.hostingDetalleHeaderInfo {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.hostingDetalleTitulo {
+    margin: 0;
+    font-family: var(--font-primary);
+    font-size: var(--text-lg);
+}
+
+.hostingDetalleHeaderMeta {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.hostingDetalleHeaderPlan {
+    font-size: var(--text-sm);
+    color: var(--text-tertiary);
+    font-weight: 500;
+}
+
+/* [094A-7] Botón soporte en header de hosting detalle */
+.hostingDetalleSoporte {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2xs);
+    margin-left: auto;
+}
+
+/* ── Loading ─────────────────────────────── */
+
+.hostingDetalleLoading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-3xl);
+    color: var(--overlay-medium);
+}
+
+/* ── Tabs internos ───────────────────────── */
+
+.hostingDetalleTabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border-default);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.hostingDetalleTab {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-family: var(--font-primary);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--text-muted);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-bottom: var(--radius-xs) solid transparent;
+    border-radius: 0;
+    white-space: nowrap;
+    transition: color var(--transicion-rapida), border-color var(--transicion-rapida);
+}
+
+.hostingDetalleTab:hover {
+    color: var(--brand-black);
+}
+
+.hostingDetalleTab--activa {
+    color: var(--brand-black);
+    border-bottom-color: var(--brand-black);
+}
+
+.hostingDetalleTabLabel {
+    display: inline;
+}
+
+/* ── Contenido ───────────────────────────── */
+
+.hostingDetalleContent {
+    min-height: 200px;
+}
+
+/* ── Responsive ──────────────────────────── */
+
+@media (max-width: 767px) {
+    .hostingDetalle {
+        padding: var(--spacing-sm);
+    }
+
+    .hostingDetalleTabs {
+        gap: 0;
+    }
+
+    .hostingDetalleTab {
+        padding: var(--spacing-xs) var(--spacing-sm);
+        font-size: var(--text-xs);
+    }
+
+    .hostingDetalleTabLabel {
+        display: none;
+    }
+
+    .hostingDetalleInfoRow {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: calc(var(--spacing-2xs) / 2);
+    }
+
+    .hostingDetalleInfoValue {
+        text-align: left;
+    }
+
+    .hostingDetalleHeaderMeta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-xs);
+    }
+
+    .hostingDetallePlanInfo {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-xs);
+    }
+}
+
+@media (min-width: 768px) {
+    .hostingDetalleInfoGrid {
+        grid-template-columns: 1fr 1fr;
+    }
+}

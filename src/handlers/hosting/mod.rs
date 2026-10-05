@@ -9,6 +9,7 @@ mod infrastructure;
 mod plans;
 mod provisioning;
 mod routes;
+mod self_service;
 mod stats;
 mod subscriptions;
 mod vps;

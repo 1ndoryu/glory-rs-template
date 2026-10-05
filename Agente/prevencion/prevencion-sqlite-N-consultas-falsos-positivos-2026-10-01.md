@@ -1,23 +1,26 @@
 # Prevención: falsos positivos de `sqlite-carga-N-consultas` Sentinel
 
 **Fecha:** 2026-10-01 · **Origen:** auditoría 01AA-3 (NAKOMI, 11 sitios en 8 archivos: 2 reales con `join!`, 9 FP).
+**Re-verificación:** 2026-10-05 (01AA-4-f3s): los 9 sitios actuales son las mismas 5 familias
+(líneas desplazadas por los splits F3a–F3r: `main.rs` → `bootstrap/fixtures.rs`,
+`middleware/prerender.rs` → `middleware/prerender/resolve.rs`). Ninguno paralelizable.
 
 ## Familias de FP verificadas contra código real
 
 1. **Ramas `match` mutuamente excluyentes** (solo una ejecuta, no hay nada que paralelizar):
-   `query_orders_for_scope` (`ai_tools_orders.rs:63`), `query_payments_for_scope`
-   (`ai_tools_orders.rs:200`), `query_reports_for_scope` (`ai_tools_reports.rs:61`).
+   `query_orders_for_scope` (`ai_tools_orders.rs:85`), `query_payments_for_scope`
+   (`ai_tools_orders.rs:222`), `query_reports_for_scope` (`ai_tools_reports.rs:83`).
 2. **Ramas `if`/`else-if` excluyentes** (un solo slug matchea):
-   `dynamic_seo_for_path` (`middleware/prerender.rs:331`, servicios/proyectos/blog).
+   `dynamic_seo_for_path` (`middleware/prerender/resolve.rs:216`, servicios/proyectos/blog).
 3. **Transacción explícita** (misma `tx`, orden secuencial por diseño):
-   `mark_connected` (`repositories/continuation_token.rs:58`),
-   `schedule_after_disconnect` (`repositories/continuation_token.rs:109`, el INSERT usa la fila del SELECT).
+   `mark_connected` (`repositories/continuation_token.rs:78`),
+   `schedule_after_disconnect` (`repositories/continuation_token.rs:140`, el INSERT usa la fila del SELECT).
 4. **Cadena de datos** (cada await consume el resultado del anterior):
-   `check_and_update_timing` (`services/chat_timing_escalation.rs:110`,
-   summary → perfil → update), `create_message` (`handlers/chat/rest_messages.rs:230`,
+   background summary (`services/chat_timing_escalation.rs:143`,
+   summary → perfil → update), `send_message` (`handlers/chat/rest_messages.rs:292`,
    msg → sesión → IA).
 5. **Orden impuesto por FK** (hijos antes que padres, no paralelizable):
-   limpieza legacy (`main.rs:565`, cascade chat → orders → hosting).
+   limpieza legacy (`bootstrap/fixtures.rs:128`, cascade chat → orders → hosting).
 
 ## Casos reales (los que sí se paralelizaron con `join!`)
 

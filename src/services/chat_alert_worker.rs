@@ -197,14 +197,22 @@ async fn process_email(
 
 /* [267A-3] El token en claro nace dentro del worker y nunca se persiste ni se
  * registra. La presencia/época se revalida justo antes del SMTP. */
-async fn process_continuation_email(
+/* [01AA-4-f3s] Preámbulo de continuación (extraído de process_continuation_email):
+ * valida config SMTP, parsea payload, revalida ciclo de desconexión y genera
+ * el token de un solo uso. Retorna None si la entrada ya quedó marcada
+ * (dead/cancelled/retry) y no hay que enviar. */
+async fn prepare_continuation_send(
     pool: &PgPool,
     entry: &ChatAlertOutbox,
     email_config: Option<&crate::services::EmailConfig>,
-) {
+) -> Option<(
+    crate::services::EmailConfig,
+    crate::models::ContinuationAlertPayload,
+    String,
+)> {
     let Some(config) = email_config else {
         let _ = ChatAlertRepository::mark_dead(pool, entry.id, "SMTP no configurado").await;
-        return;
+        return None;
     };
     let payload: crate::models::ContinuationAlertPayload =
         match serde_json::from_value(entry.payload.clone()) {
@@ -216,7 +224,7 @@ async fn process_continuation_email(
                     &format!("Payload de continuación inválido: {error}"),
                 )
                 .await;
-                return;
+                return None;
             }
         };
     match crate::repositories::continuation_token::is_disconnect_cycle_current(
@@ -234,7 +242,7 @@ async fn process_continuation_email(
                 "visitor_reconnected_or_consent_revoked",
             )
             .await;
-            return;
+            return None;
         }
         Err(error) => {
             let _ = ChatAlertRepository::mark_retry(
@@ -244,7 +252,7 @@ async fn process_continuation_email(
                 entry.attempts,
             )
             .await;
-            return;
+            return None;
         }
     }
 
@@ -266,8 +274,20 @@ async fn process_continuation_email(
                 entry.attempts,
             )
             .await;
-            return;
+            return None;
         }
+    };
+    Some((config.clone(), payload, token))
+}
+
+async fn process_continuation_email(
+    pool: &PgPool,
+    entry: &ChatAlertOutbox,
+    email_config: Option<&crate::services::EmailConfig>,
+) {
+    let Some((config, payload, token)) = prepare_continuation_send(pool, entry, email_config).await
+    else {
+        return;
     };
     let site_url = std::env::var("SITE_URL")
         .unwrap_or_else(|_| "https://nakomi.studio".to_string())

@@ -56,15 +56,11 @@ fn humanize_tier_name(tier_name: &str) -> &str {
 }
 
 impl VpsStripeService {
-    pub async fn create_checkout_session(
-        params: &VpsCheckoutParams<'_>,
-    ) -> Result<String, AppError> {
-        if params.amount_cents <= 0 {
-            return Err(AppError::Validation(
-                "El checkout de VPS requiere un precio mensual mayor a 0".into(),
-            ));
-        }
-
+    /* [01AA-4-f3s] Arma el form x-www-form-urlencoded para la Checkout Session
+     * de VPS (extraído de create_checkout_session): línea base + setup fee
+     * opcional + processing fee opcional. Las claves dinámicas del fee usan
+     * Box::leak como ya hacía el código original. */
+    fn build_vps_checkout_form(params: &VpsCheckoutParams<'_>) -> Vec<(&'static str, String)> {
         let tier_name = humanize_tier_name(params.tier_name);
         let mut form = vec![
             ("mode", "subscription".to_string()),
@@ -147,6 +143,20 @@ impl VpsStripeService {
                 (k("[quantity]"), "1".to_string()),
             ]);
         }
+
+        form
+    }
+
+    pub async fn create_checkout_session(
+        params: &VpsCheckoutParams<'_>,
+    ) -> Result<String, AppError> {
+        if params.amount_cents <= 0 {
+            return Err(AppError::Validation(
+                "El checkout de VPS requiere un precio mensual mayor a 0".into(),
+            ));
+        }
+
+        let form = Self::build_vps_checkout_form(params);
 
         let response = params
             .http_client

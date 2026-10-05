@@ -17,9 +17,9 @@ pub struct TemplateMeta {
     pub recipients: &'static str,
 }
 
-/// Lista completa de plantillas disponibles
-pub fn list_templates() -> Vec<TemplateMeta> {
-    vec![
+/* [01AA-4-f3s] Catálogo estático de plantillas (dato, cero ramas): el vec!
+ * monolítico (150 efectivas) se hoista a static y la fn solo lo clona. */
+static TEMPLATES: &[TemplateMeta] = &[
         TemplateMeta {
             id: "order_confirmation",
             label: "Confirmación al cliente",
@@ -167,7 +167,11 @@ pub fn list_templates() -> Vec<TemplateMeta> {
             category: "profile",
             recipients: "cliente",
         },
-    ]
+];
+
+/// Lista completa de plantillas disponibles
+pub fn list_templates() -> Vec<TemplateMeta> {
+    TEMPLATES.to_vec()
 }
 
 pub fn render_preview(_config: &EmailConfig, template: &str) -> Result<String, String> {

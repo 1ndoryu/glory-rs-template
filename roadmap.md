@@ -268,7 +268,16 @@ librería uplot/u-legend/tiptap, gap sin allowlist). VarSense 2.2.9 (pin
    + resto en curso F3j cpu_burst 39W→38W + F3k hosting-repo 38W→36W
    + F3l contabo_domains 36W→36W higiene + F3m prerender 36W→36W higiene
    + F3n payments 36W→34W    + F3o deployments 34W estable    + F3p hosting_domains 34W estable + F3q ai_tools_misc 34W→33W + F3r main.rs 33W→30W (bootstrap lib, main en 0 findings)); no se parten coolify/
-   handlers-mod/vps por waiver válido; pendiente resto F3s (largas/DIP/N-consultas) +
-   Fase 4 frontend con verificación visual).
+   handlers-mod/vps por waiver válido; F3s Rust CERRADO 2026-10-05
+   (`quality:check 01AA-4-f3s` PASS 0E/16W/53H: funcion-larga x5 extraídas
+   — ws_staff/ws_visitor/checkout/payment/vps_stripe — + waivers god-object
+   retirados al partir; solo quedan 3 god-object con waiver F3g/regla14);
+   F3s frontend CERRADO 2026-10-05 (`hosting.ts` 1049→7 módulos+barrel,
+   `HostingDetalle.css` 1208→5 módulos+barrel, receta `Thumbnail.css`;
+   type-check + build OK, equivalencia 111/111 exports y 155/155 selectores);
+   pendiente Fase 4 resto frontend con verificación visual).
 - Fuera de alcance (observado, sin autorización): `large-interface-isp` x37,
-  `parametros-excesivos-rs` x17, `css-especificacion-diseno-local` x1.
+  `parametros-excesivos-rs` x17, `css-especificacion-diseno-local` x1
+  (baseline 01AA; gate f3s actual: 16W = 3 god-object con waiver F3g/regla14 +
+  4 handler-accede-bd con waiver bootstrap + 9 N-consultas FP documentados;
+  0 funcion-larga, 0 limite-lineas).

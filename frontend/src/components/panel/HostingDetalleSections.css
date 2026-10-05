@@ -1,0 +1,295 @@
+/* [01AA-4-f3s] Secciones del detalle de hosting (split de HostingDetalle.css):
+ * cards de sección, info grid, copy button, code block, plan card y vacíos. */
+
+/* [094A-11] Cada sección del detalle es una card con fondo blanco y borde */
+.hostingDetalleSection {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+    background: var(--brand-white);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-default);
+}
+
+.hostingDetalleSectionTitle {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    margin: 0;
+    font-family: var(--font-primary);
+    font-size: var(--text-base);
+    
+    color: var(--brand-black);
+    padding-bottom: var(--spacing-xs);
+    border-bottom: 1px solid var(--bg-item-hover);
+}
+
+/* [259A-6] Variante sin separador para tabs que ya separan por layout. */
+.hostingDetalleSectionTitle--sinBorde {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.hostingDetalleSubTitle {
+    margin: var(--spacing-sm) 0 0;
+    font-family: var(--font-primary);
+    font-size: var(--text-sm);
+    
+    color: var(--brand-black);
+}
+
+.hostingDetalleSectionDesc {
+    font-size: var(--text-sm);
+    color: var(--text-tertiary);
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* ── Info Grid (label: valor) ────────────── */
+
+.hostingDetalleInfoGrid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--spacing-xs);
+}
+
+.hostingDetalleInfoRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--bg-card-subtle);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+    min-height: 36px;
+}
+
+.hostingDetalleInfoLabel {
+    color: var(--text-muted);
+    font-weight: 500;
+    flex-shrink: 0;
+}
+
+.hostingDetalleInfoValue {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    color: var(--brand-black);
+    font-weight: 500;
+    text-align: right;
+    /* [195A-1] Evita que dominios largos rompan el layout de la fila. */
+    min-width: 0;
+    overflow-wrap: break-word;
+    word-break: break-all;
+}
+
+.hostingDetalleLink {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2xs);
+    color: var(--brand-primary);
+    text-decoration: none;
+}
+
+.hostingDetalleLink:hover {
+    text-decoration: underline;
+}
+
+/* ── Copy Button ─────────────────────────── */
+
+.hostingDetalleCopyBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-2xs);
+    padding: var(--radius-xs) var(--spacing-xs);
+    font-size: var(--text-xs);
+    min-height: auto;
+}
+
+.hostingDetalleCopied {
+    color: var(--color-success);
+    font-size: var(--text-xs);
+    
+}
+
+/* ── Code Block (SSH command) ────────────── */
+
+.hostingDetalleCodeBlock {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--bg-dark);
+    border-radius: var(--radius-md);
+    overflow-x: auto;
+}
+
+.hostingDetalleCodeBlock code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: var(--text-sm);
+    color: var(--brand-white);
+}
+
+.hostingDetalleCodeBlock .hostingDetalleCopyBtn {
+    border-color: var(--white-20);
+    color: var(--white-60);
+}
+
+.hostingDetalleCodeBlock .hostingDetalleCopyBtn:hover {
+    background: var(--white-10);
+    color: var(--brand-white);
+}
+
+/* ── Plan Card (facturación) ─────────────── */
+
+.hostingDetallePlanCard {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md);
+    background: var(--bg-card-subtle);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+}
+
+.hostingDetallePlanInfo {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.hostingDetallePlanNombre {
+    font-size: var(--text-base);
+    font-weight: 500;
+    color: var(--brand-black);
+}
+
+.hostingDetallePlanPrecio {
+    font-size: var(--text-base);
+    font-weight: 500;
+    color: var(--brand-primary);
+}
+
+.hostingDetallePlanFeatures {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs) var(--spacing-md);
+    font-size: var(--text-sm);
+    color: var(--text-tertiary);
+}
+
+/* [195A-1] Plan meta: fila informativa adicional dentro de la plan card. */
+.hostingDetallePlanMeta {
+    border-top: 1px solid var(--border-light);
+    padding-top: var(--spacing-xs);
+}
+
+/* [094A-6] Botón cambiar plan dentro de la plan card */
+.hostingDetallePlanChangeBtn {
+    align-self: flex-start;
+    margin-top: var(--spacing-xs);
+}
+
+/* [094A-6] Grid de opciones de plan (upgrade/downgrade) */
+.hostingDetallePlanOptions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-md);
+}
+
+.hostingDetallePlanGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--spacing-md);
+}
+
+/* [084A-45] Rediseño minimalista: más gap para separar botón */
+/* sentinel-disable-next-line css-especificacion-diseno-local */
+.hostingDetallePlanOption {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: var(--bg-card-subtle);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    transition: border-color var(--transicion-rapida);
+}
+
+/* [084A-45] Beneficios como lista con bullet points */
+.hostingDetallePlanFeaturesList {
+    margin: 0;
+    padding-left: var(--spacing-md);
+    list-style: disc;
+    font-size: var(--text-sm);
+    color: var(--text-tertiary);
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing-2xs) / 2);
+}
+
+.hostingDetallePlanOption:hover {
+    border-color: var(--brand-primary);
+}
+
+.hostingDetallePlanOptionHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* [104A-21] Badge sin color — solo neutro. */
+.hostingDetallePlanBadge {
+    font-size: var(--text-xs);
+    padding: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-tertiary);
+}
+
+/* upgrade/downgrade ya no usan colores (regla: ningún badge con color) */
+
+/* ── Estados vacíos (acceso, recursos) ───── */
+
+.hostingDetalleAccesoInactivo,
+.hostingDetalleRecursosInactivo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-3xl);
+    color: var(--overlay-medium);
+    text-align: center;
+}
+
+.hostingDetalleRecursos {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.hostingDetalleRecursosNota {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    font-style: italic;
+    margin: 0;
+}
+
+.hostingDetalleNoDomain {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    padding: var(--spacing-md);
+    background: var(--bg-card-subtle);
+    border-radius: var(--radius-md);
+    text-align: center;
+    margin: 0;
+}
+
+.hostingDetalleSslNota {
+    font-size: var(--text-xs);
+    color: var(--color-success);
+    margin: 0;
+}
