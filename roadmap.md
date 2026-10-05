@@ -522,7 +522,10 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   decisión usuaria 2026-10-05; 3er reto: P0 seguridad/PII/rollback/
   concurrentes + 8 contradicciones; 4º reto: E0 checklist ejecutable,
   frase canónica de ficha, schema publicado, rollback por repo, números
-  con origen, orden E1→E2→M3→M2→E3→M4→M1).
+  con origen, orden E1→E2→M3→M2→E3→M4→M1; 5º reto: avisoId nullable,
+  freeze cifrado, token endpoint con spec, HMAC audit, restore con dueño,
+  strip allowlist, CLI 8h, scopes separados, 429 exime a ella, store en
+  memoria, doctrina referenciada a 03AA-5).
 - E0 en curso (solo lectura, timebox 3 días). E1 bloqueado hasta E0 real;
   E2+ espera tus puntos restantes.
 
