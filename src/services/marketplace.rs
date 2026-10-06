@@ -180,6 +180,9 @@ pub fn matriz_negativa(texto: &str) -> Option<&'static str> {
 }
 
 /// Claims del JWT mp (`iss mn-backend`, `aud mp`, `scope mp:borrador`).
+/// `mid` (E3, solo CLI): hash hex64 de la máquina atada; `None` = token de
+/// panel sin binding. `default` para que los tokens de panel en vuelo (sin
+/// `mid`) sigan decodificando.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MpClaims {
     pub iss: String,
@@ -188,6 +191,35 @@ pub struct MpClaims {
     pub scope: String,
     pub exp: usize,
     pub jti: String,
+    #[serde(default)]
+    pub mid: Option<String>,
+}
+
+/// Minutos de vida por alcance: panel 15min, CLI 8h (E3, con binding).
+#[must_use]
+pub const fn minutos_para_cli(es_cli: bool) -> i64 {
+    if es_cli {
+        480
+    } else {
+        15
+    }
+}
+
+/// Hash de máquina válido: 64 hex (igual que `firma`; nunca el id en claro).
+#[must_use]
+pub fn maquina_valida(mid: &str) -> bool {
+    mid.len() == 64 && mid.chars().all(|c| c.is_ascii_hexdigit())
+}
+
+/// Binding E3: con `mid` en el token, la petición debe traer la misma máquina
+/// en `X-MP-Maquina`; sin `mid` (panel) no se exige nada.
+#[must_use]
+pub fn maquina_autorizada(claims_mid: Option<&str>, cabecera: Option<&str>) -> bool {
+    match (claims_mid, cabecera) {
+        (None, _) => true,
+        (Some(_), None) => false,
+        (Some(a), Some(b)) => a == b,
+    }
 }
 
 /// `MP_SIN_LIMITE_SUB` (coma-separada): la dueña queda exenta del 429 del
@@ -437,6 +469,55 @@ mod pruebas {
 
     /* Contra BD viva: 2 hit + 1 copiar hoy se agregan en la fila del día;
      * sin `DATABASE_URL` se omite. Solo lee conteos, sin PII. */
+
+    #[test]
+    fn cli_vive_8h_y_panel_15min() {
+        assert_eq!(minutos_para_cli(true), 480);
+        assert_eq!(minutos_para_cli(false), 15);
+    }
+
+    #[test]
+    fn maquina_solo_hex64() {
+        assert!(maquina_valida(&"a".repeat(64)));
+        assert!(maquina_valida(&"A1".repeat(32)));
+        assert!(!maquina_valida("corto"));
+        assert!(!maquina_valida(&"z".repeat(64)));
+        assert!(!maquina_valida(""));
+    }
+
+    #[test]
+    fn binding_solo_cuando_hay_mid() {
+        assert!(maquina_autorizada(None, None));
+        assert!(maquina_autorizada(None, Some("x")));
+        assert!(!maquina_autorizada(Some("a"), None));
+        assert!(!maquina_autorizada(Some("a"), Some("b")));
+        assert!(maquina_autorizada(Some("a"), Some("a")));
+    }
+
+    /* Expiración (DoD E3): un token con `exp` pasado no decodifica — la misma
+     * `decode`+`Validation` que usa `MpAuth`, así que el rechazo queda
+     * probado a nivel JWT (el chequeo DB `expira_en > now()` es redundante). */
+    #[test]
+    fn decode_rechaza_expirado() {
+        use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+        let pasado = usize::try_from(chrono::Utc::now().timestamp() - 60).unwrap_or(0);
+        let claims = MpClaims {
+            iss: "mn-backend".to_string(),
+            sub: "s".to_string(),
+            aud: "mp".to_string(),
+            scope: "mp:borrador".to_string(),
+            exp: pasado,
+            jti: "j".to_string(),
+            mid: Some("a".repeat(64)),
+        };
+        let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(b"x")).unwrap();
+        let r = decode::<MpClaims>(
+            &token,
+            &DecodingKey::from_secret(b"x"),
+            &Validation::new(jsonwebtoken::Algorithm::HS256),
+        );
+        assert!(r.is_err());
+    }
     #[tokio::test]
     async fn uso_agrega_por_dia_y_evento() {
         let Some(pool) = pool_si_hay() else { return };

@@ -541,9 +541,15 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   82/82 tests (6 nuevos), medida mock p50=0.01ms p95=0.03ms, prueba viva
   (login 200, token 201, borrador 200 fuente=ia, audit 201 HMAC sin PII, 429 OK;
   la viva cazó `RETURNING n` INT4→i64, fixeado con `::BIGINT`).
-  Activo: E3 (CLI token 8h+binding máquina). Siguiente: M4 (caché
-  `mp_respuestas_cache` + Regenerar + purga), luego M1 (BLOQUEADO: exige firma
-  otro frente + ventana congelación, sin firma M1 prohibido).
+   Activo: M4 (caché `mp_respuestas_cache` + Regenerar + purga). E3 hecho
+2026-10-06: `MpClaims.mid` opcional hex64 + `POST /token/cli` (exp 8h,
+`maquina_hash` 64hex, cubo propio 5/min) + binding `X-MP-Maquina` en `MpAuth`
+(401 máquina ajena/sin header, 422 hash malo; panel sin `mid` intacto, sin
+header 200) + `scripts/mp-cli.mjs` Node sin Electron (fuga 0: solo borrador;
+audit `emision`) + test expiración; gate fmt+clippy limpios, 87/87 tests;
+viva (CLI 480min fuente=reserva sin inventar precio; panel 15min 200).
+Siguiente: M1 (BLOQUEADO: exige firma otro frente + ventana congelación,
+sin firma M1 prohibido).
   Falta de tu parte para cerrar E0: remoto del repo + fecha de viva 30min.
 - M2 hecho 2026-10-06: panel en `../plugins-opencode/src/panel/`
   (`selectores.json` pin v1 por rol/nombre + `registerMode()` asistente>radar +

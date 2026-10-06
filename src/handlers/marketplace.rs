@@ -76,6 +76,16 @@ impl FromRequestParts<AppState> for MpAuth {
         if vigente != Some(true) {
             return Err(AppError::Unauthorized);
         }
+        /* E3: token CLI atado a máquina: exige `X-MP-Maquina` igual al `mid`
+         * del token. Sin `mid` (panel) no se pide nada. Fallo = 401 seco,
+         * sin decir si fue máquina o token (sin oráculo). */
+        let maquina = parts
+            .headers
+            .get("x-mp-maquina")
+            .and_then(|v| v.to_str().ok());
+        if !crate::services::marketplace::maquina_autorizada(claims.mid.as_deref(), maquina) {
+            return Err(AppError::Unauthorized);
+        }
         Ok(Self { sub: claims.sub })
     }
 }
@@ -99,7 +109,7 @@ pub struct TokenResponse {
     pub expira_en_minutos: i64,
 }
 
-/// Emite el JWT mp (`exp` 15 min). Tope 5/min por admin para que un bucle no
+/// Emite el JWT mp de panel (`exp` 15 min, sin binding). Tope 5/min por admin para que un bucle no
 /// fabrique tokens sin parar.
 #[utoipa::path(
     post,
@@ -131,6 +141,7 @@ pub async fn emitir_token(
             scope: SCOPE.to_string(),
             exp,
             jti,
+            mid: None,
         },
         &EncodingKey::from_secret(state.jwt_secret.as_bytes()),
     )
@@ -140,6 +151,72 @@ pub async fn emitir_token(
         Json(TokenResponse {
             token,
             expira_en_minutos: TOKEN_MINUTOS,
+        }),
+    )
+        .into_response())
+}
+
+/// [03AA-3 E3] Token CLI: `exp` 8h atado a máquina (`mid` = hash hex64 que el
+/// CLI deriva localmente; el id real jamás viaja). `borrador`/`audit` con
+/// este token exigen `X-MP-Maquina` igual o devuelven 401. Cubo propio
+/// 5/min para que un bucle CLI no fabrique tokens sin parar.
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+pub struct CliTokenRequest {
+    pub maquina_hash: String,
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/admin/marketplace/token/cli",
+    request_body = CliTokenRequest,
+    responses(
+        (status = 201, description = "Token CLI emitido (8h, atado a máquina)", body = TokenResponse),
+        (status = 422, description = "maquina_hash inválido", body = crate::errors::ErrorResponse),
+        (status = 429, description = "Tope de emisión", body = crate::errors::ErrorResponse)
+    )
+)]
+pub async fn emitir_token_cli(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    r: Result<Json<CliTokenRequest>, axum::extract::rejection::JsonRejection>,
+) -> Result<Response, AppError> {
+    use crate::services::marketplace::{maquina_valida, minutos_para_cli};
+    let r = r.map_err(|e| AppError::Validation(format!("JSON inválido: {e}")))?;
+    let mid = r.maquina_hash.trim().to_string();
+    if !maquina_valida(&mid) {
+        return Err(AppError::Validation(
+            "maquina_hash debe ser 64 hex (hash local, nunca el id en claro)".to_string(),
+        ));
+    }
+    let clave = format!("tokcli:{}", auth.user_id);
+    if !consumir_minuto(&state.pool, &clave, TOPE_TOKEN_MINUTO).await? {
+        return Ok(limite(60));
+    }
+    let minutos = minutos_para_cli(true);
+    let expira = Utc::now() + chrono::Duration::minutes(minutos);
+    let sub = auth.user_id.to_string();
+    let jti = registrar_token(&state.pool, &sub, &expira).await?;
+    let exp = usize::try_from(expira.timestamp())
+        .map_err(|_| AppError::Internal("Timestamp fuera de rango".to_string()))?;
+    let token = encode(
+        &Header::default(),
+        &MpClaims {
+            iss: ISS.to_string(),
+            sub,
+            aud: AUD.to_string(),
+            scope: SCOPE.to_string(),
+            exp,
+            jti,
+            mid: Some(mid),
+        },
+        &EncodingKey::from_secret(state.jwt_secret.as_bytes()),
+    )
+    .map_err(|e| AppError::Internal(format!("Error generando token CLI: {e}")))?;
+    Ok((
+        StatusCode::CREATED,
+        Json(TokenResponse {
+            token,
+            expira_en_minutos: minutos,
         }),
     )
         .into_response())
@@ -314,6 +391,7 @@ pub async fn audit(
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/marketplace/token", post(emitir_token))
+        .route("/marketplace/token/cli", post(emitir_token_cli))
         .route("/marketplace/borrador", post(borrador))
         .route("/marketplace/audit", post(audit))
         .route("/marketplace/uso", get(uso))
