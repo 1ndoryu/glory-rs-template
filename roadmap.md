@@ -260,9 +260,9 @@ librería uplot/u-legend/tiptap, gap sin allowlist). VarSense 2.2.9 (pin
   documentada: `admin_client_bootstrap.rs` x4 BLOQUEADO (dirty ajeno) + 9 FP de
   `sqlite-carga-N-consultas` aceptados como warnings (ver prevención
   2026-10-01 en completadas).
-- **01AA-4** — L4: `funcion-larga-rs` x17 + `god-object-rs` x18 +
-  `limite-lineas` x9 (+1 nivel-2). Plan multi-fase en
-   `Agente/planes/plan-01AA-4-2026-10-01.md` (Fases 1-2 cerradas 59W→52W;
+- **01AA-4** — ✅ CERRADA 2026-10-06 — L4: `funcion-larga-rs` x17 + `god-object-rs` x18 +
+  `limite-lineas` x9 (+1 nivel-2). Plan (cerrado) en
+   `Agente/planes/completados/plan-01AA-4-2026-10-01.md` (Fases 1-2 cerradas 59W→52W;
    Fase 3 en curso (9/9 splits grandes 52W→39W: infrastructure_metrics, payment,
    order-svc, seed, chat-repo, order-repo, ai_chat, email_templates, hosting_stripe;
    + resto en curso F3j cpu_burst 39W→38W + F3k hosting-repo 38W→36W
@@ -274,8 +274,10 @@ librería uplot/u-legend/tiptap, gap sin allowlist). VarSense 2.2.9 (pin
    retirados al partir; solo quedan 3 god-object con waiver F3g/regla14);
    F3s frontend CERRADO 2026-10-05 (`hosting.ts` 1049→7 módulos+barrel,
    `HostingDetalle.css` 1208→5 módulos+barrel, receta `Thumbnail.css`;
-   type-check + build OK, equivalencia 111/111 exports y 155/155 selectores);
-   pendiente Fase 4 resto frontend con verificación visual).
+    type-check + build OK, equivalencia 111/111 exports y 155/155 selectores);
+    Fase 4 CERRADA 2026-10-06 (0 findings frontend en warning/error; resto =
+    37 `large-interface-isp` info, fuera de alcance; sin render en navegador,
+    ver plan).
 - Fuera de alcance (observado, sin autorización): `large-interface-isp` x37,
   `parametros-excesivos-rs` x17, `css-especificacion-diseno-local` x1
   (baseline 01AA; gate f3s actual: 16W = 3 god-object con waiver F3g/regla14 +
