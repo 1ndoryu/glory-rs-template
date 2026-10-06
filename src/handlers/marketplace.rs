@@ -1,6 +1,8 @@
 /* [03AA-3 M3] HTTP del asistente Marketplace (token, borrador, audit).
  * [03AA-3 M2] suma `uso`: dashboard agregado (día+evento+conteo, sin PII)
- * con el JWT admin. La lógica pura vive en `services::marketplace`; aquí
+ * con el JWT admin. [03AA-3 M4] suma caché (`regenerar`, `corregir`):
+ * hit/miss por (firma, precio, catálogo), sin servir precio viejo.
+ * La lógica pura vive en `services::marketplace`; aquí
  * solo boundary HTTP + 429 con `Retry-After`. */
 
 use axum::async_trait;
@@ -21,9 +23,10 @@ use crate::errors::AppError;
 use crate::middleware::AuthUser;
 use crate::repositories::InmuebleRepository;
 use crate::services::marketplace::{
-    consumir_minuto, matriz_negativa, registrar_token, resumen_uso, strip_ficha_para_prompt,
-    sub_exento, validar_borrador, BorradorRequest, MpClaims, FALLBACK_BORRADOR,
-    MATRIZ_NEGATIVA_VERSION, STRIP_VERSION,
+    borrar_cache, buscar_cache, consumir_minuto, corregir_cache, guardar_cache, hash_ficha,
+    matriz_negativa, precio_hash_seguro, reemplazar_cache, registrar_token, resumen_uso,
+    strip_ficha_para_prompt, sub_exento, validar_borrador, BorradorRequest, MpClaims,
+    FALLBACK_BORRADOR, MATRIZ_NEGATIVA_VERSION, SIN_FICHA, STRIP_VERSION,
 };
 use crate::AppState;
 
@@ -229,17 +232,53 @@ pub struct BorradorResponse {
     pub aviso_conocido: bool,
     pub firma_version: String,
     pub matriz_version: u8,
+    /// `true` si el texto es corrección de la dueña (vía `corregir`).
+    pub corregida: bool,
+}
+
+/// Claves de caché para un `avisoId` opaco: UUID de `inmuebles` → hashes de
+/// la fila recién leída; lo demás (o UUID inexistente) es ruta sin-ficha.
+/// Mismo cálculo en `borrador`, `regenerar` y `corregir` para que los tres
+/// hablen de la misma fila (si la ficha cambia entre llamadas, miss honesto).
+async fn claves_cache(
+    pool: &sqlx::PgPool,
+    aviso_id: Option<&str>,
+) -> Result<
+    (
+        Option<crate::services::marketplace::PromptSeguro>,
+        String,
+        String,
+        bool,
+    ),
+    AppError,
+> {
+    match aviso_id {
+        Some(a) => match Uuid::parse_str(a) {
+            Ok(id) => match InmuebleRepository::find_by_id(pool, id).await? {
+                Some(f) => {
+                    let seguro = strip_ficha_para_prompt(&f, STRIP_VERSION)?;
+                    let precio = precio_hash_seguro(&seguro);
+                    let catalogo = hash_ficha(&f);
+                    Ok((Some(seguro), precio, catalogo, true))
+                }
+                None => Ok((None, SIN_FICHA.to_string(), SIN_FICHA.to_string(), false)),
+            },
+            Err(_) => Ok((None, SIN_FICHA.to_string(), SIN_FICHA.to_string(), false)),
+        },
+        None => Ok((None, SIN_FICHA.to_string(), SIN_FICHA.to_string(), false)),
+    }
 }
 
 /// Genera el borrador: valida schema (422), resuelve la ficha por UUID y la
-/// stripea (sin ficha → no se afirma precio), llama la IA y aplica la matriz
-/// negativa (cualquier fallo → fallback exacto, nunca error seco).
+/// stripea (sin ficha → no se afirma precio), consulta la caché (hit → sin
+/// gastar IA) y si es miss genera con singleflight (un doble clic = una IA)
+/// y guarda. Solo se cachea `fuente=ia`; el fallback nunca (ver M4).
 #[utoipa::path(
     post,
     path = "/api/admin/marketplace/borrador",
     request_body = BorradorRequest,
     responses(
-        (status = 200, description = "Borrador listo (ia o reserva)", body = BorradorResponse),
+        (status = 200, description = "Borrador listo (cache, ia o reserva)", body = BorradorResponse),
         (status = 422, description = "Schema inválido", body = crate::errors::ErrorResponse),
         (status = 429, description = "Tope por sub", body = crate::errors::ErrorResponse)
     )
@@ -264,38 +303,172 @@ pub async fn borrador(
     if !errores.is_empty() {
         return Err(AppError::Validation(errores.join("; ")));
     }
-    /* El avisoId del plugin es opaco: solo un UUID de `inmuebles` enlaza
-     * ficha (M2 formaliza el catálogo). Lo demás es ruta sin-ficha: el
-     * prompt lo declara y la IA no afirma precio. */
-    let seguro = match r.aviso_id.as_deref() {
-        Some(a) => match Uuid::parse_str(a) {
-            Ok(id) => match InmuebleRepository::find_by_id(&state.pool, id).await? {
-                Some(f) => Some(strip_ficha_para_prompt(&f, STRIP_VERSION)?),
-                None => None,
-            },
-            Err(_) => None,
-        },
-        None => None,
-    };
-    let (borrador, fuente) = generar_borrador(&state, &r, seguro.as_ref()).await;
+    let (seguro, precio_hash, catalog_hash, conocido) =
+        claves_cache(&state.pool, r.aviso_id.as_deref()).await?;
+    if let Some((texto, corregida)) =
+        buscar_cache(&state.pool, &r.firma, &precio_hash, &catalog_hash).await?
+    {
+        /* Hit: el plugin audita `hit`; aquí no se audita nada (el conteo de
+         * usos ya subió en la misma sentencia del `UPDATE ... RETURNING`). */
+        return Ok((
+            StatusCode::OK,
+            Json(BorradorResponse {
+                borrador: texto,
+                fuente: "cache".to_string(),
+                aviso_conocido: conocido,
+                firma_version: "firma-v1".to_string(),
+                matriz_version: MATRIZ_NEGATIVA_VERSION,
+                corregida,
+            }),
+        )
+            .into_response());
+    }
+    /* Miss (el plugin audita `miss`): una sola IA por clave en vuelo. */
+    let clave_vuelo = format!("{}:{precio_hash}:{catalog_hash}", r.firma);
+    let gen = state
+        .mp_vuelo
+        .ejecutar(&clave_vuelo, || generar_borrador(&r, seguro.as_ref()))
+        .await;
+    if gen.fuente == "ia" {
+        guardar_cache(
+            &state.pool,
+            &r.firma,
+            &precio_hash,
+            &catalog_hash,
+            &gen.texto,
+        )
+        .await?;
+    }
     Ok((
         StatusCode::OK,
         Json(BorradorResponse {
-            borrador,
-            fuente,
-            aviso_conocido: seguro.is_some(),
+            borrador: gen.texto.clone(),
+            fuente: gen.fuente.clone(),
+            aviso_conocido: conocido,
             firma_version: "firma-v1".to_string(),
             matriz_version: MATRIZ_NEGATIVA_VERSION,
+            corregida: false,
         }),
     )
         .into_response())
 }
 
+/// Regenerar explícito de la dueña: `DELETE` + bypass de lectura (nueva IA
+/// siempre) + reemplazo (pisa incluso correcciones: lo pidió ella).
+/// Sin tope por minuto por decisión 2026-10-05 (freno = ritmo humano); el
+/// resto del flujo (schema 422, matriz → reserva, no cachear fallback)
+/// es idéntico al `borrador`.
+#[utoipa::path(
+    post,
+    path = "/api/admin/marketplace/regenerar",
+    request_body = BorradorRequest,
+    responses(
+        (status = 200, description = "Borrador regenerado (ia o reserva)", body = BorradorResponse),
+        (status = 422, description = "Schema inválido", body = crate::errors::ErrorResponse)
+    )
+)]
+pub async fn regenerar(
+    State(state): State<AppState>,
+    _auth: MpAuth,
+    r: Result<Json<BorradorRequest>, axum::extract::rejection::JsonRejection>,
+) -> Result<Response, AppError> {
+    let r = r.map_err(|e| AppError::Validation(format!("JSON inválido: {e}")))?;
+    let errores = validar_borrador(&r);
+    if !errores.is_empty() {
+        return Err(AppError::Validation(errores.join("; ")));
+    }
+    let (seguro, precio_hash, catalog_hash, conocido) =
+        claves_cache(&state.pool, r.aviso_id.as_deref()).await?;
+    borrar_cache(&state.pool, &r.firma, &precio_hash, &catalog_hash).await?;
+    /* Bypass: directo a la IA, sin vuelo (Regenerar es gesto explícito; si
+     * dos llegan juntas, la última que escribe gana por `reemplazar`). */
+    let gen = generar_borrador(&r, seguro.as_ref()).await;
+    if gen.fuente == "ia" {
+        reemplazar_cache(
+            &state.pool,
+            &r.firma,
+            &precio_hash,
+            &catalog_hash,
+            &gen.texto,
+        )
+        .await?;
+    }
+    Ok((
+        StatusCode::OK,
+        Json(BorradorResponse {
+            borrador: gen.texto,
+            fuente: gen.fuente,
+            aviso_conocido: conocido,
+            firma_version: "firma-v1".to_string(),
+            matriz_version: MATRIZ_NEGATIVA_VERSION,
+            corregida: false,
+        }),
+    )
+        .into_response())
+}
+
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+pub struct CorregirRequest {
+    pub firma: String,
+    pub firma_version: String,
+    #[serde(rename = "avisoId")]
+    pub aviso_id: Option<String>,
+    pub texto: String,
+}
+
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct CorregirResponse {
+    pub corregida: bool,
+}
+
+/// Guarda la corrección de la dueña (`corregida=TRUE`, vigencia +90d). Cubo
+/// propio 30/min (escritura barata pero no gratis); la matriz vale también
+/// para su texto (422 con motivo si trae contacto).
+#[utoipa::path(
+    post,
+    path = "/api/admin/marketplace/corregir",
+    request_body = CorregirRequest,
+    responses(
+        (status = 200, description = "Corrección guardada", body = CorregirResponse),
+        (status = 422, description = "Texto inválido o con contacto", body = crate::errors::ErrorResponse),
+        (status = 429, description = "Tope por sub", body = crate::errors::ErrorResponse)
+    )
+)]
+pub async fn corregir(
+    State(state): State<AppState>,
+    auth: MpAuth,
+    r: Result<Json<CorregirRequest>, axum::extract::rejection::JsonRejection>,
+) -> Result<Response, AppError> {
+    if !sub_exento(&auth.sub)
+        && !consumir_minuto(
+            &state.pool,
+            &format!("corr:{}", auth.sub),
+            TOPE_BORRADOR_MINUTO,
+        )
+        .await?
+    {
+        return Ok(limite(60));
+    }
+    let r = r.map_err(|e| AppError::Validation(format!("JSON inválido: {e}")))?;
+    if r.firma.len() != 64 || !r.firma.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err(AppError::Validation("firma debe ser hex64".to_string()));
+    }
+    if r.firma_version != "firma-v1" {
+        return Err(AppError::Validation(
+            "firma_version debe ser firma-v1".to_string(),
+        ));
+    }
+    let (_, precio_hash, catalog_hash, _) =
+        claves_cache(&state.pool, r.aviso_id.as_deref()).await?;
+    corregir_cache(&state.pool, &r.firma, &precio_hash, &catalog_hash, &r.texto).await?;
+    Ok((StatusCode::OK, Json(CorregirResponse { corregida: true })).into_response())
+}
+
 async fn generar_borrador(
-    _state: &AppState, // M4: aquí se consulta `mp_respuestas_cache` antes de llamar a la IA.
     r: &BorradorRequest,
     seguro: Option<&crate::services::marketplace::PromptSeguro>,
-) -> (String, String) {
+) -> crate::services::marketplace::Generado {
+    use crate::services::marketplace::Generado;
     let datos = seguro.map_or_else(
         || "SIN FICHA: no conoces el inmueble; no afirmes precio ni medidas.".to_string(),
         |s| serde_json::to_string(s).unwrap_or_else(|_| "SIN FICHA".to_string()),
@@ -317,14 +490,23 @@ async fn generar_borrador(
         Ok((t, _)) => t,
         Err(e) => {
             tracing::warn!("borrador mp: IA caída ({e}), va fallback");
-            return (FALLBACK_BORRADOR.to_string(), "reserva".to_string());
+            return Generado {
+                texto: FALLBACK_BORRADOR.to_string(),
+                fuente: "reserva".to_string(),
+            };
         }
     };
     if let Some(motivo) = matriz_negativa(&texto) {
         tracing::warn!("borrador mp: matriz negativa ({motivo}), va fallback");
-        return (FALLBACK_BORRADOR.to_string(), "reserva".to_string());
+        return Generado {
+            texto: FALLBACK_BORRADOR.to_string(),
+            fuente: "reserva".to_string(),
+        };
     }
-    (texto, "ia".to_string())
+    Generado {
+        texto,
+        fuente: "ia".to_string(),
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, ToSchema)]
@@ -393,6 +575,8 @@ pub fn routes() -> Router<AppState> {
         .route("/marketplace/token", post(emitir_token))
         .route("/marketplace/token/cli", post(emitir_token_cli))
         .route("/marketplace/borrador", post(borrador))
+        .route("/marketplace/regenerar", post(regenerar))
+        .route("/marketplace/corregir", post(corregir))
         .route("/marketplace/audit", post(audit))
         .route("/marketplace/uso", get(uso))
 }

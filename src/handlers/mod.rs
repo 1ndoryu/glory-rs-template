@@ -88,6 +88,8 @@ impl utoipa::Modify for SecurityAddon {
         marketplace::emitir_token,
         marketplace::emitir_token_cli,
         marketplace::borrador,
+        marketplace::regenerar,
+        marketplace::corregir,
         marketplace::audit,
         marketplace::uso,
         public::list_public,
@@ -136,6 +138,8 @@ impl utoipa::Modify for SecurityAddon {
         crate::handlers::marketplace::AuditIn,
         crate::handlers::marketplace::EventoAudit,
         crate::handlers::marketplace::CliTokenRequest,
+        crate::handlers::marketplace::CorregirRequest,
+        crate::handlers::marketplace::CorregirResponse,
         crate::handlers::marketplace::UsoQuery,
         crate::services::marketplace::UsoDia,
         crate::models::CreateSuscriptorRequest,
@@ -166,6 +170,8 @@ pub fn create_router(pool: sqlx::PgPool, config: crate::config::AppConfig) -> Ro
         upload_dir: config.upload_dir.into(),
         hub,
         static_dir: config.static_dir.map(PathBuf::from),
+        /* [03AA-3 M4] Singleflight por proceso del asistente Marketplace. */
+        mp_vuelo: std::sync::Arc::new(crate::services::marketplace::Singleflight::default()),
     };
 
     /* [239A-1] CORS: abierto solo si no hay `CORS_ORIGINS` (dev). En prod se

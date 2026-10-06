@@ -23,6 +23,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     sqlx::migrate!().run(&pool).await?;
 
+    /* [03AA-3 M4] Purga de caché mp al arrancar (siempre, fail-open) + pg_cron
+     * diario solo con `DB_24H=true` (07:00 UTC = 03:00 Caracas). Sin pg_cron
+     * en el servidor se avisa y se sigue: la purga al arrancar ya cubre. */
+    match glory_backend::services::marketplace::purgar_cache(&pool).await {
+        Ok(n) => tracing::info!("mp caché: {n} vencidas purgadas al arrancar"),
+        Err(e) => tracing::warn!("mp caché: purga inicial falló ({e}), sigue sin purgar"),
+    }
+    if std::env::var("DB_24H").as_deref() == Ok("true") {
+        match glory_backend::services::marketplace::programar_purga_diaria(&pool).await {
+            Ok(()) => tracing::info!("mp caché: purga diaria pg_cron 07:00 UTC"),
+            Err(e) => {
+                tracing::warn!("mp caché: pg_cron no programado ({e}); solo purga al arrancar")
+            }
+        }
+    }
+
     tokio::fs::create_dir_all(&config.upload_dir).await?;
     tracing::info!("Uploads en {}", config.upload_dir);
 

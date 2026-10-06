@@ -329,6 +329,274 @@ pub async fn resumen_uso(pool: &sqlx::PgPool, dias: i32) -> Result<Vec<UsoDia>, 
         .collect())
 }
 
+/* [03AA-3 M4] Caché de respuestas (`mp_respuestas_cache`): la clave es
+ * (firma, precio_hash, catalog_hash). `precio_hash` ata la respuesta al
+ * precio citado (si cambia el precio, miss y se regenera: jamás se sirve un
+ * precio viejo). `catalog_hash` sale de `hash_ficha` — hash de los bytes que
+ * alimentan el prompt (campos del strip + estado) calculados tras el fetch
+ * y antes del strip; cualquier cambio ahí invalida. Campos ajenos al prompt
+ * (copy, receta, extras) NO invalidan a propósito: no cambian la respuesta.
+ * Solo se cachea `fuente=ia`; el fallback nunca (con la IA caída, cachearlo
+ * envenenaría 90 días). La corrección humana (`corregida`) gana sobre
+ * generaciones futuras (`guardar` usa DO NOTHING; solo `reemplazar`, vía
+ * Regenerar explícito, la pisa). Sin ficha: claves literales "sin-ficha"
+ * (la `firma` ya diferencia cada excerpt). */
+
+/// Marca sin ficha para `precio_hash`/`catalog_hash` (la firma diferencia).
+pub const SIN_FICHA: &str = "sin-ficha";
+
+/// SHA-256 hex con `sha2` (ya dependencia directa). Solo hashes, sin PII.
+#[must_use]
+pub fn sha_hex(canon: &str) -> String {
+    use sha2::{Digest, Sha256};
+    format!("{:x}", Sha256::digest(canon.as_bytes()))
+}
+
+/// Hash del catálogo: serialización canónica de exactamente lo que entra al
+/// prompt (los 6 campos del strip + `estado`, que condiciona disponibilidad),
+/// calculada sobre la fila recién leída y antes de stripeear. Si la ficha
+/// cambia en algo que la respuesta cita → hash distinto → miss → regenera.
+#[must_use]
+pub fn hash_ficha(ficha: &InmuebleRow) -> String {
+    let canon = match strip_ficha_para_prompt(ficha, STRIP_VERSION) {
+        Ok(s) => serde_json::json!({
+            "titulo": s.titulo,
+            "precio": s.precio_publico,
+            "zona": s.zona,
+            "m2": s.m2,
+            "hab": s.habitaciones,
+            "desc": s.descripcion_corta,
+            "estado": ficha.estado,
+        }),
+        /* Inalcanzable con v1 (el handler lo rechazaría antes); clave
+         * estable para no romper el flujo si el strip evoluciona. */
+        Err(_) => serde_json::json!({"strip": "error"}),
+    };
+    sha_hex(&canon.to_string())
+}
+
+/// Hash del precio citado: el `precio_publico` ya formateado que ve la IA.
+#[must_use]
+pub fn precio_hash_seguro(seguro: &PromptSeguro) -> String {
+    sha_hex(&seguro.precio_publico)
+}
+
+/// Hit de caché: el texto listo + si es corrección de la dueña. El `UPDATE`
+/// atómico cuenta el uso en la misma sentencia (sin roundtrip ni carrera).
+pub async fn buscar_cache(
+    pool: &sqlx::PgPool,
+    firma: &str,
+    precio_hash: &str,
+    catalog_hash: &str,
+) -> Result<Option<(String, bool)>, AppError> {
+    let fila: Option<(String, bool)> = sqlx::query_as(
+        "UPDATE mp_respuestas_cache SET usos = usos + 1 \
+         WHERE firma = $1 AND precio_hash = $2 AND catalog_hash = $3 \
+         AND valida_hasta > now() \
+         RETURNING respuesta, corregida",
+    )
+    .bind(firma)
+    .bind(precio_hash)
+    .bind(catalog_hash)
+    .fetch_optional(pool)
+    .await?;
+    Ok(fila)
+}
+
+/// Guarda una generación fresca; si la dueña ya corrigió esa clave, su texto
+/// gana (`DO NOTHING`: la corrección humana no se pisa en silencio).
+pub async fn guardar_cache(
+    pool: &sqlx::PgPool,
+    firma: &str,
+    precio_hash: &str,
+    catalog_hash: &str,
+    respuesta: &str,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "INSERT INTO mp_respuestas_cache (firma, precio_hash, catalog_hash, respuesta) \
+         VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
+    )
+    .bind(firma)
+    .bind(precio_hash)
+    .bind(catalog_hash)
+    .bind(respuesta)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Pisa la fila (Regenerar explícito de la dueña): texto nuevo, vigencia
+/// renovada, `corregida=FALSE`, contador a cero (nueva versión).
+pub async fn reemplazar_cache(
+    pool: &sqlx::PgPool,
+    firma: &str,
+    precio_hash: &str,
+    catalog_hash: &str,
+    respuesta: &str,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "INSERT INTO mp_respuestas_cache (firma, precio_hash, catalog_hash, respuesta) \
+         VALUES ($1, $2, $3, $4) \
+         ON CONFLICT (firma, precio_hash, catalog_hash) DO UPDATE SET \
+         respuesta = EXCLUDED.respuesta, valida_hasta = now() + INTERVAL '90 days', \
+         corregida = FALSE, usos = 0",
+    )
+    .bind(firma)
+    .bind(precio_hash)
+    .bind(catalog_hash)
+    .bind(respuesta)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Borra la fila (primer paso de Regenerar: la siguiente lectura es miss).
+pub async fn borrar_cache(
+    pool: &sqlx::PgPool,
+    firma: &str,
+    precio_hash: &str,
+    catalog_hash: &str,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "DELETE FROM mp_respuestas_cache \
+         WHERE firma = $1 AND precio_hash = $2 AND catalog_hash = $3",
+    )
+    .bind(firma)
+    .bind(precio_hash)
+    .bind(catalog_hash)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Guarda la corrección de la dueña: la matriz negativa también vale para su
+/// texto (las respuestas jamás llevan contacto; lo añade ella a mano fuera
+/// del borrador). Vigencia renovada; la fila misma es el registro (sin audit
+/// separada: `corregida=TRUE` + `usos` ya lo cuentan).
+pub async fn corregir_cache(
+    pool: &sqlx::PgPool,
+    firma: &str,
+    precio_hash: &str,
+    catalog_hash: &str,
+    texto: &str,
+) -> Result<(), AppError> {
+    let n = texto.chars().count();
+    if n == 0 || n > 2000 {
+        return Err(AppError::Validation("texto 1..2000 caracteres".to_string()));
+    }
+    if let Some(motivo) = matriz_negativa(texto) {
+        return Err(AppError::Validation(format!(
+            "la corrección no puede traer {motivo} (lo añades a mano al enviar)"
+        )));
+    }
+    sqlx::query(
+        "INSERT INTO mp_respuestas_cache (firma, precio_hash, catalog_hash, respuesta, corregida) \
+         VALUES ($1, $2, $3, $4, TRUE) \
+         ON CONFLICT (firma, precio_hash, catalog_hash) DO UPDATE SET \
+         respuesta = EXCLUDED.respuesta, valida_hasta = now() + INTERVAL '90 days', \
+         corregida = TRUE, usos = 0",
+    )
+    .bind(firma)
+    .bind(precio_hash)
+    .bind(catalog_hash)
+    .bind(texto)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Purga vencidas; devuelve cuántas cayeron. Se corre al arrancar (siempre) y
+/// a diario vía `pg_cron` (solo `DB_24H=true`).
+pub async fn purgar_cache(pool: &sqlx::PgPool) -> Result<u64, sqlx::Error> {
+    let r = sqlx::query("DELETE FROM mp_respuestas_cache WHERE valida_hasta <= now()")
+        .execute(pool)
+        .await?;
+    Ok(r.rows_affected())
+}
+
+/// Programa la purga diaria en `pg_cron` (07:00 UTC = 03:00 Caracas, sin horario
+/// de verano). Idempotente (reemplaza el job si existe). Falla si no hay
+/// `pg_cron` en el servidor: el llamador lo deja en `warn` y sigue (la purga al
+/// arrancar ya cubre; fail-open documentado, nunca tumba el boot).
+pub async fn programar_purga_diaria(pool: &sqlx::PgPool) -> Result<(), sqlx::Error> {
+    sqlx::query("CREATE EXTENSION IF NOT EXISTS pg_cron")
+        .execute(pool)
+        .await?;
+    sqlx::query(
+        "DO $purga$ BEGIN \
+           IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'mp-purga-diaria') THEN \
+             PERFORM cron.unschedule('mp-purga-diaria'); \
+           END IF; \
+           PERFORM cron.schedule('mp-purga-diaria', '0 7 * * *', \
+             'DELETE FROM mp_respuestas_cache WHERE valida_hasta <= now()'); \
+         END $purga$",
+    )
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/* Singleflight single-process: N peticiones concurrentes con la misma clave
+ * (doble clic en Regenerar, reintento + original en vuelo) comparten UNA
+ * generación de IA en vez de gastar N. El líder computa y difunde; los
+ * seguidores esperan el mismo `Arc`. Ventana residual de microsegundos entre
+ * `send` y `remove` (el que llegue ahí recomputa): best-effort honesto para
+ * doble clic humano, no barrera distribuida; el `UNIQUE` + `DO NOTHING` de
+ * la tabla respalda duplicados. Solo vive en memoria del proceso. */
+
+/// Generación compartible en vuelo: texto + fuente (`ia`, nunca `reserva` —
+/// el fallback no entra al vuelo: cada miss reintenta la IA).
+#[derive(Debug, Clone)]
+pub struct Generado {
+    pub texto: String,
+    pub fuente: String,
+}
+
+#[derive(Debug, Default)]
+pub struct Singleflight {
+    vuelo: tokio::sync::Mutex<
+        std::collections::HashMap<String, tokio::sync::broadcast::Sender<std::sync::Arc<Generado>>>,
+    >,
+}
+
+impl Singleflight {
+    /// Ejecuta `f` si nadie vuela con `clave`; si no, espera el resultado
+    /// ajeno. Sin `Send` en `f`: se sondea inline, sin `spawn`.
+    pub async fn ejecutar<F, Fut>(&self, clave: &str, f: F) -> std::sync::Arc<Generado>
+    where
+        F: FnOnce() -> Fut,
+        Fut: std::future::Future<Output = Generado>,
+    {
+        let seguidor = {
+            let mut mapa = self.vuelo.lock().await;
+            if let Some(tx) = mapa.get(clave) {
+                Some(tx.subscribe())
+            } else {
+                let (tx, _rx) = tokio::sync::broadcast::channel(1);
+                mapa.insert(clave.to_string(), tx);
+                None
+            }
+        };
+        /* Seguidor: el líder difunde; si el canal murió (líder caído),
+         * se degrada a fallback en vez de colgar (fail-open). */
+        if let Some(mut rx) = seguidor {
+            rx.recv().await.unwrap_or_else(|_| {
+                std::sync::Arc::new(Generado {
+                    texto: FALLBACK_BORRADOR.to_string(),
+                    fuente: "reserva".to_string(),
+                })
+            })
+        } else {
+            let gen = std::sync::Arc::new(f().await);
+            let mut mapa = self.vuelo.lock().await;
+            if let Some(tx) = mapa.remove(clave) {
+                let _ = tx.send(std::sync::Arc::clone(&gen));
+            }
+            gen
+        }
+    }
+}
+
 #[cfg(test)]
 mod pruebas {
     use super::*;
@@ -492,6 +760,247 @@ mod pruebas {
         assert!(!maquina_autorizada(Some("a"), None));
         assert!(!maquina_autorizada(Some("a"), Some("b")));
         assert!(maquina_autorizada(Some("a"), Some("a")));
+    }
+
+    /* Tests M4: hashes estables, invalidación honesta y ciclo de la caché.
+     * Los vivos usan `pool_si_hay` (sin `DATABASE_URL` se omiten). */
+
+    fn fila_prueba(precio: f64) -> InmuebleRow {
+        InmuebleRow {
+            id: uuid::Uuid::new_v4(),
+            titulo: "Apartamento en Los Palos Grandes".to_string(),
+            descripcion: "Lindo apartamento con vista".to_string(),
+            ubicacion: "Chacao".to_string(),
+            puestos: 1,
+            residencia: "Edif. Los Pinos".to_string(),
+            precio,
+            tipo: "apartamento".to_string(),
+            operacion: "venta".to_string(),
+            habitaciones: 2,
+            banos: 2,
+            metros: 85.0,
+            metros_terreno: 0.0,
+            estado: "disponible".to_string(),
+            publicado: true,
+            slug: "apt-test".to_string(),
+            copy_corta: None,
+            copy_larga: None,
+            copy_modelo: None,
+            copy_actualizada_en: None,
+            receta: None,
+            extras: sqlx::types::Json(serde_json::json!({})),
+            precio_minimo: None,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        }
+    }
+
+    fn clave_azar() -> String {
+        format!(
+            "{:x}{:x}",
+            uuid::Uuid::new_v4().as_simple(),
+            uuid::Uuid::new_v4().as_simple()
+        )
+    }
+
+    #[test]
+    fn hash_ficha_estable_y_hex64() {
+        let f = fila_prueba(43_000.0);
+        let a = hash_ficha(&f);
+        let b = hash_ficha(&fila_prueba(43_000.0));
+        assert_eq!(a, b);
+        assert!(es_hex64(&a));
+    }
+
+    #[test]
+    fn hash_ficha_invalida_si_cambia_lo_que_cita() {
+        let base = hash_ficha(&fila_prueba(43_000.0));
+        let mut f = fila_prueba(45_000.0);
+        assert_ne!(hash_ficha(&f), base, "precio distinto debe invalidar");
+        f = fila_prueba(43_000.0);
+        f.titulo = "Otro título".to_string();
+        assert_ne!(hash_ficha(&f), base, "título distinto debe invalidar");
+        f = fila_prueba(43_000.0);
+        f.estado = "vendido".to_string();
+        assert_ne!(hash_ficha(&f), base, "estado distinto debe invalidar");
+    }
+
+    #[test]
+    fn hash_ficha_ignora_lo_que_no_entra_al_prompt() {
+        let base = hash_ficha(&fila_prueba(43_000.0));
+        let mut f = fila_prueba(43_000.0);
+        f.copy_corta = Some("Copy marketing".to_string());
+        f.extras = sqlx::types::Json(serde_json::json!({"piso": "3"}));
+        assert_eq!(hash_ficha(&f), base, "copy/extras no cambian la respuesta");
+    }
+
+    #[test]
+    fn precio_hash_ata_al_precio_citado() {
+        let a = precio_hash_seguro(&strip_ficha_para_prompt(&fila_prueba(43_000.0), "v1").unwrap());
+        let b = precio_hash_seguro(&strip_ficha_para_prompt(&fila_prueba(45_000.0), "v1").unwrap());
+        assert!(es_hex64(&a));
+        assert_ne!(a, b);
+    }
+
+    #[tokio::test]
+    async fn cache_guarda_hit_y_cuenta_usos() {
+        let Some(pool) = pool_si_hay() else { return };
+        let (firma, ph, ch) = (clave_azar(), clave_azar(), clave_azar());
+        guardar_cache(&pool, &firma, &ph, &ch, "texto-ia")
+            .await
+            .expect("guarda");
+        let hit = buscar_cache(&pool, &firma, &ph, &ch).await.expect("busca");
+        assert_eq!(hit, Some(("texto-ia".to_string(), false)));
+        buscar_cache(&pool, &firma, &ph, &ch)
+            .await
+            .expect("busca x2");
+        let usos: i64 = sqlx::query_scalar(
+            "SELECT usos::BIGINT FROM mp_respuestas_cache WHERE firma = $1 AND precio_hash = $2 AND catalog_hash = $3",
+        )
+        .bind(&firma).bind(&ph).bind(&ch)
+        .fetch_one(&pool).await.expect("lee usos");
+        assert_eq!(usos, 2);
+        borrar_cache(&pool, &firma, &ph, &ch).await.expect("limpia");
+    }
+
+    #[tokio::test]
+    async fn cache_miss_si_cambia_precio_o_catalogo() {
+        let Some(pool) = pool_si_hay() else { return };
+        let (firma, ph, ch) = (clave_azar(), clave_azar(), clave_azar());
+        guardar_cache(&pool, &firma, &ph, &ch, "texto-ia")
+            .await
+            .expect("guarda");
+        assert!(buscar_cache(&pool, &firma, &clave_azar(), &ch)
+            .await
+            .expect("busca")
+            .is_none());
+        assert!(buscar_cache(&pool, &firma, &ph, &clave_azar())
+            .await
+            .expect("busca")
+            .is_none());
+        borrar_cache(&pool, &firma, &ph, &ch).await.expect("limpia");
+    }
+
+    #[tokio::test]
+    async fn cache_vencida_no_devuelve_y_purga_limpia() {
+        let Some(pool) = pool_si_hay() else { return };
+        let (firma, ph, ch) = (clave_azar(), clave_azar(), clave_azar());
+        guardar_cache(&pool, &firma, &ph, &ch, "viejo")
+            .await
+            .expect("guarda");
+        sqlx::query(
+            "UPDATE mp_respuestas_cache SET valida_hasta = now() - INTERVAL '1 day' \
+             WHERE firma = $1 AND precio_hash = $2 AND catalog_hash = $3",
+        )
+        .bind(&firma)
+        .bind(&ph)
+        .bind(&ch)
+        .execute(&pool)
+        .await
+        .expect("envejece");
+        assert!(buscar_cache(&pool, &firma, &ph, &ch)
+            .await
+            .expect("busca")
+            .is_none());
+        let n = purgar_cache(&pool).await.expect("purga");
+        assert!(n >= 1, "purga={n}");
+        let queda: i64 =
+            sqlx::query_scalar("SELECT COUNT(*)::BIGINT FROM mp_respuestas_cache WHERE firma = $1")
+                .bind(&firma)
+                .fetch_one(&pool)
+                .await
+                .expect("cuenta");
+        assert_eq!(queda, 0);
+    }
+
+    #[tokio::test]
+    async fn corregir_marca_y_guardar_no_pisa_correccion() {
+        let Some(pool) = pool_si_hay() else { return };
+        let (firma, ph, ch) = (clave_azar(), clave_azar(), clave_azar());
+        guardar_cache(&pool, &firma, &ph, &ch, "texto-ia")
+            .await
+            .expect("guarda");
+        corregir_cache(&pool, &firma, &ph, &ch, "texto de la dueña")
+            .await
+            .expect("corrige");
+        assert_eq!(
+            buscar_cache(&pool, &firma, &ph, &ch).await.expect("busca"),
+            Some(("texto de la dueña".to_string(), true))
+        );
+        /* Generación posterior no pisa la corrección (DO NOTHING). */
+        guardar_cache(&pool, &firma, &ph, &ch, "texto-ia-2")
+            .await
+            .expect("guarda x2");
+        assert_eq!(
+            buscar_cache(&pool, &firma, &ph, &ch).await.expect("busca"),
+            Some(("texto de la dueña".to_string(), true))
+        );
+        /* Regenerar explícito sí pisa y resetea versión. */
+        reemplazar_cache(&pool, &firma, &ph, &ch, "nueva-ia")
+            .await
+            .expect("reemplaza");
+        assert_eq!(
+            buscar_cache(&pool, &firma, &ph, &ch).await.expect("busca"),
+            Some(("nueva-ia".to_string(), false))
+        );
+        borrar_cache(&pool, &firma, &ph, &ch).await.expect("limpia");
+    }
+
+    #[tokio::test]
+    async fn corregir_rechaza_vacio_y_contacto() {
+        let Some(pool) = pool_si_hay() else { return };
+        let (firma, ph, ch) = (clave_azar(), clave_azar(), clave_azar());
+        assert!(corregir_cache(&pool, &firma, &ph, &ch, "").await.is_err());
+        assert!(
+            corregir_cache(&pool, &firma, &ph, &ch, "llámame al 0412 1234567")
+                .await
+                .is_err()
+        );
+        assert!(
+            corregir_cache(&pool, &firma, &ph, &ch, "escríbeme a a@b.com")
+                .await
+                .is_err()
+        );
+        assert!(buscar_cache(&pool, &firma, &ph, &ch)
+            .await
+            .expect("busca")
+            .is_none());
+    }
+
+    /* Singleflight (assert del plan): 10 concurrentes con la misma clave =
+     * UNA sola ejecución y el mismo `Arc` para todos. */
+    #[tokio::test]
+    async fn vuelo_comparte_una_generacion() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+        let vuelo = Singleflight::default();
+        let vuelo = Arc::new(vuelo);
+        let contador = Arc::new(AtomicUsize::new(0));
+        let mut tareas = Vec::new();
+        for _ in 0..10 {
+            let v = Arc::clone(&vuelo);
+            let c = Arc::clone(&contador);
+            tareas.push(tokio::spawn(async move {
+                v.ejecutar("clave-x", || async move {
+                    c.fetch_add(1, Ordering::SeqCst);
+                    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                    Generado {
+                        texto: "hola".to_string(),
+                        fuente: "ia".to_string(),
+                    }
+                })
+                .await
+            }));
+        }
+        let mut resultados = Vec::new();
+        for t in tareas {
+            resultados.push(t.await.expect("tarea"));
+        }
+        assert_eq!(contador.load(Ordering::SeqCst), 1);
+        for r in &resultados {
+            assert_eq!(r.texto, "hola");
+            assert!(Arc::ptr_eq(&resultados[0], r), "mismo Arc para todos");
+        }
     }
 
     /* Expiración (DoD E3): un token con `exp` pasado no decodifica — la misma

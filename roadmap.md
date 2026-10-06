@@ -547,7 +547,19 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 (401 máquina ajena/sin header, 422 hash malo; panel sin `mid` intacto, sin
 header 200) + `scripts/mp-cli.mjs` Node sin Electron (fuga 0: solo borrador;
 audit `emision`) + test expiración; gate fmt+clippy limpios, 87/87 tests;
-viva (CLI 480min fuente=reserva sin inventar precio; panel 15min 200).
+ viva (CLI 480min fuente=reserva sin inventar precio; panel 15min 200).
+ M4 hecho 2026-10-06: migración `mp_respuestas_cache`
+ (firma,precio_hash,catalog_hash,respuesta,valida_hasta +90d,usos,corregida)
+ + `hash_ficha()` byte-a-byte tras fetch + `claves_cache()` único cálculo +
+ borrador hit (`fuente=cache`) / miss singleflight (una sola generación ante
+ 10 concurrentes) + `guardar_cache` solo `fuente=ia` + Regenerar
+ (`DELETE`+bypass, sin tope por decisión 2026-10-05) + `corregir`
+ (`corregida=TRUE`, cubo propio 30/min, matriz también al texto) + purga al
+ arrancar siempre + pg_cron diaria solo si `DB_24H=true`; gate fmt+clippy
+ limpios, 97/97 tests (10 nuevos; la suite cazó `usos` INT4→i64, fixeado con
+ `::BIGINT` igual que M3); viva `M4-VIVA-OK` (miss ia → hit cache mismo texto
+ → regenerar fresco → corregir → borrador corregida=true con el texto
+ corregido → contacto 422).
 Siguiente: M1 (BLOQUEADO: exige firma otro frente + ventana congelación,
 sin firma M1 prohibido).
   Falta de tu parte para cerrar E0: remoto del repo + fecha de viva 30min.

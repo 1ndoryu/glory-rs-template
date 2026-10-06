@@ -28,4 +28,7 @@ pub struct AppState {
     /* [169A-4] Mismo hub que el router visitante: el staff emite al WS del
      * visitante (`ChatHub` es `Clone` con interiores `Arc`). */
     pub hub: glory_agent::session::ChatHub,
+    /* [03AA-3 M4] Singleflight del asistente Marketplace (una generación de
+     * IA por clave en vuelo). En `Arc` porque `Mutex` no es `Clone`. */
+    pub mp_vuelo: std::sync::Arc<crate::services::marketplace::Singleflight>,
 }

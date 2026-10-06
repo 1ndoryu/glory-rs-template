@@ -330,6 +330,8 @@ mod pruebas {
             upload_dir: std::path::PathBuf::from(r"C:\tmp\sombra-test"),
             static_dir: None,
             hub: glory_agent::session::ChatHub::new(),
+            /* [03AA-3 M4] El vuelo mp no se usa aquí; igual hay que darlo. */
+            mp_vuelo: std::sync::Arc::new(crate::services::marketplace::Singleflight::default()),
         };
         let entrada = || {
             Json(EntradaSombra {
