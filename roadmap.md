@@ -541,8 +541,23 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   82/82 tests (6 nuevos), medida mock p50=0.01ms p95=0.03ms, prueba viva
   (login 200, token 201, borrador 200 fuente=ia, audit 201 HMAC sin PII, 429 OK;
   la viva cazó `RETURNING n` INT4→i64, fixeado con `::BIGINT`).
-  Activo: M2 (panel con `selectores.json` + `registerMode` + dashboard uso).
+  Activo: E3 (CLI token 8h+binding máquina). Siguiente: M4 (caché
+  `mp_respuestas_cache` + Regenerar + purga), luego M1 (BLOQUEADO: exige firma
+  otro frente + ventana congelación, sin firma M1 prohibido).
   Falta de tu parte para cerrar E0: remoto del repo + fecha de viva 30min.
+- M2 hecho 2026-10-06: panel en `../plugins-opencode/src/panel/`
+  (`selectores.json` pin v1 por rol/nombre + `registerMode()` asistente>radar +
+  `BorradorStore` `mp_borrador:{threadId}` TTL 24h + `PanelController` con
+  degradado que bloquea copiar/regenerar + `VistaDom` semántica) 51/51 tests;
+  backend `GET /api/admin/marketplace/uso?dias=` (agregado día+evento sin PII,
+  solo JWT admin) + test BD viva; gate fmt+clippy limpios, 83/83 tests, viva
+  (uso 200, audit copiar 201, copiar 2→3, thread_id jamás en respuesta).
+  Visual 1280/390 + teclado/contraste + SPA: checklist manual en README del
+  plugin (sin harness de navegador en el repo).
+- Deuda aparte (no del cambio, no se mezcla): `handlers::sombra` tiene carrera
+  preexistente — sus tests comparten `agent_config` sin sincronizar
+  (`adapter_defaults_sin_config` borra `adapter_responde_ia_global` mientras
+  otros la escriben; falla 1/2 corridas full, en aislamiento 9/9 verde).
 
 ## 03AA-4 — WhatsApp un solo número + triage + config + escenarios (plan activo 2026-10-03)
 - Plan: `Agente/planes/plan-whatsapp-numero-unico-2026-10-03.md`.

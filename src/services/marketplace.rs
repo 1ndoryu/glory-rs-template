@@ -236,6 +236,67 @@ pub async fn registrar_token(
     Ok(jti)
 }
 
+/// Fila del dashboard M2: conteos por día y evento. Sin PII: el HMAC del hilo
+/// jamás sale, solo día + evento + conteo.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct UsoDia {
+    pub dia: String,
+    pub hit: i64,
+    pub miss: i64,
+    pub copiar: i64,
+    pub regenerar: i64,
+    pub emision: i64,
+}
+
+/// Agrega `mp_auditoria` en una sola consulta (`GROUP BY` día+evento, sin
+/// N+1). `dias` se acota a 1..=90; la ventana es día calendario local del
+/// servidor (misma base que `ts_hora` truncada a la hora).
+pub async fn resumen_uso(pool: &sqlx::PgPool, dias: i32) -> Result<Vec<UsoDia>, AppError> {
+    use sqlx::Row as _;
+    let dias = dias.clamp(1, 90);
+    let filas = sqlx::query(
+        "SELECT ts_hora::date AS dia, evento, COUNT(*) AS n \
+         FROM mp_auditoria \
+         WHERE ts_hora >= date_trunc('day', now()) - make_interval(days => $1) \
+         GROUP BY dia, evento ORDER BY dia",
+    )
+    .bind(dias)
+    .fetch_all(pool)
+    .await?;
+    let mut orden: Vec<String> = Vec::new();
+    let mut por_dia: std::collections::HashMap<String, UsoDia> = std::collections::HashMap::new();
+    for f in &filas {
+        let dia: chrono::NaiveDate = f.try_get("dia")?;
+        let evento: String = f.try_get("evento")?;
+        let n: i64 = f.try_get("n")?;
+        let clave = dia.format("%Y-%m-%d").to_string();
+        let entrada = por_dia.entry(clave.clone()).or_insert_with(|| {
+            orden.push(clave.clone());
+            UsoDia {
+                dia: String::new(),
+                hit: 0,
+                miss: 0,
+                copiar: 0,
+                regenerar: 0,
+                emision: 0,
+            }
+        });
+        entrada.dia.clone_from(&clave);
+        match evento.as_str() {
+            "hit" => entrada.hit = n,
+            "miss" => entrada.miss = n,
+            "copiar" => entrada.copiar = n,
+            "regenerar" => entrada.regenerar = n,
+            "emision" => entrada.emision = n,
+            otro => tracing::warn!("resumen_uso: evento desconocido {otro}"),
+        }
+    }
+    Ok(orden
+        .into_iter()
+        .filter_map(|d| por_dia.remove(&d))
+        .collect())
+}
+
 #[cfg(test)]
 mod pruebas {
     use super::*;
@@ -364,5 +425,37 @@ mod pruebas {
         assert!(!sub_exento("plugin"));
         std::env::remove_var("MP_SIN_LIMITE_SUB");
         assert!(!sub_exento("ella"));
+    }
+
+    fn pool_si_hay() -> Option<sqlx::PgPool> {
+        let url = std::env::var("DATABASE_URL").ok()?;
+        sqlx::postgres::PgPoolOptions::new()
+            .max_connections(1)
+            .connect_lazy(&url)
+            .ok()
+    }
+
+    /* Contra BD viva: 2 hit + 1 copiar hoy se agregan en la fila del día;
+     * sin `DATABASE_URL` se omite. Solo lee conteos, sin PII. */
+    #[tokio::test]
+    async fn uso_agrega_por_dia_y_evento() {
+        let Some(pool) = pool_si_hay() else { return };
+        let base = uuid::Uuid::new_v4().to_string().replace('-', "");
+        for (sufijo, evento) in [("a", "hit"), ("b", "hit"), ("c", "copiar")] {
+            sqlx::query(
+                "INSERT INTO mp_auditoria (hilo_hmac, ts_hora, evento) \
+                 VALUES ($1, date_trunc('hour', now()), $2)",
+            )
+            .bind(format!("{base}{sufijo}"))
+            .bind(evento)
+            .execute(&pool)
+            .await
+            .expect("inserta auditoria");
+        }
+        let filas = resumen_uso(&pool, 7).await.expect("resume uso");
+        let hoy = chrono::Utc::now().format("%Y-%m-%d").to_string();
+        let fila = filas.iter().find(|f| f.dia == hoy).expect("fila de hoy");
+        assert!(fila.hit >= 2, "hit={}", fila.hit);
+        assert!(fila.copiar >= 1, "copiar={}", fila.copiar);
     }
 }

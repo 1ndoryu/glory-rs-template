@@ -1,16 +1,15 @@
 /* [03AA-3 M3] HTTP del asistente Marketplace (token, borrador, audit).
- * Tres endpoints: `token` (emite el JWT mp con el JWT admin), `borrador`
- * (genera el borrador con la IA y la ficha stripeada) y `audit`
- * (observabilidad con HMAC, nunca texto en claro). La lógica pura vive en
- * `services::marketplace`; aquí solo boundary HTTP + 429 con `Retry-After`. */
+ * [03AA-3 M2] suma `uso`: dashboard agregado (día+evento+conteo, sin PII)
+ * con el JWT admin. La lógica pura vive en `services::marketplace`; aquí
+ * solo boundary HTTP + 429 con `Retry-After`. */
 
 use axum::async_trait;
-use axum::extract::{FromRequestParts, State};
+use axum::extract::{FromRequestParts, Query, State};
 use axum::http::header::RETRY_AFTER;
 use axum::http::request::Parts;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::routing::post;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use chrono::Utc;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
@@ -22,9 +21,9 @@ use crate::errors::AppError;
 use crate::middleware::AuthUser;
 use crate::repositories::InmuebleRepository;
 use crate::services::marketplace::{
-    consumir_minuto, matriz_negativa, registrar_token, strip_ficha_para_prompt, sub_exento,
-    validar_borrador, BorradorRequest, MpClaims, FALLBACK_BORRADOR, MATRIZ_NEGATIVA_VERSION,
-    STRIP_VERSION,
+    consumir_minuto, matriz_negativa, registrar_token, resumen_uso, strip_ficha_para_prompt,
+    sub_exento, validar_borrador, BorradorRequest, MpClaims, FALLBACK_BORRADOR,
+    MATRIZ_NEGATIVA_VERSION, STRIP_VERSION,
 };
 use crate::AppState;
 
@@ -317,4 +316,29 @@ pub fn routes() -> Router<AppState> {
         .route("/marketplace/token", post(emitir_token))
         .route("/marketplace/borrador", post(borrador))
         .route("/marketplace/audit", post(audit))
+        .route("/marketplace/uso", get(uso))
+}
+
+/// [03AA-3 M2] Dashboard agregado para el panel: conteos por día y evento de
+/// los últimos `dias` (default 7, tope 90). Solo JWT admin; sin PII.
+#[derive(Debug, Clone, Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
+pub struct UsoQuery {
+    pub dias: Option<i32>,
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/admin/marketplace/uso",
+    params(UsoQuery),
+    responses(
+        (status = 200, description = "Uso agregado por día", body = Vec<crate::services::marketplace::UsoDia>)
+    )
+)]
+pub async fn uso(
+    State(state): State<AppState>,
+    _auth: AuthUser,
+    Query(q): Query<UsoQuery>,
+) -> Result<Response, AppError> {
+    let filas = resumen_uso(&state.pool, q.dias.unwrap_or(7)).await?;
+    Ok((StatusCode::OK, Json(filas)).into_response())
 }
