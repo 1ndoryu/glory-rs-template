@@ -529,8 +529,20 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 - E0 ejecutado 2026-10-05 (día 1 de 3, solo lectura): freeze cifrado en
   `%MP_PRIVADO%` + inventario + firma-v1 + anonimizar/verificador + fixture
   sintética + corpus (3 hilos copiados + 1 de visita dictado por ti, ANON_OK).
-  Falta de tu parte para cerrar E0: remoto del repo + fecha de viva 30min;
-  sin eso E0 no cierra. E1 bloqueado hasta E0 real; E2+ espera tus puntos restantes.
+  E1 hecho: repo local `../plugins-opencode` (rama `main`, sin remoto) con
+  núcleo agnóstico (excerpt 5 campos, firma-v1, lector, intención, schema M3)
+  31/31 tests verdes. E2 hecho: bridge simétrico + flag `MP_NUCLEO=off`
+  (fail-safe) + paridad 7/7 sobre corpus real (el plan pedía 10/10; el corpus
+  trae 7 mensajes literales: hilo-04 es dictado no literal y se excluyó).
+  M3 hecho 2026-10-06 (commit 81244ec1): migración `mp_tokens_emitidos` +
+  `mp_uso_minuto` + `mp_auditoria`, strip allowlist 6 campos, JWT mp 15min con
+  `jti`+revocación, cubo 429 (5/min token, 30/min borrador) con `Retry-After`,
+  matriz negativa v1, audit con HMAC server-side; gate: fmt+check+clippy limpios,
+  82/82 tests (6 nuevos), medida mock p50=0.01ms p95=0.03ms, prueba viva
+  (login 200, token 201, borrador 200 fuente=ia, audit 201 HMAC sin PII, 429 OK;
+  la viva cazó `RETURNING n` INT4→i64, fixeado con `::BIGINT`).
+  Activo: M2 (panel con `selectores.json` + `registerMode` + dashboard uso).
+  Falta de tu parte para cerrar E0: remoto del repo + fecha de viva 30min.
 
 ## 03AA-4 — WhatsApp un solo número + triage + config + escenarios (plan activo 2026-10-03)
 - Plan: `Agente/planes/plan-whatsapp-numero-unico-2026-10-03.md`.
