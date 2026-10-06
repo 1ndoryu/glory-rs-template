@@ -2,6 +2,7 @@ mod alerta_whatsapp;
 mod auth;
 mod canal_resolver;
 mod inmueble;
+pub mod marketplace;
 mod note;
 mod outbox_idempotency;
 mod solicitud;

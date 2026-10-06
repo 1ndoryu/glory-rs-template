@@ -8,6 +8,7 @@ mod chat_tools;
 mod health;
 mod ia;
 mod inmuebles;
+pub mod marketplace;
 mod notes;
 mod public;
 mod solicitud;
@@ -84,6 +85,9 @@ impl utoipa::Modify for SecurityAddon {
         solicitud::revisar_solicitud,
         visita::list_visitas,
         visita::revisar_visita,
+        marketplace::emitir_token,
+        marketplace::borrador,
+        marketplace::audit,
         public::list_public,
         public::get_public,
         suscriptor::suscribir,
@@ -119,6 +123,16 @@ impl utoipa::Modify for SecurityAddon {
         crate::models::Visita,
         crate::models::PaginatedVisitas,
         crate::models::UpdateEstadoVisita,
+        crate::services::marketplace::PromptSeguro,
+        crate::services::marketplace::BorradorRequest,
+        crate::services::marketplace::ExcerptIn,
+        crate::services::marketplace::ExtrasIn,
+        crate::services::marketplace::Tono,
+        crate::services::marketplace::Largo,
+        crate::handlers::marketplace::TokenResponse,
+        crate::handlers::marketplace::BorradorResponse,
+        crate::handlers::marketplace::AuditIn,
+        crate::handlers::marketplace::EventoAudit,
         crate::models::CreateSuscriptorRequest,
         crate::models::Suscriptor,
         crate::errors::ErrorResponse,
@@ -253,6 +267,8 @@ fn admin_routes() -> Router<AppState> {
         .merge(visita::admin_routes())
         .merge(uploads::routes())
         .merge(users::routes())
+        /* [03AA-3 M3] Asistente Marketplace: token mp, borrador y audit. */
+        .merge(marketplace::routes())
         /* [169A-4] Atención del chat: bandeja, hilo, responder, tomar/soltar
          * IA y config (rutas bajo /api/admin/agent). */
         .merge(chat_staff::staff_routes())

@@ -509,7 +509,9 @@ async fn completar_glory(
         .ok_or_else(|| "GloryAPI devolvio una respuesta sin texto".to_string())
 }
 
-async fn completar_opencode(
+/* [03AA-3 M3] Se expone al handler `marketplace` para generar borradores;
+ * sigue sin ruta HTTP propia (solo `probar`/`completar` del centro de IA). */
+pub(crate) async fn completar_opencode(
     system: &str,
     texto: &str,
     fotos: &[String],
