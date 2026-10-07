@@ -45,6 +45,51 @@ pub(crate) const FALLBACK_TEXTO: &str =
     "Se me complicó con eso, ¿me lo repites en un momentico? 🙏";
 pub(crate) const AVISO_ASESOR_TEXTO: &str = "Dame un momentico que ya te atiende un asesor 🙏";
 
+/// Claves de `agent_config` con el tono editable (F4 las expone en admin).
+pub(crate) const CLAVE_ACUSE: &str = "whatsapp_acuse_texto";
+pub(crate) const CLAVE_FALLBACK: &str = "whatsapp_fallback_texto";
+pub(crate) const CLAVE_AVISO_ASESOR: &str = "whatsapp_aviso_asesor_texto";
+
+/// Tono efectivo del turno (dueño de los `String` para el background).
+pub(crate) struct TextosTono {
+    pub(crate) acuse: String,
+    pub(crate) fallback: String,
+    pub(crate) aviso_asesor: String,
+}
+
+/// Valor efectivo: `None` o vacío = constante por defecto (el admin que
+/// borra el campo vuelve al tono de fábrica, nunca al silencio).
+/* [07AA-1 F4] Pura para testear; la lectura real es `leer_tono`. */
+pub(crate) fn texto_efectivo<'a>(valor: Option<&'a str>, defecto: &'a str) -> &'a str {
+    match valor {
+        Some(v) if !v.trim().is_empty() => v,
+        _ => defecto,
+    }
+}
+
+/// Lee el tono desde `agent_config` (3 lecturas en camino excepcional: turno
+/// lento, escalada o fallo — nunca en el camino caliente del 2xx). Fallo o
+/// vacío = constantes (`ACUSE_TEXTO`, `FALLBACK_TEXTO`, `AVISO_ASESOR_TEXTO`).
+pub(crate) async fn leer_tono(pool: &sqlx::PgPool) -> TextosTono {
+    let acuse = glory_agent::persistence::get_config(pool, CLAVE_ACUSE)
+        .await
+        .ok()
+        .flatten();
+    let fallback = glory_agent::persistence::get_config(pool, CLAVE_FALLBACK)
+        .await
+        .ok()
+        .flatten();
+    let aviso = glory_agent::persistence::get_config(pool, CLAVE_AVISO_ASESOR)
+        .await
+        .ok()
+        .flatten();
+    TextosTono {
+        acuse: texto_efectivo(acuse.as_deref(), ACUSE_TEXTO).to_string(),
+        fallback: texto_efectivo(fallback.as_deref(), FALLBACK_TEXTO).to_string(),
+        aviso_asesor: texto_efectivo(aviso.as_deref(), AVISO_ASESOR_TEXTO).to_string(),
+    }
+}
+
 /// Parte el texto final en mensajes breves (por líneas en blanco, máx
 /// `MAX_PARTES`; el sobrante se funde en la última parte). Pura para testear.
 /* [011A-5 Fase2] `pub(crate)`: la sombra compara este partido contra el
@@ -331,7 +376,8 @@ fn programar_acuse(
             return;
         }
         tracing::info!("webhook WhatsApp: {sesion} turno lento, encolando acuse");
-        encolar_texto_ia(&pool, sesion, &destino, &canal, "acuse", ACUSE_TEXTO).await;
+        let tono = leer_tono(&pool).await;
+        encolar_texto_ia(&pool, sesion, &destino, &canal, "acuse", &tono.acuse).await;
     });
 }
 
@@ -403,7 +449,8 @@ pub(crate) async fn atender_resultado_turno(
             }
             /* [E-fluido F4] La escalada ya no es silencio para el
              * visitante: se le dice que viene un asesor. */
-            encolar_texto_ia(pool, sesion, destino, canal, "asesor", AVISO_ASESOR_TEXTO).await;
+            let tono = leer_tono(pool).await;
+            encolar_texto_ia(pool, sesion, destino, canal, "asesor", &tono.aviso_asesor).await;
             if let Err(e) = ClienteRepository::marcar_atencion(pool, sesion, "consultando").await {
                 tracing::error!(
                     "webhook WhatsApp: {sesion} sin respuesta IA y no se pudo escalar: {e}"
@@ -420,7 +467,8 @@ pub(crate) async fn atender_resultado_turno(
              * próximo mensaje. */
             vivo.store(false, Ordering::Relaxed);
             tracing::warn!("webhook WhatsApp: {sesion} turno IA falló: {e}");
-            encolar_texto_ia(pool, sesion, destino, canal, "fallback", FALLBACK_TEXTO).await;
+            let tono = leer_tono(pool).await;
+            encolar_texto_ia(pool, sesion, destino, canal, "fallback", &tono.fallback).await;
         }
     }
 }
@@ -431,4 +479,18 @@ pub(crate) async fn atender_resultado_turno(
 #[must_use]
 pub(crate) fn debe_escalar_consultando(ciclo: Option<&str>) -> bool {
     ciclo != Some("answered")
+}
+
+#[cfg(test)]
+mod pruebas {
+    use super::{texto_efectivo, ACUSE_TEXTO};
+
+    /* [07AA-1 F4] El tono configurado manda; `None` o vacío = fábrica. */
+    #[test]
+    fn texto_efectivo_respeta_config_o_fabrica() {
+        assert_eq!(texto_efectivo(Some("Ya voy 👀"), ACUSE_TEXTO), "Ya voy 👀");
+        assert_eq!(texto_efectivo(None, ACUSE_TEXTO), ACUSE_TEXTO);
+        assert_eq!(texto_efectivo(Some(""), ACUSE_TEXTO), ACUSE_TEXTO);
+        assert_eq!(texto_efectivo(Some("   "), ACUSE_TEXTO), ACUSE_TEXTO);
+    }
 }

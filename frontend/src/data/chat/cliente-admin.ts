@@ -24,13 +24,23 @@ export interface ResumenSesion {
   updated_at: string;
 }
 
-/* Allowlist del backend (`CLAVES_CONFIG` en `chat_staff.rs`). */
+/* Allowlist del backend (`CLAVES_CONFIG` en `chat_staff.rs`; [07AA-1 F4]
+ * todo-controlable: números A/B, ventana, autorizados, tope, corte y tono). */
 export const CLAVES_CONFIG = [
   'prompt_extra',
   'contacto_telefono',
   'whatsapp_admin',
+  'wa_numero_a',
+  'wa_numero_b',
   'ai_enabled_global',
   'tools_deshabilitadas',
+  'ventana_retraso_min',
+  'whatsapp_autorizados',
+  'ia_tope_tokens_dia',
+  'corte_whatsapp',
+  'whatsapp_acuse_texto',
+  'whatsapp_fallback_texto',
+  'whatsapp_aviso_asesor_texto',
 ] as const;
 export type ClaveConfig = (typeof CLAVES_CONFIG)[number];
 export type MapaConfig = Record<ClaveConfig, string | null>;

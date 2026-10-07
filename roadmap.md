@@ -611,6 +611,15 @@ sin firma M1 prohibido).
     `atiende:neutral`/`publico` con breve+califica,
     `atiende:cliente`/`autorizado`, reutiliza hilo). Próximo: F4 config
     admin.
+  - 07AA-1 F4 config admin (hecha 2026-10-06): expone en
+    `PUT /api/admin/agent/config` + panel `ventana_retraso_min`,
+    `whatsapp_autorizados`, `ia_tope_tokens_dia`, `corte_whatsapp` y tono
+    (`whatsapp_acuse/fallback/aviso_asesor_texto`, que el turno lee con
+    fallback a constantes); `wa_numero_a/b` ya editables en backend salen
+    en el front; fix `config_triage` a columnas `key/value` (estaba
+    fail-open silencioso); `GLORY_ALERT_GATEWAY_URL` queda env (infra, no
+    UI); `prompt_extra` sigue guardada sin lector (deuda). Próximo: F5
+    retirar `wa_b`.
 
 ## 03AA-5 — Detector de captación Marketplace (REPLANTEADO 2026-10-03, bloqueado)
 - Plan: `Agente/planes/plan-detector-captacion-2026-10-03.md` (incorpora reto

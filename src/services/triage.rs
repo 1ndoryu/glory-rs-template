@@ -419,9 +419,12 @@ async fn foto_hilo(pool: &sqlx::PgPool, sesion: Uuid) -> FotoHilo {
 
 /// Lee `ai_enabled_global` + `ventana_retraso_min` en una consulta. Fallo o
 /// valor raro = fail-open (`true`, `VENTANA_RETRASO_MIN_DEFAULT`).
+/* [07AA-1 F4] Columnas `key`/`value` (la tabla las llama así desde
+ * `20260916000008_agent_config`): con `clave`/`valor` la consulta fallaba
+ * siempre y el `unwrap_or_default` lo escondía en fail-open silencioso. */
 async fn config_triage(pool: &sqlx::PgPool) -> (bool, i64) {
     let filas = sqlx::query_as::<_, (String, Option<String>)>(
-        "SELECT clave, valor FROM agent_config WHERE clave IN ($1, $2)",
+        "SELECT key, value FROM agent_config WHERE key IN ($1, $2)",
     )
     .bind(CLAVE_IA_GLOBAL)
     .bind(CLAVE_VENTANA)
