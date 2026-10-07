@@ -44,6 +44,7 @@
     ]
   },
   "orphanClassDetection": {
-    "minClassLength": 3
+    "minClassLength": 3,
+    "excludeClassPatterns": ["uplot", "u-legend", "tiptap", "is-editor-empty"]
   }
 }
