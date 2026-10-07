@@ -77,6 +77,9 @@ pub struct ExcerptIn {
     pub remitente_hash: String,
     pub texto: String,
     pub hora: String,
+    /* [C1-lab 2026-10-07] default: el puente del piloto no lo manda y no se
+     * usa en ningun calculo; exigirlo rompia la integracion con 422. */
+    #[serde(default)]
     pub leido: bool,
 }
 
