@@ -581,6 +581,15 @@ Siguiente: C1 (NUEVO 2026-10-07 [07AA-5]: cableado en opencode-propio —
   (`adapter_defaults_sin_config` borra `adapter_responde_ia_global` mientras
   otros la escriben; falla 1/2 corridas full, en aislamiento 9/9 verde).
 
+## 07AA-6 — Flujo lab opencode-propio-dev (plan nuevo 2026-10-07)
+
+- Plan: `Agente/planes/plan-flujo-lab-opencode-propio-2026-10-07.md`.
+- Su app corre en dev con recarga (guardar rompe); su checkout con cambios
+  sin guardar. Lab hermano ya creado + regla `LEEME-LAB.md`.
+- Fases: F1 skill `lab-opencode` + F2 promoción con diff-first y manifest +
+  F3 piloto C1 de 03AA-3 + F4 prohibiciones. Sin git en el lab (decidido).
+- Estado: plan listo, pendiente ejecución. C1 espera a F1+F2.
+
 ## 03AA-4 — WhatsApp un solo número + triage + config + escenarios (cerrada 2026-10-07: ver `Agente/completados/tareas-2026-10-07.md`)
 - Plan: `Agente/planes/completados/plan-whatsapp-numero-unico-2026-10-03.md`.
 - Un asistente general en el 0412 0825234 (el mismo de la web); se jubila el
