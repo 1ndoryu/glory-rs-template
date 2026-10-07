@@ -21,7 +21,8 @@ use glory_agent::errors::AgentError;
  * Baileys tendrá 2 sesiones (una por número) y llamará aquí con
  * `numero_destino` (el número MN que recibió) + `remitente` (el cliente) +
  * `texto` (+ `media_url` opcional para fotos solo-enviar/recibir).
- * El reparto es por destino: A→`wa_a`/`completo`, B→`wa_b`/`inicial`.
+ * El reparto es por destino: solo A atiende (`wa_a`/`completo`); el B
+ * jubilado calla con motivo `no:canal-jubilado` (F5) y lo desconocido es 400.
  * Un hilo por cliente×canal (web y WhatsApp no mezclan hilos, se enlazan por
  * `clientes`); el mensaje entra como `client` (mismo `sender` del núcleo) y
  * el trigger `registrar_uso_estimado()` lo cuenta en `uso_mensajes`.
@@ -108,6 +109,27 @@ async fn webhook(
         .ok_or_else(|| AgentError::Internal("sin BD".to_string()))?;
     let (a, b) = numeros_configurados(&pool).await;
     let (mut rep, medios) = repartir_y_vincular(&pool, &state.hub, &a, &b, &entrada).await?;
+    /* [07AA-2 F5] Destino jubilado (`ok:false`): el 2xx lleva el motivo ya
+     * fijado (`no:canal-jubilado`) sin triage ni turno; solo se resuelven
+     * `rol`/`trato` para que el recibo venga completo. Nada persistió. */
+    if !rep.ok {
+        let remitente_norm = ClienteRepository::normalizar_telefono(entrada.remitente.trim());
+        let trato = triage::evaluar_trato(entrada.texto.trim()).trato;
+        let regla = politica::resolver(
+            &politica::leer_autorizados(&pool).await,
+            &remitente_norm,
+            trato,
+        );
+        rep.rol = regla.rol.codigo().to_string();
+        rep.trato = politica::codigo_trato(regla.trato).to_string();
+        tracing::warn!(
+            "webhook WhatsApp: destino jubilado {} (rol={} trato={})",
+            rep.canal,
+            rep.rol,
+            rep.trato
+        );
+        return Ok(Json(rep));
+    }
     /* [06AA-1] Triage F1: el mensaje ya persistió (auditoría/panel); si la
      * decisión es `no`, el 2xx lleva el motivo y no corre turno.
      * [06AA-2] Política F2: rol por allowlist + trato→tono. Se resuelve en
@@ -175,28 +197,31 @@ mod pruebas {
     /* [06AA-3 F3] Las pruebas se quedaron en la orquesta: importan lo que se
      * mudó a `services/` (el resto sigue llegando por `super::*`). */
     use crate::services::sesion::AudioPendiente;
-    use crate::services::transporte::reparto;
+    use crate::services::transporte::{destino_jubilado, reparto};
     use crate::services::turno::{
         atender_resultado_turno, cuerpo_audio_con_texto, debe_escalar_consultando,
         hay_avance_turno, partir_respuesta, transcribir_y_anexar, ACUSE_TEXTO, AVISO_ASESOR_TEXTO,
         ESPERA_ACUSE_MS, FALLBACK_TEXTO, MAX_PARTES,
     };
 
+    /* [07AA-2 F5] Solo A reparte; B es jubilado (calla con motivo) y lo
+     * demás sigue sin reparto. */
     #[test]
-    fn reparto_lleva_cada_numero_a_su_modo() {
+    fn reparto_solo_atiende_al_numero_a() {
         assert_eq!(
-            reparto("584120825234", "584249208855", "0412 0825234"),
+            reparto("584120825234", "0412 0825234"),
             Some(("wa_a", "completo"))
         );
         assert_eq!(
-            reparto("584120825234", "584249208855", "0424 9208855"),
-            Some(("wa_b", "inicial"))
-        );
-        assert_eq!(
-            reparto("584120825234", "584249208855", "+584120825234"),
+            reparto("584120825234", "+584120825234"),
             Some(("wa_a", "completo"))
         );
-        assert_eq!(reparto("584120825234", "584249208855", "04120000000"), None);
+        assert_eq!(reparto("584120825234", "0424 9208855"), None);
+        assert_eq!(reparto("584120825234", "04120000000"), None);
+        assert!(destino_jubilado("584249208855", "0424 9208855"));
+        assert!(destino_jubilado("584249208855", "+584249208855"));
+        assert!(!destino_jubilado("584249208855", "0412 0825234"));
+        assert!(!destino_jubilado("584249208855", "04120000000"));
     }
 
     /* [279A-2] Secreto del gateway: sin configurar acepta todo (simulado);
@@ -359,10 +384,11 @@ mod pruebas {
             .unwrap();
     }
 
-    /* [279A-2 F2] El mismo cliente×canal reutiliza hilo; otro canal abre otro
-     * (web y WhatsApp no mezclan hilos). Sin `DATABASE_URL` se omite. */
+    /* [279A-2 F2] El mismo cliente×canal reutiliza hilo (web y WhatsApp no
+     * mezclan hilos). [07AA-2 F5] Al B jubilado no se le crea nada: recibo
+     * `ok:false` con motivo y cero filas. Sin `DATABASE_URL` se omite. */
     #[tokio::test]
-    async fn webhook_reutiliza_hilo_por_cliente_canal() {
+    async fn webhook_reutiliza_hilo_y_jubila_b_sin_persistir() {
         let Some(pool) = pool_si_hay() else { return };
         let hub = glory_agent::session::ChatHub::new();
         let numero_a = "584120825234";
@@ -382,17 +408,19 @@ mod pruebas {
         let (r1, _) = repartir_y_vincular(&pool, &hub, numero_a, numero_b, &entrada_a)
             .await
             .unwrap();
+        assert!(r1.ok);
         assert_eq!((r1.canal.as_str(), r1.modo.as_str()), ("wa_a", "completo"));
         let (r2, _) = repartir_y_vincular(&pool, &hub, numero_a, numero_b, &entrada_a)
             .await
             .unwrap();
         assert_eq!(r1.session_id, r2.session_id);
+        let remitente_b = format!("34608{:05}", rand_num());
         let entrada_b = EntradaWhatsapp {
             numero_destino: numero_b.to_string(),
-            remitente: remitente.clone(),
+            remitente: remitente_b.clone(),
             texto: "hola B".to_string(),
             nombre: None,
-            media_url: Some("https://example.com/foto.jpg".to_string()),
+            media_url: None,
             ts_ms: None,
             from_me: None,
             es_sistema: None,
@@ -401,43 +429,42 @@ mod pruebas {
         let (r3, _) = repartir_y_vincular(&pool, &hub, numero_a, numero_b, &entrada_b)
             .await
             .unwrap();
-        assert_eq!((r3.canal.as_str(), r3.modo.as_str()), ("wa_b", "inicial"));
-        assert_ne!(r1.session_id, r3.session_id);
-        let modo_b: String =
-            sqlx::query_scalar("SELECT modo FROM atencion_sesiones WHERE session_id = $1")
-                .bind(r3.session_id)
-                .fetch_one(&pool)
+        assert!(!r3.ok);
+        assert_eq!(r3.decision.as_str(), "no:canal-jubilado");
+        assert_eq!((r3.canal.as_str(), r3.modo.as_str()), ("wa_b", "jubilado"));
+        let sin_cliente: Option<Uuid> =
+            sqlx::query_scalar("SELECT id FROM clientes WHERE telefono = $1")
+                .bind(&remitente_b)
+                .fetch_optional(&pool)
                 .await
                 .unwrap();
-        assert_eq!(modo_b, "inicial");
+        assert!(sin_cliente.is_none());
 
-        for sid in [r1.session_id, r3.session_id] {
-            sqlx::query("DELETE FROM agent_messages WHERE session_id = $1")
-                .bind(sid)
-                .execute(&pool)
-                .await
-                .unwrap();
-            sqlx::query("DELETE FROM canal_sesiones WHERE session_id = $1")
-                .bind(sid)
-                .execute(&pool)
-                .await
-                .unwrap();
-            sqlx::query("DELETE FROM atencion_sesiones WHERE session_id = $1")
-                .bind(sid)
-                .execute(&pool)
-                .await
-                .unwrap();
-            sqlx::query("DELETE FROM agent_response_cycles WHERE session_id = $1")
-                .bind(sid)
-                .execute(&pool)
-                .await
-                .unwrap();
-            sqlx::query("DELETE FROM agent_sessions WHERE id = $1")
-                .bind(sid)
-                .execute(&pool)
-                .await
-                .unwrap();
-        }
+        sqlx::query("DELETE FROM agent_messages WHERE session_id = $1")
+            .bind(r1.session_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM canal_sesiones WHERE session_id = $1")
+            .bind(r1.session_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM atencion_sesiones WHERE session_id = $1")
+            .bind(r1.session_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM agent_response_cycles WHERE session_id = $1")
+            .bind(r1.session_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM agent_sessions WHERE id = $1")
+            .bind(r1.session_id)
+            .execute(&pool)
+            .await
+            .unwrap();
         sqlx::query("DELETE FROM clientes WHERE id = $1")
             .bind(r1.cliente_id)
             .execute(&pool)

@@ -620,6 +620,11 @@ sin firma M1 prohibido).
     fail-open silencioso); `GLORY_ALERT_GATEWAY_URL` queda env (infra, no
     UI); `prompt_extra` sigue guardada sin lector (deuda). Próximo: F5
     retirar `wa_b`.
+  - 07AA-2 F5 retirar `wa_b` (hecha 2026-10-07): solo A reparte
+    (`reparto` sin B + `destino_jubilado`); destino B → 2xx
+    `no:canal-jubilado` sin persistir ni turno; destino desconocido sigue
+    400; envío manual staff por `wa_b` queda (explícito + auditado,
+    gateway B mudo lo frena); gateway intacto. Próximo: F6 escenarios.
 
 ## 03AA-5 — Detector de captación Marketplace (REPLANTEADO 2026-10-03, bloqueado)
 - Plan: `Agente/planes/plan-detector-captacion-2026-10-03.md` (incorpora reto

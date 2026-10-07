@@ -119,13 +119,14 @@ pub async fn adapter_config_desde_bd(pool: &sqlx::PgPool) -> AdapterConfig {
 pub async fn huella(
     pool: &sqlx::PgPool,
     numero_a: &str,
-    numero_b: &str,
     numero_destino: &str,
     remitente: &str,
     texto: &str,
 ) -> HuellaSombra {
     let remitente_norm = ClienteRepository::normalizar_telefono(remitente);
-    let (canal, modo) = match reparto(numero_a, numero_b, numero_destino) {
+    /* [07AA-2 F5] Solo A reparte (el B jubilado y lo desconocido dan
+     * `None`, igual que antes lo desconocido): sin canal no hay sesión. */
+    let (canal, modo) = match reparto(numero_a, numero_destino) {
         Some((c, m)) => (Some(c.to_string()), Some(m.to_string())),
         None => (None, None),
     };
@@ -186,12 +187,11 @@ pub(crate) async fn comparar(
     if !sombra_activa() {
         return Err(AppError::NotFound("sombra apagada".to_string()));
     }
-    let (numero_a, numero_b) = numeros_configurados(&state.pool).await;
+    let (numero_a, _numero_b) = numeros_configurados(&state.pool).await;
     Ok(Json(
         huella(
             &state.pool,
             &numero_a,
-            &numero_b,
             &entrada.numero_destino,
             &entrada.remitente,
             &entrada.texto,
@@ -215,6 +215,14 @@ mod pruebas {
             .connect_lazy(&url)
             .ok()
     }
+
+    /* [07AA-2 F5] Los tests comparten la clave global
+     * `adapter_responde_ia_global` (uno la pone a `0`, otros esperan el
+     * default on): sin este candado el runner paralelo los cruza y
+     * `diff_coincide_en_sesion_sana` lee `Some(false)` (visto en F5).
+     * `tokio::sync` para no bloquear el executor entre `await`. */
+    static BLOQUEO_ADAPTER_CONFIG: std::sync::LazyLock<tokio::sync::Mutex<()>> =
+        std::sync::LazyLock::new(|| tokio::sync::Mutex::new(()));
 
     /* [011A-2] La sombra solo existe con `GLORY_SHADOW=1` exacto. */
     #[test]
@@ -245,7 +253,6 @@ mod pruebas {
         let h = huella(
             &pool,
             "584120825234",
-            "584249208855",
             "0412 0825234",
             "+34609123456",
             "hola",
@@ -256,15 +263,7 @@ mod pruebas {
         assert_eq!(h.modo.as_deref(), Some("completo"));
         assert!(h.session_id.is_none());
         assert_eq!(h.tokens_est, 1);
-        let h2 = huella(
-            &pool,
-            "584120825234",
-            "584249208855",
-            "04120000000",
-            "+34609123456",
-            "hola",
-        )
-        .await;
+        let h2 = huella(&pool, "584120825234", "04120000000", "+34609123456", "hola").await;
         assert!(h2.canal.is_none());
         assert!(h2.modo.is_none());
         assert!(h2.session_id.is_none());
@@ -290,7 +289,6 @@ mod pruebas {
         let h = huella(
             &pool,
             "584120825234",
-            "584249208855",
             "584120825234",
             tel,
             "hola, busco piso",
@@ -364,6 +362,7 @@ mod pruebas {
     #[tokio::test]
     async fn adapter_defaults_sin_config() {
         let Some(pool) = pool_si_hay() else { return };
+        let _bloqueo = BLOQUEO_ADAPTER_CONFIG.lock().await;
         for k in [
             "adapter_responde_ia_global",
             "adapter_tope_mensajes_dia",
@@ -392,6 +391,7 @@ mod pruebas {
     #[tokio::test]
     async fn adapter_global_apagado_apaga_ambas() {
         let Some(pool) = pool_si_hay() else { return };
+        let _bloqueo = BLOQUEO_ADAPTER_CONFIG.lock().await;
         glory_agent::persistence::set_config(&pool, "adapter_responde_ia_global", "0")
             .await
             .unwrap();
@@ -410,6 +410,7 @@ mod pruebas {
     #[tokio::test]
     async fn diff_coincide_en_sesion_sana() {
         let Some(pool) = pool_si_hay() else { return };
+        let _bloqueo = BLOQUEO_ADAPTER_CONFIG.lock().await;
         sqlx::query("DELETE FROM agent_config WHERE key = 'adapter_responde_ia_global'")
             .execute(&pool)
             .await
@@ -428,15 +429,7 @@ mod pruebas {
         ClienteRepository::vincular_canal(&pool, sid, cliente.id, tel, "wa_a", "completo")
             .await
             .unwrap();
-        let h = huella(
-            &pool,
-            "584120825234",
-            "584249208855",
-            "584120825234",
-            tel,
-            "hola",
-        )
-        .await;
+        let h = huella(&pool, "584120825234", "584120825234", tel, "hola").await;
         assert_eq!(h.responde_ia_adapter, Some(true));
         assert_eq!(h.responde_ia_sesion, Some(true));
         assert_eq!(h.via_permitida, Some(true));

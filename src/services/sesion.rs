@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use crate::handlers::chat_tools::telefono_valido;
 use crate::repositories::ClienteRepository;
-use crate::services::transporte::{reparto, EntradaWhatsapp};
+use crate::services::transporte::{destino_jubilado, reparto, EntradaWhatsapp};
 use crate::services::{CanalResolver, InmuebleService};
 use glory_agent::channels::Resolver;
 use glory_agent::errors::AgentError;
@@ -179,6 +179,27 @@ pub struct RepartoWhatsapp {
     pub(crate) secuencia: i64,
 }
 
+impl RepartoWhatsapp {
+    /* [07AA-2 F5] Recibo sintético del destino jubilado: `ok:false` (el
+     * webhook lo devuelve 2xx sin triage ni turno), sin nada persistido.
+     * Los ids `nil` marcan "sin sesión/cliente/mensaje": nunca llegan al
+     * panel porque nada se guarda; solo viajan en el 2xx para el gateway. */
+    pub(crate) fn jubilado() -> Self {
+        Self {
+            ok: false,
+            canal: "wa_b".to_string(),
+            modo: "jubilado".to_string(),
+            session_id: Uuid::nil(),
+            cliente_id: Uuid::nil(),
+            mensaje_id: Uuid::nil(),
+            decision: "no:canal-jubilado".to_string(),
+            rol: "pendiente".to_string(),
+            trato: "pendiente".to_string(),
+            secuencia: 0,
+        }
+    }
+}
+
 /// Persiste la media entrante (`[foto]`/`[audio]`) y la emite por el hub.
 /// Best-effort con aviso: el mensaje de texto ya quedó guardado; la media no
 /// debe tumbarlo. Devuelve el id del mensaje para anexar la descripción (E11).
@@ -303,7 +324,18 @@ pub async fn repartir_y_vincular(
             return Err(AgentError::BadRequest("nombre <=80".to_string()));
         }
     }
-    let Some((canal, modo)) = reparto(numero_a, numero_b, destino_txt) else {
+    let Some((canal, modo)) = reparto(numero_a, destino_txt) else {
+        /* [07AA-2 F5] B jubilado: 2xx con motivo, sin persistir ni turno
+         * (el gateway reintentaría ante un 400). Lo desconocido sigue 400. */
+        if destino_jubilado(numero_b, destino_txt) {
+            return Ok((
+                RepartoWhatsapp::jubilado(),
+                MediosPendientes {
+                    foto: None,
+                    audio: None,
+                },
+            ));
+        }
         return Err(AgentError::BadRequest(
             "numero_destino desconocido".to_string(),
         ));

@@ -125,7 +125,8 @@ impl ClienteRepository {
     }
 
     /* [279A-2 F2] Vinculación del webhook: fija `canal`/`modo` del reparto
-     * (wa_a→completo, wa_b→inicial) y sincroniza el `modo` de la máquina
+     * ([07AA-2 F5] solo `wa_a`→`completo` en tráfico nuevo; `wa_b` jubilado)
+     * y sincroniza el `modo` de la máquina
      * propia sin tocar su `estado` (la máquina F3 es la única que lo cambia:
      * una ráfaga de WhatsApp no debe reabrir un hilo delegado). */
     pub async fn vincular_canal(

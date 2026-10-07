@@ -2,7 +2,10 @@
  * del gateway normalizado a decisión de encaminamiento, sin BD de negocio
  * (solo lee `agent_config` para los números A/B). Lo que era prefijo de
  * `handlers/whatsapp.rs` (DTO + secreto + números + reparto puro) vive aquí;
- * el webhook solo orquesta. Sin cambios de conducta: movimientos verbatim. */
+ * el webhook solo orquesta. Sin cambios de conducta: movimientos verbatim.
+ * [07AA-2 F5] Un solo número atiende: `reparto` solo reconoce A; el B
+ * jubilado se detecta con `destino_jubilado` (el flujo calla con motivo
+ * `no:canal-jubilado`, sin persistir ni turno) y lo demás sigue 400. */
 
 use serde::Deserialize;
 
@@ -59,23 +62,27 @@ pub(crate) async fn numeros_configurados(pool: &sqlx::PgPool) -> (String, String
     )
 }
 
-/// Reparto puro por destino (testeable sin BD): `wa_a`/`completo`, `wa_b`/`inicial`.
+/// Reparto puro por destino (testeable sin BD): solo A (`wa_a`/`completo`).
+/// [07AA-2 F5] El B jubilado y lo desconocido devuelven `None`: el flujo
+/// distingue con `destino_jubilado` (calla con motivo) del 400 clásico.
 /// El `modo` sale de `modo_por_canal` (fuente única, compartida con el resolutor).
 #[must_use]
-pub fn reparto(
-    numero_a: &str,
-    numero_b: &str,
-    numero_destino: &str,
-) -> Option<(&'static str, &'static str)> {
+pub fn reparto(numero_a: &str, numero_destino: &str) -> Option<(&'static str, &'static str)> {
     let destino = ClienteRepository::normalizar_telefono(numero_destino);
-    let canal = if destino == ClienteRepository::normalizar_telefono(numero_a) {
-        "wa_a"
-    } else if destino == ClienteRepository::normalizar_telefono(numero_b) {
-        "wa_b"
-    } else {
+    if destino != ClienteRepository::normalizar_telefono(numero_a) {
         return None;
-    };
+    }
+    let canal = "wa_a";
     Some((canal, modo_por_canal(canal)?))
+}
+
+/// Destino al número B jubilado (normalizado igual que el reparto): el
+/// webhook responde 2xx `no:canal-jubilado` sin persistir ni correr turno.
+/// No valida formato (eso lo hace `repartir_y_vincular` antes): solo compara.
+#[must_use]
+pub fn destino_jubilado(numero_b: &str, numero_destino: &str) -> bool {
+    ClienteRepository::normalizar_telefono(numero_destino)
+        == ClienteRepository::normalizar_telefono(numero_b)
 }
 
 /// Secreto compartido con el gateway Baileys (llega con F2 real): si

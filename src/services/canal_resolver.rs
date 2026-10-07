@@ -15,8 +15,10 @@ use uuid::Uuid;
 use crate::repositories::ClienteRepository;
 
 /// Modo de atención por canal (fuente única: antes vivía dentro de
-/// `reparto()` en `whatsapp.rs`; el resolutor también la necesita y el
-/// trait no recibe `modo`). Canal desconocido → `None`.
+/// `reparto()` en `whatsapp.rs`, hoy en `transporte.rs`; el resolutor también
+/// la necesita y el trait no recibe `modo`). Canal desconocido → `None`.
+/// [07AA-2 F5] El mapa conserva `wa_b`→`inicial` para sesiones legado (el
+/// reparto nuevo ya no lo emite).
 #[must_use]
 pub fn modo_por_canal(canal: &str) -> Option<&'static str> {
     match canal {

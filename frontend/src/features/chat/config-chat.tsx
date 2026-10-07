@@ -27,7 +27,7 @@ const BLOQUES: Bloque[] = [
     titulo: 'Números WhatsApp',
     campos: [
       { clave: 'wa_numero_a', etiqueta: 'Número A (canónico, 0412)', ayuda: 'El asistente general: mismo de la web. Dígitos con prefijo.' },
-      { clave: 'wa_numero_b', etiqueta: 'Número B (temporal, a jubilar)', ayuda: 'Solo mudo/inicial hasta F5. Dígitos con prefijo.' },
+      { clave: 'wa_numero_b', etiqueta: 'Número B (jubilado en F5)', ayuda: 'Ya no recibe ni responde: su tráfico calla con motivo. Se conserva para nombrar el silencio.' },
       { clave: 'contacto_telefono', etiqueta: 'Teléfono de contacto público', ayuda: 'Lo da la IA y sale en la ficha del chat.' },
     ],
   },
@@ -67,7 +67,7 @@ const BLOQUES: Bloque[] = [
     campos: [
       { clave: 'ventana_retraso_min', etiqueta: 'Ventana de retraso (min)', ayuda: 'Antigüedad máx del mensaje: 1–1440, fábrica 10.' },
       { clave: 'ia_tope_tokens_dia', etiqueta: 'Tope diario LLM (tokens)', ayuda: 'Solo alerta, nunca apaga. Fábrica 2000000.' },
-      { clave: 'corte_whatsapp', etiqueta: 'Corte idempotencia (vacío|total|wa_b|apagado)', ayuda: 'Base de F5: hoy solo cubre reintentos, no bloquea envíos.' },
+      { clave: 'corte_whatsapp', etiqueta: 'Corte idempotencia (vacío|total|wa_b|apagado)', ayuda: 'Hoy solo cubre reintentos, no bloquea envíos.' },
     ],
   },
 ];
