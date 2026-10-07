@@ -253,7 +253,7 @@ Consola área: NAKOMI = 73 (info/hints + waivers contados en crudo; gate propio
 16W). Plan: `Agente/planes/plan-barrido-consola-07AA-2026-10-07.md`.
 
 - **07AA-1** varsense x4 (uplot/tiptap): FP confirmado, prevencion vigente — CERRADA sin cambio.
-- **07AA-2** handler-accede-bd x4 → repos — código terminado y 4 queries verificadas live, pero BLOQUEADO: árbol HEAD no compila (errores ajenos E0432/E0603/E0599, detalle en plan). Propuesta **07AA-7** reparar árbol como prerrequisito; sin commit sobre árbol roto.
+- **07AA-2** handler-accede-bd x4 → repos — DESBLOQUEADA 2026-10-07: árbol HEAD compila; gate `task-check.mjs 07AA-2` PASS (fmt 9.0s + clippy `--all-targets -D warnings` 37.5s + sentinel 0E/9W/50I; `.quality-reports/check/07AA-2/latest.md`). Cero E0432/E0603/E0599 post-splits 07AA-14 (re-exports intactos en `coolify/mod.rs` y `vps/mod.rs`). Git limpio (`--help` accidental eliminado, `glory-rs` restaurado, plan de otra sesión preservado y commiteado). Pendiente: re-aplicar el DIP F2 (4 upserts en repos; ese código no está en este árbol).
 - **07AA-3** sqlite-carga-N x9: triage en 07AA-14 — mismas 5 familias FP 01AA-3/01AA-4-f3s, solo referencia, sin cambio.
 - **07AA-4** parametros-excesivos x13 (info): 11 preexistentes (email_admin x6, email_orders x3, checkout, lifecycle) + 2 reubicadas verbatim en `coolify/` — excepción clase 229A-1, sin churn (agrupar cambia firmas públicas).
 - **07AA-5** god-object x3 — CERRADA en 07AA-14 (splits + gate PASS, ver 07AA-14).
