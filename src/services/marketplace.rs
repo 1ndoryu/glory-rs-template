@@ -16,6 +16,29 @@ pub const STRIP_VERSION: &str = "v1";
 pub const MATRIZ_NEGATIVA_VERSION: u8 = 1;
 /// Fallback exacto cuando no hay ficha, falla la IA o salta la matriz.
 pub const FALLBACK_BORRADOR: &str = "Lo reviso y te confirmo precio/entrega por aquí";
+/// [07AA-8] Contacto fijo de los borradores (decisión de ella 2026-10-07):
+/// la IA no lo inventa, el prompt lo exige literal y la matriz exime
+/// exactamente estas dos cadenas (el resto de contactos sigue bloqueado).
+pub const CONTACTO_TEL: &str = "0424 9208855";
+pub const CONTACTO_WA: &str = "https://wa.me/584249208855";
+
+/// [07AA-8] Garantía determinista del formato: si el texto generado no trae
+/// el teléfono o el enlace, se agregan (teléfono como penúltima línea,
+/// enlace cerrando). Solo se aplica al borrador de IA, nunca al texto
+/// manual de la dueña.
+#[must_use]
+pub fn asegurar_contacto(texto: &str) -> String {
+    use std::fmt::Write as _;
+    let mut t = texto.trim_end().to_string();
+    if !t.contains(CONTACTO_TEL) {
+        let _ = write!(t, "\nCualquier cosa escríbeme al {CONTACTO_TEL}.");
+    }
+    if !t.contains(CONTACTO_WA) {
+        t.push('\n');
+        t.push_str(CONTACTO_WA);
+    }
+    t
+}
 
 /// Prompt seguro: solo los 6 campos del allowlist. La frase canónica de la
 /// ficha vive en la tabla `inmuebles`; el plugin jamás ve el resto.
@@ -164,22 +187,54 @@ fn es_hora_caracas(hora: &str) -> bool {
 }
 
 /// Matriz negativa v1 sobre el borrador generado: teléfono (7+ dígitos),
-/// email o URL → la IA no entrega contacto; lo añade la dueña a mano.
+/// email o URL → la IA no entrega contacto salvo el fijo de [07AA-8]
+/// (`CONTACTO_TEL` + `CONTACTO_WA` literales; lo demás sigue bloqueado).
 /// Devuelve el motivo o `None` si pasa.
 #[must_use]
 pub fn matriz_negativa(texto: &str) -> Option<&'static str> {
     let min = texto.to_lowercase();
-    if min.contains('@') {
+    let limpio = min
+        .replace(&CONTACTO_WA.to_lowercase(), "")
+        .replace(&CONTACTO_TEL.to_lowercase(), "");
+    if limpio.contains('@') {
         return Some("email");
     }
-    if min.contains("http") || min.contains("wa.me") || min.contains("www.") {
+    if limpio.contains("http") || limpio.contains("wa.me") || limpio.contains("www.") {
         return Some("url");
     }
-    let digitos: String = min.chars().filter(char::is_ascii_digit).collect();
+    let digitos: String = limpio.chars().filter(char::is_ascii_digit).collect();
     if digitos.len() >= 7 {
         return Some("telefono");
     }
     None
+}
+
+/// [07AA-8] Título del aviso desde el `thread_id` del puente
+/// (`comprador|aviso`, minúsculas, tope 120): contexto aproximado para abrir
+/// el borrador con la ficha breve cuando no hay `avisoId` (piloto: siempre).
+pub fn aviso_fb_de_thread(thread_id: &str) -> Option<String> {
+    let aviso = thread_id
+        .split('|')
+        .nth(1)
+        .map(str::trim)
+        .unwrap_or_default();
+    if aviso.is_empty() {
+        return None;
+    }
+    Some(aviso.to_string())
+}
+
+/// [07AA-8] Últimos borradores del hilo (máx 3, recientes primero): contexto
+/// "ya dicho" para que la IA avance la conversación en vez de repetir.
+pub async fn hilo_previo(pool: &sqlx::PgPool, thread: &str) -> Result<Vec<String>, AppError> {
+    let filas: Vec<String> = sqlx::query_scalar(
+        "SELECT respuesta FROM mp_respuestas_cache \
+         WHERE thread_id = $1 ORDER BY valida_hasta DESC LIMIT 3",
+    )
+    .bind(thread)
+    .fetch_all(pool)
+    .await?;
+    Ok(filas)
 }
 
 /// Claims del JWT mp (`iss mn-backend`, `aud mp`, `scope mp:borrador`).
@@ -665,7 +720,7 @@ impl Singleflight {
         if let Some(mut rx) = seguidor {
             rx.recv().await.unwrap_or_else(|_| {
                 std::sync::Arc::new(Generado {
-                    texto: FALLBACK_BORRADOR.to_string(),
+                    texto: asegurar_contacto(FALLBACK_BORRADOR),
                     fuente: "reserva".to_string(),
                 })
             })
@@ -798,7 +853,38 @@ mod pruebas {
         assert_eq!(matriz_negativa("Escríbeme a x@y.com"), Some("email"));
         assert_eq!(matriz_negativa("Mira wa.me/584121234567"), Some("url"));
         assert_eq!(matriz_negativa("Sí, sigue disponible en $43.000"), None);
+        /* [07AA-8] El contacto fijo pasa literal; cualquier otro, no. */
+        assert_eq!(
+            matriz_negativa("cualquier cosa escríbeme al 0424 9208855 https://wa.me/584249208855"),
+            None
+        );
+        assert_eq!(
+            matriz_negativa("Llama al 0424 9208855 y al 0412 0000000"),
+            Some("telefono")
+        );
         assert_eq!(MATRIZ_NEGATIVA_VERSION, 1);
+    }
+
+    #[test]
+    fn asegurar_contacto_agrega_lo_que_falta_y_respeta_lo_presente() {
+        let sin_nada = asegurar_contacto("Casa en Riberas.\nSí, aceptamos visita.");
+        assert!(sin_nada.contains(CONTACTO_TEL));
+        assert!(sin_nada.ends_with(CONTACTO_WA));
+        let completo = asegurar_contacto(&format!(
+            "Casa.\nCualquier cosa escríbeme al {CONTACTO_TEL}.\n{CONTACTO_WA}"
+        ));
+        assert_eq!(completo.matches(CONTACTO_TEL).count(), 1);
+        assert_eq!(completo.matches(CONTACTO_WA).count(), 1);
+    }
+
+    #[test]
+    fn aviso_fb_sale_del_hilo() {
+        assert_eq!(
+            aviso_fb_de_thread("javier|casa en venta en riberas del caroní, p..."),
+            Some("casa en venta en riberas del caroní, p...".to_string())
+        );
+        assert_eq!(aviso_fb_de_thread("sin-hilo"), None);
+        assert_eq!(aviso_fb_de_thread("solo|"), None);
     }
 
     #[test]
@@ -929,17 +1015,9 @@ mod pruebas {
     async fn cache_guarda_hit_y_cuenta_usos() {
         let Some(pool) = pool_si_hay() else { return };
         let (firma, ph, ch) = (clave_azar(), clave_azar(), clave_azar());
-        guardar_cache(
-            &pool,
-            &firma,
-            &ph,
-            &ch,
-            "texto-ia",
-            "hilo-1",
-            "Mayita: hola",
-        )
-        .await
-        .expect("guarda");
+        guardar_cache(&pool, &firma, &ph, &ch, "texto-ia", "hilo-1", "Dueña: hola")
+            .await
+            .expect("guarda");
         let hit = buscar_cache(&pool, &firma, &ph, &ch).await.expect("busca");
         assert_eq!(hit, Some(("texto-ia".to_string(), false)));
         /* [07AA-7] El panel agrupa por chat: hilo + foto guardados. */
@@ -953,7 +1031,7 @@ mod pruebas {
         .fetch_one(&pool)
         .await
         .expect("lee hilo");
-        assert_eq!(hilo, ("hilo-1".to_string(), "Mayita: hola".to_string()));
+        assert_eq!(hilo, ("hilo-1".to_string(), "Dueña: hola".to_string()));
         buscar_cache(&pool, &firma, &ph, &ch)
             .await
             .expect("busca x2");
@@ -1046,7 +1124,7 @@ mod pruebas {
             &ch,
             "nueva-ia",
             "hilo-2",
-            "Mayita: sigue disponible?",
+            "Dueña: sigue disponible?",
         )
         .await
         .expect("reemplaza");
@@ -1067,10 +1145,7 @@ mod pruebas {
         .expect("lee hilo");
         assert_eq!(
             hilo2,
-            (
-                "hilo-2".to_string(),
-                "Mayita: sigue disponible?".to_string()
-            )
+            ("hilo-2".to_string(), "Dueña: sigue disponible?".to_string())
         );
         borrar_cache(&pool, &firma, &ph, &ch).await.expect("limpia");
     }

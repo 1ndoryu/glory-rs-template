@@ -328,7 +328,9 @@ pub async fn borrador(
     let clave_vuelo = format!("{}:{precio_hash}:{catalog_hash}", r.firma);
     let gen = state
         .mp_vuelo
-        .ejecutar(&clave_vuelo, || generar_borrador(&r, seguro.as_ref()))
+        .ejecutar(&clave_vuelo, || {
+            generar_borrador(&r, seguro.as_ref(), &state.pool)
+        })
         .await;
     if gen.fuente == "ia" {
         guardar_cache(
@@ -385,7 +387,7 @@ pub async fn regenerar(
     borrar_cache(&state.pool, &r.firma, &precio_hash, &catalog_hash).await?;
     /* Bypass: directo a la IA, sin vuelo (Regenerar es gesto explícito; si
      * dos llegan juntas, la última que escribe gana por `reemplazar`). */
-    let gen = generar_borrador(&r, seguro.as_ref()).await;
+    let gen = generar_borrador(&r, seguro.as_ref(), &state.pool).await;
     if gen.fuente == "ia" {
         reemplazar_cache(
             &state.pool,
@@ -472,12 +474,28 @@ pub async fn corregir(
 async fn generar_borrador(
     r: &BorradorRequest,
     seguro: Option<&crate::services::marketplace::PromptSeguro>,
+    pool: &sqlx::PgPool,
 ) -> crate::services::marketplace::Generado {
-    use crate::services::marketplace::Generado;
+    use crate::services::marketplace::{
+        aviso_fb_de_thread, hilo_previo, Generado, CONTACTO_TEL, CONTACTO_WA,
+    };
     let datos = seguro.map_or_else(
         || "SIN FICHA: no conoces el inmueble; no afirmes precio ni medidas.".to_string(),
         |s| serde_json::to_string(s).unwrap_or_else(|_| "SIN FICHA".to_string()),
     );
+    /* [07AA-8] El aviso de Facebook viaja en el hilo (`comprador|aviso`):
+     * contexto aproximado para abrir con la ficha breve en el piloto. */
+    let aviso = aviso_fb_de_thread(r.thread_id.trim()).unwrap_or_else(|| "desconocido".to_string());
+    /* [07AA-8] Lo ya dicho en este hilo: la IA avanza, no repite. Si la BD
+     * falla aquí, se genera sin contexto (nunca se bloquea el borrador). */
+    let previas = hilo_previo(pool, r.thread_id.trim())
+        .await
+        .unwrap_or_default();
+    let ya_dicho = if previas.is_empty() {
+        "nada todavía".to_string()
+    } else {
+        previas.join(" / ")
+    };
     let tono = r.extras.as_ref().map_or("amable", |e| match e.tono {
         crate::services::marketplace::Tono::Corto => "corto",
         crate::services::marketplace::Tono::Amable => "amable",
@@ -485,10 +503,20 @@ async fn generar_borrador(
     });
     let sistema = format!(
         "Eres el asistente de MN Inmobiliaria respondiendo en Marketplace. \
-         Tono {tono}, máximo 3 líneas. Datos del inmueble: {datos}. \
-         Reglas: responde solo disponibilidad, precio o visita según pregunten; \
-         jamás inventes teléfono, email, dirección ni cifras fuera de los datos; \
-         si preguntan precio y no hay datos, responde exactamente: {FALLBACK_BORRADOR}"
+         Tono {tono}, máximo 6 líneas. Datos del inmueble: {datos}. \
+         Aviso en Facebook: {aviso}. \
+         La conversación trae marcas: `Cliente:` es el comprador, `Dueña:` \
+         es la dueña (tú no eres la dueña: no repitas lo que ella ya dijo). \
+         Responde la última pregunta del Cliente con coherencia. \
+         Formato obligatorio, en este orden exacto de 4 partes: abre con la \
+         ficha breve (propiedad, precio y zona según los datos o el aviso); \
+         responde la pregunta del Cliente; incluye siempre «cualquier cosa \
+         escríbeme al {CONTACTO_TEL}»; cierra siempre con {CONTACTO_WA}. \
+         Reglas: jamás inventes teléfono, email, dirección ni cifras fuera \
+         de los datos y el aviso; \
+         si preguntan precio y no hay datos, responde exactamente: {FALLBACK_BORRADOR} \
+         (el sistema agrega el contacto y el enlace al final). \
+         Ya le dijiste (no lo repitas igual): {ya_dicho}"
     );
     let texto = match crate::handlers::ia::completar_opencode(&sistema, &r.excerpt.texto, &[]).await
     {
@@ -496,7 +524,7 @@ async fn generar_borrador(
         Err(e) => {
             tracing::warn!("borrador mp: IA caída ({e}), va fallback");
             return Generado {
-                texto: FALLBACK_BORRADOR.to_string(),
+                texto: crate::services::marketplace::asegurar_contacto(FALLBACK_BORRADOR),
                 fuente: "reserva".to_string(),
             };
         }
@@ -504,12 +532,12 @@ async fn generar_borrador(
     if let Some(motivo) = matriz_negativa(&texto) {
         tracing::warn!("borrador mp: matriz negativa ({motivo}), va fallback");
         return Generado {
-            texto: FALLBACK_BORRADOR.to_string(),
+            texto: crate::services::marketplace::asegurar_contacto(FALLBACK_BORRADOR),
             fuente: "reserva".to_string(),
         };
     }
     Generado {
-        texto,
+        texto: crate::services::marketplace::asegurar_contacto(&texto),
         fuente: "ia".to_string(),
     }
 }
