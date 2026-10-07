@@ -24,7 +24,7 @@ use crate::middleware::AuthUser;
 use crate::repositories::InmuebleRepository;
 use crate::services::marketplace::{
     borrar_cache, buscar_cache, consumir_minuto, corregir_cache, detalle_chat, guardar_cache,
-    hash_ficha, matriz_negativa, precio_hash_seguro, reemplazar_cache, registrar_token,
+    hash_ficha, matriz_negativa_con_precio, precio_hash_seguro, reemplazar_cache, registrar_token,
     resumen_chats, resumen_uso, strip_ficha_para_prompt, sub_exento, validar_borrador,
     BorradorRequest, MpClaims, FALLBACK_BORRADOR, MATRIZ_NEGATIVA_VERSION, SIN_FICHA,
     STRIP_VERSION,
@@ -477,15 +477,24 @@ async fn generar_borrador(
     pool: &sqlx::PgPool,
 ) -> crate::services::marketplace::Generado {
     use crate::services::marketplace::{
-        aviso_fb_de_thread, hilo_previo, Generado, CONTACTO_TEL, CONTACTO_WA,
+        aviso_fb_de_thread, hilo_previo, precio_del_aviso, Generado, CONTACTO_TEL, CONTACTO_WA,
     };
-    let datos = seguro.map_or_else(
-        || "SIN FICHA: no conoces el inmueble; no afirmes precio ni medidas.".to_string(),
-        |s| serde_json::to_string(s).unwrap_or_else(|_| "SIN FICHA".to_string()),
-    );
     /* [07AA-8] El aviso de Facebook viaja en el hilo (`comprador|aviso`):
      * contexto aproximado para abrir con la ficha breve en el piloto. */
     let aviso = aviso_fb_de_thread(r.thread_id.trim()).unwrap_or_else(|| "desconocido".to_string());
+    /* [07AA-9] En el piloto no hay ficha, pero el título del aviso sí puede
+     * traer el precio publicado (`125.000$`): se extrae y se entrega como
+     * dato conocido para que la IA lo dé directo en vez del fallback. */
+    let precio_aviso = precio_del_aviso(&aviso);
+    let datos = match (&seguro, &precio_aviso) {
+        (Some(s), _) => serde_json::to_string(s).unwrap_or_else(|_| "SIN FICHA".to_string()),
+        (None, Some(p)) => format!(
+            "Precio publicado en el aviso: {p}. Sin ficha: no afirmes medidas, ubicación exacta ni otros datos; el precio del aviso sí dalo directo."
+        ),
+        (None, None) => {
+            "SIN FICHA: no conoces el inmueble; no afirmes precio ni medidas.".to_string()
+        }
+    };
     /* [07AA-8] Lo ya dicho en este hilo: la IA avanza, no repite. Si la BD
      * falla aquí, se genera sin contexto (nunca se bloquea el borrador). */
     let previas = hilo_previo(pool, r.thread_id.trim())
@@ -513,8 +522,9 @@ async fn generar_borrador(
          responde la pregunta del Cliente; incluye siempre «cualquier cosa \
          escríbeme al {CONTACTO_TEL}»; cierra siempre con {CONTACTO_WA}. \
          Reglas: jamás inventes teléfono, email, dirección ni cifras fuera \
-         de los datos y el aviso; \
-         si preguntan precio y no hay datos, responde exactamente: {FALLBACK_BORRADOR} \
+         de los datos y el aviso; el precio de los datos o del aviso dalo \
+         directamente con la cifra exacta; \
+         si preguntan precio y no hay precio en los datos ni en el aviso, responde exactamente: {FALLBACK_BORRADOR} \
          (el sistema agrega el contacto y el enlace al final). \
          Ya le dijiste (no lo repitas igual): {ya_dicho}"
     );
@@ -529,7 +539,7 @@ async fn generar_borrador(
             };
         }
     };
-    if let Some(motivo) = matriz_negativa(&texto) {
+    if let Some(motivo) = matriz_negativa_con_precio(&texto, precio_aviso.as_deref()) {
         tracing::warn!("borrador mp: matriz negativa ({motivo}), va fallback");
         return Generado {
             texto: crate::services::marketplace::asegurar_contacto(FALLBACK_BORRADOR),

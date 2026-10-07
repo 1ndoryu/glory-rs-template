@@ -13,7 +13,7 @@ use crate::models::InmuebleRow;
 /// Versión del strip aceptada (`strip_vN` del plan: hoy solo v1).
 pub const STRIP_VERSION: &str = "v1";
 /// Versión de la matriz negativa aplicada al borrador generado.
-pub const MATRIZ_NEGATIVA_VERSION: u8 = 1;
+pub const MATRIZ_NEGATIVA_VERSION: u8 = 2;
 /// Fallback exacto cuando no hay ficha, falla la IA o salta la matriz.
 pub const FALLBACK_BORRADOR: &str = "Lo reviso y te confirmo precio/entrega por aquí";
 /// [07AA-8] Contacto fijo de los borradores (decisión de ella 2026-10-07):
@@ -186,27 +186,138 @@ fn es_hora_caracas(hora: &str) -> bool {
     })
 }
 
-/// Matriz negativa v1 sobre el borrador generado: teléfono (7+ dígitos),
+/// Matriz negativa v2 sobre el borrador generado: teléfono (7+ dígitos),
 /// email o URL → la IA no entrega contacto salvo el fijo de [07AA-8]
 /// (`CONTACTO_TEL` + `CONTACTO_WA` literales; lo demás sigue bloqueado).
+/// Con `precio` conocido (v2, [07AA-9]): el literal citado y sus dígitos no
+/// cuentan — si no, "125.000$" + "3 habitaciones" sumaría 7 y caería como
+/// "teléfono". Compromiso: un teléfono alucinado que contenga los dígitos
+/// exactos del precio pasaría; el resto sigue bloqueado.
 /// Devuelve el motivo o `None` si pasa.
 #[must_use]
 pub fn matriz_negativa(texto: &str) -> Option<&'static str> {
+    matriz_negativa_con_precio(texto, None)
+}
+
+/// Variante con precio del aviso eximido (ver `matriz_negativa`).
+#[must_use]
+pub fn matriz_negativa_con_precio(texto: &str, precio: Option<&str>) -> Option<&'static str> {
     let min = texto.to_lowercase();
-    let limpio = min
+    let mut limpio = min
         .replace(&CONTACTO_WA.to_lowercase(), "")
         .replace(&CONTACTO_TEL.to_lowercase(), "");
+    let mut digitos_conocidos = String::new();
+    if let Some(p) = precio {
+        let pl = p.to_lowercase();
+        if limpio.contains(&pl) {
+            limpio = limpio.replace(&pl, "");
+        }
+        digitos_conocidos = pl.chars().filter(char::is_ascii_digit).collect();
+    }
     if limpio.contains('@') {
         return Some("email");
     }
     if limpio.contains("http") || limpio.contains("wa.me") || limpio.contains("www.") {
         return Some("url");
     }
-    let digitos: String = limpio.chars().filter(char::is_ascii_digit).collect();
+    let mut digitos: String = limpio.chars().filter(char::is_ascii_digit).collect();
+    if !digitos_conocidos.is_empty() {
+        digitos = digitos.replace(&digitos_conocidos, "");
+    }
     if digitos.len() >= 7 {
         return Some("telefono");
     }
     None
+}
+
+/// [07AA-9] Precio publicado en el título del aviso (`125.000$`, `$95.000`,
+/// `USD 120.000`): en el piloto no hay ficha, pero el título de Facebook sí
+/// trae el precio y la IA debe darlo directo en vez del fallback. Sin `regex`
+/// en el árbol: escaneo manual, moneda antes o después del número.
+#[must_use]
+pub fn precio_del_aviso(aviso: &str) -> Option<String> {
+    let lower = aviso.to_lowercase();
+    let bytes = lower.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        /* Avance por bytes: jamás se trocea a mitad de un carácter
+         * multibyte (p. ej. la `í` de "peonías"). */
+        if !lower.is_char_boundary(i) {
+            i += 1;
+            continue;
+        }
+        let marca_len = if bytes[i] == b'$' {
+            1
+        } else if lower[i..].starts_with("usd") || lower[i..].starts_with("vef") {
+            3
+        } else {
+            i += 1;
+            continue;
+        };
+        let fin_marca = i + marca_len;
+        if let Some(n) =
+            numero_cercano(&lower, i, true).or_else(|| numero_cercano(&lower, fin_marca, false))
+        {
+            let moneda = if marca_len == 1 {
+                "$"
+            } else {
+                &lower[i..fin_marca]
+            };
+            return Some(if numero_antes(&lower, i) {
+                format!("{n}{moneda}")
+            } else {
+                format!("{moneda} {n}")
+            });
+        }
+        i = fin_marca;
+    }
+    None
+}
+
+/// Número pegado a la marca: hacia atrás (`hacia_atras`) o hacia adelante,
+/// permitiendo espacios y separadores de miles. Mínimo 4 dígitos (evita
+/// "casa 2" o pisos sueltos).
+fn numero_cercano(texto: &str, pos: usize, hacia_atras: bool) -> Option<String> {
+    let mut j = pos;
+    let bytes = texto.as_bytes();
+    if hacia_atras {
+        while j > 0 && (bytes[j - 1] == b' ' || bytes[j - 1] == b'\t') {
+            j -= 1;
+        }
+        let mut k = j;
+        while k > 0
+            && (bytes[k - 1].is_ascii_digit() || bytes[k - 1] == b'.' || bytes[k - 1] == b',')
+        {
+            k -= 1;
+        }
+        let num = texto[k..j].trim_matches(['.', ',']);
+        numero_valido(num).then(|| num.to_string())
+    } else {
+        while j < bytes.len() && (bytes[j] == b' ' || bytes[j] == b'\t') {
+            j += 1;
+        }
+        let mut k = j;
+        while k < bytes.len() && (bytes[k].is_ascii_digit() || bytes[k] == b'.' || bytes[k] == b',')
+        {
+            k += 1;
+        }
+        let num = texto[j..k].trim_matches(['.', ',']);
+        numero_valido(num).then(|| num.to_string())
+    }
+}
+
+fn numero_valido(num: &str) -> bool {
+    !num.is_empty()
+        && num
+            .chars()
+            .all(|c| c.is_ascii_digit() || c == '.' || c == ',')
+        && num.chars().filter(char::is_ascii_digit).count() >= 4
+}
+
+/// ¿El número está a la izquierda de la marca (`125.000$`) o a la derecha
+/// (`$ 125.000`)? Decide el orden del literal devuelto.
+fn numero_antes(texto: &str, pos_marca: usize) -> bool {
+    numero_cercano(texto, pos_marca, true).is_some()
 }
 
 /// [07AA-8] Título del aviso desde el `thread_id` del puente
@@ -862,7 +973,47 @@ mod pruebas {
             matriz_negativa("Llama al 0424 9208855 y al 0412 0000000"),
             Some("telefono")
         );
-        assert_eq!(MATRIZ_NEGATIVA_VERSION, 1);
+        assert_eq!(MATRIZ_NEGATIVA_VERSION, 2);
+    }
+
+    #[test]
+    fn precio_del_aviso_extrae_moneda_antes_o_despues() {
+        assert_eq!(
+            precio_del_aviso("town house en venta en las peonías 125.000$"),
+            Some("125.000$".to_string())
+        );
+        assert_eq!(
+            precio_del_aviso("Casa $95.000 en Riberas"),
+            Some("$ 95.000".to_string())
+        );
+        assert_eq!(
+            precio_del_aviso("APTO USD 120.000"),
+            Some("usd 120.000".to_string())
+        );
+        assert_eq!(precio_del_aviso("casa en venta, 3 habitaciones"), None);
+        assert_eq!(precio_del_aviso("piso 2, año 2024"), None);
+    }
+
+    #[test]
+    fn matriz_v2_exime_precio_del_aviso_pero_no_telefonos() {
+        let precio = Some("125.000$");
+        assert_eq!(
+            matriz_negativa_con_precio(
+                "Town house 125.000$. 3 habitaciones. Escríbeme al 0424 9208855 https://wa.me/584249208855",
+                precio
+            ),
+            None
+        );
+        assert_eq!(
+            matriz_negativa_con_precio("Vale 125.000$. Llama al 0412 0000000", precio),
+            Some("telefono")
+        );
+        /* Sin precio conocido el conteo v1 sigue intacto: 6 dígitos del
+         * precio + 1 de habitaciones = 7 → bloquea (por eso existe v2). */
+        assert_eq!(
+            matriz_negativa("Vale 125.000$. Tiene 3 habitaciones"),
+            Some("telefono")
+        );
     }
 
     #[test]
