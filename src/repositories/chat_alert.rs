@@ -14,6 +14,18 @@ use crate::models::ChatAlertOutbox;
 
 pub struct ChatAlertRepository;
 
+/* [07AA-14] Entrada agrupada para insert_tx (parametros-excesivos-rs 9→2):
+ * prestada (`&`) para no cambiar ni una asignación en los llamadores. */
+pub struct EntradaAlertaChat<'a> {
+    pub idempotency_key: &'a str,
+    pub event_type: &'a str,
+    pub channel: &'a str,
+    pub recipient: &'a str,
+    pub reference_type: Option<&'a str>,
+    pub reference_id: Option<Uuid>,
+    pub payload: &'a serde_json::Value,
+}
+
 /* Backoff en segundos: 5s, 30s, 2m, 10m, 30m → dead */
 const BACKOFF_SEQUENCE: [i64; 5] = [5, 30, 120, 600, 1800];
 const MAX_ATTEMPTS: i32 = 5;
@@ -25,13 +37,7 @@ impl ChatAlertRepository {
     /// Retorna true si se insertó (nuevo), false si ya existía (duplicado).
     pub async fn insert_tx(
         tx: &mut sqlx::PgConnection,
-        idempotency_key: &str,
-        event_type: &str,
-        channel: &str,
-        recipient: &str,
-        reference_type: Option<&str>,
-        reference_id: Option<Uuid>,
-        payload: &serde_json::Value,
+        entrada: EntradaAlertaChat<'_>,
     ) -> Result<bool, AppError> {
         let row = sqlx::query_scalar!(
             r#"INSERT INTO chat_alert_outbox
@@ -40,13 +46,13 @@ impl ChatAlertRepository {
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             ON CONFLICT (idempotency_key) DO NOTHING
             RETURNING id"#,
-            idempotency_key,
-            event_type,
-            channel,
-            recipient,
-            reference_type,
-            reference_id,
-            payload
+            entrada.idempotency_key,
+            entrada.event_type,
+            entrada.channel,
+            entrada.recipient,
+            entrada.reference_type,
+            entrada.reference_id,
+            entrada.payload
         )
         .fetch_optional(&mut *tx)
         .await

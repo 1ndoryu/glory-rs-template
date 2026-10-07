@@ -60,29 +60,35 @@ impl EmailLogRow {
 
 pub struct EmailLogRepository;
 
+/* [07AA-14] Entrada agrupada para insert (parametros-excesivos-rs 8→2):
+ * prestada (`&`) para no cambiar ni una asignación en los llamadores. */
+pub struct NuevoEmailLog<'a> {
+    pub to_email: &'a str,
+    pub subject: &'a str,
+    pub template: &'a str,
+    pub reference_type: Option<&'a str>,
+    pub reference_id: Option<Uuid>,
+    pub status: &'a str,
+    pub error_msg: Option<&'a str>,
+}
+
 impl EmailLogRepository {
     /// Inserta un registro de correo enviado (non-fatal).
     pub async fn insert(
         pool: &PgPool,
-        to_email: &str,
-        subject: &str,
-        template: &str,
-        reference_type: Option<&str>,
-        reference_id: Option<Uuid>,
-        status: &str,
-        error_msg: Option<&str>,
+        entrada: NuevoEmailLog<'_>,
     ) -> Result<Uuid, sqlx::Error> {
         let rec = sqlx::query_scalar!(
             r#"INSERT INTO email_logs (to_email, subject, template, reference_type, reference_id, status, error_msg)
                VALUES ($1, $2, $3, $4, $5, $6, $7)
                RETURNING id"#,
-            to_email,
-            subject,
-            template,
-            reference_type,
-            reference_id,
-            status,
-            error_msg
+            entrada.to_email,
+            entrada.subject,
+            entrada.template,
+            entrada.reference_type,
+            entrada.reference_id,
+            entrada.status,
+            entrada.error_msg
         )
         .fetch_one(pool)
         .await?;

@@ -4,7 +4,7 @@
 
 use sqlx::PgPool;
 
-use crate::repositories::EmailLogRepository;
+use crate::repositories::{EmailLogRepository, NuevoEmailLog};
 
 use super::email::{EmailConfig, EmailService};
 
@@ -35,13 +35,15 @@ impl EmailService {
 
         if let Err(log_err) = EmailLogRepository::insert(
             pool,
-            client_email,
-            &subject,
-            "chat_invoice_paid_client",
-            Some("chat_invoice"),
-            None,
-            status,
-            error_msg,
+            NuevoEmailLog {
+                to_email: client_email,
+                subject: &subject,
+                template: "chat_invoice_paid_client",
+                reference_type: Some("chat_invoice"),
+                reference_id: None,
+                status,
+                error_msg,
+            },
         )
         .await
         {
@@ -84,13 +86,15 @@ impl EmailService {
 
             if let Err(log_err) = EmailLogRepository::insert(
                 pool,
-                email,
-                &subject,
-                "chat_invoice_paid_admin",
-                Some("chat_session"),
-                Some(session_id),
-                status,
-                error_msg,
+                NuevoEmailLog {
+                    to_email: email,
+                    subject: &subject,
+                    template: "chat_invoice_paid_admin",
+                    reference_type: Some("chat_session"),
+                    reference_id: Some(session_id),
+                    status,
+                    error_msg,
+                },
             )
             .await
             {
@@ -138,13 +142,15 @@ impl EmailService {
 
             if let Err(log_err) = EmailLogRepository::insert(
                 pool,
-                email,
-                &subject,
-                "vps_pending_approval",
-                Some("vps"),
-                None,
-                status,
-                error_msg,
+                NuevoEmailLog {
+                    to_email: email,
+                    subject: &subject,
+                    template: "vps_pending_approval",
+                    reference_type: Some("vps"),
+                    reference_id: None,
+                    status,
+                    error_msg,
+                },
             )
             .await
             {
@@ -184,13 +190,15 @@ impl EmailService {
 
         if let Err(log_err) = EmailLogRepository::insert(
             pool,
-            client_email,
-            &subject,
-            "vps_approved",
-            Some("vps"),
-            None,
-            status,
-            error_msg,
+            NuevoEmailLog {
+                to_email: client_email,
+                subject: &subject,
+                template: "vps_approved",
+                reference_type: Some("vps"),
+                reference_id: None,
+                status,
+                error_msg,
+            },
         )
         .await
         {
@@ -220,13 +228,15 @@ impl EmailService {
 
         if let Err(log_err) = EmailLogRepository::insert(
             pool,
-            client_email,
-            &subject,
-            "vps_rejected",
-            Some("vps"),
-            None,
-            status,
-            error_msg,
+            NuevoEmailLog {
+                to_email: client_email,
+                subject: &subject,
+                template: "vps_rejected",
+                reference_type: Some("vps"),
+                reference_id: None,
+                status,
+                error_msg,
+            },
         )
         .await
         {
@@ -263,13 +273,15 @@ impl EmailService {
 
         if let Err(log_err) = EmailLogRepository::insert(
             pool,
-            new_email,
-            subject,
-            "profile_email_changed_new",
-            Some("user"),
-            None,
-            status,
-            error_msg,
+            NuevoEmailLog {
+                to_email: new_email,
+                subject,
+                template: "profile_email_changed_new",
+                reference_type: Some("user"),
+                reference_id: None,
+                status,
+                error_msg,
+            },
         )
         .await
         {
@@ -311,13 +323,15 @@ impl EmailService {
 
         if let Err(log_err) = EmailLogRepository::insert(
             pool,
-            old_email,
-            subject,
-            "profile_email_changed_old",
-            Some("user"),
-            None,
-            status,
-            error_msg,
+            NuevoEmailLog {
+                to_email: old_email,
+                subject,
+                template: "profile_email_changed_old",
+                reference_type: Some("user"),
+                reference_id: None,
+                status,
+                error_msg,
+            },
         )
         .await
         {
@@ -354,13 +368,15 @@ impl EmailService {
 
         if let Err(log_err) = EmailLogRepository::insert(
             pool,
-            to_email,
-            subject,
-            "profile_password_changed",
-            Some("user"),
-            None,
-            status,
-            error_msg,
+            NuevoEmailLog {
+                to_email,
+                subject,
+                template: "profile_password_changed",
+                reference_type: Some("user"),
+                reference_id: None,
+                status,
+                error_msg,
+            },
         )
         .await
         {
@@ -396,13 +412,15 @@ impl EmailService {
 
         if let Err(log_err) = EmailLogRepository::insert(
             pool,
-            to_email,
-            subject,
-            "chat_continuation",
-            Some("chat_session"),
-            Some(session_id),
-            status,
-            error_msg,
+            NuevoEmailLog {
+                to_email,
+                subject,
+                template: "chat_continuation",
+                reference_type: Some("chat_session"),
+                reference_id: Some(session_id),
+                status,
+                error_msg,
+            },
         )
         .await
         {

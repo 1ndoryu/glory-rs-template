@@ -14,7 +14,7 @@ use crate::models::{
     AlertEventType, AlertPayload, ChatMessage, ChatSession, CreateNotification, NOTIF_NEW_MESSAGE,
 };
 use crate::repositories::{
-    ChatAlertRepository, ChatRepository, NotificationRepository, UserRepository,
+    ChatAlertRepository, ChatRepository, EntradaAlertaChat, NotificationRepository, UserRepository,
 };
 
 /* [257A-1] Las alertas nuevas son fail-closed: una variable ausente, vacía o
@@ -109,13 +109,15 @@ async fn enqueue_email_outbox(
 
         ChatAlertRepository::insert_tx(
             tx,
-            &idempotency_key,
-            AlertEventType::ClientMessage.as_str(),
-            "email",
-            &to_email,
-            Some("chat_message"),
-            Some(msg.id),
-            &payload,
+            EntradaAlertaChat {
+                idempotency_key: &idempotency_key,
+                event_type: AlertEventType::ClientMessage.as_str(),
+                channel: "email",
+                recipient: &to_email,
+                reference_type: Some("chat_message"),
+                reference_id: Some(msg.id),
+                payload: &payload,
+            },
         )
         .await?;
     }
@@ -144,13 +146,15 @@ async fn enqueue_whatsapp_outbox(
 
     ChatAlertRepository::insert_tx(
         tx,
-        &idempotency_key,
-        AlertEventType::ClientMessage.as_str(),
-        "whatsapp",
-        "admin",
-        Some("chat_message"),
-        Some(msg.id),
-        &payload,
+        EntradaAlertaChat {
+            idempotency_key: &idempotency_key,
+            event_type: AlertEventType::ClientMessage.as_str(),
+            channel: "whatsapp",
+            recipient: "admin",
+            reference_type: Some("chat_message"),
+            reference_id: Some(msg.id),
+            payload: &payload,
+        },
     )
     .await?;
     Ok(())

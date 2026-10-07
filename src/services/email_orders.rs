@@ -4,7 +4,7 @@
 
 use sqlx::PgPool;
 
-use crate::repositories::EmailLogRepository;
+use crate::repositories::{EmailLogRepository, NuevoEmailLog};
 
 use super::email::{EmailConfig, EmailService};
 
@@ -37,13 +37,15 @@ impl EmailService {
 
         if let Err(log_err) = EmailLogRepository::insert(
             pool,
-            to_email,
-            &subject,
-            "order_confirmation",
-            Some("order"),
-            None,
-            status,
-            error_msg,
+            NuevoEmailLog {
+                to_email,
+                subject: &subject,
+                template: "order_confirmation",
+                reference_type: Some("order"),
+                reference_id: None,
+                status,
+                error_msg,
+            },
         )
         .await
         {
@@ -78,13 +80,15 @@ impl EmailService {
 
         if let Err(log_err) = EmailLogRepository::insert(
             pool,
-            to_email,
-            &subject,
-            "order_completed_client",
-            Some("order"),
-            Some(order_id),
-            status,
-            error_msg,
+            NuevoEmailLog {
+                to_email,
+                subject: &subject,
+                template: "order_completed_client",
+                reference_type: Some("order"),
+                reference_id: Some(order_id),
+                status,
+                error_msg,
+            },
         )
         .await
         {
@@ -122,13 +126,15 @@ impl EmailService {
 
         if let Err(log_err) = EmailLogRepository::insert(
             pool,
-            to_email,
-            &subject,
-            "order_cancelled_client",
-            Some("order"),
-            Some(order_id),
-            status,
-            error_msg,
+            NuevoEmailLog {
+                to_email,
+                subject: &subject,
+                template: "order_cancelled_client",
+                reference_type: Some("order"),
+                reference_id: Some(order_id),
+                status,
+                error_msg,
+            },
         )
         .await
         {
@@ -169,13 +175,15 @@ impl EmailService {
 
         if let Err(log_err) = EmailLogRepository::insert(
             pool,
-            to_email,
-            &subject,
-            "phase_delivered_client",
-            Some("order"),
-            Some(order_id),
-            status,
-            error_msg,
+            NuevoEmailLog {
+                to_email,
+                subject: &subject,
+                template: "phase_delivered_client",
+                reference_type: Some("order"),
+                reference_id: Some(order_id),
+                status,
+                error_msg,
+            },
         )
         .await
         {
@@ -215,13 +223,15 @@ impl EmailService {
 
         if let Err(log_err) = EmailLogRepository::insert(
             pool,
-            to_email,
-            &subject,
-            "problem_reported_client",
-            Some("order"),
-            Some(order_id),
-            status,
-            error_msg,
+            NuevoEmailLog {
+                to_email,
+                subject: &subject,
+                template: "problem_reported_client",
+                reference_type: Some("order"),
+                reference_id: Some(order_id),
+                status,
+                error_msg,
+            },
         )
         .await
         {

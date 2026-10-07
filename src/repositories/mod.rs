@@ -36,13 +36,13 @@ pub use activity_log::{ActivityLogRepository, ActivityRow};
 pub use billing::{AdminBillingItem, BillingRepository, BootstrapBillingItemParams};
 pub use blog::{BlogRepository, CreateBlogPostParams, UpdateBlogPostParams};
 pub use chat::ChatRepository;
-pub use chat_alert::ChatAlertRepository;
+pub use chat_alert::{ChatAlertRepository, EntradaAlertaChat};
 pub use continuation_token::ContinuationTokenInfo;
 pub use dashboard::DashboardRepository;
 pub use delegation::{DelegationRepository, EmployeeListItemRow};
 pub use deliverable::{CreateDeliverableParams, DeliverableRepository};
 pub use domain::{CreateDomainOrderParams, DomainOrderRepository};
-pub use email_log::{EmailLogRepository, EmailLogRow};
+pub use email_log::{EmailLogRepository, EmailLogRow, NuevoEmailLog};
 pub use fixture::{FixtureRepository, FixtureTableStat};
 pub use hosting::{
     BootstrapHostingParams, CreateHostingParams, HostingRepository, ServerInfo, UpdateHostingParams,

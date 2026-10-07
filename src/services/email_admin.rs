@@ -4,7 +4,7 @@
 
 use sqlx::PgPool;
 
-use crate::repositories::EmailLogRepository;
+use crate::repositories::{EmailLogRepository, NuevoEmailLog};
 
 use super::email::{EmailConfig, EmailService};
 
@@ -48,13 +48,15 @@ impl EmailService {
 
             if let Err(log_err) = EmailLogRepository::insert(
                 pool,
-                email,
-                &subject,
-                "new_order_admin",
-                Some("order"),
-                Some(order_id),
-                status,
-                error_msg,
+                NuevoEmailLog {
+                    to_email: email,
+                    subject: &subject,
+                    template: "new_order_admin",
+                    reference_type: Some("order"),
+                    reference_id: Some(order_id),
+                    status,
+                    error_msg,
+                },
             )
             .await
             {
@@ -97,13 +99,15 @@ impl EmailService {
 
             if let Err(log_err) = EmailLogRepository::insert(
                 pool,
-                email,
-                &subject,
-                "escalation",
-                Some("chat_session"),
-                Some(session_id),
-                status,
-                error_msg,
+                NuevoEmailLog {
+                    to_email: email,
+                    subject: &subject,
+                    template: "escalation",
+                    reference_type: Some("chat_session"),
+                    reference_id: Some(session_id),
+                    status,
+                    error_msg,
+                },
             )
             .await
             {
@@ -155,13 +159,15 @@ impl EmailService {
 
             if let Err(log_err) = EmailLogRepository::insert(
                 pool,
-                email,
-                &subject,
-                "payment_received_admin",
-                Some("order"),
-                Some(order_id),
-                status,
-                error_msg,
+                NuevoEmailLog {
+                    to_email: email,
+                    subject: &subject,
+                    template: "payment_received_admin",
+                    reference_type: Some("order"),
+                    reference_id: Some(order_id),
+                    status,
+                    error_msg,
+                },
             )
             .await
             {
@@ -210,13 +216,15 @@ impl EmailService {
             let error_msg = result.as_ref().err().map(String::as_str);
             if let Err(log_err) = EmailLogRepository::insert(
                 pool,
-                email,
-                &subject,
-                "order_completed_admin",
-                Some("order"),
-                Some(order_id),
-                status,
-                error_msg,
+                NuevoEmailLog {
+                    to_email: email,
+                    subject: &subject,
+                    template: "order_completed_admin",
+                    reference_type: Some("order"),
+                    reference_id: Some(order_id),
+                    status,
+                    error_msg,
+                },
             )
             .await
             {
@@ -264,13 +272,15 @@ impl EmailService {
             let error_msg = result.as_ref().err().map(String::as_str);
             if let Err(log_err) = EmailLogRepository::insert(
                 pool,
-                email,
-                &subject,
-                "order_cancelled_admin",
-                Some("order"),
-                Some(order_id),
-                status,
-                error_msg,
+                NuevoEmailLog {
+                    to_email: email,
+                    subject: &subject,
+                    template: "order_cancelled_admin",
+                    reference_type: Some("order"),
+                    reference_id: Some(order_id),
+                    status,
+                    error_msg,
+                },
             )
             .await
             {
@@ -319,13 +329,15 @@ impl EmailService {
             let error_msg = result.as_ref().err().map(String::as_str);
             if let Err(log_err) = EmailLogRepository::insert(
                 pool,
-                email,
-                &subject,
-                "problem_reported_admin",
-                Some("order"),
-                Some(order_id),
-                status,
-                error_msg,
+                NuevoEmailLog {
+                    to_email: email,
+                    subject: &subject,
+                    template: "problem_reported_admin",
+                    reference_type: Some("order"),
+                    reference_id: Some(order_id),
+                    status,
+                    error_msg,
+                },
             )
             .await
             {
@@ -375,13 +387,15 @@ impl EmailService {
             let error_msg = result.as_ref().err().map(String::as_str);
             if let Err(log_err) = EmailLogRepository::insert(
                 pool,
-                email,
-                &subject,
-                "refund_requested_admin",
-                Some("refund"),
-                Some(refund_id),
-                status,
-                error_msg,
+                NuevoEmailLog {
+                    to_email: email,
+                    subject: &subject,
+                    template: "refund_requested_admin",
+                    reference_type: Some("refund"),
+                    reference_id: Some(refund_id),
+                    status,
+                    error_msg,
+                },
             )
             .await
             {
@@ -426,13 +440,15 @@ impl EmailService {
             let error_msg = result.as_ref().err().map(String::as_str);
             if let Err(log_err) = EmailLogRepository::insert(
                 pool,
-                email,
-                &subject,
-                "new_user_registered_admin",
-                Some("user"),
-                Some(user_id),
-                status,
-                error_msg,
+                NuevoEmailLog {
+                    to_email: email,
+                    subject: &subject,
+                    template: "new_user_registered_admin",
+                    reference_type: Some("user"),
+                    reference_id: Some(user_id),
+                    status,
+                    error_msg,
+                },
             )
             .await
             {

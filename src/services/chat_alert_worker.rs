@@ -10,7 +10,7 @@ use std::time::Duration;
 use sqlx::PgPool;
 
 use crate::models::ChatAlertOutbox;
-use crate::repositories::{ChatAlertRepository, EmailLogRepository};
+use crate::repositories::{ChatAlertRepository, EmailLogRepository, NuevoEmailLog};
 
 const TICK_INTERVAL: Duration = Duration::from_secs(5);
 const CLAIM_LIMIT: i64 = 20;
@@ -149,13 +149,15 @@ async fn process_email(
             let _ = ChatAlertRepository::mark_sent(pool, entry.id).await;
             let _ = EmailLogRepository::insert(
                 pool,
-                &entry.recipient,
-                &subject,
-                "chat_client_message",
-                Some("chat_message"),
-                entry.reference_id,
-                "sent",
-                None,
+                NuevoEmailLog {
+                    to_email: &entry.recipient,
+                    subject: &subject,
+                    template: "chat_client_message",
+                    reference_type: Some("chat_message"),
+                    reference_id: entry.reference_id,
+                    status: "sent",
+                    error_msg: None,
+                },
             )
             .await;
             tracing::debug!(
@@ -168,13 +170,15 @@ async fn process_email(
             let _ = ChatAlertRepository::mark_retry(pool, entry.id, &e, entry.attempts).await;
             let _ = EmailLogRepository::insert(
                 pool,
-                &entry.recipient,
-                &subject,
-                "chat_client_message",
-                Some("chat_message"),
-                entry.reference_id,
-                "failed",
-                Some(&e),
+                NuevoEmailLog {
+                    to_email: &entry.recipient,
+                    subject: &subject,
+                    template: "chat_client_message",
+                    reference_type: Some("chat_message"),
+                    reference_id: entry.reference_id,
+                    status: "failed",
+                    error_msg: Some(&e),
+                },
             )
             .await;
             tracing::warn!(
