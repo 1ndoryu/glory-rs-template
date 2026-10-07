@@ -477,7 +477,8 @@ async fn generar_borrador(
     pool: &sqlx::PgPool,
 ) -> crate::services::marketplace::Generado {
     use crate::services::marketplace::{
-        aviso_fb_de_thread, hilo_previo, precio_del_aviso, Generado, CONTACTO_TEL, CONTACTO_WA,
+        aviso_fb_de_thread, hilo_previo, nombre_de_thread, precio_del_aviso, Generado,
+        CONTACTO_TEL, CONTACTO_WA,
     };
     /* [07AA-8] El aviso de Facebook viaja en el hilo (`comprador|aviso`):
      * contexto aproximado para abrir con la ficha breve en el piloto. */
@@ -510,23 +511,38 @@ async fn generar_borrador(
         crate::services::marketplace::Tono::Amable => "amable",
         crate::services::marketplace::Tono::Formal => "formal",
     });
+    /* [07AA-10] Saludo primero y por su nombre: el hilo trae `nombre|aviso`.
+     * El precio siempre con «negociable»; el cierre invita a contar qué
+     * busca (conocer intención, no solo coordinar visita). */
+    let saludo = match nombre_de_thread(r.thread_id.trim()) {
+        Some(n) => format!("salúdalo por su nombre («Hola, {n}, ...»)"),
+        None => "salúdalo sin nombre (solo «Hola, ...»)".to_string(),
+    };
     let sistema = format!(
         "Eres el asistente de MN Inmobiliaria respondiendo en Marketplace. \
          Tono {tono}, máximo 6 líneas. Datos del inmueble: {datos}. \
          Aviso en Facebook: {aviso}. \
+         Hora del mensaje: {hora}: saluda con buenos días, buenas tardes o \
+         buenas noches según corresponda. \
          La conversación trae marcas: `Cliente:` es el comprador, `Dueña:` \
          es la dueña (tú no eres la dueña: no repitas lo que ella ya dijo). \
          Responde la última pregunta del Cliente con coherencia. \
-         Formato obligatorio, en este orden exacto de 4 partes: abre con la \
-         ficha breve (propiedad, precio y zona según los datos o el aviso); \
-         responde la pregunta del Cliente; incluye siempre «cualquier cosa \
-         escríbeme al {CONTACTO_TEL}»; cierra siempre con {CONTACTO_WA}. \
+         Formato obligatorio, en este orden exacto: primero el saludo, \
+         {saludo}, seguido en la misma apertura por la ficha breve \
+         (propiedad y zona según los datos o el aviso, precio con la cifra \
+         exacta de los datos o del aviso seguida siempre de la palabra \
+         «negociable»); después responde la pregunta del Cliente; luego \
+         invítalo a contarte qué busca para ayudarlo (cálido, p. ej. \
+         «Cuéntame qué estás buscando y con gusto te ayudo»); incluye \
+         siempre «cualquier cosa escríbeme al {CONTACTO_TEL}»; cierra \
+         siempre con {CONTACTO_WA}. \
          Reglas: jamás inventes teléfono, email, dirección ni cifras fuera \
-         de los datos y el aviso; el precio de los datos o del aviso dalo \
-         directamente con la cifra exacta; \
+         de los datos y el aviso; si no hay precio en los datos ni en el \
+         aviso, no lo inventes: di que lo confirmas con la dueña; \
          si preguntan precio y no hay precio en los datos ni en el aviso, responde exactamente: {FALLBACK_BORRADOR} \
          (el sistema agrega el contacto y el enlace al final). \
-         Ya le dijiste (no lo repitas igual): {ya_dicho}"
+         Ya le dijiste (no lo repitas igual): {ya_dicho}",
+        hora = r.excerpt.hora
     );
     let texto = match crate::handlers::ia::completar_opencode(&sistema, &r.excerpt.texto, &[]).await
     {

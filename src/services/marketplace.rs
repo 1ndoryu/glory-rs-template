@@ -230,6 +230,30 @@ pub fn matriz_negativa_con_precio(texto: &str, precio: Option<&str>) -> Option<&
     None
 }
 
+/// [07AA-10] Nombre del cliente desde el hilo (`alejandro|casa en venta...`
+/// → `Alejandro`): el borrador lo saluda por su nombre. `sin-hilo` o sin
+/// `nombre|` → `None` (saludo sin nombre).
+#[must_use]
+pub fn nombre_de_thread(thread_id: &str) -> Option<String> {
+    let (nombre, _) = thread_id.split_once('|')?;
+    if nombre.trim().is_empty() || nombre.trim().eq_ignore_ascii_case("sin-hilo") {
+        return None;
+    }
+    Some(
+        nombre
+            .split_whitespace()
+            .map(|p| {
+                let mut c = p.chars();
+                match c.next() {
+                    Some(i) => i.to_uppercase().to_string() + c.as_str(),
+                    None => String::new(),
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" "),
+    )
+}
+
 /// [07AA-9] Precio publicado en el título del aviso (`125.000$`, `$95.000`,
 /// `USD 120.000`): en el piloto no hay ficha, pero el título de Facebook sí
 /// trae el precio y la IA debe darlo directo en vez del fallback. Sin `regex`
@@ -974,6 +998,21 @@ mod pruebas {
             Some("telefono")
         );
         assert_eq!(MATRIZ_NEGATIVA_VERSION, 2);
+    }
+
+    #[test]
+    fn nombre_de_thread_saluda_por_nombre() {
+        assert_eq!(
+            nombre_de_thread("alejandro|casa en venta en riberas"),
+            Some("Alejandro".to_string())
+        );
+        assert_eq!(
+            nombre_de_thread("jean carlos|apto amoblado"),
+            Some("Jean Carlos".to_string())
+        );
+        assert_eq!(nombre_de_thread("sin-hilo"), None);
+        assert_eq!(nombre_de_thread("solo-sin-barra"), None);
+        assert_eq!(nombre_de_thread("|aviso sin nombre"), None);
     }
 
     #[test]
