@@ -577,8 +577,8 @@ sin firma M1 prohibido).
   (`adapter_defaults_sin_config` borra `adapter_responde_ia_global` mientras
   otros la escriben; falla 1/2 corridas full, en aislamiento 9/9 verde).
 
-## 03AA-4 — WhatsApp un solo número + triage + config + escenarios (plan activo 2026-10-03)
-- Plan: `Agente/planes/plan-whatsapp-numero-unico-2026-10-03.md`.
+## 03AA-4 — WhatsApp un solo número + triage + config + escenarios (cerrada 2026-10-07: ver `Agente/completados/tareas-2026-10-07.md`)
+- Plan: `Agente/planes/completados/plan-whatsapp-numero-unico-2026-10-03.md`.
 - Un asistente general en el 0412 0825234 (el mismo de la web); se jubila el
   modo dual completo/inicial y el `wa_b` temporal; multi-número por config.
 - Triage con regla de oro (por defecto se atiende; cada `no` con motivo),
@@ -632,6 +632,11 @@ sin firma M1 prohibido).
     eco, duplicado, autorizado temporal (setup/restore allowlist por
     psql; login harness da 401 — ver lecciones). Limpieza 0 filas,
     allowlist restaurada, 3110 cerrado. Próximo: F7 vivo + cierre.
+  - 07AA-4 F7 pasada vivo + cierre (hecha 2026-10-07): gate completo
+    (`fmt`, clippy 0, `cargo test --lib` 116/116, `tsc` 0) + harness
+    `C:\tmp\probar-f6.mjs` `F6-OK 13/13` en pasada viva con sufijo
+    nuevo; limpieza 0 filas, allowlist restaurada, 3110 cerrado.
+    03AA-4 cerrada, plan archivado.
 
 ## 03AA-5 — Detector de captación Marketplace (REPLANTEADO 2026-10-03, bloqueado)
 - Plan: `Agente/planes/plan-detector-captacion-2026-10-03.md` (incorpora reto

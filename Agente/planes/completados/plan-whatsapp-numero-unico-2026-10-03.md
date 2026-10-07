@@ -82,8 +82,8 @@ capas (sin cambiar conducta); F4 config admin; F5 retirar `wa_b` del flujo;
 F6 harness + 8 escenarios base en `stub`; F7 pasada `vivo` + cierre.
 
 ## Estado
-Plan escrito 2026-10-03. Base limpia (chats a cero). F1–F6 hechas
-(2026-10-07). Próximo: F7.
+Plan escrito 2026-10-03. Base limpia (chats a cero). F1–F7 hechas.
+Cerrado 2026-10-07 (07AA-4): archivado en `planes/completados/`.
 
 ## Gate y DoD
 Backend: fmt/check/clippy/test + harness `stub` verde en el gate; `vivo`
