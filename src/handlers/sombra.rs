@@ -3,10 +3,13 @@ use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::whatsapp;
 use crate::errors::AppError;
 use crate::middleware::AuthUser;
 use crate::repositories::ClienteRepository;
+/* [06AA-3 F3] La sombra compara contra las capas, no contra el webhook:
+ * reparto/números salen de `Transporte` y el partido de `Turno`. */
+use crate::services::transporte::{numeros_configurados, reparto};
+use crate::services::turno::partir_respuesta;
 use crate::AppState;
 use glory_agent::channels::adapters::{AdapterConfig, SesionConfig};
 use glory_agent::channels::{ANTI_ECO_MAX, ANTI_ECO_TTL_SECS};
@@ -122,7 +125,7 @@ pub async fn huella(
     texto: &str,
 ) -> HuellaSombra {
     let remitente_norm = ClienteRepository::normalizar_telefono(remitente);
-    let (canal, modo) = match whatsapp::reparto(numero_a, numero_b, numero_destino) {
+    let (canal, modo) = match reparto(numero_a, numero_b, numero_destino) {
         Some((c, m)) => (Some(c.to_string()), Some(m.to_string())),
         None => (None, None),
     };
@@ -152,7 +155,7 @@ pub async fn huella(
             .map(|s| s.ai_enabled),
         None => None,
     };
-    let partes_mn = whatsapp::partir_respuesta(texto).len();
+    let partes_mn = partir_respuesta(texto).len();
     let partes_nucleo = glory_agent::channels::adapters::partir_respuesta(texto).len();
     let coincide = responde_ia_adapter
         .zip(responde_ia_sesion)
@@ -183,7 +186,7 @@ pub(crate) async fn comparar(
     if !sombra_activa() {
         return Err(AppError::NotFound("sombra apagada".to_string()));
     }
-    let (numero_a, numero_b) = whatsapp::numeros_configurados(&state.pool).await;
+    let (numero_a, numero_b) = numeros_configurados(&state.pool).await;
     Ok(Json(
         huella(
             &state.pool,
@@ -473,11 +476,11 @@ mod pruebas {
             "a\n\nb\n\nc\n\nd\n\ne",
         ] {
             assert_eq!(
-                whatsapp::partir_respuesta(texto),
+                partir_respuesta(texto),
                 partir_nucleo(texto),
                 "texto {texto:?}"
             );
         }
-        assert_eq!(whatsapp::partir_respuesta("a\n\nb\n\nc\n\nd\n\ne").len(), 3);
+        assert_eq!(partir_respuesta("a\n\nb\n\nc\n\nd\n\ne").len(), 3);
     }
 }

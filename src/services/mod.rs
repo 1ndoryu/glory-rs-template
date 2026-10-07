@@ -6,10 +6,13 @@ pub mod marketplace;
 mod note;
 mod outbox_idempotency;
 pub mod politica;
+pub mod sesion;
 mod solicitud;
 mod suscriptor;
 mod tope_uso;
+pub mod transporte;
 pub mod triage;
+pub mod turno;
 
 pub use alerta_whatsapp::vigilar as vigilar_alertas_whatsapp;
 pub use auth::{AuthService, Claims};
