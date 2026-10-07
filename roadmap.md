@@ -259,6 +259,8 @@ Consola área: NAKOMI = 73 (info/hints + waivers contados en crudo; gate propio
 - **07AA-5** god-object x3: re-evaluar waiver F3g — pendiente.
 - **07AA-6** large-interface-isp x37 (info): partir solo con ISP real, sin churn — pendiente.
 - **07AA-8** tope físico a validaciones → TRASLADADA a workspace-manager `07AA-6` (alcance de área; el plan vive allí).
+- **07AA-10** piloto F5/fase-observe — CERRADA 2026-10-07 (aviso+registro sin bloqueo, PASS).
+- **07AA-11** piloto F5/fase-enforce+override — CERRADA 2026-10-07 (2 PASS + bloqueo exit 2 + override +1 PASS; detalle en `Agente/completados/tareas-2026-10-07.md`).
 
 ## Gate 01AA — barrido warnings Rust + VarSense 2.2.9 (octubre 2026)
 
