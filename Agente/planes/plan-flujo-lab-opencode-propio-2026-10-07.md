@@ -97,10 +97,15 @@ no decidido en código.
 
 ## Estado
 
-F1+F2+F3a+F3b+F3c hechas. Sigue C1b: ventana con ella (diff-first +
-manifest + ella reinicia + prueba viva). Sin su aviso, nada se mueve.
+F1+F2+F3a+F3b+F3c hechas. C1b CANCELADO 2026-10-07 (navegadores
+separados, sin copia de sesión, sin dev del lab). Promoción 2026-10-07 en
+ventana explícita (app cerrada, `:4096` libre, diff-first limpio, manifest
+en lab `PROMOCION-VENTANA.md`): F3b a su app (3 archivos marketplace,
+`MP_NUCLEO` default OFF) + OP-47 auto (3 archivos `session/`, guard
+terminar-vs-pendientes). Tests en su árbol 33/33 + 38/38, sin commit.
+Sigue: ella reinicia con su acceso directo + prueba viva en opencode-propio.
 
-## C1b — Sesiones de navegador (decidido 2026-10-07, verificado en código)
+## C1b — Sesiones de navegador (CANCELADO por ella 2026-10-07)
 
 - Las sesiones viven en `<userData>/Partitions/propio-browser-shared`;
   userData suya = `%APPDATA%/ai.opencode.desktop.propio`, userData del lab
@@ -109,8 +114,21 @@ manifest + ella reinicia + prueba viva). Sin su aviso, nada se mueve.
   apps = pelea por single-instance lock + dos Chromium escribiendo el
   mismo LevelDB (riesgo real: corromper la sesión y sacarla de Facebook,
   justo lo que ella teme; además no recuerda la contraseña).
-- Procedimiento C1b: 1) ella cierra su app; 2) el agente copia
+- Procedimiento C1b ~~(cancelado, ver abajo)~~: 1) ella cierra su app; 2) el agente copia
   `Partitions/propio-browser-shared` (app cerrada = copia consistente) al
   userData del lab; 3) el dev corre con esa copia (su app puede reabrirse
   después; el lab nunca escribe en su perfil). Sin ella cerrando, no hay
   prueba con sesión.
+- **CANCELADO 2026-10-07 (decisión de ella)**: no se copia ninguna sesión al
+  lab, no se corre el dev del lab, navegadores siempre separados. La prueba
+  del piloto se hace en su opencode-propio tras la promoción.
+- **Incidente 2026-10-07 (sesión Facebook cerrada)**: el agente copió por
+  error jars obsoletos de `%APPDATA%/ai.opencode.desktop.propio`
+  (`Cookies` 15/09, cero cookies facebook) sobre el perfil VIVO, que es
+  `%APPDATA%/ai.opencode.desktop.dev` (`lockfile`+`DevToolsActivePort` de
+  hoy; sin `OPENCODE_CHANNEL` el userData desempaquetado es `.dev`, el
+  `.propio` está obsoleto). Forense readonly posterior: cero cookies
+  facebook en las 10 particiones del perfil vivo. Causa probable del
+  logout; sin contraseña no hay recuperación forense, solo vías oficiales
+  de Facebook. Regla 6 agregada a la skill `lab-opencode`: prohibido
+  escribir en perfiles de navegador.
