@@ -130,5 +130,17 @@ Sigue: ella reinicia con su acceso directo + prueba viva en opencode-propio.
   `.propio` está obsoleto). Forense readonly posterior: cero cookies
   facebook en las 10 particiones del perfil vivo. Causa probable del
   logout; sin contraseña no hay recuperación forense, solo vías oficiales
-  de Facebook. Regla 6 agregada a la skill `lab-opencode`: prohibido
-  escribir en perfiles de navegador.
+   de Facebook. Regla 6 agregada a la skill `lab-opencode`: prohibido
+   escribir en perfiles de navegador.
+- **Trasplante 2026-10-07 (excepción autorizada por ella, app cerrada)**:
+  cookies de su Chrome wan trasplantadas al jar shared del perfil vivo
+  (`...ai.opencode.desktop.dev\Partitions\propio-browser-shared\Network\Cookies`)
+  con `C:\tmp\fb-insert.ts` (DELETE+INSERT, solo imprimió nombres).
+  Insertadas las 7 (c_user,xs,datr,fr,sb,ps_l,ps_n) + 2 preexistentes (dpr,wd).
+  Gotchas del script: (1) `new Database(path,{})`/`{create:false}` falla en
+  este bun (`SQLITE_MISUSE`); sin opciones abre bien. (2) el jar usa schema
+  Chromium viejo: sin `is_same_party`, con `encrypted_value`+`source_type`+
+  `has_cross_site_ancestor` (INSERT ajustado). Valores nunca mostrados ni
+  commiteados. Sigue: ella borra `C:\tmp\fb-wan.txt`, reabre su app, prueba
+  facebook.com en el Navegador (si pide "¿fuiste tú?", aprueba en Chrome wan).
+  Si no restaura: probable invalidación servidor → solo queda código de mañana.
