@@ -1,8 +1,7 @@
-/* sentinel-disable-file limite-lineas god-object-rs: router central de Axum.
- * [164A-17] Sigue siendo el orquestador único de rutas/estado global del backend.
- * [01AA-4-f3s] god-object-rs: partir el router central dispersaría el wiring de
- * estado/middlewares sin ganar cohesión; el tamaño viene del registro de rutas. */
-#![allow(clippy::needless_for_each)] // Generado por utoipa OpenApi derive
+/* [07AA-14] Router central adelgazado: solo declara módulos, `create_router` y
+ * `api_routes`. El documento OpenAPI vive en `openapi_doc.rs` y el bootstrap
+ * (security headers, inits, `create_app`, SPA shell) en `app.rs`.
+ * [164A-17] Sigue siendo el orquestador único de rutas/estado global del backend. */
 
 mod admin_billing;
 mod admin_client_bootstrap;
@@ -13,6 +12,7 @@ mod admin_seed;
 mod admin_seo;
 mod admin_services;
 mod admin_users;
+mod app;
 mod assignment;
 mod auth;
 mod billing;
@@ -27,6 +27,7 @@ mod hosting_domains;
 mod image_proxy;
 mod notes;
 mod notifications;
+mod openapi_doc;
 mod order_lifecycle;
 mod orders;
 mod payment_methods;
@@ -45,12 +46,7 @@ mod uploads;
 mod vps;
 mod wallet;
 
-use argon2::PasswordHasher;
-use axum::body::Body;
-use axum::extract::State;
-use axum::http::{header, HeaderName, HeaderValue, Method, StatusCode};
-use axum::response::{IntoResponse, Response};
-use axum::routing::get;
+use axum::http::{HeaderName, HeaderValue, Method};
 use axum::Router;
 use tower_governor::{
     governor::GovernorConfigBuilder, key_extractor::SmartIpKeyExtractor, GovernorLayer,
@@ -58,7 +54,7 @@ use tower_governor::{
 use tower_http::compression::CompressionLayer;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tower_http::normalize_path::NormalizePathLayer;
-use tower_http::services::{ServeDir, ServeFile};
+use tower_http::services::ServeDir;
 use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
 use utoipa::OpenApi;
@@ -66,374 +62,11 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::AppState;
 
-/// Define el esquema de seguridad Bearer para Swagger UI
-struct SecurityAddon;
+pub use app::create_app;
 
-impl utoipa::Modify for SecurityAddon {
-    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
-        /* components existe porque el derive ya registra schemas */
-        if let Some(components) = openapi.components.as_mut() {
-            components.add_security_scheme(
-                "bearer_auth",
-                utoipa::openapi::security::SecurityScheme::Http(
-                    utoipa::openapi::security::Http::new(
-                        utoipa::openapi::security::HttpAuthScheme::Bearer,
-                    ),
-                ),
-            );
-        }
-    }
-}
+/* [07AA-14] SecurityAddon + ApiDoc movidos a `openapi_doc.rs`. */
 
-#[derive(OpenApi)]
-#[openapi(
-    paths(
-        health::health_check,
-        auth::register,
-        auth::quick_register,
-        auth::login,
-        notes::create_note,
-        notes::get_note,
-        notes::list_notes,
-        notes::update_note,
-        notes::delete_note,
-        services::list_services,
-        services::get_service,
-        orders::create_order,
-        orders::list_orders,
-        orders::get_order,
-        orders::update_order_project_description_handler,
-        orders::update_order_phase_definition_handler,
-        orders::assign_order,
-        order_lifecycle::misc::switch_role,
-        order_lifecycle::cancel::cancel_order_handler,
-        order_lifecycle::approve::approve_phase,
-        order_lifecycle::misc::request_revision,
-        order_lifecycle::misc::toggle_ai_intermediary,
-        order_lifecycle::misc::get_order_activity,
-        payments::checkout::initiate_payment,
-        payments::webhook::stripe_webhook,
-        payments::checkout::list_payments,
-        payment_methods::create_setup_intent,
-        payment_methods::list_payment_methods,
-        payment_methods::save_payment_method,
-        payment_methods::delete_payment_method,
-        assignment::take_order,
-        assignment::list_unassigned,
-        assignment::list_employees,
-        assignment::create_delegation,
-        assignment::create_help_request,
-        assignment::respond_delegation,
-        assignment::list_delegations,
-        chat::list_sessions,
-        chat::get_messages,
-        chat::create_session,
-        chat::send_message,
-        deliverables::deliver_phase_with_files,
-        deliverables::list_deliverables,
-        deliverables::download_deliverable,
-        refunds::request_refund,
-        refunds::review_refund,
-        refunds::list_refunds,
-        refunds::get_order_refund,
-        reviews::create_review,
-        reviews::respond_review,
-        reviews::get_order_review,
-        reviews::list_reviews,
-        notifications::list_notifications,
-        notifications::get_unread_count,
-        notifications::mark_read,
-        notifications::mark_all_read,
-        dashboard::get_dashboard,
-        profile::get_profile,
-        profile::upload_avatar,
-        public_config::get_public_config,
-        admin_users::list_users,
-        admin_users::create_user,
-        admin_users::change_role,
-        admin_users::change_status,
-        admin_users::delete_user,
-        admin_fixtures::get_fixture_status,
-        admin_fixtures::trigger_sync,
-        admin_services::list_all,
-        admin_services::create,
-        admin_services::update,
-        admin_services::archive,
-        admin_services::destroy,
-        blog::list_published,
-        blog::get_by_slug,
-        blog::list_all,
-        blog::create,
-        blog::update,
-        blog::archive,
-        blog::destroy,
-        uploads::upload_image,
-        image_proxy::image_proxy,
-        projects::list_published,
-        projects::get_by_slug,
-        projects::list_all,
-        projects::create,
-        projects::update,
-        projects::archive,
-        projects::destroy,
-        team_members::list_published,
-        team_members::list_all,
-        team_members::create,
-        team_members::update,
-        team_members::archive,
-        team_members::destroy,
-        public_users::get_profile,
-        public_users::get_reviews_received,
-        public_users::get_reviews_given,
-        public_users::get_rating_distribution,
-        problems::report_problem,
-        problems::list_problems,
-        problems::list_order_problems,
-        problems::resolve_problem,
-        wallet::get_balance,
-        wallet::list_transactions,
-        cancellation::create_cancellation_request,
-        cancellation::respond_cancellation_request,
-        wallet::create_withdrawal,
-        wallet::list_withdrawals,
-        wallet::admin_list_withdrawals,
-        wallet::admin_resolve_withdrawal,
-        hosting::email_aliases::get_email_info,
-        hosting::email_aliases::create_alias,
-        hosting::email_aliases::delete_alias,
-        admin_billing::list_billing_items,
-        admin_billing::update_billing_status,
-    ),
-    components(schemas(
-        health::HealthResponse,
-        crate::models::RegisterRequest,
-        crate::models::QuickRegisterRequest,
-        crate::models::LoginRequest,
-        crate::models::AuthResponse,
-        crate::models::Note,
-        crate::models::CreateNoteRequest,
-        crate::models::UpdateNoteRequest,
-        crate::models::PaginatedNotes,
-        crate::models::UserRole,
-        crate::models::ServiceDetailResponse,
-        crate::models::ServicePlanResponse,
-        crate::models::ServicePlanPhaseResponse,
-        crate::models::CreateOrderRequest,
-        crate::models::OrderResponse,
-        crate::models::OrderPhaseResponse,
-        crate::models::SwitchRoleRequest,
-        crate::models::ToggleAiIntermediaryRequest,
-        crate::models::PaymentMode,
-        crate::models::OrderStatus,
-        crate::models::PhaseStatus,
-        crate::models::PaymentStatus,
-        crate::models::InitiatePaymentRequest,
-        crate::models::PaymentIntentResponse,
-        crate::models::PaymentResponse,
-        crate::models::PaymentMethodResponse,
-        crate::models::SetupIntentResponse,
-        crate::models::SavePaymentMethodRequest,
-        crate::models::DelegationStatus,
-        crate::models::DelegationResponse,
-        crate::models::EmployeeListItem,
-        crate::models::CreateDelegationRequest,
-        crate::models::RespondDelegationRequest,
-        crate::models::ChatSession,
-        crate::models::ChatMessage,
-        crate::models::ChatMessageResponse,
-        crate::models::ChatSessionResponse,
-        crate::models::ChatAttachment,
-        crate::models::VisitorProfile,
-        crate::models::CreateChatSessionRequest,
-        crate::models::SendMessageRequest,
-        crate::models::PhaseDeliverable,
-        crate::models::DeliverPhaseResponse,
-        crate::models::PhaseDeliverablesResponse,
-        crate::models::RefundStatus,
-        crate::models::RefundResponse,
-        crate::models::RequestRefundBody,
-        crate::models::ReviewRefundBody,
-        crate::models::ReviewAction,
-        crate::models::CreateReviewBody,
-        crate::models::RespondReviewBody,
-        crate::models::ReviewResponse,
-        crate::models::NotificationResponse,
-        crate::models::UnreadCountResponse,
-        crate::models::MarkReadBody,
-        crate::models::WsNotification,
-        crate::models::DashboardResponse,
-        crate::models::RevenueStats,
-        crate::models::OrderCounts,
-        crate::models::EmployeePerformance,
-        crate::models::DashboardAlerts,
-        crate::models::AdminUserItem,
-        crate::models::PaginatedUsers,
-        crate::models::ChangeRoleRequest,
-        crate::models::ChangeStatusRequest,
-        crate::models::AdminCreateUserRequest,
-        crate::models::AdminServiceResponse,
-        crate::models::CreateServiceRequest,
-        crate::models::UpdateServiceRequest,
-        crate::models::BlogPostResponse,
-        crate::models::PaginatedBlogPosts,
-        crate::models::CreateBlogPostRequest,
-        crate::models::UpdateBlogPostRequest,
-        crate::models::ProjectResponse,
-        crate::models::ProjectLink,
-        crate::models::ProjectSkill,
-        crate::models::CreateProjectRequest,
-        crate::models::UpdateProjectRequest,
-        crate::models::TeamMemberResponse,
-        crate::models::CreateTeamMemberRequest,
-        crate::models::UpdateTeamMemberRequest,
-        crate::models::PublicUserProfile,
-        crate::models::PublicReviewItem,
-        crate::models::PaginatedPublicReviews,
-        crate::models::RatingDistribution,
-        crate::models::ProblemStatus,
-        crate::models::ProblemResponse,
-        crate::models::ProblemAction,
-        crate::models::ReportProblemRequest,
-        crate::models::ResolveProblemRequest,
-        crate::models::CancelOrderRequest,
-        crate::models::WalletResponse,
-        crate::models::WalletTransactionResponse,
-        crate::models::WalletTransactionsPage,
-        crate::models::CancellationRequestResponse,
-        crate::models::CreateCancellationRequest,
-        crate::models::RespondCancellationRequest,
-        crate::models::WithdrawalRequestResponse,
-        crate::models::WithdrawalRequestsPage,
-        crate::models::CreateWithdrawalRequest,
-        crate::models::ResolveWithdrawalRequest,
-        crate::models::HostingEmailAlias,
-        crate::models::HostingEmailMailbox,
-        crate::models::EmailAliasResponse,
-        crate::models::EmailMailboxResponse,
-        crate::models::HostingEmailInfoResponse,
-        crate::models::CreateEmailAliasRequest,
-        crate::models::AdminBillingItemResponse,
-        crate::models::AdminUpdateBillingStatusRequest,
-        order_lifecycle::ActivityEntry,
-        profile::AvatarResponse,
-        public_config::PublicConfigResponse,
-        uploads::UploadResponse,
-        crate::errors::ErrorResponse,
-        admin_fixtures::FixtureStatusResponse,
-        admin_fixtures::FixtureTableSummary,
-        admin_fixtures::FixtureSyncResult,
-    )),
-    modifiers(&SecurityAddon),
-    info(
-        title = "Glory RS API",
-        version = "0.1.0",
-        description = "Template API — Rust + Axum + OpenAPI"
-    )
-)]
-#[allow(clippy::needless_for_each)]
-pub struct ApiDoc;
-
-/* [164A-16] Security headers OWASP extraídos para mantener create_router dentro del límite clippy */
-type SecurityHeaderLayer = SetResponseHeaderLayer<HeaderValue>;
-fn security_headers() -> (
-    SecurityHeaderLayer,
-    SecurityHeaderLayer,
-    SecurityHeaderLayer,
-    SecurityHeaderLayer,
-    SecurityHeaderLayer,
-) {
-    let hsts = SetResponseHeaderLayer::if_not_present(
-        HeaderName::from_static("strict-transport-security"),
-        HeaderValue::from_static("max-age=31536000; includeSubDomains"),
-    );
-    let nosniff = SetResponseHeaderLayer::if_not_present(
-        HeaderName::from_static("x-content-type-options"),
-        HeaderValue::from_static("nosniff"),
-    );
-    let frame_deny = SetResponseHeaderLayer::if_not_present(
-        HeaderName::from_static("x-frame-options"),
-        HeaderValue::from_static("DENY"),
-    );
-    let referrer = SetResponseHeaderLayer::if_not_present(
-        HeaderName::from_static("referrer-policy"),
-        HeaderValue::from_static("strict-origin-when-cross-origin"),
-    );
-    let permissions = SetResponseHeaderLayer::if_not_present(
-        HeaderName::from_static("permissions-policy"),
-        HeaderValue::from_static("camera=(), microphone=(), geolocation=()"),
-    );
-    (hsts, nosniff, frame_deny, referrer, permissions)
-}
-
-fn init_contabo_service() -> Option<crate::services::ContaboService> {
-    crate::services::ContaboConfig::from_env().map(|cfg| {
-        tracing::info!("Contabo API configurado para {}", cfg.api_user);
-        crate::services::ContaboService::new(cfg, reqwest::Client::new())
-    })
-}
-
-fn init_coolify_config() -> Option<crate::services::CoolifyConfig> {
-    let coolify_config = crate::services::CoolifyConfig::from_env();
-    if coolify_config.is_some() {
-        tracing::info!("Coolify provisioning configurado");
-    } else {
-        tracing::warn!(
-            "Coolify NO configurado — provisioning de hosting desactivado (faltan vars COOLIFY_*)"
-        );
-    }
-    coolify_config
-}
-
-/* [VPS1-support] Config de Coolify para la VPS principal, vars COOLIFY_VPS1_* */
-fn init_coolify_config_vps1() -> Option<crate::services::CoolifyConfig> {
-    let cfg = crate::services::CoolifyConfig::from_env_with_prefix("COOLIFY_VPS1_");
-    if cfg.is_some() {
-        tracing::info!("Coolify VPS1 configurado");
-    } else {
-        tracing::debug!("Coolify VPS1 no configurado (opcional — faltan vars COOLIFY_VPS1_*)");
-    }
-    cfg
-}
-
-fn init_email_config() -> Option<crate::services::EmailConfig> {
-    let email_config = crate::services::EmailConfig::from_env();
-    if email_config.is_some() {
-        tracing::info!("Email SMTP configurado");
-    } else {
-        tracing::warn!("Email SMTP NO configurado (faltan vars SMTP_*) — emails desactivados");
-    }
-    email_config
-}
-
-fn init_fixture_manager(
-    pool: &sqlx::PgPool,
-) -> Option<std::sync::Arc<glory_rs::fixtures::ContentManager>> {
-    let content_dir = std::env::var("CONTENT_DIR").unwrap_or_else(|_| "content".to_string());
-    if std::path::Path::new(&content_dir).exists() {
-        tracing::info!("Fixture manager configurado en '{content_dir}'");
-        let password_hasher: glory_rs::fixtures::PasswordHasher = Box::new(|plain| {
-            let salt = argon2::password_hash::SaltString::generate(
-                &mut argon2::password_hash::rand_core::OsRng,
-            );
-            let hash = argon2::Argon2::default()
-                .hash_password(plain.as_bytes(), &salt)
-                .map_err(
-                    |e: argon2::password_hash::Error| -> Box<dyn std::error::Error + Send + Sync> {
-                        e.to_string().into()
-                    },
-                )?
-                .to_string();
-            Ok(hash)
-        });
-        Some(std::sync::Arc::new(
-            glory_rs::fixtures::ContentManager::new(pool.clone(), &content_dir)
-                .with_password_hasher(password_hasher),
-        ))
-    } else {
-        tracing::warn!("Content dir '{content_dir}' no encontrado — fixture sync desactivado");
-        None
-    }
-}
+/* [07AA-14] security_headers + inits movidos a `app.rs`. */
 
 /// Crea el router principal con CORS, tracing, Swagger UI y todas las rutas
 /* sentinel-disable-next-line funcion-larga-rs: create_router concentra wiring global de estado, middlewares y servicios opcionales para no fragmentar el bootstrap del servidor. */
@@ -442,11 +75,11 @@ pub fn create_router(pool: sqlx::PgPool, config: crate::config::AppConfig) -> Ro
     let chat_hub = crate::services::ChatHub::new(pool.clone());
     let notification_hub = crate::services::NotificationHub::new(pool.clone());
     let ai_config = crate::services::AiChatConfig::from_env();
-    let contabo_service = init_contabo_service();
-    let coolify_config = init_coolify_config();
-    let coolify_config_vps1 = init_coolify_config_vps1();
-    let email_config = init_email_config();
-    let fixture_manager = init_fixture_manager(&pool);
+    let contabo_service = app::init_contabo_service();
+    let coolify_config = app::init_coolify_config();
+    let coolify_config_vps1 = app::init_coolify_config_vps1();
+    let email_config = app::init_email_config();
+    let fixture_manager = app::init_fixture_manager(&pool);
 
     let state = AppState {
         pool,
@@ -508,11 +141,14 @@ pub fn create_router(pool: sqlx::PgPool, config: crate::config::AppConfig) -> Ro
             .allow_credentials(true)
     };
 
-    let (hsts, nosniff, frame_deny, referrer, permissions) = security_headers();
+    let (hsts, nosniff, frame_deny, referrer, permissions) = app::security_headers();
 
     Router::new()
         .merge(health::root_routes())
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+        .merge(
+            SwaggerUi::new("/swagger-ui")
+                .url("/api-docs/openapi.json", openapi_doc::ApiDoc::openapi()),
+        )
         .merge(seo::routes())
         /* [044A-38 Fase 5] WebSocket routes at root level (not under /api) */
         .merge(chat::ws_routes())
@@ -535,7 +171,7 @@ pub fn create_router(pool: sqlx::PgPool, config: crate::config::AppConfig) -> Ro
          * forma estructural, no solo en un router anidado paralelo. */
         .merge(image_proxy::routes())
         .nest("/api", api_routes())
-        .merge(spa_shell_routes())
+        .merge(app::spa_shell_routes())
         .layer(TraceLayer::new_for_http())
         /* [255A-1] Canonizar rutas publicas con slash final (`/panel/` -> `/panel`).
          * Axum caia al SPA fallback estatico y devolvia `index.html` con estado 404.
@@ -552,99 +188,7 @@ pub fn create_router(pool: sqlx::PgPool, config: crate::config::AppConfig) -> Ro
         .with_state(state)
 }
 
-/* [044A-9] Monta el frontend React como SPA: archivos estaticos con fallback a index.html.
- * Solo se activa si STATIC_DIR esta configurado (en produccion). En desarrollo, Vite sirve el frontend.
- * [114A-19] Cache-Control diferenciado: assets con hash → 1 año immutable, index.html → no-cache.
- * Esto mejora PageSpeed: evita re-descargar 5+ MB de JS/CSS en visitas repetidas. */
-pub fn create_app(pool: sqlx::PgPool, config: crate::config::AppConfig) -> Router {
-    let static_dir = config.static_dir.clone();
-    let pool_for_prerender = pool.clone();
-    let router = create_router(pool, config);
-
-    if let Some(dir) = static_dir {
-        let index_path = format!("{dir}/index.html");
-        let assets_dir = format!("{dir}/assets");
-
-        /* [114A-19] Assets con content-hash de Vite (ej: index-B5XA6NlK.js): cache 1 año immutable.
-         * El hash cambia cada vez que el contenido cambia, así que es seguro. */
-        let asset_service = tower::ServiceBuilder::new()
-            .layer(SetResponseHeaderLayer::if_not_present(
-                HeaderName::from_static("cache-control"),
-                HeaderValue::from_static("public, max-age=31536000, immutable"),
-            ))
-            .service(ServeDir::new(&assets_dir));
-
-        /* SPA fallback: index.html se revalida siempre para apuntar a los assets más recientes.
-         * Otros archivos sin hash (favicon, fonts) obtienen 1 día de cache. */
-        let spa_serve = ServeDir::new(&dir).not_found_service(ServeFile::new(&index_path));
-
-        /* [214A-2] Middleware SEO dinámico: inyecta meta tags desde BD para crawlers.
-         * Reemplaza el enfoque estático de 114A-SEO3 (Puppeteer) que no soportaba CMS editable. */
-        let prerender_state = crate::middleware::prerender::PrerenderState {
-            pool: pool_for_prerender,
-            static_dir: dir.clone(),
-            app_url: std::env::var("APP_URL").unwrap_or_else(|_| "http://localhost:5173".into()),
-            seo_cache: crate::middleware::prerender::SeoCache::new(),
-        };
-
-        /* [185A-1] CompressionLayer aqui cubre /assets/ y SPA fallback (HTML).
-         * El CompressionLayer de create_router solo cubre /api/ y /uploads/.
-         * Los nest_service/fallback_service en create_app quedan fuera de ese layer.
-         * tower-http no recomprime si Content-Encoding ya esta establecido. */
-        router
-            .nest_service("/assets", asset_service)
-            .fallback_service(spa_serve)
-            .layer(axum::middleware::from_fn_with_state(
-                prerender_state,
-                crate::middleware::prerender::prerender,
-            ))
-            .layer(CompressionLayer::new())
-    } else {
-        router
-    }
-}
-
-fn spa_shell_routes() -> Router<AppState> {
-    Router::new()
-        .route("/", get(spa_index))
-        .route("/servicios", get(spa_index))
-        .route("/servicios/:slug", get(spa_index))
-        .route("/proyectos", get(spa_index))
-        .route("/proyectos/:slug", get(spa_index))
-        .route("/nosotros", get(spa_index))
-        .route("/soluciones/hosting-wordpress", get(spa_index))
-        .route("/soluciones/hosting", get(spa_index))
-        .route("/soluciones/vps", get(spa_index))
-        .route("/portal-vps", get(spa_index))
-        .route("/politica-privacidad", get(spa_index))
-        .route("/blog", get(spa_index))
-        .route("/blog/:slug", get(spa_index))
-        .route("/contacto", get(spa_index))
-        .route("/usuario/:username", get(spa_index))
-        .route("/panel", get(spa_index))
-        .route("/panel/", get(spa_index))
-        .route("/panel/chat", get(spa_index))
-}
-
-async fn spa_index(State(state): State<AppState>) -> Response {
-    let Some(static_dir) = state.static_dir.as_deref() else {
-        return StatusCode::NOT_FOUND.into_response();
-    };
-
-    let index_path = format!("{static_dir}/index.html");
-    match tokio::fs::read(index_path).await {
-        Ok(bytes) => Response::builder()
-            .status(StatusCode::OK)
-            .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
-            .header(header::CACHE_CONTROL, "no-cache")
-            .body(Body::from(bytes))
-            .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response()),
-        Err(error) => {
-            tracing::error!(%error, static_dir, "No se pudo leer index.html para SPA");
-            StatusCode::NOT_FOUND.into_response()
-        }
-    }
-}
+/* [07AA-14] create_app + SPA shell movidos a `app.rs` (re-exportado arriba). */
 
 fn api_routes() -> Router<AppState> {
     /* [064A-73][225A-4][255A-1][255A-3][176A-1] Rate limiting: detrás de Coolify/Traefik

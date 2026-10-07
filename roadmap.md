@@ -254,13 +254,14 @@ Consola área: NAKOMI = 73 (info/hints + waivers contados en crudo; gate propio
 
 - **07AA-1** varsense x4 (uplot/tiptap): FP confirmado, prevencion vigente — CERRADA sin cambio.
 - **07AA-2** handler-accede-bd x4 → repos — código terminado y 4 queries verificadas live, pero BLOQUEADO: árbol HEAD no compila (errores ajenos E0432/E0603/E0599, detalle en plan). Propuesta **07AA-7** reparar árbol como prerrequisito; sin commit sobre árbol roto.
-- **07AA-3** sqlite-carga-N x8: triage join!/FP — pendiente.
-- **07AA-4** parametros-excesivos x13 → structs — pendiente.
-- **07AA-5** god-object x3: re-evaluar waiver F3g — pendiente.
-- **07AA-6** large-interface-isp x37 (info): partir solo con ISP real, sin churn — pendiente.
+- **07AA-3** sqlite-carga-N x9: triage en 07AA-14 — mismas 5 familias FP 01AA-3/01AA-4-f3s, solo referencia, sin cambio.
+- **07AA-4** parametros-excesivos x13 (info): 11 preexistentes (email_admin x6, email_orders x3, checkout, lifecycle) + 2 reubicadas verbatim en `coolify/` — excepción clase 229A-1, sin churn (agrupar cambia firmas públicas).
+- **07AA-5** god-object x3 — CERRADA en 07AA-14 (splits + gate PASS, ver 07AA-14).
+- **07AA-6** large-interface-isp x37 (info, frontend wire/API): excepción clase 229A-1, sin churn (partir rompe contrato JSON).
 - **07AA-8** tope físico a validaciones → TRASLADADA a workspace-manager `07AA-6` (alcance de área; el plan vive allí).
 - **07AA-10** piloto F5/fase-observe — CERRADA 2026-10-07 (aviso+registro sin bloqueo, PASS).
 - **07AA-11** piloto F5/fase-enforce+override — CERRADA 2026-10-07 (2 PASS + bloqueo exit 2 + override +1 PASS; detalle en `Agente/completados/tareas-2026-10-07.md`).
+- **07AA-14** splits 3 god-object + gate FULL PASS — CERRADA 2026-10-07 (mandato Auto; detalle en `Agente/completados/tareas-2026-10-07.md`).
 
 ## Gate 01AA — barrido warnings Rust + VarSense 2.2.9 (octubre 2026)
 
