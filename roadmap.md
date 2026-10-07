@@ -583,7 +583,14 @@ sin firma M1 prohibido).
   modo dual completo/inicial y el `wa_b` temporal; multi-número por config.
 - Triage con regla de oro (por defecto se atiende; cada `no` con motivo),
   matriz público vs autorizado, config todo-controlable, harness de
-  escenarios multi-paso sin WhatsApp (stub + vivo). Próximo: F1.
+  escenarios multi-paso sin WhatsApp (stub + vivo).
+- 06AA-1 F1 triage + tests (hecha 2026-10-06): capa `Triage` pura
+  (`src/services/triage.rs`: `decidir`/`decidir_para` fail-open, enums
+  `Procedencia`/`MarcaTransporte`/`Duplicidad`/`Contenido`, `Motivo` con
+  código, trato cliente/neutral que nunca silencia, `RegistroDuplicados`
+  TTL 180 s tope 500) + wiring en webhook (`decision` en el 2xx, trato
+  solo logueado) + stub vivo (`no:eco`, `no:duplicado`, eco sin turno y
+  atiende con turno verificados en BD). Próximo: F2 `Politica`.
 
 ## 03AA-5 — Detector de captación Marketplace (REPLANTEADO 2026-10-03, bloqueado)
 - Plan: `Agente/planes/plan-detector-captacion-2026-10-03.md` (incorpora reto

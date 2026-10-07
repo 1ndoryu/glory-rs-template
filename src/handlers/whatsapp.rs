@@ -1,5 +1,5 @@
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
 
 use axum::extract::State;
@@ -12,7 +12,7 @@ use uuid::Uuid;
 use crate::repositories::ClienteRepository;
 use crate::services::InmuebleService;
 use crate::services::{
-    clave_idempotencia, corte_cubre, debe_usar_clave, encolar_outbox_idem, modo_por_canal,
+    clave_idempotencia, corte_cubre, debe_usar_clave, encolar_outbox_idem, modo_por_canal, triage,
     CanalResolver, Encolado,
 };
 use glory_agent::channels::Resolver;
@@ -328,6 +328,16 @@ pub struct EntradaWhatsapp {
     texto: String,
     nombre: Option<String>,
     media_url: Option<String>,
+    /* [06AA-1] Campos del transporte real (F-transporte): el simulado no los
+     * manda (`None` = dato ausente = el triage atiende, regla de oro). */
+    #[serde(default)]
+    ts_ms: Option<i64>,
+    #[serde(default)]
+    from_me: Option<bool>,
+    #[serde(default)]
+    es_sistema: Option<bool>,
+    #[serde(default)]
+    client_seq: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -338,6 +348,10 @@ pub struct RepartoWhatsapp {
     session_id: Uuid,
     cliente_id: Uuid,
     mensaje_id: Uuid,
+    /* [06AA-1] Decisión del triage (`atiende:cliente`, `no:delegada`, ...):
+     * la fija el webhook tras `repartir_y_vincular`; el harness vivo la
+     * verifica sin leer logs. */
+    decision: String,
     /* [289A-1] Secuencia del `client` recién persistido: el turno IA la
      * excluye del historial y la re-anexa como actual. */
     secuencia: i64,
@@ -630,9 +644,65 @@ pub async fn repartir_y_vincular(
             cliente_id: cliente.id,
             mensaje_id: msg.id,
             secuencia: msg.sequence_num,
+            decision: "pendiente".to_string(),
         },
         medios,
     ))
+}
+
+/// [06AA-1] Registro de `client_seq` del proceso (duplicados del
+/// transporte): TTL 180 s igual que el eco del gateway, tope 500.
+static REGISTRO_DUPLICADOS: LazyLock<Mutex<triage::RegistroDuplicados>> = LazyLock::new(|| {
+    Mutex::new(triage::RegistroDuplicados::nuevo(
+        Duration::from_secs(180),
+        500,
+    ))
+});
+
+/// [06AA-1] Triage del webhook (extraída por el lint de 100 líneas):
+/// resuelve el remitente normalizado y la decisión (`decidir_para`). El
+/// mensaje ya quedó persistido por `repartir_y_vincular` (el staff lo ve en
+/// el panel aunque no se atienda); aquí solo se decide si corre el turno.
+/// `Mutex` del registro: sección crítica breve, sin `await` dentro.
+async fn triar_entrada(
+    pool: &sqlx::PgPool,
+    numero_a: &str,
+    numero_b: &str,
+    entrada: &EntradaWhatsapp,
+    sesion: Uuid,
+) -> (String, triage::Decision) {
+    let remitente = ClienteRepository::normalizar_telefono(entrada.remitente.trim());
+    let texto = entrada.texto.trim();
+    let tiene_media = entrada
+        .media_url
+        .as_deref()
+        .is_some_and(|u| !u.trim().is_empty());
+    let marca = if entrada.from_me.unwrap_or(false) {
+        triage::MarcaTransporte::Eco
+    } else if entrada.es_sistema.unwrap_or(false) {
+        triage::MarcaTransporte::Sistema
+    } else {
+        triage::MarcaTransporte::Normal
+    };
+    let sin_resolver = triage::EntradaSinResolver {
+        procedencia: if remitente == numero_a || remitente == numero_b {
+            triage::Procedencia::Propio
+        } else {
+            triage::Procedencia::Externo
+        },
+        marca,
+        contenido: if texto.is_empty() && !tiene_media {
+            triage::Contenido::Vacio
+        } else {
+            triage::Contenido::Util
+        },
+        texto,
+        ts_ms: entrada.ts_ms,
+        client_seq: entrada.client_seq.as_deref(),
+        sesion,
+    };
+    let decision = triage::decidir_para(pool, &sin_resolver, &REGISTRO_DUPLICADOS).await;
+    (remitente, decision)
 }
 
 async fn webhook(
@@ -652,7 +722,28 @@ async fn webhook(
         .clone()
         .ok_or_else(|| AgentError::Internal("sin BD".to_string()))?;
     let (a, b) = numeros_configurados(&pool).await;
-    let (rep, medios) = repartir_y_vincular(&pool, &state.hub, &a, &b, &entrada).await?;
+    let (mut rep, medios) = repartir_y_vincular(&pool, &state.hub, &a, &b, &entrada).await?;
+    /* [06AA-1] Triage F1: el mensaje ya persistió (auditoría/panel); si la
+     * decisión es `no`, el 2xx lleva el motivo y no corre turno. El trato
+     * solo se loguea (F2 `Politica` lo usará para el tono). */
+    let (remitente_norm, decision) = triar_entrada(&pool, &a, &b, &entrada, rep.session_id).await;
+    rep.decision = decision.codigo().to_string();
+    match decision {
+        triage::Decision::NoAtiende { motivo } => {
+            tracing::warn!(
+                "webhook WhatsApp: {} triage no atiende ({})",
+                rep.session_id,
+                motivo.codigo()
+            );
+            return Ok(Json(rep));
+        }
+        triage::Decision::Atiende { trato } => {
+            tracing::info!(
+                "webhook WhatsApp: {} triage atiende (trato={trato:?})",
+                rep.session_id
+            );
+        }
+    }
     /* [299A-1 E11] La foto se describe en background ANTES del turno para que
      * el historial ya traiga el `— se ve:`.
      * [309A-4] El audio se transcribe igual (`— dice:`). El 2xx al gateway
@@ -667,7 +758,7 @@ async fn webhook(
     let fondo = state.clone();
     let pool_fondo = pool.clone();
     let texto_fondo = entrada.texto.trim().to_string();
-    let remitente_fondo = ClienteRepository::normalizar_telefono(entrada.remitente.trim());
+    let remitente_fondo = remitente_norm;
     let canal_fondo = rep.canal.clone();
     let sesion_fondo = rep.session_id;
     let secuencia_fondo = rep.secuencia;
@@ -1046,6 +1137,10 @@ mod pruebas {
             texto: "hola A".to_string(),
             nombre: Some("Humo WA".to_string()),
             media_url: None,
+            ts_ms: None,
+            from_me: None,
+            es_sistema: None,
+            client_seq: None,
         };
         let (r1, _) = repartir_y_vincular(&pool, &hub, numero_a, numero_b, &entrada_a)
             .await
@@ -1061,6 +1156,10 @@ mod pruebas {
             texto: "hola B".to_string(),
             nombre: None,
             media_url: Some("https://example.com/foto.jpg".to_string()),
+            ts_ms: None,
+            from_me: None,
+            es_sistema: None,
+            client_seq: None,
         };
         let (r3, _) = repartir_y_vincular(&pool, &hub, numero_a, numero_b, &entrada_b)
             .await

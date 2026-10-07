@@ -8,6 +8,7 @@ mod outbox_idempotency;
 mod solicitud;
 mod suscriptor;
 mod tope_uso;
+pub mod triage;
 
 pub use alerta_whatsapp::vigilar as vigilar_alertas_whatsapp;
 pub use auth::{AuthService, Claims};
@@ -21,3 +22,8 @@ pub use outbox_idempotency::{
 pub use solicitud::SolicitudService;
 pub use suscriptor::SuscriptorService;
 pub use tope_uso::{revisar_tope, vigilar as vigilar_tope_uso};
+pub use triage::{
+    decidir, decidir_para, evaluar_trato, Contenido, Decision, Duplicidad, EntradaSinResolver,
+    EvaluacionTrato, EventoTriage, MarcaTransporte, Motivo, Procedencia, RegistroDuplicados, Trato,
+    VENTANA_RETRASO_MIN_DEFAULT,
+};
