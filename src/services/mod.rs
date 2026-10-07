@@ -5,6 +5,7 @@ mod inmueble;
 pub mod marketplace;
 mod note;
 mod outbox_idempotency;
+pub mod politica;
 mod solicitud;
 mod suscriptor;
 mod tope_uso;
@@ -18,6 +19,10 @@ pub use note::NoteService;
 pub use outbox_idempotency::{
     clave_idempotencia, corte_cubre, debe_usar_clave, encolar as encolar_outbox_idem,
     marcar as marcar_outbox, purgar_resueltos, reencolar_fallidos, Encolado,
+};
+pub use politica::{
+    codigo_trato, leer_autorizados, prefijo_contexto, resolver, texto_para_turno, DecisionPolitica,
+    Rol, CLAVE_AUTORIZADOS, REGLA_FRONTERA,
 };
 pub use solicitud::SolicitudService;
 pub use suscriptor::SuscriptorService;

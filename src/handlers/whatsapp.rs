@@ -12,8 +12,8 @@ use uuid::Uuid;
 use crate::repositories::ClienteRepository;
 use crate::services::InmuebleService;
 use crate::services::{
-    clave_idempotencia, corte_cubre, debe_usar_clave, encolar_outbox_idem, modo_por_canal, triage,
-    CanalResolver, Encolado,
+    clave_idempotencia, corte_cubre, debe_usar_clave, encolar_outbox_idem, modo_por_canal,
+    politica, triage, CanalResolver, Encolado,
 };
 use glory_agent::channels::Resolver;
 use glory_agent::errors::AgentError;
@@ -352,6 +352,10 @@ pub struct RepartoWhatsapp {
      * la fija el webhook tras `repartir_y_vincular`; el harness vivo la
      * verifica sin leer logs. */
     decision: String,
+    /* [06AA-2] Rol (`publico`/`autorizado`) y trato (`cliente`/`neutral`)
+     * de F2 `Politica`: los fija el webhook junto a la decisión. */
+    rol: String,
+    trato: String,
     /* [289A-1] Secuencia del `client` recién persistido: el turno IA la
      * excluye del historial y la re-anexa como actual. */
     secuencia: i64,
@@ -645,6 +649,8 @@ pub async fn repartir_y_vincular(
             mensaje_id: msg.id,
             secuencia: msg.sequence_num,
             decision: "pendiente".to_string(),
+            rol: "pendiente".to_string(),
+            trato: "pendiente".to_string(),
         },
         medios,
     ))
@@ -724,23 +730,40 @@ async fn webhook(
     let (a, b) = numeros_configurados(&pool).await;
     let (mut rep, medios) = repartir_y_vincular(&pool, &state.hub, &a, &b, &entrada).await?;
     /* [06AA-1] Triage F1: el mensaje ya persistió (auditoría/panel); si la
-     * decisión es `no`, el 2xx lleva el motivo y no corre turno. El trato
-     * solo se loguea (F2 `Politica` lo usará para el tono). */
+     * decisión es `no`, el 2xx lleva el motivo y no corre turno.
+     * [06AA-2] Política F2: rol por allowlist + trato→tono. Se resuelve en
+     * ambas ramas para que el 2xx siempre traiga `rol`/`trato`; el tono
+     * neutral viaja como prefijo de contexto solo al modelo (lo persistido
+     * y el panel quedan intactos). */
     let (remitente_norm, decision) = triar_entrada(&pool, &a, &b, &entrada, rep.session_id).await;
     rep.decision = decision.codigo().to_string();
+    let autorizados = politica::leer_autorizados(&pool).await;
+    let trato = match decision {
+        triage::Decision::Atiende { trato } => trato,
+        triage::Decision::NoAtiende { .. } => {
+            triage::evaluar_trato(entrada.texto.trim()).trato
+        }
+    };
+    let regla = politica::resolver(&autorizados, &remitente_norm, trato);
+    rep.rol = regla.rol.codigo().to_string();
+    rep.trato = politica::codigo_trato(regla.trato).to_string();
     match decision {
         triage::Decision::NoAtiende { motivo } => {
             tracing::warn!(
-                "webhook WhatsApp: {} triage no atiende ({})",
+                "webhook WhatsApp: {} triage no atiende ({}) rol={} trato={}",
                 rep.session_id,
-                motivo.codigo()
+                motivo.codigo(),
+                regla.rol.codigo(),
+                politica::codigo_trato(regla.trato)
             );
             return Ok(Json(rep));
         }
-        triage::Decision::Atiende { trato } => {
+        triage::Decision::Atiende { .. } => {
             tracing::info!(
-                "webhook WhatsApp: {} triage atiende (trato={trato:?})",
-                rep.session_id
+                "webhook WhatsApp: {} triage atiende (rol={} trato={})",
+                rep.session_id,
+                regla.rol.codigo(),
+                politica::codigo_trato(regla.trato)
             );
         }
     }
@@ -757,7 +780,8 @@ async fn webhook(
      * tome. `Err` se loguea: nunca 500 al gateway por fallos del LLM. */
     let fondo = state.clone();
     let pool_fondo = pool.clone();
-    let texto_fondo = entrada.texto.trim().to_string();
+    /* [06AA-2] El modelo ve el tono de la política; lo persistido no cambia. */
+    let texto_fondo = politica::texto_para_turno(regla.trato, entrada.texto.trim());
     let remitente_fondo = remitente_norm;
     let canal_fondo = rep.canal.clone();
     let sesion_fondo = rep.session_id;

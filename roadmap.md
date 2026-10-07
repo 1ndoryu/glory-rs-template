@@ -589,8 +589,17 @@ sin firma M1 prohibido).
   `Procedencia`/`MarcaTransporte`/`Duplicidad`/`Contenido`, `Motivo` con
   código, trato cliente/neutral que nunca silencia, `RegistroDuplicados`
   TTL 180 s tope 500) + wiring en webhook (`decision` en el 2xx, trato
-  solo logueado) + stub vivo (`no:eco`, `no:duplicado`, eco sin turno y
-  atiende con turno verificados en BD). Próximo: F2 `Politica`.
+   solo logueado) + stub vivo (`no:eco`, `no:duplicado`, eco sin turno y
+   atiende con turno verificados en BD).
+ - 06AA-2 F2 política + tono (hecha 2026-10-07): capa `Politica`
+   (`src/services/politica.rs`: `Rol` por allowlist
+   `agent_config.whatsapp_autorizados` fail-closed a `Publico`, `resolver`
+   pura, `leer_autorizados` 1 consulta, `prefijo_contexto`/`texto_para_turno`
+   solo al modelo, `REGLA_FRONTERA` al prompt global) + wiring en webhook
+   (`rol`/`trato` en el 2xx, tono al turno, frontera al prompt) + stub vivo
+   (`atiende:cliente`/`publico`, `atiende:neutral`/`publico`,
+   `atiende:cliente`/`autorizado`, tono neutral breve+califica e intacto en
+   BD). Próximo: F3 (gancho propio al partir capas).
 
 ## 03AA-5 — Detector de captación Marketplace (REPLANTEADO 2026-10-03, bloqueado)
 - Plan: `Agente/planes/plan-detector-captacion-2026-10-03.md` (incorpora reto

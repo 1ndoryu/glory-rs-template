@@ -85,6 +85,10 @@ fn linea_hora_venezuela() -> String {
 /// claves), no inventes su contenido: dile que ahora mismo no puedes
 /// escuchar audios y que por favor te lo escriba por aquí; sigue ayudando
 /// por texto y ofrece seguimiento por el teléfono oficial.
+/// [06AA-2] Frontera F2 `Politica`: `REGLA_FRONTERA` cierra al modelo los
+/// datos de otros clientes (las tools ya no exponen ninguno). El tono por
+/// trato (`neutral` = breve + califica) no va aquí —es por turno— sino en
+/// el prefijo de contexto que arma el webhook.
 fn prompt_config() -> glory_agent::prompts::PromptConfig {
     let contacto = contacto_defecto();
     glory_agent::prompts::PromptConfig::new(
@@ -97,7 +101,8 @@ fn prompt_config() -> glory_agent::prompts::PromptConfig {
              uses otra).",
             linea_hora_venezuela()
         ),
-        "Ante cualquier pregunta sobre oferta concreta usa `buscar_inmuebles` \
+        &format!(
+            "Ante cualquier pregunta sobre oferta concreta usa `buscar_inmuebles` \
          (y `detalle_inmueble` para la ficha) antes de responder: solo hablas \
          de inmuebles que la tool devuelva. Pasa `habitaciones` y `zona` \
          siempre que el visitante los mencione (filtros exactos en BD) y \
@@ -153,8 +158,10 @@ fn prompt_config() -> glory_agent::prompts::PromptConfig {
           correspondiente respondió éxito EN ESTE TURNO: prohibido decir \
           'ya quedó registrado' sin haber llamado a la tool (Fase3-H2). No \
           hay oficina física: si pide dirección, ubicación o punto de \
-          encuentro, JAMÁS inventes una; llama a `consultar_agente` para que \
-          un asesor coordine con el visitante (Fase3-H5).",
+           encuentro, JAMÁS inventes una; llama a `consultar_agente` para que \
+            un asesor coordine con el visitante (Fase3-H5). {}",
+            crate::services::politica::REGLA_FRONTERA
+        ),
         &format!(
             "Si el visitante pide un humano o das 2 respuestas sin resolver, \
              llama a `escalar_a_humano` con el motivo y ofrece seguimiento por \
