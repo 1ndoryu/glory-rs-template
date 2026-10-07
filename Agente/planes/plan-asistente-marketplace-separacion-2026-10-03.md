@@ -18,11 +18,13 @@ backend MN con caché (firma conocida = 0 tokens). El envío siempre es humano.
 - No: auto-envío (prohibido siempre), credenciales/sesión de Meta (las pone
   ella), API oficial de Messenger, auto-pegado al composer, móvil real
   (fuera de alcance: solo desktop-estrecho 390px).
-- Protección while vivo [07AA-5]: `opencode-propio` en ejecución (puerto
-  5174) no se toca nunca — ni sus archivos, ni sus procesos, ni sus
-  puertos. Todo C1a se prepara fuera (plugin + backend MN + parche
-  versionado); el parche entra solo en la ventana C1b, y el reinicio
-  lo hace ella, nunca el agente.
+- Protección while vivo [07AA-5, endurecida 2026-10-07: la app corre en
+  modo dev — guardar un archivo la recarga y la puede romper]: mientras
+  `opencode-propio` esté en ejecución (puerto 5174) no se edita NADA
+  dentro de su checkout, ni siquiera en disco. Todo C1a se prepara
+  fuera (plugin + backend MN + copias en `C:\tmp` + parche versionado
+  como diff archivado); el parche entra solo en la ventana C1b, y el
+  reinicio lo hace ella, nunca el agente.
 
 ## Doctrina Meta
 Fuente canónica: plan 03AA-5 (pin `doctrina-v1`); aquí solo ref + delta
@@ -131,11 +133,12 @@ pineado junto a `firma-v1`.
 - **C1 — Cableado en `opencode-propio` (FALTABA; lo más importante):**
   conecta el núcleo nuevo (`plugins-opencode` + backend MN) dentro de la
   app, con flag `MP_NUCLEO=off` por defecto (lo viejo sigue mandando).
-  - C1a Preparación (SIN tocar la app viva): todo se hace fuera — plugin,
-    backend, docs — y el cableado se deja listo como parche versionado
-    (diff archivado, no editado en vivo). Verificación estática:
-    `tsc`+tests del plugin y fmt/clippy/test del backend. Cero reinicios,
-    cero puertos tocados.
+  - C1a Preparación (SIN tocar la app viva ni sus archivos en disco):
+    todo se hace fuera — plugin, backend, docs — trabajando sobre copias
+    en `C:\tmp`, y el cableado se deja listo como parche versionado (diff
+    archivado, jamás editado dentro del checkout vivo). Verificación
+    estática: `tsc`+tests del plugin y fmt/clippy/test del backend. Cero
+    reinicios, cero puertos tocados, cero guardados en dev.
   - C1b Ventana de cutover (con ella): ella avisa, se aplica el parche,
     se verifica que la app arranca con flag off = burbuja vieja intacta;
     recién ahí viva 30min con flag on. El reinicio lo hace ella.
