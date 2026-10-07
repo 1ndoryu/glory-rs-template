@@ -6,7 +6,7 @@
  * solo boundary HTTP + 429 con `Retry-After`. */
 
 use axum::async_trait;
-use axum::extract::{FromRequestParts, Query, State};
+use axum::extract::{FromRequestParts, Path, Query, State};
 use axum::http::header::RETRY_AFTER;
 use axum::http::request::Parts;
 use axum::http::StatusCode;
@@ -23,10 +23,11 @@ use crate::errors::AppError;
 use crate::middleware::AuthUser;
 use crate::repositories::InmuebleRepository;
 use crate::services::marketplace::{
-    borrar_cache, buscar_cache, consumir_minuto, corregir_cache, guardar_cache, hash_ficha,
-    matriz_negativa, precio_hash_seguro, reemplazar_cache, registrar_token, resumen_uso,
-    strip_ficha_para_prompt, sub_exento, validar_borrador, BorradorRequest, MpClaims,
-    FALLBACK_BORRADOR, MATRIZ_NEGATIVA_VERSION, SIN_FICHA, STRIP_VERSION,
+    borrar_cache, buscar_cache, consumir_minuto, corregir_cache, detalle_chat, guardar_cache,
+    hash_ficha, matriz_negativa, precio_hash_seguro, reemplazar_cache, registrar_token,
+    resumen_chats, resumen_uso, strip_ficha_para_prompt, sub_exento, validar_borrador,
+    BorradorRequest, MpClaims, FALLBACK_BORRADOR, MATRIZ_NEGATIVA_VERSION, SIN_FICHA,
+    STRIP_VERSION,
 };
 use crate::AppState;
 
@@ -336,6 +337,8 @@ pub async fn borrador(
             &precio_hash,
             &catalog_hash,
             &gen.texto,
+            r.thread_id.trim(),
+            &r.excerpt.texto,
         )
         .await?;
     }
@@ -390,6 +393,8 @@ pub async fn regenerar(
             &precio_hash,
             &catalog_hash,
             &gen.texto,
+            r.thread_id.trim(),
+            &r.excerpt.texto,
         )
         .await?;
     }
@@ -579,6 +584,8 @@ pub fn routes() -> Router<AppState> {
         .route("/marketplace/corregir", post(corregir))
         .route("/marketplace/audit", post(audit))
         .route("/marketplace/uso", get(uso))
+        .route("/marketplace/chats", get(chats))
+        .route("/marketplace/chats/:thread", get(chat_detalle))
 }
 
 /// [03AA-3 M2] Dashboard agregado para el panel: conteos por día y evento de
@@ -602,5 +609,42 @@ pub async fn uso(
     Query(q): Query<UsoQuery>,
 ) -> Result<Response, AppError> {
     let filas = resumen_uso(&state.pool, q.dias.unwrap_or(7)).await?;
+    Ok((StatusCode::OK, Json(filas)).into_response())
+}
+
+/// [07AA-7] Panel por chat: lista de hilos con conteos. Solo JWT admin.
+#[utoipa::path(
+    get,
+    path = "/api/admin/marketplace/chats",
+    responses(
+        (status = 200, description = "Chats con borradores", body = Vec<crate::services::marketplace::ChatResumen>)
+    )
+)]
+pub async fn chats(State(state): State<AppState>, _auth: AuthUser) -> Result<Response, AppError> {
+    let filas = resumen_chats(&state.pool).await?;
+    Ok((StatusCode::OK, Json(filas)).into_response())
+}
+
+/// [07AA-7] Panel por chat: filas de un hilo (extracto + respuesta).
+/// Solo JWT admin.
+#[utoipa::path(
+    get,
+    path = "/api/admin/marketplace/chats/{thread}",
+    params(("thread" = String, Path, description = "Clave del hilo")),
+    responses(
+        (status = 200, description = "Borradores del hilo", body = Vec<crate::services::marketplace::ChatFila>),
+        (status = 422, description = "Hilo vacío", body = crate::errors::ErrorResponse)
+    )
+)]
+pub async fn chat_detalle(
+    State(state): State<AppState>,
+    _auth: AuthUser,
+    Path(thread): Path<String>,
+) -> Result<Response, AppError> {
+    let hilo = thread.trim();
+    if hilo.is_empty() {
+        return Err(AppError::Validation("thread requerido".to_string()));
+    }
+    let filas = detalle_chat(&state.pool, hilo).await?;
     Ok((StatusCode::OK, Json(filas)).into_response())
 }

@@ -592,6 +592,27 @@ Siguiente: C1 (NUEVO 2026-10-07 [07AA-5]: cableado en opencode-propio —
   flag verificado 38/38 tests + typecheck). C1b espera ventana con ella
   (ella reinicia y prueba viva).
 
+## 07AA-8 — Formato de borrador con ficha + contacto y distinguir mis mensajes (nueva 2026-10-07)
+
+- Pedido de ella: el borrador siempre abre con info breve (propiedad, precio,
+  ubicación), da el número de contacto ("cualquier cosa escríbeme al …") y
+  cierra con el enlace de WhatsApp; duda si la IA distingue sus mensajes de
+  los del cliente.
+- Estado: diagnosticado (matriz prohíbe contacto hoy; `avisoId` siempre null
+  = sin ficha; excerpt plano sin marcas de autor). Falta su respuesta:
+  qué número/enlace usar y si etiqueto Cliente/Mayita en el excerpt.
+- Al cerrar 07AA-7, registrar 07AA-8 activa con esas dos preguntas.
+
+## 07AA-7 — Panel admin Marketplace por chat (cerrada 2026-10-07: ver `Agente/completados/tareas-2026-10-07.md`)
+
+- Plan: `Agente/planes/completados/plan-panel-marketplace-chat-2026-10-07.md`.
+- Pedido de ella tras el piloto C1-lab: ver en el admin lo generado por
+  chat (conversación + borrador + usos + vigencia). Decisión de ella:
+  guardar chat + borrador (solo admin, retención 90d).
+- Fases hechas: F1 migración `20261007000031` → F2 guardar en
+  `guardar`/`reemplazar` (+ tests de hilo/foto) → F3 `GET chats` +
+  `GET chats/:thread` → F4 pestaña Marketplace en Mensajes → F5 gate + humo.
+
 ## 03AA-4 — WhatsApp un solo número + triage + config + escenarios (cerrada 2026-10-07: ver `Agente/completados/tareas-2026-10-07.md`)
 - Plan: `Agente/planes/completados/plan-whatsapp-numero-unico-2026-10-03.md`.
 - Un asistente general en el 0412 0825234 (el mismo de la web); se jubila el

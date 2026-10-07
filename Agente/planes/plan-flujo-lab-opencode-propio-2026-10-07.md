@@ -105,6 +105,17 @@ en lab `PROMOCION-VENTANA.md`): F3b a su app (3 archivos marketplace,
 terminar-vs-pendientes). Tests en su árbol 33/33 + 38/38, sin commit.
 Sigue: ella reinicia con su acceso directo + prueba viva en opencode-propio.
 
+## C1-lab — Puente verificado 2026-10-07 (~17:00)
+- Lab `opencode-propio-dev` con `MP_NUCLEO=on` + token CLI 8h (`mid
+  d9f5aed6…`, header `X-MP-Maquina`) + `MP_SAL` 32hex, lanzado vía
+  `C:\tmp\lab-dev.cmd` (las env por `Invoke-CimMethod` directo no llegaban;
+  cero líneas `[mp-nucleo]` todo el día hasta el relanzamiento).
+- Prueba viva de ella: Regenerar cambió el texto. Evidencia:
+  `lab-dev.log` 4× `[mp-nucleo] borrador del núcleo` + `mn-server.log`
+  `POST /borrador 200` (latencias 5-14s = IA, luego 4ms = caché).
+- Retención vigente: `mp_respuestas_cache` 90d (`valida_hasta`, `usos`,
+  `corregida`), solo se cachea `fuente=ia`; audit sin PII (tope 90d).
+
 ## C1b — Sesiones de navegador (CANCELADO por ella 2026-10-07)
 
 - Las sesiones viven en `<userData>/Partitions/propio-browser-shared`;
