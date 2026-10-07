@@ -1,5 +1,14 @@
 # Lecciones aprendidas
 
+## 2026-10-07 - Harness sin login: setup de config por psql, no JWT en scripts
+- El login admin del harness dio 401 con el password default de M3 (el hash
+  de esta BD ya no coincide): no cazar ni rotar passwords para un test. El
+  setup de `agent_config` (allowlist, flags) se hace por `psql`
+  (`INSERT ... ON CONFLICT`) con fila de respaldo (`f6_prev_*`, borrada al
+  final) y el harness solo ejerce el contrato HTTP. La escritura de config
+  por API ya la cubre su propia fase (F4); no duplicarla en cada harness.
+- `F6_SUF` (env) coordina el sufijo entre el setup psql y el `.mjs`: sin
+  env, cada lado inventa sufijo distinto y el escenario autorizado falla.
 ## 2026-09-30 - Groq 403 es red, no keys; Opencode Go no transcribe audio
 - `403 {"error":{"message":"Forbidden"}}` de Groq hasta en `/models` y en el
   login web con keys válidas = IP/red bloqueada, no keys revocadas: con VPN

@@ -625,6 +625,13 @@ sin firma M1 prohibido).
     `no:canal-jubilado` sin persistir ni turno; destino desconocido sigue
     400; envío manual staff por `wa_b` queda (explícito + auditado,
     gateway B mudo lo frena); gateway intacto. Próximo: F6 escenarios.
+  - 07AA-3 F6 harness 8 escenarios (hecha 2026-10-07): receptor
+    stubbed (HTTP directo), IA real sin afirmar texto — solo contrato.
+    `C:\tmp\probar-f6.mjs` `F6-OK 13/13`: A público, reutiliza hilo
+    (secuencia crece), B jubilado, B from_me jubila, desconocido 400,
+    eco, duplicado, autorizado temporal (setup/restore allowlist por
+    psql; login harness da 401 — ver lecciones). Limpieza 0 filas,
+    allowlist restaurada, 3110 cerrado. Próximo: F7 vivo + cierre.
 
 ## 03AA-5 — Detector de captación Marketplace (REPLANTEADO 2026-10-03, bloqueado)
 - Plan: `Agente/planes/plan-detector-captacion-2026-10-03.md` (incorpora reto
