@@ -74,10 +74,7 @@ pub struct NuevoEmailLog<'a> {
 
 impl EmailLogRepository {
     /// Inserta un registro de correo enviado (non-fatal).
-    pub async fn insert(
-        pool: &PgPool,
-        entrada: NuevoEmailLog<'_>,
-    ) -> Result<Uuid, sqlx::Error> {
+    pub async fn insert(pool: &PgPool, entrada: NuevoEmailLog<'_>) -> Result<Uuid, sqlx::Error> {
         let rec = sqlx::query_scalar!(
             r#"INSERT INTO email_logs (to_email, subject, template, reference_type, reference_id, status, error_msg)
                VALUES ($1, $2, $3, $4, $5, $6, $7)

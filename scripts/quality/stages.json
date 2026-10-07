@@ -2,6 +2,24 @@
   "schemaVersion": 1,
   "stages": [
     {
+      "name": "fmt",
+      "executable": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "scripts/quality/cargo-stage.ps1", "{reportPath}", "fmt", "--check"],
+      "reportPath": "fmt.json",
+      "expectedSchemaVersion": "1",
+      "timeoutMs": 120000,
+      "cwd": "."
+    },
+    {
+      "name": "clippy",
+      "executable": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "scripts/quality/cargo-stage.ps1", "{reportPath}", "clippy", "--all-targets", "--", "-D", "warnings"],
+      "reportPath": "clippy.json",
+      "expectedSchemaVersion": "1",
+      "timeoutMs": 1800000,
+      "cwd": "."
+    },
+    {
       "name": "sentinel",
       "executable": "node",
       "args": ["scripts/quality/sentinel-stage.mjs", "{reportPath}"],

@@ -8,9 +8,9 @@ $cargoArgs = @($args | Select-Object -Skip 1)
 $target = $env:GLORY_CARGO_TARGET_DIR
 if ([string]::IsNullOrWhiteSpace($target)) { $target = 'C:\tmp\glory-target\nakomi' }
 $env:CARGO_TARGET_DIR = $target
-& cargo @cargoArgs
+& cargo @cargoArgs 2>&1
 $code = $LASTEXITCODE
 if ($code -eq 0) {
-    Set-Content -LiteralPath $Report -Value '{"schemaVersion":1,"entries":[]}' -Encoding utf8 -NoNewline
+    [System.IO.File]::WriteAllText($Report, '{"schemaVersion":1,"entries":[]}', [System.Text.UTF8Encoding]::new($false))
 }
 exit $code
