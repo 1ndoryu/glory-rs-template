@@ -134,11 +134,11 @@ pineado junto a `firma-v1`.
   conecta el núcleo nuevo (`plugins-opencode` + backend MN) dentro de la
   app, con flag `MP_NUCLEO=off` por defecto (lo viejo sigue mandando).
   - C1a Preparación (SIN tocar la app viva ni sus archivos en disco):
-    todo se hace fuera — plugin, backend, docs — trabajando sobre copias
-    en `C:\tmp`, y el cableado se deja listo como parche versionado (diff
-    archivado, jamás editado dentro del checkout vivo). Verificación
-    estática: `tsc`+tests del plugin y fmt/clippy/test del backend. Cero
-    reinicios, cero puertos tocados, cero guardados en dev.
+    todo se hace fuera — plugin, backend, docs — trabajando en el lab
+    `../opencode-propio-dev` (copia hermana, regla en su `LEEME-LAB.md`;
+    tu carpeta es solo-lectura). Verificación estática: `tsc`+tests del
+    plugin y fmt/clippy/test del backend + `bun typecheck/test` en el
+    lab. Cero reinicios, cero puertos tocados, cero guardados en dev.
   - C1b Ventana de cutover (con ella): ella avisa, se aplica el parche,
     se verifica que la app arranca con flag off = burbuja vieja intacta;
     recién ahí viva 30min con flag on. El reinicio lo hace ella.
