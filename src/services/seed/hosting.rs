@@ -130,7 +130,7 @@ impl SeedService {
      * de un hosting comprado: pago → provisioning → DNS → SSL → activo.
      * Para hostings suspendidos agrega evento de suspensión por falta de pago. */
     #[allow(clippy::too_many_lines)]
-    async fn create_seed_hosting_events(
+    pub(crate) async fn create_seed_hosting_events(
         pool: &PgPool,
         client_id: Uuid,
     ) -> Result<u32, sqlx::Error> {

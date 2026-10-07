@@ -33,8 +33,7 @@ mod vps;
 mod wallet;
 
 pub use activity_log::{ActivityLogRepository, ActivityRow};
-pub use billing::AdminBillingItem;
-pub use billing::BillingRepository;
+pub use billing::{AdminBillingItem, BillingRepository, BootstrapBillingItemParams};
 pub use blog::{BlogRepository, CreateBlogPostParams, UpdateBlogPostParams};
 pub use chat::ChatRepository;
 pub use chat_alert::ChatAlertRepository;
@@ -45,7 +44,9 @@ pub use deliverable::{CreateDeliverableParams, DeliverableRepository};
 pub use domain::{CreateDomainOrderParams, DomainOrderRepository};
 pub use email_log::{EmailLogRepository, EmailLogRow};
 pub use fixture::{FixtureRepository, FixtureTableStat};
-pub use hosting::{CreateHostingParams, HostingRepository, ServerInfo, UpdateHostingParams};
+pub use hosting::{
+    BootstrapHostingParams, CreateHostingParams, HostingRepository, ServerInfo, UpdateHostingParams,
+};
 pub use infrastructure::{
     BandwidthEnforcementCandidate, BandwidthSnapshotInput, BandwidthThrottleCandidate,
     ConfiguredServerInput, CpuBurstCandidate, HostingResourceAllocation, InfrastructureRepository,

@@ -7,7 +7,7 @@ use std::time::Instant;
 
 use crate::repositories::SeoSettingsRepository;
 
-use super::helpers::{SeoMeta, json_escape};
+use super::helpers::{json_escape, SeoMeta};
 use super::inject::{dynamic_blog_json_ld, dynamic_service_json_ld, static_json_ld};
 use super::state::{CachedSeoEntry, SeoCache};
 

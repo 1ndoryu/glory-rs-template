@@ -76,7 +76,10 @@ async fn insert_seed_withdrawal_request(
 impl SeedService {
     /* [045A-1] Limpieza puntual de wallet para la cuenta que ejecuta el seed.
      * No tocamos sus notificaciones ni otras tablas ajenas al problema del panel wallet. */
-    async fn delete_wallet_seed_for_user(pool: &PgPool, user_id: Uuid) -> Result<(), sqlx::Error> {
+    pub(crate) async fn delete_wallet_seed_for_user(
+        pool: &PgPool,
+        user_id: Uuid,
+    ) -> Result<(), sqlx::Error> {
         sqlx::query("DELETE FROM withdrawal_requests WHERE user_id = $1")
             .bind(user_id)
             .execute(pool)
@@ -98,7 +101,7 @@ impl SeedService {
      * El empleado tiene saldo de $38.40 (80% comisión de orden completada).
      * Retornamos (balance_cents_cliente, num_withdrawals). */
     #[allow(clippy::too_many_lines)]
-    async fn create_seed_wallet(
+    pub(crate) async fn create_seed_wallet(
         pool: &PgPool,
         client_id: Uuid,
         employee_id: Uuid,

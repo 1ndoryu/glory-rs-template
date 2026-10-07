@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO hosting_subscriptions (\n                    user_id, client_name, client_email, plan, domain,\n                    domain_verification_status, domain_verified_at, coolify_site_name,\n                    status, stripe_subscription_id, monthly_price_cents, storage_limit_mb,\n                    server_uuid, server_ip\n                )\n                VALUES ($1, $2, $3, 'normal-basico', $4, 'active', $5, $6, 'active', $7, 248, 5120, $8, '66.94.100.241')\n                ON CONFLICT (domain) DO UPDATE SET\n                    user_id = EXCLUDED.user_id,\n                    client_name = EXCLUDED.client_name,\n                    client_email = EXCLUDED.client_email,\n                    plan = EXCLUDED.plan,\n                    domain_verification_status = 'active',\n                    domain_verified_at = COALESCE(hosting_subscriptions.domain_verified_at, EXCLUDED.domain_verified_at),\n                    coolify_site_name = EXCLUDED.coolify_site_name,\n                    status = 'active',\n                    stripe_subscription_id = COALESCE(hosting_subscriptions.stripe_subscription_id, EXCLUDED.stripe_subscription_id),\n                    monthly_price_cents = EXCLUDED.monthly_price_cents,\n                    storage_limit_mb = EXCLUDED.storage_limit_mb,\n                    server_uuid = EXCLUDED.server_uuid,\n                    server_ip = EXCLUDED.server_ip,\n                    updated_at = NOW()\n                RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Timestamptz",
+        "Varchar",
+        "Varchar",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f2231ef2a94d03b2a543249ef58524c1712d95508ec46f357e622ee6dcfa4626"
+}

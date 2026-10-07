@@ -73,11 +73,7 @@ pub fn render_chat_invoice_paid_admin(
 }
 
 /// VPS pendiente — admin
-pub fn render_vps_pending_approval(
-    client_name: &str,
-    plan_name: &str,
-    panel_link: &str,
-) -> String {
+pub fn render_vps_pending_approval(client_name: &str, plan_name: &str, panel_link: &str) -> String {
     let content = format!(
         "{msg}\n{table}\n{button}",
         msg = paragraph_tight(&format!(

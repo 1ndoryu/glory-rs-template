@@ -66,18 +66,11 @@ pub async fn approve_phase(
 }
 
 /* [01AA-4-F2] Aviso a admins de fase aprobada. */
-async fn notify_phase_approved(
-    state: &AppState,
-    order: &Order,
-    phase_number: i32,
-    actor_id: Uuid,
-) {
+async fn notify_phase_approved(state: &AppState, order: &Order, phase_number: i32, actor_id: Uuid) {
     /* [20CA-10] Notificar a admins que una fase fue aprobada */
     if let Ok(admin_ids) = UserRepository::admin_ids(&state.pool).await {
-        let admins_filtered: Vec<Uuid> = admin_ids
-            .into_iter()
-            .filter(|id| *id != actor_id)
-            .collect();
+        let admins_filtered: Vec<Uuid> =
+            admin_ids.into_iter().filter(|id| *id != actor_id).collect();
         if !admins_filtered.is_empty() {
             let base = CreateNotification {
                 user_id: Uuid::nil(),
@@ -100,12 +93,7 @@ async fn notify_phase_approved(
 }
 
 /* [01AA-4-F2] Orquestador de orden completada: log + notifs + emails + captura + comisión. */
-async fn handle_order_completed(
-    state: &AppState,
-    order: &Order,
-    order_id: Uuid,
-    actor_id: Uuid,
-) {
+async fn handle_order_completed(state: &AppState, order: &Order, order_id: Uuid, actor_id: Uuid) {
     /* [154A-15d] Registrar orden completada */
     let _ = ActivityLogRepository::log(
         &state.pool,
@@ -191,8 +179,8 @@ async fn email_order_completed(state: &AppState, order: &Order) {
                 .ok()
                 .flatten()
                 .unwrap_or_else(|| "Cliente".to_string());
-            let site_url = std::env::var("SITE_URL")
-                .unwrap_or_else(|_| "https://nakomi.studio".to_string());
+            let site_url =
+                std::env::var("SITE_URL").unwrap_or_else(|_| "https://nakomi.studio".to_string());
             tokio::spawn(async move {
                 crate::services::EmailService::send_order_completed_client(
                     &cfg,

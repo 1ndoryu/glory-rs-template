@@ -7,7 +7,9 @@ use sqlx::PgPool;
 
 use crate::repositories::ChatRepository;
 
-use super::ai_tools::{require_auth, tool_status, RichMessage, ToolAuthContext, ToolExecResult};
+use crate::services::ai_tools::{
+    require_auth, tool_status, RichMessage, ToolAuthContext, ToolExecResult,
+};
 
 pub(crate) async fn exec_create_support_ticket(
     pool: &PgPool,

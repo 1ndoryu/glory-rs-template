@@ -1,6 +1,6 @@
 use axum::routing::get;
 use axum::Router;
-use tower_governor::governor::{GovernorConfig, GovernorConfigBuilder};
+use tower_governor::governor::GovernorConfigBuilder;
 use tower_governor::key_extractor::SmartIpKeyExtractor;
 use tower_governor::GovernorLayer;
 
@@ -24,30 +24,35 @@ use super::subscriptions::{
 use super::vps::{get_vps, list_vps};
 use crate::AppState;
 
-/* [01AA-4-F1] Los dos limiters de checkout/subscribe comparten config
- * (1 req/s, burst 5): un solo builder para no duplicar ~18 líneas. */
-fn rate_limit_governor() -> GovernorConfig<SmartIpKeyExtractor> {
-    /* [259A-1] Config fija valida por construccion; si falla es error de
-     * programacion en arranque: salida explicita, nunca panic en produccion. */
-    GovernorConfigBuilder::default()
-        .key_extractor(SmartIpKeyExtractor)
-        .per_second(1)
-        .burst_size(5)
-        .finish()
-        .unwrap_or_else(|| {
-            eprintln!("[fatal] subscribe rate limit config invalida");
-            std::process::exit(1);
-        })
-}
-
 fn subscription_routes() -> Router<AppState> {
     /* [255A-1] Checkout/suscripción también debe usar la IP real del cliente.
      * Si se limita por la IP interna del proxy, un pico ajeno puede bloquear compras.
      *
      * [176A-1] Corregido: per_second(N) = 1 token cada N segundos.
-     * Checkout: 1 req/s, burst 5 — prevenir abuso sin bloquear compras legítimas. */
-    let subscribe_gov = rate_limit_governor();
-    let checkout_gov = rate_limit_governor();
+     * Checkout: 1 req/s, burst 5 — prevenir abuso sin bloquear compras legítimas.
+     *
+     * [07AA-7] Config construida inline (sin helper): tower_governor 0.4
+     * exige GovernorConfig<K, M> con 2 genéricos y su M (NoOpMiddleware de
+     * governor 0.6) no es nombrable desde fuera — el crate no lo re-exporta
+     * y el governor 0.7 directo del workspace es OTRO tipo incompatible.
+     * Sin Clone utilizable en esta instanciación (bounds de SmartIp/NoOp
+     * no satisfechos): dos builds idénticos, uno por limiter.
+     * [259A-1] finish() fijo válido por construcción; si falla es error de
+     * programación en arranque: salida explícita, nunca panic en producción.
+     * [01AA-4-F1] Ambos limiters comparten los mismos parámetros. */
+    let build_governor_config = || {
+        GovernorConfigBuilder::default()
+            .key_extractor(SmartIpKeyExtractor)
+            .per_second(1)
+            .burst_size(5)
+            .finish()
+            .unwrap_or_else(|| {
+                eprintln!("[fatal] subscribe rate limit config invalida");
+                std::process::exit(1);
+            })
+    };
+    let subscribe_gov = build_governor_config();
+    let checkout_gov = build_governor_config();
 
     Router::new()
         .route(

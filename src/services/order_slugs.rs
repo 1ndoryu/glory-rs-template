@@ -61,7 +61,7 @@ fn plan_slug_candidates(slug: &str) -> Vec<String> {
     candidates
 }
 
-pub(super) async fn find_service_for_order(
+pub(crate) async fn find_service_for_order(
     pool: &PgPool,
     requested_slug: &str,
 ) -> Result<ServiceRecord, AppError> {
@@ -76,7 +76,7 @@ pub(super) async fn find_service_for_order(
     )))
 }
 
-pub(super) async fn find_plan_for_order(
+pub(crate) async fn find_plan_for_order(
     pool: &PgPool,
     service_id: Uuid,
     requested_slug: &str,

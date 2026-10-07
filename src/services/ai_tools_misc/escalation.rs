@@ -4,7 +4,7 @@
 
 use serde_json::{json, Value};
 
-use super::ai_tools::{tool_status, RichMessage, ToolExecResult};
+use crate::services::ai_tools::{RichMessage, ToolExecResult};
 
 pub(crate) fn exec_request_human(args: &Value) -> ToolExecResult {
     let reason = args["reason"].as_str().unwrap_or("Sin motivo especificado");

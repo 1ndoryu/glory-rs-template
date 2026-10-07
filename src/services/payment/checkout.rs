@@ -8,9 +8,7 @@ use uuid::Uuid;
 use super::super::order_slugs::{find_plan_for_order, find_service_for_order};
 use super::PaymentService;
 use crate::errors::AppError;
-use crate::models::{
-    OrderStatus, PaymentIntentResponse, PaymentMode, PaymentStatus, PhaseStatus,
-};
+use crate::models::{OrderStatus, PaymentIntentResponse, PaymentMode, PaymentStatus, PhaseStatus};
 use crate::repositories::{
     CreateOrderParams, CreatePaymentParams, CreatePhaseParams, OrderRepository, PaymentRepository,
     ServiceRepository, UserRepository,
@@ -277,8 +275,14 @@ impl PaymentService {
         .await?;
 
         /* Generar fases de la orden desde plantillas del plan */
-        Self::create_order_phases_from_templates(pool, order.id, plan.id, final_price, payment_mode)
-            .await?;
+        Self::create_order_phases_from_templates(
+            pool,
+            order.id,
+            plan.id,
+            final_price,
+            payment_mode,
+        )
+        .await?;
 
         /* Crear registro de pago en order_payments y marcarlo como held */
         let phase_1_id = if payment_mode == PaymentMode::Phased {

@@ -24,20 +24,6 @@ use crate::AppState;
 REPORTAR PROBLEMA
 ============================================================ */
 
-/// Reportar un problema en una orden (cliente o empleado vinculado)
-#[utoipa::path(
-    post,
-    path = "/api/orders/{order_id}/report-problem",
-    params(("order_id" = Uuid, Path, description = "ID de la orden")),
-    request_body = ReportProblemRequest,
-    responses(
-        (status = 201, description = "Problema reportado", body = ProblemResponse),
-        (status = 400, description = "Datos inválidos"),
-        (status = 403, description = "Sin permisos"),
-    ),
-    security(("bearer_auth" = [])),
-    tag = "problems"
-)]
 /* [01AA-4-F1] Notificaciones post-reporte fuera del handler (~80 líneas):
  * hub de admins + nombre del reportero + emails non-fatal a cliente y admins.
  * Retorna el nombre del reportero para la respuesta. */
@@ -148,6 +134,20 @@ async fn notify_problem_reported(
     reporter_name
 }
 
+/// Reportar un problema en una orden (cliente o empleado vinculado)
+#[utoipa::path(
+    post,
+    path = "/api/orders/{order_id}/report-problem",
+    params(("order_id" = Uuid, Path, description = "ID de la orden")),
+    request_body = ReportProblemRequest,
+    responses(
+        (status = 201, description = "Problema reportado", body = ProblemResponse),
+        (status = 400, description = "Datos inválidos"),
+        (status = 403, description = "Sin permisos"),
+    ),
+    security(("bearer_auth" = [])),
+    tag = "problems"
+)]
 pub async fn report_problem(
     State(state): State<AppState>,
     auth: AuthUser,

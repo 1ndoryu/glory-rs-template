@@ -35,7 +35,7 @@ use crate::AppState;
     tag = "hosting"
 )]
 #[allow(clippy::too_many_lines)]
-pub(super) async fn delete_deployment(
+pub(crate) async fn delete_deployment(
     State(state): State<AppState>,
     auth: AuthUser,
     Path(deployment_uuid): Path<String>,

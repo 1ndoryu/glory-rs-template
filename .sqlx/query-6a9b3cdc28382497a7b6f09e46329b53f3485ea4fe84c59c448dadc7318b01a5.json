@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO billing_items (\n                    id, user_id, resource_type, resource_id, title, description,\n                    amount_cents, currency, billing_period, status, due_at,\n                    grace_period_ends_at, metadata\n                )\n                VALUES ($1, $2, $3, $4, $5, $6, $7, 'USD', $8, $12, $9, $10, $11)\n                ON CONFLICT (id) DO UPDATE SET\n                    user_id = EXCLUDED.user_id,\n                    resource_type = EXCLUDED.resource_type,\n                    resource_id = EXCLUDED.resource_id,\n                    title = EXCLUDED.title,\n                    description = EXCLUDED.description,\n                    amount_cents = EXCLUDED.amount_cents,\n                    currency = EXCLUDED.currency,\n                    billing_period = EXCLUDED.billing_period,\n                    status = CASE\n                        WHEN $12 = 'paid' OR billing_items.status = 'paid' THEN 'paid'\n                        ELSE 'pending'\n                    END,\n                    due_at = EXCLUDED.due_at,\n                    grace_period_ends_at = EXCLUDED.grace_period_ends_at,\n                    paid_at = CASE\n                        WHEN $12 = 'paid' THEN COALESCE(billing_items.paid_at, NOW())\n                        WHEN billing_items.status = 'paid' THEN billing_items.paid_at\n                        ELSE NULL\n                    END,\n                    stripe_session_id = CASE WHEN billing_items.status = 'paid' THEN billing_items.stripe_session_id ELSE NULL END,\n                    metadata = EXCLUDED.metadata,\n                    updated_at = NOW()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Uuid",
+        "Varchar",
+        "Text",
+        "Int4",
+        "Varchar",
+        "Timestamptz",
+        "Timestamptz",
+        "Jsonb",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6a9b3cdc28382497a7b6f09e46329b53f3485ea4fe84c59c448dadc7318b01a5"
+}

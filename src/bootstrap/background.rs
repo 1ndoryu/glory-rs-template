@@ -57,8 +57,10 @@ fn spawn_coolify_loops(
         });
 
         let cpu_burst_pool = pool.clone();
-        let cpu_burst_vps1 = coolify_config_vps1.clone();
-        let cpu_burst_default = coolify_config.clone();
+        /* [07AA-7] Mover (no clonar) el último uso: el valor se consume y
+         * clippy::needless_pass_by_value queda satisfecho sin &Option. */
+        let cpu_burst_vps1 = coolify_config_vps1;
+        let cpu_burst_default = coolify_config;
         tokio::spawn(async move {
             cpu_burst_loop(cpu_burst_pool, cpu_burst_vps1, cpu_burst_default).await;
         });
@@ -136,11 +138,7 @@ pub fn spawn_background_services(pool: &PgPool) {
     let refund_pool = pool.clone();
     let refund_stripe_key = std::env::var("STRIPE_SECRET_KEY").ok();
     tokio::spawn(async move {
-        crate::services::RefundService::run_refund_retry_loop(
-            refund_pool,
-            refund_stripe_key,
-        )
-        .await;
+        crate::services::RefundService::run_refund_retry_loop(refund_pool, refund_stripe_key).await;
     });
 
     if let Some(contabo_config) = ContaboConfig::from_env() {

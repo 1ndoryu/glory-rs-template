@@ -472,6 +472,46 @@ impl UserRepository {
         Ok(rows)
     }
 
+    /* [07AA-2] Bootstrap Guillermo: aplica perfil cliente a un usuario existente
+     * (display_name solo si estaba vacío + rol client + hash nuevo). El SQL vivía
+     * en admin_client_bootstrap.rs (handler-accede-bd-rs); el repositorio es su
+     * casa (DIP). Semántica COALESCE preservada verbatim. */
+    pub async fn apply_bootstrap_credentials(
+        pool: &PgPool,
+        user_id: Uuid,
+        display_name: &str,
+        role: UserRole,
+        password_hash: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query!(
+            r#"UPDATE users SET display_name = COALESCE(display_name, $2), role = $3, password_hash = $4 WHERE id = $1"#,
+            user_id,
+            display_name,
+            role as UserRole,
+            password_hash,
+        )
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    /* [07AA-2] Bootstrap Guillermo: fija display_name y deja email sin verificar
+     * en el usuario recién creado. Movido desde el handler (DIP). */
+    pub async fn mark_bootstrap_created(
+        pool: &PgPool,
+        user_id: Uuid,
+        display_name: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query!(
+            r#"UPDATE users SET display_name = $2, email_verified = false WHERE id = $1"#,
+            user_id,
+            display_name,
+        )
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
     /* [154A-5] Actualiza la contraseña de un usuario y marca password_set = true.
      * Usado cuando un usuario de quick_register establece su propia contraseña,
      * o cuando usa el endpoint explícito de set-password. */

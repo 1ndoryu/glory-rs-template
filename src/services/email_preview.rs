@@ -20,153 +20,153 @@ pub struct TemplateMeta {
 /* [01AA-4-f3s] Catálogo estático de plantillas (dato, cero ramas): el vec!
  * monolítico (150 efectivas) se hoista a static y la fn solo lo clona. */
 static TEMPLATES: &[TemplateMeta] = &[
-        TemplateMeta {
-            id: "order_confirmation",
-            label: "Confirmación al cliente",
-            description: "Se envía al cliente tras crear un pedido",
-            category: "orders",
-            recipients: "cliente",
-        },
-        TemplateMeta {
-            id: "new_order_admin",
-            label: "Nueva orden (admin)",
-            description: "Notifica a los admins cuando se crea un pedido",
-            category: "orders",
-            recipients: "admin",
-        },
-        TemplateMeta {
-            id: "payment_received_admin",
-            label: "Pago recibido (admin)",
-            description: "Notifica a los admins cuando un pago se recibe",
-            category: "payments",
-            recipients: "admin",
-        },
-        TemplateMeta {
-            id: "order_completed_client",
-            label: "Orden completada (cliente)",
-            description: "Se envía al cliente cuando su orden se completa",
-            category: "orders",
-            recipients: "cliente",
-        },
-        TemplateMeta {
-            id: "order_completed_admin",
-            label: "Orden completada (admin)",
-            description: "Notifica a admins cuando una orden se completa",
-            category: "orders",
-            recipients: "admin",
-        },
-        TemplateMeta {
-            id: "order_cancelled_client",
-            label: "Orden cancelada (cliente)",
-            description: "Se envía al cliente cuando su orden se cancela",
-            category: "orders",
-            recipients: "cliente",
-        },
-        TemplateMeta {
-            id: "order_cancelled_admin",
-            label: "Orden cancelada (admin)",
-            description: "Notifica a admins cuando una orden se cancela",
-            category: "orders",
-            recipients: "admin",
-        },
-        TemplateMeta {
-            id: "phase_delivered_client",
-            label: "Fase entregada (cliente)",
-            description: "Notifica al cliente que una fase fue entregada",
-            category: "orders",
-            recipients: "cliente",
-        },
-        TemplateMeta {
-            id: "problem_reported_client",
-            label: "Problema reportado (cliente)",
-            description: "Se envía al cliente cuando se reporta un problema",
-            category: "orders",
-            recipients: "cliente",
-        },
-        TemplateMeta {
-            id: "problem_reported_admin",
-            label: "Problema reportado (admin)",
-            description: "Notifica a admins cuando se reporta un problema",
-            category: "orders",
-            recipients: "admin",
-        },
-        TemplateMeta {
-            id: "refund_requested_admin",
-            label: "Reembolso solicitado (admin)",
-            description: "Notifica a admins cuando un cliente solicita reembolso",
-            category: "orders",
-            recipients: "admin",
-        },
-        TemplateMeta {
-            id: "escalation",
-            label: "Escalación de chat",
-            description: "Notifica a admins cuando la IA escala un chat",
-            category: "chat",
-            recipients: "admin",
-        },
-        TemplateMeta {
-            id: "chat_invoice_paid_client",
-            label: "Factura chat pagada (cliente)",
-            description: "Confirma al cliente el pago de una factura de chat",
-            category: "chat",
-            recipients: "cliente",
-        },
-        TemplateMeta {
-            id: "chat_invoice_paid_admin",
-            label: "Factura chat pagada (admin)",
-            description: "Notifica a admins del pago de una factura de chat",
-            category: "chat",
-            recipients: "admin",
-        },
-        TemplateMeta {
-            id: "vps_pending_approval",
-            label: "VPS pendiente (admin)",
-            description: "Notifica a admins de una suscripción VPS pendiente",
-            category: "vps",
-            recipients: "admin",
-        },
-        TemplateMeta {
-            id: "vps_approved",
-            label: "VPS aprobado (cliente)",
-            description: "Se envía al cliente cuando su VPS es aprobado",
-            category: "vps",
-            recipients: "cliente",
-        },
-        TemplateMeta {
-            id: "vps_rejected",
-            label: "VPS rechazado (cliente)",
-            description: "Se envía al cliente cuando su VPS es rechazado",
-            category: "vps",
-            recipients: "cliente",
-        },
-        TemplateMeta {
-            id: "new_user_registered_admin",
-            label: "Nuevo usuario registrado (admin)",
-            description: "Notifica a admins cuando un nuevo usuario se registra",
-            category: "profile",
-            recipients: "admin",
-        },
-        TemplateMeta {
-            id: "profile_email_changed_new",
-            label: "Email cambiado (nuevo)",
-            description: "Confirma al nuevo correo el cambio de email",
-            category: "profile",
-            recipients: "cliente",
-        },
-        TemplateMeta {
-            id: "profile_email_changed_old",
-            label: "Email cambiado (anterior)",
-            description: "Alerta al correo anterior sobre el cambio",
-            category: "profile",
-            recipients: "cliente",
-        },
-        TemplateMeta {
-            id: "profile_password_changed",
-            label: "Contraseña cambiada",
-            description: "Notifica al usuario que su contraseña fue cambiada",
-            category: "profile",
-            recipients: "cliente",
-        },
+    TemplateMeta {
+        id: "order_confirmation",
+        label: "Confirmación al cliente",
+        description: "Se envía al cliente tras crear un pedido",
+        category: "orders",
+        recipients: "cliente",
+    },
+    TemplateMeta {
+        id: "new_order_admin",
+        label: "Nueva orden (admin)",
+        description: "Notifica a los admins cuando se crea un pedido",
+        category: "orders",
+        recipients: "admin",
+    },
+    TemplateMeta {
+        id: "payment_received_admin",
+        label: "Pago recibido (admin)",
+        description: "Notifica a los admins cuando un pago se recibe",
+        category: "payments",
+        recipients: "admin",
+    },
+    TemplateMeta {
+        id: "order_completed_client",
+        label: "Orden completada (cliente)",
+        description: "Se envía al cliente cuando su orden se completa",
+        category: "orders",
+        recipients: "cliente",
+    },
+    TemplateMeta {
+        id: "order_completed_admin",
+        label: "Orden completada (admin)",
+        description: "Notifica a admins cuando una orden se completa",
+        category: "orders",
+        recipients: "admin",
+    },
+    TemplateMeta {
+        id: "order_cancelled_client",
+        label: "Orden cancelada (cliente)",
+        description: "Se envía al cliente cuando su orden se cancela",
+        category: "orders",
+        recipients: "cliente",
+    },
+    TemplateMeta {
+        id: "order_cancelled_admin",
+        label: "Orden cancelada (admin)",
+        description: "Notifica a admins cuando una orden se cancela",
+        category: "orders",
+        recipients: "admin",
+    },
+    TemplateMeta {
+        id: "phase_delivered_client",
+        label: "Fase entregada (cliente)",
+        description: "Notifica al cliente que una fase fue entregada",
+        category: "orders",
+        recipients: "cliente",
+    },
+    TemplateMeta {
+        id: "problem_reported_client",
+        label: "Problema reportado (cliente)",
+        description: "Se envía al cliente cuando se reporta un problema",
+        category: "orders",
+        recipients: "cliente",
+    },
+    TemplateMeta {
+        id: "problem_reported_admin",
+        label: "Problema reportado (admin)",
+        description: "Notifica a admins cuando se reporta un problema",
+        category: "orders",
+        recipients: "admin",
+    },
+    TemplateMeta {
+        id: "refund_requested_admin",
+        label: "Reembolso solicitado (admin)",
+        description: "Notifica a admins cuando un cliente solicita reembolso",
+        category: "orders",
+        recipients: "admin",
+    },
+    TemplateMeta {
+        id: "escalation",
+        label: "Escalación de chat",
+        description: "Notifica a admins cuando la IA escala un chat",
+        category: "chat",
+        recipients: "admin",
+    },
+    TemplateMeta {
+        id: "chat_invoice_paid_client",
+        label: "Factura chat pagada (cliente)",
+        description: "Confirma al cliente el pago de una factura de chat",
+        category: "chat",
+        recipients: "cliente",
+    },
+    TemplateMeta {
+        id: "chat_invoice_paid_admin",
+        label: "Factura chat pagada (admin)",
+        description: "Notifica a admins del pago de una factura de chat",
+        category: "chat",
+        recipients: "admin",
+    },
+    TemplateMeta {
+        id: "vps_pending_approval",
+        label: "VPS pendiente (admin)",
+        description: "Notifica a admins de una suscripción VPS pendiente",
+        category: "vps",
+        recipients: "admin",
+    },
+    TemplateMeta {
+        id: "vps_approved",
+        label: "VPS aprobado (cliente)",
+        description: "Se envía al cliente cuando su VPS es aprobado",
+        category: "vps",
+        recipients: "cliente",
+    },
+    TemplateMeta {
+        id: "vps_rejected",
+        label: "VPS rechazado (cliente)",
+        description: "Se envía al cliente cuando su VPS es rechazado",
+        category: "vps",
+        recipients: "cliente",
+    },
+    TemplateMeta {
+        id: "new_user_registered_admin",
+        label: "Nuevo usuario registrado (admin)",
+        description: "Notifica a admins cuando un nuevo usuario se registra",
+        category: "profile",
+        recipients: "admin",
+    },
+    TemplateMeta {
+        id: "profile_email_changed_new",
+        label: "Email cambiado (nuevo)",
+        description: "Confirma al nuevo correo el cambio de email",
+        category: "profile",
+        recipients: "cliente",
+    },
+    TemplateMeta {
+        id: "profile_email_changed_old",
+        label: "Email cambiado (anterior)",
+        description: "Alerta al correo anterior sobre el cambio",
+        category: "profile",
+        recipients: "cliente",
+    },
+    TemplateMeta {
+        id: "profile_password_changed",
+        label: "Contraseña cambiada",
+        description: "Notifica al usuario que su contraseña fue cambiada",
+        category: "profile",
+        recipients: "cliente",
+    },
 ];
 
 /// Lista completa de plantillas disponibles
@@ -181,9 +181,7 @@ pub fn render_preview(_config: &EmailConfig, template: &str) -> Result<String, S
     const EMAIL: &str = "cliente@ejemplo.com";
     const ORDER: i32 = 12345;
     const SERVICE: &str = "Diseño Web Profesional";
-    const PLAN: &str = "Pro";
     const PRICE: &str = "$499.00 USD";
-    const PAYMENT_MODE: &str = "transferencia";
     const REASON: &str = "Fondos insuficientes en el método de pago";
     const PHASE: &str = "Maquetación responsive";
     const PROBLEM_DESC: &str = "El formulario de contacto no envía los datos correctamente. Ya verificamos la configuración SMTP y el problema persiste.";
@@ -201,18 +199,9 @@ pub fn render_preview(_config: &EmailConfig, template: &str) -> Result<String, S
     let chat_panel = format!("{SITE}/panel/chat?session={UUID}");
 
     match template {
-        "order_confirmation" => Ok(t::render_order_confirmation(
-            NAME, ORDER, SERVICE, PLAN, PRICE,
-        )),
+        "order_confirmation" => Ok(t::render_order_confirmation(NAME, ORDER, SERVICE, PRICE)),
         "new_order_admin" => Ok(t::render_new_order_admin(
-            NAME,
-            EMAIL,
-            ORDER,
-            SERVICE,
-            PLAN,
-            PRICE,
-            PAYMENT_MODE,
-            &panel,
+            NAME, ORDER, SERVICE, PRICE, &panel,
         )),
         "payment_received_admin" => {
             Ok(t::render_payment_received_admin(NAME, ORDER, PRICE, &panel))
@@ -247,12 +236,7 @@ pub fn render_preview(_config: &EmailConfig, template: &str) -> Result<String, S
             UUID,
             &chat_panel,
         )),
-        "vps_pending_approval" => Ok(t::render_vps_pending_approval(
-            NAME,
-            TIER,
-            "mi-dominio.com",
-            &panel,
-        )),
+        "vps_pending_approval" => Ok(t::render_vps_pending_approval(NAME, TIER, &panel)),
         "vps_approved" => Ok(t::render_vps_approved(
             NAME, TIER, PUBLIC_IP, USERNAME, PASSWORD,
         )),

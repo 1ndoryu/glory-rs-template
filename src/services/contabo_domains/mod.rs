@@ -16,7 +16,7 @@ pub mod handles;
 pub mod types;
 
 pub use types::{
-    ContaboDomain, ContaboHandle, CreateDnsRecordRequest, CreateHandleRequest, DnsRecord,
-    DnsZone, DomainHandles, HandleAddress, HandlePhone, Nameserver, OrderDomainRequest,
+    ContaboDomain, ContaboHandle, CreateDnsRecordRequest, CreateHandleRequest, DnsRecord, DnsZone,
+    DomainHandles, HandleAddress, HandlePhone, Nameserver, OrderDomainRequest,
     UpdateDnsRecordRequest,
 };

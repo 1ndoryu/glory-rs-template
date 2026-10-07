@@ -13,7 +13,7 @@ use crate::models::{
     PaymentIntentResponse, PaymentResponse, UserRole,
 };
 use crate::repositories::{OrderRepository, UserRepository};
-use crate::services::{PaymentService, is_checkout_bypass_email};
+use crate::services::{is_checkout_bypass_email, PaymentService};
 use crate::AppState;
 
 /// Iniciar pago de una orden (crea `PaymentIntent` en Stripe)

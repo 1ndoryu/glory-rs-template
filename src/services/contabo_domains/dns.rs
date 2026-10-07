@@ -1,8 +1,8 @@
 /* [01AA-4-f3l] Zonas y registros DNS Contabo (extraido de contabo_domains.rs). */
 
-use super::super::contabo::{API_BASE, ContaboService};
+use super::super::contabo::{ContaboService, API_BASE};
 use super::types::{
-    CreateDnsRecordRequest, DnsRecord, DnsZone, ListResponse, UpdateDnsRecordRequest, req_id,
+    req_id, CreateDnsRecordRequest, DnsRecord, DnsZone, ListResponse, UpdateDnsRecordRequest,
 };
 
 impl ContaboService {

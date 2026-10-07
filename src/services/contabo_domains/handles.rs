@@ -1,7 +1,7 @@
 /* [01AA-4-f3l] Handles Contabo / contactos WHOIS (extraido de contabo_domains.rs). */
 
-use super::super::contabo::{API_BASE, ContaboService};
-use super::types::{ContaboHandle, CreateHandleRequest, ListResponse, req_id};
+use super::super::contabo::{ContaboService, API_BASE};
+use super::types::{req_id, ContaboHandle, CreateHandleRequest, ListResponse};
 
 impl ContaboService {
     /// Listar todos los handles (contactos registrados en Contabo).

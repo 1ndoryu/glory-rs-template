@@ -4,8 +4,8 @@ use uuid::Uuid;
 use crate::errors::AppError;
 use crate::models::{HostingEvent, HostingSubscription};
 
+use super::types::{BootstrapHostingParams, CreateHostingParams, UpdateHostingParams};
 use super::HostingRepository;
-use super::types::{CreateHostingParams, UpdateHostingParams};
 
 impl HostingRepository {
     pub async fn list_all(pool: &PgPool) -> Result<Vec<HostingSubscription>, AppError> {
@@ -105,6 +105,52 @@ impl HostingRepository {
         .fetch_one(pool)
         .await?;
         Ok(row)
+    }
+
+    /* [07AA-2] Upsert de bootstrap por dominio (caso Guillermo): inserta o
+     * reactiva la suscripción legacy con precio/límites fijos. El SQL vivía en
+     * admin_client_bootstrap.rs (handler-accede-bd-rs); el repositorio es su
+     * casa (DIP). Semántica ON CONFLICT preservada verbatim. */
+    pub async fn upsert_bootstrap(
+        pool: &PgPool,
+        params: BootstrapHostingParams<'_>,
+    ) -> Result<Uuid, AppError> {
+        let id = sqlx::query_scalar!(
+            r#"INSERT INTO hosting_subscriptions (
+                    user_id, client_name, client_email, plan, domain,
+                    domain_verification_status, domain_verified_at, coolify_site_name,
+                    status, stripe_subscription_id, monthly_price_cents, storage_limit_mb,
+                    server_uuid, server_ip
+                )
+                VALUES ($1, $2, $3, 'normal-basico', $4, 'active', $5, $6, 'active', $7, 248, 5120, $8, '66.94.100.241')
+                ON CONFLICT (domain) DO UPDATE SET
+                    user_id = EXCLUDED.user_id,
+                    client_name = EXCLUDED.client_name,
+                    client_email = EXCLUDED.client_email,
+                    plan = EXCLUDED.plan,
+                    domain_verification_status = 'active',
+                    domain_verified_at = COALESCE(hosting_subscriptions.domain_verified_at, EXCLUDED.domain_verified_at),
+                    coolify_site_name = EXCLUDED.coolify_site_name,
+                    status = 'active',
+                    stripe_subscription_id = COALESCE(hosting_subscriptions.stripe_subscription_id, EXCLUDED.stripe_subscription_id),
+                    monthly_price_cents = EXCLUDED.monthly_price_cents,
+                    storage_limit_mb = EXCLUDED.storage_limit_mb,
+                    server_uuid = EXCLUDED.server_uuid,
+                    server_ip = EXCLUDED.server_ip,
+                    updated_at = NOW()
+                RETURNING id"#,
+            params.user_id,
+            params.client_name,
+            params.client_email,
+            params.domain,
+            params.verified_at,
+            params.coolify_site_name,
+            params.paid_subscription_id,
+            params.server_uuid,
+        )
+        .fetch_one(pool)
+        .await?;
+        Ok(id)
     }
 
     pub async fn update_status(pool: &PgPool, id: Uuid, status: &str) -> Result<(), AppError> {

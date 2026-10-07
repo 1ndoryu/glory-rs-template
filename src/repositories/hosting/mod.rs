@@ -11,6 +11,6 @@ mod server;
 mod subscriptions;
 mod types;
 
-pub use types::{CreateHostingParams, ServerInfo, UpdateHostingParams};
+pub use types::{BootstrapHostingParams, CreateHostingParams, ServerInfo, UpdateHostingParams};
 
 pub struct HostingRepository;

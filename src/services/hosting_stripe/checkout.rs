@@ -3,9 +3,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::errors::AppError;
-use crate::models::{
-    CreateNotification, NOTIF_HOSTING_CANCELLED, NOTIF_HOSTING_SUSPENDED,
-};
+use crate::models::{CreateNotification, NOTIF_HOSTING_CANCELLED, NOTIF_HOSTING_SUSPENDED};
 use crate::repositories::{HostingRepository, NotificationRepository};
 use crate::services::{CoolifyConfig, HostingRuntimeService};
 

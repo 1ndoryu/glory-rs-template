@@ -67,10 +67,8 @@ impl ResponseCycleRepository {
                 cycle_id
             )
             .execute(&mut *tx)
-                .await
-                .map_err(|error| {
-                    AppError::Internal(format!("Error cerrando ciclo humano: {error}"))
-                })?;
+            .await
+            .map_err(|error| AppError::Internal(format!("Error cerrando ciclo humano: {error}")))?;
             tx.commit().await.map_err(|error| {
                 AppError::Internal(format!("Error confirmando ciclo humano: {error}"))
             })?;

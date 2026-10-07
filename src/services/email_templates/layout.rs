@@ -28,21 +28,15 @@ pub(crate) fn email_layout(
 }
 
 pub(crate) fn section_title(text: &str) -> String {
-    format!(
-        "<h2 style=\"font-size:18px;margin:0 0 12px;color:#18181b;\">{text}</h2>"
-    )
+    format!("<h2 style=\"font-size:18px;margin:0 0 12px;color:#18181b;\">{text}</h2>")
 }
 
 pub(crate) fn paragraph(text: &str) -> String {
-    format!(
-        "<p style=\"font-size:15px;line-height:1.6;color:#27272a;margin:0 0 12px;\">{text}</p>"
-    )
+    format!("<p style=\"font-size:15px;line-height:1.6;color:#27272a;margin:0 0 12px;\">{text}</p>")
 }
 
 pub(crate) fn paragraph_tight(text: &str) -> String {
-    format!(
-        "<p style=\"font-size:14px;line-height:1.5;color:#27272a;margin:0 0 8px;\">{text}</p>"
-    )
+    format!("<p style=\"font-size:14px;line-height:1.5;color:#27272a;margin:0 0 8px;\">{text}</p>")
 }
 
 pub(crate) fn summary_table(rows: &[(&str, &str)]) -> String {

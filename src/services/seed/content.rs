@@ -9,7 +9,7 @@ use super::SeedService;
 
 impl SeedService {
     /* [074A-2] Notificaciones de prueba para que la campanita muestre algo */
-    async fn create_seed_notifications(
+    pub(crate) async fn create_seed_notifications(
         pool: &PgPool,
         client_id: Uuid,
         employee_id: Uuid,
@@ -79,7 +79,7 @@ impl SeedService {
     }
 
     /* [074A-2] Review en la orden completada */
-    async fn create_seed_reviews(
+    pub(crate) async fn create_seed_reviews(
         pool: &PgPool,
         client_id: Uuid,
         employee_id: Uuid,
@@ -108,7 +108,7 @@ impl SeedService {
     }
 
     /* [074A-2] Chat con mensajes entre cliente y empleado en la orden in_progress */
-    async fn create_seed_chat(
+    pub(crate) async fn create_seed_chat(
         pool: &PgPool,
         client_id: Uuid,
         employee_id: Uuid,
@@ -167,7 +167,7 @@ impl SeedService {
     }
 
     /* [074A-2] Activity log para dashboard admin */
-    async fn create_seed_activity(
+    pub(crate) async fn create_seed_activity(
         pool: &PgPool,
         client_id: Uuid,
         employee_id: Uuid,

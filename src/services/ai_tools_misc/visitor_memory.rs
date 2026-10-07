@@ -11,7 +11,7 @@ use sqlx::PgPool;
 
 use crate::repositories::ChatRepository;
 
-use super::ai_tools::{tool_status, ToolExecResult};
+use crate::services::ai_tools::{tool_status, ToolExecResult};
 
 /* [124A-CHAT2] Helper: actualiza visitor_name en chat_sessions para que el panel
  * muestre el nombre real del visitante capturado por la IA.

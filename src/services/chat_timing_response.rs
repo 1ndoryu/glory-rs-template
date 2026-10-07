@@ -55,9 +55,14 @@ pub(crate) async fn generate_ai_response(
         return irrelevant_count;
     }
 
-    if let Some(updated) =
-        handle_irrelevant_message(deps, session_id, combined, irrelevant_count, generation_epoch)
-            .await
+    if let Some(updated) = handle_irrelevant_message(
+        deps,
+        session_id,
+        combined,
+        irrelevant_count,
+        generation_epoch,
+    )
+    .await
     {
         return updated;
     }
@@ -77,10 +82,7 @@ pub(crate) async fn generate_ai_response(
  * None si la IA no debe generar (sesión ausente/inactiva/pausada/en ventana humana).
  * [237A-9] Respetar ai_mode: manual_pause bloquea IA completamente;
  * human_priority con ciclo waiting también bloquea (el worker genera fallback). */
-async fn fetch_generation_session(
-    pool: &PgPool,
-    session_id: Uuid,
-) -> Option<(ChatSession, i64)> {
+async fn fetch_generation_session(pool: &PgPool, session_id: Uuid) -> Option<(ChatSession, i64)> {
     /* [259A-1] let-else en vez de match de un solo patron (clippy manual_let_else). */
     let Ok(Some(session)) =
         crate::repositories::ChatRepository::find_session_by_id(pool, session_id).await

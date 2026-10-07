@@ -300,7 +300,7 @@ async fn process_continuation_email(
     let result = tokio::time::timeout(
         SMTP_TIMEOUT,
         crate::services::EmailService::send_chat_continuation(
-            config,
+            &config,
             pool,
             &entry.recipient,
             &payload.visitor_name,

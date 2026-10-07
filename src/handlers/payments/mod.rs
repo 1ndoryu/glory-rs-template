@@ -16,8 +16,8 @@ pub mod webhook;
 pub use checkout::{create_checkout_intent, initiate_payment, list_payments};
 pub use webhook::stripe_webhook;
 
-use axum::Router;
 use axum::routing::{get, post};
+use axum::Router;
 
 use crate::AppState;
 

@@ -3,16 +3,13 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use crate::models::{
-    CPU_SCALING_POLICY_BASELINE_BURST, CPU_SCALING_POLICY_CONTENTION_THROTTLE,
-};
+/* [07AA-7] Constantes sin uso (warning rustc al validar el bloque). */
 use crate::repositories::CpuBurstCandidate;
 
 use super::state::{
-    CpuLimitTarget, CpuScalingPolicy, CPU_ACTIVATION_UTILIZATION,
-    CPU_BURST_MAX_SAMPLE_AGE_MINUTES, CPU_DEACTIVATION_UTILIZATION,
-    SERVER_HIGH_PRESSURE_PCT, SERVER_LOW_PRESSURE_PCT, SERVER_RESERVE_MIN_CORES,
-    SERVER_RESERVE_RATIO,
+    CpuLimitTarget, CpuScalingPolicy, CPU_ACTIVATION_UTILIZATION, CPU_BURST_MAX_SAMPLE_AGE_MINUTES,
+    CPU_DEACTIVATION_UTILIZATION, SERVER_HIGH_PRESSURE_PCT, SERVER_LOW_PRESSURE_PCT,
+    SERVER_RESERVE_MIN_CORES, SERVER_RESERVE_RATIO,
 };
 
 pub(crate) fn usize_to_f64(value: usize) -> f64 {
@@ -75,7 +72,7 @@ pub(crate) fn current_site_limit(candidate: &CpuBurstCandidate) -> Option<f64> {
 }
 
 pub(crate) fn baseline_site_limit(candidate: &CpuBurstCandidate) -> f64 {
-    use super::state::{CPU_STEP_CORES, round_cpu_target};
+    use super::state::{round_cpu_target, CPU_STEP_CORES};
     round_cpu_target(candidate.baseline_site_cpu_cores.max(CPU_STEP_CORES))
 }
 
@@ -251,7 +248,7 @@ mod tests {
             server_cpu_percent: Some(20.0),
             server_sampled_at: Some(Utc::now()),
             baseline_site_cpu_cores: 0.5,
-            cpu_scaling_policy: CPU_SCALING_POLICY_BASELINE_BURST.to_string(),
+            cpu_scaling_policy: CpuScalingPolicy::BaselineBurst.as_str().to_string(),
             current_site_cpu_limit_cores: Some(0.5),
             deployment_cpu_percent: Some(50.0),
             deployment_sampled_at: Some(Utc::now()),
@@ -301,7 +298,7 @@ mod tests {
     #[test]
     fn contention_policy_throttles_only_under_high_pressure() {
         let mut row = candidate();
-        row.cpu_scaling_policy = CPU_SCALING_POLICY_CONTENTION_THROTTLE.to_string();
+        row.cpu_scaling_policy = CpuScalingPolicy::ContentionThrottle.as_str().to_string();
         row.current_site_cpu_limit_cores = None;
         row.server_cpu_percent = Some(85.0);
         row.deployment_cpu_percent = Some(75.0);
@@ -313,7 +310,7 @@ mod tests {
     #[test]
     fn contention_policy_releases_limit_when_host_recovers() {
         let mut row = candidate();
-        row.cpu_scaling_policy = CPU_SCALING_POLICY_CONTENTION_THROTTLE.to_string();
+        row.cpu_scaling_policy = CpuScalingPolicy::ContentionThrottle.as_str().to_string();
         row.current_site_cpu_limit_cores = Some(2.0);
         row.server_cpu_percent = Some(20.0);
         row.deployment_cpu_percent = Some(40.0);

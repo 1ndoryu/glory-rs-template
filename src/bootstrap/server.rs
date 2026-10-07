@@ -6,9 +6,7 @@
 use std::net::SocketAddr;
 use std::time::Duration;
 
-use glory_rs::runtime::{
-    spawn_runtime_watchdog, HttpProbeConfig, RuntimeWatchdogConfig,
-};
+use glory_rs::runtime::{spawn_runtime_watchdog, HttpProbeConfig, RuntimeWatchdogConfig};
 use hyper::body::Incoming;
 use hyper_util::rt::{TokioExecutor, TokioIo, TokioTimer};
 use hyper_util::server::conn::auto;
@@ -17,8 +15,11 @@ use tower::{Service, ServiceExt};
 
 use super::diagnostics::{dump_kernel_stacks, spawn_runtime_heartbeat_logger};
 
+/* [07AA-7] En axum 0.7 el tipo vive en extract::connect_info (routing ya no
+ * lo re-exporta como público); into_make_service_with_connect_info lo
+ * retorna desde ahí. Sin cambio de comportamiento. */
 type MakeService =
-    axum::routing::IntoMakeServiceWithConnectInfo<axum::Router, SocketAddr>;
+    axum::extract::connect_info::IntoMakeServiceWithConnectInfo<axum::Router, SocketAddr>;
 
 /* Entrypoint del servidor HTTP: bindea el socket, arma el watchdog y delega
  * en serve(). Drena con graceful shutdown (SIGTERM/SIGINT → 30s de plazo). */
@@ -121,7 +122,7 @@ async fn serve(
         .keep_alive_interval(Duration::from_secs(30))
         .keep_alive_timeout(Duration::from_secs(10));
 
-    accept_loop(listener, make_service, graceful, builder).await?;
+    accept_loop(listener, make_service, &graceful, builder).await?;
 
     /* [096A-4] Drenar conexiones activas: graceful.shutdown() notifica a todas
      * las conexiones watched que deben cerrar. Damos 30s de plazo; si alguna
@@ -142,7 +143,7 @@ async fn serve(
 async fn accept_loop(
     listener: tokio::net::TcpListener,
     mut make_service: MakeService,
-    graceful: GracefulShutdown,
+    graceful: &GracefulShutdown,
     builder: &'static mut auto::Builder<TokioExecutor>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let shutdown = shutdown_signal();

@@ -59,3 +59,17 @@ pub struct UpdateHostingParams<'a> {
     pub domain_verification_token: Option<&'a str>,
     pub domain_verified_at: Option<DateTime<Utc>>,
 }
+
+/* [07AA-2] Params del upsert bootstrap por dominio (caso Guillermo): 8 campos
+ * agrupados en struct (evita params-excesivos y reutiliza la convención
+ * CreateHostingParams). El SQL vivía en admin_client_bootstrap.rs. */
+pub struct BootstrapHostingParams<'a> {
+    pub user_id: Uuid,
+    pub client_name: &'a str,
+    pub client_email: &'a str,
+    pub domain: &'a str,
+    pub verified_at: DateTime<Utc>,
+    pub coolify_site_name: &'a str,
+    pub paid_subscription_id: Option<&'a str>,
+    pub server_uuid: &'a str,
+}

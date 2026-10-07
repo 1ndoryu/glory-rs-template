@@ -1,5 +1,7 @@
 /* sentinel-disable-file sqlx-query-sin-macro sqlx-query-as-sin-macro: repositorio nuevo con filtros opcionales.
  * [205A-1] Queries preparadas con bind para cobros pendientes del panel. */
+use chrono::{DateTime, Utc};
+use serde_json::Value;
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
@@ -7,6 +9,23 @@ use crate::errors::AppError;
 use crate::models::BillingItem;
 
 pub struct BillingRepository;
+
+/* [07AA-2] Params del upsert bootstrap de cobros (caso Guillermo): 12 campos
+ * agrupados en struct. El SQL vivía en admin_client_bootstrap.rs. */
+pub struct BootstrapBillingItemParams<'a> {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub resource_type: &'a str,
+    pub resource_id: Option<Uuid>,
+    pub title: &'a str,
+    pub description: &'a str,
+    pub amount_cents: i32,
+    pub billing_period: &'a str,
+    pub due_at: DateTime<Utc>,
+    pub grace_period_ends_at: DateTime<Utc>,
+    pub metadata: Value,
+    pub initial_status: &'a str,
+}
 
 impl BillingRepository {
     pub async fn list_for_user(pool: &PgPool, user_id: Uuid) -> Result<Vec<BillingItem>, AppError> {
@@ -47,6 +66,65 @@ impl BillingRepository {
         .fetch_all(pool)
         .await
         .map_err(AppError::from)
+    }
+
+    /* [07AA-2] Upsert de cobro bootstrap por id (caso Guillermo): inserta o
+     * actualiza sin revertir pagos. El SQL vivía en admin_client_bootstrap.rs
+     * (handler-accede-bd-rs); el repositorio es su casa (DIP).
+     * [205A-4] $12 = initial_status ('paid' | 'pending').
+     * ON CONFLICT: si el item ya es 'paid' O el bootstrap lo marca paid, queda paid.
+     * Esto permite re-ejecutar el bootstrap sin revertir pagos ya registrados
+     * y sin crear deuda falsa para cobros ya saldados (e.g. guillechatbots.es). */
+    pub async fn upsert_bootstrap_item(
+        pool: &PgPool,
+        params: BootstrapBillingItemParams<'_>,
+    ) -> Result<(), AppError> {
+        sqlx::query!(
+            r#"INSERT INTO billing_items (
+                    id, user_id, resource_type, resource_id, title, description,
+                    amount_cents, currency, billing_period, status, due_at,
+                    grace_period_ends_at, metadata
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, 'USD', $8, $12, $9, $10, $11)
+                ON CONFLICT (id) DO UPDATE SET
+                    user_id = EXCLUDED.user_id,
+                    resource_type = EXCLUDED.resource_type,
+                    resource_id = EXCLUDED.resource_id,
+                    title = EXCLUDED.title,
+                    description = EXCLUDED.description,
+                    amount_cents = EXCLUDED.amount_cents,
+                    currency = EXCLUDED.currency,
+                    billing_period = EXCLUDED.billing_period,
+                    status = CASE
+                        WHEN $12 = 'paid' OR billing_items.status = 'paid' THEN 'paid'
+                        ELSE 'pending'
+                    END,
+                    due_at = EXCLUDED.due_at,
+                    grace_period_ends_at = EXCLUDED.grace_period_ends_at,
+                    paid_at = CASE
+                        WHEN $12 = 'paid' THEN COALESCE(billing_items.paid_at, NOW())
+                        WHEN billing_items.status = 'paid' THEN billing_items.paid_at
+                        ELSE NULL
+                    END,
+                    stripe_session_id = CASE WHEN billing_items.status = 'paid' THEN billing_items.stripe_session_id ELSE NULL END,
+                    metadata = EXCLUDED.metadata,
+                    updated_at = NOW()"#,
+            params.id,
+            params.user_id,
+            params.resource_type,
+            params.resource_id,
+            params.title,
+            params.description,
+            params.amount_cents,
+            params.billing_period,
+            params.due_at,
+            params.grace_period_ends_at,
+            params.metadata,
+            params.initial_status,
+        )
+        .execute(pool)
+        .await?;
+        Ok(())
     }
 
     pub async fn set_checkout_session(

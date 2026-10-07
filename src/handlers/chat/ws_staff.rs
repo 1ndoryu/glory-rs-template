@@ -214,7 +214,17 @@ async fn handle_staff_ws(socket: WebSocket, state: AppState, staff_id: Uuid, rol
             continue;
         };
 
-        if !dispatch_staff_message(&state, &hub, &tx, &mut subscriptions, staff_id, role, ws_msg).await {
+        if !dispatch_staff_message(
+            &state,
+            &hub,
+            &tx,
+            &mut subscriptions,
+            staff_id,
+            role,
+            ws_msg,
+        )
+        .await
+        {
             break;
         }
     }

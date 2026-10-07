@@ -4,7 +4,7 @@
 
 use serde_json::{json, Value};
 
-use super::ai_tools::{tool_json, tool_status, RichMessage, ToolExecResult};
+use crate::services::ai_tools::{tool_json, tool_status, RichMessage, ToolExecResult};
 
 /* create_invoice: crea factura en Stripe con link de pago.
  * Flujo: create customer → create invoice → add line item → finalize → get URL.

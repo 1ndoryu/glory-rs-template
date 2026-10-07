@@ -3,14 +3,16 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use super::order_slugs::{find_plan_for_order, find_service_for_order};
 use super::OrderService;
 use crate::errors::AppError;
 use crate::models::{
     CreateOrderRequest, Order, OrderPhaseResponse, OrderResponse, OrderStatus, PaymentMode,
     PhaseStatus,
 };
-use crate::repositories::{CreateOrderParams, CreatePhaseParams, OrderRepository, ServiceRepository};
+use crate::repositories::{
+    CreateOrderParams, CreatePhaseParams, OrderRepository, ServiceRepository,
+};
+use crate::services::order_slugs::{find_plan_for_order, find_service_for_order};
 
 impl OrderService {
     /// Crea una orden: resuelve servicio/plan, calcula descuento, genera fases

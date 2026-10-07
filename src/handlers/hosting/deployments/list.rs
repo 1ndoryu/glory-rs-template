@@ -35,7 +35,7 @@ use crate::AppState;
     tag = "hosting"
 )]
 #[allow(clippy::too_many_lines)]
-pub(super) async fn list_deployments(
+pub(crate) async fn list_deployments(
     State(state): State<AppState>,
     auth: AuthUser,
 ) -> Result<Json<Vec<CoolifyDeploymentResponse>>, AppError> {

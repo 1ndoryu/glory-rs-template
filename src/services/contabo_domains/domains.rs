@@ -3,10 +3,10 @@
 
 use tracing::error;
 
-use super::super::contabo::{API_BASE, ContaboService};
+use super::super::contabo::{ContaboService, API_BASE};
 use super::types::{
-    AuthCodeEntry, ContaboDomain, DomainHandles, ListResponse, Nameserver, OrderDomainRequest,
-    req_id,
+    req_id, AuthCodeEntry, ContaboDomain, DomainHandles, ListResponse, Nameserver,
+    OrderDomainRequest,
 };
 
 impl ContaboService {

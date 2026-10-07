@@ -238,7 +238,7 @@ fn audit_static_pages(db_settings: &[SeoSetting]) -> Vec<SeoPageEntry> {
             });
         }
     } else {
-        for setting in &db_settings {
+        for setting in db_settings {
             let title_opt = Some(setting.title.clone());
             let desc_opt = Some(setting.description.clone());
             let og_custom = setting.og_image_url.is_some();
@@ -269,7 +269,7 @@ fn audit_static_pages(db_settings: &[SeoSetting]) -> Vec<SeoPageEntry> {
 /* [01AA-4-f3s] Servicios dinámicos. Extraído de seo_audit. */
 fn audit_service_pages(services: &[ServiceRecord]) -> Vec<SeoPageEntry> {
     let mut pages: Vec<SeoPageEntry> = Vec::new();
-    for svc in &services {
+    for svc in services {
         let title = Some(svc.title.clone());
         let desc = svc.description.clone();
         let json_ld: Option<String> = Some("Service".into());
@@ -299,7 +299,7 @@ fn audit_service_pages(services: &[ServiceRecord]) -> Vec<SeoPageEntry> {
 /* [01AA-4-f3s] Proyectos dinámicos. Extraído de seo_audit. */
 fn audit_project_pages(projects: &[Project]) -> Vec<SeoPageEntry> {
     let mut pages: Vec<SeoPageEntry> = Vec::new();
-    for proj in &projects {
+    for proj in projects {
         let title = Some(
             proj.meta_title
                 .clone()
@@ -339,7 +339,7 @@ fn audit_blog_entries(blog_posts: &[BlogPost]) -> (Vec<SeoBlogEntry>, usize) {
     /* Blog entries */
     let mut blog_entries: Vec<SeoBlogEntry> = Vec::new();
     let mut blog_published_count = 0usize;
-    for post in &blog_posts {
+    for post in blog_posts {
         if post.status == "published" {
             blog_published_count += 1;
         }

@@ -15,8 +15,8 @@ use std::collections::HashMap;
 
 use sqlx::PgPool;
 
-use super::types::SAMPLER_INTERVAL;
-use super::types::SAMPLER_STARTUP_RETRY_INTERVAL;
+use self::types::SAMPLER_INTERVAL;
+use self::types::SAMPLER_STARTUP_RETRY_INTERVAL;
 use crate::models::HostingSubscription;
 use crate::repositories::HostingRepository;
 use crate::services::coolify::CoolifyConfig;

@@ -12,8 +12,8 @@ use super::types::{
 };
 use crate::models::HostingSubscription;
 use crate::services::coolify::{CoolifyConfig, CoolifyServiceSummary};
-use crate::services::docker_stats::storage_targets;
 use crate::services::docker_stats::parse_docker_stats_public;
+use crate::services::docker_stats::storage_targets;
 
 #[must_use]
 pub(crate) fn secret_ref_for(label: &str) -> &'static str {

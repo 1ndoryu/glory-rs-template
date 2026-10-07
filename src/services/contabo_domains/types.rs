@@ -164,7 +164,7 @@ pub struct UpdateDnsRecordRequest {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct ListResponse<T> {
-    data: Vec<T>,
+    pub(crate) data: Vec<T>,
 }
 
 #[derive(Deserialize)]

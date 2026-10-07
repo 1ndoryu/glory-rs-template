@@ -10,9 +10,12 @@
  * cancel.rs (cancelación), approve.rs (aprobación/completado),
  * misc.rs (switch-role, revisiones, AI-intermediary, activity). */
 
-mod approve;
-mod cancel;
-mod misc;
+/* [07AA-7] Submódulos visibles en el crate: handlers/mod.rs referencia las
+ * rutas utoipa por su ubicación real (order_lifecycle::misc::fn), igual que
+ * hosting::email_aliases. Sin esto, __path_* generados no se resuelven (E0433). */
+pub(crate) mod approve;
+pub(crate) mod cancel;
+pub(crate) mod misc;
 
 pub use approve::approve_phase;
 pub use cancel::cancel_order_handler;

@@ -17,16 +17,16 @@ impl EmailService {
         client_name: &str,
         order_number: i32,
         service_title: &str,
-        plan_name: &str,
+        _plan_name: &str,
         price_display: &str,
     ) {
         let subject = format!("¡Pedido #{order_number} recibido! — Nakomi Studio");
 
+        /* [07AA-7] F3h redujo el template a 4 params (sin plan): se adapta la llamada. */
         let html = super::email_templates::render_order_confirmation(
             client_name,
             order_number,
             service_title,
-            plan_name,
             price_display,
         );
 

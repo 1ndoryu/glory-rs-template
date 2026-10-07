@@ -247,6 +247,19 @@ archivos, 157 con violaciones (34 errores, 363 warnings, 6 info, 60 hints).
   sentinel-disable-ignorado RESUELTA).
    Plan: `Agente/planes/plan-259A-5-2026-09-26.md`.
 
+## Barrido consola 07AA (2026-10-07, ACTIVO)
+
+Consola área: NAKOMI = 73 (info/hints + waivers contados en crudo; gate propio
+16W). Plan: `Agente/planes/plan-barrido-consola-07AA-2026-10-07.md`.
+
+- **07AA-1** varsense x4 (uplot/tiptap): FP confirmado, prevencion vigente — CERRADA sin cambio.
+- **07AA-2** handler-accede-bd x4 → repos — código terminado y 4 queries verificadas live, pero BLOQUEADO: árbol HEAD no compila (errores ajenos E0432/E0603/E0599, detalle en plan). Propuesta **07AA-7** reparar árbol como prerrequisito; sin commit sobre árbol roto.
+- **07AA-3** sqlite-carga-N x8: triage join!/FP — pendiente.
+- **07AA-4** parametros-excesivos x13 → structs — pendiente.
+- **07AA-5** god-object x3: re-evaluar waiver F3g — pendiente.
+- **07AA-6** large-interface-isp x37 (info): partir solo con ISP real, sin churn — pendiente.
+- **07AA-8** tope físico a validaciones → TRASLADADA a workspace-manager `07AA-6` (alcance de área; el plan vive allí).
+
 ## Gate 01AA — barrido warnings Rust + VarSense 2.2.9 (octubre 2026)
 
 Gate 2026-10-01 02:05: 0E / 79W / 54H (sentinel) + 4W VarSense (clases de

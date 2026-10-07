@@ -8,7 +8,8 @@ use uuid::Uuid;
 use crate::errors::AppError;
 use crate::middleware::AuthUser;
 use crate::models::{CreateNotification, Order, NOTIF_ORDER_CANCELLED};
-use crate::repositories::{ActivityLogRepository, OrderRepository, UserRepository};
+/* [07AA-7] Import sin uso (warning rustc al validar el bloque). */
+use crate::repositories::{ActivityLogRepository, UserRepository};
 use crate::services::OrderService;
 use crate::AppState;
 

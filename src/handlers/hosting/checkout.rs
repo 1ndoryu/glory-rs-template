@@ -8,9 +8,9 @@ use super::domain::{build_domain_verification_state, normalize_domain};
 use super::self_service::{persist_self_hosting_subscription, SelfHostingDraft};
 use crate::errors::AppError;
 use crate::middleware::AuthUser;
+/* [07AA-7] Import sin uso (warning rustc al validar el bloque). */
 use crate::models::{
-    HostingSubscription, HostingSubscriptionResponse, SelfSubscribeRequest, SelfSubscribeResponse,
-    UserRole,
+    HostingSubscriptionResponse, SelfSubscribeRequest, SelfSubscribeResponse, UserRole,
 };
 use crate::repositories::{
     CreateHostingParams, HostingRepository, InfrastructureRepository, UserRepository,

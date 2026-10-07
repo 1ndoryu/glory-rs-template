@@ -17,27 +17,26 @@ impl EmailService {
         config: &EmailConfig,
         pool: &PgPool,
         admin_emails: &[String],
-        client_email: &str,
+        _client_email: &str,
         client_name: &str,
         order_number: i32,
         service_title: &str,
-        plan_name: &str,
+        _plan_name: &str,
         price_display: &str,
-        payment_mode: &str,
+        _payment_mode: &str,
         order_id: uuid::Uuid,
         site_url: &str,
     ) {
         let subject = format!("🆕 Nueva orden #{order_number} — {client_name} — Nakomi Studio");
         let panel_link = format!("{site_url}/panel?seccion=ordenes&id={order_id}");
 
+        /* [07AA-7] F3h redujo el template a 5 params (sin email/plan/modo):
+         * se adapta la llamada; plan y modo siguen en subject/contexto del panel. */
         let html = super::email_templates::render_new_order_admin(
             client_name,
-            client_email,
             order_number,
             service_title,
-            plan_name,
             price_display,
-            payment_mode,
             &panel_link,
         );
 

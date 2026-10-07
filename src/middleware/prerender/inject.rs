@@ -1,7 +1,7 @@
 /* [01AA-4-f3m] Inyeccion HTML + JSON-LD (extraido de prerender.rs).
  * Visibilidad pub(crate): lo usan middleware.rs e resolve.rs. */
 
-use super::helpers::{SeoMeta, html_escape};
+use super::helpers::{html_escape, SeoMeta};
 
 /* Inyecta meta SEO en el HTML del SPA: reemplaza <title> y description
  * existentes, y agrega OG/canonical antes de </head>. */
@@ -75,7 +75,12 @@ pub(crate) fn static_json_ld(path: &str, app_url: &str) -> Option<String> {
 }
 
 /* [277A-14] Genera JSON-LD dinámico para servicios desde DB */
-pub(crate) fn dynamic_service_json_ld(title: &str, desc: &str, slug: &str, app_url: &str) -> String {
+pub(crate) fn dynamic_service_json_ld(
+    title: &str,
+    desc: &str,
+    slug: &str,
+    app_url: &str,
+) -> String {
     let breadcrumb = format!(
         "{{\"@context\":\"https://schema.org\",\"@type\":\"BreadcrumbList\",\"itemListElement\":[{{\"@type\":\"ListItem\",\"position\":1,\"name\":\"Inicio\",\"item\":\"{app_url}\"}},{{\"@type\":\"ListItem\",\"position\":2,\"name\":\"Servicios\",\"item\":\"{app_url}/servicios\"}},{{\"@type\":\"ListItem\",\"position\":3,\"name\":\"{title}\",\"item\":\"{app_url}/servicios/{slug}\"}}]}}"
     );

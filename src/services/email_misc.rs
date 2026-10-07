@@ -6,7 +6,7 @@ use sqlx::PgPool;
 
 use crate::repositories::EmailLogRepository;
 
-use super::email::{format_usd_cents, EmailConfig, EmailService};
+use super::email::{EmailConfig, EmailService};
 
 impl EmailService {
     /* [124A-INV] Email al cliente notificando que su factura fue pagada y
@@ -115,16 +115,19 @@ impl EmailService {
         admin_emails: &[String],
         client_email: &str,
         tier_name: &str,
-        monthly_price_cents: i32,
+        _monthly_price_cents: i32,
     ) {
         let subject = format!("VPS pendiente de aprobación: {tier_name} — Nakomi Studio");
-        let amount_display = format_usd_cents(monthly_price_cents);
+        /* [07AA-7] F3h redujo el template a (cliente, plan, panel_link): antes se
+         * pasaba el importe como link (hack). Link real al panel vía SITE_URL. */
+        let site_url =
+            std::env::var("SITE_URL").unwrap_or_else(|_| "https://nakomi.studio".to_string());
+        let panel_link = format!("{}/panel", site_url.trim_end_matches('/'));
 
         let html = super::email_templates::render_vps_pending_approval(
             client_email,
             tier_name,
-            "",
-            &amount_display,
+            &panel_link,
         );
 
         for email in admin_emails {

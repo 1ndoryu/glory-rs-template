@@ -1,9 +1,7 @@
-/* sentinel-disable-file sqlx-query-sin-macro sqlx-query-as-sin-macro handler-accede-bd-rs:
- * Bootstrap administrativo con queries dinámicas runtime propias del caso Guillermo.
- * No corresponde mover a repositorio porque son DMLs one-shot con ON CONFLICT
- * y RETURNING específicos de este bootstrap, no parte del CRUD general. */
 /* [205A-1] Bootstrap administrativo para el caso Guillermo.
- * Crea solo cliente, hostings legacy y cobros pendientes; no sincroniza fixtures ni reprovisiona infraestructura. */
+ * Crea solo cliente, hostings legacy y cobros pendientes; no sincroniza fixtures ni reprovisiona infraestructura.
+ * [07AA-2] Handler limpio de SQL (DIP): los 4 upserts viven en UserRepository /
+ * HostingRepository / BillingRepository; aquí solo orquestación + fechas. */
 
 use std::collections::HashMap;
 
@@ -19,7 +17,10 @@ use uuid::Uuid;
 use crate::errors::AppError;
 use crate::middleware::AuthUser;
 use crate::models::UserRole;
-use crate::repositories::UserRepository;
+use crate::repositories::{
+    BillingRepository, BootstrapBillingItemParams, BootstrapHostingParams, HostingRepository,
+    UserRepository,
+};
 use crate::services::hash_password;
 use crate::AppState;
 
@@ -184,14 +185,15 @@ async fn upsert_guillermo_user(
 ) -> Result<(Uuid, bool), AppError> {
     if let Some(existing) = UserRepository::find_by_email(pool, GUILLERMO_EMAIL).await? {
         let password_hash = hash_password(temporary_password)?;
-        sqlx::query(
-            "UPDATE users SET display_name = COALESCE(display_name, $1), role = 'client'::user_role, password_hash = $3 WHERE id = $2",
+        UserRepository::apply_bootstrap_credentials(
+            pool,
+            existing.id,
+            GUILLERMO_NAME,
+            UserRole::Client,
+            &password_hash,
         )
-        .bind(GUILLERMO_NAME)
-        .bind(existing.id)
-        .bind(password_hash)
-        .execute(pool)
-        .await?;
+        .await
+        .map_err(AppError::from)?;
         return Ok((existing.id, false));
     }
 
@@ -204,11 +206,9 @@ async fn upsert_guillermo_user(
         true,
     )
     .await?;
-    sqlx::query("UPDATE users SET display_name = $1, email_verified = false WHERE id = $2")
-        .bind(GUILLERMO_NAME)
-        .bind(user.id)
-        .execute(pool)
-        .await?;
+    UserRepository::mark_bootstrap_created(pool, user.id, GUILLERMO_NAME)
+        .await
+        .map_err(AppError::from)?;
 
     Ok((user.id, true))
 }
@@ -221,42 +221,21 @@ async fn upsert_guillermo_hostings(
     let verified_at = Utc::now();
 
     for hosting in GUILLERMO_HOSTINGS {
-        let row: (Uuid,) = sqlx::query_as(
-            r"INSERT INTO hosting_subscriptions (
-                    user_id, client_name, client_email, plan, domain,
-                    domain_verification_status, domain_verified_at, coolify_site_name,
-                    status, stripe_subscription_id, monthly_price_cents, storage_limit_mb,
-                    server_uuid, server_ip
-                )
-                VALUES ($1, $2, $3, 'normal-basico', $4, 'active', $5, $6, 'active', $7, 248, 5120, $8, '66.94.100.241')
-                ON CONFLICT (domain) DO UPDATE SET
-                    user_id = EXCLUDED.user_id,
-                    client_name = EXCLUDED.client_name,
-                    client_email = EXCLUDED.client_email,
-                    plan = EXCLUDED.plan,
-                    domain_verification_status = 'active',
-                    domain_verified_at = COALESCE(hosting_subscriptions.domain_verified_at, EXCLUDED.domain_verified_at),
-                    coolify_site_name = EXCLUDED.coolify_site_name,
-                    status = 'active',
-                    stripe_subscription_id = COALESCE(hosting_subscriptions.stripe_subscription_id, EXCLUDED.stripe_subscription_id),
-                    monthly_price_cents = EXCLUDED.monthly_price_cents,
-                    storage_limit_mb = EXCLUDED.storage_limit_mb,
-                    server_uuid = EXCLUDED.server_uuid,
-                    server_ip = EXCLUDED.server_ip,
-                    updated_at = NOW()
-                RETURNING id",
+        let id = HostingRepository::upsert_bootstrap(
+            pool,
+            BootstrapHostingParams {
+                user_id,
+                client_name: GUILLERMO_NAME,
+                client_email: GUILLERMO_EMAIL,
+                domain: hosting.domain,
+                verified_at,
+                coolify_site_name: hosting.coolify_site_name,
+                paid_subscription_id: hosting.paid_subscription_id,
+                server_uuid: hosting.server_uuid,
+            },
         )
-        .bind(user_id)
-        .bind(GUILLERMO_NAME)
-        .bind(GUILLERMO_EMAIL)
-        .bind(hosting.domain)
-        .bind(verified_at)
-        .bind(hosting.coolify_site_name)
-        .bind(hosting.paid_subscription_id)
-        .bind(hosting.server_uuid)
-        .fetch_one(pool)
         .await?;
-        hosting_ids.insert(hosting.domain, row.0);
+        hosting_ids.insert(hosting.domain, id);
     }
 
     Ok(hosting_ids)
@@ -292,50 +271,23 @@ async fn upsert_guillermo_billing_items(
         } else {
             "pending"
         };
-        sqlx::query(
-            r"INSERT INTO billing_items (
-                    id, user_id, resource_type, resource_id, title, description,
-                    amount_cents, currency, billing_period, status, due_at,
-                    grace_period_ends_at, metadata
-                )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, 'USD', $8, $12, $9, $10, $11)
-                ON CONFLICT (id) DO UPDATE SET
-                    user_id = EXCLUDED.user_id,
-                    resource_type = EXCLUDED.resource_type,
-                    resource_id = EXCLUDED.resource_id,
-                    title = EXCLUDED.title,
-                    description = EXCLUDED.description,
-                    amount_cents = EXCLUDED.amount_cents,
-                    currency = EXCLUDED.currency,
-                    billing_period = EXCLUDED.billing_period,
-                    status = CASE
-                        WHEN $12 = 'paid' OR billing_items.status = 'paid' THEN 'paid'
-                        ELSE 'pending'
-                    END,
-                    due_at = EXCLUDED.due_at,
-                    grace_period_ends_at = EXCLUDED.grace_period_ends_at,
-                    paid_at = CASE
-                        WHEN $12 = 'paid' THEN COALESCE(billing_items.paid_at, NOW())
-                        WHEN billing_items.status = 'paid' THEN billing_items.paid_at
-                        ELSE NULL
-                    END,
-                    stripe_session_id = CASE WHEN billing_items.status = 'paid' THEN billing_items.stripe_session_id ELSE NULL END,
-                    metadata = EXCLUDED.metadata,
-                    updated_at = NOW()",
+        BillingRepository::upsert_bootstrap_item(
+            pool,
+            BootstrapBillingItemParams {
+                id: item_id,
+                user_id,
+                resource_type: item.resource_type,
+                resource_id,
+                title: item.title,
+                description: item.description,
+                amount_cents: item.amount_cents,
+                billing_period: item.billing_period,
+                due_at,
+                grace_period_ends_at,
+                metadata,
+                initial_status,
+            },
         )
-        .bind(item_id)
-        .bind(user_id)
-        .bind(item.resource_type)
-        .bind(resource_id)
-        .bind(item.title)
-        .bind(item.description)
-        .bind(item.amount_cents)
-        .bind(item.billing_period)
-        .bind(due_at)
-        .bind(grace_period_ends_at)
-        .bind(metadata)
-        .bind(initial_status)
-        .execute(pool)
         .await?;
     }
 

@@ -8,12 +8,12 @@ use serde_json::Value;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use super::ai_providers::{call_ai_api, call_ai_api_with_options, ChatApiOptions};
-use super::ai_prompts::{build_intermediary_prompt, build_system_prompt};
-use super::context::{build_context_messages, parse_escalation, tool_results_with_ids};
 use super::config::AiChatConfig;
+use super::context::{build_context_messages, parse_escalation, tool_results_with_ids};
 use crate::models::{ChatMessage, Order};
 use crate::repositories::{ChatRepository, OrderRepository};
+use crate::services::ai_prompts::{build_intermediary_prompt, build_system_prompt};
+use crate::services::ai_providers::{call_ai_api, call_ai_api_with_options, ChatApiOptions};
 use crate::services::ai_tools::{self, RichMessage};
 
 pub struct AiChatService;

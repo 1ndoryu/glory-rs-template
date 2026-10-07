@@ -3,8 +3,8 @@ use sqlx::PgPool;
 use crate::errors::AppError;
 use crate::models::{HostingPlanConfig, UpdatePlanConfigRequest};
 
-use super::HostingRepository;
 use super::types::validated_cpu_scaling_policy;
+use super::HostingRepository;
 
 impl HostingRepository {
     /* [114A-3] Obtener configuración de recursos para un plan específico */

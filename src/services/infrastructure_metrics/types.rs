@@ -64,8 +64,7 @@ pub(crate) struct ServiceStorageProbe {
     pub(crate) path: &'static str,
 }
 
-pub(crate) static CPU_HISTORY: OnceLock<RwLock<HashMap<String, CpuCounters>>> =
-    OnceLock::new();
+pub(crate) static CPU_HISTORY: OnceLock<RwLock<HashMap<String, CpuCounters>>> = OnceLock::new();
 pub(crate) static STORAGE_HISTORY: OnceLock<RwLock<HashSet<String>>> = OnceLock::new();
 
 pub(crate) fn f64_to_i64_rounded(value: f64) -> i64 {

@@ -9,7 +9,9 @@ use utoipa::ToSchema;
 use super::helpers::{contabo, require_admin};
 use crate::errors::AppError;
 use crate::middleware::AuthUser;
-use crate::services::contabo_domains::{CreateDnsRecordRequest, DnsRecord, DnsZone, UpdateDnsRecordRequest};
+use crate::services::contabo_domains::{
+    CreateDnsRecordRequest, DnsRecord, DnsZone, UpdateDnsRecordRequest,
+};
 use crate::AppState;
 
 pub(super) async fn list_dns_zones(

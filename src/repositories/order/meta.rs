@@ -12,58 +12,65 @@ impl OrderRepository {
     [035A-12] HELPERS DE DISPLAY: info legible de órdenes
     ============================================================ */
 
-    /* [035A-12] Info legible de orden para client/chat: descripcion, servicio, plan y estado. */
+    /* [07AA-7] Revert de F3f: la firma por order_id usaba `s.name`
+     * (columna inexistente en services: solo title/slug) y ningún caller
+     * la adoptó (11+8 callers siguen la forma vieja). Se restaura el
+     * contrato original (service_id, plan_id) con queries con caché offline. */
+    /// Obtiene título, slug del servicio y nombre del plan para un order
     pub async fn get_order_display_info(
         pool: &PgPool,
-        order_id: Uuid,
-    ) -> Result<Option<(String, String, String, String)>, sqlx::Error> {
-        let row = sqlx::query!(
-            r#"SELECT o.project_description, s.name as service_name,
-                      sp.name as plan_name, o.status::text as status
-               FROM orders o
-               JOIN services s ON s.id = o.service_id
-               JOIN service_plans sp ON sp.id = o.plan_id
-               WHERE o.id = $1"#,
-            order_id,
-        )
-        .fetch_optional(pool)
-        .await?;
-        Ok(row.map(|r| {
-            (
-                r.project_description.unwrap_or_default(),
-                r.service_name.unwrap_or_default(),
-                r.plan_name.unwrap_or_default(),
-                r.status.unwrap_or_default(),
+        service_id: Uuid,
+        plan_id: Uuid,
+    ) -> Result<(String, String, String), sqlx::Error> {
+        let (service_title, service_slug): (String, String) = {
+            let row = sqlx::query!(
+                r#"SELECT title, slug FROM services WHERE id = $1"#,
+                service_id,
             )
-        }))
+            .fetch_one(pool)
+            .await?;
+            (row.title, row.slug)
+        };
+
+        let plan_name: String =
+            sqlx::query_scalar!(r#"SELECT name FROM service_plans WHERE id = $1"#, plan_id,)
+                .fetch_one(pool)
+                .await?;
+
+        Ok((service_title, service_slug, plan_name))
     }
 
-    /* [035A-12] Nombre display de un empleado por id. */
+    /* [064A-30] Obtiene display_name del empleado asignado a una orden.
+     * Retorna None si employee_id es None o si el usuario no tiene display_name.
+     * Usa query_scalar sin macro para no depender del cache offline. */
     pub async fn get_employee_display_name(
         pool: &PgPool,
-        employee_id: Uuid,
-    ) -> Result<String, sqlx::Error> {
-        let display: Option<String> = sqlx::query_scalar(
-            "SELECT display_name FROM users WHERE id = $1",
-        )
-        .bind(employee_id)
-        .fetch_optional(pool)
-        .await?;
-        Ok(display.unwrap_or_else(|| "Empleado".to_string()))
+        employee_id: Option<Uuid>,
+    ) -> Result<Option<String>, sqlx::Error> {
+        let Some(eid) = employee_id else {
+            return Ok(None);
+        };
+        let name: Option<String> =
+            sqlx::query_scalar("SELECT display_name FROM users WHERE id = $1")
+                .bind(eid)
+                .fetch_optional(pool)
+                .await?
+                .flatten();
+        Ok(name)
     }
 
-    /* [035A-12] Nombre display de un cliente por id. */
+    /* [074A-53] Obtener nombre del cliente para la respuesta de órdenes */
     pub async fn get_client_display_name(
         pool: &PgPool,
         client_id: Uuid,
-    ) -> Result<String, sqlx::Error> {
-        let display: Option<String> = sqlx::query_scalar(
-            "SELECT display_name FROM users WHERE id = $1",
-        )
-        .bind(client_id)
-        .fetch_optional(pool)
-        .await?;
-        Ok(display.unwrap_or_else(|| "Cliente".to_string()))
+    ) -> Result<Option<String>, sqlx::Error> {
+        let name: Option<String> =
+            sqlx::query_scalar("SELECT display_name FROM users WHERE id = $1")
+                .bind(client_id)
+                .fetch_optional(pool)
+                .await?
+                .flatten();
+        Ok(name)
     }
 
     /* [T-10] Activa/desactiva IA intermediaria para una orden */

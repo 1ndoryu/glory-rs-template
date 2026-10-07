@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "stages": [
+    {
+      "name": "check",
+      "executable": "pwsh",
+      "args": ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "scripts/quality/cargo-stage.ps1", "{reportPath}", "check", "--message-format=short", "--color=never"],
+      "expectedSchemaVersion": "1",
+      "timeoutMs": 540000,
+      "cwd": "."
+    }
+  ]
+}

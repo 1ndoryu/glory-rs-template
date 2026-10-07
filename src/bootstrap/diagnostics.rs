@@ -6,9 +6,7 @@ use std::time::Duration;
 
 use glory_rs::runtime::RuntimeHeartbeat;
 
-pub(crate) fn spawn_runtime_heartbeat_logger(
-    heartbeat: RuntimeHeartbeat,
-) -> std::io::Result<()> {
+pub(crate) fn spawn_runtime_heartbeat_logger(heartbeat: RuntimeHeartbeat) -> std::io::Result<()> {
     std::thread::Builder::new()
         .name("hb-logger".into())
         .spawn(move || {
