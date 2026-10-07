@@ -588,7 +588,9 @@ Siguiente: C1 (NUEVO 2026-10-07 [07AA-5]: cableado en opencode-propio —
   sin guardar. Lab hermano ya creado + regla `LEEME-LAB.md`.
 - Fases: F1 skill `lab-opencode` + F2 promoción con diff-first y manifest +
   F3 piloto C1 de 03AA-3 + F4 prohibiciones. Sin git en el lab (decidido).
-- Estado: plan listo, pendiente ejecución. C1 espera a F1+F2.
+- Estado: F1+F2+F3a+F3b hechas en lab (skill + checklist + cableado con
+  flag verificado 38/38 tests + typecheck). C1b espera ventana con ella
+  (ella reinicia y prueba viva).
 
 ## 03AA-4 — WhatsApp un solo número + triage + config + escenarios (cerrada 2026-10-07: ver `Agente/completados/tareas-2026-10-07.md`)
 - Plan: `Agente/planes/completados/plan-whatsapp-numero-unico-2026-10-03.md`.

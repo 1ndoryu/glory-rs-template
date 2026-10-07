@@ -49,7 +49,53 @@ promoción explícito y una skill que lo enseñe a otros agentes.
   puertos, correr la app del lab por defecto, commitear en `src/`,
   compartir su `identity.db`.
 
+## F3a — Puntos de cableado (estudiado 2026-10-07, solo lectura)
+
+- Motor actual (lab `marketplace-service.ts`): `syncFloatGuest` —bucle auto
+  5 s + poll manual— y el IPC `marketplace-drafts` usan el motor local
+  `generarBorradores` de `./marketplace-assistant`. Punto de inserción: antes
+  de `generarBorradores`, rama núcleo con fallback silencioso al local.
+- Contrato backend (verificado `marketplace.rs` + `handlers/marketplace.rs`):
+  `POST /api/admin/marketplace/borrador` con `BorradorRequest` (`threadId`,
+  `firma` hex64 + `firma_version: "firma-v1"`, `lang` 2 letras,
+  `excerpt{remitente_hash hex64, texto 1..2000, hora ISO8601 -04:00}`,
+  `avisoId?`, `extras?`) + JWT mp. El handler valida formato y usa `firma`
+  como clave de caché —no verifica HMAC—.
+- Cripto ya existe en cliente (`plugins-opencode/src/nucleo/firmas.ts`,
+  `excerpt.ts`, `lector.ts`): HMAC_SHA256 con sal del keyring del SO
+  (hex ≥16 B); `remitenteHash` + `firmaAviso` + `construirExcerpt`.
+- Flag del bridge (`bridge.ts`): `MP_NUCLEO=on` activa, default OFF.
+
+## F3b — Diseño (mínimo, sin UX)
+
+Portar al lab (main, `node:crypto` disponible): `firmaAviso` +
+`remitenteHash` + construcción del excerpt desde `window.excerpt`/`key`.
+Token mp por env `MP_MN_TOKEN` (pegado manual, sin cambios de settings en
+el piloto); flag default OFF; ante cualquier fallo, fallback silencioso
+al motor local. UX de obtención del token queda pendiente documentado,
+no decidido en código.
+
+## F3b — Implementado en lab (2026-10-07, verificado)
+
+- `opencode-propio-dev/src/packages/desktop/src/main/marketplace-nucleo.ts`
+  (nuevo): `nucleoActivo` (flag `MP_NUCLEO=on` + `MP_MN_TOKEN` + `MP_SAL`,
+  default OFF), port fiel `firmaAviso`/`remitenteHash`/`colapso`,
+  `horaCaracasISO` (-04:00), `buildBorradorRequest` (espejo de
+  `validar_borrador`), `parseBorradorResponse`,
+  `pedirBorradorNucleo` (timeout 20 s, nunca lanza) y
+  `borradorNucleoParaVentana` (forma de panel o `undefined`).
+- `marketplace-service.ts` (+import, 3 líneas en `syncFloatGuest`): núcleo
+  primero, motor local intacto como fallback; caché/auto-copia/panel sin
+  cambios. `marketplace-drafts` IPC queda local a propósito en el piloto.
+- Tests nuevos `marketplace-nucleo.test.ts` (12) + existentes (26):
+  **38/38 verde** (`bun test`, un fallo inicial corrigió el test, no el
+  código: `""` normaliza a sin-aviso como el backend). `bun run typecheck`
+  limpio. Viva intacta: cero ediciones fuera del lab.
+- Lección test: `firmaAviso(x, "", sal) === firmaAviso(x, null, sal)` por
+  diseño (`?? ""`); el backend rechaza `avisoId` vacío, el builder manda
+  siempre `null` en el piloto (Aviso no trae id).
+
 ## Estado
 
-Plan nuevo 2026-10-07, pendiente de ejecución (F1 → F3). C1 de 03AA-3
-espera a F1+F2.
+F1+F2+F3a+F3b+F3c hechas. Sigue C1b: ventana con ella (diff-first +
+manifest + ella reinicia + prueba viva). Sin su aviso, nada se mueve.
