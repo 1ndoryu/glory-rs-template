@@ -99,3 +99,18 @@ no decidido en código.
 
 F1+F2+F3a+F3b+F3c hechas. Sigue C1b: ventana con ella (diff-first +
 manifest + ella reinicia + prueba viva). Sin su aviso, nada se mueve.
+
+## C1b — Sesiones de navegador (decidido 2026-10-07, verificado en código)
+
+- Las sesiones viven en `<userData>/Partitions/propio-browser-shared`;
+  userData suya = `%APPDATA%/ai.opencode.desktop.propio`, userData del lab
+  = `%APPDATA%/ai.opencode.desktop.dev` (separado por diseño, `index.ts`).
+- Compartir en vivo es imposible y peligroso: mismo userData con las dos
+  apps = pelea por single-instance lock + dos Chromium escribiendo el
+  mismo LevelDB (riesgo real: corromper la sesión y sacarla de Facebook,
+  justo lo que ella teme; además no recuerda la contraseña).
+- Procedimiento C1b: 1) ella cierra su app; 2) el agente copia
+  `Partitions/propio-browser-shared` (app cerrada = copia consistente) al
+  userData del lab; 3) el dev corre con esa copia (su app puede reabrirse
+  después; el lab nunca escribe en su perfil). Sin ella cerrando, no hay
+  prueba con sesión.
