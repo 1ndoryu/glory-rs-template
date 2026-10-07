@@ -13,10 +13,16 @@ backend MN con caché (firma conocida = 0 tokens). El envío siempre es humano.
 ## Alcance / no alcance
 - Sí (en orden): E0 inventario; E1 núcleo+contrato M3 congelado; E2
   adaptador con flag (contra stub M3 declarado); M3 endpoint; M2 panel;
-  E3 CLI; M4 caché; M1 strip.
+  E3 CLI; M4 caché; C1 cableado en `opencode-propio` (FALTABA 2026-10-07:
+  era lo más importante y no estaba en el plan); M1 strip.
 - No: auto-envío (prohibido siempre), credenciales/sesión de Meta (las pone
   ella), API oficial de Messenger, auto-pegado al composer, móvil real
   (fuera de alcance: solo desktop-estrecho 390px).
+- Protección while vivo [07AA-5]: `opencode-propio` en ejecución (puerto
+  5174) no se toca nunca — ni sus archivos, ni sus procesos, ni sus
+  puertos. Todo C1a se prepara fuera (plugin + backend MN + parche
+  versionado); el parche entra solo en la ventana C1b, y el reinicio
+  lo hace ella, nunca el agente.
 
 ## Doctrina Meta
 Fuente canónica: plan 03AA-5 (pin `doctrina-v1`); aquí solo ref + delta
@@ -33,8 +39,10 @@ test que falla si una migración añade columna no mapeada; `strip-vN`
 pineado junto a `firma-v1`.
 
 ## Dependencias y contrato
-- `opencode-propio` (no git, otro frente): solo adaptador; nadie modifica
-  `marketplace-*` sin avisar; tarball verificado por sha256 pineado.
+- `opencode-propio` (su app, somos nosotros: no hay otro frente —
+  corrección 2026-10-07, dicho por ella): el cableado C1 lo hace este
+  plan; nadie modifica `marketplace-*` fuera de la ventana C1b; tarball
+  verificado por sha256 pineado.
 - Backend MN local + `OPENCODE_GO_API_KEY`; generador pineado `chat-MN vX.Y`
   (assert CI, nunca `jev`).
 - Remoto del repo (lo crea ella o local hasta su aviso); sin remoto no hay
@@ -115,11 +123,24 @@ pineado junto a `firma-v1`.
   retención legal 90d (columnas separadas). Contador
   `GET /api/admin/marketplace/uso-hoy` (scope `mp:lectura`). DoD: hit-rate,
   precio 10/10 tras cambio, hit con ficha vieja = 0.
-- **M1 — Strip (SOLO si E2+M2+M3 verdes en viva + firma del otro frente):**
+- **M1 — Strip (SOLO si C1+E2+M2+M3 verdes en viva + firma de ella):**
   tag `pre-strip-vX` (o bundle) + backup zip <15min antes + `diff`
-  pre-restore; restore solo por dueño de `opencode-propio` en ventana de
-  congelación escrita; recién ahí se borra watch/strip UI + i18n. Sin firma,
-  M1 prohibido. Rollback = runbook probado 1..N.
+  pre-restore; restore solo por ella (dueña de `opencode-propio`) en
+  ventana de congelación escrita por ella; recién ahí se borra watch/strip
+  UI + i18n. Sin su firma, M1 prohibido. Rollback = runbook probado 1..N.
+- **C1 — Cableado en `opencode-propio` (FALTABA; lo más importante):**
+  conecta el núcleo nuevo (`plugins-opencode` + backend MN) dentro de la
+  app, con flag `MP_NUCLEO=off` por defecto (lo viejo sigue mandando).
+  - C1a Preparación (SIN tocar la app viva): todo se hace fuera — plugin,
+    backend, docs — y el cableado se deja listo como parche versionado
+    (diff archivado, no editado en vivo). Verificación estática:
+    `tsc`+tests del plugin y fmt/clippy/test del backend. Cero reinicios,
+    cero puertos tocados.
+  - C1b Ventana de cutover (con ella): ella avisa, se aplica el parche,
+    se verifica que la app arranca con flag off = burbuja vieja intacta;
+    recién ahí viva 30min con flag on. El reinicio lo hace ella.
+  - DoD: parche aplicado en ventana, app arranca, off = viejo intacto,
+    on = borradores del núcleo nuevo, viva verde.
 
 ## Observabilidad
 `POST /api/admin/marketplace/audit` + tabla
@@ -136,6 +157,9 @@ que IA; Regenerar sin tope (decisión usuaria), contador de métrica.
 ## Estado
 E0 en curso (checklist, 3 días). E1 bloqueado hasta E0 real + remoto.
 E2+ espera tus puntos restantes.
+[07AA-5 2026-10-07]: se suma C1 (cableado, faltaba) y M1 pide firma de
+ella (no hay otro frente). Corrección solo-docs: opencode-propio vivo
+intacto, sin reinicios.
 
 ## Gate y cierre
 Plugin TS (`tsc` 0 + tests) y backend Rust (fmt/check/clippy/test) por

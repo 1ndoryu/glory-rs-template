@@ -560,8 +560,12 @@ audit `emision`) + test expiración; gate fmt+clippy limpios, 87/87 tests;
  `::BIGINT` igual que M3); viva `M4-VIVA-OK` (miss ia → hit cache mismo texto
  → regenerar fresco → corregir → borrador corregida=true con el texto
  corregido → contacto 422).
-Siguiente: M1 (BLOQUEADO: exige firma otro frente + ventana congelación,
-sin firma M1 prohibido).
+Siguiente: C1 (NUEVO 2026-10-07 [07AA-5]: cableado en opencode-propio —
+  faltaba, es lo más importante; C1a se prepara sin tocar la app viva,
+  C1b en ventana con ella y reinicio por ella) y luego M1 (BLOQUEADO:
+  exige C1+E2+M2+M3 verdes en viva + firma de ella + ventana
+  congelación escrita por ella; no hay otro frente; sin su firma M1
+  prohibido).
   Falta de tu parte para cerrar E0: remoto del repo + fecha de viva 30min.
 - M2 hecho 2026-10-06: panel en `../plugins-opencode/src/panel/`
   (`selectores.json` pin v1 por rol/nombre + `registerMode()` asistente>radar +
