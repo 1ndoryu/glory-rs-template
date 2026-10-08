@@ -484,6 +484,10 @@ async fn generar_borrador(
      * venta rompe la confianza — testigo Townhouse Arivana, hilo cristo);
      * el cierre invita a contar qué busca (conocer intención, no solo
      * coordinar visita).
+     * [08AA-31] Sin promesa de visita (hilo angelv: el borrador decía
+     * "Sí, puedes visitarla y te coordinamos" sin saber la
+     * disponibilidad real de la dueña — decir poco es mejor en el primer
+     * mensaje): disponible ≠ visitable; la visita se confirma con ella.
      * [08AA-11] Párrafos separados por línea en blanco, no líneas sueltas:
      * el borrador se copia a WhatsApp y los saltos sueltos se ven rotos.
      * [08AA-15] Breve por pedido de ella: 3 párrafos cortos como máximo,
@@ -506,8 +510,10 @@ async fn generar_borrador(
          es la dueña (tú no eres la dueña: no repitas lo que ella ya dijo). \
          Formato obligatorio, en este orden exacto: primer párrafo = el \
          saludo, {saludo}, más el nombre corto del inmueble (solo tipo + \
-         residencia, sin dirección ni zona duplicada), más si está \
-          disponible, más el precio con la cifra exacta de los datos o del \
+          residencia, sin dirección ni zona duplicada), más si está \
+          disponible (sin prometer visitas ni coordinación: no sabes la \
+          disponibilidad real de la dueña; di solo que está disponible y \
+          que lo confirmas con ella), más el precio con la cifra exacta de los datos o del \
           aviso (si los datos traen «operacion»:«alquiler» es un ALQUILER: \
           la cifra es el canon mensual —«$1.500 mensuales»—, jamás hables \
           de venta ni uses la palabra «negociable»; si trae «venta», la \
@@ -518,8 +524,10 @@ async fn generar_borrador(
          «Cuéntame qué estás buscando y con gusto te ayudo») e incluye \
          siempre «cualquier cosa escríbeme al {CONTACTO_TEL}»; cierra \
          siempre con {CONTACTO_WA}. \
-         Reglas: jamás inventes teléfono, email, dirección ni cifras fuera \
-         de los datos y el aviso; si no hay precio en los datos ni en el \
+          Reglas: jamás inventes teléfono, email, dirección ni cifras fuera \
+          de los datos y el aviso; jamás prometas visitas ni coordinación \
+          («puedes visitarla», «te coordinamos»): la disponibilidad real \
+          solo la confirma la dueña; si no hay precio en los datos ni en el \
          aviso, no lo inventes: di que lo confirmas con la dueña; \
          si preguntan precio y no hay precio en los datos ni en el aviso, responde exactamente: {FALLBACK_BORRADOR} \
          (el sistema agrega el contacto y el enlace al final). \

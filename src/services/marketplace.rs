@@ -831,6 +831,30 @@ pub async fn reemplazar_cache(
     Ok(())
 }
 
+/// [08AA-31] Foto combinada del hilo (pura, sin BD): une la foto vieja con
+/// el `limpio` nuevo, línea a línea, con dedup exacto y tope de 30 líneas
+/// (las últimas). Sin esto, `releer_foto` pisaba todas las filas con el
+/// último snapshot y si ese solo traía lo propio (`Tú:`), el mensaje del
+/// cliente desaparecía del panel (hilo angelv). Las líneas del cliente
+/// viajan sin etiqueta y las propias como `Tú:` (08AA-29): el dedup es por
+/// línea exacta, así que ambos lados conviven.
+#[must_use]
+pub fn combinar_foto_hilo(vieja: &str, nueva: &str) -> String {
+    use std::collections::HashSet as Conjunto;
+    let mut vistas: Conjunto<String> = Conjunto::new();
+    let mut lineas: Vec<&str> = Vec::new();
+    for linea in vieja.lines().chain(nueva.lines()) {
+        let t = linea.trim();
+        if t.is_empty() || vistas.contains(t) {
+            continue;
+        }
+        vistas.insert(t.to_string());
+        lineas.push(t);
+    }
+    let desde = lineas.len().saturating_sub(30);
+    lineas[desde..].join("\n")
+}
+
 /// [08AA-28] Releer con creación: refresca la foto del hilo; si no hay
 /// fila (caché borrada o hilo nuevo sin borrador), la crea solo con la
 /// foto y `respuesta` vacía para que el chat aparezca en el panel sin
@@ -839,6 +863,9 @@ pub async fn reemplazar_cache(
 /// borrador posterior inserta su propia fila y gana por `valida_hasta`.
 /// `ON CONFLICT DO UPDATE` lo hace idempotente (doble clic o releers
 /// concurrentes convergen; regla 6: upsert atómico, no buscar-crear).
+/// [08AA-31] Fusiona con `combinar_foto_hilo` en vez de pisar: la foto
+/// vieja aporta las líneas que el último snapshot ya no trae (el mensaje
+/// del cliente cuando el eco propio es lo único nuevo).
 /// Devuelve `(actualizado, creado)`.
 pub async fn releer_foto(
     pool: &sqlx::PgPool,
@@ -846,11 +873,22 @@ pub async fn releer_foto(
     limpio: &str,
     crudo: &str,
 ) -> Result<(bool, bool), AppError> {
+    let vieja: Option<(String,)> = sqlx::query_as(
+        "SELECT excerpt_texto FROM mp_respuestas_cache WHERE thread_id = $1 \
+         ORDER BY valida_hasta DESC LIMIT 1",
+    )
+    .bind(clave_hilo(hilo))
+    .fetch_optional(pool)
+    .await?;
+    let combinada = match &vieja {
+        Some((v,)) => combinar_foto_hilo(v, limpio),
+        None => limpio.to_string(),
+    };
     let tocadas = sqlx::query(
         "UPDATE mp_respuestas_cache SET excerpt_texto = $1, excerpt_crudo = $2 \
          WHERE thread_id = $3",
     )
-    .bind(limpio)
+    .bind(&combinada)
     .bind(crudo)
     .bind(clave_hilo(hilo))
     .execute(pool)
@@ -868,7 +906,7 @@ pub async fn releer_foto(
     )
     .bind(firma)
     .bind(clave_hilo(hilo))
-    .bind(limpio)
+    .bind(&combinada)
     .bind(crudo)
     .execute(pool)
     .await?;
@@ -1769,6 +1807,18 @@ mod pruebas {
         );
         assert!(r.is_err());
     }
+    /* [08AA-31] La foto fusiona sin perder al cliente: el snapshot nuevo
+     * solo trae lo propio (`Tú:`) y la foto vieja aporta la pregunta;
+     * el dedup exacto evita duplicar lo que ya estaba. */
+    #[test]
+    fn combinar_foto_hilo_conserva_cliente_ante_eco_propio() {
+        let vieja = "¿Sigue disponible?\nTú: Hola, por favor, déjame un número.";
+        let nueva = "Tú: Hola, por favor, déjame un número.";
+        assert_eq!(combinar_foto_hilo(vieja, nueva), vieja);
+        assert_eq!(combinar_foto_hilo("", nueva), nueva);
+        assert_eq!(combinar_foto_hilo(vieja, vieja), vieja);
+    }
+
     /* [08AA-28] Releer crea la fila solo-foto si falta (sin inventar
      * borrador) y la segunda vez solo refresca. Vivo con `pool_si_hay`;
      * sin `DATABASE_URL` se omite. */

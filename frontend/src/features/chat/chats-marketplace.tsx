@@ -11,6 +11,22 @@ function fechaCorta(iso: string): string {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString('es-VE', { dateStyle: 'short', timeStyle: 'short' });
 }
 
+/* [08AA-31] Lado por marca de texto: lo propio viaja como `Tú:`/`Tu:`/`You:`
+ * (backend 08AA-29); lo demás es del cliente (viaja sin etiqueta). Sin esta
+ * separación el excerpt se veía pegado en un solo bloque (hilo angelv). */
+function esLadoPropio(linea: string): boolean {
+  const marca = linea.trim().toLowerCase();
+  return marca.startsWith('tú:') || marca.startsWith('tu:') || marca.startsWith('you:');
+}
+
+/* [08AA-31] Quita la marca de lado (`Tú: msg` → `msg`): el Badge ya dice el
+ * lado, repetirlo en el texto duplica. Solo se usa con `esLadoPropio`. */
+function textoSinMarca(linea: string): string {
+  const i = linea.indexOf(':');
+  const resto = i < 0 ? '' : linea.slice(i + 1).trim();
+  return resto === '' ? linea.trim() : resto;
+}
+
 export function ChatsMarketplace() {
   const { lista, seleccion, error, recargar, elegir } = useChatsMarketplace();
 
@@ -63,9 +79,28 @@ export function ChatsMarketplace() {
             <li key={`${seleccion?.hilo}-${i}`} className="rounded-md border px-3 py-2 text-xs">
               {/* [08AA-5] La conversación se muestra una sola vez: las filas
                * vienen recientes-primero y cada snapshot trae el hilo
-               * completo, así que solo la primera pinta su excerpt. */}
+               * completo, así que solo la primera pinta su excerpt.
+               * [08AA-31] Como chat real: una línea por mensaje con su Badge
+               * (`Tú` lo propio, `Cliente` lo de ella/él) en vez del bloque
+               * pegado en un solo `span`. */}
               {i === 0 && f.excerpt_texto && (
-                <span className="block border-l-2 border-primary/40 pl-2 text-muted-foreground">{f.excerpt_texto}</span>
+                <span className="block space-y-1 border-l-2 border-primary/40 pl-2 text-muted-foreground">
+                  {f.excerpt_texto.split('\n').map((linea, j) => {
+                    const texto = linea.trim();
+                    if (texto === '') return null;
+                    const propia = esLadoPropio(texto);
+                    return (
+                      <span key={j} className="flex flex-wrap items-center gap-1">
+                        <Badge variant={propia ? 'default' : 'secondary'} className="text-[10px]">
+                          {propia ? 'Tú' : 'Cliente'}
+                        </Badge>
+                        <span className="min-w-0 flex-1 break-words">
+                          {propia ? textoSinMarca(texto) : texto}
+                        </span>
+                      </span>
+                    );
+                  })}
+                </span>
               )}
               <span className="mt-1 block">{f.respuesta}</span>
               <span className="mt-1 flex flex-wrap items-center gap-2 text-muted-foreground">
