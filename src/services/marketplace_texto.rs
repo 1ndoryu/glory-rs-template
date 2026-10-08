@@ -237,13 +237,21 @@ fn es_cabecera_hilo(linea: &str, nombre: Option<&str>, aviso: Option<&str>) -> b
     if let Some(a) = aviso.map(str::trim).filter(|a| !a.is_empty()) {
         let cuerpo = cuerpo_sin_marca(linea);
         if cuerpo.len() == linea.len() && cuerpo.chars().count() >= 12 {
-            let a_min = a.to_lowercase();
-            if a_min.contains(&cuerpo.to_lowercase()) {
+            let a_canon = canon_separadores(&a.to_lowercase());
+            let c_canon = canon_separadores(&cuerpo.to_lowercase());
+            if a_canon.contains(&c_canon) {
                 return true;
             }
         }
     }
     false
+}
+
+/// [08AA-17] El visor separa con ` - ` o ` · ` donde el título trae un
+/// espacio (`VEF0 - Casa en venta...` vs aviso `vef0 casa en venta...`):
+/// se canonizan a un espacio en ambos lados antes del `contains`.
+fn canon_separadores(s: &str) -> String {
+    s.replace(" - ", " ").replace(" · ", " ")
 }
 
 /// Minúsculas sin tildes para comparar cabeceras (`Kerley`/`kerley`,
@@ -284,7 +292,12 @@ const RUIDO_EXCERPT_PREFIJOS: &[&str] = &[
 /// Líneas completas del chrome del visor (comparación exacta).
 /// [08AA-16] +`Mensajes` (cabecera de la columna), la instrucción de las
 /// respuestas rápidas y `Enviado` (marca de mensaje propio enviado).
+/// [08AA-17] +`Marketplace` suelto, `Cargando...`/`Loading...`
+/// (placeholder de hilo aún cargando) del reporte Tina.
 const RUIDO_EXCERPT_EXACTO: &[&str] = &[
+    "Marketplace",
+    "Cargando...",
+    "Loading...",
     "View buyer",
     "More options",
     "Ver perfil",

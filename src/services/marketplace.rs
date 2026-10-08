@@ -1053,6 +1053,27 @@ mod pruebas {
     }
 
     #[test]
+    fn normalizar_hilo_tina_cargando_devuelve_vacio() {
+        /* [08AA-17] Reporte de ella 2026-10-08 (panel, hilo Tina): el
+         * hilo aún cargaba (`Cargando...`) y el visor repetía cabeceras
+         * (`Tina · Casa ...`, `Marketplace`, `VEF0 - Casa ...` con guion,
+         * `Escribe en Tina · ...`) sin ningún mensaje real. Todo es
+         * ruido → vacío (el handler conserva el original en ese caso). */
+        let hilo = "tina|VEF0 casa en venta en riberas del caroní, puerto ordaz";
+        let crudo = "Tina · Casa en venta en Riberas del Caroní, Puerto Ordaz\n\
+            Marketplace\n\
+            VEF0 - Casa en venta en Riberas del Caroní, Puerto Ordaz\n\
+            View buyer\n\
+            More options\n\
+            Mensajes\n\
+            Cargando...\n\
+            Escribir mensaje\n\
+            Escribe en Tina · Casa en venta en Riberas del Caroní, Puerto Ordaz\n\
+            Aa";
+        assert!(normalizar_excerpt_hilo(hilo, crudo).is_empty());
+    }
+
+    #[test]
     fn precio_del_aviso_extrae_moneda_antes_o_despues() {
         assert_eq!(
             precio_del_aviso("town house en venta en las peonías 125.000$"),
@@ -1408,24 +1429,23 @@ mod pruebas {
     }
 
     #[tokio::test]
-    async fn corregir_rechaza_vacio_y_contacto() {
+    async fn corregir_rechaza_vacio_y_acepta_contacto() {
+        /* [08AA-14] Sin matriz negativa por decisión de ella: el texto de
+         * la dueña (incluido su contacto) pasa tal cual; solo el vacío
+         * se rechaza. (Antes este test exigía rechazar el contacto.) */
         let Some(pool) = pool_si_hay() else { return };
         let (firma, ph, ch) = (clave_azar(), clave_azar(), clave_azar());
         assert!(corregir_cache(&pool, &firma, &ph, &ch, "").await.is_err());
         assert!(
             corregir_cache(&pool, &firma, &ph, &ch, "llámame al 0412 1234567")
                 .await
-                .is_err()
+                .is_ok()
         );
-        assert!(
-            corregir_cache(&pool, &firma, &ph, &ch, "escríbeme a a@b.com")
-                .await
-                .is_err()
+        assert_eq!(
+            buscar_cache(&pool, &firma, &ph, &ch).await.expect("busca"),
+            Some(("llámame al 0412 1234567".to_string(), true))
         );
-        assert!(buscar_cache(&pool, &firma, &ph, &ch)
-            .await
-            .expect("busca")
-            .is_none());
+        borrar_cache(&pool, &firma, &ph, &ch).await.expect("limpia");
     }
 
     /* Expiración (DoD E3): un token con `exp` pasado no decodifica — la misma
