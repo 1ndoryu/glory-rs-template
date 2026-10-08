@@ -51,9 +51,14 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   (insensible a mayúsculas donde sea seguro) + dedup tolerante a `·`/`-`
   + test con ese excerpt exacto + regenerar la fila y verificar en el
   panel. Pregunta abierta a ella: además de limpio, ¿quiere que el
-  excerpt se vea como chat (burbujas por mensaje) o basta el texto
-  limpio? Lo segundo es cambio mayor (hoy solo se guarda
-  `excerpt_texto` plano).
+   excerpt se vea como chat (burbujas por mensaje) o basta el texto
+   limpio? Lo segundo es cambio mayor (hoy solo se guarda
+   `excerpt_texto` plano).
+   Verificado 2026-10-08 (filtro pegado sin saltos): `segmentar_pegado()`
+   + extras ES en `RUIDO_EXCERPT_*` (`marketplace_texto.rs`); testigo
+   wilmery 554 → `Hola. ¿Sigue estando disponible?` (32) en vivo
+   (`/releer` → `actualizado:true`; crudo 554 guardado). Gate 138/138.
+   Queda abierta la 08AA-8b y la pregunta del chat.
 - **08AA-8b — El excerpt no incluye la respuesta de ella (reportado por
   ella 2026-10-08: respondió en Messenger y su mensaje no aparece):**
   dos causas confirmadas en código. (1) El float sí distingue lados

@@ -1139,6 +1139,23 @@ mod pruebas {
     }
 
     #[test]
+    fn normalizar_hilo_wilmery_pegado_deja_solo_la_pregunta() {
+        /* [08AA-8] Testigo exacto en BD
+         * (`wilmery|apartamento amoblado 3 hab. en vista hermosa, puerto
+         * ordaz.`, `length(excerpt_texto)=554`): el puente aplana el DOM a
+         * una sola línea pegada (`OrdazDetalles`, `WilmeryHola.`,
+         * `disponible?Presionar`, `mensajeEscribe`) y el filtro por líneas
+         * no tocaba nada. Solo la pregunta del cliente sobrevive (la
+         * duplicada se colapsa). */
+        let hilo = "wilmery|apartamento amoblado 3 hab. en vista hermosa, puerto ordaz.";
+        let crudo = "También es miembro de CASAS y APARTAMENTOS en Puerto OrdazDetalles del compradorPresionar Enter, Mensaje enviado: 3:18 pm por: WilmeryHola. ¿Sigue estando disponible?Presionar Enter, Mensaje enviado 3:18 pm por Wilmery: Hola. ¿Sigue estando disponible?Envía una respuesta rápidaToca una respuesta para enviársela al comprador.Sí. ¿Te interesa?Lo estoy mirando. Te avisaré.Lo siento, no está disponible.Presionar Enter, Mensaje enviado: 3:18 pm por: WilmeryEscribir mensajeEscribe en Wilmery · Apartamento amoblado 3 hab. en Vista Hermosa, Puerto Ordaz.Aa";
+        assert_eq!(
+            normalizar_excerpt_hilo(hilo, crudo),
+            "Hola. ¿Sigue estando disponible?"
+        );
+    }
+
+    #[test]
     fn clave_hilo_deshace_precio_inyectado_y_respeta_lo_demas() {
         /* [08AA-18] El puente (07AA-11) manda `tina|$43.000 vef0...` pero
          * la cifra parpadea entre llamadas: la BD solo ve la forma

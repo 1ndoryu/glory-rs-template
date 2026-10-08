@@ -151,11 +151,37 @@ pub fn normalizar_excerpt_con_hilo(
     nombre: Option<&str>,
     aviso: Option<&str>,
 ) -> String {
-    let mut fuera: Vec<&str> = Vec::new();
+    /* [08AA-8] El puente aplana el DOM a texto pegado sin saltos (testigo
+     * wilmery 554: una sola línea): el filtro por líneas no veía nada.
+     * Se segmenta antes de filtrar (un `\n` antes de cada prefijo conocido
+     * y aislando las líneas exactas largas + rápidas) y se pela la
+     * atribución `Mensaje enviado ... por [:] Nombre` pegada al mensaje
+     * (con el `nombre` del hilo se separa `WilmeryHola.` sin separador). */
+    let troceado = segmentar_pegado(texto);
+    let mut fuera: Vec<String> = Vec::new();
     let mut primera = true;
-    for linea in texto.lines() {
-        let t = linea.trim();
-        let duplicada = fuera.last().is_some_and(|&u| u == t);
+    let mut marca_pendiente: Option<&str> = None;
+    for linea in troceado.lines() {
+        let t = linea
+            .trim()
+            .trim_start_matches([',', '.', ':', ';', '·'])
+            .trim();
+        /* La segmentación puede dejar la marca de rol colgada
+         * (`Cliente:` + rápida en la línea siguiente): se reata al
+         * segmento siguiente para que el filtro la vea con su marca y la
+         * conserve como mensaje real. */
+        if t == "Cliente:" || t == "Dueña:" {
+            marca_pendiente = Some(t);
+            continue;
+        }
+        let compuesto;
+        let mut t = t;
+        if let Some(marca) = marca_pendiente.take() {
+            compuesto = format!("{marca} {t}");
+            t = compuesto.as_str();
+        }
+        let t = quitar_prefijo_enviado(t, nombre).trim();
+        let duplicada = fuera.last().is_some_and(|u| u == t);
         if t.is_empty() || duplicada {
             continue;
         }
@@ -171,9 +197,154 @@ pub fn normalizar_excerpt_con_hilo(
         if es_cabecera_hilo(t, nombre, aviso) {
             continue;
         }
-        fuera.push(t);
+        fuera.push(t.to_string());
     }
     fuera.join("\n")
+}
+
+/// [08AA-8] Parte el texto pegado del puente para que el filtro por líneas
+/// lo vea: `\n` antes de cada prefijo de ruido (conserva la atribución
+/// `Mensaje enviado ...` pegada al mensaje para pelarla después) y aísla
+/// las líneas exactas largas + respuestas rápidas. Las exactas cortas
+/// (`Aa`, `Visto`, `Enviado`) no se tocan: partirlas rompería mensajes
+/// reales (`He visto...`); `Toca una respuesta` / `Tap a reply` tampoco:
+/// son prefijo de la instrucción completa y partirlas dejaría la cola
+/// (`para enviársela al comprador.`) como supuesto mensaje.
+fn segmentar_pegado(texto: &str) -> String {
+    let mut fuera = texto.to_string();
+    let mut marcadores: Vec<(&&str, bool)> = RUIDO_EXCERPT_PREFIJOS
+        .iter()
+        .map(|m| (m, true))
+        .chain(
+            RUIDO_EXCERPT_EXACTO
+                .iter()
+                .filter(|m| {
+                    m.chars().count() >= 8 && **m != "Toca una respuesta" && **m != "Tap a reply"
+                })
+                .map(|m| (m, false)),
+        )
+        .chain(RESPUESTAS_RAPIDAS_FB.iter().map(|m| (m, false)))
+        .collect();
+    marcadores.sort_by_key(|a| std::cmp::Reverse(a.0.len()));
+    for (m, es_prefijo) in marcadores {
+        if fuera.contains(*m) {
+            let corte = if es_prefijo {
+                format!("\n{m}")
+            } else {
+                format!("\n{m}\n")
+            };
+            fuera = fuera.replace(*m, &corte);
+        }
+    }
+    fuera
+}
+
+/// [08AA-8] Pela la atribución del visor al inicio del segmento
+/// (`Mensaje enviado: 3:18 pm por: Wilmery`, `Message sent ... by ...`):
+/// devuelve el mensaje que trae pegado o vacío si era solo atribución.
+/// Sin `regex`: escaneo manual como `precio_del_aviso`.
+fn quitar_prefijo_enviado<'a>(linea: &'a str, nombre: Option<&str>) -> &'a str {
+    let lower = linea.to_lowercase();
+    let marca = if lower.starts_with("mensaje enviado") {
+        "mensaje enviado".len()
+    } else if lower.starts_with("message sent") {
+        "message sent".len()
+    } else {
+        return linea;
+    };
+    let mut resto = linea[marca..].trim_start_matches([' ', ':', ',', '.', '\u{a0}', '\u{202f}']);
+    resto = saltar_hora_fb(resto);
+    resto = resto.trim_start_matches([' ', ':', ',', '.']).trim_start();
+    let palabra = |w: &str| {
+        let l = resto.to_lowercase();
+        l.starts_with(w)
+            && l[w.len()..]
+                .chars()
+                .next()
+                .is_none_or(|c| !c.is_alphabetic())
+    };
+    let con_por = palabra("por") || palabra("by");
+    if con_por {
+        let n = if resto.to_lowercase().starts_with("por") {
+            3
+        } else {
+            2
+        };
+        resto = resto[n..]
+            .trim_start_matches([' ', ':', ',', '.'])
+            .trim_start();
+        if let Some(nom) = nombre.map(str::trim).filter(|n| !n.is_empty()) {
+            if let Some(r) = cortar_nombre(resto, nom) {
+                return r.trim_start_matches([' ', ':', ',', '.']).trim_start();
+            }
+        }
+        resto = saltar_palabra(resto)
+            .trim_start_matches([' ', ':', ',', '.'])
+            .trim_start();
+    }
+    resto
+}
+
+/// Salta la hora de la atribución (`3:18 pm`) sin comerse el `por`/`by`
+/// que viene después (la `p` colisiona con `pm`).
+fn saltar_hora_fb(s: &str) -> &str {
+    let mut resto = s;
+    while !resto.is_empty() {
+        let l = resto.to_lowercase();
+        if l.starts_with("por")
+            && l["por".len()..]
+                .chars()
+                .next()
+                .is_none_or(|c| !c.is_alphabetic())
+        {
+            break;
+        }
+        if l.starts_with("by")
+            && l["by".len()..]
+                .chars()
+                .next()
+                .is_none_or(|c| !c.is_alphabetic())
+        {
+            break;
+        }
+        let c = resto.chars().next().unwrap_or(' ');
+        if c.is_ascii_digit() || " :,./-\u{a0}\u{202f}apmAPM".contains(c) {
+            resto = &resto[c.len_utf8()..];
+        } else {
+            break;
+        }
+    }
+    resto
+}
+
+/// Corta el `nombre` del hilo al inicio de `resto` (insensible a caja y
+/// tildes: el `thread_id` viaja sin tildes y el visor puede traerlas).
+fn cortar_nombre<'a>(resto: &'a str, nombre: &str) -> Option<&'a str> {
+    let canon = sin_tilde_min(nombre);
+    let n_chars = nombre.chars().count();
+    let toma: String = resto.chars().take(n_chars).collect();
+    if sin_tilde_min(&toma) == canon {
+        let idx = resto
+            .char_indices()
+            .nth(n_chars)
+            .map_or(resto.len(), |(i, _)| i);
+        Some(resto[idx..].trim_start())
+    } else {
+        None
+    }
+}
+
+/// Salta una palabra (el nombre cuando el hilo no lo dio): solo letras,
+// tildes y espacios, tope 30 caracteres.
+fn saltar_palabra(s: &str) -> &str {
+    let mut bytes = 0;
+    for (n, (i, c)) in s.char_indices().enumerate() {
+        if n >= 30 || !(c.is_alphabetic() || c == ' ') {
+            break;
+        }
+        bytes = i + c.len_utf8();
+    }
+    s[bytes..].trim_start()
 }
 
 /// [08AA-16] Cola de un mensaje cortado a mitad de palabra en la primera
@@ -275,12 +446,22 @@ fn sin_tilde_min(s: &str) -> String {
 }
 
 /// Prefijos literales de ruido de Facebook (ES + EN).
+/// [08AA-8] +cabeceras ES del hilo wilmery (testigo 554 en BD, texto
+/// pegado): `También es miembro de...`, `Detalles del comprador` /
+/// `Detalles de la conversación` y `Ver perfil...` nunca son contenido.
 const RUIDO_EXCERPT_PREFIJOS: &[&str] = &[
     "Si te vas a reunir con alguien",
     "If you're meeting someone",
     "If you are meeting someone",
     "Meta podría usar tecnología",
     "Meta may use technology",
+    "También es miembro de",
+    "Also a member of",
+    "Detalles de",
+    "Detalles del",
+    "Details of",
+    "Ver perfil",
+    "View profile",
     "Escribe en ",
     "Write to ",
     "Presionar Enter",
@@ -301,6 +482,10 @@ const RUIDO_EXCERPT_EXACTO: &[&str] = &[
     "View buyer",
     "More options",
     "Ver perfil",
+    "Ver perfil del comprador",
+    "Detalles del comprador",
+    "Detalles de la conversación",
+    "Buyer details",
     "Mensajes",
     "Enviar mensaje",
     "Escribir mensaje",
