@@ -37,13 +37,14 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   `marketplace.rs` de la otra sesión). No toca `handlers/marketplace.rs`,
   `services/marketplace.rs`, `tope_uso.rs` ni migraciones (08AA-21).
 - **08AA-21 — Guardar excerpt crudo junto al limpio (pedido por ella
-  2026-10-08, en curso):** el filtro por líneas no puede calibrarse a
-  ciegas: el puente aplana el DOM a texto y lo que llega (`OrdazDetalles`,
-  `Mensaje enviado 3:18 pm por: Wilmery` pegados) no se ve en ningún lado.
-  Alcance: columna `excerpt_crudo TEXT` (migración `...32`), `guardar` /
-  `reemplazar` / `releer` guardan el texto tal como llegó además del
-  limpio; con el crudo del hilo wilmery a la vista se corrige el filtro
-  (08AA-8) en el mismo bloque.
+  2026-10-08, verificado vivo 2026-10-08, commit `e50839a1`):** columna
+  `excerpt_crudo TEXT` (migración `...32`, NULL en filas viejas);
+  `borrador`/`regenerar`/`releer` guardan el texto tal como llegó además
+  del limpio (struct `FotoHilo`: clippy no admite 8 args). Verificado:
+  `/borrador` sintético con ruido pegado estilo wilmery → `fuente=ia`
+  y `excerpt_texto` = `excerpt_crudo` = texto enviado — confirma que sin
+  saltos de línea el filtro no toca nada (pista para el 08AA-8).
+  Fila de prueba borrada, `wilmery` intacta.
 - **08AA-8 — Excerpt Marketplace sigue sucio con chrome en español
   (reportado por ella 2026-10-08 con captura, hilo andreina):** el 08AA-5
   calibró con el fixture (chrome en inglés) pero el hilo real trae
