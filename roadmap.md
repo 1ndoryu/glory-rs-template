@@ -96,19 +96,6 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
    su propia línea) aplicado tras `asegurar_contacto`, con tests.
   **Estado 2026-10-08:** implementado, gate verde (133 tests);
    verificación visual del texto pendiente del proveedor IA.
-- **08AA-14 — Quitar la matriz negativa del todo (autorizado por ella
-  2026-10-08, en curso):** el borrador caía a `Lo reviso y te confirmo
-  precio/entrega por aquí` por `WARN borrador mp: matriz negativa
-  (telefono), va fallback` (`C:\tmp\mn-backend.log` 06:36:18Z) aunque el
-  teléfono era el fijo `CONTACTO_TEL/WA`. Alcance: eliminar
-  `matriz_negativa*` + `MATRIZ_NEGATIVA_VERSION` + chequeo en
-  `corregir_cache` + tests, dejando `asegurar_contacto` como única
-  garantía del contacto. El texto (propio o de la IA) pasa tal cual.
-  **Estado 2026-10-08:** implementado, gate verde (135 tests),
-  verificado en vivo con binario nuevo: `POST /borrador` kerley
-  07:14Z → `fuente=reserva` sin ningún `matriz negativa` en el log
-  (último WARN 06:36:18Z, binario viejo); `matriz_negativa` ya no
-  existe en el código.
 - **08AA-15 — Borrador breve 3 párrafos con nombre corto (pedido por
   ella 2026-10-08, en curso):** ejemplo suyo `Hola Karely, buenas
   noches, el Apartamento de Residencias Caroni (nombre corto) esta
@@ -118,27 +105,6 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   `src/handlers/marketplace.rs`.
   **Estado 2026-10-08:** prompt aplicado en código; verificación viva
   pendiente (el proveedor IA devuelve respuesta sin texto).
-- **08AA-16 — Excerpt ES: cabeceras Kerley, fragmento `ponible?`,
-  marcas de tiempo y sugeridas FB (pedido por ella 2026-10-08, en
-  curso):** testigos exactos en BD (`kerley|VEF0 apartamento
-  residencias rio aro plaza puerto ordaz` y `tina|VEF0 casa en venta en
-  riberas del caroní, puerto ordaz`): cabecera `amento Residencias Rio
-  Aro Plaza Puerto Ordaz` + `Mensajes` + `Kerley · Apartamento
-  Residencias Rio Aro Plaza Puerto Ordaz` + `Kerley` sueltos,
-  fragmento `ponible?` (corte a mitad de palabra del float),
-  `2:43 am`, `Enviado`, y sugeridas `Toca una respuesta para
-  enviársela al comprador.` / `Lo estoy mirando. Te avisaré.` / `Lo
-  siento, no está disponible.`. Alcance backend: literales ES a
-  `RUIDO_EXCERPT_*`, filtro de marcas de tiempo `H:MM am/pm`, filtro
-  de cabeceras del hilo (nombre del comprador + eco del título, con
-  contexto de `thread_id`) y gota truncada inicial; tests con los
-  excerpts exactos. Límite conocido: la atribución Cliente/Dueña
-  depende del float con pestaña visible (08AA-8b); sin marcas no se
-  puede inventar.
-  **Estado 2026-10-08:** implementado, gate verde; verificado en vivo:
-  `POST /releer` kerley con excerpt crudo exacto → `actualizado:true`,
-  `excerpt_texto=¿Sigue disponible?` (andamio eliminado con `DELETE`
-  después).
 - **08AA-6 — Barrido progresivo baseline sentinel (activa 2026-10-08, no
   urgente)**: el tablero marca ~518 en MN (26E/483A preexistentes, verificados
   2026-10-08: ningún hallazgo nuevo de 08AA-1/3/4; el conteo incluso bajó 9).
