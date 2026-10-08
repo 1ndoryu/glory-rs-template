@@ -85,7 +85,9 @@ pub async fn revisar_tope(pool: &PgPool) -> Result<bool, String> {
  * único SELECT (misma foto instantánea, sin carrera entre lecturas;
  * antes eran 4 `await` directos y saltaba `sqlite-carga-N-consultas`).
  * La validación (`trim`/`parse`, default) sigue en Rust, idéntica. */
-async fn leer_estado_uso(pool: &PgPool) -> Result<(String, Option<String>, Option<String>, i64), String> {
+async fn leer_estado_uso(
+    pool: &PgPool,
+) -> Result<(String, Option<String>, Option<String>, i64), String> {
     sqlx::query_as(
         "SELECT CURRENT_DATE::TEXT, \
           (SELECT value FROM agent_config WHERE key = $1), \

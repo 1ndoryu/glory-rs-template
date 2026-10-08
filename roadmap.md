@@ -26,6 +26,18 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 
 ## Pendientes
 
+- **08AA-32 — Extraer 5 hooks `componente-sin-hook` (cola de 08AA-26, CERRADA 2026-10-08):**
+  `useHiloMensajes`, `useSesionesWhatsapp`, `usePestanaIA`, `useTarjetaFotoMejora`,
+  `useModalDescargarFotos`; componentes con solo JSX + helpers puros.
+  Evidencia: `tsc -b` 0 errores; sentinel `frontend/src` 0 `sin-hook`
+  (85→79 findings, 0 nuevos); gate `0E/435W/0H` (sin `componente-sin-hook`).
+- **08AA-30 — Unificar `thread_id` borrador vs releer (hallazgo 2026-10-08
+  verificando 08AA-28 en vivo):** `borrador` guarda `thread_id` literal
+  (`handlers/marketplace.rs:197`) mientras `releer`/`buscar` usan
+  `clave_hilo()` (`:363`): el hilo Yusmelis quedó en 2 filas (`...puerto
+  ordaz.` con borrador viejo 320 + `...puerto ordaz` solo-foto nueva 353).
+  Decidir forma canónica y migrar/fusionar (ver filas en
+  `glory_backend_inmobiliaria.mp_respuestas_cache`).
 - **08AA-26 — Reparar reglas Sentinel con FPs documentados (pedido por ella
   2026-10-08 tras 08AA-23; reglas CERRADAS 2026-10-08):** gate `0E/439W/0H`,
   7 reglas del alcance a 0 (`ruta-post`, `path-join`, `key-index`, `promise`,
