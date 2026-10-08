@@ -2,17 +2,14 @@
 //!
 //! Extraído de `marketplace.rs` (límite 700): schema M3 v1
 //! (`BorradorRequest` y tipos), validación (`validar_borrador`), limpieza
-//! del excerpt (`normalizar_excerpt`), matriz negativa (`matriz_negativa`),
-//! precio del aviso (`precio_del_aviso`) y formato de precio
-//! (`precio_publico`). `marketplace.rs` conserva strip de ficha, contacto,
+//! del excerpt (`normalizar_excerpt`), precio del aviso (`precio_del_aviso`)
+//! y formato de precio (`precio_publico`). `marketplace.rs` conserva strip de ficha, contacto,
 //! párrafos, títulos, caché y tokens, y re-exporta estos nombres para no
 //! mover sus usos externos (handlers, utoipa, sombra).
 
 use chrono::DateTime;
 use serde::Deserialize;
 use utoipa::ToSchema;
-
-use super::marketplace::{CONTACTO_TEL, CONTACTO_WA};
 
 /// `$43.000`: miles con punto, sin decimales, solo con strings (sin casts).
 #[must_use]
@@ -134,17 +131,139 @@ fn es_hora_caracas(hora: &str) -> bool {
 /// Riberas del Caroní). Se conserva el orden y las marcas
 /// `Cliente:`/`Dueña:` que el prompt necesita; si solo había ruido se
 /// devuelve vacío y el handler conserva el original (nunca se guarda vacío).
+/// Sin contexto del hilo equivale a `normalizar_excerpt_con_hilo` con
+/// `(None, None)`; los handlers pasan nombre y aviso del `thread_id`.
 #[must_use]
 pub fn normalizar_excerpt(texto: &str) -> String {
+    normalizar_excerpt_con_hilo(texto, None, None)
+}
+
+/// [08AA-16] Variante con contexto del hilo: `nombre` (comprador, de
+/// `nombre_de_thread`) filtra las cabeceras que el visor repite (`Kerley`,
+/// `Kerley · Apartamento ...`); `aviso` (título FB del hilo) filtra el eco
+/// del título (a veces recortado por la izquierda por el corte del float:
+/// `amento Residencias Rio Aro ...`). Además quita marcas de tiempo
+/// (`2:43 am`) y la cola truncada de la primera línea (`ponible?` de
+/// `¿Sigue disponible?`: el float corta por carácter, no por línea).
+#[must_use]
+pub fn normalizar_excerpt_con_hilo(
+    texto: &str,
+    nombre: Option<&str>,
+    aviso: Option<&str>,
+) -> String {
     let mut fuera: Vec<&str> = Vec::new();
+    let mut primera = true;
     for linea in texto.lines() {
         let t = linea.trim();
         let duplicada = fuera.last().is_some_and(|&u| u == t);
-        if !t.is_empty() && !es_ruido_excerpt(t) && !duplicada {
-            fuera.push(t);
+        if t.is_empty() || duplicada {
+            continue;
         }
+        if primera {
+            primera = false;
+            if es_cola_truncada(t) {
+                continue;
+            }
+        }
+        if es_ruido_excerpt(t) || es_marca_tiempo_fb(t) {
+            continue;
+        }
+        if es_cabecera_hilo(t, nombre, aviso) {
+            continue;
+        }
+        fuera.push(t);
     }
     fuera.join("\n")
+}
+
+/// [08AA-16] Cola de un mensaje cortado a mitad de palabra en la primera
+/// línea (testigo: `ponible?`). Heurística estrecha: sin espacios, empieza
+/// en minúscula, termina en `?`/`!` y ≤15 caracteres. Un mensaje completo
+/// corto (`Hola`, `Sí`, `Gracias`) empieza en mayúscula y se conserva.
+/// Fix canónico pendiente: que el float corte por línea, no por carácter.
+fn es_cola_truncada(linea: &str) -> bool {
+    let n = linea.chars().count();
+    n > 0
+        && n <= 15
+        && !linea.contains(' ')
+        && linea.starts_with(|c: char| c.is_lowercase())
+        && (linea.ends_with('?') || linea.ends_with('!'))
+}
+
+/// [08AA-16] Marcas de tiempo del visor (`2:43 am`, `11:30 pm`): separan
+/// mensajes, no son contenido. Formato exacto `H:MM am|pm` con hora 1-12
+/// y minutos 00-59 (sin `regex` en el árbol: escaneo manual como
+/// `precio_del_aviso`).
+fn es_marca_tiempo_fb(linea: &str) -> bool {
+    let t = linea.trim().to_lowercase();
+    let hora = t
+        .strip_suffix("am")
+        .or_else(|| t.strip_suffix("pm"))
+        .map_or("", str::trim_end);
+    let mut partes = hora.split(':');
+    match (partes.next(), partes.next(), partes.next()) {
+        (Some(h), Some(m), None) => {
+            h.len() <= 2
+                && m.len() == 2
+                && h.bytes().all(|b| b.is_ascii_digit())
+                && m.bytes().all(|b| b.is_ascii_digit())
+                && h.parse::<u32>().is_ok_and(|h| (1..=12).contains(&h))
+                && m.parse::<u32>().is_ok_and(|m| m <= 59)
+        }
+        _ => false,
+    }
+}
+
+/// [08AA-16] Cabeceras del visor que repiten metadatos del hilo, nunca
+/// contenido: el nombre del comprador solo (`Kerley`, insensible a
+/// caja y tildes) o como prefijo con `·` (`Kerley · Apartamento ...`),
+/// y el eco del título del aviso (`amento Residencias Rio Aro ...`).
+/// El eco del título solo vale sin marca de rol: una línea atribuida
+/// (`Cliente:`/`Dueña:`) es mensaje real aunque cite el título.
+fn es_cabecera_hilo(linea: &str, nombre: Option<&str>, aviso: Option<&str>) -> bool {
+    if let Some(n) = nombre.map(str::trim).filter(|n| !n.is_empty()) {
+        let canon = sin_tilde_min(n);
+        if sin_tilde_min(linea) == canon {
+            return true;
+        }
+        let prefijo = format!("{n} · ");
+        if linea
+            .get(..prefijo.len())
+            .is_some_and(|h| sin_tilde_min(h) == sin_tilde_min(&prefijo))
+        {
+            return true;
+        }
+    }
+    if let Some(a) = aviso.map(str::trim).filter(|a| !a.is_empty()) {
+        let cuerpo = cuerpo_sin_marca(linea);
+        if cuerpo.len() == linea.len() && cuerpo.chars().count() >= 12 {
+            let a_min = a.to_lowercase();
+            if a_min.contains(&cuerpo.to_lowercase()) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Minúsculas sin tildes para comparar cabeceras (`Kerley`/`kerley`,
+/// `Andréina`/`Andreina`): el `thread_id` viaja sin tildes y el visor
+/// puede traerlas. Réplica local de `quitar_tilde` (privada de
+/// `marketplace.rs`) para no cruzar módulos por una comparación.
+fn sin_tilde_min(s: &str) -> String {
+    s.to_lowercase()
+        .chars()
+        .map(|c| match c {
+            'á' | 'à' | 'ä' | 'â' => 'a',
+            'é' | 'è' | 'ë' | 'ê' => 'e',
+            'í' | 'ì' | 'ï' | 'î' => 'i',
+            'ó' | 'ò' | 'ö' | 'ô' => 'o',
+            'ú' | 'ù' | 'ü' | 'û' => 'u',
+            'ñ' => 'n',
+            'ç' => 'c',
+            otro => otro,
+        })
+        .collect()
 }
 
 /// Prefijos literales de ruido de Facebook (ES + EN).
@@ -163,19 +282,24 @@ const RUIDO_EXCERPT_PREFIJOS: &[&str] = &[
 ];
 
 /// Líneas completas del chrome del visor (comparación exacta).
+/// [08AA-16] +`Mensajes` (cabecera de la columna), la instrucción de las
+/// respuestas rápidas y `Enviado` (marca de mensaje propio enviado).
 const RUIDO_EXCERPT_EXACTO: &[&str] = &[
     "View buyer",
     "More options",
     "Ver perfil",
+    "Mensajes",
     "Enviar mensaje",
     "Escribir mensaje",
     "Aa",
     "Ver más consejos de seguridad",
     "See more safety tips",
     "Toca una respuesta",
+    "Toca una respuesta para enviársela al comprador.",
     "Tap a reply",
     "Envía una respuesta rápida",
     "Send a quick reply",
+    "Enviado",
     "Visto",
     "Seen",
 ];
@@ -183,10 +307,13 @@ const RUIDO_EXCERPT_EXACTO: &[&str] = &[
 /// Respuestas rápidas sugeridas por Facebook: solo se filtran sin marca de
 /// rol (el chip centrado no trae `Cliente:`/`Dueña:`). Si el cliente las
 /// escribe de verdad, llevan marca y se conservan.
+/// [08AA-16] +las dos sugeridas ES del hilo Kerley (testigo en BD).
 const RESPUESTAS_RAPIDAS_FB: &[&str] = &[
     "Sí. ¿Te interesa?",
     "Sí. ¿Sigue disponible?",
     "¿Cuál es el precio?",
+    "Lo estoy mirando. Te avisaré.",
+    "Lo siento, no está disponible.",
     "Yes. Are you interested?",
     "Yes. Is this still available?",
     "What is the price?",
@@ -213,50 +340,6 @@ fn es_ruido_excerpt(linea: &str) -> bool {
     }
     let sin_marca = cuerpo.len() == linea.len();
     sin_marca && RESPUESTAS_RAPIDAS_FB.contains(&cuerpo)
-}
-
-/// Matriz negativa v2 sobre el borrador generado: teléfono (7+ dígitos),
-/// email o URL → la IA no entrega contacto salvo el fijo de [07AA-8]
-/// (`CONTACTO_TEL` + `CONTACTO_WA` literales; lo demás sigue bloqueado).
-/// Con `precio` conocido (v2, [07AA-9]): el literal citado y sus dígitos no
-/// cuentan — si no, "125.000$" + "3 habitaciones" sumaría 7 y caería como
-/// "teléfono". Compromiso: un teléfono alucinado que contenga los dígitos
-/// exactos del precio pasaría; el resto sigue bloqueado.
-/// Devuelve el motivo o `None` si pasa.
-#[must_use]
-pub fn matriz_negativa(texto: &str) -> Option<&'static str> {
-    matriz_negativa_con_precio(texto, None)
-}
-
-/// Variante con precio del aviso eximido (ver `matriz_negativa`).
-#[must_use]
-pub fn matriz_negativa_con_precio(texto: &str, precio: Option<&str>) -> Option<&'static str> {
-    let min = texto.to_lowercase();
-    let mut limpio = min
-        .replace(&CONTACTO_WA.to_lowercase(), "")
-        .replace(&CONTACTO_TEL.to_lowercase(), "");
-    let mut digitos_conocidos = String::new();
-    if let Some(p) = precio {
-        let pl = p.to_lowercase();
-        if limpio.contains(&pl) {
-            limpio = limpio.replace(&pl, "");
-        }
-        digitos_conocidos = pl.chars().filter(char::is_ascii_digit).collect();
-    }
-    if limpio.contains('@') {
-        return Some("email");
-    }
-    if limpio.contains("http") || limpio.contains("wa.me") || limpio.contains("www.") {
-        return Some("url");
-    }
-    let mut digitos: String = limpio.chars().filter(char::is_ascii_digit).collect();
-    if !digitos_conocidos.is_empty() {
-        digitos = digitos.replace(&digitos_conocidos, "");
-    }
-    if digitos.len() >= 7 {
-        return Some("telefono");
-    }
-    None
 }
 
 /// [07AA-9] Precio publicado en el título del aviso (`125.000$`, `$95.000`,

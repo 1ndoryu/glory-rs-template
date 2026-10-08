@@ -15,12 +15,12 @@ use crate::repositories::InmuebleRepository;
  * re-exporta para no mover sus usos externos (`lib.rs`, handlers, sombra). */
 pub use super::marketplace_vuelo::{Generado, Singleflight};
 
-/* [08AA-8] Texto puro (schema, excerpt, matriz, precio) vive en su dominio
+/* [08AA-8] Texto puro (schema, excerpt, precio) vive en su dominio
  * (`marketplace_texto`); se re-exporta para no mover sus usos externos
  * (handlers, utoipa, sombra, tests). */
 pub use super::marketplace_texto::{
-    matriz_negativa, matriz_negativa_con_precio, normalizar_excerpt, precio_del_aviso,
-    precio_publico, validar_borrador, BorradorRequest, ExcerptIn, ExtrasIn, Largo, Tono,
+    normalizar_excerpt, normalizar_excerpt_con_hilo, precio_del_aviso, precio_publico,
+    validar_borrador, BorradorRequest, ExcerptIn, ExtrasIn, Largo, Tono,
 };
 /* Solo tests (`super::es_hex64` en `pruebas`): fuera de `cfg(test)` sería
  * import sin uso y rompería `clippy -D warnings` (mismo patrón que `ia.rs`). */
@@ -29,13 +29,12 @@ use super::marketplace_texto::es_hex64;
 
 /// Versión del strip aceptada (`strip_vN` del plan: hoy solo v1).
 pub const STRIP_VERSION: &str = "v1";
-/// Versión de la matriz negativa aplicada al borrador generado.
-pub const MATRIZ_NEGATIVA_VERSION: u8 = 2;
-/// Fallback exacto cuando no hay ficha, falla la IA o salta la matriz.
+/// Fallback exacto cuando no hay ficha o falla la IA.
 pub const FALLBACK_BORRADOR: &str = "Lo reviso y te confirmo precio/entrega por aquí";
 /// [07AA-8] Contacto fijo de los borradores (decisión de ella 2026-10-07):
-/// la IA no lo inventa, el prompt lo exige literal y la matriz exime
-/// exactamente estas dos cadenas (el resto de contactos sigue bloqueado).
+/// la IA no lo inventa, el prompt lo exige literal y `asegurar_contacto`
+/// lo agrega si falta. [08AA-14] Sin matriz negativa por decisión de ella
+/// 2026-10-08: el texto (propio o de la IA) pasa tal cual.
 pub const CONTACTO_TEL: &str = "0424 9208855";
 pub const CONTACTO_WA: &str = "https://wa.me/584249208855";
 
@@ -180,7 +179,7 @@ pub fn strip_ficha_para_prompt(ficha: &InmuebleRow, strip: &str) -> Result<Promp
  * `validar_borrador` y `normalizar_excerpt` viven en `marketplace_texto.rs`
  * (re-export arriba para usos externos e internos). */
 
-/* [08AA-8] `normalizar_excerpt` + `matriz_negativa*` viven en
+/* [08AA-8] `normalizar_excerpt*` vive en
  * `marketplace_texto.rs` (re-export arriba). */
 
 /// [07AA-10] Nombre del cliente desde el hilo (`alejandro|casa en venta...`
@@ -223,6 +222,19 @@ pub fn aviso_fb_de_thread(thread_id: &str) -> Option<String> {
         return None;
     }
     Some(aviso.to_string())
+}
+
+/// [08AA-16] Normaliza el excerpt con contexto del hilo: nombre del
+/// comprador y título del aviso salen del `thread_id`
+/// (`comprador|aviso`). Lo usan `borrador`, `regenerar` y `releer` para
+/// que el backend guarde la foto limpia del hilo, no el chrome del visor.
+#[must_use]
+pub fn normalizar_excerpt_hilo(thread_id: &str, texto: &str) -> String {
+    normalizar_excerpt_con_hilo(
+        texto,
+        nombre_de_thread(thread_id).as_deref(),
+        aviso_fb_de_thread(thread_id).as_deref(),
+    )
 }
 
 /// [08AA-10] El piloto no trae `avisoId`, pero el título del hilo sí nombra
@@ -766,10 +778,10 @@ pub async fn borrar_cache(
     Ok(())
 }
 
-/// Guarda la corrección de la dueña: la matriz negativa también vale para su
-/// texto (las respuestas jamás llevan contacto; lo añade ella a mano fuera
-/// del borrador). Vigencia renovada; la fila misma es el registro (sin audit
-/// separada: `corregida=TRUE` + `usos` ya lo cuentan).
+/// Guarda la corrección de la dueña (su texto manda tal cual: lo revisa
+/// ella a mano al enviar). Vigencia renovada; la fila misma es el registro
+/// (sin audit separada: `corregida=TRUE` + `usos` ya lo cuentan).
+/// [08AA-14] Sin matriz negativa por decisión de ella 2026-10-08.
 pub async fn corregir_cache(
     pool: &sqlx::PgPool,
     firma: &str,
@@ -780,11 +792,6 @@ pub async fn corregir_cache(
     let n = texto.chars().count();
     if n == 0 || n > 2000 {
         return Err(AppError::Validation("texto 1..2000 caracteres".to_string()));
-    }
-    if let Some(motivo) = matriz_negativa(texto) {
-        return Err(AppError::Validation(format!(
-            "la corrección no puede traer {motivo} (lo añades a mano al enviar)"
-        )));
     }
     sqlx::query(
         "INSERT INTO mp_respuestas_cache (firma, precio_hash, catalog_hash, respuesta, corregida) \
@@ -946,24 +953,6 @@ mod pruebas {
     }
 
     #[test]
-    fn matriz_frena_contacto_y_deja_pasar_precio() {
-        assert_eq!(matriz_negativa("Llama al 0412 1234567"), Some("telefono"));
-        assert_eq!(matriz_negativa("Escríbeme a x@y.com"), Some("email"));
-        assert_eq!(matriz_negativa("Mira wa.me/584121234567"), Some("url"));
-        assert_eq!(matriz_negativa("Sí, sigue disponible en $43.000"), None);
-        /* [07AA-8] El contacto fijo pasa literal; cualquier otro, no. */
-        assert_eq!(
-            matriz_negativa("cualquier cosa escríbeme al 0424 9208855 https://wa.me/584249208855"),
-            None
-        );
-        assert_eq!(
-            matriz_negativa("Llama al 0424 9208855 y al 0412 0000000"),
-            Some("telefono")
-        );
-        assert_eq!(MATRIZ_NEGATIVA_VERSION, 2);
-    }
-
-    #[test]
     fn nombre_de_thread_saluda_por_nombre() {
         assert_eq!(
             nombre_de_thread("alejandro|casa en venta en riberas"),
@@ -1015,6 +1004,55 @@ mod pruebas {
     }
 
     #[test]
+    fn normalizar_hilo_kerley_deja_solo_la_pregunta() {
+        /* [08AA-16] Testigo exacto en BD
+         * (`kerley|VEF0 apartamento residencias rio aro plaza puerto
+         * ordaz`): el visor repite cabeceras (eco del título recortado,
+         * `Mensajes`, `Kerley · Apartamento ...`, `Kerley` suelto) e
+         * inyecta la instrucción + las dos sugeridas ES. Solo la
+         * pregunta del cliente sobrevive. */
+        let hilo = "kerley|VEF0 apartamento residencias rio aro plaza puerto ordaz";
+        let crudo = "amento Residencias Rio Aro Plaza Puerto Ordaz\n\
+            Mensajes\n\
+            Kerley · Apartamento Residencias Rio Aro Plaza Puerto Ordaz\n\
+            Kerley\n\
+            ¿Sigue disponible?\n\
+            Toca una respuesta para enviársela al comprador.\n\
+            Lo estoy mirando. Te avisaré.\n\
+            Lo siento, no está disponible.";
+        assert_eq!(normalizar_excerpt_hilo(hilo, crudo), "¿Sigue disponible?");
+    }
+
+    #[test]
+    fn normalizar_hilo_tina_limpia_cola_y_marcas() {
+        /* [08AA-16] Testigo exacto en BD (`tina|VEF0 casa en venta en
+         * riberas del caroní, puerto ordaz`): el float cortó a mitad de
+         * palabra (`ponible?`), el visor mete hora (`2:43 am`) y marca
+         * de enviado. El resto (aunque sea mensaje propio sin marca)
+         * se conserva como contexto. */
+        let hilo = "tina|VEF0 casa en venta en riberas del caroní, puerto ordaz";
+        let crudo = "ponible?\n\
+            2:43 am\n\
+            Hola, disponible.\n\
+            $43.000 negociable\n\
+            04249208855\n\
+            Enviado";
+        assert_eq!(
+            normalizar_excerpt_hilo(hilo, crudo),
+            "Hola, disponible.\n$43.000 negociable\n04249208855"
+        );
+    }
+
+    #[test]
+    fn normalizar_hilo_conserva_mensaje_corto_con_mayuscula() {
+        /* La cola truncada no se come saludos completos: empiezan en
+         * mayúscula aunque vayan en primera línea y sin espacios. */
+        let hilo = "tina|VEF0 casa en venta en riberas del caroní, puerto ordaz";
+        assert_eq!(normalizar_excerpt_hilo(hilo, "Hola"), "Hola");
+        assert_eq!(normalizar_excerpt_hilo(hilo, "Sí"), "Sí");
+    }
+
+    #[test]
     fn precio_del_aviso_extrae_moneda_antes_o_despues() {
         assert_eq!(
             precio_del_aviso("town house en venta en las peonías 125.000$"),
@@ -1030,28 +1068,6 @@ mod pruebas {
         );
         assert_eq!(precio_del_aviso("casa en venta, 3 habitaciones"), None);
         assert_eq!(precio_del_aviso("piso 2, año 2024"), None);
-    }
-
-    #[test]
-    fn matriz_v2_exime_precio_del_aviso_pero_no_telefonos() {
-        let precio = Some("125.000$");
-        assert_eq!(
-            matriz_negativa_con_precio(
-                "Town house 125.000$. 3 habitaciones. Escríbeme al 0424 9208855 https://wa.me/584249208855",
-                precio
-            ),
-            None
-        );
-        assert_eq!(
-            matriz_negativa_con_precio("Vale 125.000$. Llama al 0412 0000000", precio),
-            Some("telefono")
-        );
-        /* Sin precio conocido el conteo v1 sigue intacto: 6 dígitos del
-         * precio + 1 de habitaciones = 7 → bloquea (por eso existe v2). */
-        assert_eq!(
-            matriz_negativa("Vale 125.000$. Tiene 3 habitaciones"),
-            Some("telefono")
-        );
     }
 
     #[test]

@@ -19,10 +19,9 @@ use crate::middleware::AuthUser;
 use crate::repositories::InmuebleRepository;
 use crate::services::marketplace::{
     aviso_fb_de_thread, borrar_cache, buscar_cache, consumir_minuto, corregir_cache, detalle_chat,
-    formatear_parrafos, guardar_cache, hash_ficha, matriz_negativa_con_precio, normalizar_excerpt,
-    precio_hash_seguro, reemplazar_cache, resumen_chats, resumen_uso, strip_ficha_para_prompt,
-    sub_exento, validar_borrador, BorradorRequest, FALLBACK_BORRADOR, MATRIZ_NEGATIVA_VERSION,
-    SIN_FICHA, STRIP_VERSION,
+    formatear_parrafos, guardar_cache, hash_ficha, normalizar_excerpt_hilo, precio_hash_seguro,
+    reemplazar_cache, resumen_chats, resumen_uso, strip_ficha_para_prompt, sub_exento,
+    validar_borrador, BorradorRequest, FALLBACK_BORRADOR, SIN_FICHA, STRIP_VERSION,
 };
 use crate::AppState;
 
@@ -42,7 +41,6 @@ pub struct BorradorResponse {
     pub fuente: String,
     pub aviso_conocido: bool,
     pub firma_version: String,
-    pub matriz_version: u8,
     /// `true` si el texto es corrección de la dueña (vía `corregir`).
     pub corregida: bool,
 }
@@ -154,8 +152,9 @@ pub async fn borrador(
     }
     /* [08AA-5] El excerpt del puente trae cada mensaje dos veces + ruido
      * de Facebook: se limpia antes del prompt y del guardado. Si solo
-     * había ruido se conserva el original (nunca se guarda vacío). */
-    let limpio = normalizar_excerpt(&r.excerpt.texto);
+     * había ruido se conserva el original (nunca se guarda vacío).
+     * [08AA-16] Con contexto del hilo: fuera cabeceras del visor. */
+    let limpio = normalizar_excerpt_hilo(r.thread_id.trim(), &r.excerpt.texto);
     if !limpio.is_empty() {
         r.excerpt.texto = limpio;
     }
@@ -174,7 +173,6 @@ pub async fn borrador(
                 fuente: "cache".to_string(),
                 aviso_conocido: conocido,
                 firma_version: "firma-v1".to_string(),
-                matriz_version: MATRIZ_NEGATIVA_VERSION,
                 corregida,
             }),
         )
@@ -207,7 +205,6 @@ pub async fn borrador(
             fuente: gen.fuente.clone(),
             aviso_conocido: conocido,
             firma_version: "firma-v1".to_string(),
-            matriz_version: MATRIZ_NEGATIVA_VERSION,
             corregida: false,
         }),
     )
@@ -217,8 +214,10 @@ pub async fn borrador(
 /// Regenerar explícito de la dueña: `DELETE` + bypass de lectura (nueva IA
 /// siempre) + reemplazo (pisa incluso correcciones: lo pidió ella).
 /// Sin tope por minuto por decisión 2026-10-05 (freno = ritmo humano); el
-/// resto del flujo (schema 422, matriz → reserva, no cachear fallback)
-/// es idéntico al `borrador`.
+/// resto del flujo (schema 422, reserva si cae la IA, no cachear fallback)
+/// es idéntico al `borrador`. [08AA-14] Sin matriz negativa por decisión de
+/// ella 2026-10-08: el texto de la IA pasa tal cual (el prompt conserva la
+/// regla de no inventar contacto).
 #[utoipa::path(
     post,
     path = "/api/admin/marketplace/regenerar",
@@ -238,8 +237,9 @@ pub async fn regenerar(
     if !errores.is_empty() {
         return Err(AppError::Validation(errores.join("; ")));
     }
-    /* [08AA-5] Igual que en `borrador`: excerpt limpio al prompt y al reemplazo. */
-    let limpio = normalizar_excerpt(&r.excerpt.texto);
+    /* [08AA-5] Igual que en `borrador`: excerpt limpio al prompt y al reemplazo.
+     * [08AA-16] Con contexto del hilo. */
+    let limpio = normalizar_excerpt_hilo(r.thread_id.trim(), &r.excerpt.texto);
     if !limpio.is_empty() {
         r.excerpt.texto = limpio;
     }
@@ -269,7 +269,6 @@ pub async fn regenerar(
             fuente: gen.fuente,
             aviso_conocido: conocido,
             firma_version: "firma-v1".to_string(),
-            matriz_version: MATRIZ_NEGATIVA_VERSION,
             corregida: false,
         }),
     )
@@ -333,8 +332,8 @@ pub async fn releer(
         ));
     }
     /* [08AA-5] Igual que en `borrador`: lo que se guarda es el excerpt
-     * limpio, nunca el ruido crudo del DOM. */
-    let limpio = normalizar_excerpt(&r.excerpt);
+     * limpio, nunca el ruido crudo del DOM. [08AA-16] Con contexto. */
+    let limpio = normalizar_excerpt_hilo(r.thread_id.trim(), &r.excerpt);
     if limpio.is_empty() {
         return Err(AppError::Validation(
             "excerpt sin contenido aprovechable".to_string(),
@@ -458,29 +457,34 @@ async fn generar_borrador(
      * El precio siempre con «negociable»; el cierre invita a contar qué
      * busca (conocer intención, no solo coordinar visita).
      * [08AA-11] Párrafos separados por línea en blanco, no líneas sueltas:
-     * el borrador se copia a WhatsApp y los saltos sueltos se ven rotos. */
+     * el borrador se copia a WhatsApp y los saltos sueltos se ven rotos.
+     * [08AA-15] Breve por pedido de ella: 3 párrafos cortos como máximo,
+     * nombre corto del inmueble (tipo + residencia, sin dirección ni zona
+     * duplicada) y sin párrafo de relleno ("sigue disponible y con gusto…"
+     * ya va dicho en la apertura). */
     let saludo = match nombre_de_thread(r.thread_id.trim()) {
         Some(n) => format!("salúdalo por su nombre («Hola, {n}, ...»)"),
         None => "salúdalo sin nombre (solo «Hola, ...»)".to_string(),
     };
     let sistema = format!(
         "Eres el asistente de MN Inmobiliaria respondiendo en Marketplace. \
-         Tono {tono}, máximo 4 párrafos cortos: cada parte del formato \
-         obligatorio es un párrafo y los párrafos se separan con una línea \
-         en blanco (nada de líneas sueltas). Datos del inmueble: {datos}. \
+         Tono {tono}, BREVE: máximo 3 párrafos cortos, cada uno en su \
+         párrafo separado por una línea en blanco (nada de líneas sueltas). \
+         Datos del inmueble: {datos}. \
          Aviso en Facebook: {aviso}. \
          Hora del mensaje: {hora}: saluda con buenos días, buenas tardes o \
          buenas noches según corresponda. \
          La conversación trae marcas: `Cliente:` es el comprador, `Dueña:` \
          es la dueña (tú no eres la dueña: no repitas lo que ella ya dijo). \
-         Responde la última pregunta del Cliente con coherencia. \
-         Formato obligatorio, en este orden exacto: primero el saludo, \
-         {saludo}, seguido en la misma apertura por la ficha breve \
-         (propiedad y zona según los datos o el aviso, precio con la cifra \
-         exacta de los datos o del aviso seguida siempre de la palabra \
-         «negociable»); después responde la pregunta del Cliente; luego \
-         invítalo a contarte qué busca para ayudarlo (cálido, p. ej. \
-         «Cuéntame qué estás buscando y con gusto te ayudo»); incluye \
+         Formato obligatorio, en este orden exacto: primer párrafo = el \
+         saludo, {saludo}, más el nombre corto del inmueble (solo tipo + \
+         residencia, sin dirección ni zona duplicada), más si está \
+         disponible, más el precio con la cifra exacta de los datos o del \
+         aviso seguida siempre de la palabra «negociable»; segundo párrafo \
+         = responde la última pregunta del Cliente en una línea, con \
+         coherencia y sin repetir lo ya dicho; tercer párrafo = invítalo a \
+         contarte qué busca para ayudarlo (cálido, p. ej. \
+         «Cuéntame qué estás buscando y con gusto te ayudo») e incluye \
          siempre «cualquier cosa escríbeme al {CONTACTO_TEL}»; cierra \
          siempre con {CONTACTO_WA}. \
          Reglas: jamás inventes teléfono, email, dirección ni cifras fuera \
@@ -504,15 +508,6 @@ async fn generar_borrador(
             };
         }
     };
-    if let Some(motivo) = matriz_negativa_con_precio(&texto, precio_aviso.as_deref()) {
-        tracing::warn!("borrador mp: matriz negativa ({motivo}), va fallback");
-        return Generado {
-            texto: formatear_parrafos(&crate::services::marketplace::asegurar_contacto(
-                FALLBACK_BORRADOR,
-            )),
-            fuente: "reserva".to_string(),
-        };
-    }
     Generado {
         texto: formatear_parrafos(&crate::services::marketplace::asegurar_contacto(&texto)),
         fuente: "ia".to_string(),
