@@ -3,7 +3,7 @@
 //! Extraído de `marketplace.rs` (límite 500): extractor `MpAuth` (JWT mp +
 //! binding `X-MP-Maquina` para CLI), 429 `limite` con `Retry-After` y las
 //! dos rutas de emisión (`emitir_token` panel 15 min, `emitir_token_cli`
-//! 8h atado a máquina). `marketplace.rs` conserva borrador/regenerar/
+//! 8h por defecto (`MP_CLI_MINUTOS`, [08AA-20]) atado a máquina). `marketplace.rs` conserva borrador/regenerar/
 //! releer/corregir/audit/uso/chats y re-exporta estos nombres para que las
 //! rutas utoipa (`marketplace::emitir_token`…) sigan resolviendo.
 
@@ -152,8 +152,9 @@ pub async fn emitir_token(
         .into_response())
 }
 
-/// [03AA-3 E3] Token CLI: `exp` 8h atado a máquina (`mid` = hash hex64 que el
-/// CLI deriva localmente; el id real jamás viaja). `borrador`/`audit` con
+/// [03AA-3 E3] Token CLI atado a máquina (`mid` = hash hex64 que el
+/// CLI deriva localmente; el id real jamás viaja). `exp` según
+/// `MP_CLI_MINUTOS` (defecto 8h, [08AA-20]). `borrador`/`audit` con
 /// este token exigen `X-MP-Maquina` igual o devuelven 401. Cubo propio
 /// 5/min para que un bucle CLI no fabrique tokens sin parar.
 #[derive(Debug, Clone, Deserialize, ToSchema)]
@@ -166,7 +167,7 @@ pub struct CliTokenRequest {
     path = "/api/admin/marketplace/token/cli",
     request_body = CliTokenRequest,
     responses(
-        (status = 201, description = "Token CLI emitido (8h, atado a máquina)", body = TokenResponse),
+        (status = 201, description = "Token CLI emitido (vida MP_CLI_MINUTOS, atado a máquina)", body = TokenResponse),
         (status = 422, description = "maquina_hash inválido", body = crate::errors::ErrorResponse),
         (status = 429, description = "Tope de emisión", body = crate::errors::ErrorResponse)
     )

@@ -462,14 +462,21 @@ pub struct MpClaims {
     pub mid: Option<String>,
 }
 
-/// Minutos de vida por alcance: panel 15min, CLI 8h (E3, con binding).
+/* [08AA-20] Vida del token CLI configurable: `MP_CLI_MINUTOS` manda
+ * (local: 43200 = 30d en `.env`, gitignored); ausente/inválido → 480
+ * (8h, lo que sigue viendo producción). El panel queda fijo en 15min.
+ * Por qué env y no quitar la expiración: `jti`+revocación y binding a
+ * máquina siguen valiendo; solo se estira el `exp`. */
 #[must_use]
-pub const fn minutos_para_cli(es_cli: bool) -> i64 {
-    if es_cli {
-        480
-    } else {
-        15
+pub fn minutos_para_cli(es_cli: bool) -> i64 {
+    if !es_cli {
+        return 15;
     }
+    std::env::var("MP_CLI_MINUTOS")
+        .ok()
+        .and_then(|v| v.trim().parse::<i64>().ok())
+        .filter(|&m| m > 0)
+        .unwrap_or(480)
 }
 
 /// Hash de máquina válido: 64 hex (igual que `firma`; nunca el id en claro).
@@ -1255,10 +1262,19 @@ mod pruebas {
     /* Contra BD viva: 2 hit + 1 copiar hoy se agregan en la fila del día;
      * sin `DATABASE_URL` se omite. Solo lee conteos, sin PII. */
 
+    /* [08AA-20] Por defecto CLI 8h/panel 15min; `MP_CLI_MINUTOS`
+     * manda cuando es entero positivo; lo inválido cae al default. */
     #[test]
     fn cli_vive_8h_y_panel_15min() {
+        std::env::remove_var("MP_CLI_MINUTOS");
         assert_eq!(minutos_para_cli(true), 480);
         assert_eq!(minutos_para_cli(false), 15);
+        std::env::set_var("MP_CLI_MINUTOS", "43200");
+        assert_eq!(minutos_para_cli(true), 43200);
+        assert_eq!(minutos_para_cli(false), 15);
+        std::env::set_var("MP_CLI_MINUTOS", "basura");
+        assert_eq!(minutos_para_cli(true), 480);
+        std::env::remove_var("MP_CLI_MINUTOS");
     }
 
     #[test]
