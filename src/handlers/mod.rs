@@ -5,12 +5,16 @@ mod auth;
 mod chat;
 mod chat_staff;
 mod chat_staff_config; // [08AA-6] split god-object: config del panel
+mod chat_staff_envio; // [08AA-8] split god-object: envío+uso+auditoría+gateway
 pub(crate) mod chat_tools;
+mod chat_tools_captacion; // [08AA-8] split god-object: captación/contacto/escalado
 mod chat_tools_definiciones; // [08AA-6] split god-object: schemas provider
 mod health;
 pub(crate) mod ia;
+mod ia_proveedores; // [08AA-8] split god-object: GloryAPI+OpenCode+Groq STT
 mod inmuebles;
 pub mod marketplace;
+pub(crate) mod marketplace_token; // [08AA-8] split límite 500: extractor `MpAuth` + emisión panel/CLI
 mod notes;
 mod public;
 mod rate_limit;
@@ -88,8 +92,8 @@ impl utoipa::Modify for SecurityAddon {
         solicitud::revisar_solicitud,
         visita::list_visitas,
         visita::revisar_visita,
-        marketplace::emitir_token,
-        marketplace::emitir_token_cli,
+        marketplace_token::emitir_token,
+        marketplace_token::emitir_token_cli,
         marketplace::borrador,
         marketplace::regenerar,
         marketplace::corregir,
@@ -138,11 +142,11 @@ impl utoipa::Modify for SecurityAddon {
         crate::services::marketplace::ExtrasIn,
         crate::services::marketplace::Tono,
         crate::services::marketplace::Largo,
-        crate::handlers::marketplace::TokenResponse,
+        crate::handlers::marketplace_token::TokenResponse,
         crate::handlers::marketplace::BorradorResponse,
         crate::handlers::marketplace::AuditIn,
         crate::handlers::marketplace::EventoAudit,
-        crate::handlers::marketplace::CliTokenRequest,
+        crate::handlers::marketplace_token::CliTokenRequest,
         crate::handlers::marketplace::CorregirRequest,
         crate::handlers::marketplace::CorregirResponse,
         crate::handlers::marketplace::UsoQuery,
