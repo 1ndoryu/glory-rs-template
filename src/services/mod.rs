@@ -3,6 +3,7 @@ mod auth;
 mod canal_resolver;
 mod inmueble;
 pub mod marketplace;
+mod marketplace_vuelo; // [08AA-7] Singleflight en su dominio (re-exportado arriba)
 mod note;
 mod outbox_idempotency;
 pub mod politica;

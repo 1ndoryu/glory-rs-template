@@ -49,10 +49,10 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   +5 (+2 degradados + 3 umbrales marginales por líneas netas: `mod.rs`
   502/500, `services/marketplace.rs` 727/700). Cero errores nuevos.
 - **08AA-7 — Partir `handlers/mod.rs` y `services/marketplace.rs`
-  (pendiente, no urgente)**: ambos superaron su umbral sentinel por
-  líneas netas de 08AA-5+08AA-6 (`limite-lineas` + `god-object` en
-  `mod.rs`, `limite-lineas` en servicio). Partir por dominio sin
-  romper rutas; no maquillar con recorte de comentarios.
+  (cerrado 2026-10-08, ver `Agente/completados/tareas-2026-10-08.md`)**:
+  `superficie.rs` (SPA + SEO + catálogo agente) y `marketplace_vuelo.rs`
+  (Singleflight + test, re-exportado). Gate `22E/478W/7H`: caen los 3
+  umbrales marginales de 08AA-6; cero hallazgos en archivos nuevos.
 
 ## Deploy mn-inmobiliaria.com (239A-1, en curso 2026-09-23)
 
