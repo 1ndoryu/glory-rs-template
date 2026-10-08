@@ -21,7 +21,8 @@ use crate::services::marketplace::{
     aviso_fb_de_thread, borrar_cache, buscar_cache, clave_hilo, consumir_minuto, corregir_cache,
     detalle_chat, formatear_parrafos, guardar_cache, hash_ficha, normalizar_excerpt_hilo,
     precio_hash_seguro, reemplazar_cache, resumen_chats, resumen_uso, strip_ficha_para_prompt,
-    sub_exento, validar_borrador, BorradorRequest, FALLBACK_BORRADOR, SIN_FICHA, STRIP_VERSION,
+    sub_exento, validar_borrador, BorradorRequest, FotoHilo, FALLBACK_BORRADOR, SIN_FICHA,
+    STRIP_VERSION,
 };
 use crate::AppState;
 
@@ -155,7 +156,10 @@ pub async fn borrador(
      * había ruido se conserva el original (nunca se guarda vacío).
      * [08AA-16] Con contexto del hilo: fuera cabeceras del visor.
      * [08AA-18] Contexto con `clave_hilo()`: la cifra inyectada por el
-     * puente (07AA-11) parpadea y el aviso con `$` no empareja el eco. */
+     * puente (07AA-11) parpadea y el aviso con `$` no empareja el eco.
+     * [08AA-21] El crudo se captura antes de limpiar: se guarda tal cual
+     * llegó para calibrar el filtro (08AA-8). */
+    let crudo = r.excerpt.texto.clone();
     let limpio = normalizar_excerpt_hilo(&clave_hilo(r.thread_id.trim()), &r.excerpt.texto);
     if !limpio.is_empty() {
         r.excerpt.texto = limpio;
@@ -189,14 +193,18 @@ pub async fn borrador(
         })
         .await;
     if gen.fuente == "ia" {
+        let foto = FotoHilo {
+            thread_id: r.thread_id.trim(),
+            excerpt: &r.excerpt.texto,
+            excerpt_crudo: &crudo,
+        };
         guardar_cache(
             &state.pool,
             &r.firma,
             &precio_hash,
             &catalog_hash,
             &gen.texto,
-            r.thread_id.trim(),
-            &r.excerpt.texto,
+            &foto,
         )
         .await?;
     }
@@ -241,7 +249,9 @@ pub async fn regenerar(
     }
     /* [08AA-5] Igual que en `borrador`: excerpt limpio al prompt y al reemplazo.
      * [08AA-16] Con contexto del hilo.
-     * [08AA-18] Contexto con `clave_hilo()` (ver `borrador`). */
+     * [08AA-18] Contexto con `clave_hilo()` (ver `borrador`).
+     * [08AA-21] Crudo capturado antes de limpiar (ver `borrador`). */
+    let crudo = r.excerpt.texto.clone();
     let limpio = normalizar_excerpt_hilo(&clave_hilo(r.thread_id.trim()), &r.excerpt.texto);
     if !limpio.is_empty() {
         r.excerpt.texto = limpio;
@@ -254,14 +264,18 @@ pub async fn regenerar(
      * dos llegan juntas, la última que escribe gana por `reemplazar`). */
     let gen = generar_borrador(&r, seguro.as_ref(), &state.pool).await;
     if gen.fuente == "ia" {
+        let foto = FotoHilo {
+            thread_id: r.thread_id.trim(),
+            excerpt: &r.excerpt.texto,
+            excerpt_crudo: &crudo,
+        };
         reemplazar_cache(
             &state.pool,
             &r.firma,
             &precio_hash,
             &catalog_hash,
             &gen.texto,
-            r.thread_id.trim(),
-            &r.excerpt.texto,
+            &foto,
         )
         .await?;
     }
@@ -339,8 +353,12 @@ pub async fn releer(
      * [08AA-18] Guarda y busca con `clave_hilo()`: la cifra inyectada
      * por el puente (07AA-11) parpadea entre el `/borrador` y el
      * `/releer` y el `thread_id` literal no empareja (`actualizado=false`
-     * en silencio). */
+     * en silencio).
+     * [08AA-21] El crudo también se guarda (`excerpt_crudo`), para
+     * calibrar el filtro (08AA-8): lo limpio al panel, lo crudo al
+     * diagnóstico. */
     let hilo = clave_hilo(r.thread_id.trim());
+    let crudo = r.excerpt.clone();
     let limpio = normalizar_excerpt_hilo(&hilo, &r.excerpt);
     if limpio.is_empty() {
         return Err(AppError::Validation(
@@ -349,9 +367,10 @@ pub async fn releer(
     }
     r.excerpt = limpio;
     let filas: u64 =
-        sqlx::query("UPDATE mp_respuestas_cache SET excerpt_texto = $2 WHERE thread_id = $1")
+        sqlx::query("UPDATE mp_respuestas_cache SET excerpt_texto = $2, excerpt_crudo = $3 WHERE thread_id = $1")
             .bind(&hilo)
             .bind(&r.excerpt)
+            .bind(&crudo)
             .execute(&state.pool)
             .await?
             .rows_affected();

@@ -26,6 +26,24 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 
 ## Pendientes
 
+- **08AA-22 — Barrido gate: mecánicos front + todo-prosa + FPs (activa
+  2026-10-08):** gate 22E/469W/7H. Alcance: emoji-en-codigo x2, window-reference
+  (getter en `platform/ventana.ts`), todo-prosa x22 (todos menos los 2 de
+  `services/marketplace.rs, en curso por 08AA-21 concurrente) + MD de
+  prevencion con los FPs front (inline-style dinámico, key-index lista
+  estática, promise lazy/catch-interno, mixed-barrel shim, DTOs anchas) +
+  triaje documentado de lo no-ejecutable (clases masivas sqlx/handler/html =
+  patrón del proyecto; DISEÑO usestate/hook/canvas; ajenos glory-rs;
+  `marketplace.rs` de la otra sesión). No toca `handlers/marketplace.rs`,
+  `services/marketplace.rs`, `tope_uso.rs` ni migraciones (08AA-21).
+- **08AA-21 — Guardar excerpt crudo junto al limpio (pedido por ella
+  2026-10-08, en curso):** el filtro por líneas no puede calibrarse a
+  ciegas: el puente aplana el DOM a texto y lo que llega (`OrdazDetalles`,
+  `Mensaje enviado 3:18 pm por: Wilmery` pegados) no se ve en ningún lado.
+  Alcance: columna `excerpt_crudo TEXT` (migración `...32`), `guardar` /
+  `reemplazar` / `releer` guardan el texto tal como llegó además del
+  limpio; con el crudo del hilo wilmery a la vista se corrige el filtro
+  (08AA-8) en el mismo bloque.
 - **08AA-8 — Excerpt Marketplace sigue sucio con chrome en español
   (reportado por ella 2026-10-08 con captura, hilo andreina):** el 08AA-5
   calibró con el fixture (chrome en inglés) pero el hilo real trae

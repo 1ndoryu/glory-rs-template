@@ -747,31 +747,45 @@ pub async fn buscar_cache(
     Ok(fila)
 }
 
+/// [08AA-21] Foto del hilo que acompaña a cada fila de caché: clave de la
+/// ventana + excerpt limpio (panel) + excerpt crudo tal como llegó del
+/// puente (diagnóstico del filtro, 08AA-8). Viaja junta para no engordar
+/// la firma de `guardar_cache`/`reemplazar_cache` (clippy: máx 7 args).
+pub struct FotoHilo<'a> {
+    pub thread_id: &'a str,
+    pub excerpt: &'a str,
+    pub excerpt_crudo: &'a str,
+}
+
 /// Guarda una generación fresca; si la dueña ya corrigió esa clave, su texto
 /// gana (`DO NOTHING`: la corrección humana no se pisa en silencio).
 /// [07AA-7] Anota `thread_id` + `excerpt_texto` para el panel por chat.
 /// [08AA-18] Guarda con `clave_hilo()`: la cifra inyectada por el puente
 /// (07AA-11) parpadea entre llamadas y el `thread_id` literal no empareja
 /// al releer.
+/// [08AA-21] Guarda también `excerpt_crudo`: el texto tal como llegó del
+/// puente, antes de `normalizar_excerpt`. El filtro por líneas no se puede
+/// calibrar a ciegas (el puente aplana el DOM y lo pegado no se ve);
+/// con el crudo a la vista se corrige el filtro (08AA-8).
 pub async fn guardar_cache(
     pool: &sqlx::PgPool,
     firma: &str,
     precio_hash: &str,
     catalog_hash: &str,
     respuesta: &str,
-    thread_id: &str,
-    excerpt: &str,
+    foto: &FotoHilo<'_>,
 ) -> Result<(), AppError> {
     sqlx::query(
-        "INSERT INTO mp_respuestas_cache (firma, precio_hash, catalog_hash, respuesta, thread_id, excerpt_texto) \
-         VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING",
+        "INSERT INTO mp_respuestas_cache (firma, precio_hash, catalog_hash, respuesta, thread_id, excerpt_texto, excerpt_crudo) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING",
     )
     .bind(firma)
     .bind(precio_hash)
     .bind(catalog_hash)
     .bind(respuesta)
-    .bind(clave_hilo(thread_id))
-    .bind(excerpt)
+    .bind(clave_hilo(foto.thread_id))
+    .bind(foto.excerpt)
+    .bind(foto.excerpt_crudo)
     .execute(pool)
     .await?;
     Ok(())
@@ -781,29 +795,30 @@ pub async fn guardar_cache(
 /// renovada, `corregida=FALSE`, contador a cero (nueva versión).
 /// [07AA-7] Refresca también `thread_id` + `excerpt_texto` (foto actual).
 /// [08AA-18] Guarda con `clave_hilo()` (ver `guardar_cache`).
+/// [08AA-21] Refresca también `excerpt_crudo` (ver `guardar_cache`).
 pub async fn reemplazar_cache(
     pool: &sqlx::PgPool,
     firma: &str,
     precio_hash: &str,
     catalog_hash: &str,
     respuesta: &str,
-    thread_id: &str,
-    excerpt: &str,
+    foto: &FotoHilo<'_>,
 ) -> Result<(), AppError> {
     sqlx::query(
-        "INSERT INTO mp_respuestas_cache (firma, precio_hash, catalog_hash, respuesta, thread_id, excerpt_texto) \
-         VALUES ($1, $2, $3, $4, $5, $6) \
+        "INSERT INTO mp_respuestas_cache (firma, precio_hash, catalog_hash, respuesta, thread_id, excerpt_texto, excerpt_crudo) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7) \
          ON CONFLICT (firma, precio_hash, catalog_hash) DO UPDATE SET \
          respuesta = EXCLUDED.respuesta, valida_hasta = now() + INTERVAL '90 days', \
          corregida = FALSE, usos = 0, thread_id = EXCLUDED.thread_id, \
-         excerpt_texto = EXCLUDED.excerpt_texto",
+         excerpt_texto = EXCLUDED.excerpt_texto, excerpt_crudo = EXCLUDED.excerpt_crudo",
     )
     .bind(firma)
     .bind(precio_hash)
     .bind(catalog_hash)
     .bind(respuesta)
-    .bind(clave_hilo(thread_id))
-    .bind(excerpt)
+    .bind(clave_hilo(foto.thread_id))
+    .bind(foto.excerpt)
+    .bind(foto.excerpt_crudo)
     .execute(pool)
     .await?;
     Ok(())
@@ -1124,7 +1139,7 @@ mod pruebas {
     }
 
     #[test]
-    fn clave_hilo_desHace_precio_inyectado_y_respeta_lo_demas() {
+    fn clave_hilo_deshace_precio_inyectado_y_respeta_lo_demas() {
         /* [08AA-18] El puente (07AA-11) manda `tina|$43.000 vef0...` pero
          * la cifra parpadea entre llamadas: la BD solo ve la forma
          * canónica para que guardar y buscar emparejen siempre. */
@@ -1336,6 +1351,19 @@ mod pruebas {
         )
     }
 
+    /* [08AA-21] Atajo para la foto del hilo en pruebas de caché. */
+    fn foto_prueba(
+        hilo: &'static str,
+        limpio: &'static str,
+        crudo: &'static str,
+    ) -> FotoHilo<'static> {
+        FotoHilo {
+            thread_id: hilo,
+            excerpt: limpio,
+            excerpt_crudo: crudo,
+        }
+    }
+
     #[test]
     fn hash_ficha_estable_y_hex64() {
         let f = fila_prueba(43_000.0);
@@ -1379,14 +1407,22 @@ mod pruebas {
     async fn cache_guarda_hit_y_cuenta_usos() {
         let Some(pool) = pool_si_hay() else { return };
         let (firma, ph, ch) = (clave_azar(), clave_azar(), clave_azar());
-        guardar_cache(&pool, &firma, &ph, &ch, "texto-ia", "hilo-1", "Dueña: hola")
-            .await
-            .expect("guarda");
+        guardar_cache(
+            &pool,
+            &firma,
+            &ph,
+            &ch,
+            "texto-ia",
+            &foto_prueba("hilo-1", "Dueña: hola", "CRUDO Dueña: hola"),
+        )
+        .await
+        .expect("guarda");
         let hit = buscar_cache(&pool, &firma, &ph, &ch).await.expect("busca");
         assert_eq!(hit, Some(("texto-ia".to_string(), false)));
-        /* [07AA-7] El panel agrupa por chat: hilo + foto guardados. */
-        let hilo: (String, String) = sqlx::query_as(
-            "SELECT thread_id, excerpt_texto FROM mp_respuestas_cache \
+        /* [07AA-7] El panel agrupa por chat: hilo + foto guardados.
+         * [08AA-21] El crudo viaja junto al limpio. */
+        let hilo: (String, String, Option<String>) = sqlx::query_as(
+            "SELECT thread_id, excerpt_texto, excerpt_crudo FROM mp_respuestas_cache \
              WHERE firma = $1 AND precio_hash = $2 AND catalog_hash = $3",
         )
         .bind(&firma)
@@ -1395,7 +1431,14 @@ mod pruebas {
         .fetch_one(&pool)
         .await
         .expect("lee hilo");
-        assert_eq!(hilo, ("hilo-1".to_string(), "Dueña: hola".to_string()));
+        assert_eq!(
+            hilo,
+            (
+                "hilo-1".to_string(),
+                "Dueña: hola".to_string(),
+                Some("CRUDO Dueña: hola".to_string())
+            )
+        );
         buscar_cache(&pool, &firma, &ph, &ch)
             .await
             .expect("busca x2");
@@ -1412,9 +1455,16 @@ mod pruebas {
     async fn cache_miss_si_cambia_precio_o_catalogo() {
         let Some(pool) = pool_si_hay() else { return };
         let (firma, ph, ch) = (clave_azar(), clave_azar(), clave_azar());
-        guardar_cache(&pool, &firma, &ph, &ch, "texto-ia", "hilo-1", "x")
-            .await
-            .expect("guarda");
+        guardar_cache(
+            &pool,
+            &firma,
+            &ph,
+            &ch,
+            "texto-ia",
+            &foto_prueba("hilo-1", "x", "crudo-x"),
+        )
+        .await
+        .expect("guarda");
         assert!(buscar_cache(&pool, &firma, &clave_azar(), &ch)
             .await
             .expect("busca")
@@ -1430,9 +1480,16 @@ mod pruebas {
     async fn cache_vencida_no_devuelve_y_purga_limpia() {
         let Some(pool) = pool_si_hay() else { return };
         let (firma, ph, ch) = (clave_azar(), clave_azar(), clave_azar());
-        guardar_cache(&pool, &firma, &ph, &ch, "viejo", "hilo-1", "x")
-            .await
-            .expect("guarda");
+        guardar_cache(
+            &pool,
+            &firma,
+            &ph,
+            &ch,
+            "viejo",
+            &foto_prueba("hilo-1", "x", "crudo-x"),
+        )
+        .await
+        .expect("guarda");
         sqlx::query(
             "UPDATE mp_respuestas_cache SET valida_hasta = now() - INTERVAL '1 day' \
              WHERE firma = $1 AND precio_hash = $2 AND catalog_hash = $3",
@@ -1462,9 +1519,16 @@ mod pruebas {
     async fn corregir_marca_y_guardar_no_pisa_correccion() {
         let Some(pool) = pool_si_hay() else { return };
         let (firma, ph, ch) = (clave_azar(), clave_azar(), clave_azar());
-        guardar_cache(&pool, &firma, &ph, &ch, "texto-ia", "hilo-1", "x")
-            .await
-            .expect("guarda");
+        guardar_cache(
+            &pool,
+            &firma,
+            &ph,
+            &ch,
+            "texto-ia",
+            &foto_prueba("hilo-1", "x", "crudo-x"),
+        )
+        .await
+        .expect("guarda");
         corregir_cache(&pool, &firma, &ph, &ch, "texto de la dueña")
             .await
             .expect("corrige");
@@ -1473,9 +1537,16 @@ mod pruebas {
             Some(("texto de la dueña".to_string(), true))
         );
         /* Generación posterior no pisa la corrección (DO NOTHING). */
-        guardar_cache(&pool, &firma, &ph, &ch, "texto-ia-2", "hilo-1", "x")
-            .await
-            .expect("guarda x2");
+        guardar_cache(
+            &pool,
+            &firma,
+            &ph,
+            &ch,
+            "texto-ia-2",
+            &foto_prueba("hilo-1", "x", "crudo-x"),
+        )
+        .await
+        .expect("guarda x2");
         assert_eq!(
             buscar_cache(&pool, &firma, &ph, &ch).await.expect("busca"),
             Some(("texto de la dueña".to_string(), true))
@@ -1487,8 +1558,11 @@ mod pruebas {
             &ph,
             &ch,
             "nueva-ia",
-            "hilo-2",
-            "Dueña: sigue disponible?",
+            &foto_prueba(
+                "hilo-2",
+                "Dueña: sigue disponible?",
+                "CRUDO Dueña: sigue disponible?",
+            ),
         )
         .await
         .expect("reemplaza");
@@ -1496,9 +1570,9 @@ mod pruebas {
             buscar_cache(&pool, &firma, &ph, &ch).await.expect("busca"),
             Some(("nueva-ia".to_string(), false))
         );
-        /* [07AA-7] Regenerar refresca la foto del chat. */
-        let hilo2: (String, String) = sqlx::query_as(
-            "SELECT thread_id, excerpt_texto FROM mp_respuestas_cache \
+        /* [07AA-7] Regenerar refresca la foto del chat (+ crudo [08AA-21]). */
+        let hilo2: (String, String, Option<String>) = sqlx::query_as(
+            "SELECT thread_id, excerpt_texto, excerpt_crudo FROM mp_respuestas_cache \
              WHERE firma = $1 AND precio_hash = $2 AND catalog_hash = $3",
         )
         .bind(&firma)
@@ -1509,7 +1583,11 @@ mod pruebas {
         .expect("lee hilo");
         assert_eq!(
             hilo2,
-            ("hilo-2".to_string(), "Dueña: sigue disponible?".to_string())
+            (
+                "hilo-2".to_string(),
+                "Dueña: sigue disponible?".to_string(),
+                Some("CRUDO Dueña: sigue disponible?".to_string())
+            )
         );
         borrar_cache(&pool, &firma, &ph, &ch).await.expect("limpia");
     }
