@@ -13,6 +13,7 @@ import {
   type ResumenSesion,
 } from '../../data/chat/cliente-admin';
 import { ErrorApi } from '../../data/inmuebles/api';
+import { repetirCada } from '../../platform/ventana';
 import { useHiloPaginado } from './use-hilo-paginado';
 
 function mensajeError(e: unknown): string {
@@ -52,12 +53,13 @@ export function useBandejaChat() {
     void recargar(seleccionada, filtro).finally(() => {
       if (viva) setCargando(false);
     });
-    const temporizador = window.setInterval(() => {
+    /* [08AA-23] Intervalo vía plataforma (sin `window` directo aquí). */
+    const detener = repetirCada(5000, () => {
       if (viva) void recargar(seleccionada, filtro);
-    }, 5000);
+    });
     return () => {
       viva = false;
-      window.clearInterval(temporizador);
+      detener();
     };
   }, [recargar, seleccionada, filtro]);
 

@@ -1,6 +1,8 @@
 // Lógica de tema pura (sin React): sirve igual en web y en el futuro
 // wrapper móvil. `dark` en <html> activa las variantes `dark:` de Tailwind.
 
+import { sistemaQuiereOscuro } from '../platform/ventana';
+
 export type Tema = 'sistema' | 'claro' | 'oscuro';
 
 const CLAVE_TEMA = 'inmobiliaria:tema:v1';
@@ -24,7 +26,8 @@ export function guardarTema(t: Tema): void {
 }
 
 export function prefiereOscuro(): boolean {
-  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  /* [08AA-23] Lectura vía plataforma (sin `window` directo aquí). */
+  return sistemaQuiereOscuro();
 }
 
 export function resolverOscuro(t: Tema): boolean {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { repetirCada } from '../../platform/ventana';
+import { repetirCada, prefiereMovimientoReducido } from '../../platform/ventana';
 
 /* Palabras que rotan en el titular con efecto máquina de escribir. */
 export const PALABRAS_ROTATIVAS = ['hogar', 'apart.', 'local', 'terreno'] as const;
@@ -16,7 +16,7 @@ const PAUSA_CAMBIO_TICKS = 3;
 export function useMaquinaEscribir() {
   const [salida, setSalida] = useState<string>(PALABRAS_ROTATIVAS[0]);
   useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (prefiereMovimientoReducido()) return;
     let indice = 0;
     let posicion = PALABRAS_ROTATIVAS[0].length;
     let borrando = false;

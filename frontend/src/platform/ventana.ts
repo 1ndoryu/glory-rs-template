@@ -35,6 +35,34 @@ export function repetirCada(ms: number, fn: () => void): () => void {
   return () => window.clearInterval(t);
 }
 
+/* [08AA-23] ¿El sistema pide tema oscuro? (sin `matchMedia` fuera). */
+export function sistemaQuiereOscuro(): boolean {
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+/* [08AA-23] ¿El sistema pide movimiento reducido? (sin `matchMedia` fuera). */
+export function prefiereMovimientoReducido(): boolean {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+/* [08AA-23] Observa cambios del tema del sistema; devuelve función para
+ * soltarlo (sin `MediaQueryList` fuera). */
+export function observarTemaSistema(fn: () => void): () => void {
+  const mq = window.matchMedia('(prefers-color-scheme: dark)');
+  mq.addEventListener('change', fn);
+  return () => mq.removeEventListener('change', fn);
+}
+
+/* [08AA-23] Emite un evento de ventana por nombre (sin `Event` fuera). */
+export function emitirEvento(nombre: string): void {
+  window.dispatchEvent(new Event(nombre));
+}
+
+/* [08AA-23] Abre URL externa en pestaña nueva aislada (sin `opener`). */
+export function abrirExterna(url: string): void {
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
 /* Navegación completa a `ruta` (pública ↔ admin son árboles distintos). */
 export function irA(ruta: string): void {
   window.location.assign(ruta);

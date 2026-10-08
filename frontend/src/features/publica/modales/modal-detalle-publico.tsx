@@ -4,6 +4,7 @@ import type { InmueblePublico } from '../../../domain/inmueble';
 import { fotosVisiblesDe } from '../../../domain/inmueble';
 import { recetaVigenteDe, resolverReceta } from '../../../domain/plantilla-publicidad';
 import { renderizarPublicidad } from '@/platform/canvas-publicidad';
+import { crearLienzo } from '@/platform/imagen';
 import { enlaceWhatsApp, mensajePropiedad } from '../../../platform/whatsapp';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import {
@@ -59,7 +60,8 @@ function Contenido({ inmueble: i }: { inmueble: InmueblePublico }) {
   useEffect(() => {
     if (!comp) return;
     let viva = true;
-    const lienzo = document.createElement('canvas');
+    /* [08AA-23] Lienzo vía plataforma (sin `document` directo aquí). */
+    const lienzo = crearLienzo();
     /* HD: a 1080px de ancho (3:4 -> 1080x1440); las fotos ya van a
      * resolución completa del servidor. */
     renderizarPublicidad(lienzo, i, comp, 1080)

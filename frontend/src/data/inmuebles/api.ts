@@ -6,6 +6,7 @@
 // formulario son dataURL y se suben con `sincronizarFotos`.
 
 import type { CopyInmueble, Inmueble, MejoraServidor } from '../../domain/inmueble';
+import { emitirEvento } from '../../platform/ventana';
 import { PRESETS_EXPORTACION, type RecetaPublicidad } from '../../domain/plantilla-publicidad';
 
 export const API_URL =
@@ -60,7 +61,8 @@ export function borrarSesion(): void {
 function avisarSesionExpirada(): void {
   borrarSesion();
   try {
-    window.dispatchEvent(new Event(EVENTO_SESION_EXPIRADA));
+    /* [08AA-23] Emisión vía plataforma (sin `window` directo aquí). */
+    emitirEvento(EVENTO_SESION_EXPIRADA);
   } catch {
     // Sin window no hay a quién avisar.
   }

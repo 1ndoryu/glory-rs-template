@@ -20,12 +20,17 @@ export function cargarImagenArchivo(file: File): Promise<HTMLImageElement> {
 }
 
 /* Dibuja `img` a `w×h` y la devuelve como JPEG dataURL con `calidad`. */
-export function reescalarAJpeg(img: HTMLImageElement, w: number, h: number, calidad: number): string {
-  const canvas = document.createElement('canvas');
+export function reescalarAJpeg(img: HTMLImageElement, w: number, h: number, calidad: number): string {  const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('El navegador no permite procesar imágenes.');
   ctx.drawImage(img, 0, 0, w, h);
   return canvas.toDataURL('image/jpeg', calidad);
+}
+
+/* [08AA-23] Lienzo fuera de pantalla para componer (detalle público):
+ * `document.createElement` vive aquí, nunca en features. */
+export function crearLienzo(): HTMLCanvasElement {
+  return document.createElement('canvas');
 }

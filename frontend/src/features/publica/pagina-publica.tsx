@@ -6,6 +6,7 @@ import { useModalLogin } from '../../hooks/publica/modales/use-modal-login';
 import { useModalPublicar } from '../../hooks/publica/modales/use-modal-publicar';
 import { useMontarAlAbrir } from '../../hooks/publica/use-montar-al-abrir';
 import { usePublica } from '../../hooks/publica/use-publica';
+import { abrirExterna } from '../../platform/ventana';
 import { BuscadorPublica } from './lista/buscador-publica';
 import { EsqueletoLista } from './lista/esqueleto-lista';
 import { construirIndice, extraerTerminos, filtrarIndice } from './busqueda';
@@ -42,7 +43,8 @@ export function PaginaPublica() {
       setChatAbierto(true);
       return;
     }
-    window.open(enlaceWhatsApp(mensajeGeneral()), '_blank', 'noopener,noreferrer');
+    /* [08AA-23] Apertura vía plataforma (sin `window` directo aquí). */
+    abrirExterna(enlaceWhatsApp(mensajeGeneral()));
   };
   /* [169A-2] El modal de publicar trae su propio estado + borrador: la
    * página solo lo abre y lo renderiza (sin más `useState` aquí). */

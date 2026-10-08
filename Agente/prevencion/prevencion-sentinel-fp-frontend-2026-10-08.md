@@ -55,11 +55,17 @@ los casos testigo que deben dejar de marcarse.
 
 ## 6. `componente-sin-hook-glory` — ya verificado
 
-- **Casos:** `modal-detalle.tsx`, `modal-nuevo.tsx`, `modal-descargar-fotos.tsx`,
-  `lista-mensajes.tsx`, `pagina-inicio.tsx`.
-- **Veredicto 08AA-22:** los 5 ya usan hooks (`useTema`, `useAnadirFotos`,
-  `useConfigCopy`, `useCopy`, `useColaMejora`, `useDocumentTitle`); el
-  informe inicial era erróneo (barrido superficial). Sin acción.
+- **Casos (gate 08AA-23, 5 marcas):**
+  - `features/chat/hilo-mensajes.tsx:12` — `useState` + 3 `useRef` + `useEffect`.
+  - `features/chat/sesiones-whatsapp.tsx:13` — 3 `useState` + `useCallback` + 2 `useEffect`.
+  - `features/configuracion/pestana-ia.tsx:7` — hook propio `useConfigIA` + `useState` + `useEffect`.
+  - `features/imagenes/tarjeta-foto-mejora.tsx:15` — 3 `useState`.
+  - `features/inmuebles/modal-descargar-fotos.tsx:8` — 4 `useState`.
+- **Veredicto 08AA-22/23:** los 5 usan hooks (verificado por grep de
+  `use[A-Z]` en cada archivo; la lista inicial de 08AA-22 citaba otros
+  ficheros por barrido superficial). Sin acción.
+- **Detección esperada:** la regla no debería marcar un componente que
+  llama hooks de React o hooks propios del proyecto.
 
 ## Referencia
 

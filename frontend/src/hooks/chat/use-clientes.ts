@@ -3,6 +3,7 @@
 // tras cada mutación.
 
 import { useCallback, useEffect, useState } from 'react';
+import { temporizar } from '../../platform/ventana';
 import {
   actualizarCliente,
   crearCliente,
@@ -38,12 +39,13 @@ export function useClientes() {
 
   useEffect(() => {
     let viva = true;
-    const t = window.setTimeout(() => {
+    /* [08AA-23] Debounce vía plataforma (sin `window` directo aquí). */
+    const cancelar = temporizar(300, () => {
       if (viva) void recargar(busqueda).finally(() => viva && setCargando(false));
-    }, 300);
+    });
     return () => {
       viva = false;
-      window.clearTimeout(t);
+      cancelar();
     };
   }, [recargar, busqueda]);
 

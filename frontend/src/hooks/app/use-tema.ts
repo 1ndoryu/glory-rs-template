@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { aplicarTema, guardarTema, leerTemaGuardado, type Tema } from '../../app/tema';
+import { observarTemaSistema } from '../../platform/ventana';
 
 const ORDEN: Tema[] = ['sistema', 'claro', 'oscuro'];
 
@@ -14,10 +15,8 @@ export function useTema() {
 
   useEffect(() => {
     if (tema !== 'sistema') return;
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = () => aplicarTema('sistema');
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
+    /* [08AA-23] Suscripción vía plataforma (sin `window` directo aquí). */
+    return observarTemaSistema(() => aplicarTema('sistema'));
   }, [tema]);
 
   const setTema = useCallback((t: Tema) => {
