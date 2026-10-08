@@ -5,16 +5,10 @@
 // agresivo: recarga al montar, cada 20 s solo si falta alguna por vincular
 // y a mano con el botón.
 
-import { useCallback, useEffect, useState } from 'react';
-import { descargarQr, sesionesWhatsapp, type SesionWhatsapp } from '../../data/chat/cliente-duena';
-import { ErrorApi } from '../../data/inmuebles/api';
-import { repetirCada } from '../../platform/ventana';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-
-function mensajeError(e: unknown): string {
-  return e instanceof ErrorApi ? e.message : 'Fallo inesperado de sesiones WhatsApp.';
-}
+/* [08AA-32] Lista, QRs, error y recarga viven en useSesionesWhatsapp. */
+import { useSesionesWhatsapp } from '@/hooks/chat/use-sesiones-whatsapp';
 
 const ETIQUETA_ESTADO: Record<string, string> = {
   iniciando: 'Iniciando…',
@@ -24,49 +18,8 @@ const ETIQUETA_ESTADO: Record<string, string> = {
 };
 
 export function SesionesWhatsapp() {
-  const [sesiones, setSesiones] = useState<SesionWhatsapp[] | null>(null);
-  const [qrPorVia, setQrPorVia] = useState<Record<string, string>>({});
-  const [error, setError] = useState<string | null>(null);
-
-  const recargar = useCallback(async () => {
-    try {
-      const lista = await sesionesWhatsapp();
-      setSesiones(lista);
-      setError(null);
-      const qr: Record<string, string> = {};
-      for (const s of lista) {
-        if (s.estado === 'esperando_qr') {
-          const url = await descargarQr(s.via);
-          if (url) qr[s.via] = url;
-        }
-      }
-      setQrPorVia((prev) => {
-        for (const u of Object.values(prev)) URL.revokeObjectURL(u);
-        return qr;
-      });
-    } catch (e) {
-      setError(mensajeError(e));
-    }
-  }, []);
-
-  useEffect(() => {
-    void recargar();
-  }, [recargar]);
-
-  /* Reintento suave mientras falte alguna por vincular; al vincularse
-   * todas, el intervalo se detiene solo. */
-  useEffect(() => {
-    if (!sesiones || sesiones.every((s) => s.estado === 'abierta')) return;
-    /* [08AA-22] Intervalo vía plataforma (sin `window` directo aquí). */
-    return repetirCada(20000, () => void recargar());
-  }, [sesiones, recargar]);
-
-  useEffect(
-    () => () => {
-      for (const u of Object.values(qrPorVia)) URL.revokeObjectURL(u);
-    },
-    [qrPorVia],
-  );
+  /* [08AA-32] Estado, recarga y reintento en el hook; aquí JSX. */
+  const { sesiones, qrPorVia, error, recargar } = useSesionesWhatsapp();
 
   return (
     <div>

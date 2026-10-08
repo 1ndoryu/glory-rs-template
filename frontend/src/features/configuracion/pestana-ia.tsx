@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
 import { Bot, FlaskConical, Loader2, Power } from 'lucide-react';
-import { useConfigIA } from '@/hooks/ia/use-config-ia';
-import type { EstadoIA, ProveedorIA } from '@/domain/ia';
+/* [08AA-32] Borrador y guardado viven en usePestanaIA. */
+import { usePestanaIA } from '@/hooks/configuracion/use-pestana-ia';
+import type { ProveedorIA } from '@/domain/ia';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -10,24 +10,6 @@ import { cn } from '@/lib/utils';
  * de texto, proveedor activo, habilitar/deshabilitar y probar cada uno.
  * Las claves viven en el `.env` del servidor: aquí solo se ve si hay clave
  * (`Configurado`/`Sin clave`), nunca su valor. */
-
-interface Borrador {
-  activo: ProveedorIA;
-  hab: Record<ProveedorIA, boolean>;
-}
-
-function desdeEstado(e: EstadoIA): Borrador {
-  const hab = { gloryapi: true, 'opencode-go': true } as Record<ProveedorIA, boolean>;
-  for (const p of e.proveedores) {
-    if (p.id === 'gloryapi' || p.id === 'opencode-go') hab[p.id] = p.habilitado;
-  }
-  return { activo: e.activo, hab };
-}
-
-function sucio(form: Borrador, e: EstadoIA): boolean {
-  const base = desdeEstado(e);
-  return form.activo !== base.activo || form.hab.gloryapi !== base.hab.gloryapi || form.hab['opencode-go'] !== base.hab['opencode-go'];
-}
 
 function fechaCorta(epoch: number | null): string {
   if (!epoch) return 'nunca';
@@ -39,14 +21,23 @@ function fechaCorta(epoch: number | null): string {
 }
 
 export function PestanaIA() {
-  const { estado, cargando, guardando, probando, error, recargar, guardar, probar } = useConfigIA(true);
-  const [form, setForm] = useState<Borrador | null>(null);
+  /* [08AA-32] Borrador y guardado en el hook; aquí JSX + fechaCorta. */
+  const {
+    estado,
+    cargando,
+    guardando,
+    probando,
+    error,
+    recargar,
+    probar,
+    borrador,
+    modificado,
+    poner,
+    ponerHab,
+    guardarCambios,
+  } = usePestanaIA();
 
-  useEffect(() => {
-    if (estado && !form) setForm(desdeEstado(estado));
-  }, [estado, form]);
-
-  if (cargando || !estado) {
+  if (cargando || !estado || !borrador) {
     return (
       <div className="flex flex-col items-start gap-2 text-sm text-muted-foreground">
         {cargando || !error ? (
@@ -64,17 +55,6 @@ export function PestanaIA() {
       </div>
     );
   }
-  const borrador = form ?? desdeEstado(estado);
-  const modificado = form ? sucio(form, estado) : false;
-
-  const poner = (parche: Partial<Borrador>) => setForm({ ...borrador, ...parche });
-  const ponerHab = (id: ProveedorIA, v: boolean) => setForm({ ...borrador, hab: { ...borrador.hab, [id]: v } });
-
-  async function guardarCambios() {
-    await guardar(borrador.activo, borrador.hab.gloryapi, borrador.hab['opencode-go']);
-    setForm(null);
-  }
-
   return (
     <div className="flex flex-col gap-3">
       <p className="text-xs text-muted-foreground">

@@ -1,11 +1,10 @@
-import { useState } from 'react';
 import { Download, EllipsisVertical, Loader2, RotateCcw, Undo2, X } from 'lucide-react';
 import type { FotoMejora } from '@/domain/foto-mejora';
 import type { InfoReintento } from '@/hooks/mejora/use-cola-mejora';
-import { descargarUrl } from '@/platform/descarga';
-import { confirmar } from '@/platform/ventana';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+/* [08AA-32] Ampliación, restauración y descarga viven en useTarjetaFotoMejora. */
+import { useTarjetaFotoMejora } from '@/hooks/imagenes/use-tarjeta-foto-mejora';
 import {
   Dialog,
   DialogContent,
@@ -34,14 +33,6 @@ function variante(estado: FotoMejora['estado']): 'default' | 'secondary' | 'dest
   return 'outline';
 }
 
-/* Nombre seguro para la descarga: último segmento de la URL sin query,
- * saneado porque `:` (p. ej. en blob:) es inválido en Windows. */
-function nombreArchivo(url: string, defecto: string): string {
-  const base = url.split('/').pop()?.split('?')[0]?.trim() || defecto;
-  const limpio = base.replace(/[^A-Za-z0-9._-]/g, '_');
-  return limpio || `${defecto}.jpg`;
-}
-
 /* Tarjeta compacta: original a la izquierda y mejorada a la derecha para
  * comparar; el clic en cada una la abre completa. La mejorada se guarda en
  * la mejor resolución que devuelva el backend. `reintento` muestra el
@@ -68,54 +59,19 @@ export function TarjetaFotoMejora(props: {
   reintento?: InfoReintento | null;
 }) {
   const { foto, idOriginal, idServidor, alReintentar, alCancelar, alRestaurar, ocupado, reintento } = props;
-  const [ampliada, setAmpliada] = useState<'original' | 'mejorada' | null>(null);
-  const [restaura, setRestaura] = useState<{ enCurso: boolean; error: string | null }>({
-    enCurso: false,
-    error: null,
-  });
-  const [descarga, setDescarga] = useState<{ enCurso: boolean; error: string | null }>({
-    enCurso: false,
-    error: null,
-  });
-  const conReintento =
-    foto.estado === 'procesando' && reintento && (reintento.motivo || (reintento.enSeg ?? 0) > 0);
-  const urlAmpliada = ampliada === 'mejorada' ? (foto.mejorada ?? foto.original) : foto.original;
-  const puedeRestaurar = alRestaurar !== null && idServidor !== null && foto.estado !== 'procesando';
+  /* [08AA-32] Estado interactivo en el hook; aquí JSX + presentación. */
+  const {
+    ampliada,
+    setAmpliada,
+    restaura,
+    descarga,
+    conReintento,
+    urlAmpliada,
+    puedeRestaurar,
+    restaurar,
+    descargar,
+  } = useTarjetaFotoMejora({ foto, alRestaurar, idServidor, reintento });
 
-  /* Restaurar descarta la mejorada del servidor y deja el original
-   * vigente; el llamador limpia además la copia local (queda pendiente
-   * para mejorarla de nuevo). Con confirmación: es un borrado real. */
-  async function restaurar() {
-    if (!alRestaurar || restaura.enCurso) return;
-    if (
-      !confirmar(
-        'Descartar la mejorada del servidor y volver al original? La foto quedará pendiente para mejorarla de nuevo.',
-      )
-    ) {
-      return;
-    }
-    setRestaura({ enCurso: true, error: null });
-    try {
-      await alRestaurar();
-      setRestaura({ enCurso: false, error: null });
-    } catch (e) {
-      setRestaura({ enCurso: false, error: e instanceof Error ? e.message : 'No se pudo restaurar el original.' });
-    }
-  }
-  /* Descarga original o mejorada como archivo (vía blob temporal; el
-   * atributo `download` se ignora entre orígenes). El fallo queda visible
-   * en la tarjeta, nunca silenciado. */
-  async function descargar(cual: 'original' | 'mejorada') {
-    const url = cual === 'mejorada' ? foto.mejorada : foto.original;
-    if (!url || descarga.enCurso) return;
-    setDescarga({ enCurso: true, error: null });
-    try {
-      await descargarUrl(url, nombreArchivo(url, cual));
-      setDescarga({ enCurso: false, error: null });
-    } catch (e) {
-      setDescarga({ enCurso: false, error: e instanceof Error ? e.message : 'No se pudo descargar la foto.' });
-    }
-  }
   return (
     <div className="overflow-hidden rounded-lg border bg-card">
       <div className="grid grid-cols-2 gap-px bg-border">
@@ -170,11 +126,11 @@ export function TarjetaFotoMejora(props: {
           <span className="text-[11px] text-muted-foreground">intento {foto.intentos}</span>
         )}
         {conReintento && (
-          <span className="text-[11px] text-muted-foreground" title={reintento.motivo ?? undefined}>
-            {(reintento.enSeg ?? 0) > 60
-              ? `reintento en ~${Math.ceil((reintento.enSeg ?? 0) / 60)} min`
+          <span className="text-[11px] text-muted-foreground" title={conReintento.motivo ?? undefined}>
+            {(conReintento.enSeg ?? 0) > 60
+              ? `reintento en ~${Math.ceil((conReintento.enSeg ?? 0) / 60)} min`
               : 'reintento en cola'}{' '}
-            · intento {reintento.intentos}
+            · intento {conReintento.intentos}
           </span>
         )}
         {/* 259A-3: acciones en menú contextual de 3 puntos (mismo patrón
