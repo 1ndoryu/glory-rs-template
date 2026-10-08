@@ -53,6 +53,7 @@ export function ClientesDuena() {
             size="sm"
             disabled={!alta.telefono.trim()}
             onClick={() => {
+              /* sentinel-disable-next-line promise-sin-catch -- [08AA-26] catch-interno: alta() captura en use-clientes.ts y expone c.error (renderizado arriba); la promesa nunca rechaza. */
               void c.alta(alta.nombre, alta.telefono).then(() => {
                 setAlta({ nombre: '', telefono: '' });
               });
@@ -164,6 +165,7 @@ export function ClientesDuena() {
                       size="sm"
                       disabled={!envio.texto.trim()}
                       onClick={() => {
+                        /* sentinel-disable-next-line promise-sin-catch -- [08AA-26] catch-interno: enviar() captura en use-clientes.ts y expone c.error (renderizado arriba); la promesa nunca rechaza. */
                         void c.enviar(sel.id, envio.texto, envio.media).then(() => setEnvio({ texto: '', media: '' }));
                       }}
                     >

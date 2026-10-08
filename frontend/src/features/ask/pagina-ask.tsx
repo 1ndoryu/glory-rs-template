@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { useAsk } from '../../hooks/ask/use-ask';
 import { useLogin } from '../../hooks/sesion/use-login';
 import { useSesion } from '../../hooks/sesion/use-sesion';
@@ -203,9 +204,15 @@ function PreguntaActual({
       {inmueble.descripcion.trim() && (
         <p className={`mt-1 text-xs ${CLASE_TINTA} opacity-70`}>{inmueble.descripcion}</p>
       )}
-      {/* Progreso: aviso visual del % completado (nunca bloquea). */}
+      {/* Progreso: aviso visual del % completado (nunca bloquea).
+       * [08AA-26] Ancho dinamico via CSS var (`--progreso`), no `width`
+       * inline: el valor fluye de JS a CSS y la regla inline-style
+       * (exencion [054A-19]) no marca. */}
       <div className={`mt-2 h-2 w-full border ${CLASE_BORDE}`}>
-        <div className={`${CLASE_ACTIVO} h-full`} style={{ width: `${porcentaje}%` }} />
+        <div
+          className={`${CLASE_ACTIVO} h-full w-[var(--progreso)]`}
+          style={{ '--progreso': `${porcentaje}%` } as CSSProperties}
+        />
       </div>
       <p className={`mt-1 text-xs ${CLASE_TINTA} opacity-70`}>Ficha al {porcentaje}%{faltan > 0 ? ` · faltan ${faltan}` : ' · completa'}</p>
       {!paso ? (
