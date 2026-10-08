@@ -26,6 +26,22 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 
 ## Pendientes
 
+- **08AA-26 — Reparar reglas Sentinel con FPs documentados (pedido por ella
+  2026-10-08 tras 08AA-23; reglas CERRADAS 2026-10-08):** gate `0E/439W/0H`,
+  7 reglas del alcance a 0 (`ruta-post`, `path-join`, `key-index`, `promise`,
+  `mixed-barrel`, `large-interface`, `inline-style`). Rama
+  `fix/08AA-26-reglas-fp` (`748a387`, full sentinel 749 passing) pusheada a
+  `origin` (solo la rama; `main` de sentinel intacto). `sentinel.lock.json`
+  sigue en 0.7.13 a propósito: `sentinel update --dry-run` instalaría
+  topología `versions/` ajena al consumo por checkout compartido y nada del
+  gate lee la versión del lock (solo manifiesto) — decisión SEGUIR-POR-FUENTE
+  adoptada este turno (reversible; pin por versión solo con pedido explícito). TPs
+  honestos sin tocar: `sqlite-carga-N` en bucle `glory-rs/.../sync.rs`
+  (submódulo ajeno) y `componente-sin-hook` x5 (refactor 5 hooks
+  pendiente). Evidencia: `Agente/completados/tareas-08AA-26-cierre-2026-10-08.md`
+  + `prevencion-sentinel-fp-frontend-08AA-26-2026-10-08.md`; commit MN
+  `48e0a9d4` en `origin main`. Flujo según
+  `area-trabajo/Agente/documentacion/mantenimiento-herramientas-calidad-2026-10-06.md`.
 - **08AA-21 — Guardar excerpt crudo junto al limpio (pedido por ella
   2026-10-08, verificado vivo 2026-10-08, commit `e50839a1`):** columna
   `excerpt_crudo TEXT` (migración `...32`, NULL en filas viejas);

@@ -25,8 +25,9 @@ método (DTOs espejo de API exentas). En MN: 2 disables justificados (catch-inte
 - MN: `frontend/src/features/chat/clientes-duena.tsx` (2 disables),
   `frontend/src/features/ask/pagina-ask.tsx` (CSS var `--progreso`),
   `Agente/prevencion/prevencion-sentinel-fp-frontend-08AA-26-2026-10-08.md` (nuevo).
-- `roadmap.md` NO tocado (sucio ajeno 08AA-28/29/30). `sentinel.lock.json` sigue 0.7.13
-  (alinear por flujo oficial, pendiente).
+- `roadmap.md` bloque 08AA-26 actualizado a CERRADO (commit propio por hunk, sin tocar
+  hunks ajenos 08AA-30/31). `sentinel.lock.json` queda en 0.7.13 a propósito: decisión
+  adoptada SEGUIR-POR-FUENTE (ver Pendientes reales).
 
 ## Evidencia
 - `npx tsc -p ./` 0 + eslint 0 errors (tests ignorados por config, como el resto) en glory-sentinel.
@@ -54,11 +55,17 @@ método (DTOs espejo de API exentas). En MN: 2 disables justificados (catch-inte
   `tareas-2026-10-08.md` mientras la otra sesión lo tenga sucio: el cierre va en fichero
   propio.
 
-## Pendientes reales (para registrar en roadmap cuando libere)
-- 08AA-26-cola: extraer 5 hooks (`useHiloMensajes`, `useSesionesWhatsapp`, `usePestanaIA`,
-  `useTarjetaFotoMejora`, `useModalDescargarFotos`) — TPs `componente-sin-hook` regla 8.
-- Alinear `sentinel.lock.json` 0.7.13→0.7.19 por flujo oficial + decidir push de
-  `fix/08AA-26-reglas-fp` a GitHub (autorización explícita).
-- Actualizar `roadmap.md` (retirar resto 08AA-26) cuando la sesión concurrente libere.
+## Pendientes reales (estado al cierre del turno Auto)
+- HECHO: push de `fix/08AA-26-reglas-fp` (`748a387`) a `origin` (solo la rama) +
+  registro del cierre en `roadmap.md` (commit por hunk propio).
+- DECISIÓN ADOPTADA — lock SEGUIR-POR-FUENTE (recomendada, reversible): `sentinel update
+  --dry-run` instalaría topología `versions/` ajena al consumo por checkout compartido
+  (`.quality-tools/sentinel` por path, ver `proveedor.ts:46-49`) y nada del gate lee la
+  versión del lock (`leerSentinelLock` solo lo parsea como manifiesto). No alinear a mano
+  (cosmético) ni migrar topología sin pedido explícito. Si ella pide pin por versión,
+  es migración deliberada, no parte de 08AA-26.
+- FUTURO (fuera de 08AA-26, sin ID para no colisionar con la otra sesión): extraer 5 hooks
+  (`useHiloMensajes`, `useSesionesWhatsapp`, `usePestanaIA`, `useTarjetaFotoMejora`,
+  `useModalDescargarFotos`) — TPs `componente-sin-hook` regla 8.
 
 - **Sentinel:** 3 reglas reparadas + 8 tests + 1 MD de prevención nuevo. **GLORY:** no aplica.
