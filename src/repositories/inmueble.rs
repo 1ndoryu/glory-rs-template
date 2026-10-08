@@ -111,6 +111,15 @@ impl InmuebleRepository {
         .await
     }
 
+    /* [08AA-10] Títulos publicados (id + título) para emparejar el aviso de
+     * Facebook del hilo cuando no hay `avisoId` (piloto: siempre). Solo
+     * publicados: un borrador jamás cita el precio de un aviso oculto. */
+    pub async fn titulos_publicados(pool: &PgPool) -> Result<Vec<(Uuid, String)>, sqlx::Error> {
+        sqlx::query_as("SELECT id, titulo FROM inmuebles WHERE publicado = TRUE")
+            .fetch_all(pool)
+            .await
+    }
+
     pub async fn list_admin(
         pool: &PgPool,
         page: i64,

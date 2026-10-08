@@ -9,10 +9,23 @@ use uuid::Uuid;
 
 use crate::errors::AppError;
 use crate::models::InmuebleRow;
+use crate::repositories::InmuebleRepository;
 
 /* [08AA-7] Singleflight vive en su dominio (`marketplace_vuelo`); se
  * re-exporta para no mover sus usos externos (`lib.rs`, handlers, sombra). */
 pub use super::marketplace_vuelo::{Generado, Singleflight};
+
+/* [08AA-8] Texto puro (schema, excerpt, matriz, precio) vive en su dominio
+ * (`marketplace_texto`); se re-exporta para no mover sus usos externos
+ * (handlers, utoipa, sombra, tests). */
+pub use super::marketplace_texto::{
+    matriz_negativa, matriz_negativa_con_precio, normalizar_excerpt, precio_del_aviso,
+    precio_publico, validar_borrador, BorradorRequest, ExcerptIn, ExtrasIn, Largo, Tono,
+};
+/* Solo tests (`super::es_hex64` en `pruebas`): fuera de `cfg(test)` sería
+ * import sin uso y rompería `clippy -D warnings` (mismo patrón que `ia.rs`). */
+#[cfg(test)]
+use super::marketplace_texto::es_hex64;
 
 /// Versión del strip aceptada (`strip_vN` del plan: hoy solo v1).
 pub const STRIP_VERSION: &str = "v1";
@@ -42,6 +55,90 @@ pub fn asegurar_contacto(texto: &str) -> String {
         t.push_str(CONTACTO_WA);
     }
     t
+}
+
+/// [08AA-11] Párrafos coherentes para el borrador que se copia a
+/// `WhatsApp`: la IA a veces devuelve líneas sueltas (venía de pedirle
+/// "máximo 6 líneas") o pega el contacto al final de la frase anterior.
+/// Reglas deterministas: cada salto simple dentro de un párrafo se vuelve
+/// espacio; los bloques se separan con una línea en blanco; la invitación
+/// de contacto y el enlace wa.me siempre abren su propio párrafo; los
+/// ítems de lista (`1. `, `- `, `• `) quedan en párrafo propio.
+#[must_use]
+pub fn formatear_parrafos(texto: &str) -> String {
+    let plano = texto.replace("\r\n", "\n").replace('\r', "\n");
+    let marca_contacto = format!("Cualquier cosa escríbeme al {CONTACTO_TEL}");
+    let con_contacto = partir_pegado(&plano, &marca_contacto);
+    let con_wa = partir_pegado(&con_contacto, CONTACTO_WA);
+    let mut parrafos: Vec<String> = Vec::new();
+    let mut actual = String::new();
+    for linea in con_wa.lines() {
+        let l = linea.trim();
+        if l.is_empty() {
+            vaciar_parrafo(&mut actual, &mut parrafos);
+            continue;
+        }
+        if es_item_lista(l) {
+            vaciar_parrafo(&mut actual, &mut parrafos);
+            parrafos.push(l.to_string());
+            continue;
+        }
+        if !actual.is_empty() {
+            actual.push(' ');
+        }
+        actual.push_str(l);
+    }
+    vaciar_parrafo(&mut actual, &mut parrafos);
+    parrafos.join("\n\n")
+}
+
+/// Vacía el párrafo en curso a la lista (sin el cierre no se puede usar
+/// cierre + `push` directo: doble préstamo mutable del acumulador).
+fn vaciar_parrafo(actual: &mut String, parrafos: &mut Vec<String>) {
+    if !actual.trim().is_empty() {
+        parrafos.push(actual.trim().to_string());
+        actual.clear();
+    }
+}
+
+/// Corta `marca` a su propia línea cuando viene pegada a texto previo
+/// (con espacio simple). Si ya abre línea se deja intacta.
+fn partir_pegado(texto: &str, marca: &str) -> String {
+    let mut fuera = String::with_capacity(texto.len() + 8);
+    let mut resto = texto;
+    while let Some(pos) = resto.find(marca) {
+        let antes = &resto[..pos];
+        fuera.push_str(antes);
+        if !(antes.is_empty() || antes.ends_with('\n')) {
+            fuera.push_str("\n\n");
+        }
+        fuera.push_str(marca);
+        resto = &resto[pos + marca.len()..];
+    }
+    fuera.push_str(resto);
+    fuera
+}
+
+/// Ítem de lista al inicio de la línea: `1. `, `2) `, `- ` o `• `.
+/// Todo por `chars` (nunca por bytes: `•` es multibyte).
+fn es_item_lista(linea: &str) -> bool {
+    let mut letras = linea.chars();
+    match letras.next() {
+        Some('-' | '•') => letras.next() == Some(' '),
+        Some(c) if c.is_ascii_digit() => {
+            let mut cola = linea.chars();
+            cola.next();
+            let mut cola = cola.peekable();
+            while cola.peek().is_some_and(char::is_ascii_digit) {
+                cola.next();
+            }
+            match cola.next() {
+                Some('.' | ')') => matches!(cola.next(), Some(' ') | None),
+                _ => false,
+            }
+        }
+        _ => false,
+    }
 }
 
 /// Prompt seguro: solo los 6 campos del allowlist. La frase canónica de la
@@ -79,248 +176,12 @@ pub fn strip_ficha_para_prompt(ficha: &InmuebleRow, strip: &str) -> Result<Promp
     })
 }
 
-/// `$43.000`: miles con punto, sin decimales, solo con strings (sin casts).
-#[must_use]
-pub fn precio_publico(precio: f64) -> String {
-    let digitos = format!("{precio:.0}");
-    format!("${}", agrupar_miles(&digitos))
-}
+/* [08AA-8] `precio_publico`, schema M3 (`BorradorRequest`…),
+ * `validar_borrador` y `normalizar_excerpt` viven en `marketplace_texto.rs`
+ * (re-export arriba para usos externos e internos). */
 
-fn agrupar_miles(digitos: &str) -> String {
-    let mut fuera = String::with_capacity(digitos.len() + digitos.len() / 3);
-    for (i, c) in digitos.chars().enumerate() {
-        let resto = digitos.len() - i;
-        if i > 0 && resto.is_multiple_of(3) {
-            fuera.push('.');
-        }
-        fuera.push(c);
-    }
-    fuera
-}
-
-/// Schema M3 v1 (espeja `plugins-opencode/src/nucleo/schema.ts`).
-#[derive(Debug, Clone, Deserialize, ToSchema)]
-pub struct ExcerptIn {
-    pub remitente_hash: String,
-    pub texto: String,
-    pub hora: String,
-    /* [C1-lab 2026-10-07] default: el puente del piloto no lo manda y no se
-     * usa en ningun calculo; exigirlo rompia la integracion con 422. */
-    #[serde(default)]
-    pub leido: bool,
-}
-
-#[derive(Debug, Clone, Deserialize, ToSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum Tono {
-    Corto,
-    Amable,
-    Formal,
-}
-
-#[derive(Debug, Clone, Deserialize, ToSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum Largo {
-    S,
-    M,
-    L,
-}
-
-#[derive(Debug, Clone, Deserialize, ToSchema)]
-pub struct ExtrasIn {
-    pub tono: Tono,
-    pub largo: Largo,
-}
-
-#[derive(Debug, Clone, Deserialize, ToSchema)]
-pub struct BorradorRequest {
-    #[serde(rename = "threadId")]
-    pub thread_id: String,
-    pub firma: String,
-    pub firma_version: String,
-    pub lang: String,
-    pub excerpt: ExcerptIn,
-    #[serde(rename = "avisoId")]
-    pub aviso_id: Option<String>,
-    pub extras: Option<ExtrasIn>,
-}
-
-fn es_hex64(s: &str) -> bool {
-    s.len() == 64 && s.chars().all(|c| c.is_ascii_hexdigit())
-}
-
-/// Valida el schema y devuelve la lista de motivos (vacía = válido).
-/// El 422 del handler sale de aquí; el parse JSON fallido sale de axum.
-#[must_use]
-pub fn validar_borrador(r: &BorradorRequest) -> Vec<String> {
-    let mut errores = Vec::new();
-    if r.thread_id.trim().is_empty() {
-        errores.push("threadId requerido".to_string());
-    }
-    if !es_hex64(&r.firma) {
-        errores.push("firma debe ser hex64".to_string());
-    }
-    if r.firma_version != "firma-v1" {
-        errores.push("firma_version debe ser firma-v1".to_string());
-    }
-    if !(r.lang.len() == 2 && r.lang.chars().all(|c| c.is_ascii_lowercase())) {
-        errores.push("lang ISO 2 letras minúsculas".to_string());
-    }
-    if !es_hex64(&r.excerpt.remitente_hash) {
-        errores.push("excerpt.remitente_hash debe ser hex64".to_string());
-    }
-    let n = r.excerpt.texto.chars().count();
-    if n == 0 || n > 2000 {
-        errores.push("excerpt.texto 1..2000 caracteres".to_string());
-    }
-    if !es_hora_caracas(&r.excerpt.hora) {
-        errores.push("excerpt.hora debe ser ISO8601 America/Caracas (-04:00)".to_string());
-    }
-    if r.aviso_id.as_deref().is_some_and(str::is_empty) {
-        errores.push("avisoId null o string no vacío".to_string());
-    }
-    errores
-}
-
-/// RFC3339 con desplazamiento exactamente -04:00 (hora de Caracas).
-fn es_hora_caracas(hora: &str) -> bool {
-    DateTime::parse_from_rfc3339(hora).is_ok_and(|f| f.offset().local_minus_utc() == -4 * 3600)
-}
-
-/// [08AA-5] Limpieza del excerpt del puente antes de guardarlo y de pasarlo
-/// a la IA. El DOM de Messenger repite cada mensaje en dos nodos (texto
-/// visible + `aria-label`: por eso la conversación salía dos veces) e
-/// inyecta ruido: tips de seguridad, aviso de Meta, `X inició este chat`,
-/// chrome (`View buyer`, `More options`), composer y respuestas rápidas.
-/// Literales calibrados con el HTML real de ella
-/// (`Agente/documentacion/usuario/conversacion-html-facebook.md`, hilo
-/// Riberas del Caroní). Se conserva el orden y las marcas
-/// `Cliente:`/`Dueña:` que el prompt necesita; si solo había ruido se
-/// devuelve vacío y el handler conserva el original (nunca se guarda vacío).
-#[must_use]
-pub fn normalizar_excerpt(texto: &str) -> String {
-    let mut fuera: Vec<&str> = Vec::new();
-    for linea in texto.lines() {
-        let t = linea.trim();
-        let duplicada = fuera.last().is_some_and(|&u| u == t);
-        if !t.is_empty() && !es_ruido_excerpt(t) && !duplicada {
-            fuera.push(t);
-        }
-    }
-    fuera.join("\n")
-}
-
-/// Prefijos literales de ruido de Facebook (ES + EN).
-const RUIDO_EXCERPT_PREFIJOS: &[&str] = &[
-    "Si te vas a reunir con alguien",
-    "If you're meeting someone",
-    "If you are meeting someone",
-    "Meta podría usar tecnología",
-    "Meta may use technology",
-    "Escribe en ",
-    "Write to ",
-    "Presionar Enter",
-    "Press Enter",
-    "Mensaje enviado",
-    "Message sent",
-];
-
-/// Líneas completas del chrome del visor (comparación exacta).
-const RUIDO_EXCERPT_EXACTO: &[&str] = &[
-    "View buyer",
-    "More options",
-    "Ver perfil",
-    "Enviar mensaje",
-    "Escribir mensaje",
-    "Aa",
-    "Ver más consejos de seguridad",
-    "See more safety tips",
-    "Toca una respuesta",
-    "Tap a reply",
-    "Envía una respuesta rápida",
-    "Send a quick reply",
-    "Visto",
-    "Seen",
-];
-
-/// Respuestas rápidas sugeridas por Facebook: solo se filtran sin marca de
-/// rol (el chip centrado no trae `Cliente:`/`Dueña:`). Si el cliente las
-/// escribe de verdad, llevan marca y se conservan.
-const RESPUESTAS_RAPIDAS_FB: &[&str] = &[
-    "Sí. ¿Te interesa?",
-    "Sí. ¿Sigue disponible?",
-    "¿Cuál es el precio?",
-    "Yes. Are you interested?",
-    "Yes. Is this still available?",
-    "What is the price?",
-];
-
-/// Cuerpo de la línea sin la marca de rol (`Cliente:`/`Dueña:`), si la trae.
-fn cuerpo_sin_marca(linea: &str) -> &str {
-    linea
-        .strip_prefix("Cliente:")
-        .or_else(|| linea.strip_prefix("Dueña:"))
-        .map_or(linea, str::trim_start)
-}
-
-fn es_ruido_excerpt(linea: &str) -> bool {
-    let cuerpo = cuerpo_sin_marca(linea);
-    if cuerpo.contains("inició este chat") || cuerpo.contains("started this chat") {
-        return true;
-    }
-    if RUIDO_EXCERPT_PREFIJOS.iter().any(|p| cuerpo.starts_with(p)) {
-        return true;
-    }
-    if RUIDO_EXCERPT_EXACTO.contains(&cuerpo) {
-        return true;
-    }
-    let sin_marca = cuerpo.len() == linea.len();
-    sin_marca && RESPUESTAS_RAPIDAS_FB.contains(&cuerpo)
-}
-
-/// Matriz negativa v2 sobre el borrador generado: teléfono (7+ dígitos),
-/// email o URL → la IA no entrega contacto salvo el fijo de [07AA-8]
-/// (`CONTACTO_TEL` + `CONTACTO_WA` literales; lo demás sigue bloqueado).
-/// Con `precio` conocido (v2, [07AA-9]): el literal citado y sus dígitos no
-/// cuentan — si no, "125.000$" + "3 habitaciones" sumaría 7 y caería como
-/// "teléfono". Compromiso: un teléfono alucinado que contenga los dígitos
-/// exactos del precio pasaría; el resto sigue bloqueado.
-/// Devuelve el motivo o `None` si pasa.
-#[must_use]
-pub fn matriz_negativa(texto: &str) -> Option<&'static str> {
-    matriz_negativa_con_precio(texto, None)
-}
-
-/// Variante con precio del aviso eximido (ver `matriz_negativa`).
-#[must_use]
-pub fn matriz_negativa_con_precio(texto: &str, precio: Option<&str>) -> Option<&'static str> {
-    let min = texto.to_lowercase();
-    let mut limpio = min
-        .replace(&CONTACTO_WA.to_lowercase(), "")
-        .replace(&CONTACTO_TEL.to_lowercase(), "");
-    let mut digitos_conocidos = String::new();
-    if let Some(p) = precio {
-        let pl = p.to_lowercase();
-        if limpio.contains(&pl) {
-            limpio = limpio.replace(&pl, "");
-        }
-        digitos_conocidos = pl.chars().filter(char::is_ascii_digit).collect();
-    }
-    if limpio.contains('@') {
-        return Some("email");
-    }
-    if limpio.contains("http") || limpio.contains("wa.me") || limpio.contains("www.") {
-        return Some("url");
-    }
-    let mut digitos: String = limpio.chars().filter(char::is_ascii_digit).collect();
-    if !digitos_conocidos.is_empty() {
-        digitos = digitos.replace(&digitos_conocidos, "");
-    }
-    if digitos.len() >= 7 {
-        return Some("telefono");
-    }
-    None
-}
+/* [08AA-8] `normalizar_excerpt` + `matriz_negativa*` viven en
+ * `marketplace_texto.rs` (re-export arriba). */
 
 /// [07AA-10] Nombre del cliente desde el hilo (`alejandro|casa en venta...`
 /// → `Alejandro`): el borrador lo saluda por su nombre. `sin-hilo` o sin
@@ -346,95 +207,8 @@ pub fn nombre_de_thread(thread_id: &str) -> Option<String> {
     )
 }
 
-/// [07AA-9] Precio publicado en el título del aviso (`125.000$`, `$95.000`,
-/// `USD 120.000`): en el piloto no hay ficha, pero el título de Facebook sí
-/// trae el precio y la IA debe darlo directo en vez del fallback. Sin `regex`
-/// en el árbol: escaneo manual, moneda antes o después del número.
-#[must_use]
-pub fn precio_del_aviso(aviso: &str) -> Option<String> {
-    let lower = aviso.to_lowercase();
-    let bytes = lower.as_bytes();
-    let mut i = 0;
-    while i < bytes.len() {
-        /* Avance por bytes: jamás se trocea a mitad de un carácter
-         * multibyte (p. ej. la `í` de "peonías"). */
-        if !lower.is_char_boundary(i) {
-            i += 1;
-            continue;
-        }
-        let marca_len = if bytes[i] == b'$' {
-            1
-        } else if lower[i..].starts_with("usd") || lower[i..].starts_with("vef") {
-            3
-        } else {
-            i += 1;
-            continue;
-        };
-        let fin_marca = i + marca_len;
-        if let Some(n) =
-            numero_cercano(&lower, i, true).or_else(|| numero_cercano(&lower, fin_marca, false))
-        {
-            let moneda = if marca_len == 1 {
-                "$"
-            } else {
-                &lower[i..fin_marca]
-            };
-            return Some(if numero_antes(&lower, i) {
-                format!("{n}{moneda}")
-            } else {
-                format!("{moneda} {n}")
-            });
-        }
-        i = fin_marca;
-    }
-    None
-}
-
-/// Número pegado a la marca: hacia atrás (`hacia_atras`) o hacia adelante,
-/// permitiendo espacios y separadores de miles. Mínimo 4 dígitos (evita
-/// "casa 2" o pisos sueltos).
-fn numero_cercano(texto: &str, pos: usize, hacia_atras: bool) -> Option<String> {
-    let mut j = pos;
-    let bytes = texto.as_bytes();
-    if hacia_atras {
-        while j > 0 && (bytes[j - 1] == b' ' || bytes[j - 1] == b'\t') {
-            j -= 1;
-        }
-        let mut k = j;
-        while k > 0
-            && (bytes[k - 1].is_ascii_digit() || bytes[k - 1] == b'.' || bytes[k - 1] == b',')
-        {
-            k -= 1;
-        }
-        let num = texto[k..j].trim_matches(['.', ',']);
-        numero_valido(num).then(|| num.to_string())
-    } else {
-        while j < bytes.len() && (bytes[j] == b' ' || bytes[j] == b'\t') {
-            j += 1;
-        }
-        let mut k = j;
-        while k < bytes.len() && (bytes[k].is_ascii_digit() || bytes[k] == b'.' || bytes[k] == b',')
-        {
-            k += 1;
-        }
-        let num = texto[j..k].trim_matches(['.', ',']);
-        numero_valido(num).then(|| num.to_string())
-    }
-}
-
-fn numero_valido(num: &str) -> bool {
-    !num.is_empty()
-        && num
-            .chars()
-            .all(|c| c.is_ascii_digit() || c == '.' || c == ',')
-        && num.chars().filter(char::is_ascii_digit).count() >= 4
-}
-
-/// ¿El número está a la izquierda de la marca (`125.000$`) o a la derecha
-/// (`$ 125.000`)? Decide el orden del literal devuelto.
-fn numero_antes(texto: &str, pos_marca: usize) -> bool {
-    numero_cercano(texto, pos_marca, true).is_some()
-}
+/* [08AA-8] `precio_del_aviso` vive en `marketplace_texto.rs`
+ * (re-export arriba). */
 
 /// [07AA-8] Título del aviso desde el `thread_id` del puente
 /// (`comprador|aviso`, minúsculas, tope 120): contexto aproximado para abrir
@@ -449,6 +223,164 @@ pub fn aviso_fb_de_thread(thread_id: &str) -> Option<String> {
         return None;
     }
     Some(aviso.to_string())
+}
+
+/// [08AA-10] El piloto no trae `avisoId`, pero el título del hilo sí nombra
+/// el aviso y el catálogo tiene la ficha con el precio real: se empareja
+/// en el backend (fuente de verdad) en vez de fiarse del DOM. Sin
+/// `regex` en el árbol: normalización manual (caja, tildes, ruido).
+#[must_use]
+pub fn normalizar_titulo(s: &str) -> String {
+    let mut fuera = String::with_capacity(s.len());
+    for c in s.to_lowercase().chars() {
+        if c.is_alphanumeric() {
+            fuera.push(quitar_tilde(c));
+        } else if !fuera.ends_with(' ') {
+            fuera.push(' ');
+        }
+    }
+    fuera.trim().to_string()
+}
+
+/// Minúsculas ya aplicadas por quien llama.
+fn quitar_tilde(c: char) -> char {
+    match c {
+        'á' | 'à' | 'ä' | 'â' => 'a',
+        'é' | 'è' | 'ë' | 'ê' => 'e',
+        'í' | 'ì' | 'ï' | 'î' => 'i',
+        'ó' | 'ò' | 'ö' | 'ô' => 'o',
+        'ú' | 'ù' | 'ü' | 'û' => 'u',
+        'ñ' => 'n',
+        'ç' => 'c',
+        _ => c,
+    }
+}
+
+/// Palabras que no identifican un aviso (operación, tipología, zonas
+/// grandes, conectores): dos hilos distintos las comparten.
+const PALABRAS_GENERICAS_TITULO: &[&str] = &[
+    "casa",
+    "venta",
+    "alquiler",
+    "alquilo",
+    "vendo",
+    "vende",
+    "apto",
+    "apartamento",
+    "terreno",
+    "local",
+    "galpon",
+    "oficina",
+    "town",
+    "house",
+    "townhouse",
+    "quinta",
+    "villa",
+    "edificio",
+    "piso",
+    "anexo",
+    "habitacion",
+    "habitaciones",
+    "urb",
+    "urbanizacion",
+    "residencia",
+    "residencias",
+    "conjunto",
+    "sector",
+    "zona",
+    "centro",
+    "norte",
+    "sur",
+    "este",
+    "oeste",
+    "puerto",
+    "ordaz",
+    "ciudad",
+    "guayana",
+    "bolivar",
+    "san",
+    "felix",
+    "en",
+    "de",
+    "del",
+    "la",
+    "el",
+    "los",
+    "las",
+    "con",
+    "por",
+    "para",
+    "negociable",
+];
+
+/// Palabra sin valor identificativo: corta, cifra, precio (`vef0`,
+/// `usd120000`) o genérica del negocio.
+fn es_generica(palabra: &str) -> bool {
+    palabra.len() <= 2
+        || palabra.chars().all(|c| c.is_ascii_digit())
+        || palabra.starts_with("vef")
+        || palabra.starts_with("usd")
+        || palabra.starts_with('$')
+        || PALABRAS_GENERICAS_TITULO.contains(&palabra)
+}
+
+/// `(directo, solape, distintivo)`: `directo` si un título normalizado
+/// contiene al otro (títulos de ≥12 caracteres: un "apto" suelto no vale);
+/// si no, conteo de palabras compartidas y cuántas son distintivas.
+#[must_use]
+pub fn puntaje_titulo(fb: &str, titulo: &str) -> (bool, usize, usize) {
+    let fb_n = normalizar_titulo(fb);
+    let titulo_n = normalizar_titulo(titulo);
+    if fb_n.is_empty() || titulo_n.is_empty() {
+        return (false, 0, 0);
+    }
+    let directo = (fb_n.contains(&titulo_n) || titulo_n.contains(&fb_n))
+        && fb_n.len() >= 12
+        && titulo_n.len() >= 12;
+    let en_fb: std::collections::HashSet<&str> = fb_n.split(' ').collect();
+    let mut solape = 0;
+    let mut distintivo = 0;
+    for p in titulo_n.split(' ') {
+        if p.len() > 2 && en_fb.contains(p) {
+            solape += 1;
+            if !es_generica(p) {
+                distintivo += 1;
+            }
+        }
+    }
+    (directo, solape, distintivo)
+}
+
+/// Ficha publicada cuyo título mejor empareja con el del hilo: directo, o
+/// solape ≥3 con ≥1 palabra distintiva. Empate entre dos avisos o BD
+/// caída = `None` (nunca se cita un precio dudoso; quien llama decide si
+/// lo registra: el borrador jamás se bloquea por esto).
+pub async fn ficha_por_titulo(
+    pool: &sqlx::PgPool,
+    titulo_fb: &str,
+) -> Result<Option<InmuebleRow>, AppError> {
+    let candidatos = InmuebleRepository::titulos_publicados(pool).await?;
+    let mut mejor: Option<(uuid::Uuid, usize, usize)> = None;
+    let mut empate = false;
+    for (id, titulo) in &candidatos {
+        let (directo, solape, distintivo) = puntaje_titulo(titulo_fb, titulo);
+        if !(directo || (solape >= 3 && distintivo >= 1)) {
+            continue;
+        }
+        let clave = (distintivo, solape);
+        match mejor {
+            Some((_, md, ms)) if (md, ms) == clave => empate = true,
+            Some((_, md, ms)) if (md, ms) > clave => {}
+            _ => {
+                mejor = Some((*id, distintivo, solape));
+                empate = false;
+            }
+        }
+    }
+    match (mejor, empate) {
+        (Some((id, _, _)), false) => Ok(InmuebleRepository::find_by_id(pool, id).await?),
+        _ => Ok(None),
+    }
 }
 
 /// [07AA-8] Últimos borradores del hilo (máx 3, recientes primero): contexto
@@ -1142,6 +1074,58 @@ mod pruebas {
         );
         assert_eq!(aviso_fb_de_thread("sin-hilo"), None);
         assert_eq!(aviso_fb_de_thread("solo|"), None);
+    }
+
+    #[test]
+    fn titulo_normaliza_tildes_caja_y_ruido() {
+        assert_eq!(
+            normalizar_titulo("VEF0 Casa en venta en Riberas del Caroní, Puerto Ordaz"),
+            "vef0 casa en venta en riberas del caroni puerto ordaz"
+        );
+        assert_eq!(normalizar_titulo("  "), "");
+    }
+
+    #[test]
+    fn puntaje_titulo_directo_con_prefijo_de_precio() {
+        /* Caso andreina 08AA-10: el título trae `VEF0` (precio 0 en
+         * Facebook) y aun así empareja con la ficha del catálogo. */
+        let (directo, _, _) = puntaje_titulo(
+            "VEF0 casa en venta en riberas del caroní, puerto ordaz",
+            "Casa en venta en Riberas del Caroní",
+        );
+        assert!(directo);
+    }
+
+    #[test]
+    fn puntaje_titulo_no_confunde_avisos_genericos() {
+        /* Mismo negocio, distinta zona: sin palabra distintiva no hay
+         * emparejamiento (un precio ajeno es peor que el dodge). */
+        let (directo, solape, distintivo) = puntaje_titulo(
+            "casa en venta en arivana",
+            "Casa en venta en Riberas del Caroní",
+        );
+        assert!(!directo);
+        assert!(solape < 3 || distintivo < 1);
+        /* Título suelto de 1 palabra jamás es directo. */
+        assert_eq!(puntaje_titulo("apto precioso apTO", "apto").0, false);
+    }
+
+    #[test]
+    fn formatear_parrafos_une_saltos_sueltos_y_separa_bloques() {
+        let entrado = "Hola, Andreina, buenas noches.\nTe escribo por la casa.\nSí, sigue disponible.\nCuéntame qué estás buscando y con gusto te ayudo, cualquier cosa escríbeme al 0424 9208855 https://wa.me/584249208855";
+        let salido = formatear_parrafos(&entrado);
+        assert_eq!(
+            salido,
+            "Hola, Andreina, buenas noches. Te escribo por la casa. Sí, sigue disponible. Cuéntame qué estás buscando y con gusto te ayudo, cualquier cosa escríbeme al 0424 9208855\n\nhttps://wa.me/584249208855"
+        );
+    }
+
+    #[test]
+    fn formatear_parrafos_respeta_lista_y_no_duplica() {
+        let entrado = "Tiene:\n1. Piscina\n2. Planta eléctrica\n\nhttps://wa.me/584249208855";
+        let salido = formatear_parrafos(&entrado);
+        assert!(salido.contains("Tiene:\n\n1. Piscina\n\n2. Planta eléctrica"));
+        assert_eq!(salido.matches(CONTACTO_WA).count(), 1);
     }
 
     #[test]

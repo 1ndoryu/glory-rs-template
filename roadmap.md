@@ -26,6 +26,76 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 
 ## Pendientes
 
+- **08AA-8 — Excerpt Marketplace sigue sucio con chrome en español
+  (reportado por ella 2026-10-08 con captura, hilo andreina):** el 08AA-5
+  calibró con el fixture (chrome en inglés) pero el hilo real trae
+  `Marketplace` suelto, `View buyer`/`More options` con mayúscula,
+  `Mensajes`, `Presionar Enter, Detalles de la conversación`,
+  `Ver perfil del comprador`, `Mensaje enviado 11:30 pm por Andreina:`,
+  `Escribir mensaje`/`Escribe en …`, títulos con `·` en vez de `-`
+  (rompe el dedup) y el mensaje del comprador duplicado con prefijos
+  distintos. Testigo exacto en BD: `mp_respuestas_cache`
+  `thread_id='andreina|VEF0 casa en venta en riberas del caroní, puerto
+  ordaz'`, `length(excerpt_texto)=614`. La respuesta/borrador sí sale
+  bien (4 partes + contacto + wa.me). Alcance: extender
+  `RUIDO_EXCERPT_*` en `src/services/marketplace.rs` con variantes ES
+  (insensible a mayúsculas donde sea seguro) + dedup tolerante a `·`/`-`
+  + test con ese excerpt exacto + regenerar la fila y verificar en el
+  panel. Pregunta abierta a ella: además de limpio, ¿quiere que el
+  excerpt se vea como chat (burbujas por mensaje) o basta el texto
+  limpio? Lo segundo es cambio mayor (hoy solo se guarda
+  `excerpt_texto` plano).
+- **08AA-8b — El excerpt no incluye la respuesta de ella (reportado por
+  ella 2026-10-08: respondió en Messenger y su mensaje no aparece):**
+  dos causas confirmadas en código. (1) El float sí distingue lados
+  (`mpDialogo()` en `marketplace-float.ts:181-214`: izq=`Cliente:`,
+  der=`Dueña:`), pero cae a texto plano sin marcas cuando la pestaña
+  está en fondo (`getBoundingClientRect` en 0 → `""` → `texto=full`,
+  línea 301); el excerpt guardado de andreina no trae ni una marca,
+  luego se generó en plano. (2) Aunque el DOM cambie, el servicio
+  reutiliza el borrador en caché (`marketplace-service.ts:191-195`:
+  "con borrador en caché se reutiliza aunque el texto cambie"); solo
+  ventana nueva o Regenerar generan y guardan excerpt fresco en el
+  backend. O sea: su respuesta posterior no refresca nada hasta
+  Regenerar. Workaround inmediato: pulsar **Regenerar en el float del
+  lab** (manda excerpt fresco + genera de nuevo). Alcance del fix:
+  política de refresco del excerpt ante mensajes nuevos (distinguiendo
+  ruido DOM de mensaje real por firma, sin romper el 08AA-1) +
+  rescatar marcas Cliente/Dueña aun con pestaña en fondo si el DOM lo
+  permite.
+- **08AA-9 — Botón Releer separado (pedido por ella 2026-10-08):** el
+  float del lab lleva un segundo botón junto a Regenerar que manda el
+  excerpt fresco al backend SIN regenerar el borrador (solo refresca la
+  foto del hilo en el panel). Backend: `POST
+  /api/admin/marketplace/releer` (`thread_id` + `excerpt`, normaliza con
+  `normalizar_excerpt`, `UPDATE mp_respuestas_cache SET excerpt_texto`
+  por `thread_id`, sin IA, con tope por minuto). Lab: botón `.mp-rere`
+   + `releerNucleoParaVentana()` + strings `reread`. **Estado
+  2026-10-08:** implementado y verificado vivo (`actualizado:true`,
+  `length(excerpt_texto)` andreina 614→222). Lab pendiente de
+  promocionar en ventana explícita.
+- **08AA-10 — El borrador no da el precio de Riberas (pedido por ella):**
+  causa raíz confirmada: `claves_cache(pool, None)` (piloto: `avisoId`
+  siempre null) nunca intenta emparejar el título del hilo contra
+  `inmuebles`, y `precio_del_aviso("VEF0 casa...")` da None (el 0 no
+  vale como cifra). El catálogo SÍ tiene `Casa en venta en Riberas del
+  Caroní` $43.000. Fix en el backend (fuente de verdad, no el DOM):
+  `ficha_por_titulo()` (normaliza tildes/caja, directo por includes,
+  si no solape ≥3 con ≥1 palabra distintiva no genérica, solo
+   publicados; fallo de BD → None sin bloquear) usada por `borrador` y
+  `regenerar` cuando no hay ficha por UUID, con sus hashes reales.
+  **Estado 2026-10-08:** verificado vivo (`/regenerar` andreina →
+  `aviso_conocido:true`, `fuente:reserva`). Texto final con precio
+  pendiente: el proveedor IA (OpenCode Go) devuelve vacío hoy
+  (`/ia/probar` cuelga; ambiental, sin tocar `ia*.rs`).
+- **08AA-11 — Borrador largo y con saltos incoherentes (pedido por
+  ella):** el prompt pedía "máximo 6 líneas" y la IA devuelve líneas
+  sueltas sin separación. Fix: prompt exige 4 párrafos cortos separados
+  por línea en blanco + `formatear_parrafos()` post-IA (colapsa 3+,
+  parte `Cualquier cosa escríbeme al TEL` y el enlace wa.me cada uno a
+   su propia línea) aplicado tras `asegurar_contacto`, con tests.
+  **Estado 2026-10-08:** implementado, gate verde (133 tests);
+  verificación visual del texto pendiente del proveedor IA.
 - **08AA-6 — Barrido progresivo baseline sentinel (activa 2026-10-08, no
   urgente)**: el tablero marca ~518 en MN (26E/483A preexistentes, verificados
   2026-10-08: ningún hallazgo nuevo de 08AA-1/3/4; el conteo incluso bajó 9).
