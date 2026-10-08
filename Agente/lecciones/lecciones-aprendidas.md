@@ -126,3 +126,13 @@
 - Sentinel `todo-prosa-sin-marcador` salta con la palabra "todo" en
   cualquier comentario (08AA-5 añadió 2 warnings con "si todo era ruido"):
   redactar comentarios sin ella ("si solo había ruido").
+- Gate "sin nuevos" exige diff calibrado por pares `ruleId|archivo`
+  baseline-vs-post con testigo (08AA-6: 509 pares base, solo 1+4 difieren):
+  comparar totales no atribuye; los pares distinguen eliminados,
+  degradados, reubicados y umbrales marginales por líneas netas.
+- `Set-Content -NoNewline` con array concatena todo en una línea y rompe
+  comparaciones posteriores (08AA-6: diff de 510 pares inservible dos veces);
+  para archivos de pares usar escritura con saltos o memoria.
+- Test que barre un canal compartido (`reencolar_fallidos`) es flaky con
+  hilos paralelos en la misma BD (08AA-6: 127/128): canal único por corrida
+  (`...-{sid.simple()}`), no `sleep` ni serialización global.

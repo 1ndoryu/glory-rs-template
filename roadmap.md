@@ -38,9 +38,21 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   Verificado 2026-10-08 ~22:40: re-escaneo gate forzado idéntico 26E/476W/7H
   (cero nuevos); secret-scan limpio en `d7d3b6d4`+`aeee01c6`; 26E = 21
   ruta-post (FP documentado) + 2 broadcast-mutex
-  (`services/marketplace.rs:827,844`) + 2 god-object
-  (`handlers/chat_staff.rs`, `handlers/chat_tools.rs`) + 1 path-join (FP
-  documentado). Lo corregible real: broadcast/god-object por refactor.
+   (`services/marketplace.rs:827,844`) + 2 god-object
+   (`handlers/chat_staff.rs`, `handlers/chat_tools.rs`) + 1 path-join (FP
+   documentado). Lo corregible real: broadcast/god-object por refactor.
+- **08AA-6 — Refactor broadcast-mutex + god-object (cerrado 2026-10-08,
+  ver `Agente/completados/tareas-2026-10-08.md`)**: fan-out `mpsc`
+  + split `chat_staff_config`/`chat_tools_definiciones`. Gate calibrado
+  (pares `ruleId|archivo` baseline vs post): errores 26→22 (−2
+  broadcast eliminados, −2 god-object degradados a warning), warnings
+  +5 (+2 degradados + 3 umbrales marginales por líneas netas: `mod.rs`
+  502/500, `services/marketplace.rs` 727/700). Cero errores nuevos.
+- **08AA-7 — Partir `handlers/mod.rs` y `services/marketplace.rs`
+  (pendiente, no urgente)**: ambos superaron su umbral sentinel por
+  líneas netas de 08AA-5+08AA-6 (`limite-lineas` + `god-object` en
+  `mod.rs`, `limite-lineas` en servicio). Partir por dominio sin
+  romper rutas; no maquillar con recorte de comentarios.
 
 ## Deploy mn-inmobiliaria.com (239A-1, en curso 2026-09-23)
 

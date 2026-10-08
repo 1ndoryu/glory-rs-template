@@ -351,8 +351,8 @@ mod pruebas {
         let Some(pool) = pool_si_hay() else { return };
         let sid = Uuid::new_v4();
         /* [08AA-6] Canal único por corrida: los tests corren en hilos
-         * paralelos contra la misma BD y `reencolar_fallidos` barre TODO
-         * el canal; con "whatsapp" fijo, un `failed` de un test hermano
+         * paralelos contra la misma BD y `reencolar_fallidos` barre el canal
+         * completo; con "whatsapp" fijo, un `failed` de un test hermano
          * colado entre medias hacía fallar el `== 0` de forma flaky. */
         let canal = format!("whatsapp-requeue-{}", sid.simple());
         let clave = clave_idempotencia(&sid.to_string(), "ia", "requeue-test");
