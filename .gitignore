@@ -52,6 +52,9 @@ desktop.ini
 !/scripts/importar-rescate.mjs
 !/scripts/bateria-ia.ps1
 !/scripts/sync-pull.mjs
+!/scripts/inmueble.mjs
+!/scripts/lib-api.mjs
+!/scripts/pelar-exif.py
 # [08AA-2] Credenciales del sync prod→local: jamás en git
 /scripts/.env.prod.local
 /backups/

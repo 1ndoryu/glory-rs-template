@@ -136,3 +136,15 @@
 - Test que barre un canal compartido (`reencolar_fallidos`) es flaky con
   hilos paralelos en la misma BD (08AA-6: 127/128): canal único por corrida
   (`...-{sid.simple()}`), no `sleep` ni serialización global.
+- Salud "listo" no es sesión viva (08AA-27): `GET /api/salud listo:true` solo
+  dice que hay cookies con forma válida; el worker puede fallar con
+  `UNAUTHENTICATED` igual. Ante error de auth del worker, renovar y reintentar
+  sin molestar; solo el login ausente (códigos 3/4) escala a ella.
+- Bytes de IA se normalizan siempre antes de subir (08AA-27): lo que devuelve
+  Gemini no siempre es PNG decodificable aunque traiga esa magia; el frontend
+  lo tapaba al re-codificar en canvas. El CLI re-codifica todo a JPG con PIL:
+  si PIL no lo abre, es basura real (guardar testigo y seguir).
+- Dedup del servidor puede devolver resultado viejo (08AA-27): F21 no duplica
+  trabajos `lista` por foto, así que reintentar con el mismo `fotoId` reutiliza
+  el resultado anterior. Usar `fotoId` único por intento cuando se quiere
+  trabajo fresco.

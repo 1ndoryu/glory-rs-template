@@ -13,86 +13,17 @@
 // Exit: 0 ok | 2 preflight/auth | 3 error de sync | 4 verificación fallida.
 // Requisito previo: backup local (pg_dump) antes de correr sin --dry-run.
 
-import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { api, leerEnv, login, nucleo, ENV_DEFECTO } from './lib-api.mjs';
 
-const AQUI = dirname(fileURLToPath(import.meta.url));
 const args = Object.fromEntries(
   process.argv.slice(2).map((a, i, arr) => (a.startsWith('--') ? [a.slice(2), arr[i + 1] ?? 'true'] : [])).filter((p) => p.length),
 );
 const DRY = args['dry-run'] === 'true' || args['dry-run'] === '';
-const ENV_RUTA = args.env ?? join(AQUI, '.env.prod.local');
-
-function leerEnv(ruta) {
-  if (!existsSync(ruta)) {
-    console.error(`FALLO preflight: no existe ${ruta}. Créalo con PROD_BASE, PROD_EMAIL, PROD_PASSWORD, LOCAL_API, LOCAL_EMAIL, LOCAL_PASSWORD.`);
-    process.exit(2);
-  }
-  const cfg = {};
-  for (const linea of readFileSync(ruta, 'utf8').split('\n')) {
-    const l = linea.trim();
-    if (!l || l.startsWith('#')) continue;
-    const i = l.indexOf('=');
-    if (i > 0) cfg[l.slice(0, i).trim()] = l.slice(i + 1).trim();
-  }
-  for (const k of ['PROD_BASE', 'PROD_EMAIL', 'PROD_PASSWORD', 'LOCAL_EMAIL', 'LOCAL_PASSWORD']) {
-    if (!cfg[k]) {
-      console.error(`FALLO preflight: falta ${k} en ${ruta}.`);
-      process.exit(2);
-    }
-  }
-  cfg.LOCAL_API = cfg.LOCAL_API ?? 'http://127.0.0.1:3110';
-  return cfg;
-}
-
-async function api(base, ruta, { metodo = 'GET', token, json, bytes } = {}) {
-  const cabeceras = {};
-  if (token) cabeceras.Authorization = `Bearer ${token}`;
-  let cuerpo;
-  if (json !== undefined) {
-    cabeceras['Content-Type'] = 'application/json';
-    cuerpo = JSON.stringify(json);
-  } else if (bytes && bytes !== true) {
-    cabeceras['Content-Type'] = 'application/octet-stream';
-    cuerpo = bytes;
-  }
-  const res = await fetch(`${base}${ruta}`, {
-    method: metodo,
-    headers: cabeceras,
-    body: cuerpo,
-    signal: AbortSignal.timeout(60000),
-  });
-  if (bytes === true) {
-    if (!res.ok) throw new Error(`${metodo} ${ruta} → ${res.status}`);
-    return Buffer.from(await res.arrayBuffer());
-  }
-  const texto = await res.text();
-  let datos = null;
-  try {
-    datos = texto ? JSON.parse(texto) : null;
-  } catch {
-    throw new Error(`${metodo} ${ruta} → respuesta no JSON: ${texto.slice(0, 120)}`);
-  }
-  if (!res.ok) throw new Error(`${metodo} ${ruta} → ${res.status}: ${texto.slice(0, 200)}`);
-  return datos;
-}
-
-/* Payload de alta/actualización con los campos que manda prod (el slug lo
- * genera el servidor desde el título: determinista, coincide si el título
- * coincide; el emparejamiento siempre es por slug, nunca por id). */
-function nucleo(p) {
-  return {
-    titulo: p.titulo, descripcion: p.descripcion, ubicacion: p.ubicacion,
-    puestos: p.puestos, residencia: p.residencia, precio: p.precio,
-    tipo: p.tipo, operacion: p.operacion, habitaciones: p.habitaciones,
-    banos: p.banos, metros: p.metros, metros_terreno: p.metros_terreno,
-    estado: p.estado, copy: p.copy ?? null, receta: p.receta ?? null,
-  };
-}
+const ENV_RUTA = args.env ?? ENV_DEFECTO;
 
 async function main() {
-  const cfg = leerEnv(ENV_RUTA);
+  const cfg = leerEnv(ENV_RUTA, ['PROD_BASE', 'PROD_EMAIL', 'PROD_PASSWORD', 'LOCAL_EMAIL', 'LOCAL_PASSWORD']);
+  cfg.LOCAL_API = cfg.LOCAL_API ?? 'http://127.0.0.1:3110';
   const PROD = cfg.PROD_BASE.replace(/\/$/, '');
   const LOCAL = cfg.LOCAL_API.replace(/\/$/, '');
   console.log(`Modo: ${DRY ? 'dry-run (sin escribir)' : 'ESPEJO prod→local (solo escribe en local)'}`);
@@ -108,8 +39,8 @@ async function main() {
       console.error(`FALLO auth ${quien}: revisa email/password en ${ENV_RUTA}.`);
       process.exit(2);
     })).token;
-  const tokenP = await login(PROD, cfg.PROD_EMAIL, cfg.PROD_PASSWORD, 'prod');
-  const tokenL = await login(LOCAL, cfg.LOCAL_EMAIL, cfg.LOCAL_PASSWORD, 'local');
+  const tokenP = await login(PROD, cfg.PROD_EMAIL, cfg.PROD_PASSWORD, 'prod', ENV_RUTA);
+  const tokenL = await login(LOCAL, cfg.LOCAL_EMAIL, cfg.LOCAL_PASSWORD, 'local', ENV_RUTA);
   console.log('Auth prod+local OK (tokens solo en memoria).');
 
   const itemsP = (await api(PROD, '/api/admin/inmuebles?page=1&per_page=200', { token: tokenP })).items;
