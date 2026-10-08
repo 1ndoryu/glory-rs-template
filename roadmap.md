@@ -13,7 +13,7 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 | Serialización | serde |
 | Base de datos | SQLx 0.8 (PostgreSQL) |
 | Migraciones | SQLx migrate |
-| Validación | validator 0.18 |
+| Validación | validator 0.20 |
 | Variables de entorno | dotenvy |
 | Logging | tracing + tracing-subscriber |
 | Errores | thiserror 2 |
@@ -26,7 +26,39 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 
 ## Pendientes
 
-(Sin pendientes.)
+- **08AA-3 — Barrido problemas sentinel (activa 2026-10-08, de mas facil a mas dificil)**:
+  gate 32E/478W/8H. Alcance: backend de este repo (el otro agente lleva solo
+  featured en el front; aqui no existe `featured`/`destacado` en `src/`).
+  No tocar `Cargo.toml`/`Cargo.lock` (08AA-1 ajena en curso, sin commit).
+  Bloques: B1 `todo-prosa` x4 → B2 `expect` x4 + `unwrap` x1 →
+  B3 `path-join` x3 → B4 `ruta-post-sin-rate-limit` x20 (waiver o limite) →
+  B5 `parametros-excesivos` x1 + resto warnings (sqlx-macros, handler-bd).
+  B5 hecho 2026-10-08: `ActualizacionInmueble<'a>` (18 campos) +
+  `update(pool,id,&cambios)` 3 params (`models/inmueble.rs`,
+  `repositories/inmueble.rs`, `services/inmueble.rs`); `check`+clippy 0,
+  `test --lib` 125 passed. Re-escaneo gate: 26E/477W/7H
+  (`parametros-excesivos` 0; `path-join` x1 y `ruta-post` x21 son falsos
+  positivos documentados en `Agente/prevencion/prevencion-sentinel-path-join-guardia-lexica-2026-10-08.md`
+  y `prevencion-sentinel-ruta-post-middleware-global-2026-10-08.md`).
+  Gotcha sqlx 0.8: `&mut Transaction` no es `Executor`, usar `tx.as_mut()`.
+  Pendiente: self-check + commit.
+- **08AA-1 — Seguridad deps cargo (activa 2026-10-08)**: `cargo audit` 7 → 1
+  (quinn-proto→0.11.19, rustls→0.23.45, webpki→0.103.15, validator 0.18→0.20 para
+  sacar idna 0.5.0; queda rsa RUSTSEC-2023-0071 sin parche upstream).
+- **08AA-4 — Bug galería Altos del Caroní (activa 2026-10-08)**: Ver inmueble
+  admin + tab Imágenes muestran original↔mejorada cruzados. Causa raíz: pareo
+  frágil por `orden` + borrado simple sin cascada ni renumerado + mejoradas
+  duplicadas de regeneraciones (dHash: mej-0→orig-1, mej-1→orig-2,
+  mej-2→orig-3, mej-3→orig-4, mej-4→orig-5, mej-5→orig-6, mej-8→orig-7 visual,
+  mej-10→orig-8, mej-14→orig-9, mej-12→orig-10, mej-13→orig-11; huérfanas
+  mej-6 sin original y dupes mej-7/mej-9/mej-11; orig-0 sin mejora).
+  Plan: F1 reparar pares por contenido (4 DELETE + 10 UPDATE, solo local) →
+  F2 backend `delete_foto` con cascada a hermana + renumerar en transacción +
+  test → F3 gate + verificación UI + commit. No tocar `Cargo.toml`/`Cargo.lock`.
+  OJO: prod sigue roto; no re-correr `sync:pull` de este inmueble hasta
+  arreglar prod o el espejo reintroduce el desfase.
+  F2 código+tests commiteados en conjunto con 08AA-3 (self-check verde);
+  pendiente F3 (gate + verificación UI).
 
 ## Deploy mn-inmobiliaria.com (239A-1, en curso 2026-09-23)
 

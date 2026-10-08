@@ -263,7 +263,7 @@ impl ClienteRepository {
 }
 
 /// Ficha comercial de una sesión para avisar al humano (ver
-/// `ficha_para_aviso`). Todo opcional salvo `modo`: sin cliente vinculado
+/// `ficha_para_aviso`). Campos opcionales salvo `modo`: sin cliente vinculado
 /// llega lo que la sesión sepa (mejor aviso parcial que ninguno).
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct FichaAviso {

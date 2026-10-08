@@ -11,6 +11,7 @@ mod inmuebles;
 pub mod marketplace;
 mod notes;
 mod public;
+mod rate_limit;
 mod solicitud;
 mod sombra;
 mod suscriptor;
@@ -259,7 +260,15 @@ pub fn create_router(pool: sqlx::PgPool, config: crate::config::AppConfig) -> Ro
             CompressionLayer::new()
                 .compress_when(SizeAbove::new(1024).and(NotForContentType::IMAGES)),
         )
-        .layer(cors);
+        .layer(cors)
+        /* [08AA-3 B4] Rate-limit global por IP (último layer = el primero
+         * que corre): cubre las 20 rutas POST sin parchear cada handler.
+         * Escrituras 120/min, lecturas 1200/min; el exceso es 429 con
+         * `Retry-After`. Ver `rate_limit.rs`. */
+        .layer(axum::middleware::from_fn_with_state(
+            rate_limit::LimitadorTasa::default(),
+            rate_limit::capa_limite,
+        ));
     app.with_state(state)
 }
 
@@ -310,10 +319,20 @@ async fn fallback_spa(
         return StatusCode::NOT_FOUND.into_response();
     }
     let base = est.static_dir.unwrap_or_default();
+    /* [08AA-3 B3] `ruta` viene de la URI (input externo): un `..` escaparía
+     * de `base` con el `join` pelado. Se canonicaliza el candidato y se
+     * exige que siga dentro de la base canonicalizada; si no existe o
+     * escapa, cae a `index.html` como cualquier otra ruta no fichero. */
+    let base_canon: PathBuf = tokio::fs::canonicalize(&base)
+        .await
+        .unwrap_or_else(|_| PathBuf::from(&base));
+    let candidato = Path::new(&base).join(ruta.trim_start_matches('/'));
+    let dentro = tokio::fs::canonicalize(&candidato)
+        .await
+        .is_ok_and(|c| c.starts_with(&base_canon));
     /* `is_file` y no `exists`: `/` resuelve al propio directorio base y debe
      * caer a `index.html` en vez de intentar leer el directorio. */
-    let candidato = Path::new(&base).join(ruta.trim_start_matches('/'));
-    let archivo = if es_fichero(&candidato).await {
+    let archivo = if dentro && es_fichero(&candidato).await {
         candidato
     } else {
         Path::new(&base).join("index.html")

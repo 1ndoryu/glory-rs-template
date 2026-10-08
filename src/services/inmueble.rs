@@ -5,9 +5,9 @@ use uuid::Uuid;
 
 use crate::errors::AppError;
 use crate::models::{
-    AddFotoRequest, CreateInmuebleRequest, FiltrosPublicos, FotoPublica, Inmueble, InmuebleRow,
-    PaginatedInmuebles, UpdateInmuebleRequest, ESTADOS, EXTENSIONES_FOTO, FORMATOS_RECETA,
-    MAX_FOTO_BYTES, OPERACIONES, ORIGENES_FOTO, TIPOS,
+    ActualizacionInmueble, AddFotoRequest, CreateInmuebleRequest, FiltrosPublicos, FotoPublica,
+    Inmueble, InmuebleRow, PaginatedInmuebles, UpdateInmuebleRequest, ESTADOS, EXTENSIONES_FOTO,
+    FORMATOS_RECETA, MAX_FOTO_BYTES, OPERACIONES, ORIGENES_FOTO, TIPOS,
 };
 use crate::repositories::InmuebleRepository;
 
@@ -124,20 +124,20 @@ impl InmuebleService {
         let row = InmuebleRepository::find_by_id(pool, id)
             .await?
             .ok_or_else(|| AppError::NotFound("Inmueble no encontrado".into()))?;
-        Ok(Self::con_fotos(pool, vec![row])
+        Self::con_fotos(pool, vec![row])
             .await?
             .pop()
-            .expect("una fila produce un inmueble"))
+            .ok_or_else(|| AppError::Internal("con_fotos devolvio vacio para una fila".into()))
     }
 
     pub async fn get_public(pool: &PgPool, slug: &str) -> Result<Inmueble, AppError> {
         let row = InmuebleRepository::find_public_by_slug(pool, slug)
             .await?
             .ok_or_else(|| AppError::NotFound("Inmueble no encontrado".into()))?;
-        Ok(Self::con_fotos(pool, vec![row])
+        Self::con_fotos(pool, vec![row])
             .await?
             .pop()
-            .expect("una fila produce un inmueble"))
+            .ok_or_else(|| AppError::Internal("con_fotos devolvio vacio para una fila".into()))
     }
 
     pub async fn list_admin(
@@ -209,34 +209,35 @@ impl InmuebleService {
             }
         }
 
-        let row = InmuebleRepository::update(
-            pool,
-            id,
-            req.titulo.as_deref(),
-            req.descripcion.as_deref(),
-            req.ubicacion.as_deref(),
-            req.puestos,
-            req.residencia.as_deref(),
-            req.precio,
-            tipo.as_deref(),
-            operacion.as_deref(),
-            req.habitaciones,
-            req.banos,
-            req.metros,
-            req.metros_terreno,
-            estado.as_deref(),
-            req.copy.as_ref().map(|c| c.corta.as_str()),
-            req.copy.as_ref().map(|c| c.larga.as_str()),
-            req.copy.as_ref().map(|c| c.modelo.as_str()),
-            req.copy.as_ref().map(|c| c.actualizada_en),
-            req.receta.clone().map(sqlx::types::Json),
-        )
-        .await?
-        .ok_or_else(|| AppError::NotFound("Inmueble no encontrado".into()))?;
-        Ok(Self::con_fotos(pool, vec![row])
+        /* [08AA-3] B5: los 18 campos viajan en `ActualizacionInmueble`
+         * (presta los `&str` de `req` + normalizados; `receta` se clona). */
+        let cambios = ActualizacionInmueble {
+            titulo: req.titulo.as_deref(),
+            descripcion: req.descripcion.as_deref(),
+            ubicacion: req.ubicacion.as_deref(),
+            puestos: req.puestos,
+            residencia: req.residencia.as_deref(),
+            precio: req.precio,
+            tipo: tipo.as_deref(),
+            operacion: operacion.as_deref(),
+            habitaciones: req.habitaciones,
+            banos: req.banos,
+            metros: req.metros,
+            metros_terreno: req.metros_terreno,
+            estado: estado.as_deref(),
+            copy_corta: req.copy.as_ref().map(|c| c.corta.as_str()),
+            copy_larga: req.copy.as_ref().map(|c| c.larga.as_str()),
+            copy_modelo: req.copy.as_ref().map(|c| c.modelo.as_str()),
+            copy_actualizada_en: req.copy.as_ref().map(|c| c.actualizada_en),
+            receta: req.receta.clone().map(sqlx::types::Json),
+        };
+        let row = InmuebleRepository::update(pool, id, &cambios)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Inmueble no encontrado".into()))?;
+        Self::con_fotos(pool, vec![row])
             .await?
             .pop()
-            .expect("una fila produce un inmueble"))
+            .ok_or_else(|| AppError::Internal("con_fotos devolvio vacio para una fila".into()))
     }
 
     pub async fn set_publicado(
@@ -247,10 +248,10 @@ impl InmuebleService {
         let row = InmuebleRepository::set_publicado(pool, id, publicado)
             .await?
             .ok_or_else(|| AppError::NotFound("Inmueble no encontrado".into()))?;
-        Ok(Self::con_fotos(pool, vec![row])
+        Self::con_fotos(pool, vec![row])
             .await?
             .pop()
-            .expect("una fila produce un inmueble"))
+            .ok_or_else(|| AppError::Internal("con_fotos devolvio vacio para una fila".into()))
     }
 
     pub async fn delete(pool: &PgPool, upload_dir: &Path, id: Uuid) -> Result<(), AppError> {
@@ -296,20 +297,21 @@ impl InmuebleService {
         upload_dir: &Path,
         foto_id: Uuid,
     ) -> Result<(), AppError> {
-        let foto = InmuebleRepository::find_foto(pool, foto_id)
-            .await?
-            .ok_or_else(|| AppError::NotFound("Foto no encontrada".into()))?;
-        InmuebleRepository::delete_foto(pool, foto_id).await?;
-        /* [249A-1] Invalida la caché de fotos (`?v=<updated_at>`). */
-        InmuebleRepository::tocar_inmueble(pool, foto.inmueble_id).await?;
-        Self::borrar_archivo(upload_dir, &foto.storage_key).await;
-        /* El thumb muere con su original (si no existe, no pasa nada):
-         * formato actual más legado `thumb-` de 320 px ([249A-4]). */
-        if let Some(clave_thumb) = Self::clave_miniatura(&foto.storage_key) {
-            Self::borrar_archivo(upload_dir, &clave_thumb).await;
-        }
-        if let Some(clave_legada) = Self::clave_miniatura_legada(&foto.storage_key) {
-            Self::borrar_archivo(upload_dir, &clave_legada).await;
+        /* [08AA-4] La cascada a la hermana + renumerado + `tocar_inmueble`
+         * ocurren en una transacción; aquí solo limpieza de disco best-effort. */
+        let Some(claves) = InmuebleRepository::delete_foto_en_cascada(pool, foto_id).await? else {
+            return Err(AppError::NotFound("Foto no encontrada".into()));
+        };
+        for clave in &claves {
+            Self::borrar_archivo(upload_dir, clave).await;
+            /* El thumb muere con su original (si no existe, no pasa nada):
+             * formato actual más legado `thumb-` de 320 px ([249A-4]). */
+            if let Some(clave_thumb) = Self::clave_miniatura(clave) {
+                Self::borrar_archivo(upload_dir, &clave_thumb).await;
+            }
+            if let Some(clave_legada) = Self::clave_miniatura_legada(clave) {
+                Self::borrar_archivo(upload_dir, &clave_legada).await;
+            }
         }
         Ok(())
     }
@@ -432,7 +434,7 @@ impl InmuebleService {
 
     /* [299A-1 E12] Las notas de voz se archivan igual que las fotos pero
      * con su propia validación: `guardar_archivo` solo acepta imágenes y
-     * todo audio caía al fallback `[media]` (la IA pedía el texto sin que el
+     * cualquier audio caía al fallback `[media]` (la IA pedía el texto sin que el
      * staff pudiera oír nada). Misma carpeta y mismo tope de tamaño. */
     pub async fn guardar_audio(
         upload_dir: &Path,
@@ -686,6 +688,129 @@ mod pruebas_receta {
             .await
             .unwrap_err();
         assert!(matches!(err, AppError::Validation(_)));
+
+        InmuebleService::delete(&pool, Path::new("."), creado.id)
+            .await
+            .unwrap();
+    }
+}
+
+/* [08AA-4] Borrado de foto sin desfase: borrar una `original` arrastra a su
+ * `mejorada` hermana y renumera el resto (orden denso); borrar solo la
+ * mejorada conserva el original (caso "regenerar"). Humo contra la BD real
+ * de rama (`DATABASE_URL`); sin ella se omite como el resto de humos. */
+#[cfg(test)]
+mod pruebas_borrado_foto {
+    use super::*;
+    use crate::models::{AddFotoRequest, CreateInmuebleRequest};
+
+    fn pool_si_hay() -> Option<PgPool> {
+        let url = std::env::var("DATABASE_URL").ok()?;
+        sqlx::postgres::PgPoolOptions::new()
+            .max_connections(1)
+            .connect_lazy(&url)
+            .ok()
+    }
+
+    fn crear_humo() -> CreateInmuebleRequest {
+        CreateInmuebleRequest {
+            titulo: "Humo borrado foto 08AA-4".to_string(),
+            descripcion: String::new(),
+            ubicacion: String::new(),
+            puestos: 0,
+            residencia: String::new(),
+            precio: 0.0,
+            tipo: "apartamento".to_string(),
+            operacion: "venta".to_string(),
+            habitaciones: 0,
+            banos: 0,
+            metros: 0.0,
+            metros_terreno: 0.0,
+            estado: "disponible".to_string(),
+            copy: None,
+        }
+    }
+
+    fn alta(orden: i32, origen: &str) -> AddFotoRequest {
+        AddFotoRequest {
+            storage_key: format!("humo-borrado-{orden}-{origen}.jpg"),
+            orden: Some(orden),
+            origen: Some(origen.to_string()),
+        }
+    }
+
+    #[tokio::test]
+    async fn borrar_original_arrastra_hermana_y_renumera() {
+        let Some(pool) = pool_si_hay() else { return };
+        let creado = InmuebleService::create(&pool, crear_humo()).await.unwrap();
+        let original_cero = InmuebleService::add_foto(&pool, creado.id, alta(0, "original"))
+            .await
+            .unwrap();
+        InmuebleService::add_foto(&pool, creado.id, alta(0, "mejorada"))
+            .await
+            .unwrap();
+        InmuebleService::add_foto(&pool, creado.id, alta(1, "original"))
+            .await
+            .unwrap();
+        InmuebleService::add_foto(&pool, creado.id, alta(1, "mejorada"))
+            .await
+            .unwrap();
+
+        InmuebleService::delete_foto(&pool, Path::new("."), original_cero.id)
+            .await
+            .unwrap();
+
+        let releido = InmuebleService::get_admin(&pool, creado.id).await.unwrap();
+        assert_eq!(releido.fotos.len(), 2, "cae el par completo del orden 0");
+        for foto in &releido.fotos {
+            assert_eq!(foto.orden, 0, "el orden 1 se renumera a 0");
+        }
+        let mut origenes: Vec<&str> = releido
+            .fotos
+            .iter()
+            .map(|foto| foto.origen.as_str())
+            .collect();
+        origenes.sort_unstable();
+        assert_eq!(origenes, vec!["mejorada", "original"]);
+
+        InmuebleService::delete(&pool, Path::new("."), creado.id)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn borrar_mejorada_conserva_original() {
+        let Some(pool) = pool_si_hay() else { return };
+        let creado = InmuebleService::create(&pool, crear_humo()).await.unwrap();
+        InmuebleService::add_foto(&pool, creado.id, alta(0, "original"))
+            .await
+            .unwrap();
+        let mejorada = InmuebleService::add_foto(&pool, creado.id, alta(0, "mejorada"))
+            .await
+            .unwrap();
+        InmuebleService::add_foto(&pool, creado.id, alta(1, "original"))
+            .await
+            .unwrap();
+
+        InmuebleService::delete_foto(&pool, Path::new("."), mejorada.id)
+            .await
+            .unwrap();
+
+        let releido = InmuebleService::get_admin(&pool, creado.id).await.unwrap();
+        assert_eq!(releido.fotos.len(), 2, "el original sobrevive");
+        assert!(
+            releido.fotos.iter().all(|foto| foto.origen == "original"),
+            "no quedan mejoradas"
+        );
+        let mut ordenes: Vec<i32> = releido.fotos.iter().map(|foto| foto.orden).collect();
+        ordenes.sort_unstable();
+        assert_eq!(ordenes, vec![0, 1], "sin renumerado al caer solo mejora");
+
+        let err = InmuebleService::delete_foto(&pool, Path::new("."), mejorada.id).await;
+        assert!(
+            matches!(err, Err(AppError::NotFound(_))),
+            "segundo borrado es 404"
+        );
 
         InmuebleService::delete(&pool, Path::new("."), creado.id)
             .await

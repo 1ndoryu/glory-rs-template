@@ -18,6 +18,7 @@
  *   separa intro y cierre con línea en blanco (ver prompt en `chat.rs`).
  * - F4 Fallback: un turno fallido tras acuse no puede ser silencio total. */
 
+use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -150,6 +151,20 @@ async fn encolar_texto_ia(
     }
 }
 
+/// [08AA-3 B3] Resuelve una `clave` de storage bajo `dir` sin escape:
+/// solo sobreviven componentes `Normal` (`whatsapp/<digitos>/<uuid>.<ext>`);
+/// cualquier `..`, ruta absoluta o prefijo devuelve `None`. La `clave` la
+/// generan `guardar_archivo`/`guardar_audio` (servidor), pero la lectura se
+/// blinda igual en el boundary: chequeo léxico puro, sin IO extra.
+fn ruta_clave(dir: &str, clave: &str) -> Option<PathBuf> {
+    let rel = Path::new(clave);
+    if rel.components().all(|c| matches!(c, Component::Normal(_))) {
+        Some(Path::new(dir).join(rel))
+    } else {
+        None
+    }
+}
+
 /// [299A-1 E11] Describe la foto con visión real y anexa el texto al mensaje
 /// ANTES del turno IA, para que el historial la "vea". Corre en el spawn del
 /// webhook (no en el camino rápido del 2xx). Best-effort total: cualquier
@@ -159,7 +174,13 @@ async fn encolar_texto_ia(
 async fn describir_y_anexar(pool: &sqlx::PgPool, foto: FotoPendiente) {
     const TOPE_BYTES: u64 = 4_000_000;
     let dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
-    let ruta = std::path::Path::new(&dir).join(&foto.clave);
+    let Some(ruta) = ruta_clave(&dir, &foto.clave) else {
+        tracing::warn!(
+            "webhook WhatsApp: clave de foto fuera de UPLOAD_DIR: {}",
+            foto.clave
+        );
+        return;
+    };
     let bytes = match tokio::fs::read(&ruta).await {
         Ok(b) => b,
         Err(e) => {
@@ -221,7 +242,13 @@ pub(crate) async fn transcribir_y_anexar(pool: &sqlx::PgPool, audio: AudioPendie
      * que ya se archivó en local es lo que hay. */
     const TOPE_BYTES: usize = 10 * 1024 * 1024;
     let dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
-    let ruta = std::path::Path::new(&dir).join(&audio.clave);
+    let Some(ruta) = ruta_clave(&dir, &audio.clave) else {
+        tracing::warn!(
+            "webhook WhatsApp: clave de audio fuera de UPLOAD_DIR: {}",
+            audio.clave
+        );
+        return;
+    };
     let bytes = match tokio::fs::read(&ruta).await {
         Ok(b) => b,
         Err(e) => {

@@ -1,3 +1,5 @@
+use std::net::SocketAddr;
+
 use glory_backend::config::AppConfig;
 use glory_backend::handlers;
 
@@ -34,7 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         match glory_backend::services::marketplace::programar_purga_diaria(&pool).await {
             Ok(()) => tracing::info!("mp caché: purga diaria pg_cron 07:00 UTC"),
             Err(e) => {
-                tracing::warn!("mp caché: pg_cron no programado ({e}); solo purga al arrancar")
+                tracing::warn!("mp caché: pg_cron no programado ({e}); solo purga al arrancar");
             }
         }
     }
@@ -57,7 +59,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /* [279A-2] Tope diario de tokens LLM: solo alerta (nunca apaga). */
     tokio::spawn(glory_backend::services::vigilar_tope_uso(pool));
     let listener = tokio::net::TcpListener::bind(&addr).await?;
-    axum::serve(listener, app).await?;
+    /* [08AA-3 B4] Con `ConnectInfo` el rate-limit ve la IP del par (y la
+     * X-Forwarded-For del proxy); sin esto cada petición caería al cubo común. */
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await?;
 
     Ok(())
 }

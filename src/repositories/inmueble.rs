@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use sqlx::{PgPool, Postgres, QueryBuilder};
 use uuid::Uuid;
 
-use crate::models::{FiltrosPublicos, Foto, InmuebleRow, RecetaPublicidad};
+use crate::models::{ActualizacionInmueble, FiltrosPublicos, Foto, InmuebleRow};
 
 /* [159A-1] Acceso a `inmuebles`/`fotos` con prepared statements.
  * Listas públicas con QueryBuilder: el SQL dinámico solo concatena
@@ -176,28 +176,12 @@ impl InmuebleRepository {
         Ok((rows, total))
     }
 
-    #[allow(clippy::too_many_arguments)]
+    /* [08AA-3] B5: 21 params -> struct `ActualizacionInmueble` (ver modelo).
+     * El orden de los `.bind` sigue al de las columnas ($1..$18, $19 = id). */
     pub async fn update(
         pool: &PgPool,
         id: Uuid,
-        titulo: Option<&str>,
-        descripcion: Option<&str>,
-        ubicacion: Option<&str>,
-        puestos: Option<i32>,
-        residencia: Option<&str>,
-        precio: Option<f64>,
-        tipo: Option<&str>,
-        operacion: Option<&str>,
-        habitaciones: Option<i32>,
-        banos: Option<i32>,
-        metros: Option<f64>,
-        metros_terreno: Option<f64>,
-        estado: Option<&str>,
-        copy_corta: Option<&str>,
-        copy_larga: Option<&str>,
-        copy_modelo: Option<&str>,
-        copy_actualizada_en: Option<chrono::DateTime<chrono::Utc>>,
-        receta: Option<sqlx::types::Json<RecetaPublicidad>>,
+        cambios: &ActualizacionInmueble<'_>,
     ) -> Result<Option<InmuebleRow>, sqlx::Error> {
         sqlx::query_as::<_, InmuebleRow>(&format!(
             "UPDATE inmuebles \
@@ -232,24 +216,24 @@ impl InmuebleRepository {
               WHERE id = $19 \
               RETURNING {COLUMNAS}",
         ))
-        .bind(titulo)
-        .bind(descripcion)
-        .bind(ubicacion)
-        .bind(puestos)
-        .bind(residencia)
-        .bind(precio)
-        .bind(tipo)
-        .bind(operacion)
-        .bind(habitaciones)
-        .bind(banos)
-        .bind(metros)
-        .bind(metros_terreno)
-        .bind(estado)
-        .bind(copy_corta)
-        .bind(copy_larga)
-        .bind(copy_modelo)
-        .bind(copy_actualizada_en)
-        .bind(receta)
+        .bind(cambios.titulo)
+        .bind(cambios.descripcion)
+        .bind(cambios.ubicacion)
+        .bind(cambios.puestos)
+        .bind(cambios.residencia)
+        .bind(cambios.precio)
+        .bind(cambios.tipo)
+        .bind(cambios.operacion)
+        .bind(cambios.habitaciones)
+        .bind(cambios.banos)
+        .bind(cambios.metros)
+        .bind(cambios.metros_terreno)
+        .bind(cambios.estado)
+        .bind(cambios.copy_corta)
+        .bind(cambios.copy_larga)
+        .bind(cambios.copy_modelo)
+        .bind(cambios.copy_actualizada_en)
+        .bind(cambios.receta.clone())
         .bind(id)
         .fetch_optional(pool)
         .await
@@ -327,13 +311,50 @@ impl InmuebleRepository {
         .await
     }
 
-    pub async fn delete_foto(pool: &PgPool, foto_id: Uuid) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query("DELETE FROM fotos WHERE id = $1")
-            .bind(foto_id)
-            .execute(pool)
+    /* [08AA-4] Borrado de foto sin desfase: si cae una `original`, su
+     * `mejorada` hermana (mismo `inmueble_id` + `orden`) cae en la misma
+     * transacción y el resto se renumera para mantener `orden` denso. Sin
+     * esto el pareo original↔mejorada por `orden` se cruza (Altos del
+     * Caroní: 15 mejoradas para 12 originales + 3 duplicadas). Borrar solo
+     * la mejorada no toca el original (caso "regenerar"). Devuelve las
+     * `storage_key` eliminadas para limpiar disco fuera de la transacción. */
+    pub async fn delete_foto_en_cascada(
+        pool: &PgPool,
+        foto_id: Uuid,
+    ) -> Result<Option<Vec<String>>, sqlx::Error> {
+        let Some(foto) = Self::find_foto(pool, foto_id).await? else {
+            return Ok(None);
+        };
+        let mut tx = pool.begin().await?;
+        let claves: Vec<String> = if foto.origen == "original" {
+            let filas: Vec<(String,)> = sqlx::query_as(
+                "DELETE FROM fotos WHERE inmueble_id = $1 AND orden = $2 \
+                 RETURNING storage_key",
+            )
+            .bind(foto.inmueble_id)
+            .bind(foto.orden)
+            .fetch_all(&mut *tx)
             .await?;
-
-        Ok(result.rows_affected() > 0)
+            sqlx::query(
+                "UPDATE fotos SET orden = orden - 1 \
+                 WHERE inmueble_id = $1 AND orden > $2",
+            )
+            .bind(foto.inmueble_id)
+            .bind(foto.orden)
+            .execute(&mut *tx)
+            .await?;
+            filas.into_iter().map(|fila| fila.0).collect()
+        } else {
+            sqlx::query("DELETE FROM fotos WHERE id = $1")
+                .bind(foto_id)
+                .execute(&mut *tx)
+                .await?;
+            vec![foto.storage_key]
+        };
+        /* [249A-1] Invalida la caché de fotos (`?v=<updated_at>`). */
+        Self::tocar_inmueble_tx(&mut tx, foto.inmueble_id).await?;
+        tx.commit().await?;
+        Ok(Some(claves))
     }
 
     /* [249A-1] Las fotos versionan su URL con `?v=<updated_at>` (front
@@ -343,6 +364,20 @@ impl InmuebleRepository {
         sqlx::query("UPDATE inmuebles SET updated_at = NOW() WHERE id = $1")
             .bind(inmueble_id)
             .execute(pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Variante de [`Self::tocar_inmueble`] dentro de una transacción abierta.
+    /* [08AA-3] Gotcha sqlx 0.8: `&mut Transaction` NO implementa `Executor`
+     * (solo `&mut PgConnection`); hay que bajar a la conexión con `as_mut()`. */
+    async fn tocar_inmueble_tx(
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        inmueble_id: Uuid,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query("UPDATE inmuebles SET updated_at = NOW() WHERE id = $1")
+            .bind(inmueble_id)
+            .execute(tx.as_mut())
             .await?;
         Ok(())
     }

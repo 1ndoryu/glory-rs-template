@@ -6,7 +6,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 /* [159A-1] Catálogo de inmuebles: fila plana (FromRow) + vista con fotos.
- * Sin obligatorios: crear admite payload vacío (todo con DEFAULT).
+ * Sin obligatorios: crear admite payload vacío (cada columna con DEFAULT).
  * Enums como texto validado contra allowlists en el servicio.
  * [159A-2] Copy IA como columnas anulables + `FotoPublica` con URL lista. */
 
@@ -310,6 +310,32 @@ pub struct UpdateInmuebleRequest {
     /// Receta publicitaria (`Some` la fija, `None` la deja como está)
     #[validate(nested)]
     pub receta: Option<RecetaPublicidad>,
+}
+
+/* [08AA-3] B5 parametros-excesivos: el repositorio recibía 21 argumentos
+ * (sentinel `parametros-excesivos-rs`, máx 8). Agrupa los 18 campos ya
+ * normalizados listos para bindear: `&str` prestados, resto propios. El
+ * servicio la arma desde `UpdateInmuebleRequest` + normalizados. */
+#[derive(Debug)]
+pub struct ActualizacionInmueble<'a> {
+    pub titulo: Option<&'a str>,
+    pub descripcion: Option<&'a str>,
+    pub ubicacion: Option<&'a str>,
+    pub puestos: Option<i32>,
+    pub residencia: Option<&'a str>,
+    pub precio: Option<f64>,
+    pub tipo: Option<&'a str>,
+    pub operacion: Option<&'a str>,
+    pub habitaciones: Option<i32>,
+    pub banos: Option<i32>,
+    pub metros: Option<f64>,
+    pub metros_terreno: Option<f64>,
+    pub estado: Option<&'a str>,
+    pub copy_corta: Option<&'a str>,
+    pub copy_larga: Option<&'a str>,
+    pub copy_modelo: Option<&'a str>,
+    pub copy_actualizada_en: Option<DateTime<Utc>>,
+    pub receta: Option<sqlx::types::Json<RecetaPublicidad>>,
 }
 
 /// Cambio de visibilidad pública — el backend decide qué se publica

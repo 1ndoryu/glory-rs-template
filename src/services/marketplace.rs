@@ -1,8 +1,8 @@
 /* [03AA-3 M3] Lógica pura del asistente Marketplace (sin HTTP): strip de ficha
  * por allowlist, validación del schema M3 v1, matriz negativa versionada,
- * claims del JWT mp y cubo de tasa por minuto. Todo testeable sin BD. */
+ * claims del JWT mp y cubo de tasa por minuto. Verificable sin BD. */
 
-use chrono::{DateTime, FixedOffset};
+use chrono::DateTime;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -180,10 +180,7 @@ pub fn validar_borrador(r: &BorradorRequest) -> Vec<String> {
 
 /// RFC3339 con desplazamiento exactamente -04:00 (hora de Caracas).
 fn es_hora_caracas(hora: &str) -> bool {
-    DateTime::parse_from_rfc3339(hora).is_ok_and(|f| {
-        f.offset()
-            == &FixedOffset::west_opt(4 * 3600).unwrap_or_else(|| FixedOffset::east_opt(0).unwrap())
-    })
+    DateTime::parse_from_rfc3339(hora).is_ok_and(|f| f.offset().local_minus_utc() == -4 * 3600)
 }
 
 /// Matriz negativa v2 sobre el borrador generado: teléfono (7+ dígitos),
