@@ -35,6 +35,12 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   ausente` (declarar o eximir) + rsa residual sin parche. Abordar por clases,
   sin mezclar con frentes; `dev deriva 3102` es gateway parado normal (no
   arrancar sin QR/autorización) y `sinPush` era caché pre-push.
+  Verificado 2026-10-08 ~22:40: re-escaneo gate forzado idéntico 26E/476W/7H
+  (cero nuevos); secret-scan limpio en `d7d3b6d4`+`aeee01c6`; 26E = 21
+  ruta-post (FP documentado) + 2 broadcast-mutex
+  (`services/marketplace.rs:827,844`) + 2 god-object
+  (`handlers/chat_staff.rs`, `handlers/chat_tools.rs`) + 1 path-join (FP
+  documentado). Lo corregible real: broadcast/god-object por refactor.
 
 - **08AA-5 — Limpieza conversación Marketplace (activa 2026-10-08)**: el
   excerpt del hilo sale duplicado y con ruido de Facebook
