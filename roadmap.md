@@ -105,23 +105,6 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   `src/handlers/marketplace.rs`.
   **Estado 2026-10-08:** prompt aplicado en código; verificación viva
   pendiente (el proveedor IA devuelve respuesta sin texto).
-- **08AA-17 — Excerpt Tina: `Marketplace` suelto, `VEF0 - Casa...` con
-  guion y `Cargando...` (reportado por ella 2026-10-08, en curso):**
-  el panel muestra `Tina · Casa en venta en Riberas del Caroní, Puerto
-  Ordaz` + `Marketplace` + `VEF0 - Casa en venta...` + `View buyer` +
-  `More options` + `Mensajes` + `Cargando...` + `Escribir mensaje` +
-  `Escribe en Tina · ...` + `Aa`. Todo se filtra ya salvo 3 fugas:
-  `Marketplace` (no estaba en exactos), `Cargando...` (placeholder de
-  carga, nuevo) y `VEF0 - Casa...` (el eco del aviso trae ` - ` y el
-  `contains` falla). Alcance: 3 literales a `RUIDO_EXCERPT_EXACTO` +
-  canonizar ` - `/` · ` a espacio al comparar el eco del aviso + test
-  con ese excerpt exacto. Sin HTML: el texto basta para ruido; el HTML
-  solo haría falta para atribución (08AA-8b).
-  **Estado 2026-10-08:** implementado, gate verde (136 tests; se
-  actualizó `corregir_rechaza_vacio_y_contacto` que exigía la matriz
-  eliminada en 08AA-14). Verificado en vivo: `POST /releer` Tina con
-  el texto exacto → 422 `excerpt sin contenido aprovechable`, nada
-  guardado (el handler conserva el original); caché a 0.
 - **08AA-6 — Barrido progresivo baseline sentinel (activa 2026-10-08, no
   urgente)**: el tablero marca ~518 en MN (26E/483A preexistentes, verificados
   2026-10-08: ningún hallazgo nuevo de 08AA-1/3/4; el conteo incluso bajó 9).
