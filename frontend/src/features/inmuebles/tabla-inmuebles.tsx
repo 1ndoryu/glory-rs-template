@@ -1,30 +1,17 @@
 import { useState } from 'react';
-import { BedDouble, Bath, CarFront, Globe, Ruler, LandPlot, MapPin, Pencil, Trash2, Building2, Eye, EyeOff, EllipsisVertical, ImagePlus, ImageDown, Images, Megaphone } from 'lucide-react';
-import { ETIQUETAS_TIPO, formatearPrecio, fotosVisiblesDe, portadaDe, type EstadoInmueble, type Inmueble } from '@/domain/inmueble';
-import { calcularCompletitud } from '@/domain/ficha-ask';
+import { Bath, BedDouble, Building2, CarFront, LandPlot, MapPin, Ruler } from 'lucide-react';
+import { ETIQUETAS_TIPO, portadaDe, type Inmueble } from '@/domain/inmueble';
 import { recetaVigenteDe, resolverReceta } from '@/domain/plantilla-publicidad';
 import { exportarPublicidad } from '@/platform/canvas-publicidad';
 import { usePublicidades } from '@/hooks/publicidad/use-publicidades';
 import { ModalDescargarFotos } from '@/features/inmuebles/modal-descargar-fotos';
 import { ModalEditorPublicidad } from '@/features/publicidad/modal-editor-publicidad';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-
-const claseEstado: Record<EstadoInmueble, string> = {
-  disponible: 'border-transparent bg-emerald-100 text-emerald-900',
-  reservado: 'border-transparent bg-amber-100 text-amber-900',
-  vendido: 'border-transparent bg-sky-100 text-sky-900',
-  alquilado: '',
-};
+/* [08AA-13] Celdas y menú viven en módulos propios: la tabla supera 300 líneas. */
+import { claseEstadoDe, Foto, precioVisible, Publico, SemaforoFicha } from './tabla/celdas-tabla-inmuebles';
+import { MenuAcciones } from './tabla/menu-acciones-inmueble';
 
 interface Props {
   inmuebles: Inmueble[];
@@ -37,139 +24,6 @@ interface Props {
   /* La receta hace su propio PUT: con esto la lista se refresca con el
    * inmueble ya persistido (sin releer todo). */
   onActualizarInmueble?: (inmueble: Inmueble) => void;
-}
-
-/* Sin obligatorios: lo no indicado se muestra neutro ("—" / "Sin título"). */
-function precioVisible(precio: number): string {
-  return precio > 0 ? formatearPrecio(precio) : '—';
-}
-
-/* Semáforo de ficha /ask (279A-3): % de preguntas respondidas por tipo.
- * Solo aviso visual: nunca bloquea publicar ni editar. */
-function SemaforoFicha({ inmueble }: { inmueble: Inmueble }) {
-  const { porcentaje } = calcularCompletitud(inmueble.tipo, inmueble.extras ?? {}, inmueble.precioMinimo ?? null, inmueble);
-  const color =
-    porcentaje === 100
-      ? 'border-transparent bg-emerald-100 text-emerald-900'
-      : porcentaje >= 50
-        ? 'border-transparent bg-amber-100 text-amber-900'
-        : 'border-transparent bg-red-100 text-red-900';
-  return (
-    <Badge variant="secondary" className={color} title={`Ficha al ${porcentaje}%`}>
-      {porcentaje}%
-    </Badge>
-  );
-}
-
-/* Etiqueta de visibilidad en la web pública. */
-function Publico({ publicado }: { publicado: boolean }) {
-  if (!publicado) return <span className="text-xs text-muted-foreground">Oculto</span>;
-  return (
-    <Badge variant="secondary" className="border-transparent bg-emerald-100 text-emerald-900">
-      <Globe className="h-3 w-3" /> Público
-    </Badge>
-  );
-}
-
-function Foto({ src, titulo }: { src?: string; titulo: string }) {
-  if (!src) {
-    return (
-      <div className="flex h-14 w-20 items-center justify-center rounded-md bg-muted">
-        <Building2 className="h-5 w-5 text-muted-foreground" />
-      </div>
-    );
-  }
-  return (
-    <img
-      src={src}
-      alt={titulo}
-      className="h-14 w-20 rounded-md object-cover"
-      onError={(e) => {
-        (e.target as HTMLImageElement).style.display = 'none';
-      }}
-    />
-  );
-}
-
-/* Menú contextual de 3 puntos: Ver, Editar, Copy, Añadir fotos,
- * Publicar/Retirar, imagen publicitaria (editar/descargar), descargar
- * mejoradas y Eliminar (con confirmación). */
-function MenuAcciones({
-  inmueble,
-  onVer,
-  onEditar,
-  onCopy,
-  onAnadirFotos,
-  onEliminar,
-  onPublicar,
-  onDescargarPublicidad,
-  onDescargarMejoradas,
-  onEditarPublicidad,
-}: {
-  inmueble: Inmueble;
-  onVer: () => void;
-  onEditar: () => void;
-  onCopy: () => void;
-  onAnadirFotos: () => void;
-  onEliminar: () => void;
-  onPublicar: () => void;
-  onDescargarPublicidad: () => void;
-  onDescargarMejoradas: () => void;
-  onEditarPublicidad: () => void;
-}) {
-  const nombre = inmueble.titulo || 'Sin título';
-  const conFotos = fotosVisiblesDe(inmueble).length > 0;
-  const confirmarEliminar = () => {
-    if (window.confirm(`Eliminar "${nombre}". Esta acción no se puede deshacer.`)) {
-      onEliminar();
-    }
-  };
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button variant="ghost" size="icon" title="Acciones" aria-label={`Acciones de ${nombre}`}>
-            <EllipsisVertical />
-          </Button>
-        }
-      />
-      <DropdownMenuContent align="end" className="w-64">
-        <DropdownMenuItem onClick={onVer}>
-          <Eye /> Ver
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={onEditar}>
-          <Pencil /> Editar
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={onCopy}>
-          <Megaphone /> Copy redes
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={onAnadirFotos}>
-          <ImagePlus /> Añadir fotos
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={onPublicar}>
-          {inmueble.publicado ? <EyeOff /> : <Globe />}
-          {inmueble.publicado ? 'Retirar' : 'Publicar'}
-        </DropdownMenuItem>
-        {conFotos && (
-          <>
-            <DropdownMenuItem onClick={onEditarPublicidad}>
-              <Pencil /> Editar imagen publicitaria
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onDescargarPublicidad}>
-              <ImageDown /> Descargar imagen publicitaria
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onDescargarMejoradas}>
-              <Images /> Descargar fotos mejoradas
-            </DropdownMenuItem>
-          </>
-        )}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem variant="destructive" onClick={confirmarEliminar}>
-          <Trash2 /> Eliminar
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
 }
 
 export function TablaInmuebles({ inmuebles, onVer, onEditar, onEliminar, onAnadirFotos, onCopy, onPublicar, onActualizarInmueble }: Props) {
@@ -283,7 +137,7 @@ export function TablaInmuebles({ inmuebles, onVer, onEditar, onEliminar, onAnadi
                 </TableCell>
                 <TableCell className="whitespace-nowrap font-semibold">{precioVisible(i.precio)}</TableCell>
                 <TableCell>
-                  <Badge variant="secondary" className={cn('capitalize', claseEstado[i.estado])}>
+                  <Badge variant="secondary" className={cn('capitalize', claseEstadoDe(i.estado))}>
                     {i.estado}
                   </Badge>
                 </TableCell>
@@ -331,7 +185,7 @@ export function TablaInmuebles({ inmuebles, onVer, onEditar, onEliminar, onAnadi
                 <div className="flex shrink-0 items-center gap-1.5">
                   <Publico publicado={i.publicado} />
                   <SemaforoFicha inmueble={i} />
-                  <Badge variant="secondary" className={cn('capitalize', claseEstado[i.estado])}>
+                  <Badge variant="secondary" className={cn('capitalize', claseEstadoDe(i.estado))}>
                     {i.estado}
                   </Badge>
                 </div>

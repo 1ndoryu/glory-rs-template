@@ -30,7 +30,7 @@ pub fn staff_routes() -> Router<AppState> {
         .route("/agent/sesiones/:id", patch(actualizar_sesion))
         .route("/agent/config", get(leer_config).put(guardar_config))
         /* [279A-2 F5] Consola dueña: clientes, envío manual, uso y auditoría.
-         * Todo JSON para operar por terminal/HTTP (ver plan §8). */
+         * Responde JSON para operar por terminal/HTTP (ver plan §8). */
         .route("/agent/clientes", get(listar_clientes).post(crear_cliente))
         .route("/agent/clientes/:id", patch(actualizar_cliente))
         .route("/agent/clientes/:id/sesiones", get(sesiones_de_cliente))

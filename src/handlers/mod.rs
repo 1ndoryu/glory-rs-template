@@ -213,7 +213,7 @@ pub fn create_router(pool: sqlx::PgPool, config: crate::config::AppConfig) -> Ro
 
     /* [239A-1] Monorepo: si `STATIC_DIR` trae `index.html`, el front SPA se
      * sirve desde el propio binario (fichero tal cual o `index.html`). En dev
-     * (sin `STATIC_DIR`) no se registra nada y todo sigue igual. */
+     * (sin `STATIC_DIR`) no se registra nada y nada cambia. */
     let sirve_front = state
         .static_dir
         .as_ref()
@@ -287,7 +287,7 @@ fn api_routes() -> Router<AppState> {
         .nest("/public", public::routes())
 }
 
-/// Rutas de administración: todo requiere JWT (`AuthUser` por handler)
+/// Rutas de administración: cada ruta requiere JWT (`AuthUser` por handler)
 fn admin_routes() -> Router<AppState> {
     Router::new()
         .merge(inmuebles::routes())

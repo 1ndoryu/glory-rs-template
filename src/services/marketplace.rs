@@ -120,7 +120,7 @@ fn partir_pegado(texto: &str, marca: &str) -> String {
 }
 
 /// Ítem de lista al inicio de la línea: `1. `, `2) `, `- ` o `• `.
-/// Todo por `chars` (nunca por bytes: `•` es multibyte).
+/// Siempre por `chars` (nunca por bytes: `•` es multibyte).
 fn es_item_lista(linea: &str) -> bool {
     let mut letras = linea.chars();
     match letras.next() {

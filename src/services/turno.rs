@@ -114,7 +114,10 @@ pub(crate) fn partir_respuesta(texto: &str) -> Vec<String> {
 /* [011A-5 Fase1] Encolado idempotente: bajo corte (`corte_whatsapp` cubre
  * `via`) la fila lleva `idempotency_key = sha256(sesion:motivo:texto)`;
  * un duplicado en vuelo retorna `None` y se registra (no es error).
- * `manual` nunca lleva clave (lo excluye `debe_usar_clave`). */
+ * `manual` nunca lleva clave (lo excluye `debe_usar_clave`).
+ * [08AA-13] FP `sqlite-carga-N-consultas`: los 2 `await` son dependientes
+ * (la escritura necesita el veredicto del corte); no hay bucle ni N+1.
+ * Detalle en `Agente/prevencion/prevencion-sentinel-secuencial-dependiente-fp-2026-10-08.md`. */
 async fn encolar_texto_ia(
     pool: &sqlx::PgPool,
     sesion: Uuid,

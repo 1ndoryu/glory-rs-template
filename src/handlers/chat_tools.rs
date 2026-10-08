@@ -264,7 +264,7 @@ fn formato_precio(precio: f64) -> String {
 
 /// Encola una tarjeta por propiedad (hasta `MAX_TARJETAS`) en outbox
 /// `whatsapp`. Devuelve `(nuevas, repetidas)`: `0` nuevas = el modelo lista
-/// a mano o todo ya se había enviado.
+/// a mano o ya estaban encoladas.
 /// [309A-1] Dedup entre turnos: el modelo re-llama `buscar` en el turno
 /// siguiente ("mándame las fotos") y antes re-encolaba la misma tarjeta
 /// (el visitante la recibía 2 veces). Se compara el texto exacto contra los
@@ -411,8 +411,8 @@ struct Tarjeta {
 
 /// Ficha completa de un inmueble para `detalle_inmueble` (struct en vez de
 /// tupla de 12: legible y evita el lint de tipos complejos). Tipos alineados
-/// con `20260915000002_inmuebles.up.sql` (todo NOT NULL salvo `copy_corta`).
-/* [279A-8] La IA ve todo lo rellenable: `extras` (respuestas /ask, tal cual,
+/// con `20260915000002_inmuebles.up.sql` (NOT NULL salvo `copy_corta`).
+/* [279A-8] La IA ve cada campo rellenable: `extras` (respuestas /ask, tal cual,
  * incluidos `no_se`/`a_veces`: saber lo que falta también informa) y si el
  * precio tiene margen (`margen_negociable`, calculado en SQL). La cifra del
  * mínimo jamás sale (frontera 279A-3: la IA insinúa sin cifras). */

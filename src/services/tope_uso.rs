@@ -31,26 +31,11 @@ pub fn evaluar_tope(uso_hoy: i64, tope: i64, ya_alertado: bool) -> bool {
 
 /// Revisa el uso de hoy y alerta una vez al día. Devuelve `true` si alertó.
 pub async fn revisar_tope(pool: &PgPool) -> Result<bool, String> {
-    let tope = glory_agent::persistence::get_config(pool, CLAVE_TOPE)
-        .await
-        .map_err(|e| e.to_string())?
+    let (hoy, tope_cfg, alerta_cfg, uso_hoy) = leer_estado_uso(pool).await?;
+    let tope = tope_cfg
         .and_then(|v| v.trim().parse::<i64>().ok())
         .unwrap_or(TOPE_DEFECTO);
-    let hoy: String = sqlx::query_scalar("SELECT CURRENT_DATE::TEXT")
-        .fetch_one(pool)
-        .await
-        .map_err(|e| e.to_string())?;
-    let ya_alertado = glory_agent::persistence::get_config(pool, CLAVE_ALERTA)
-        .await
-        .map_err(|e| e.to_string())?
-        .is_some_and(|v| v == hoy);
-    let uso_hoy: i64 = sqlx::query_scalar(
-        "SELECT COALESCE(SUM(COALESCE(tokens_in, 0) + COALESCE(tokens_out, 0)), 0) \
-         FROM uso_mensajes WHERE created_at >= CURRENT_DATE",
-    )
-    .fetch_one(pool)
-    .await
-    .map_err(|e| e.to_string())?;
+    let ya_alertado = alerta_cfg.is_some_and(|v| v == hoy);
     if !evaluar_tope(uso_hoy, tope, ya_alertado) {
         return Ok(false);
     }
@@ -96,6 +81,25 @@ pub async fn revisar_tope(pool: &PgPool) -> Result<bool, String> {
     Ok(true)
 }
 
+/* [08AA-13] Una sola ida a BD: fecha + las 2 claves + suma del día en un
+ * único SELECT (misma foto instantánea, sin carrera entre lecturas;
+ * antes eran 4 `await` directos y saltaba `sqlite-carga-N-consultas`).
+ * La validación (`trim`/`parse`, default) sigue en Rust, idéntica. */
+async fn leer_estado_uso(pool: &PgPool) -> Result<(String, Option<String>, Option<String>, i64), String> {
+    sqlx::query_as(
+        "SELECT CURRENT_DATE::TEXT, \
+          (SELECT value FROM agent_config WHERE key = $1), \
+          (SELECT value FROM agent_config WHERE key = $2), \
+          (SELECT COALESCE(SUM(COALESCE(tokens_in, 0) + COALESCE(tokens_out, 0)), 0) \
+           FROM uso_mensajes WHERE created_at >= CURRENT_DATE)",
+    )
+    .bind(CLAVE_TOPE)
+    .bind(CLAVE_ALERTA)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| e.to_string())
+}
+
 /// Bucle de fondo: revisa cada 5 min; los fallos se registran y se reintenta
 /// (igual que el watcher de alertas: observación ruidosa, nunca pánico).
 pub async fn vigilar(pool: PgPool) {
@@ -109,7 +113,15 @@ pub async fn vigilar(pool: PgPool) {
 
 #[cfg(test)]
 mod pruebas {
-    use super::evaluar_tope;
+    use super::{evaluar_tope, leer_estado_uso};
+
+    fn pool_si_hay() -> Option<sqlx::PgPool> {
+        let url = std::env::var("DATABASE_URL").ok()?;
+        sqlx::postgres::PgPoolOptions::new()
+            .max_connections(1)
+            .connect_lazy(&url)
+            .ok()
+    }
 
     #[test]
     fn tope_solo_alerta_una_vez_al_superar() {
@@ -120,5 +132,37 @@ mod pruebas {
         assert!(!evaluar_tope(3_000_000, 2_000_000, true));
         assert!(!evaluar_tope(3_000_000, 0, false));
         assert!(!evaluar_tope(3_000_000, -5, false));
+    }
+
+    /* [08AA-13] La foto única equivale a las 3 lecturas separadas anteriores
+     * (misma instantánea) y decodifica (`SUM` BIGINT → `i64`). Solo SELECTs:
+     * no escribe config ni outbox, así que no interfiere con otros tests.
+     * Sin `DATABASE_URL` se omite. */
+    #[tokio::test]
+    async fn estado_una_sola_foto_equivale_a_lecturas() {
+        let Some(pool) = pool_si_hay() else { return };
+        let (hoy, tope_cfg, alerta_cfg, uso_hoy) =
+            leer_estado_uso(&pool).await.expect("foto única");
+        let hoy2: String = sqlx::query_scalar("SELECT CURRENT_DATE::TEXT")
+            .fetch_one(&pool)
+            .await
+            .expect("fecha");
+        assert_eq!(hoy, hoy2);
+        let tope2 = glory_agent::persistence::get_config(&pool, super::CLAVE_TOPE)
+            .await
+            .expect("tope");
+        assert_eq!(tope_cfg, tope2);
+        let alerta2 = glory_agent::persistence::get_config(&pool, super::CLAVE_ALERTA)
+            .await
+            .expect("alerta");
+        assert_eq!(alerta_cfg, alerta2);
+        let uso2: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(COALESCE(tokens_in, 0) + COALESCE(tokens_out, 0)), 0) \
+             FROM uso_mensajes WHERE created_at >= CURRENT_DATE",
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("suma");
+        assert_eq!(uso_hoy, uso2);
     }
 }
