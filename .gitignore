@@ -66,3 +66,6 @@ frontend/tsconfig.tsbuildinfo
 glory-rust-template.code-workspace
 .sentinel-report.md
 .cargo/config.toml
+
+# Reportes locales de calidad (los genera el tablero/extensiones; no versionar)
+/.quality-reports/
