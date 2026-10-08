@@ -180,16 +180,27 @@ pub fn normalizar_excerpt_con_hilo(
             compuesto = format!("{marca} {t}");
             t = compuesto.as_str();
         }
-        let t = quitar_prefijo_enviado(t, nombre).trim();
-        let duplicada = fuera.last().is_some_and(|u| u == t);
-        if t.is_empty() || duplicada {
-            continue;
-        }
         if primera {
             primera = false;
+            /* [08AA-24] El `slice(-1200)` del float corta por carácter y el
+             * crudo puede empezar a mitad de `Presionar Enter,` (testigo
+             * cristo: `sionar Enter,`): se pela el fragmento ANTES de
+             * quitar el prefijo, porque el pelado expone el `Mensaje
+             * enviado ...` que hay que pelar después. */
+            t = pelar_enter_truncado(t);
             if es_cola_truncada(t) {
                 continue;
             }
+        }
+        let t = quitar_prefijo_enviado(t, nombre).trim();
+        /* [08AA-24] El pelado (cola truncada, `sionar Enter,`) puede dejar
+         * la línea vacía: no es mensaje, se salta antes del split. */
+        if t.is_empty() {
+            continue;
+        }
+        let duplicada = fuera.last().is_some_and(|u| u == t);
+        if duplicada {
+            continue;
         }
         if es_ruido_excerpt(t) || es_marca_tiempo_fb(t) {
             continue;
@@ -285,8 +296,10 @@ fn quitar_prefijo_enviado<'a>(linea: &'a str, nombre: Option<&str>) -> &'a str {
     resto
 }
 
-/// Salta la hora de la atribución (`3:18 pm`) sin comerse el `por`/`by`
-/// que viene después (la `p` colisiona con `pm`).
+/// Salta la hora de la atribución (`3:18 pm`, `lunes 22:48`) sin comerse
+/// el `por`/`by` que viene después (la `p` colisiona con `pm`).
+/// [08AA-24] El visor antepone el día de la semana a la hora
+/// (`Mensaje enviado lunes 22:48 por Cristo:`): se salta igual.
 fn saltar_hora_fb(s: &str) -> &str {
     let mut resto = s;
     while !resto.is_empty() {
@@ -307,6 +320,10 @@ fn saltar_hora_fb(s: &str) -> &str {
         {
             break;
         }
+        if largo_dia_semana(&l) > 0 {
+            resto = &resto[largo_dia_semana(&l)..];
+            continue;
+        }
         let c = resto.chars().next().unwrap_or(' ');
         if c.is_ascii_digit() || " :,./-\u{a0}\u{202f}apmAPM".contains(c) {
             resto = &resto[c.len_utf8()..];
@@ -315,6 +332,39 @@ fn saltar_hora_fb(s: &str) -> &str {
         }
     }
     resto
+}
+
+/// Longitud en bytes del día de semana al inicio (ES + EN, con y sin
+/// tildes: el corte del float a veces las pela), o 0 si no hay día.
+/// El día debe cerrar con no-letra (`lunes 22:48`, no `lunes bueno`...
+/// bueno, `lunes` + espacio + `bueno` también casaría, pero esto solo se
+/// usa tras `Mensaje enviado`, donde día = fecha, nunca mensaje).
+fn largo_dia_semana(min: &str) -> usize {
+    const DIAS: &[&str] = &[
+        "lunes",
+        "martes",
+        "miercoles",
+        "miércoles",
+        "jueves",
+        "viernes",
+        "sabado",
+        "sábado",
+        "domingo",
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
+    ];
+    DIAS.iter()
+        .find_map(|d| {
+            min.strip_prefix(d)
+                .filter(|r| r.chars().next().is_none_or(|c| !c.is_alphabetic()))
+                .map(|_| d.len())
+        })
+        .unwrap_or(0)
 }
 
 /// Corta el `nombre` del hilo al inicio de `resto` (insensible a caja y
@@ -347,6 +397,23 @@ fn saltar_palabra(s: &str) -> &str {
     s[bytes..].trim_start()
 }
 
+/// [08AA-24] Cola del `Presionar Enter,` inicial cortada por el
+/// `slice(-1200)` del float (testigo cristo: el crudo empieza en `sionar
+/// Enter,`): el corte cae dentro de `pre|sionar` y el filtro no reconoce
+/// el resto. Se pela el fragmento `...r enter,` (0-8 letras: cualquier
+/// truncado de `presionar`) solo en la primera línea; un mensaje real
+/// jamás empieza así (`enterarme` no casa por la coma obligatoria).
+fn pelar_enter_truncado(linea: &str) -> &str {
+    let lower = linea.to_lowercase();
+    if let Some(pos) = lower.find("r enter,") {
+        let cabeza = &lower[..pos];
+        if cabeza.len() <= 8 && cabeza.bytes().all(|b| b.is_ascii_alphabetic()) {
+            return linea[pos + "r enter,".len()..].trim_start();
+        }
+    }
+    linea
+}
+
 /// [08AA-16] Cola de un mensaje cortado a mitad de palabra en la primera
 /// línea (testigo: `ponible?`). Heurística estrecha: sin espacios, empieza
 /// en minúscula, termina en `?`/`!` y ≤15 caracteres. Un mensaje completo
@@ -361,16 +428,25 @@ fn es_cola_truncada(linea: &str) -> bool {
         && (linea.ends_with('?') || linea.ends_with('!'))
 }
 
-/// [08AA-16] Marcas de tiempo del visor (`2:43 am`, `11:30 pm`): separan
-/// mensajes, no son contenido. Formato exacto `H:MM am|pm` con hora 1-12
-/// y minutos 00-59 (sin `regex` en el árbol: escaneo manual como
-/// `precio_del_aviso`).
+/// [08AA-16] Marcas de tiempo del visor (`2:43 am`, `11:30 pm`,
+/// [08AA-24] `lunes 22:48`, `22:48`): separan mensajes, no son contenido.
+/// Formato exacto `H:MM` + opcional `am|pm` y opcional día de semana
+/// delante; con `am|pm` la hora es 1-12, sin es 0-23 (formato 24h del
+/// visor ES). Sin `regex` en el árbol: escaneo manual como
+/// `precio_del_aviso`.
 fn es_marca_tiempo_fb(linea: &str) -> bool {
-    let t = linea.trim().to_lowercase();
-    let hora = t
+    let bajado = linea.trim().to_lowercase();
+    let sin_dia: &str = bajado[largo_dia_semana(&bajado)..].trim_start();
+    let (hora, con_ampm) = if let Some(h) = sin_dia
         .strip_suffix("am")
-        .or_else(|| t.strip_suffix("pm"))
-        .map_or("", str::trim_end);
+        .or_else(|| sin_dia.strip_suffix("pm"))
+        .or_else(|| sin_dia.strip_suffix("a.m."))
+        .or_else(|| sin_dia.strip_suffix("p.m."))
+    {
+        (h.trim_end(), true)
+    } else {
+        (sin_dia, false)
+    };
     let mut partes = hora.split(':');
     match (partes.next(), partes.next(), partes.next()) {
         (Some(h), Some(m), None) => {
@@ -378,8 +454,14 @@ fn es_marca_tiempo_fb(linea: &str) -> bool {
                 && m.len() == 2
                 && h.bytes().all(|b| b.is_ascii_digit())
                 && m.bytes().all(|b| b.is_ascii_digit())
-                && h.parse::<u32>().is_ok_and(|h| (1..=12).contains(&h))
                 && m.parse::<u32>().is_ok_and(|m| m <= 59)
+                && h.parse::<u32>().is_ok_and(|h| {
+                    if con_ampm {
+                        (1..=12).contains(&h)
+                    } else {
+                        h <= 23
+                    }
+                })
         }
         _ => false,
     }

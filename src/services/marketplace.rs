@@ -27,8 +27,10 @@ pub use super::marketplace_texto::{
 #[cfg(test)]
 use super::marketplace_texto::es_hex64;
 
-/// Versión del strip aceptada (`strip_vN` del plan: hoy solo v1).
-pub const STRIP_VERSION: &str = "v1";
+/// Versión del strip aceptada (`strip_vN` del plan).
+/// [08AA-25] v2 suma `operacion` al allowlist: sin ella la IA presentaba
+/// los alquileres como ventas (testigo: Townhouse Arivana, hilo cristo).
+pub const STRIP_VERSION: &str = "v2";
 /// Fallback exacto cuando no hay ficha o falla la IA.
 pub const FALLBACK_BORRADOR: &str = "Lo reviso y te confirmo precio/entrega por aquí";
 /// [07AA-8] Contacto fijo de los borradores (decisión de ella 2026-10-07):
@@ -140,20 +142,23 @@ fn es_item_lista(linea: &str) -> bool {
     }
 }
 
-/// Prompt seguro: solo los 6 campos del allowlist. La frase canónica de la
+/// Prompt seguro: solo los 7 campos del allowlist. La frase canónica de la
 /// ficha vive en la tabla `inmuebles`; el plugin jamás ve el resto.
+/// [08AA-25] `operacion` (`venta`|`alquiler`, tal cual en la fila): sin
+/// ella el prompt hablaba siempre en lenguaje de venta.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct PromptSeguro {
     pub titulo: String,
     pub precio_publico: String,
+    pub operacion: String,
     pub zona: String,
     pub m2: f64,
     pub habitaciones: i32,
     pub descripcion_corta: String,
 }
 
-/// Recorta la ficha al allowlist. `strip` distinto de v1 se rechaza para que
-/// un despliegue viejo no cuele campos nuevos en silencio.
+/// Recorta la ficha al allowlist. `strip` distinto de la versión vigente se
+/// rechaza para que un despliegue viejo no cuele campos nuevos en silencio.
 pub fn strip_ficha_para_prompt(ficha: &InmuebleRow, strip: &str) -> Result<PromptSeguro, AppError> {
     if strip != STRIP_VERSION {
         return Err(AppError::BadRequest(format!(
@@ -168,6 +173,7 @@ pub fn strip_ficha_para_prompt(ficha: &InmuebleRow, strip: &str) -> Result<Promp
     Ok(PromptSeguro {
         titulo: ficha.titulo.clone(),
         precio_publico: precio_publico(ficha.precio),
+        operacion: ficha.operacion.clone(),
         zona,
         m2: ficha.metros,
         habitaciones: ficha.habitaciones,
@@ -697,7 +703,7 @@ pub fn sha_hex(canon: &str) -> String {
 }
 
 /// Hash del catálogo: serialización canónica de exactamente lo que entra al
-/// prompt (los 6 campos del strip + `estado`, que condiciona disponibilidad),
+/// prompt (los 7 campos del strip + `estado`, que condiciona disponibilidad),
 /// calculada sobre la fila recién leída y antes de stripeear. Si la ficha
 /// cambia en algo que la respuesta cita → hash distinto → miss → regenera.
 #[must_use]
@@ -706,13 +712,14 @@ pub fn hash_ficha(ficha: &InmuebleRow) -> String {
         Ok(s) => serde_json::json!({
             "titulo": s.titulo,
             "precio": s.precio_publico,
+            "operacion": s.operacion,
             "zona": s.zona,
             "m2": s.m2,
             "hab": s.habitaciones,
             "desc": s.descripcion_corta,
             "estado": ficha.estado,
         }),
-        /* Inalcanzable con v1 (el handler lo rechazaría antes); clave
+        /* Inalcanzable con v2 (el handler lo rechazaría antes); clave
          * estable para no romper el flujo si el strip evoluciona. */
         Err(_) => serde_json::json!({"strip": "error"}),
     };
@@ -941,12 +948,13 @@ mod pruebas {
         }
     }
 
-    /* El strip deja pasar exactamente los 6 campos del allowlist: ni el
+    /* El strip deja pasar exactamente los 7 campos del allowlist: ni el
      * slug, ni el estado interno, ni la receta viajan al prompt.
-     * (`serde_json::Map` ordena claves: se compara ordenado.) */
+     * (`serde_json::Map` ordena claves: se compara ordenado.)
+     * [08AA-25] `operacion` viaja (v2): sin ella la IA vendía alquileres. */
     #[test]
-    fn strip_solo_allowlist_seis_campos() {
-        let s = strip_ficha_para_prompt(&ficha(), "v1").unwrap();
+    fn strip_solo_allowlist_siete_campos() {
+        let s = strip_ficha_para_prompt(&ficha(), STRIP_VERSION).unwrap();
         let v = serde_json::to_value(&s).unwrap();
         let mut claves: Vec<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
         claves.sort_unstable();
@@ -956,18 +964,20 @@ mod pruebas {
                 "descripcion_corta",
                 "habitaciones",
                 "m2",
+                "operacion",
                 "precio_publico",
                 "titulo",
                 "zona"
             ]
         );
         assert_eq!(s.precio_publico, "$43.000");
+        assert_eq!(s.operacion, "venta");
         assert_eq!(s.zona, "Puerto Ordaz, Riberas del Caroní");
     }
 
     #[test]
     fn strip_version_desconocida_se_rechaza() {
-        assert!(strip_ficha_para_prompt(&ficha(), "v2").is_err());
+        assert!(strip_ficha_para_prompt(&ficha(), "v9").is_err());
     }
 
     #[test]
@@ -1122,7 +1132,7 @@ mod pruebas {
         /* [08AA-17] Reporte de ella 2026-10-08 (panel, hilo Tina): el
          * hilo aún cargaba (`Cargando...`) y el visor repetía cabeceras
          * (`Tina · Casa ...`, `Marketplace`, `VEF0 - Casa ...` con guion,
-         * `Escribe en Tina · ...`) sin ningún mensaje real. Todo es
+         * `Escribe en Tina · ...`) sin ningún mensaje real: es
          * ruido → vacío (el handler conserva el original en ese caso). */
         let hilo = "tina|VEF0 casa en venta en riberas del caroní, puerto ordaz";
         let crudo = "Tina · Casa en venta en Riberas del Caroní, Puerto Ordaz\n\
@@ -1156,6 +1166,22 @@ mod pruebas {
     }
 
     #[test]
+    fn normalizar_hilo_cristo_dia_y_truncado_deja_solo_preguntas() {
+        /* [08AA-24] Crudo exacto del hilo cristo (`excerpt_crudo` 1200,
+         * con saltos): día de semana ante la hora (`lunes 22:48 por
+         * Cristo:`), duplicado con dos puntos (`lunes 22:48 por:
+         * Cristo`), inicio truncado por el `slice(-1200)` del float
+         * (`sionar Enter,`) y marca `3:53 pm` separando mensajes. Solo
+         * las 2 preguntas sobreviven. */
+        let hilo = "cristo|VEF0 alquiler townhouse 2 niveles en arivana, puerto ordaz.";
+        let crudo = "sionar Enter, Mensaje enviado lunes 22:48 por Cristo: Hola. ¿Sigue estando disponible?\nEnvía una respuesta rápida\nToca una respuesta para enviársela al comprador.\nSí. ¿Te interesa?\nLo estoy mirando. Te avisaré.\nLo siento, no está disponible.\nPresionar Enter, Mensaje enviado: lunes 22:48 por: Cristo\nSi te vas a reunir con alguien en persona, cuéntales a familiares y amigos adónde vas. Usa la función de compartir la ubicación en tiempo real directamente con un amigo o familiar durante la reunión. Ver más consejos de seguridad\nPresionar Enter, Mensaje enviado lunes 22:48 por Cristo: Si te vas a reunir con alguien en persona, cuéntales a familiares y amigos adónde vas. Usa la función de compartir la ubicación en tiempo real directamente con un amigo o familiar durante la reunión.\n3:53 pm\nCristo\n¿Sigue disponible?\nPresionar Enter, Mensaje enviado 3:53 pm por Cristo: ¿Sigue disponible?\nEnvía una respuesta rápida\nToca una respuesta para enviársela al comprador.\nSí. ¿Te interesa?\nLo estoy mirando. Te avisaré.\nLo siento, no está disponible.\nPresionar Enter, Mensaje enviado: 3:53 pm por: Cristo\nEscribir mensaje\nEscribe en Cristo · Alquiler Townhouse 2 niveles en Arivana, Puerto Ordaz.\n\n\n\n\nAa";
+        assert_eq!(
+            normalizar_excerpt_hilo(hilo, crudo),
+            "Hola. ¿Sigue estando disponible?\n¿Sigue disponible?"
+        );
+    }
+
+    #[test]
     fn clave_hilo_deshace_precio_inyectado_y_respeta_lo_demas() {
         /* [08AA-18] El puente (07AA-11) manda `tina|$43.000 vef0...` pero
          * la cifra parpadea entre llamadas: la BD solo ve la forma
@@ -1176,7 +1202,7 @@ mod pruebas {
         assert_eq!(clave_hilo("sin-hilo"), "sin-hilo");
         assert_eq!(clave_hilo(""), "");
         /* Sin dígitos no es cifra; sin resto no hay aviso; `$` en otro
-         * sitio no es inyección: todo queda intacto. */
+         * sitio no es inyección: queda intacto. */
         assert_eq!(clave_hilo("ana|$negociable casa"), "ana|$negociable casa");
         assert_eq!(clave_hilo("ana|$50"), "ana|$50");
         assert_eq!(clave_hilo("ana|casa $50 mil"), "ana|casa $50 mil");
@@ -1401,6 +1427,11 @@ mod pruebas {
         f = fila_prueba(43_000.0);
         f.estado = "vendido".to_string();
         assert_ne!(hash_ficha(&f), base, "estado distinto debe invalidar");
+        /* [08AA-25] La operación condiciona el lenguaje del borrador
+         * (venta vs canon mensual): cambiarla invalida la caché. */
+        f = fila_prueba(43_000.0);
+        f.operacion = "alquiler".to_string();
+        assert_ne!(hash_ficha(&f), base, "operación distinta debe invalidar");
     }
 
     #[test]
@@ -1414,8 +1445,12 @@ mod pruebas {
 
     #[test]
     fn precio_hash_ata_al_precio_citado() {
-        let a = precio_hash_seguro(&strip_ficha_para_prompt(&fila_prueba(43_000.0), "v1").unwrap());
-        let b = precio_hash_seguro(&strip_ficha_para_prompt(&fila_prueba(45_000.0), "v1").unwrap());
+        let a = precio_hash_seguro(
+            &strip_ficha_para_prompt(&fila_prueba(43_000.0), STRIP_VERSION).unwrap(),
+        );
+        let b = precio_hash_seguro(
+            &strip_ficha_para_prompt(&fila_prueba(45_000.0), STRIP_VERSION).unwrap(),
+        );
         assert!(es_hex64(&a));
         assert_ne!(a, b);
     }

@@ -481,8 +481,10 @@ async fn generar_borrador(
         crate::services::marketplace::Tono::Formal => "formal",
     });
     /* [07AA-10] Saludo primero y por su nombre: el hilo trae `nombre|aviso`.
-     * El precio siempre con «negociable»; el cierre invita a contar qué
-     * busca (conocer intención, no solo coordinar visita).
+     * El precio según operación ([08AA-25]: un alquiler presentado como
+     * venta rompe la confianza — testigo Townhouse Arivana, hilo cristo);
+     * el cierre invita a contar qué busca (conocer intención, no solo
+     * coordinar visita).
      * [08AA-11] Párrafos separados por línea en blanco, no líneas sueltas:
      * el borrador se copia a WhatsApp y los saltos sueltos se ven rotos.
      * [08AA-15] Breve por pedido de ella: 3 párrafos cortos como máximo,
@@ -506,8 +508,11 @@ async fn generar_borrador(
          Formato obligatorio, en este orden exacto: primer párrafo = el \
          saludo, {saludo}, más el nombre corto del inmueble (solo tipo + \
          residencia, sin dirección ni zona duplicada), más si está \
-         disponible, más el precio con la cifra exacta de los datos o del \
-         aviso seguida siempre de la palabra «negociable»; segundo párrafo \
+          disponible, más el precio con la cifra exacta de los datos o del \
+          aviso (si los datos traen «operacion»:«alquiler» es un ALQUILER: \
+          la cifra es el canon mensual —«$1.500 mensuales»—, jamás hables \
+          de venta ni uses la palabra «negociable»; si trae «venta», la \
+          cifra va seguida siempre de la palabra «negociable»); segundo párrafo \
          = responde la última pregunta del Cliente en una línea, con \
          coherencia y sin repetir lo ya dicho; tercer párrafo = invítalo a \
          contarte qué busca para ayudarlo (cálido, p. ej. \
