@@ -18,10 +18,10 @@ use crate::errors::AppError;
 use crate::middleware::AuthUser;
 use crate::repositories::InmuebleRepository;
 use crate::services::marketplace::{
-    aviso_fb_de_thread, borrar_cache, buscar_cache, consumir_minuto, corregir_cache, detalle_chat,
-    formatear_parrafos, guardar_cache, hash_ficha, normalizar_excerpt_hilo, precio_hash_seguro,
-    reemplazar_cache, resumen_chats, resumen_uso, strip_ficha_para_prompt, sub_exento,
-    validar_borrador, BorradorRequest, FALLBACK_BORRADOR, SIN_FICHA, STRIP_VERSION,
+    aviso_fb_de_thread, borrar_cache, buscar_cache, clave_hilo, consumir_minuto, corregir_cache,
+    detalle_chat, formatear_parrafos, guardar_cache, hash_ficha, normalizar_excerpt_hilo,
+    precio_hash_seguro, reemplazar_cache, resumen_chats, resumen_uso, strip_ficha_para_prompt,
+    sub_exento, validar_borrador, BorradorRequest, FALLBACK_BORRADOR, SIN_FICHA, STRIP_VERSION,
 };
 use crate::AppState;
 
@@ -153,8 +153,10 @@ pub async fn borrador(
     /* [08AA-5] El excerpt del puente trae cada mensaje dos veces + ruido
      * de Facebook: se limpia antes del prompt y del guardado. Si solo
      * había ruido se conserva el original (nunca se guarda vacío).
-     * [08AA-16] Con contexto del hilo: fuera cabeceras del visor. */
-    let limpio = normalizar_excerpt_hilo(r.thread_id.trim(), &r.excerpt.texto);
+     * [08AA-16] Con contexto del hilo: fuera cabeceras del visor.
+     * [08AA-18] Contexto con `clave_hilo()`: la cifra inyectada por el
+     * puente (07AA-11) parpadea y el aviso con `$` no empareja el eco. */
+    let limpio = normalizar_excerpt_hilo(&clave_hilo(r.thread_id.trim()), &r.excerpt.texto);
     if !limpio.is_empty() {
         r.excerpt.texto = limpio;
     }
@@ -238,8 +240,9 @@ pub async fn regenerar(
         return Err(AppError::Validation(errores.join("; ")));
     }
     /* [08AA-5] Igual que en `borrador`: excerpt limpio al prompt y al reemplazo.
-     * [08AA-16] Con contexto del hilo. */
-    let limpio = normalizar_excerpt_hilo(r.thread_id.trim(), &r.excerpt.texto);
+     * [08AA-16] Con contexto del hilo.
+     * [08AA-18] Contexto con `clave_hilo()` (ver `borrador`). */
+    let limpio = normalizar_excerpt_hilo(&clave_hilo(r.thread_id.trim()), &r.excerpt.texto);
     if !limpio.is_empty() {
         r.excerpt.texto = limpio;
     }
@@ -332,8 +335,13 @@ pub async fn releer(
         ));
     }
     /* [08AA-5] Igual que en `borrador`: lo que se guarda es el excerpt
-     * limpio, nunca el ruido crudo del DOM. [08AA-16] Con contexto. */
-    let limpio = normalizar_excerpt_hilo(r.thread_id.trim(), &r.excerpt);
+     * limpio, nunca el ruido crudo del DOM. [08AA-16] Con contexto.
+     * [08AA-18] Guarda y busca con `clave_hilo()`: la cifra inyectada
+     * por el puente (07AA-11) parpadea entre el `/borrador` y el
+     * `/releer` y el `thread_id` literal no empareja (`actualizado=false`
+     * en silencio). */
+    let hilo = clave_hilo(r.thread_id.trim());
+    let limpio = normalizar_excerpt_hilo(&hilo, &r.excerpt);
     if limpio.is_empty() {
         return Err(AppError::Validation(
             "excerpt sin contenido aprovechable".to_string(),
@@ -342,7 +350,7 @@ pub async fn releer(
     r.excerpt = limpio;
     let filas: u64 =
         sqlx::query("UPDATE mp_respuestas_cache SET excerpt_texto = $2 WHERE thread_id = $1")
-            .bind(r.thread_id.trim())
+            .bind(&hilo)
             .bind(&r.excerpt)
             .execute(&state.pool)
             .await?
@@ -558,13 +566,15 @@ pub async fn audit(
         EventoAudit::Emision => "emision",
     };
     /* HMAC sin dependencias nuevas: `sha256()` y `encode()` son nativos de
-     * Postgres; el secreto viaja solo en el parámetro dentro del servidor. */
+     * Postgres; el secreto viaja solo en el parámetro dentro del servidor.
+     * [08AA-18] HMAC sobre `clave_hilo()`: la misma auditoría aunque la
+     * cifra inyectada (07AA-11) parpadee entre llamadas. */
     sqlx::query(
         "INSERT INTO mp_auditoria (hilo_hmac, ts_hora, evento) \
          SELECT encode(sha256(($1 || $2)::bytea), 'hex'), date_trunc('hour', now()), $3",
     )
     .bind(&state.jwt_secret)
-    .bind(r.thread_id.trim())
+    .bind(clave_hilo(r.thread_id.trim()))
     .bind(evento)
     .execute(&state.pool)
     .await?;

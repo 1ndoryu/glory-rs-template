@@ -224,6 +224,42 @@ pub fn aviso_fb_de_thread(thread_id: &str) -> Option<String> {
     Some(aviso.to_string())
 }
 
+/// [08AA-18] Clave canónica del hilo para guardar y buscar en caché: el
+/// puente inyecta la cifra del DOM tras el `|` (`tina|$43.000 vef0
+/// casa...`, 07AA-11) y esa cifra parpadea entre llamadas, así que el
+/// `thread_id` literal no sirve de clave (el `/borrador` guarda con una
+/// forma y el `/releer` busca con otra → `actualizado=false` en
+/// silencio). Se deshace un `$CIFRA ` inicial con dígitos (`$43.000`,
+/// `US$ 43.000`); sin `|`, sin `$` inicial, sin dígitos en la cifra o
+/// si no quedaría aviso, el hilo queda intacto. La cifra sigue viva en
+/// el hilo crudo que ven el prompt y `precio_del_aviso`: aquí solo se
+/// estabiliza la llave de la BD.
+#[must_use]
+pub fn clave_hilo(thread_id: &str) -> String {
+    let texto = thread_id.trim();
+    let Some((nombre, aviso)) = texto.split_once('|') else {
+        return texto.to_string();
+    };
+    /* Moneda inicial (`$`, `US$`, `RD$`): solo letras y `$`, sin
+     * espacios ni dígitos. Sin `$` no es inyección del puente
+     * (`Casa en venta`, `Casa 3 habs` quedan intactos). */
+    let aviso = aviso.trim();
+    let tras_moneda = aviso.trim_start_matches(|c: char| c.is_ascii_alphabetic() || c == '$');
+    let prefijo = &aviso[..aviso.len() - tras_moneda.len()];
+    if !prefijo.contains('$') {
+        return texto.to_string();
+    }
+    /* Cifra: dígitos con `.`/`,` tras un blanco opcional. Sin
+     * dígitos no es cifra (`$negociable casa` intacto). */
+    let tras_blanco = tras_moneda.trim_start();
+    let tras_cifra =
+        tras_blanco.trim_start_matches(|c: char| c.is_ascii_digit() || c == '.' || c == ',');
+    if tras_cifra.len() == tras_blanco.len() || tras_cifra.trim_start().is_empty() {
+        return texto.to_string();
+    }
+    format!("{}|{}", nombre.trim(), tras_cifra.trim_start())
+}
+
 /// [08AA-16] Normaliza el excerpt con contexto del hilo: nombre del
 /// comprador y título del aviso salen del `thread_id`
 /// (`comprador|aviso`). Lo usan `borrador`, `regenerar` y `releer` para
@@ -397,12 +433,14 @@ pub async fn ficha_por_titulo(
 
 /// [07AA-8] Últimos borradores del hilo (máx 3, recientes primero): contexto
 /// "ya dicho" para que la IA avance la conversación en vez de repetir.
+/// [08AA-18] Lee con `clave_hilo()`: la cifra inyectada por el puente
+/// (07AA-11) parpadea entre llamadas y el `thread_id` literal no empareja.
 pub async fn hilo_previo(pool: &sqlx::PgPool, thread: &str) -> Result<Vec<String>, AppError> {
     let filas: Vec<String> = sqlx::query_scalar(
         "SELECT respuesta FROM mp_respuestas_cache \
          WHERE thread_id = $1 ORDER BY valida_hasta DESC LIMIT 3",
     )
-    .bind(thread)
+    .bind(clave_hilo(thread))
     .fetch_all(pool)
     .await?;
     Ok(filas)
@@ -604,13 +642,14 @@ pub async fn resumen_chats(pool: &sqlx::PgPool) -> Result<Vec<ChatResumen>, AppE
 }
 
 /// Filas de un chat (tope 200, recientes primero).
+/// [08AA-18] Busca con `clave_hilo()` (ver `hilo_previo`).
 pub async fn detalle_chat(pool: &sqlx::PgPool, thread: &str) -> Result<Vec<ChatFila>, AppError> {
     let filas: Vec<(String, String, i64, bool, chrono::DateTime<chrono::Utc>)> = sqlx::query_as(
         "SELECT excerpt_texto, respuesta, usos::BIGINT, corregida, valida_hasta \
          FROM mp_respuestas_cache WHERE thread_id = $1 \
          ORDER BY valida_hasta DESC LIMIT 200",
     )
-    .bind(thread)
+    .bind(clave_hilo(thread))
     .fetch_all(pool)
     .await?;
     Ok(filas
@@ -704,6 +743,9 @@ pub async fn buscar_cache(
 /// Guarda una generación fresca; si la dueña ya corrigió esa clave, su texto
 /// gana (`DO NOTHING`: la corrección humana no se pisa en silencio).
 /// [07AA-7] Anota `thread_id` + `excerpt_texto` para el panel por chat.
+/// [08AA-18] Guarda con `clave_hilo()`: la cifra inyectada por el puente
+/// (07AA-11) parpadea entre llamadas y el `thread_id` literal no empareja
+/// al releer.
 pub async fn guardar_cache(
     pool: &sqlx::PgPool,
     firma: &str,
@@ -721,7 +763,7 @@ pub async fn guardar_cache(
     .bind(precio_hash)
     .bind(catalog_hash)
     .bind(respuesta)
-    .bind(thread_id)
+    .bind(clave_hilo(thread_id))
     .bind(excerpt)
     .execute(pool)
     .await?;
@@ -731,6 +773,7 @@ pub async fn guardar_cache(
 /// Pisa la fila (Regenerar explícito de la dueña): texto nuevo, vigencia
 /// renovada, `corregida=FALSE`, contador a cero (nueva versión).
 /// [07AA-7] Refresca también `thread_id` + `excerpt_texto` (foto actual).
+/// [08AA-18] Guarda con `clave_hilo()` (ver `guardar_cache`).
 pub async fn reemplazar_cache(
     pool: &sqlx::PgPool,
     firma: &str,
@@ -752,7 +795,7 @@ pub async fn reemplazar_cache(
     .bind(precio_hash)
     .bind(catalog_hash)
     .bind(respuesta)
-    .bind(thread_id)
+    .bind(clave_hilo(thread_id))
     .bind(excerpt)
     .execute(pool)
     .await?;
@@ -1071,6 +1114,33 @@ mod pruebas {
             Escribe en Tina · Casa en venta en Riberas del Caroní, Puerto Ordaz\n\
             Aa";
         assert!(normalizar_excerpt_hilo(hilo, crudo).is_empty());
+    }
+
+    #[test]
+    fn clave_hilo_desHace_precio_inyectado_y_respeta_lo_demas() {
+        /* [08AA-18] El puente (07AA-11) manda `tina|$43.000 vef0...` pero
+         * la cifra parpadea entre llamadas: la BD solo ve la forma
+         * canónica para que guardar y buscar emparejen siempre. */
+        assert_eq!(
+            clave_hilo("tina|$43.000 vef0 casa en venta"),
+            "tina|vef0 casa en venta"
+        );
+        assert_eq!(
+            clave_hilo("tina|US$ 43.000 vef0 casa en venta"),
+            "tina|vef0 casa en venta"
+        );
+        assert_eq!(clave_hilo("  tina|$43.000 vef0 casa  "), "tina|vef0 casa");
+        assert_eq!(
+            clave_hilo("tina|vef0 casa en venta"),
+            "tina|vef0 casa en venta"
+        );
+        assert_eq!(clave_hilo("sin-hilo"), "sin-hilo");
+        assert_eq!(clave_hilo(""), "");
+        /* Sin dígitos no es cifra; sin resto no hay aviso; `$` en otro
+         * sitio no es inyección: todo queda intacto. */
+        assert_eq!(clave_hilo("ana|$negociable casa"), "ana|$negociable casa");
+        assert_eq!(clave_hilo("ana|$50"), "ana|$50");
+        assert_eq!(clave_hilo("ana|casa $50 mil"), "ana|casa $50 mil");
     }
 
     #[test]
