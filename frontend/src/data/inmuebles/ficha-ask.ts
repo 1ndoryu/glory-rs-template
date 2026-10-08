@@ -51,7 +51,7 @@ export async function guardarColumnaAsk(
 
 /* Primera propiedad con algo que preguntar (279A-4): candidatas en orden
  * aleatorio, trae la ficha una a una y devuelve la primera con algún paso
- * sin responder. `null` = todo al día (o lista vacía). Las fichas que
+ * sin responder. `null` = al día (o lista vacía). Las fichas que
  * fallan se saltan en silencio: ya habrá otra candidata. */
 export async function buscarPendiente(
   lista: Inmueble[],

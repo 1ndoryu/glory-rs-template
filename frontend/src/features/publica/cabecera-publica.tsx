@@ -17,7 +17,7 @@ import {
 
 /* Cabecera en cuadro con bordes, apenas separada de los filtros.
  * Fija al viewport con 16px de aire al borde: se mantiene visible al
- * bajar y la foto la cubre por detrás arriba del todo. La hoja con la
+ * bajar y la foto la cubre por detrás arriba de la vista. La hoja con la
  * lista se ancla 200px debajo al subir.
  * En móvil (<md) muestra solo el logo sin letras y un botón de
  * hamburguesa que abre el mismo menú (Mensaje, Publicar, Entrar); en

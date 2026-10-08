@@ -1,6 +1,6 @@
 /* Reglas de diseño de la página pública, fijadas tal cual está la página.
  * Para escalar sin romper lo construido: ningún componente de `publica/`
- * usa colores, medidas o tamaños literales; todo sale de aquí.
+ * usa colores, medidas o tamaños literales; sale de aquí.
  *
  * Receta: fondo #e8e7e3, tinta #050200, sin redondeados, sin sombras,
  * texto único 16px Söhne 400 (`--texto-publica` en index.css). */

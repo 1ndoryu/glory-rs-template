@@ -66,7 +66,7 @@ export interface PreguntaAsk {
 
 export type ExtrasAsk = Record<string, string | number | boolean>;
 
-/* Comunes a todo tipo (3): referencia privada, negociable y mínimo.
+/* Comunes a cada tipo (3): referencia privada, negociable y mínimo.
  * (La zona/residencia dejó de ser pregunta de `extras`: es el paso
  * inteligente de columnas `ubicacion`+`residencia`, que rellena el
  * inmueble de verdad en vez de un texto suelto.)
@@ -95,7 +95,7 @@ export const COMUNES: PreguntaAsk[] = [
   },
 ];
 
-/* Servicios básicos (279A-6): aplican a todo tipo. `privada: false` los
+/* Servicios básicos (279A-6): aplican a cada tipo. `privada: false` los
  * marca aptos para la ficha visible y la IA, pero hoy nadie los lee fuera
  * del panel (pendiente: cablear pública + IA, ver roadmap). Huecos que
  * faltaban: internet y agua. */

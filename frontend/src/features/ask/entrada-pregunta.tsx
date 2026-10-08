@@ -87,7 +87,7 @@ export function EntradaPregunta({
   return (
     <div className={`mt-4 border ${CLASE_BORDE} px-4 py-6 text-center`}>
       <p className={`text-lg ${CLASE_TINTA}`}>{pregunta.etiqueta}</p>
-      {pregunta.privada && <p className={`mt-1 text-xs ${CLASE_TINTA} opacity-60`}>🔒 Privado: nadie lo ve en la página.</p>}
+      {pregunta.privada && <p className={`mt-1 text-xs ${CLASE_TINTA} opacity-60`}>Privado: nadie lo ve en la página.</p>}
       {pregunta.ayuda && <p className={`mt-1 text-xs ${CLASE_TINTA} opacity-60`}>{pregunta.ayuda}</p>}
       {pregunta.tipo === 'si_no' ? (
         <div className="mt-4 flex gap-2">

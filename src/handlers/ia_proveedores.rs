@@ -183,8 +183,8 @@ pub(crate) async fn completar_opencode(
             /* [08AA-19] 4000, no 2500: el modelo razona antes de redactar
              * y un prompt normal ya quema ~1788 tokens de razonamiento
              * (medido 2026-10-08 contra el endpoint real); con 2500 el
-             * borrador largo caía en `incomplete` sin `message` y todo
-             * iba a `reserva`. El texto útil son ~150 tokens. */
+             * borrador largo caía en `incomplete` sin `message` y acababa
+             * en `reserva`. El texto útil son ~150 tokens. */
             max_output_tokens: 4000,
             timeout_secs: 120,
         },

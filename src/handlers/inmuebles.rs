@@ -14,7 +14,7 @@ use crate::models::{
 use crate::services::InmuebleService;
 use crate::AppState;
 
-/* [159A-1] CRUD admin del catálogo. Todo requiere JWT; la visibilidad
+/* [159A-1] CRUD admin del catálogo. Requiere JWT; la visibilidad
  * pública la decide el backend con `publicado` (PATCH publicacion). */
 
 /// Crear un inmueble (admite payload vacío: borrador)

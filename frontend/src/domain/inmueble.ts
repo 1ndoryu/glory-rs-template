@@ -172,7 +172,7 @@ export interface ClaseDraft {
   estado: EstadoInmueble;
 }
 
-/** Borrador del modal: todo opcional salvo fotos (siempre array). */
+/** Borrador del modal: opcional salvo fotos (siempre array). */
 export interface InmuebleDraft extends TextoDraft, NumerosDraft, ClaseDraft {
   fotos: string[];
 }

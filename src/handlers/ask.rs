@@ -10,7 +10,7 @@ use crate::repositories::InmuebleRepository;
 use crate::AppState;
 
 /* [279A-3] Ficha /ask: la dueña completa huecos por inmueble (`extras`) +
- * precio mínimo privado. Todo requiere JWT; lo privado solo sale por aquí:
+ * precio mínimo privado. Requiere JWT; lo privado solo sale por aquí:
  * `Inmueble` (vistas públicas y tools) ni declara `precio_minimo`. */
 
 /// Leer la ficha /ask de un inmueble (incluye lo privado)

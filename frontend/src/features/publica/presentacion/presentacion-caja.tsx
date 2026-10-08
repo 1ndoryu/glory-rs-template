@@ -24,7 +24,7 @@ type PropiedadesCaja = {
 };
 
 /* Concepto 1 (conservado): presentación en 3 fases ligadas al scroll
- * (sin JS): arriba del todo cubre la pantalla sin márgenes; al bajar
+ * (sin JS): arriba cubre la pantalla sin márgenes; al bajar
  * encoge a la caja; luego se funde mientras la hoja con la lista pasa
  * por encima. Pista alta con escenario fijo: solo se animan posición y
  * opacidad (sin bucles). Contenido provisional (lorem ipsum); se define

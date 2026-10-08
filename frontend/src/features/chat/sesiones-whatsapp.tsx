@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { descargarQr, sesionesWhatsapp, type SesionWhatsapp } from '../../data/chat/cliente-duena';
 import { ErrorApi } from '../../data/inmuebles/api';
+import { repetirCada } from '../../platform/ventana';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
@@ -56,8 +57,8 @@ export function SesionesWhatsapp() {
    * todas, el intervalo se detiene solo. */
   useEffect(() => {
     if (!sesiones || sesiones.every((s) => s.estado === 'abierta')) return;
-    const t = window.setInterval(() => void recargar(), 20000);
-    return () => window.clearInterval(t);
+    /* [08AA-22] Intervalo vía plataforma (sin `window` directo aquí). */
+    return repetirCada(20000, () => void recargar());
   }, [sesiones, recargar]);
 
   useEffect(

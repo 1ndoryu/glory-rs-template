@@ -26,16 +26,6 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 
 ## Pendientes
 
-- **08AA-22 — Barrido gate: mecánicos front + todo-prosa + FPs (activa
-  2026-10-08):** gate 22E/469W/7H. Alcance: emoji-en-codigo x2, window-reference
-  (getter en `platform/ventana.ts`), todo-prosa x22 (todos menos los 2 de
-  `services/marketplace.rs, en curso por 08AA-21 concurrente) + MD de
-  prevencion con los FPs front (inline-style dinámico, key-index lista
-  estática, promise lazy/catch-interno, mixed-barrel shim, DTOs anchas) +
-  triaje documentado de lo no-ejecutable (clases masivas sqlx/handler/html =
-  patrón del proyecto; DISEÑO usestate/hook/canvas; ajenos glory-rs;
-  `marketplace.rs` de la otra sesión). No toca `handlers/marketplace.rs`,
-  `services/marketplace.rs`, `tope_uso.rs` ni migraciones (08AA-21).
 - **08AA-21 — Guardar excerpt crudo junto al limpio (pedido por ella
   2026-10-08, verificado vivo 2026-10-08, commit `e50839a1`):** columna
   `excerpt_crudo TEXT` (migración `...32`, NULL en filas viejas);

@@ -23,7 +23,7 @@ export function FichaFormulario(props: {
           const marcaNoSe = props.extras[claveNoSe(p.clave)] === NO_SE;
           return (
             <div key={p.clave} className="space-y-1">
-              <Etiqueta>{p.etiqueta} 🔒</Etiqueta>
+              <Etiqueta>{p.etiqueta} (privado)</Etiqueta>
               <Input
                 value={props.minimo}
                 onChange={(e) => {
@@ -97,7 +97,7 @@ export function FichaFormulario(props: {
           <div key={p.clave} className="space-y-1">
             <Etiqueta>
               {p.etiqueta}
-              {p.privada ? ' 🔒' : ''}
+              {p.privada ? ' (privado)' : ''}
               {p.unidad ? ` (${p.unidad})` : ''}
             </Etiqueta>
             <Input

@@ -5,6 +5,7 @@
 import { EllipsisVertical, Eye, EyeOff, Globe, ImageDown, ImagePlus, Images, Megaphone, Pencil, Trash2 } from 'lucide-react';
 import { fotosVisiblesDe, type Inmueble } from '@/domain/inmueble';
 import { Button } from '@/components/ui/button';
+import { confirmar } from '@/platform/ventana';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,7 +45,7 @@ export function MenuAcciones({
   const nombre = inmueble.titulo || 'Sin título';
   const conFotos = fotosVisiblesDe(inmueble).length > 0;
   const confirmarEliminar = () => {
-    if (window.confirm(`Eliminar "${nombre}". Esta acción no se puede deshacer.`)) {
+    if (confirmar(`Eliminar "${nombre}". Esta acción no se puede deshacer.`)) {
       onEliminar();
     }
   };

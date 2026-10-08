@@ -1,5 +1,5 @@
-/* Adaptador de plataforma (DOM): todo acceso directo al documento vive aquí,
- * nunca en componentes. Sentinel (dom-access-outside-platform). */
+/* Adaptador de plataforma (DOM): cualquier acceso directo al documento vive
+ * aquí, nunca en componentes. Sentinel (dom-access-outside-platform). */
 
 /* Descarga un dataURL como archivo con el nombre dado (via anchor temporal). */
 export function descargarDataUrl(url: string, nombre: string): void {

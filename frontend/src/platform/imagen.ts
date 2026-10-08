@@ -1,6 +1,6 @@
 /* Adaptador de plataforma (DOM/Canvas): carga y reescalado de imágenes.
- * Todo acceso directo a `document`, `Image` o `URL` vive aquí, nunca en data.
- * Sentinel (dom-access-outside-platform). */
+ * Cualquier acceso directo a `document`, `Image` o `URL` vive aquí, nunca
+ * en data. Sentinel (dom-access-outside-platform). */
 
 /* Carga un `File` como imagen lista para dibujar (libera su object URL). */
 export function cargarImagenArchivo(file: File): Promise<HTMLImageElement> {

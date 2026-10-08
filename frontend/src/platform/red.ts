@@ -1,5 +1,5 @@
 /* Adaptador de plataforma (red/DOM): descargar una URL a dataURL.
- * Todo `FileReader` vive aquí, nunca en data ni componentes. */
+ * `FileReader` vive aquí, nunca en data ni componentes. */
 
 export function urlADataUrl(url: string): Promise<string> {
   return fetch(url).then((r) => {

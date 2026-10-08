@@ -3,6 +3,7 @@ import { Download, EllipsisVertical, Loader2, RotateCcw, Undo2, X } from 'lucide
 import type { FotoMejora } from '@/domain/foto-mejora';
 import type { InfoReintento } from '@/hooks/mejora/use-cola-mejora';
 import { descargarUrl } from '@/platform/descarga';
+import { confirmar } from '@/platform/ventana';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -87,7 +88,7 @@ export function TarjetaFotoMejora(props: {
   async function restaurar() {
     if (!alRestaurar || restaura.enCurso) return;
     if (
-      !window.confirm(
+      !confirmar(
         'Descartar la mejorada del servidor y volver al original? La foto quedará pendiente para mejorarla de nuevo.',
       )
     ) {

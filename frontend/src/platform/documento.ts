@@ -1,5 +1,5 @@
 /* Adaptador de plataforma (document): raíz de montaje y portapapeles.
- * Todo acceso directo a `document`/`navigator` vive aquí, nunca en
+ * Cualquier acceso directo a `document`/`navigator` vive aquí, nunca en
  * hooks/componentes. Sentinel (dom-access-outside-platform). */
 
 /* Raíz de montaje: falla explícito si falta (nunca null silencioso). */

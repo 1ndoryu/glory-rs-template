@@ -40,7 +40,7 @@ export function AppAdmin() {
 }
 
 /* Contenido tras el login: se monta de nuevo al cambiar de usuario para
- * recargar todo con su sesión. */
+ * recargar la vista con su sesión. */
 function ContenidoApp({ email, alSalir }: { email: string; alSalir: () => void }) {
   const { inmuebles, total, cargando, crear, eliminar, actualizar, publicar, reponer, aviso, error } = useInmuebles();
   const borrador = useBorrador();

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { repetirCada } from '../../platform/ventana';
 
 /* Palabras que rotan en el titular con efecto máquina de escribir. */
 export const PALABRAS_ROTATIVAS = ['hogar', 'apart.', 'local', 'terreno'] as const;
@@ -20,7 +21,8 @@ export function useMaquinaEscribir() {
     let posicion = PALABRAS_ROTATIVAS[0].length;
     let borrando = false;
     let espera = PAUSA_COMPLETA_TICKS;
-    const id = window.setInterval(() => {
+    /* [08AA-22] Intervalo vía plataforma (sin `window` directo aquí). */
+    return repetirCada(TICK_MS, () => {
       if (espera > 0) {
         espera -= 1;
         return;
@@ -44,8 +46,7 @@ export function useMaquinaEscribir() {
         }
       }
       setSalida(actual.slice(0, posicion));
-    }, TICK_MS);
-    return () => window.clearInterval(id);
+    });
   }, []);
   return salida;
 }

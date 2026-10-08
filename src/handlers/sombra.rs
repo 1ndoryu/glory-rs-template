@@ -141,8 +141,8 @@ pub async fn huella(
                 .flatten();
         }
     }
-    /* [011A-5 Fase2] Diff contra el núcleo (todo `Option`: lo ausente no
-     * cuenta en contra de `coincide`). */
+    /* [011A-5 Fase2] Diff contra el núcleo (cada campo es `Option`: lo
+     * ausente no cuenta en contra de `coincide`). */
     let adapter = adapter_config_desde_bd(pool).await;
     let responde_ia_adapter = canal
         .as_deref()

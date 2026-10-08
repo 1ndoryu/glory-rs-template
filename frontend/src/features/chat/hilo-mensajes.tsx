@@ -47,7 +47,7 @@ export function HiloMensajes({
 }: {
   sesion: ResumenSesion;
   hilo: MensajeServidor[];
-  /* [309A-3] Paginación por scroll: al subir del todo se antepone la página
+  /* [309A-3] Paginación por scroll: al llegar arriba se antepone la página
    * anterior (`before_seq`) preservando la posición. */
   hayMas: boolean;
   cargandoMas: boolean;
@@ -91,7 +91,7 @@ export function HiloMensajes({
     previoRef.current = hilo.length;
   }, [hilo, cargandoMas]);
 
-  /* Subir del todo carga la página anterior; el efecto post-commit
+  /* Subir hasta arriba carga la página anterior; el efecto post-commit
    * compensa el crecimiento hacia arriba con la distancia guardada aquí. */
   async function cargarPagina(caja: HTMLDivElement): Promise<void> {
     if (!hayMas || pidiendoRef.current) return;

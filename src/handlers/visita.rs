@@ -15,7 +15,7 @@ use crate::AppState;
 /* [E15] Panel de visitas de la IA: el admin lista las `pendiente` y las
  * confirma (con `fecha`: día cerrado con el visitante) o las cancela.
  * Solo se mueve desde `pendiente`: una visita cerrada no se reabre por
- * aquí (si cambia, se agenda otra). Todo requiere JWT. */
+ * aquí (si cambia, se agenda otra). Requiere JWT. */
 
 /// Listar visitas para el panel (requiere JWT; filtro opcional por estado)
 #[utoipa::path(

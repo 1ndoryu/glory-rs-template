@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { EVENTO_SESION_EXPIRADA, borrarSesion, entrar, leerEmailSesion, leerToken } from '../../data/inmuebles/api';
-import { suscribirEvento } from '../../platform/ventana';
+import { suscribirEvento, nombreHost } from '../../platform/ventana';
 
 // Sesión del admin contra la API: el token vive en localStorage (dura 1
 // año y sobrevive al cierre del navegador). `email === null` = hay que entrar.
@@ -15,12 +15,8 @@ const HOSTS_LOCALES = new Set(['localhost', '127.0.0.1', 'inmobiliaria.localhost
 
 function credencialesDev(): { email: string; clave: string } | null {
   if (!import.meta.env.DEV) return null;
-  let host = '';
-  try {
-    host = window.location.hostname.toLowerCase();
-  } catch {
-    return null;
-  }
+  /* [08AA-22] Dominio vía plataforma (sin `window` directo en el hook). */
+  const host = nombreHost().toLowerCase();
   if (!HOSTS_LOCALES.has(host) && !host.endsWith('.localhost')) return null;
   const email = (import.meta.env.VITE_DEV_EMAIL as string | undefined)?.trim();
   const clave = import.meta.env.VITE_DEV_PASSWORD as string | undefined;

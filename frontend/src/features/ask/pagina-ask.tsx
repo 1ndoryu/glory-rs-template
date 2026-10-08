@@ -131,7 +131,7 @@ function CuestionarioAsk() {
   );
 }
 
-/* Sin pendientes: todo al día (o aún sin propiedades). Sin lista: solo
+/* Sin pendientes: al día (o aún sin propiedades). Sin lista: solo
  * el botón para revisar de nuevo. */
 function PanelTerminado({ vacio, alRevisar }: { vacio: boolean; alRevisar: () => void }) {
   return (

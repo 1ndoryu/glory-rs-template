@@ -45,7 +45,7 @@ fn telefono_valido(valor: &str) -> bool {
     v.is_empty() || (v.len() <= 24 && v.chars().all(|c| c.is_ascii_digit() || "+ ".contains(c)))
 }
 
-/// ¿CSV de autorizados aceptable? Vacío (nadie = todo `Publico`) o dígitos,
+/// ¿CSV de autorizados aceptable? Vacío (nadie = siempre `Publico`) o dígitos,
 /// `+`, espacios, comas y guiones (≤2000); lo raro lo filtra
 /// `leer_autorizados` igual que al remitente.
 fn autorizados_validos(valor: &str) -> bool {

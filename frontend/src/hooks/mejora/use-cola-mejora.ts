@@ -3,6 +3,7 @@ import type { ConfigMejora, FotoMejora, ParcheFoto } from '../../domain/foto-mej
 import type { TipoEventoMejora } from '../../domain/historial-mejora';
 import { enviarFoto, leerTrabajo, reintentarTrabajo, cancelarTrabajo } from '../../data/mejora/cliente-mejora';
 import { subirMejorada } from '../../data/inmuebles/api';
+import { repetirCada } from '../../platform/ventana';
 
 /* Info de reintento backend para el badge de la tarjeta: intentos que lleva
  * el trabajo, segundos hasta el próximo reintento y último motivo. */
@@ -282,8 +283,8 @@ export function useColaMejora(
       void procesarUna(siguiente, configRef.current.prompt);
     };
     intentar();
-    const latido = window.setInterval(intentar, 10_000);
-    return () => window.clearInterval(latido);
+    /* [08AA-22] Latido vía plataforma (sin `window` directo aquí). */
+    return repetirCada(10_000, intentar);
   }, [fotos, config.modo, config.prompt, procesarUna]);
 
   const reintentar = useCallback(
