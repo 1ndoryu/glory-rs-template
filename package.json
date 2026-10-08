@@ -16,6 +16,7 @@
     "codegen": "npm --prefix frontend run codegen",
     "test": "node scripts/run-with-db.mjs test",
     "roadmap": "node scripts/check-roadmap.mjs",
-    "roadmap:watch": "node scripts/check-roadmap.mjs --watch"
+    "roadmap:watch": "node scripts/check-roadmap.mjs --watch",
+    "sync:pull": "node scripts/sync-pull.mjs"
   }
 }

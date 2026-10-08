@@ -51,6 +51,9 @@ desktop.ini
 !/scripts/self-check.ps1
 !/scripts/importar-rescate.mjs
 !/scripts/bateria-ia.ps1
+!/scripts/sync-pull.mjs
+# [08AA-2] Credenciales del sync prod→local: jamás en git
+/scripts/.env.prod.local
 /backups/
 /clients/
 /frontend/public/legacy-assets/

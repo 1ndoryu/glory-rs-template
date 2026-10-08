@@ -1,6 +1,6 @@
 # Plan sync prod→local + automatización — 2026-10-08 (08AA-2)
 
-> Estado: plan. Sin ejecución todavía.
+> Estado: EJECUTADO 2026-10-08 (espejo OK 13/259, re-run exit 0).
 > Origen: pedido de ella 2026-10-08 ("sincroniza los inmuebles de prod con
 > los locales; si se puede automatizar, hazlo, que no falle ni rompa nada").
 > Hallazgo: `scripts/sync-pull.mjs` quedó planeado en Fase 5 del plan deploy
@@ -91,3 +91,11 @@ commit `08AA-2: ...` + push. Releer roadmap al cerrar (regla 16).
 2. Automatizar con tarea programada diaria o dejarlo en comando manual.
 3. `--si` (sobrescribir local sin preguntar) como default del comando o
    pedir confirmación siempre.
+
+## Respuestas de ella (2026-10-08)
+
+1. **Datos + fotos.** 2. **Solo comando manual** (`npm run sync:pull`, sin
+   tarea programada). 3. **Sobrescribir sin preguntar** (el script escribe en
+   local por defecto; `--dry-run` para previsualizar; backup `pg_dump`
+   previo obligatorio). Además: **que nada afecte prod** → el script solo
+   hace login + GETs contra prod; ni deploy, ni restart, ni escrituras.
