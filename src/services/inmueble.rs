@@ -254,6 +254,20 @@ impl InmuebleService {
             .ok_or_else(|| AppError::Internal("con_fotos devolvio vacio para una fila".into()))
     }
 
+    /* [08AA-33] Cambio de estado validado contra `ESTADOS` (422 si no
+     * existe el valor). `vendido`/`alquilado` despublican en el repo;
+     * el front /ask lo usa para "Esta propiedad se vendió". */
+    pub async fn set_estado(pool: &PgPool, id: Uuid, estado: &str) -> Result<Inmueble, AppError> {
+        let estado = Self::normalizar(estado, ESTADOS, "estado")?;
+        let row = InmuebleRepository::set_estado(pool, id, &estado)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Inmueble no encontrado".into()))?;
+        Self::con_fotos(pool, vec![row])
+            .await?
+            .pop()
+            .ok_or_else(|| AppError::Internal("con_fotos devolvio vacio para una fila".into()))
+    }
+
     pub async fn delete(pool: &PgPool, upload_dir: &Path, id: Uuid) -> Result<(), AppError> {
         let fotos = InmuebleRepository::fotos_por_inmuebles(pool, &[id])
             .await?
@@ -688,6 +702,81 @@ mod pruebas_receta {
             .await
             .unwrap_err();
         assert!(matches!(err, AppError::Validation(_)));
+
+        InmuebleService::delete(&pool, Path::new("."), creado.id)
+            .await
+            .unwrap();
+    }
+}
+
+/* [08AA-33] "Esta propiedad se vendió": `vendido`/`alquilado` cambian el
+ * estado Y despublican en una sola query; `reservado` no toca la
+ * visibilidad; estado inválido es 422 e id inexistente es 404. Humo contra
+ * la BD real de rama (`DATABASE_URL`); sin ella se omite como el resto. */
+#[cfg(test)]
+mod pruebas_estado {
+    use super::*;
+    use crate::models::CreateInmuebleRequest;
+
+    fn pool_si_hay() -> Option<PgPool> {
+        let url = std::env::var("DATABASE_URL").ok()?;
+        sqlx::postgres::PgPoolOptions::new()
+            .max_connections(1)
+            .connect_lazy(&url)
+            .ok()
+    }
+
+    fn crear_humo(titulo: &str) -> CreateInmuebleRequest {
+        CreateInmuebleRequest {
+            titulo: titulo.to_string(),
+            descripcion: String::new(),
+            ubicacion: String::new(),
+            puestos: 0,
+            residencia: String::new(),
+            precio: 0.0,
+            tipo: "apartamento".to_string(),
+            operacion: "venta".to_string(),
+            habitaciones: 0,
+            banos: 0,
+            metros: 0.0,
+            metros_terreno: 0.0,
+            estado: "disponible".to_string(),
+            copy: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn vendido_despublica_reservado_no_e_invalido_rechaza() {
+        let Some(pool) = pool_si_hay() else { return };
+        let creado = InmuebleService::create(&pool, crear_humo("Humo estado 08AA-33"))
+            .await
+            .unwrap();
+        InmuebleService::set_publicado(&pool, creado.id, true)
+            .await
+            .unwrap();
+
+        let vendido = InmuebleService::set_estado(&pool, creado.id, "vendido")
+            .await
+            .unwrap();
+        assert_eq!(vendido.estado, "vendido");
+        assert!(!vendido.publicado, "vendida sale de la web pública");
+
+        let reservado = InmuebleService::set_estado(&pool, creado.id, "reservado")
+            .await
+            .unwrap();
+        assert_eq!(reservado.estado, "reservado");
+        assert!(!reservado.publicado, "reservado no republica solo");
+
+        let err = InmuebleService::set_estado(&pool, creado.id, "quemado")
+            .await
+            .unwrap_err();
+        assert!(matches!(err, AppError::Validation(_)));
+
+        let err = InmuebleService::set_estado(&pool, Uuid::new_v4(), "vendido").await;
+        assert!(
+            matches!(err, Err(AppError::NotFound(_))),
+            "id inexistente es 404"
+        );
 
         InmuebleService::delete(&pool, Path::new("."), creado.id)
             .await

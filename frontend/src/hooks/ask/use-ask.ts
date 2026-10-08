@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { listarRemoto } from '../../data/inmuebles/api';
+import { fijarEstado, listarRemoto } from '../../data/inmuebles/api';
 import {
   buscarPendiente,
   guardarColumnaAsk,
@@ -8,7 +8,7 @@ import {
 } from '../../data/inmuebles/ficha-ask';
 import { assertNunca, extrasTrasRespuesta, marcaNoSePaso, mazclarPasos, pasosPara } from '../../domain/pasos-ask';
 import { NO_SE, type ExtrasAsk } from '../../domain/ficha-ask';
-import type { Inmueble } from '../../domain/inmueble';
+import type { EstadoInmueble, Inmueble } from '../../domain/inmueble';
 import {
   FICHA_VACIA,
   esUbicacion,
@@ -171,5 +171,30 @@ export function useAsk() {
     void iniciarEn(inmuebles, seleccionado?.id ?? null);
   }, [iniciarEn]);
 
-  return { ...estado, responder, saltar, anterior, siguiente };
+  /* [08AA-33] "Esta propiedad se vendió": marca el estado (el backend
+   * despublica en la misma llamada) y reelige con la lista fresca: la
+   * vendida sale de la cola (`buscarPendiente` solo mira `disponible`).
+   * Devuelve `ok` para que el modal decida si cierra o muestra el error. */
+  const marcarVendida = useCallback(
+    async (id: string, estado: EstadoInmueble): Promise<boolean> => {
+      setEstado((e) => ({ ...e, guardando: true, error: null }));
+      try {
+        const actualizado = await fijarEstado(id, estado);
+        const resto = estadoRef.current.inmuebles.map((i) => (i.id === id ? actualizado : i));
+        await iniciarEn(resto, id);
+        setEstado((e) => ({ ...e, guardando: false }));
+        return true;
+      } catch (e: unknown) {
+        setEstado((s) => ({
+          ...s,
+          guardando: false,
+          error: e instanceof Error ? e.message : 'No se pudo marcar como vendida.',
+        }));
+        return false;
+      }
+    },
+    [iniciarEn],
+  );
+
+  return { ...estado, responder, saltar, anterior, siguiente, marcarVendida };
 }

@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import type { PreguntaAsk } from '../../domain/ficha-ask';
 import { NO_SE } from '../../domain/ficha-ask';
+import type { EstadoInmueble, Operacion } from '../../domain/inmueble';
 import { assertNunca } from '../../domain/pasos-ask';
 import { CLASE_ACTIVO, CLASE_BORDE, CLASE_TEXTO, CLASE_TINTA } from '../publica/disenno';
+import { BotonVendida } from './boton-vendida';
 
 /* Entrada de una pregunta /ask (279A-3 F2 + 279A-7): Sí/No, opciones fijas
  * (amoblado, agua…), o campo de texto/número con unidad, stepper y error
@@ -20,6 +22,7 @@ export function EntradaPregunta({
   valorActual,
   alResponder,
   alSaltar,
+  accionVendida,
 }: {
   pregunta: PreguntaAsk;
   guardando: boolean;
@@ -28,6 +31,14 @@ export function EntradaPregunta({
   valorActual?: string | number | boolean | null;
   alResponder: (v: string | number | boolean | null) => void;
   alSaltar: () => void;
+  /* [08AA-33] Acción opcional "Esta propiedad se vendió" (solo ficha):
+   * composición por props para no mezclar responsabilidades. */
+  accionVendida?: {
+    inmuebleId: string;
+    titulo: string;
+    operacion: Operacion;
+    alMarcar: (id: string, estado: EstadoInmueble) => Promise<boolean>;
+  } | null;
 }) {
   const [texto, setTexto] = useState(
     typeof valorActual === 'string' && valorActual !== NO_SE
@@ -185,6 +196,15 @@ export function EntradaPregunta({
           <button type="button" onClick={() => alResponder(null)} className={`cursor-pointer text-sm ${CLASE_TINTA} opacity-60 underline`}>
             No aplica
           </button>
+        )}
+        {conNoAplica && accionVendida && (
+          <BotonVendida
+            inmuebleId={accionVendida.inmuebleId}
+            titulo={accionVendida.titulo}
+            operacion={accionVendida.operacion}
+            deshabilitado={guardando}
+            alMarcar={accionVendida.alMarcar}
+          />
         )}
       </div>
     </div>

@@ -344,6 +344,15 @@ pub struct PublicacionRequest {
     pub publicado: bool,
 }
 
+/// Cambio de estado (`disponible|reservado|vendido|alquilado`) — [08AA-33]:
+/// `vendido`/`alquilado` despublican en la misma query (una propiedad
+/// cerrada no debe seguir en la web pública); el resto solo cambia el
+/// estado sin tocar la visibilidad.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct EstadoRequest {
+    pub estado: String,
+}
+
 /// Alta de foto en un inmueble
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 pub struct AddFotoRequest {

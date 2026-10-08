@@ -26,6 +26,11 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 
 ## Pendientes
 
+- **08AA-34 — Migrar /ask a componentes del sistema (hallazgo gate 2026-10-08
+  cerrando 08AA-33):** 15 `html-nativo-en-vez-de-componente` en
+  `entrada-pregunta.tsx` (8) y `pagina-ask.tsx` (7); son `<button>`/`<input>`
+  preexistentes, no del bloque 08AA-33 (ese usó `Boton`/`Dialog`). Cambiar a
+  `Boton`/`Input` del sistema + verificar /ask en vivo.
 - **08AA-32 — Extraer 5 hooks `componente-sin-hook` (cola de 08AA-26, CERRADA 2026-10-08):**
   `useHiloMensajes`, `useSesionesWhatsapp`, `usePestanaIA`, `useTarjetaFotoMejora`,
   `useModalDescargarFotos`; componentes con solo JSX + helpers puros.

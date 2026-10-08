@@ -12,6 +12,7 @@ import {
   type ValorUbicacion,
 } from '../../domain/pasos-ask';
 import { ETIQUETAS_TIPO, formatearPrecio, portadaDe, type Inmueble } from '../../domain/inmueble';
+import type { EstadoInmueble } from '../../domain/inmueble';
 import { NO_SE, claveNoSe } from '../../domain/ficha-ask';
 import { EntradaPregunta } from './entrada-pregunta';
 import { EntradaUbicacion } from './entrada-ubicacion';
@@ -125,6 +126,7 @@ function CuestionarioAsk() {
             alSaltar={ask.saltar}
             alAnterior={ask.anterior}
             alOtra={ask.siguiente}
+            alMarcarVendida={ask.marcarVendida}
           />
         )}
       </div>
@@ -164,6 +166,7 @@ function PreguntaActual({
   alSaltar,
   alAnterior,
   alOtra,
+  alMarcarVendida,
 }: {
   inmueble: Inmueble;
   pasos: PasoAsk[];
@@ -175,6 +178,7 @@ function PreguntaActual({
   alSaltar: () => void;
   alAnterior: () => void;
   alOtra: () => void;
+  alMarcarVendida: (id: string, estado: EstadoInmueble) => Promise<boolean>;
 }) {
   const columnas: ColumnasAsk = inmueble;
   const { porcentaje, faltan } = progresoPasos(pasos, columnas, extras, precioMinimo);
@@ -238,6 +242,12 @@ function PreguntaActual({
           valorActual={valorFicha ?? undefined}
           alResponder={alResponder}
           alSaltar={alSaltar}
+          accionVendida={{
+            inmuebleId: inmueble.id,
+            titulo: inmueble.titulo || 'Sin título',
+            operacion: inmueble.operacion,
+            alMarcar: alMarcarVendida,
+          }}
         />
       ) : paso?.kind === 'ubicacion' ? (
         <EntradaUbicacion

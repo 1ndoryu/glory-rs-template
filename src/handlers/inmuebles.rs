@@ -8,8 +8,8 @@ use validator::Validate;
 use crate::errors::AppError;
 use crate::middleware::AuthUser;
 use crate::models::{
-    AddFotoRequest, CreateInmuebleRequest, FotoPublica, Inmueble, PaginatedInmuebles,
-    PaginationParams, PublicacionRequest, UpdateInmuebleRequest,
+    AddFotoRequest, CreateInmuebleRequest, EstadoRequest, FotoPublica, Inmueble,
+    PaginatedInmuebles, PaginationParams, PublicacionRequest, UpdateInmuebleRequest,
 };
 use crate::services::InmuebleService;
 use crate::AppState;
@@ -132,6 +132,30 @@ pub async fn set_publicacion(
     Ok(Json(inmueble))
 }
 
+/// Cambiar el estado (`vendido`/`alquilado` despublican en la misma operación)
+#[utoipa::path(
+    patch,
+    path = "/api/admin/inmuebles/{id}/estado",
+    params(("id" = Uuid, Path, description = "ID del inmueble")),
+    request_body = EstadoRequest,
+    responses(
+        (status = 200, description = "Estado actualizado", body = Inmueble),
+        (status = 404, description = "No encontrado", body = crate::errors::ErrorResponse),
+        (status = 401, description = "No autorizado", body = crate::errors::ErrorResponse),
+        (status = 422, description = "Error de validación", body = crate::errors::ErrorResponse)
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn set_estado(
+    State(state): State<AppState>,
+    _auth: AuthUser,
+    Path(id): Path<Uuid>,
+    Json(req): Json<EstadoRequest>,
+) -> Result<Json<Inmueble>, AppError> {
+    let inmueble = InmuebleService::set_estado(&state.pool, id, &req.estado).await?;
+    Ok(Json(inmueble))
+}
+
 /// Eliminar un inmueble (borra sus fotos en cascada)
 #[utoipa::path(
     delete,
@@ -210,6 +234,7 @@ pub fn routes() -> Router<AppState> {
                 .delete(delete_inmueble),
         )
         .route("/inmuebles/:id/publicacion", patch(set_publicacion))
+        .route("/inmuebles/:id/estado", patch(set_estado))
         .route("/inmuebles/:id/fotos", post(add_foto))
         .route("/fotos/:id", delete(delete_foto))
 }

@@ -57,7 +57,9 @@ export async function buscarPendiente(
   lista: Inmueble[],
   excluirId?: string | null,
 ): Promise<{ inmueble: Inmueble; ficha: FichaAsk } | null> {
-  const candidatas = lista.filter((i) => i.id !== excluirId);
+  /* [08AA-33] La cola salta lo no disponible: una vendida, alquilada o
+   * reservada no vuelve a proponerse aunque le falten datos. */
+  const candidatas = lista.filter((i) => i.id !== excluirId && i.estado === 'disponible');
   for (let i = candidatas.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [candidatas[i], candidatas[j]] = [candidatas[j], candidatas[i]];

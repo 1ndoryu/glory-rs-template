@@ -263,6 +263,27 @@ impl InmuebleRepository {
         .await
     }
 
+    /* [08AA-33] Cambio de estado atómico: `vendido`/`alquilado` despublican
+     * en la misma query. La web pública (`list_public`) solo mira
+     * `publicado`, así que sin esto una vendida seguiría a la venta en la
+     * página. El resto de estados no toca la visibilidad. */
+    pub async fn set_estado(
+        pool: &PgPool,
+        id: Uuid,
+        estado: &str,
+    ) -> Result<Option<InmuebleRow>, sqlx::Error> {
+        sqlx::query_as::<_, InmuebleRow>(&format!(
+            "UPDATE inmuebles SET estado = $1, \
+                publicado = CASE WHEN $1 IN ('vendido', 'alquilado') THEN FALSE ELSE publicado END, \
+                updated_at = NOW() WHERE id = $2 \
+             RETURNING {COLUMNAS}",
+        ))
+        .bind(estado)
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+    }
+
     pub async fn delete(pool: &PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
         let result = sqlx::query("DELETE FROM inmuebles WHERE id = $1")
             .bind(id)

@@ -361,6 +361,16 @@ export async function fijarPublicado(id: string, publicado: boolean): Promise<In
   return remotoADominio(r);
 }
 
+/* [08AA-33] Marca el estado en una sola llamada (`vendido`/`alquilado`
+ * despublican en el backend). Lanza `ErrorApi` si falla. */
+export async function fijarEstado(id: string, estado: Inmueble['estado']): Promise<Inmueble> {
+  const r = await apiFetch<InmuebleRemoto>(`/api/admin/inmuebles/${encodeURIComponent(id)}/estado`, {
+    method: 'PATCH',
+    body: JSON.stringify({ estado }),
+  });
+  return remotoADominio(r);
+}
+
 export async function eliminarRemoto(id: string): Promise<void> {
   await apiFetch<unknown>(`/api/admin/inmuebles/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
