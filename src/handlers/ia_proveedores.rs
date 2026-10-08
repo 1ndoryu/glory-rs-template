@@ -180,7 +180,12 @@ pub(crate) async fn completar_opencode(
         &entrada,
         None,
         glory_agent::providers::ChatApiOptions {
-            max_output_tokens: 2500,
+            /* [08AA-19] 4000, no 2500: el modelo razona antes de redactar
+             * y un prompt normal ya quema ~1788 tokens de razonamiento
+             * (medido 2026-10-08 contra el endpoint real); con 2500 el
+             * borrador largo caía en `incomplete` sin `message` y todo
+             * iba a `reserva`. El texto útil son ~150 tokens. */
+            max_output_tokens: 4000,
             timeout_secs: 120,
         },
         Some(&uuid::Uuid::new_v4().to_string()),
