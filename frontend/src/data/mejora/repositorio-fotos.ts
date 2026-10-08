@@ -67,8 +67,13 @@ export async function importarOriginales(inmuebles: Inmueble[], existentes: Foto
 }
 
 /* Funde las mejoras ya guardadas en el servidor (`inmueble.mejoradasServidor`,
- * emparejadas por `orden`) en el store local: solo rellena la `mejorada`
- * cuando aún no hay ninguna, nunca pisa una mejora local. Después rescata
+ * emparejadas por `orden`) en el store local. El servidor manda en el pareo:
+ * si la mejora local difiere de la del servidor (renumerado tras un borrado,
+ * dupe eliminada), se converge a la del servidor; si ya no hay mejora en ese
+ * `orden`, se limpia la local para que la vista caiga al original. Sin esto
+ * una IndexedDB vieja sombrea para siempre el pareo reparado, porque la
+ * vista prefiere lo local (`mejoradaDeLista ?? mejoradasServidor`). Las
+ * dataURL (trabajo en curso aún no subido) nunca se pisan. Después rescata
  * las mejoras solo-navegador (entradas `lista` con `mejorada` dataURL, de
  * antes del auto-guardado al completar): las sube al servidor y apunta la
  * entrada a la URL resultante. Devuelve la lista actualizada (misma
@@ -80,15 +85,29 @@ export async function importarMejoradasServidor(
   let lista = existentes;
   for (const inmueble of inmuebles) {
     if (inmueble.mejoradasServidor.length === 0) continue;
-    for (const m of inmueble.mejoradasServidor) {
-      const base = lista.find((f) => f.inmuebleId === inmueble.id && f.orden === m.orden);
-      if (!base || base.mejorada) continue;
-      try {
-        const actualizada = await marcarEstado(base, { mejorada: m.url, estado: 'lista', error: null });
-        lista = lista.map((f) => (f.id === base.id ? actualizada : f));
-      } catch {
-        // Sin IndexedDB no hay fusión; se avisa en el hook al importar.
-        break;
+    /* [08AA-4] Convergencia local→servidor por `orden` (ver comentario). */
+    const delServidor = new Map(inmueble.mejoradasServidor.map((m) => [m.orden, m.url]));
+    for (const base of lista.filter((f) => f.inmuebleId === inmueble.id)) {
+      if (base.mejorada?.startsWith('data:image/')) continue;
+      const urlServidor = delServidor.get(base.orden);
+      if (urlServidor !== undefined && base.mejorada !== urlServidor) {
+        try {
+          const actualizada = await marcarEstado(base, { mejorada: urlServidor, estado: 'lista', error: null });
+          lista = lista.map((f) => (f.id === base.id ? actualizada : f));
+        } catch {
+          break;
+        }
+      } else if (
+        urlServidor === undefined &&
+        typeof base.mejorada === 'string' &&
+        base.mejorada.startsWith('http')
+      ) {
+        try {
+          const actualizada = await marcarEstado(base, { mejorada: null });
+          lista = lista.map((f) => (f.id === base.id ? actualizada : f));
+        } catch {
+          break;
+        }
       }
     }
   }

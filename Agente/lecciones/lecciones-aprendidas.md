@@ -1,5 +1,24 @@
 # Lecciones aprendidas
 
+## 2026-10-08 - Vista local-first + renumerado servidor = sombra stale (08AA-4)
+- El visor prefiere la IndexedDB local (`mejoradaDeLista ?? mejoradasServidor`):
+  tras reparar el pareo en el servidor (renumerar `orden`), el navegador siguió
+  mostrando pares cruzados + dupes borradas porque sus entradas locales tenían
+  URLs viejas por `orden`. Regla: toda reparación de `orden` en servidor exige
+  convergencia local→servidor en `importarMejoradasServidor` (rellenar, corregir
+  URL distinta, limpiar huérfana; dataURL en curso no se pisan).
+- Verificar galerías en el MISMO perfil de navegador con estado real (otra
+  pestaña limpia no reproduce el bug). Método calibrado sin screenshot:
+  `document.images` + `getBoundingClientRect` distingue grande (630×477) de
+  tira (95×95); `indexedDB.open('inmobiliaria')` → tabla `fotos-mejora`
+  confirma el pareo efectivo.
+- sqlx 0.8: `&mut Transaction` NO implementa `Executor`; usar `tx.as_mut()`
+  (`&mut PgConnection`). `&mut *tx` falla E0277, `&mut **tx` falla E0614.
+- Dos agentes en el mismo checkout con cambios sin commit se pisan: ante
+  `git status` con ficheros ajenos a mitad de tarea, commitear conjunto con
+  IDs combinados (`08AA-3+08AA-4`) y documentar la concurrencia en la
+  completada; nunca `git add` por archivo completo si mezcla frentes.
+
 ## 2026-10-07 - Harness sin login: setup de config por psql, no JWT en scripts
 - El login admin del harness dio 401 con el password default de M3 (el hash
   de esta BD ya no coincide): no cazar ni rotar passwords para un test. El

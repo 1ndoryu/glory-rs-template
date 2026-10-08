@@ -29,20 +29,6 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 - **08AA-1 — Seguridad deps cargo (activa 2026-10-08)**: `cargo audit` 7 → 1
   (quinn-proto→0.11.19, rustls→0.23.45, webpki→0.103.15, validator 0.18→0.20 para
   sacar idna 0.5.0; queda rsa RUSTSEC-2023-0071 sin parche upstream).
-- **08AA-4 — Bug galería Altos del Caroní (activa 2026-10-08)**: Ver inmueble
-  admin + tab Imágenes muestran original↔mejorada cruzados. Causa raíz: pareo
-  frágil por `orden` + borrado simple sin cascada ni renumerado + mejoradas
-  duplicadas de regeneraciones (dHash: mej-0→orig-1, mej-1→orig-2,
-  mej-2→orig-3, mej-3→orig-4, mej-4→orig-5, mej-5→orig-6, mej-8→orig-7 visual,
-  mej-10→orig-8, mej-14→orig-9, mej-12→orig-10, mej-13→orig-11; huérfanas
-  mej-6 sin original y dupes mej-7/mej-9/mej-11; orig-0 sin mejora).
-  Plan: F1 reparar pares por contenido (4 DELETE + 10 UPDATE, solo local) →
-  F2 backend `delete_foto` con cascada a hermana + renumerar en transacción +
-  test → F3 gate + verificación UI + commit. No tocar `Cargo.toml`/`Cargo.lock`.
-  OJO: prod sigue roto; no re-correr `sync:pull` de este inmueble hasta
-  arreglar prod o el espejo reintroduce el desfase.
-  F2 código+tests commiteados en conjunto con 08AA-3 (self-check verde);
-  pendiente F3 (gate + verificación UI).
 
 ## Deploy mn-inmobiliaria.com (239A-1, en curso 2026-09-23)
 
