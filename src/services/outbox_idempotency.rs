@@ -350,10 +350,15 @@ mod pruebas {
     async fn reencolar_fallidos_devuelve_pending_con_clave() {
         let Some(pool) = pool_si_hay() else { return };
         let sid = Uuid::new_v4();
+        /* [08AA-6] Canal único por corrida: los tests corren en hilos
+         * paralelos contra la misma BD y `reencolar_fallidos` barre TODO
+         * el canal; con "whatsapp" fijo, un `failed` de un test hermano
+         * colado entre medias hacía fallar el `== 0` de forma flaky. */
+        let canal = format!("whatsapp-requeue-{}", sid.simple());
         let clave = clave_idempotencia(&sid.to_string(), "ia", "requeue-test");
         let id = encolar(
             &pool,
-            "whatsapp",
+            &canal,
             serde_json::json!({"session_id": sid.to_string()}),
             Some(&clave),
         )
@@ -362,7 +367,7 @@ mod pruebas {
         .id()
         .unwrap();
         marcar(&pool, id, "failed").await.unwrap();
-        assert_eq!(reencolar_fallidos(&pool, "whatsapp").await.unwrap(), 1);
+        assert_eq!(reencolar_fallidos(&pool, &canal).await.unwrap(), 1);
         let (estado, guardada): (String, Option<String>) =
             sqlx::query_as("SELECT status, idempotency_key FROM agent_outbox WHERE id = $1")
                 .bind(id)
@@ -374,14 +379,14 @@ mod pruebas {
         /* Concurrente idéntico colisiona con la reencolada: Duplicado. */
         let concurrente = encolar(
             &pool,
-            "whatsapp",
+            &canal,
             serde_json::json!({"session_id": sid.to_string()}),
             Some(&clave),
         )
         .await
         .unwrap();
         assert!(matches!(concurrente, Encolado::Duplicado));
-        assert_eq!(reencolar_fallidos(&pool, "whatsapp").await.unwrap(), 0);
+        assert_eq!(reencolar_fallidos(&pool, &canal).await.unwrap(), 0);
         sqlx::query("DELETE FROM agent_outbox WHERE id = $1")
             .bind(id)
             .execute(&pool)

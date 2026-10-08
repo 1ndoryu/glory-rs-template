@@ -146,7 +146,9 @@ mod pruebas {
 
     #[test]
     fn topes_coherentes() {
-        assert!(TOPE_ESCRITURA > 0 && TOPE_LECTURA >= TOPE_ESCRITURA);
+        const {
+            assert!(TOPE_ESCRITURA > 0 && TOPE_LECTURA >= TOPE_ESCRITURA);
+        }
         assert!(excede(TOPE_ESCRITURA, TOPE_ESCRITURA));
         assert!(!excede(TOPE_ESCRITURA, TOPE_ESCRITURA - 1));
     }

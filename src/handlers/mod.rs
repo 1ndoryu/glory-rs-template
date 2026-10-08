@@ -4,7 +4,9 @@ mod ask;
 mod auth;
 mod chat;
 mod chat_staff;
+mod chat_staff_config; // [08AA-6] split god-object: config del panel
 pub(crate) mod chat_tools;
+mod chat_tools_definiciones; // [08AA-6] split god-object: schemas provider
 mod health;
 pub(crate) mod ia;
 mod inmuebles;

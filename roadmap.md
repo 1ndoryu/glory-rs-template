@@ -42,17 +42,6 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   (`handlers/chat_staff.rs`, `handlers/chat_tools.rs`) + 1 path-join (FP
   documentado). Lo corregible real: broadcast/god-object por refactor.
 
-- **08AA-5 — Limpieza conversación Marketplace (activa 2026-10-08)**: el
-  excerpt del hilo sale duplicado y con ruido de Facebook
-  (`chats-marketplace.tsx:65` pinta `excerpt_texto` crudo). Distinguir:
-  mensajes del cliente vs texto del sistema (ignorar: `Otto inició este
-  chat`, tips de seguridad, `View buyer`, `More options`,
-  `Presionar Enter`, respuestas rápidas) vs mensajes enviados por ella.
-  Además: no duplicar al regenerarse con mensajes nuevos; orden cronológico
-  y conversación arriba. Plan: ella envía el HTML de una conversación →
-  pulir normalizador (dedup + filtros + orden) con ese HTML como fixture →
-  gate + verificación en panel. Falla a favor: sin HTML no hay fixture real.
-
 ## Deploy mn-inmobiliaria.com (239A-1, en curso 2026-09-23)
 
 - Plan: `Agente/planes/plan-deploy-produccion-2026-09-23.md`.

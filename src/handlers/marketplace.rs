@@ -24,10 +24,10 @@ use crate::middleware::AuthUser;
 use crate::repositories::InmuebleRepository;
 use crate::services::marketplace::{
     borrar_cache, buscar_cache, consumir_minuto, corregir_cache, detalle_chat, guardar_cache,
-    hash_ficha, matriz_negativa_con_precio, precio_hash_seguro, reemplazar_cache, registrar_token,
-    resumen_chats, resumen_uso, strip_ficha_para_prompt, sub_exento, validar_borrador,
-    BorradorRequest, MpClaims, FALLBACK_BORRADOR, MATRIZ_NEGATIVA_VERSION, SIN_FICHA,
-    STRIP_VERSION,
+    hash_ficha, matriz_negativa_con_precio, normalizar_excerpt, precio_hash_seguro,
+    reemplazar_cache, registrar_token, resumen_chats, resumen_uso, strip_ficha_para_prompt,
+    sub_exento, validar_borrador, BorradorRequest, MpClaims, FALLBACK_BORRADOR,
+    MATRIZ_NEGATIVA_VERSION, SIN_FICHA, STRIP_VERSION,
 };
 use crate::AppState;
 
@@ -299,10 +299,17 @@ pub async fn borrador(
     {
         return Ok(limite(60));
     }
-    let r = r.map_err(|e| AppError::Validation(format!("JSON inválido: {e}")))?;
+    let mut r = r.map_err(|e| AppError::Validation(format!("JSON inválido: {e}")))?;
     let errores = validar_borrador(&r);
     if !errores.is_empty() {
         return Err(AppError::Validation(errores.join("; ")));
+    }
+    /* [08AA-5] El excerpt del puente trae cada mensaje dos veces + ruido
+     * de Facebook: se limpia antes del prompt y del guardado. Si solo
+     * había ruido se conserva el original (nunca se guarda vacío). */
+    let limpio = normalizar_excerpt(&r.excerpt.texto);
+    if !limpio.is_empty() {
+        r.excerpt.texto = limpio;
     }
     let (seguro, precio_hash, catalog_hash, conocido) =
         claves_cache(&state.pool, r.aviso_id.as_deref()).await?;
@@ -377,10 +384,15 @@ pub async fn regenerar(
     _auth: MpAuth,
     r: Result<Json<BorradorRequest>, axum::extract::rejection::JsonRejection>,
 ) -> Result<Response, AppError> {
-    let r = r.map_err(|e| AppError::Validation(format!("JSON inválido: {e}")))?;
+    let mut r = r.map_err(|e| AppError::Validation(format!("JSON inválido: {e}")))?;
     let errores = validar_borrador(&r);
     if !errores.is_empty() {
         return Err(AppError::Validation(errores.join("; ")));
+    }
+    /* [08AA-5] Igual que en `borrador`: excerpt limpio al prompt y al reemplazo. */
+    let limpio = normalizar_excerpt(&r.excerpt.texto);
+    if !limpio.is_empty() {
+        r.excerpt.texto = limpio;
     }
     let (seguro, precio_hash, catalog_hash, conocido) =
         claves_cache(&state.pool, r.aviso_id.as_deref()).await?;

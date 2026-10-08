@@ -61,7 +61,10 @@ export function ChatsMarketplace() {
         <ul className="space-y-2">
           {(seleccion?.filas ?? []).map((f, i) => (
             <li key={`${seleccion?.hilo}-${i}`} className="rounded-md border px-3 py-2 text-xs">
-              {f.excerpt_texto && (
+              {/* [08AA-5] La conversación se muestra una sola vez: las filas
+               * vienen recientes-primero y cada snapshot trae el hilo
+               * completo, así que solo la primera pinta su excerpt. */}
+              {i === 0 && f.excerpt_texto && (
                 <span className="block border-l-2 border-primary/40 pl-2 text-muted-foreground">{f.excerpt_texto}</span>
               )}
               <span className="mt-1 block">{f.respuesta}</span>

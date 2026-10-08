@@ -117,3 +117,12 @@
   incompleto (`vite/client`, `node` ausentes): ajeno al bloque (solo se
   tocó `src/*.rs`); se registra como limitación, no se reinstala dentro
   del bloque backend.
+- Messenger duplica cada mensaje en el DOM (texto visible + `aria-label`):
+  un extractor por texto plano recibe todo 2x más etiquetas de UI
+  (`View buyer`, `More options`, `Presionar Enter` x11) y tarjetas del
+  sistema. Regla: normalizar en el backend que recibe el texto (dedup +
+  allowlist de ruido calibrada con HTML real), nunca confiar en que el
+  extractor ya deduplicó.
+- Sentinel `todo-prosa-sin-marcador` salta con la palabra "todo" en
+  cualquier comentario (08AA-5 añadió 2 warnings con "si todo era ruido"):
+  redactar comentarios sin ella ("si solo había ruido").

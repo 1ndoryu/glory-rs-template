@@ -151,7 +151,7 @@ mod pruebas {
             Rol::Publico
         );
         assert_eq!(
-            resolver(&["".to_string()], "584120825234", Trato::Cliente).rol,
+            resolver(&[String::new()], "584120825234", Trato::Cliente).rol,
             Rol::Publico
         );
     }

@@ -183,6 +183,97 @@ fn es_hora_caracas(hora: &str) -> bool {
     DateTime::parse_from_rfc3339(hora).is_ok_and(|f| f.offset().local_minus_utc() == -4 * 3600)
 }
 
+/// [08AA-5] Limpieza del excerpt del puente antes de guardarlo y de pasarlo
+/// a la IA. El DOM de Messenger repite cada mensaje en dos nodos (texto
+/// visible + `aria-label`: por eso la conversación salía dos veces) e
+/// inyecta ruido: tips de seguridad, aviso de Meta, `X inició este chat`,
+/// chrome (`View buyer`, `More options`), composer y respuestas rápidas.
+/// Literales calibrados con el HTML real de ella
+/// (`Agente/documentacion/usuario/conversacion-html-facebook.md`, hilo
+/// Riberas del Caroní). Se conserva el orden y las marcas
+/// `Cliente:`/`Dueña:` que el prompt necesita; si solo había ruido se
+/// devuelve vacío y el handler conserva el original (nunca se guarda vacío).
+#[must_use]
+pub fn normalizar_excerpt(texto: &str) -> String {
+    let mut fuera: Vec<&str> = Vec::new();
+    for linea in texto.lines() {
+        let t = linea.trim();
+        let duplicada = fuera.last().is_some_and(|&u| u == t);
+        if !t.is_empty() && !es_ruido_excerpt(t) && !duplicada {
+            fuera.push(t);
+        }
+    }
+    fuera.join("\n")
+}
+
+/// Prefijos literales de ruido de Facebook (ES + EN).
+const RUIDO_EXCERPT_PREFIJOS: &[&str] = &[
+    "Si te vas a reunir con alguien",
+    "If you're meeting someone",
+    "If you are meeting someone",
+    "Meta podría usar tecnología",
+    "Meta may use technology",
+    "Escribe en ",
+    "Write to ",
+    "Presionar Enter",
+    "Press Enter",
+    "Mensaje enviado",
+    "Message sent",
+];
+
+/// Líneas completas del chrome del visor (comparación exacta).
+const RUIDO_EXCERPT_EXACTO: &[&str] = &[
+    "View buyer",
+    "More options",
+    "Ver perfil",
+    "Enviar mensaje",
+    "Escribir mensaje",
+    "Aa",
+    "Ver más consejos de seguridad",
+    "See more safety tips",
+    "Toca una respuesta",
+    "Tap a reply",
+    "Envía una respuesta rápida",
+    "Send a quick reply",
+    "Visto",
+    "Seen",
+];
+
+/// Respuestas rápidas sugeridas por Facebook: solo se filtran sin marca de
+/// rol (el chip centrado no trae `Cliente:`/`Dueña:`). Si el cliente las
+/// escribe de verdad, llevan marca y se conservan.
+const RESPUESTAS_RAPIDAS_FB: &[&str] = &[
+    "Sí. ¿Te interesa?",
+    "Sí. ¿Sigue disponible?",
+    "¿Cuál es el precio?",
+    "Yes. Are you interested?",
+    "Yes. Is this still available?",
+    "What is the price?",
+];
+
+/// Cuerpo de la línea sin la marca de rol (`Cliente:`/`Dueña:`), si la trae.
+fn cuerpo_sin_marca(linea: &str) -> &str {
+    linea
+        .strip_prefix("Cliente:")
+        .or_else(|| linea.strip_prefix("Dueña:"))
+        .map_or(linea, str::trim_start)
+}
+
+fn es_ruido_excerpt(linea: &str) -> bool {
+    let cuerpo = cuerpo_sin_marca(linea);
+    if cuerpo.contains("inició este chat") || cuerpo.contains("started this chat") {
+        return true;
+    }
+    if RUIDO_EXCERPT_PREFIJOS.iter().any(|p| cuerpo.starts_with(p)) {
+        return true;
+    }
+    if RUIDO_EXCERPT_EXACTO.contains(&cuerpo) {
+        return true;
+    }
+    let sin_marca = cuerpo.len() == linea.len();
+    sin_marca && RESPUESTAS_RAPIDAS_FB.contains(&cuerpo)
+}
+
 /// Matriz negativa v2 sobre el borrador generado: teléfono (7+ dígitos),
 /// email o URL → la IA no entrega contacto salvo el fijo de [07AA-8]
 /// (`CONTACTO_TEL` + `CONTACTO_WA` literales; lo demás sigue bloqueado).
@@ -812,7 +903,12 @@ pub async fn programar_purga_diaria(pool: &sqlx::PgPool) -> Result<(), sqlx::Err
  * seguidores esperan el mismo `Arc`. Ventana residual de microsegundos entre
  * `send` y `remove` (el que llegue ahí recomputa): best-effort honesto para
  * doble clic humano, no barrera distribuida; el `UNIQUE` + `DO NOTHING` de
- * la tabla respalda duplicados. Solo vive en memoria del proceso. */
+ * la tabla respalda duplicados. Solo vive en memoria del proceso.
+ * [08AA-6] Fan-out con `mpsc::unbounded_channel` por seguidor en vez de
+ * `broadcast`: `broadcast::Sender::send` toma un `std::Mutex` interno que
+ * bloquea workers tokio bajo contención; el `send` unbounded nunca espera
+ * (un mensaje por seguidor, acotado por definición) y el `drop` de la lista
+ * si el líder cae degrada a fallback igual que antes (fail-open). */
 
 /// Generación compartible en vuelo: texto + fuente (`ia`, nunca `reserva` —
 /// el fallback no entra al vuelo: cada miss reintenta la IA).
@@ -825,7 +921,10 @@ pub struct Generado {
 #[derive(Debug, Default)]
 pub struct Singleflight {
     vuelo: tokio::sync::Mutex<
-        std::collections::HashMap<String, tokio::sync::broadcast::Sender<std::sync::Arc<Generado>>>,
+        std::collections::HashMap<
+            String,
+            Vec<tokio::sync::mpsc::UnboundedSender<std::sync::Arc<Generado>>>,
+        >,
     >,
 }
 
@@ -839,18 +938,20 @@ impl Singleflight {
     {
         let seguidor = {
             let mut mapa = self.vuelo.lock().await;
-            if let Some(tx) = mapa.get(clave) {
-                Some(tx.subscribe())
+            if let Some(lista) = mapa.get_mut(clave) {
+                let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+                lista.push(tx);
+                Some(rx)
             } else {
-                let (tx, _rx) = tokio::sync::broadcast::channel(1);
-                mapa.insert(clave.to_string(), tx);
+                mapa.insert(clave.to_string(), Vec::new());
                 None
             }
         };
-        /* Seguidor: el líder difunde; si el canal murió (líder caído),
-         * se degrada a fallback en vez de colgar (fail-open). */
+        /* Seguidor: el líder difunde; si el líder cayó (su lista se dropeó
+         * con los `Sender`), se degrada a fallback en vez de colgar
+         * (fail-open). */
         if let Some(mut rx) = seguidor {
-            rx.recv().await.unwrap_or_else(|_| {
+            rx.recv().await.unwrap_or_else(|| {
                 std::sync::Arc::new(Generado {
                     texto: asegurar_contacto(FALLBACK_BORRADOR),
                     fuente: "reserva".to_string(),
@@ -859,8 +960,10 @@ impl Singleflight {
         } else {
             let gen = std::sync::Arc::new(f().await);
             let mut mapa = self.vuelo.lock().await;
-            if let Some(tx) = mapa.remove(clave) {
-                let _ = tx.send(std::sync::Arc::clone(&gen));
+            if let Some(lista) = mapa.remove(clave) {
+                for tx in lista {
+                    let _ = tx.send(std::sync::Arc::clone(&gen));
+                }
             }
             gen
         }
@@ -935,7 +1038,7 @@ mod pruebas {
     #[test]
     fn precio_agrupa_miles_sin_casts() {
         assert_eq!(precio_publico(43000.0), "$43.000");
-        assert_eq!(precio_publico(1250000.0), "$1.250.000");
+        assert_eq!(precio_publico(1_250_000.0), "$1.250.000");
         assert_eq!(precio_publico(900.0), "$900");
     }
 
@@ -1010,6 +1113,42 @@ mod pruebas {
         assert_eq!(nombre_de_thread("sin-hilo"), None);
         assert_eq!(nombre_de_thread("solo-sin-barra"), None);
         assert_eq!(nombre_de_thread("|aviso sin nombre"), None);
+    }
+
+    #[test]
+    fn normalizar_excerpt_quita_ruido_y_duplicados_conservando_roles() {
+        /* Literales del HTML real de ella (hilo Riberas del Caroní,
+         * `Agente/documentacion/usuario/conversacion-html-facebook.md`):
+         * cada mensaje sale dos veces (visible + aria-label) y FB inyecta
+         * inicio de chat, tip de seguridad y chrome. */
+        let crudo = "Casa en venta en Riberas del Caroní, Puerto Ordaz\n\
+            Jorge inició este chat.\n\
+            Cliente: Hola. ¿Sigue estando disponible?\n\
+            Cliente: Hola. ¿Sigue estando disponible?\n\
+            Cliente: Si te vas a reunir con alguien en persona, cuéntales a familiares y amigos adónde vas.\n\
+            Dueña: Sí, sigue disponible en $43.000 negociable.\n\
+            View buyer\n\
+            Sí. ¿Te interesa?\n\
+            Cliente: Precio..??";
+        assert_eq!(
+            normalizar_excerpt(crudo),
+            "Casa en venta en Riberas del Caroní, Puerto Ordaz\n\
+            Cliente: Hola. ¿Sigue estando disponible?\n\
+            Dueña: Sí, sigue disponible en $43.000 negociable.\n\
+            Cliente: Precio..??"
+        );
+    }
+
+    #[test]
+    fn normalizar_excerpt_conserva_rapida_si_la_escribe_el_cliente() {
+        let crudo = "Cliente: Sí. ¿Te interesa?\nDueña: Sí, dime qué buscas.";
+        assert_eq!(normalizar_excerpt(crudo), crudo);
+    }
+
+    #[test]
+    fn normalizar_excerpt_vacio_si_todo_es_ruido() {
+        assert!(normalizar_excerpt("View buyer\nMore options\nAa").is_empty());
+        assert!(normalizar_excerpt("   \n  ").is_empty());
     }
 
     #[test]
