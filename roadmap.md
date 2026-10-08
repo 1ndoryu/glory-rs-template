@@ -26,9 +26,7 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 
 ## Pendientes
 
-- **08AA-1 — Seguridad deps cargo (activa 2026-10-08)**: `cargo audit` 7 → 1
-  (quinn-proto→0.11.19, rustls→0.23.45, webpki→0.103.15, validator 0.18→0.20 para
-  sacar idna 0.5.0; queda rsa RUSTSEC-2023-0071 sin parche upstream).
+(vacío 2026-10-08: 08AA-1/08AA-3/08AA-4 archivadas; ver `Agente/completados/tareas-2026-10-08.md`.)
 
 ## Deploy mn-inmobiliaria.com (239A-1, en curso 2026-09-23)
 
