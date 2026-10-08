@@ -192,6 +192,26 @@ pub fn normalizar_excerpt_con_hilo(
                 continue;
             }
         }
+        /* [08AA-29] Eco del mensaje propio (`Presionar Enter, Mensaje
+         * enviado 5:51 pm por Tú: <msg>`): se etiqueta (`Tú:`) para
+         * separar lo de ella del cliente y se retira el bloque plano
+         * que duplica (la burbuja trae saltos, el eco no: el join es
+         * insensible a blancos). Va ANTES de `quitar_prefijo_enviado`
+         * (que pelaría el lado). Solo el lado propio cambia de forma;
+         * los ecos del comprador siguen la vía de siempre (sin etiqueta,
+         * para no romper cristo/wilmery ni el contrato del panel). */
+        if let Some(msg) = eco_propio(t) {
+            let msg = msg.trim();
+            if !msg.is_empty()
+                && !es_ruido_excerpt(msg)
+                && !es_marca_tiempo_fb(msg)
+                && !es_cabecera_hilo(msg, nombre, aviso)
+            {
+                retirar_bloque_duplicado(&mut fuera, msg);
+                fuera.push(format!("Tú: {msg}"));
+            }
+            continue;
+        }
         let t = quitar_prefijo_enviado(t, nombre).trim();
         /* [08AA-24] El pelado (cola truncada, `sionar Enter,`) puede dejar
          * la línea vacía: no es mensaje, se salta antes del split. */
@@ -254,6 +274,137 @@ fn segmentar_pegado(texto: &str) -> String {
 /// (`Mensaje enviado: 3:18 pm por: Wilmery`, `Message sent ... by ...`):
 /// devuelve el mensaje que trae pegado o vacío si era solo atribución.
 /// Sin `regex`: escaneo manual como `precio_del_aviso`.
+/* [08AA-29] Eco del mensaje propio: `Presionar Enter, Mensaje enviado
+ * 5:51 pm por Tú: <msg>` (o `Message sent ... by You:` en inglés).
+ * Devuelve `<msg>` solo si el lado es el propio (`Tú`/`Tu`/`You`);
+ * `None` para ecos del comprador (siguen la vía de siempre). Exige la
+ * marca `Mensaje enviado` tras el opcional `Presionar Enter,` para no
+ * confundir texto real con ecos. Compara en minúsculas pero rebana el
+ * original (los prefijos ASCII conservan longitud en bytes). */
+fn eco_propio(linea: &str) -> Option<&str> {
+    const ENTER_ES: &str = "presionar enter,";
+    const ENTER_EN: &str = "press enter,";
+    const MARCA_ES: &str = "mensaje enviado";
+    const MARCA_EN: &str = "message sent";
+    let lower = linea.to_lowercase();
+    let sin_enter = if lower.starts_with(ENTER_ES) {
+        linea[ENTER_ES.len()..].trim_start()
+    } else if lower.starts_with(ENTER_EN) {
+        linea[ENTER_EN.len()..].trim_start()
+    } else {
+        linea
+    };
+    let lower = sin_enter.to_lowercase();
+    let sin_marca = if lower.starts_with(MARCA_ES) {
+        &sin_enter[MARCA_ES.len()..]
+    } else if lower.starts_with(MARCA_EN) {
+        &sin_enter[MARCA_EN.len()..]
+    } else {
+        return None;
+    };
+    let mut resto = sin_marca.trim_start_matches([' ', ':', ',', '.', '\u{a0}', '\u{202f}']);
+    resto = saltar_hora_fb(resto);
+    resto = resto.trim_start_matches([' ', ':', ',', '.']).trim_start();
+    let lower = resto.to_lowercase();
+    let tras_por = if palabra_en(&lower, "por") {
+        &resto["por".len()..]
+    } else if palabra_en(&lower, "by") {
+        &resto["by".len()..]
+    } else {
+        return None;
+    };
+    let tras_por = tras_por
+        .trim_start_matches([' ', ':', ',', '.'])
+        .trim_start();
+    let lower = tras_por.to_lowercase();
+    let tras_yo = if palabra_en(&lower, "tú") {
+        &tras_por["tú".len()..]
+    } else if palabra_en(&lower, "tu") {
+        &tras_por["tu".len()..]
+    } else if palabra_en(&lower, "you") {
+        &tras_por["you".len()..]
+    } else {
+        return None;
+    };
+    Some(
+        tras_yo
+            .trim_start_matches([' ', ':', ',', '.'])
+            .trim_start(),
+    )
+}
+
+/* [08AA-29] `texto` empieza por `palabra` seguida de un borde no
+ * alfabético (evita que `Tulio:` cuente como `tu`). */
+fn palabra_en(texto: &str, palabra: &str) -> bool {
+    texto.starts_with(palabra)
+        && texto[palabra.len()..]
+            .chars()
+            .next()
+            .is_none_or(|c| !c.is_alphabetic())
+}
+
+/* [08AA-29] Retira de `fuera` la cola que duplica `msg`: bien el bloque
+ * ya etiquetado (`Tú: {msg}`: el visor lista el propio dos veces
+ * —testigo Yusmelis— y el segundo eco reemplaza sin duplicar), bien la
+ * burbuja sin etiquetar (sus líneas llegan como bloques separados y el
+ * `join` es al final: se comparan concatenadas, insensibles a blancos,
+ * pues el eco colapsa los saltos). No toca bloques de otros lados: la
+ * cola se recorre solo sobre bloques sin etiqueta y se poda en cuanto
+ * deja de ser sufijo del eco. */
+fn retirar_bloque_duplicado(fuera: &mut Vec<String>, msg: &str) {
+    let etiquetado = format!("Tú: {msg}");
+    if fuera.last().is_some_and(|u| *u == etiquetado) {
+        fuera.pop();
+        return;
+    }
+    let canon = canon_eco(msg);
+    let cola: Vec<String> = fuera
+        .iter()
+        .rev()
+        .take_while(|b| !es_etiqueta(b))
+        .map(|b| canon_eco(b))
+        .collect();
+    for k in 1..=cola.len() {
+        let candidata: String = cola[..k].iter().rev().cloned().collect();
+        if candidata == canon {
+            fuera.truncate(fuera.len() - k);
+            return;
+        }
+        if !canon.ends_with(&candidata) {
+            break;
+        }
+    }
+}
+
+/* [08AA-29] Canónico para comparar burbuja vs eco: minúsculas y sin
+ * ningún blanco (el eco colapsa los saltos de la burbuja). */
+fn canon_eco(texto: &str) -> String {
+    texto
+        .to_lowercase()
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect()
+}
+
+/* [08AA-29] Bloque ya etiquetado con lado (`Tú: ...` / `You: ...`). */
+fn es_etiqueta(bloque: &str) -> bool {
+    let lower = bloque.to_lowercase();
+    palabra_en(&lower, "tú:") || palabra_en(&lower, "tu:") || palabra_en(&lower, "you:")
+}
+
+/* [08AA-29] Ruido por CONTENIDO (no por prefijo): el aviso de
+ * seguridad de Meta sobrevive al pelado de Enter/cola cuando el pegado
+ * del chat lo deja como texto suelto (`fin de detectar y reducir...`)
+ * o como eco (`... por Tú: Si te vas a reunir...`). Frases tomadas del
+ * aviso real; ninguna puede ser mensaje de un cliente. Se comparan sin
+ * tildes y en minúsculas. */
+const RUIDO_EXCERPT_CONTENIDO: &[&str] = &[
+    "detectar y reducir las estafas",
+    "familiares y amigos ad",
+    "compartir la ubicaci",
+    "consejos de seguridad",
+];
+
 fn quitar_prefijo_enviado<'a>(linea: &'a str, nombre: Option<&str>) -> &'a str {
     let lower = linea.to_lowercase();
     let marca = if lower.starts_with("mensaje enviado") {
@@ -550,6 +701,9 @@ const RUIDO_EXCERPT_PREFIJOS: &[&str] = &[
     "Press Enter",
     "Mensaje enviado",
     "Message sent",
+    /* [08AA-29] `Enviado hace 1 min` (marca de mensaje propio sin el
+     * prefijo `Mensaje enviado`, testigo Yusmelis en BD). */
+    "Enviado hace ",
 ];
 
 /// Líneas completas del chrome del visor (comparación exacta).
@@ -572,6 +726,11 @@ const RUIDO_EXCERPT_EXACTO: &[&str] = &[
     "Enviar mensaje",
     "Escribir mensaje",
     "Aa",
+    /* [08AA-29] `wa.me` suelto (línea del chrome junto al `Enviado hace`,
+     * testigo Yusmelis en BD) y `En medio de la conversación` (divisor
+     * del visor, mismo testigo): nunca son mensajes. */
+    "wa.me",
+    "En medio de la conversación",
     "Ver más consejos de seguridad",
     "See more safety tips",
     "Toca una respuesta",
@@ -616,6 +775,16 @@ fn es_ruido_excerpt(linea: &str) -> bool {
         return true;
     }
     if RUIDO_EXCERPT_EXACTO.contains(&cuerpo) {
+        return true;
+    }
+    /* [08AA-29] Ruido por contenido (aviso de seguridad de Meta dejado
+     * como texto suelto por el pegado del chat): se compara sin tildes
+     * y en minúsculas. Ninguna de estas frases puede ser mensaje real. */
+    let canon = sin_tilde_min(cuerpo);
+    if RUIDO_EXCERPT_CONTENIDO
+        .iter()
+        .any(|f| canon.contains(&sin_tilde_min(f)))
+    {
         return true;
     }
     let sin_marca = cuerpo.len() == linea.len();

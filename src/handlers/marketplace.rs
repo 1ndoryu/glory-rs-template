@@ -20,9 +20,9 @@ use crate::repositories::InmuebleRepository;
 use crate::services::marketplace::{
     aviso_fb_de_thread, borrar_cache, buscar_cache, clave_hilo, consumir_minuto, corregir_cache,
     detalle_chat, formatear_parrafos, guardar_cache, hash_ficha, normalizar_excerpt_hilo,
-    precio_hash_seguro, reemplazar_cache, resumen_chats, resumen_uso, strip_ficha_para_prompt,
-    sub_exento, validar_borrador, BorradorRequest, FotoHilo, FALLBACK_BORRADOR, SIN_FICHA,
-    STRIP_VERSION,
+    precio_hash_seguro, reemplazar_cache, releer_foto, resumen_chats, resumen_uso,
+    strip_ficha_para_prompt, sub_exento, validar_borrador, BorradorRequest, FotoHilo,
+    FALLBACK_BORRADOR, SIN_FICHA, STRIP_VERSION,
 };
 use crate::AppState;
 
@@ -305,20 +305,23 @@ pub struct ReleerRequest {
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct ReleerResponse {
     pub actualizado: bool,
+    /// [08AA-28] `true` si no había fila y se creó solo-foto (sin borrador).
+    pub creado: bool,
 }
 
 /// Releer explícito de la dueña (botón separado de Regenerar, 08AA-9):
 /// refresca la foto del hilo (`excerpt_texto`) sin generar ni tocar el
-/// borrador guardado. Sin IA, sin invalidar caché: solo `UPDATE` por
+/// borrador guardado. Sin IA, sin invalidar caché: `UPDATE` por
 /// `thread_id` (todas las firmas del hilo comparten la foto nueva).
-/// Sin fila del hilo → `actualizado: false` (el panel no muestra nada
-/// nuevo, pero tampoco se inventa nada). Mismo tope barato del borrador.
+/// [08AA-28] Sin fila del hilo → se crea solo-foto (`respuesta` vacía,
+/// `creado:true`) para que el chat aparezca en el panel sin inventar
+/// borrador. Mismo tope barato del borrador.
 #[utoipa::path(
     post,
     path = "/api/admin/marketplace/releer",
     request_body = ReleerRequest,
     responses(
-        (status = 200, description = "Foto del hilo refrescada o hilo sin fila", body = ReleerResponse),
+        (status = 200, description = "Foto del hilo refrescada o creada solo-foto", body = ReleerResponse),
         (status = 422, description = "Schema inválido", body = crate::errors::ErrorResponse),
         (status = 429, description = "Tope por sub", body = crate::errors::ErrorResponse)
     )
@@ -366,18 +369,14 @@ pub async fn releer(
         ));
     }
     r.excerpt = limpio;
-    let filas: u64 =
-        sqlx::query("UPDATE mp_respuestas_cache SET excerpt_texto = $2, excerpt_crudo = $3 WHERE thread_id = $1")
-            .bind(&hilo)
-            .bind(&r.excerpt)
-            .bind(&crudo)
-            .execute(&state.pool)
-            .await?
-            .rows_affected();
+    // [08AA-28] Upsert atómico en el servicio: si no hay fila la crea
+    // solo-foto para que el chat aparezca en el panel (caché borrada).
+    let (actualizado, creado) = releer_foto(&state.pool, &hilo, &r.excerpt, &crudo).await?;
     Ok((
         StatusCode::OK,
         Json(ReleerResponse {
-            actualizado: filas > 0,
+            actualizado,
+            creado,
         }),
     )
         .into_response())

@@ -831,6 +831,50 @@ pub async fn reemplazar_cache(
     Ok(())
 }
 
+/// [08AA-28] Releer con creación: refresca la foto del hilo; si no hay
+/// fila (caché borrada o hilo nuevo sin borrador), la crea solo con la
+/// foto y `respuesta` vacía para que el chat aparezca en el panel sin
+/// inventar borrador. La PK sintética (`firma=sha("releer-sin-borrador|hilo")`,
+/// `precio/catalog="releer"`) nunca choca con firmas HMAC reales, así un
+/// borrador posterior inserta su propia fila y gana por `valida_hasta`.
+/// `ON CONFLICT DO UPDATE` lo hace idempotente (doble clic o releers
+/// concurrentes convergen; regla 6: upsert atómico, no buscar-crear).
+/// Devuelve `(actualizado, creado)`.
+pub async fn releer_foto(
+    pool: &sqlx::PgPool,
+    hilo: &str,
+    limpio: &str,
+    crudo: &str,
+) -> Result<(bool, bool), AppError> {
+    let tocadas = sqlx::query(
+        "UPDATE mp_respuestas_cache SET excerpt_texto = $1, excerpt_crudo = $2 \
+         WHERE thread_id = $3",
+    )
+    .bind(limpio)
+    .bind(crudo)
+    .bind(clave_hilo(hilo))
+    .execute(pool)
+    .await?
+    .rows_affected();
+    if tocadas > 0 {
+        return Ok((true, false));
+    }
+    let firma = sha_hex(&format!("releer-sin-borrador|{hilo}"));
+    sqlx::query(
+        "INSERT INTO mp_respuestas_cache (firma, precio_hash, catalog_hash, respuesta, thread_id, excerpt_texto, excerpt_crudo) \
+         VALUES ($1, 'releer', 'releer', '', $2, $3, $4) \
+         ON CONFLICT (firma, precio_hash, catalog_hash) DO UPDATE SET \
+         excerpt_texto = EXCLUDED.excerpt_texto, excerpt_crudo = EXCLUDED.excerpt_crudo",
+    )
+    .bind(firma)
+    .bind(clave_hilo(hilo))
+    .bind(limpio)
+    .bind(crudo)
+    .execute(pool)
+    .await?;
+    Ok((true, true))
+}
+
 /// Borra la fila (primer paso de Regenerar: la siguiente lectura es miss).
 pub async fn borrar_cache(
     pool: &sqlx::PgPool,
@@ -1178,6 +1222,43 @@ mod pruebas {
         assert_eq!(
             normalizar_excerpt_hilo(hilo, crudo),
             "Hola. ¿Sigue estando disponible?\n¿Sigue disponible?"
+        );
+    }
+
+    #[test]
+    fn normalizar_hilo_yusmelis_etiqueta_lado_propio_y_pela_chrome() {
+        /* [08AA-29] Crudo exacto del hilo yusmelis (`excerpt_crudo` 1200
+         * en BD): el aviso de seguridad de Meta llega como texto suelto
+         * (`fin de detectar...`) y como eco propio, la burbuja propia se
+         * duplica en su eco (`por Tú:`), y el chrome trae `wa.me`,
+         * `En medio de la conversación` y `Enviado hace 1 min`. Lo de
+         * ella se etiqueta (`Tú:`) para separarlo del cliente, el eco
+         * repetido no duplica y el ruido no sobrevive. */
+        let hilo = "yusmelis|VEF0 casa en venta en urbanización villa icabarú, puerto ordaz";
+        let crudo = "fin de detectar y reducir las estafas y el fraude.\n\
+            Presionar Enter, Mensaje enviado 5:28 pm por Tú: Meta podría usar tecnología para revisar los mensajes y así garantizar la seguridad de todas las personas.\n\
+            Yusmelis\n\
+            Buenas tardes Mayerlin, gracias por la información y no ofrece algún plan de financiamiento para el pago de la casa?\n\
+            Presionar Enter, Mensaje enviado 5:28 pm por Yusmelis: Buenas tardes Mayerlin, gracias por la información y no ofrece algún plan de financiamiento para el pago de la casa?\n\
+            Estoy interesada en una casa en puerto Ordaz que esté en una zona céntrica sí tienes otras opciones que no superen los 60 mil $ me podrías informar por favor\n\
+            Mensajes\n\
+            Hola, por favor,\n\
+            dejame un numero\n\
+            para guardarte y pasarte\n\
+            la información.\n\
+            Presionar Enter, Mensaje enviado 5:51 pm por Tú: Hola, por favor, dejame un numero para guardarte y pasarte la información.\n\
+            Escribir mensaje\n\
+            Escribe en Yusmelis · Casa en venta en Urbanización Villa Icabarú, Puerto Ordaz.\n\
+            wa.me\n\
+            En medio de la conversación\n\
+            Enviado hace 1 min\n\
+            Aa\n\
+            Presionar Enter, Mensaje enviado 5:51 pm por Tú: Hola, por favor, dejame un numero para guardarte y pasarte la información.";
+        assert_eq!(
+            normalizar_excerpt_hilo(hilo, crudo),
+            "Buenas tardes Mayerlin, gracias por la información y no ofrece algún plan de financiamiento para el pago de la casa?\n\
+            Estoy interesada en una casa en puerto Ordaz que esté en una zona céntrica sí tienes otras opciones que no superen los 60 mil $ me podrías informar por favor\n\
+            Tú: Hola, por favor, dejame un numero para guardarte y pasarte la información."
         );
     }
 
@@ -1688,6 +1769,43 @@ mod pruebas {
         );
         assert!(r.is_err());
     }
+    /* [08AA-28] Releer crea la fila solo-foto si falta (sin inventar
+     * borrador) y la segunda vez solo refresca. Vivo con `pool_si_hay`;
+     * sin `DATABASE_URL` se omite. */
+    #[tokio::test]
+    async fn releer_crea_fila_si_falta() {
+        let Some(pool) = pool_si_hay() else { return };
+        let hilo = "releer-test|hilo sintético 08AA-28";
+        let limpia = || async {
+            sqlx::query("DELETE FROM mp_respuestas_cache WHERE thread_id = $1")
+                .bind(clave_hilo(hilo))
+                .execute(&pool)
+                .await
+                .expect("limpia")
+        };
+        limpia().await;
+        let (actualizado, creado) = releer_foto(&pool, hilo, "Hola. ¿Sigue disponible?", "crudo")
+            .await
+            .expect("releer crea");
+        assert!(actualizado && creado);
+        let (actualizado2, creado2) =
+            releer_foto(&pool, hilo, "Hola. ¿Sigue disponible?", "crudo2")
+                .await
+                .expect("releer refresca");
+        assert!(actualizado2 && !creado2);
+        let filas = detalle_chat(&pool, hilo).await.expect("detalle");
+        assert_eq!(filas.len(), 1);
+        assert_eq!(filas[0].respuesta, "");
+        let crudo: (String,) =
+            sqlx::query_as("SELECT excerpt_crudo FROM mp_respuestas_cache WHERE thread_id = $1")
+                .bind(clave_hilo(hilo))
+                .fetch_one(&pool)
+                .await
+                .expect("lee crudo");
+        assert_eq!(crudo.0, "crudo2");
+        limpia().await;
+    }
+
     #[tokio::test]
     async fn uso_agrega_por_dia_y_evento() {
         let Some(pool) = pool_si_hay() else { return };
