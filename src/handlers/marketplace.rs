@@ -18,11 +18,12 @@ use crate::errors::AppError;
 use crate::middleware::AuthUser;
 use crate::repositories::InmuebleRepository;
 use crate::services::marketplace::{
-    aviso_fb_de_thread, borrar_cache, borrar_todo_cache, buscar_cache, clave_hilo, consumir_minuto,
-    corregir_cache, detalle_chat, formatear_parrafos, guardar_cache, hash_ficha, nombre_de_thread,
-    normalizar_excerpt_hilo, precio_hash_seguro, reemplazar_cache, releer_foto, resumen_chats,
-    resumen_uso, strip_ficha_para_prompt, sub_exento, validar_borrador, BorradorRequest, FotoHilo,
-    FALLBACK_BORRADOR, SIN_FICHA, STRIP_VERSION,
+    aviso_fb_de_thread, borrar_todo_cache, buscar_cache, clave_hilo, consumir_minuto,
+    corregir_cache, detalle_chat, filas_para_regenerar, formatear_parrafos, guardar_cache,
+    hash_ficha, nombre_de_thread, normalizar_excerpt_hilo, precio_hash_seguro, reemplazar_cache,
+    releer_foto, resumen_chats, resumen_uso, sha_hex, strip_ficha_para_prompt, sub_exento,
+    validar_borrador, BorradorRequest, ExcerptIn, FotoHilo, FALLBACK_BORRADOR, SIN_FICHA,
+    STRIP_VERSION,
 };
 use crate::AppState;
 
@@ -226,8 +227,8 @@ pub async fn borrador(
 /// Sin tope por minuto por decisión 2026-10-05 (freno = ritmo humano); el
 /// resto del flujo (schema 422, reserva si cae la IA, no cachear fallback)
 /// es idéntico al `borrador`. [08AA-14] Sin matriz negativa por decisión de
-/// ella 2026-10-08: el texto de la IA pasa tal cual (el prompt conserva la
-/// regla de no inventar contacto).
+/// ella 2026-10-08: el texto de la IA pasa por `imponer_forma_borrador`
+/// (09AA-2) y conserva la regla de no inventar contacto.
 #[utoipa::path(
     post,
     path = "/api/admin/marketplace/regenerar",
@@ -242,11 +243,24 @@ pub async fn regenerar(
     _auth: MpAuth,
     r: Result<Json<BorradorRequest>, axum::extract::rejection::JsonRejection>,
 ) -> Result<Response, AppError> {
-    let mut r = r.map_err(|e| AppError::Validation(format!("JSON inválido: {e}")))?;
+    let r = r.map_err(|e| AppError::Validation(format!("JSON inválido: {e}")))?;
     let errores = validar_borrador(&r);
     if !errores.is_empty() {
         return Err(AppError::Validation(errores.join("; ")));
     }
+    let resp = regenerar_uno(&state.pool, r.0).await?;
+    Ok((StatusCode::OK, Json(resp)).into_response())
+}
+
+/// [09AA-3] Núcleo compartido de Regenerar (uno y todo): normaliza el
+/// excerpt, genera directo a la IA (bypass, gesto explícito) y reemplaza
+/// la fila si es `ia`. En `reserva` se CONSERVA el borrador viejo: antes
+/// se borraba primero y la fila se perdía en silencio.
+/// Sin validar schema: las filas masivas ya se validaron al ingresar.
+async fn regenerar_uno(
+    pool: &sqlx::PgPool,
+    mut r: BorradorRequest,
+) -> Result<BorradorResponse, AppError> {
     /* [08AA-5] Igual que en `borrador`: excerpt limpio al prompt y al reemplazo.
      * [08AA-16] Con contexto del hilo.
      * [08AA-18] Contexto con `clave_hilo()` (ver `borrador`).
@@ -258,11 +272,10 @@ pub async fn regenerar(
     }
     let titulo_fb = aviso_fb_de_thread(r.thread_id.trim());
     let (seguro, precio_hash, catalog_hash, conocido) =
-        claves_cache(&state.pool, r.aviso_id.as_deref(), titulo_fb.as_deref()).await?;
-    borrar_cache(&state.pool, &r.firma, &precio_hash, &catalog_hash).await?;
+        claves_cache(pool, r.aviso_id.as_deref(), titulo_fb.as_deref()).await?;
     /* Bypass: directo a la IA, sin vuelo (Regenerar es gesto explícito; si
      * dos llegan juntas, la última que escribe gana por `reemplazar`). */
-    let gen = generar_borrador(&r, seguro.as_ref(), &state.pool).await;
+    let gen = generar_borrador(&r, seguro.as_ref(), pool).await;
     if gen.fuente == "ia" {
         let foto = FotoHilo {
             thread_id: r.thread_id.trim(),
@@ -270,7 +283,7 @@ pub async fn regenerar(
             excerpt_crudo: &crudo,
         };
         reemplazar_cache(
-            &state.pool,
+            pool,
             &r.firma,
             &precio_hash,
             &catalog_hash,
@@ -279,14 +292,103 @@ pub async fn regenerar(
         )
         .await?;
     }
+    Ok(BorradorResponse {
+        borrador: gen.texto,
+        fuente: gen.fuente,
+        aviso_conocido: conocido,
+        firma_version: "firma-v1".to_string(),
+        corregida: false,
+    })
+}
+
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct RegenerarTodoFila {
+    pub thread_id: String,
+    /// `ia` (reemplazado), `reserva` (IA caída: se conservó el viejo) u
+    /// `omitido` (sin excerpt con que regenerar).
+    pub fuente: String,
+}
+
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct RegenerarTodoResponse {
+    pub candidatos: i64,
+    pub regenerados: i64,
+    pub en_reserva: i64,
+    pub omitidos: i64,
+    pub detalle: Vec<RegenerarTodoFila>,
+}
+
+/// Hora actual de Caracas en RFC3339 `-04:00` (el schema la exige así):
+/// UTC-4 fijo, sin tzdata. El saludo del borrador queda fechado al momento
+/// de la regeneración masiva, no al del mensaje original.
+fn hora_caracas_actual() -> String {
+    let ahora = chrono::Utc::now() - chrono::Duration::hours(4);
+    format!("{}-04:00", ahora.format("%Y-%m-%dT%H:%M:%S"))
+}
+
+/// [09AA-3] Regeneración masiva del panel (botón «Regenerar todo»): una
+/// pasada EN SERIE por cada fila con borrador (ver `filas_para_regenerar`:
+/// salta correcciones de la dueña y filas solo-foto). En serie, no en
+/// paralelo: la misma carga que N clics manuales, sin picos contra la IA
+/// (cada uno tarda ~15s). Solo JWT admin. Responde el resumen por hilo.
+#[utoipa::path(
+    post,
+    path = "/api/admin/marketplace/regenerar-todo",
+    responses(
+        (status = 200, description = "Resumen de la regeneración masiva", body = RegenerarTodoResponse),
+    )
+)]
+pub async fn regenerar_todo(
+    State(state): State<AppState>,
+    _auth: AuthUser,
+) -> Result<Response, AppError> {
+    let filas = filas_para_regenerar(&state.pool).await?;
+    let hora = hora_caracas_actual();
+    let mut detalle = Vec::with_capacity(filas.len());
+    for f in &filas {
+        if f.excerpt_texto.trim().is_empty() {
+            detalle.push(RegenerarTodoFila {
+                thread_id: f.thread_id.clone(),
+                fuente: "omitido".to_string(),
+            });
+            continue;
+        }
+        /* La firma HMAC real viaja en la fila (es la llave de caché); el
+         * resto se reconstruye: `remitente_hash` nunca sale del proceso
+         * (la validación de ingreso ya pasó) y la hora es la actual. */
+        let req = BorradorRequest {
+            thread_id: f.thread_id.clone(),
+            firma: f.firma.clone(),
+            firma_version: "firma-v1".to_string(),
+            lang: "es".to_string(),
+            excerpt: ExcerptIn {
+                remitente_hash: sha_hex("regenerar-todo"),
+                texto: f.excerpt_texto.clone(),
+                hora: hora.clone(),
+                leido: false,
+            },
+            aviso_id: None,
+            extras: None,
+        };
+        let fuente = regenerar_uno(&state.pool, req).await?.fuente;
+        detalle.push(RegenerarTodoFila {
+            thread_id: f.thread_id.clone(),
+            fuente,
+        });
+    }
+    /* `i64` sin cast: el conteo cabe siempre; si algún día no cupiera,
+     * se satura en vez de envolver. */
+    let cuenta = |fuente: &str| {
+        i64::try_from(detalle.iter().filter(|d| d.fuente == fuente).count()).unwrap_or(i64::MAX)
+    };
     Ok((
         StatusCode::OK,
-        Json(BorradorResponse {
-            borrador: gen.texto,
-            fuente: gen.fuente,
-            aviso_conocido: conocido,
-            firma_version: "firma-v1".to_string(),
-            corregida: false,
+        Json(RegenerarTodoResponse {
+            candidatos: i64::try_from(detalle.len()).unwrap_or(i64::MAX),
+            regenerados: cuenta("ia"),
+            en_reserva: cuenta("reserva"),
+            omitidos: cuenta("omitido"),
+            detalle,
         }),
     )
         .into_response())
@@ -552,38 +654,23 @@ async fn generar_borrador(
          Hora del mensaje: {hora}: saluda con buenos días, buenas tardes o \
          buenas noches según corresponda. \
          La conversación trae marcas: `Cliente:` es el comprador, `Dueña:` \
-         es la dueña (tú no eres la dueña: no repitas lo que ella ya dijo). \
-          Formato obligatorio, en este orden exacto: primer párrafo = el \
+          es la dueña (tú no eres la dueña: no repitas lo que ella ya dijo). \
+           Formato obligatorio, en este orden exacto: primer párrafo = el \
           saludo, {saludo} ({regla_nombre}), más el nombre corto del inmueble (solo tipo + \
-          residencia, sin dirección ni zona duplicada), más si está \
-          disponible (sin prometer visitas ni coordinación: no sabes la \
-           disponibilidad real de la dueña; di solo que está disponible y \
-          jamás anuncies que confirmas o coordinas nada con ella \
-          (prohibido «lo confirmo con la dueña», «te confirmo su estatus» \
-          o similar: el dato se da una sola vez, sin meta-comentarios), \
-          más el precio con la cifra exacta de los datos o del \
-          aviso (si los datos traen «operacion»:«alquiler» es un ALQUILER: \
-          la cifra es el canon mensual —«$1.500 mensuales»—, jamás hables \
-          de venta ni uses la palabra «negociable»; si trae «venta», la \
-          cifra va seguida siempre de la palabra «negociable»); segundo bloque \
-          = párrafo final con este texto literal, sin cambiar ni una palabra: \
-          «Cuéntame qué estás buscando y con gusto te ayudo. Cualquier cosa \
-          escríbeme al {CONTACTO_TEL}» y en línea aparte {CONTACTO_WA}. \
-          Excepción: un párrafo intermedio de UNA sola línea (máximo 140 \
-          caracteres, sin signos ? ni ¿) SOLO si la última pregunta del \
-          Cliente pide un dato concreto no dicho en el primer párrafo \
-          (baños, habitaciones, m2, ubicación). Si pregunta si sigue \
-          disponible, cuál es el precio, o no hay pregunta concreta, OMITE \
-          el párrafo por completo: no lo sustituyas con transición, oferta \
-          de fotos ni pregunta alguna. Prohibido en todo el texto, salvo el \
-          párrafo final: los signos ? y ¿, ofrecer o mencionar fotos, \
-          preguntar qué busca o si le interesa, y reafirmar disponibilidad o \
-          precio con cualquier palabra; \
-          Reglas: jamás inventes teléfono, email, dirección ni cifras fuera \
-          de los datos y el aviso; jamás prometas visitas ni coordinación \
-           («puedes visitarla», «te coordinamos»): la disponibilidad real \
-          solo la confirma la dueña; si no hay precio en los datos ni en el \
-          aviso, no lo inventes; \
+          residencia), más si está disponible (sin prometer visitas ni \
+          coordinación ni anunciar que confirmas nada con la dueña), más el \
+          precio exacto de los datos o del aviso («venta» → cifra seguida de \
+          «negociable»; «alquiler» → canon mensual, jamás venta ni \
+          «negociable»); segundo bloque = este texto literal, sin cambiar ni \
+          una palabra: «Cuéntame qué estás buscando y con gusto te ayudo. \
+          Cualquier cosa escríbeme al {CONTACTO_TEL}» y en línea aparte {CONTACTO_WA}. \
+          Excepción: un párrafo intermedio de UNA línea (máximo 140 \
+          caracteres, sin ? ni ¿) SOLO si el Cliente pide un dato concreto \
+          no dicho arriba (baños, habitaciones, m2, ubicación). Sin pregunta \
+          concreta, OMITE el párrafo: nada de transiciones, fotos, preguntas \
+          ni reafirmaciones con ninguna palabra. Prohibido fuera del bloque \
+          final: ? ¿ fotos disponible precio visitas cifras contacto propio; \
+          sin precio en datos ni aviso, no lo inventes; \
          si preguntan precio y no hay precio en los datos ni en el aviso, responde exactamente: {FALLBACK_BORRADOR} \
          (el sistema agrega el contacto y el enlace al final). \
           Ya le dijiste (no lo repitas igual): {ya_dicho}",
@@ -683,6 +770,7 @@ pub fn routes() -> Router<AppState> {
         .route("/marketplace/token/cli", post(emitir_token_cli))
         .route("/marketplace/borrador", post(borrador))
         .route("/marketplace/regenerar", post(regenerar))
+        .route("/marketplace/regenerar-todo", post(regenerar_todo))
         .route("/marketplace/releer", post(releer))
         .route("/marketplace/corregir", post(corregir))
         .route("/marketplace/audit", post(audit))

@@ -28,7 +28,7 @@ function textoSinMarca(linea: string): string {
 }
 
 export function ChatsMarketplace() {
-  const { lista, seleccion, error, recargar, elegir, limpiar } = useChatsMarketplace();
+  const { lista, seleccion, error, recargar, elegir, limpiar, regenerando, resumenRegen, regenerarTodoPanel } = useChatsMarketplace();
 
   return (
     <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
@@ -63,15 +63,27 @@ export function ChatsMarketplace() {
             </li>
           )}
         </ul>
-        <div className="mt-2 flex gap-2">
+        <div className="mt-2 flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={() => void recargar()}>
             Recargar
+          </Button>
+          {/* [09AA-3] Regeneración masiva al lado de Recargar: refresca
+           * todos los borradores sin borrar la caché. Tarda ~15s por chat. */}
+          <Button variant="secondary" size="sm" disabled={regenerando} onClick={() => void regenerarTodoPanel()}>
+            {regenerando ? 'Regenerando…' : 'Regenerar todo'}
           </Button>
           {/* [08AA-39] Limpieza total al lado de Recargar, con confirmación. */}
           <Button variant="destructive" size="sm" onClick={() => void limpiar()}>
             Limpiar
           </Button>
         </div>
+        {resumenRegen && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Regenerados {resumenRegen.regenerados} de {resumenRegen.candidatos}
+            {resumenRegen.en_reserva > 0 && ` (${resumenRegen.en_reserva} en reserva: IA caída, se conservó el viejo)`}
+            {resumenRegen.omitidos > 0 && `, ${resumenRegen.omitidos} omitidos`}.
+          </p>
+        )}
       </section>
       <section>
         <h3 className="mb-2 text-sm font-medium">

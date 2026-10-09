@@ -26,6 +26,17 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 
 ## Pendientes
 
+- **09AA-3 — Regenerar-todo + dieta del prompt (pedido por ella 2026-10-09,
+  ACTIVA):** (1) botón «Regenerar todo» al lado de Limpiar:
+  `POST /api/admin/marketplace/regenerar-todo` regenera en serie cada fila
+  con borrador (salta `corregida=TRUE` y `respuesta=''`), responde resumen;
+  (2) dieta del prompt (~-30% tokens de entrada: bans 08AA-36/37/38
+  fusionados, la forma la impone Rust desde 09AA-2); (3) respuesta honesta:
+  NO hay perilla minimal/low (el provider `glory-agent` solo expone
+  `max_output_tokens`+`timeout_secs`, el relay da 400 a campos extra) y la
+  «plantilla» que ve a veces es del puente local (timeout 20s del puente
+  vs 120s del backend), no del backend — subir ese timeout queda para el
+  lab de opencode-propio.
 - **08AA-39 — Botón Limpiar chats (pedido por ella 2026-10-08, CERRADA
   pendiente de su prueba):** botón «Limpiar» (destructive) al lado de
   «Recargar», con confirmación; `DELETE /api/admin/marketplace/chats`

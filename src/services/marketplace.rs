@@ -907,6 +907,34 @@ pub async fn detalle_chat(pool: &sqlx::PgPool, thread: &str) -> Result<Vec<ChatF
         .collect())
 }
 
+/// [09AA-3] Candidata a regeneración masiva: hilos con borrador real.
+/// Salta correcciones de la dueña (`corregida`: su texto manda) y filas
+/// solo-foto (`respuesta=''`: sin borrador que refrescar). Una fila por
+/// clave de caché (un hilo puede traer varias: cada una se regenera).
+#[derive(Debug, Clone)]
+pub struct FilaRegen {
+    pub thread_id: String,
+    pub firma: String,
+    pub excerpt_texto: String,
+}
+
+pub async fn filas_para_regenerar(pool: &sqlx::PgPool) -> Result<Vec<FilaRegen>, AppError> {
+    let filas: Vec<(String, String, String)> = sqlx::query_as(
+        "SELECT thread_id, firma, excerpt_texto FROM mp_respuestas_cache \
+         WHERE respuesta <> '' AND NOT corregida ORDER BY valida_hasta DESC",
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(filas
+        .into_iter()
+        .map(|(thread_id, firma, excerpt_texto)| FilaRegen {
+            thread_id,
+            firma,
+            excerpt_texto,
+        })
+        .collect())
+}
+
 /* [03AA-3 M4] Caché de respuestas (`mp_respuestas_cache`): la clave es
  * (firma, precio_hash, catalog_hash). `precio_hash` ata la respuesta al
  * precio citado (si cambia el precio, miss y se regenera: jamás se sirve un
@@ -1912,6 +1940,63 @@ mod pruebas {
                 .await
                 .expect("cuenta");
         assert_eq!(queda, 0);
+    }
+
+    /* [09AA-3] Candidatos de la regeneración masiva: entra el borrador
+     * normal; quedan fuera la corrección de la dueña y la fila vacía. */
+    #[tokio::test]
+    async fn regen_solo_borradores_no_corregidos() {
+        let Some(pool) = pool_si_hay() else { return };
+        let (fa, pa, ca) = (clave_azar(), clave_azar(), clave_azar());
+        guardar_cache(
+            &pool,
+            &fa,
+            &pa,
+            &ca,
+            "borrador-a",
+            &foto_prueba("hilo-1", "x", "crudo-x"),
+        )
+        .await
+        .expect("guarda a");
+        let (fb, pb, cb) = (clave_azar(), clave_azar(), clave_azar());
+        guardar_cache(
+            &pool,
+            &fb,
+            &pb,
+            &cb,
+            "borrador-b",
+            &foto_prueba("hilo-1", "y", "crudo-y"),
+        )
+        .await
+        .expect("guarda b");
+        corregir_cache(&pool, &fb, &pb, &cb, "texto duena")
+            .await
+            .expect("corrige b");
+        let (fc, pc, cc) = (clave_azar(), clave_azar(), clave_azar());
+        guardar_cache(
+            &pool,
+            &fc,
+            &pc,
+            &cc,
+            "",
+            &foto_prueba("hilo-1", "z", "crudo-z"),
+        )
+        .await
+        .expect("guarda c");
+        let filas = filas_para_regenerar(&pool).await.expect("lista");
+        let firmas: Vec<&str> = filas.iter().map(|f| f.firma.as_str()).collect();
+        assert!(firmas.contains(&fa.as_str()), "a entra: {firmas:?}");
+        assert!(
+            !firmas.contains(&fb.as_str()),
+            "b fuera (corregida): {firmas:?}"
+        );
+        assert!(
+            !firmas.contains(&fc.as_str()),
+            "c fuera (vacía): {firmas:?}"
+        );
+        borrar_cache(&pool, &fa, &pa, &ca).await.expect("limpia a");
+        borrar_cache(&pool, &fb, &pb, &cb).await.expect("limpia b");
+        borrar_cache(&pool, &fc, &pc, &cc).await.expect("limpia c");
     }
 
     #[tokio::test]

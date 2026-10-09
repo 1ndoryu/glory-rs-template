@@ -97,6 +97,7 @@ impl utoipa::Modify for SecurityAddon {
         marketplace_token::emitir_token_cli,
         marketplace::borrador,
         marketplace::regenerar,
+        marketplace::regenerar_todo,
         marketplace::corregir,
         marketplace::audit,
         marketplace::uso,

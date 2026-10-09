@@ -34,3 +34,23 @@ export function leerChat(thread: string): Promise<ChatFila[]> {
 export function limpiarChats(): Promise<{ borrados: number }> {
   return apiFetch<{ borrados: number }>('/api/admin/marketplace/chats', { method: 'DELETE' });
 }
+
+/* [09AA-3] Regeneración masiva: una pasada en serie por cada fila con
+ * borrador (ver `handlers::marketplace::regenerar_todo`). Salta
+ * correcciones de la dueña y filas solo-foto. Tarda ~15s por chat. */
+export interface RegenerarTodoFila {
+  thread_id: string;
+  fuente: string;
+}
+
+export interface RegenerarTodoResumen {
+  candidatos: number;
+  regenerados: number;
+  en_reserva: number;
+  omitidos: number;
+  detalle: RegenerarTodoFila[];
+}
+
+export function regenerarTodo(): Promise<RegenerarTodoResumen> {
+  return apiFetch<RegenerarTodoResumen>('/api/admin/marketplace/regenerar-todo', { method: 'POST' });
+}
