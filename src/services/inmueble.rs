@@ -11,6 +11,8 @@ use crate::models::{
 };
 use crate::repositories::InmuebleRepository;
 
+use super::inmueble_alias;
+use super::inmueble_slug;
 use super::inmueble_vinculo;
 
 /* [159A-1] Lógica del catálogo: normalización de enums, slug único con
@@ -21,32 +23,6 @@ use super::inmueble_vinculo;
 pub struct InmuebleService;
 
 impl InmuebleService {
-    /// Slug desde el título: minúsculas, ASCII, guiones; `inmueble` si queda vacío
-    #[must_use]
-    pub fn slugify(titulo: &str) -> String {
-        let mut slug = String::new();
-        let mut guion_pendiente = false;
-        for ch in titulo.to_lowercase().chars() {
-            if ch.is_ascii_alphanumeric() {
-                if guion_pendiente && !slug.is_empty() {
-                    slug.push('-');
-                }
-                guion_pendiente = false;
-                slug.push(ch);
-            } else if ch.is_whitespace() || ch == '-' || ch == '_' {
-                guion_pendiente = true;
-            }
-            if slug.len() >= 60 {
-                break;
-            }
-        }
-        if slug.is_empty() {
-            "inmueble".to_string()
-        } else {
-            slug
-        }
-    }
-
     fn normalizar(valor: &str, permitidos: &[&str], campo: &str) -> Result<String, AppError> {
         let normalizado = valor.trim().to_lowercase();
         let base = if normalizado.is_empty() {
@@ -92,7 +68,9 @@ impl InmuebleService {
         /* [09AA-21] Vínculo en `inmueble_vinculo::preparar_para_crear`. */
         let marketplace_id =
             inmueble_vinculo::preparar_para_crear(pool, req.marketplace_id.as_deref()).await?;
-        let base_slug = Self::slugify(&req.titulo);
+        /* [09AA-24] Alias en `inmueble_alias::preparar_para_crear`. */
+        let alias_titulos = inmueble_alias::preparar_para_crear(req.alias_titulos)?;
+        let base_slug = inmueble_slug::slugify(&req.titulo);
 
         let mut intento = 0;
         loop {
@@ -121,6 +99,8 @@ impl InmuebleService {
                 copy_modelo: req.copy.as_ref().map(|c| c.modelo.as_str()),
                 copy_actualizada_en: req.copy.as_ref().map(|c| c.actualizada_en),
                 marketplace_id: marketplace_id.as_deref(),
+                /* Se clona por reintento de slug (máx 3, ≤10 textos cortos). */
+                alias_titulos: alias_titulos.clone(),
             };
             match InmuebleRepository::create(pool, &nuevo).await {
                 Ok(row) => return Ok(Inmueble::from_row(row, Vec::new())),
@@ -215,6 +195,8 @@ impl InmuebleService {
         /* [09AA-21] Tri-estado en `inmueble_vinculo::preparar_para_update`. */
         let marketplace_id =
             inmueble_vinculo::preparar_para_update(pool, id, req.marketplace_id.as_ref()).await?;
+        /* [09AA-24] Alias en `inmueble_alias::preparar_para_update`. */
+        let alias_titulos = inmueble_alias::preparar_para_update(req.alias_titulos)?;
         /* El formato de la receta no admite normalización con defecto (vacío
          * no es válido): allowlist directa. Los índices los cubre `range`
          * del validador en el modelo. [229A-2] */
@@ -250,6 +232,7 @@ impl InmuebleService {
             copy_actualizada_en: req.copy.as_ref().map(|c| c.actualizada_en),
             receta: req.receta.clone().map(sqlx::types::Json),
             marketplace_id: inmueble_vinculo::prestar_para_update(marketplace_id.as_ref()),
+            alias_titulos,
         };
         let fila = InmuebleRepository::update(pool, id, &cambios).await;
         let row = match fila {
@@ -594,17 +577,6 @@ mod tests {
     use super::InmuebleService;
 
     #[test]
-    fn slugify_basicos() {
-        assert_eq!(InmuebleService::slugify("Piso en Centro"), "piso-en-centro");
-        assert_eq!(
-            InmuebleService::slugify("  Casa -- Grande__  "),
-            "casa-grande"
-        );
-        assert_eq!(InmuebleService::slugify(""), "inmueble");
-        assert_eq!(InmuebleService::slugify("---"), "inmueble");
-    }
-
-    #[test]
     fn extension_y_magia() {
         assert!(InmuebleService::extension_valida("foto.JPG").is_ok());
         assert!(InmuebleService::extension_valida("foto.webp").is_ok());
@@ -681,6 +653,7 @@ mod pruebas_receta {
             metros_terreno: 0.0,
             estado: "disponible".to_string(),
             marketplace_id: None,
+            alias_titulos: Vec::new(),
             copy: None,
         }
     }
@@ -701,6 +674,7 @@ mod pruebas_receta {
             metros_terreno: None,
             estado: None,
             marketplace_id: None,
+            alias_titulos: None,
             copy: None,
             receta,
         }
@@ -769,6 +743,7 @@ mod pruebas_estado {
             metros_terreno: 0.0,
             estado: "disponible".to_string(),
             marketplace_id: None,
+            alias_titulos: Vec::new(),
             copy: None,
         }
     }
@@ -845,6 +820,7 @@ mod pruebas_borrado_foto {
             metros_terreno: 0.0,
             estado: "disponible".to_string(),
             marketplace_id: None,
+            alias_titulos: Vec::new(),
             copy: None,
         }
     }

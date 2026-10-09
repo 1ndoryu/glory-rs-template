@@ -175,6 +175,7 @@ mod pruebas_marketplace_id {
             metros_terreno: 0.0,
             estado: "disponible".to_string(),
             marketplace_id: marketplace_id.map(str::to_string),
+            alias_titulos: Vec::new(),
             copy: None,
         }
     }
@@ -198,6 +199,7 @@ mod pruebas_marketplace_id {
             metros_terreno: None,
             estado: None,
             marketplace_id: marketplace_id.map(|interior| interior.map(str::to_string)),
+            alias_titulos: None,
             copy: None,
             receta: None,
         }

@@ -1088,6 +1088,7 @@ mod pruebas_claves_cache_mp_id {
             metros_terreno: 0.0,
             estado: "disponible".to_string(),
             marketplace_id: marketplace_id.map(str::to_string),
+            alias_titulos: Vec::new(),
             copy: None,
         }
     }

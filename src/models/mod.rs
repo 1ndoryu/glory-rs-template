@@ -1,5 +1,7 @@
 mod cliente;
 mod inmueble;
+mod inmueble_alias;
+mod inmueble_paginacion;
 mod note;
 mod solicitud;
 mod suscriptor;
@@ -9,11 +11,12 @@ mod visita;
 pub use cliente::{Cliente, ClienteRow, CreateClienteRequest};
 pub use inmueble::{
     validar_extras, ActualizacionInmueble, AddFotoRequest, CopyInmueble, CreateInmuebleRequest,
-    CreateUserRequest, EstadoRequest, FichaAskRequest, FichaAskResponse, FiltrosPublicos, Foto,
-    FotoPublica, Inmueble, InmuebleRow, PaginatedInmuebles, PublicacionRequest, RecetaPublicidad,
-    UpdateInmuebleRequest, ESTADOS, EXTENSIONES_FOTO, FORMATOS_RECETA, MAX_FOTO_BYTES, OPERACIONES,
-    ORIGENES_FOTO, TIPOS,
+    CreateUserRequest, EstadoRequest, FichaAskRequest, FichaAskResponse, Foto, FotoPublica,
+    Inmueble, InmuebleRow, PublicacionRequest, RecetaPublicidad, UpdateInmuebleRequest, ESTADOS,
+    EXTENSIONES_FOTO, FORMATOS_RECETA, MAX_FOTO_BYTES, OPERACIONES, ORIGENES_FOTO, TIPOS,
 };
+pub use inmueble_alias::{normalizar_alias_titulos, MAX_ALIAS, MAX_ALIAS_LEN};
+pub use inmueble_paginacion::{FiltrosPublicos, PaginatedInmuebles};
 
 pub use note::{CreateNoteRequest, Note, PaginatedNotes, PaginationParams, UpdateNoteRequest};
 pub use solicitud::{

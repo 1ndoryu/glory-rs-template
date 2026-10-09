@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
-use utoipa::{IntoParams, ToSchema};
+use utoipa::ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 
@@ -106,6 +106,10 @@ pub struct InmuebleRow {
     pub marketplace_id: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    /* [09AA-24] Nombres alternativos (`alias_titulos TEXT[]`, vacío = sin
+     * alias): el mismo inmueble publicado con otro nombre. Va al final para
+     * no renumerar los `$n` del repositorio. */
+    pub alias_titulos: Vec<String>,
 }
 
 /// Inmueble con sus fotos — lo que expone la API
@@ -139,6 +143,9 @@ pub struct Inmueble {
     /* [09AA-21] Vínculo exacto con el aviso (dígitos, `None` = sin vincular).
      * Viaja en admin y en público (es el ID del aviso, ya público en FB). */
     pub marketplace_id: Option<String>,
+    /* [09AA-24] Nombres alternativos: el admin los edita y el emparejado los
+     * puntúa; en público solo informan (son nombres ya publicados). */
+    pub alias_titulos: Vec<String>,
     pub fotos: Vec<FotoPublica>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -183,6 +190,7 @@ impl Inmueble {
             receta: row.receta.map(|j| j.0),
             extras: row.extras.0,
             marketplace_id: row.marketplace_id,
+            alias_titulos: row.alias_titulos,
             fotos: fotos.into_iter().map(FotoPublica::from).collect(),
             created_at: row.created_at,
             updated_at: row.updated_at,
@@ -284,6 +292,11 @@ pub struct CreateInmuebleRequest {
      * (dígitos 5–32, URL → dígitos). */
     #[serde(default)]
     pub marketplace_id: Option<String>,
+    /* [09AA-24] Nombres alternativos (lista completa; ausente = vacía).
+     * El servicio recorta, quita vacíos/duplicados y valida (máx 10,
+     * c/u ≤200 caracteres). */
+    #[serde(default)]
+    pub alias_titulos: Vec<String>,
     /// Copy IA (`None` = sin copy); al crear, `None` deja las columnas NULL
     #[serde(default)]
     #[validate(nested)]
@@ -322,6 +335,10 @@ pub struct UpdateInmuebleRequest {
      * ausente (`None`) de `null` (`Some(None)`). */
     #[serde(default)]
     pub marketplace_id: Option<Option<String>>,
+    /* [09AA-24] Alias: ausente = no tocar, lista (incluso vacía) = reemplazar
+     * entera (como el resto del PUT, que es reemplazo entero). */
+    #[serde(default)]
+    pub alias_titulos: Option<Vec<String>>,
     /// Copy IA (`Some` la fija, `None` la deja como está; no se puede borrar por PUT)
     #[validate(nested)]
     pub copy: Option<CopyInmueble>,
@@ -357,6 +374,9 @@ pub struct ActualizacionInmueble<'a> {
     /* [09AA-21] Tri-estado listo para bindear: `None` = no tocar,
      * `Some(None)` = SET NULL (desvincular), `Some(Some(v))` = fijar. */
     pub marketplace_id: Option<Option<&'a str>>,
+    /* [09AA-24] Alias ya normalizados: `None` = no tocar, `Some` = fijar la
+     * lista entera (`COALESCE`, el vacío limpia). */
+    pub alias_titulos: Option<Vec<String>>,
 }
 
 /// Cambio de visibilidad pública — el backend decide qué se publica
@@ -431,42 +451,6 @@ pub fn validar_extras(v: &serde_json::Value) -> Result<(), String> {
         }
     }
     Ok(())
-}
-
-/// Filtros públicos + paginación
-#[derive(Debug, Deserialize, IntoParams)]
-pub struct FiltrosPublicos {
-    /// Filtrar por tipo (apartamento, casa, local, terreno, townhouse)
-    pub tipo: Option<String>,
-    /// Filtrar por operación (venta, alquiler)
-    pub operacion: Option<String>,
-    /// Precio mínimo
-    pub precio_min: Option<f64>,
-    /// Precio máximo
-    pub precio_max: Option<f64>,
-    /// Página (empezando en 1)
-    #[serde(default = "default_page")]
-    pub page: i64,
-    /// Resultados por página
-    #[serde(default = "default_per_page")]
-    pub per_page: i64,
-}
-
-fn default_page() -> i64 {
-    1
-}
-
-fn default_per_page() -> i64 {
-    20
-}
-
-/// Response paginada de inmuebles
-#[derive(Debug, Serialize, ToSchema)]
-pub struct PaginatedInmuebles {
-    pub items: Vec<Inmueble>,
-    pub total: i64,
-    pub page: i64,
-    pub per_page: i64,
 }
 
 /// Alta de usuario por un owner (register público = solo bootstrap)

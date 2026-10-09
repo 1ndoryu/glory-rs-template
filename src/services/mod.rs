@@ -2,6 +2,8 @@ mod alerta_whatsapp;
 mod auth;
 mod canal_resolver;
 mod inmueble;
+mod inmueble_alias; // [09AA-24-split] alias_titulos en su dominio (usado por inmueble.rs)
+mod inmueble_slug; // [09AA-24-split] slug del catálogo en su dominio (usado por inmueble.rs)
 mod inmueble_vinculo; // [09AA-21-split] vínculo marketplace_id en su dominio (usado por inmueble.rs)
 pub mod marketplace;
 mod marketplace_burbujas; // [09AA-20] F0: tipos+validador burbujas (re-exportado arriba)

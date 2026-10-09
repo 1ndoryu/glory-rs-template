@@ -223,6 +223,9 @@ export interface InmuebleRemoto
    * fuente de verdad del emparejado (hoy solo vive en `/borrador`). */
   marketplace_id?: string | null;
   aviso_conocido?: boolean;
+  /* [09AA-24] Alias del inmueble (otros nombres del aviso). Ausente en
+   * registros viejos = sin alias. */
+  alias_titulos?: string[] | null;
 }
 
 export function urlAbsoluta(url: string): string {
@@ -297,9 +300,10 @@ export function remotoADominio(r: InmuebleRemoto): Inmueble {
     /* Ficha /ask (ausente = aún sin responder; nunca sale a lo público). */
     extras: r.extras ?? undefined,
     precioMinimo: r.precio_minimo ?? undefined,
-    /* Vínculo Marketplace (ausente en el backend hasta F7a = sin vincular). */
+    /* Vínculo Marketplace + alias (ausentes en registros viejos). */
     marketplaceId: r.marketplace_id ?? null,
     avisoConocido: r.aviso_conocido,
+    aliasTitulos: r.alias_titulos ?? [],
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -326,6 +330,8 @@ function dominioACuerpo(i: Inmueble): Record<string, unknown> {
      * el backend ignora este campo hasta entonces (serde descarta lo
      * desconocido). Se envía igual para dejar el front preparado. */
     marketplace_id: i.marketplaceId,
+    /* [09AA-24] Alias: el backend los normaliza y topa (422 si se pasan). */
+    alias_titulos: i.aliasTitulos,
     copy: copyARemoto(i.copy),
     receta: recetaADominio(i.receta),
   };

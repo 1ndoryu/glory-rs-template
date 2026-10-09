@@ -634,19 +634,36 @@ pub fn puntaje_titulo(fb: &str, titulo: &str) -> (bool, usize, usize) {
     (directo, solape, distintivo)
 }
 
+/// [09AA-24] Mejor puntaje entre el título canónico y sus alias: el mismo
+/// inmueble puede publicarse con otro nombre (Caroní Plaza = Río Aro Plaza)
+/// y el hilo nombra cualquiera de los dos. Orden del tuple: directo manda,
+/// luego solape, luego distintivo.
+#[must_use]
+pub fn mejor_puntaje_con_alias(fb: &str, titulo: &str, alias: &[String]) -> (bool, usize, usize) {
+    let mut mejor = puntaje_titulo(fb, titulo);
+    for nombre in alias {
+        let puntos = puntaje_titulo(fb, nombre);
+        if puntos > mejor {
+            mejor = puntos;
+        }
+    }
+    mejor
+}
+
 /// Ficha publicada cuyo título mejor empareja con el del hilo: directo, o
 /// solape ≥3 con ≥1 palabra distintiva. Empate entre dos avisos o BD
 /// caída = `None` (nunca se cita un precio dudoso; quien llama decide si
 /// lo registra: el borrador jamás se bloquea por esto).
+/// [09AA-24] Cada ficha puntúa con su título + alias (`mejor_puntaje_con_alias`).
 pub async fn ficha_por_titulo(
     pool: &sqlx::PgPool,
     titulo_fb: &str,
 ) -> Result<Option<InmuebleRow>, AppError> {
-    let candidatos = InmuebleRepository::titulos_publicados(pool).await?;
+    let candidatos = InmuebleRepository::titulos_alias_publicados(pool).await?;
     let mut mejor: Option<(uuid::Uuid, usize, usize)> = None;
     let mut empate = false;
-    for (id, titulo) in &candidatos {
-        let (directo, solape, distintivo) = puntaje_titulo(titulo_fb, titulo);
+    for (id, titulo, alias) in &candidatos {
+        let (directo, solape, distintivo) = mejor_puntaje_con_alias(titulo_fb, titulo, alias);
         if !(directo || (solape >= 3 && distintivo >= 1)) {
             continue;
         }
@@ -905,17 +922,20 @@ pub async fn resumen_chats(pool: &sqlx::PgPool) -> Result<Vec<ChatResumen>, AppE
     )
     .fetch_all(pool)
     .await?;
-    let candidatos: Vec<(uuid::Uuid, String)> =
-        match InmuebleRepository::titulos_publicados(pool).await {
+    let candidatos: Vec<(uuid::Uuid, String, Vec<String>)> =
+        match InmuebleRepository::titulos_alias_publicados(pool).await {
             Ok(c) => c,
             Err(e) => {
                 tracing::warn!("resumen_chats: sin títulos publicados ({e}), avisos no conocidos");
                 Vec::new()
             }
         };
-    let vinculos: std::collections::HashMap<String, String> =
+    let vinculos: std::collections::HashMap<String, (String, Vec<String>)> =
         match InmuebleRepository::vinculos_publicados(pool).await {
-            Ok(v) => v.into_iter().collect(),
+            Ok(v) => v
+                .into_iter()
+                .map(|(aviso, titulo, alias)| (aviso, (titulo, alias)))
+                .collect(),
             Err(e) => {
                 tracing::warn!("resumen_chats: sin vínculos de aviso ({e}), solo título");
                 std::collections::HashMap::new()
@@ -944,11 +964,14 @@ pub async fn resumen_chats(pool: &sqlx::PgPool) -> Result<Vec<ChatResumen>, AppE
  * empate = no conocido). Pura en memoria (sin BD).
  * [09AA-23] Devuelve el título emparejado (rama exacta: el título del
  * vínculo; rama título: el título candidato). `resumen_chats` deriva
- * `aviso_conocido` como `vinculado.is_some()`. */
+ * `aviso_conocido` como `vinculado.is_some()`.
+ * [09AA-24] Las ramas por título puntúan título + alias: el hilo puede
+ * nombrar cualquiera de los nombres del inmueble, pero el badge muestra
+ * siempre el título canónico. */
 fn titulo_vinculado_del_hilo(
     thread_id: &str,
-    candidatos: &[(uuid::Uuid, String)],
-    vinculos: &std::collections::HashMap<String, String>,
+    candidatos: &[(uuid::Uuid, String, Vec<String>)],
+    vinculos: &std::collections::HashMap<String, (String, Vec<String>)>,
 ) -> Option<String> {
     let aviso = aviso_fb_de_thread(thread_id).unwrap_or_default();
     let recortado = aviso.trim();
@@ -956,13 +979,13 @@ fn titulo_vinculado_del_hilo(
         return None;
     }
     if recortado.chars().all(|c| c.is_ascii_digit()) && (5..=32).contains(&recortado.len()) {
-        return vinculos.get(recortado).cloned();
+        return vinculos.get(recortado).map(|(titulo, _)| titulo.clone());
     }
     let mut mejor: Option<(usize, usize)> = None;
     let mut titulo_mejor: Option<String> = None;
     let mut empate = false;
-    for (_, titulo) in candidatos {
-        let (directo, solape, distintivo) = puntaje_titulo(recortado, titulo);
+    for (_, titulo, alias) in candidatos {
+        let (directo, solape, distintivo) = mejor_puntaje_con_alias(recortado, titulo, alias);
         if !(directo || (solape >= 3 && distintivo >= 1)) {
             continue;
         }
@@ -1386,6 +1409,7 @@ mod pruebas {
             marketplace_id: None,
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
+            alias_titulos: Vec::new(),
         }
     }
 
@@ -1804,21 +1828,27 @@ mod pruebas {
      * empareja, huérfano que no empareja, y empate entre dos fichas que no
      * reclama a ninguna (mismo criterio que `ficha_por_titulo`).
      * [09AA-23] Los vínculos ahora son mapa ID→título y se verifica además
-     * que el título devuelto es el de la ficha emparejada. */
+     * que el título devuelto es el de la ficha emparejada.
+     * [09AA-24] Candidatos y vínculos viajan con alias: el hilo puede nombrar
+     * cualquiera de los nombres, pero el vinculado es siempre el canónico.
+     * Testigo Río Aro: el hilo salazar nombra el alias y empareja Caroní. */
     #[test]
     fn aviso_conocido_id_titulo_huerfano_y_empate() {
         use std::collections::HashMap;
-        let conocido =
-            |hilo: &str, candidatos: &[(Uuid, String)], vinculos: &HashMap<String, String>| {
-                titulo_vinculado_del_hilo(hilo, candidatos, vinculos).is_some()
-            };
+        type Candidatos = Vec<(Uuid, String, Vec<String>)>;
+        type Vinculos = HashMap<String, (String, Vec<String>)>;
+        let conocido = |hilo: &str, candidatos: &Candidatos, vinculos: &Vinculos| {
+            titulo_vinculado_del_hilo(hilo, candidatos, vinculos).is_some()
+        };
         let id = Uuid::new_v4();
         let titulo_riberas = "Casa en venta en Riberas del Caroní".to_string();
-        let candidatos = vec![(id, titulo_riberas.clone())];
-        let vinculos: HashMap<String, String> =
-            [("123456789012345".to_string(), titulo_riberas.clone())]
-                .into_iter()
-                .collect();
+        let candidatos: Candidatos = vec![(id, titulo_riberas.clone(), Vec::new())];
+        let vinculos: Vinculos = [(
+            "123456789012345".to_string(),
+            (titulo_riberas.clone(), Vec::new()),
+        )]
+        .into_iter()
+        .collect();
         assert_eq!(
             titulo_vinculado_del_hilo("tina|123456789012345", &candidatos, &vinculos),
             Some(titulo_riberas.clone())
@@ -1839,14 +1869,16 @@ mod pruebas {
             &vinculos
         ));
         assert!(!conocido("sin-separador", &candidatos, &vinculos));
-        let empatados = vec![
+        let empatados: Candidatos = vec![
             (
                 Uuid::new_v4(),
                 "Casa en venta en Riberas del Caroní Norte".to_string(),
+                Vec::new(),
             ),
             (
                 Uuid::new_v4(),
                 "Casa en venta en Riberas del Caroní Sur".to_string(),
+                Vec::new(),
             ),
         ];
         assert!(!conocido(
@@ -1854,15 +1886,64 @@ mod pruebas {
             &empatados,
             &HashMap::new()
         ));
-        /* Huérfano real de hoy: Río Aro no está en el catálogo → None. */
+        /* Testigo Río Aro [09AA-24]: la ficha Caroní Plaza declara el alias y
+         * el hilo salazar —que nombra el alias— empareja con el canónico. */
+        let titulo_caroni = "Apartamento en Caroní Plaza".to_string();
+        let candidatos_alias: Candidatos = vec![(
+            Uuid::new_v4(),
+            titulo_caroni.clone(),
+            vec!["Apartamento en Río Aro Plaza".to_string()],
+        )];
         assert_eq!(
             titulo_vinculado_del_hilo(
                 "salazar|VEF0 apartamento residencias rio aro plaza puerto ordaz",
-                &candidatos,
+                &candidatos_alias,
+                &HashMap::new()
+            ),
+            Some(titulo_caroni.clone())
+        );
+        /* Sin el alias declarado, el mismo hilo sigue huérfano (calibrado). */
+        let candidatos_sin_alias: Candidatos = vec![(Uuid::new_v4(), titulo_caroni, Vec::new())];
+        assert_eq!(
+            titulo_vinculado_del_hilo(
+                "salazar|VEF0 apartamento residencias rio aro plaza puerto ordaz",
+                &candidatos_sin_alias,
                 &vinculos
             ),
             None
         );
+    }
+
+    /* [09AA-24] El alias puntúa igual que el canónico: el mejor de los
+     * nombres gana. El alias Río Aro no es substring del hilo (el hilo trae
+     * "residencias" donde el alias trae "en"), así que empareja por solape
+     * con distintivas — el mismo camino que ya usa `titulo_vinculado`. */
+    #[test]
+    fn puntaje_alias_igual_que_canonico_y_mejor_gana() {
+        let alias = vec!["Apartamento en Río Aro Plaza".to_string()];
+        let (directo, solape, distintivo) = mejor_puntaje_con_alias(
+            "VEF0 apartamento residencias rio aro plaza puerto ordaz",
+            "Apartamento en Caroní Plaza",
+            &alias,
+        );
+        assert!(!directo, "el alias no es substring del hilo");
+        assert!(
+            solape >= 3 && distintivo >= 1,
+            "el alias empareja por solape con distintivas aunque el canónico no"
+        );
+        let (directo_canonico, _, _) = mejor_puntaje_con_alias(
+            "apartamento en caroní plaza",
+            "Apartamento en Caroní Plaza",
+            &alias,
+        );
+        assert!(directo_canonico);
+        let (directo_ninguno, solape, distintivo) = mejor_puntaje_con_alias(
+            "casa en venta en arivana",
+            "Apartamento en Caroní Plaza",
+            &alias,
+        );
+        assert!(!directo_ninguno);
+        assert!(solape < 3 || distintivo < 1);
     }
 
     #[test]
@@ -1967,6 +2048,7 @@ mod pruebas {
             marketplace_id: None,
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
+            alias_titulos: Vec::new(),
         }
     }
 

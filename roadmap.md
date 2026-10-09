@@ -45,6 +45,7 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   (el +1 es la nueva `query_as` en `inmueble.rs:157`, misma familia
   preexistente `sqlx-sin-macro` que sus 17 vecinas). Pendiente de ella:
   crear el inmueble Río Aro con precio y Regenerar el hilo salazar.
+
 - **09AA-19 — Burbujas estructuradas (pedido por ella 2026-10-09, EN
   CURSO):** cerrado F0 (09AA-20✓), F7a+F7c (09AA-21✓) y F3 (09AA-22✓) con
   commit+push (ver `Agente/completados/tareas-2026-10-09.md`): splits
@@ -66,6 +67,12 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   (`ficha-formulario`, `modal-inmueble`, `vincular-hilo`, …). Hoy ese
   componente no existe; `vincular-hilo` (09AA-21) sigue la convención
   vigente (`CLASE_SELECT`). No mezclar con 09AA-19.
+- **09AA-25 — Migrar queries a macros sqlx (gate 2026-10-09: familias
+  `sqlx-query-sin-macro` 143 + `sqlx-query-as-sin-macro` 71, todas warning):
+  ** migrar `sqlx::query/query_as` a `query!/query_as!` por dominio
+  (empieza por `repositories/inmueble.rs`), con test en verde por tanda.
+  Prioridad baja, no bloquea nada; las queries actuales usan binds
+  (seguras), es higiene del gate, no defecto.
 - **09AA-14 — Conectar el flotante al núcleo local (pedido por ella
   2026-10-10, EN CURSO):** la ventanita negra cocinaba sola con receta vieja
   (plantilla "sigue disponible + precio" con solo el título, intención

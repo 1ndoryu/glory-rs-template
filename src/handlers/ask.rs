@@ -138,6 +138,7 @@ mod pruebas {
                 metros_terreno: 0.0,
                 estado: "disponible".to_string(),
                 marketplace_id: None,
+                alias_titulos: Vec::new(),
                 copy: None,
             },
         )

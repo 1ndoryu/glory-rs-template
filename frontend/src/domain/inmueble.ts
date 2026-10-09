@@ -93,14 +93,39 @@ export interface Inmueble
 }
 
 /* [09AA-19 F7c] Vínculo exacto con el aviso de Marketplace (`/marketplace/item/<id>`).
- * `marketplaceId` = dígitos del aviso (`null` = sin vincular). El backend aún
- * no expone la columna (migración F7a pendiente): el front la envía y la lee
- * de forma tolerante (ausente = `null`). `avisoConocido` es la futura fuente
- * de verdad del backend (`aviso_conocido` de `/borrador`); ausente = se
- * deriva de `marketplaceId`. */
+ * `marketplaceId` = dígitos del aviso (`null` = sin vincular). `avisoConocido`
+ * es la fuente de verdad del backend (`aviso_conocido` de `/borrador`);
+ * ausente = se deriva de `marketplaceId`.
+ * [09AA-24] `aliasTitulos`: otros nombres con los que se publica el mismo
+ * inmueble (Caroní Plaza = Río Aro Plaza). El hilo puede nombrar cualquiera;
+ * el badge muestra siempre el título canónico. Máx 10, 200 caracteres. */
 export interface VinculoMarketplace {
   marketplaceId: string | null;
   avisoConocido?: boolean;
+  aliasTitulos: string[];
+}
+
+/* Un alias por línea → lista saneada (recorte, sin vacíos, sin repetidos
+ * sin importar caja). Pura. El backend rechaza (422) si pasan los topes;
+ * aquí solo se sanea para previsualizar. */
+export function normalizarAliasTitulos(entrada: string): string[] {
+  const vistos = new Set<string>();
+  const saneados: string[] = [];
+  for (const linea of entrada.split('\n')) {
+    const recortado = linea.trim();
+    if (!recortado) continue;
+    const clave = recortado.toLowerCase();
+    if (vistos.has(clave)) continue;
+    vistos.add(clave);
+    saneados.push(recortado);
+  }
+  return saneados;
+}
+
+/* Formato válido: ≤10 alias de ≤200 caracteres. Pura. */
+export function esAliasTitulosValido(entrada: string): boolean {
+  const lista = normalizarAliasTitulos(entrada);
+  return lista.length <= 10 && lista.every((a) => a.length <= 200);
 }
 
 /* Extrae los dígitos del aviso desde un ID pegado o una URL
@@ -214,6 +239,8 @@ export interface ClaseDraft {
 /* Vínculo del borrador (texto del formulario; se normaliza al guardar). */
 export interface VinculoDraft {
   marketplaceId: string;
+  /* Un alias por línea (otros nombres del mismo inmueble). */
+  aliasTitulos: string;
 }
 
 /** Borrador del modal: opcional salvo fotos (siempre array). */
@@ -237,6 +264,7 @@ export const DRAFT_VACIO: InmuebleDraft = {
   fotos: [],
   estado: 'disponible',
   marketplaceId: '',
+  aliasTitulos: '',
 };
 
 export const TIPOS: TipoInmueble[] = ['apartamento', 'casa', 'local', 'terreno', 'townhouse'];
@@ -251,7 +279,7 @@ export const ETIQUETAS_TIPO: Record<TipoInmueble, string> = {
 };
 export const ESTADOS: EstadoInmueble[] = ['disponible', 'reservado', 'vendido', 'alquilado'];
 
-export type ErroresDraft = Partial<Record<'titulo' | 'ubicacion' | 'residencia' | 'precio' | 'tipo' | 'operacion' | 'habitaciones' | 'banos' | 'metros' | 'metrosTerreno' | 'puestos' | 'marketplaceId', string>>;
+export type ErroresDraft = Partial<Record<'titulo' | 'ubicacion' | 'residencia' | 'precio' | 'tipo' | 'operacion' | 'habitaciones' | 'banos' | 'metros' | 'metrosTerreno' | 'puestos' | 'marketplaceId' | 'aliasTitulos', string>>;
 
 /* Ningún campo es obligatorio: se trabaja con la información disponible.
  * La validación nunca bloquea el guardado; la conversión (`draftAInmueble`)
@@ -262,6 +290,11 @@ export type ErroresDraft = Partial<Record<'titulo' | 'ubicacion' | 'residencia' 
 export function validarDraft(d: InmuebleDraft): ErroresDraft {
   if (!esMarketplaceIdValido(d.marketplaceId)) {
     return { marketplaceId: 'Pega el ID numérico del aviso o su URL (/marketplace/item/<id>).' };
+  }
+  /* [09AA-24] Los topes los rechaza el backend (422): se avisa antes para
+   * no perder el formulario. */
+  if (!esAliasTitulosValido(d.aliasTitulos)) {
+    return { aliasTitulos: 'Máximo 10 nombres de 200 caracteres (uno por línea).' };
   }
   return {};
 }
@@ -281,6 +314,7 @@ export function draftTieneContenido(d: InmuebleDraft): boolean {
       d.metrosTerreno.trim() ||
       d.puestos.trim() ||
       d.marketplaceId.trim() ||
+      d.aliasTitulos.trim() ||
       d.fotos.length > 0,
   );
 }
@@ -315,6 +349,8 @@ export function draftAInmueble(d: InmuebleDraft, base?: Inmueble): Inmueble {
      * `avisoConocido` no se edita en el formulario: lo dirá el backend. */
     marketplaceId: normalizarMarketplaceId(d.marketplaceId),
     avisoConocido: base?.avisoConocido,
+    /* [09AA-24] Alias: un nombre por línea; vacío = sin alias. */
+    aliasTitulos: normalizarAliasTitulos(d.aliasTitulos),
     // El copy y la receta no se editan en el formulario: se conservan.
     publicado: base?.publicado ?? false,
     copy: base?.copy ?? null,
@@ -345,6 +381,8 @@ export function inmuebleADraft(i: Inmueble): InmuebleDraft {
     fotos: [...i.fotos],
     estado: i.estado,
     marketplaceId: i.marketplaceId ?? '',
+    /* Registros guardados antes de existir la columna no la traen. */
+    aliasTitulos: (i.aliasTitulos ?? []).join('\n'),
   };
 }
 

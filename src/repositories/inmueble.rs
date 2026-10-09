@@ -14,7 +14,7 @@ use crate::models::{ActualizacionInmueble, FiltrosPublicos, Foto, InmuebleRow};
 const COLUMNAS: &str = "id, titulo, descripcion, ubicacion, puestos, residencia, precio, \
     tipo, operacion, habitaciones, banos, metros, metros_terreno, estado, publicado, \
     slug, copy_corta, copy_larga, copy_modelo, copy_actualizada_en, receta, extras, \
-    precio_minimo, marketplace_id, created_at, updated_at";
+    precio_minimo, marketplace_id, created_at, updated_at, alias_titulos";
 
 /* [279A-3] Columnas para la web pública: las mismas salvo `extras` y
  * `precio_minimo` (privados de la dueña). Se rellenan con valores vacíos
@@ -24,7 +24,8 @@ const COLUMNAS: &str = "id, titulo, descripcion, ubicacion, puestos, residencia,
 const COLUMNAS_PUBLICAS: &str = "id, titulo, descripcion, ubicacion, puestos, residencia, precio, \
     tipo, operacion, habitaciones, banos, metros, metros_terreno, estado, publicado, \
     slug, copy_corta, copy_larga, copy_modelo, copy_actualizada_en, receta, \
-    '{}'::JSONB AS extras, NULL::FLOAT8 AS precio_minimo, marketplace_id, created_at, updated_at";
+    '{}'::JSONB AS extras, NULL::FLOAT8 AS precio_minimo, marketplace_id, created_at, updated_at, \
+    alias_titulos";
 
 /// Valores ya normalizados listos para insertar
 pub struct NuevoInmueble<'a> {
@@ -48,6 +49,8 @@ pub struct NuevoInmueble<'a> {
     pub copy_actualizada_en: Option<chrono::DateTime<chrono::Utc>>,
     /* [09AA-21] Vínculo exacto ya normalizado (dígitos) o `None` = sin vincular. */
     pub marketplace_id: Option<&'a str>,
+    /* [09AA-24] Alias ya normalizados (lista completa, vacía = sin alias). */
+    pub alias_titulos: Vec<String>,
 }
 
 pub struct InmuebleRepository;
@@ -61,9 +64,10 @@ impl InmuebleRepository {
         sqlx::query_as::<_, InmuebleRow>(&format!(
             "INSERT INTO inmuebles (id, titulo, descripcion, ubicacion, puestos, residencia, \
               precio, tipo, operacion, habitaciones, banos, metros, metros_terreno, estado, \
-              slug, copy_corta, copy_larga, copy_modelo, copy_actualizada_en, marketplace_id) \
+              slug, copy_corta, copy_larga, copy_modelo, copy_actualizada_en, marketplace_id, \
+              alias_titulos) \
               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, \
-               $16, $17, $18, $19, $20) \
+               $16, $17, $18, $19, $20, $21) \
               RETURNING {COLUMNAS}",
         ))
         .bind(id)
@@ -86,6 +90,7 @@ impl InmuebleRepository {
         .bind(nuevo.copy_modelo)
         .bind(nuevo.copy_actualizada_en)
         .bind(nuevo.marketplace_id)
+        .bind(&nuevo.alias_titulos)
         .fetch_one(pool)
         .await
     }
@@ -141,11 +146,15 @@ impl InmuebleRepository {
         .await
     }
 
-    /* [08AA-10] Títulos publicados (id + título) para emparejar el aviso de
-     * Facebook del hilo cuando no hay `avisoId` (piloto: siempre). Solo
-     * publicados: un borrador jamás cita el precio de un aviso oculto. */
-    pub async fn titulos_publicados(pool: &PgPool) -> Result<Vec<(Uuid, String)>, sqlx::Error> {
-        sqlx::query_as("SELECT id, titulo FROM inmuebles WHERE publicado = TRUE")
+    /* [08AA-10] Títulos publicados (id + título + alias) para emparejar el
+     * aviso de Facebook del hilo cuando no hay `avisoId` (piloto: siempre).
+     * Solo publicados: un borrador jamás cita el precio de un aviso oculto.
+     * [09AA-24] Incluye los alias: el mismo inmueble puede publicarse con
+     * otro nombre (Caroní Plaza = Río Aro Plaza). */
+    pub async fn titulos_alias_publicados(
+        pool: &PgPool,
+    ) -> Result<Vec<(Uuid, String, Vec<String>)>, sqlx::Error> {
+        sqlx::query_as("SELECT id, titulo, alias_titulos FROM inmuebles WHERE publicado = TRUE")
             .fetch_all(pool)
             .await
     }
@@ -153,10 +162,14 @@ impl InmuebleRepository {
     /* [09AA-21] IDs de aviso vinculados en publicados, para `aviso_conocido`
      * del panel (`resumen_chats`): una sola query, sin N+1.
      * [09AA-23] Devuelve también el título: el panel muestra con qué
-     * inmueble está vinculado cada hilo (`inmueble_vinculado`). */
-    pub async fn vinculos_publicados(pool: &PgPool) -> Result<Vec<(String, String)>, sqlx::Error> {
+     * inmueble está vinculado cada hilo (`inmueble_vinculado`).
+     * [09AA-24] Y los alias: la rama exacta también muestra el canónico
+     * aunque el hilo nombre un alias. */
+    pub async fn vinculos_publicados(
+        pool: &PgPool,
+    ) -> Result<Vec<(String, String, Vec<String>)>, sqlx::Error> {
         sqlx::query_as(
-            "SELECT marketplace_id, titulo FROM inmuebles \
+            "SELECT marketplace_id, titulo, alias_titulos FROM inmuebles \
              WHERE publicado = TRUE AND marketplace_id IS NOT NULL",
         )
         .fetch_all(pool)
@@ -230,10 +243,12 @@ impl InmuebleRepository {
 
     /* [08AA-3] B5: 21 params -> struct `ActualizacionInmueble` (ver modelo).
      * El orden de los `.bind` sigue al de las columnas ($1..$18, $19/$20
-     * vínculo exacto, $21 = id).
+     * vínculo exacto, $21 = id, $22 = alias).
      * [09AA-21] `marketplace_id` es tri-estado (`COALESCE` no puede poner
      * NULL): `CASE WHEN $20 THEN $19 ELSE marketplace_id END` — `false` =
-     * no tocar, `true` + NULL = desvincular, `true` + valor = fijar. */
+     * no tocar, `true` + NULL = desvincular, `true` + valor = fijar.
+     * [09AA-24] `alias_titulos` es reemplazo entero (`COALESCE`: `None` = no
+     * tocar, `Some` = fijar la lista, incluso vacía para limpiar). */
     pub async fn update(
         pool: &PgPool,
         id: Uuid,
@@ -264,6 +279,7 @@ impl InmuebleRepository {
                   copy_actualizada_en = COALESCE($17, copy_actualizada_en), \
                   receta = COALESCE($18, receta), \
                   marketplace_id = CASE WHEN $20 THEN $19 ELSE marketplace_id END, \
+                  alias_titulos = COALESCE($22, alias_titulos), \
                   /* [279A-7] Al llegar el dato real se borra su marca «no sé»
                    * de `extras` (el front la borra en local al mismo tiempo).
                    * Quitar una clave ausente es no-op, por eso el ELSE ''. */
@@ -298,6 +314,7 @@ impl InmuebleRepository {
         .bind(mp_valor)
         .bind(mp_fijar)
         .bind(id)
+        .bind(cambios.alias_titulos.clone())
         .fetch_optional(pool)
         .await
     }
