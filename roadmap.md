@@ -27,12 +27,15 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 ## Pendientes
 
 - **09AA-19 — Burbujas estructuradas (pedido por ella 2026-10-09, EN
-  CURSO):** cerrado F0 (09AA-20✓) y F7a+F7c (09AA-21✓) con commit+push
-  (ver `Agente/completados/tareas-2026-10-09.md`): splits exigidos por el
-  gate (`marketplace_estructuradas.rs`, `inmueble_vinculo.rs`; gate final
-  0E/449W, error god-object liquidado); F7b+F1 en lab (implementado+tests
-  verdes, pendiente promocionar en su ventana). Falta: F3 cablear
-  `conversacion` en el handler, F4 retest, F5/F6/F7d.
+  CURSO):** cerrado F0 (09AA-20✓), F7a+F7c (09AA-21✓) y F3 (09AA-22✓) con
+  commit+push (ver `Agente/completados/tareas-2026-10-09.md`): splits
+  exigidos por el gate (`marketplace_estructuradas.rs`,
+  `inmueble_vinculo.rs`); gate 2026-10-09 **0E/448W** sin nuevos atribuibles
+  (bajó 1; `todo-prosa` restantes son falsos positivos sobre
+  `borrar_todo_cache`/`RegenerarTodo` preexistentes); F7b+F1+F6 en lab
+  (código+tests verdes, pendiente promocionar en su ventana). Falta solo
+  vivo: F4 retest (3 filas intactas, 0 corregidas) y F7d (2 avisos), + F5
+  promo lab en su ventana.
 - **09AA-18 — Partir `marketplace_texto.rs` (gate 2026-10-09: 0E/445W,
   `limite-lineas` 738 efectivas > tope 700 + `god-object-rs`; el bloque
   09AA-17 lo empujó por encima del tope):** extraer por dominio

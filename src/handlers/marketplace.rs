@@ -18,19 +18,22 @@ use crate::errors::AppError;
 use crate::middleware::AuthUser;
 use crate::repositories::InmuebleRepository;
 use crate::services::marketplace::{
-    aviso_fb_de_thread, borrar_hilo_no_corregidas, borrar_todo_cache, buscar_cache, clave_hilo,
-    consumir_minuto, corregir_cache, detalle_chat, filas_para_regenerar, formatear_parrafos,
-    guardar_cache, hash_ficha, nombre_de_thread, normalizar_excerpt_hilo, precio_hash_seguro,
-    reemplazar_cache, releer_foto, resumen_chats, resumen_uso, sha_hex, strip_ficha_para_prompt,
-    sub_exento, validar_borrador, BorradorRequest, ExcerptIn, FotoHilo, FALLBACK_BORRADOR,
-    FIRMA_VERSION_V2, SIN_FICHA, STRIP_VERSION,
+    aviso_fb_de_thread, borrar_hilo_no_corregidas, borrar_todo_cache, clave_hilo, consumir_minuto,
+    corregir_cache, detalle_chat, filas_para_regenerar, formatear_parrafos, guardar_cache,
+    hash_ficha, nombre_de_thread, normalizar_excerpt_hilo, precio_hash_seguro, reemplazar_cache,
+    releer_foto, resumen_chats, resumen_uso, sha_hex, strip_ficha_para_prompt, sub_exento,
+    validar_borrador, BorradorRequest, ExcerptIn, FotoHilo, FALLBACK_BORRADOR, FIRMA_VERSION_V2,
+    SIN_FICHA, STRIP_VERSION,
 };
 use crate::AppState;
 
 /* F0 estructuradas/idempotencia vive en `marketplace_estructuradas.rs`
  * (split god-object): aquí solo el wiring para `borrador`/`regenerar`. */
+/* [09AA-22] F3 suma al wiring: verificación de la llave contra hint+firma
+ * + lectura con convivencia v2→v1 (lógica en el módulo, aquí llamadas). */
 use super::marketplace_estructuradas::{
-    clave_idempotencia, con_idempotencia, resolver_fuente, FuenteBorrador,
+    buscar_cache_convivencia, clave_idempotencia, con_idempotencia, resolver_fuente,
+    verificar_idempotencia_conversacion, FuenteBorrador,
 };
 
 /* [08AA-8] Token mp (extractor + emisión) vive en `marketplace_token.rs`
@@ -250,18 +253,29 @@ pub async fn borrador(
     /* [09AA-20] `Idempotency-Key` opcional (422 si es basura) + F0: la
      * estructurada deja `excerpt.texto` renderizado y su firma v2; el texto
      * plano sigue el camino de siempre (`fuente_v1`: limpia excerpt,
-     * conserva el original si solo había ruido, crudo para calibrar). */
+     * conserva el original si solo había ruido, crudo para calibrar).
+     * [09AA-22] F3: la llave se verifica contra hint+firma (422 si es de
+     * otro hilo) y la lectura convive v2→v1 en transición. */
     let clave_idem = clave_idempotencia(&headers)?;
+    let fuente = resolver_fuente(&mut r)?;
+    verificar_idempotencia_conversacion(&r, &fuente, clave_idem.as_ref())?;
     let FuenteBorrador {
         firma_cache,
         firma_version,
         crudo,
-    } = resolver_fuente(&mut r)?;
+        firma_legacy,
+    } = fuente;
     let titulo_fb = aviso_fb_de_thread(r.thread_id.trim());
     let (seguro, precio_hash, catalog_hash, conocido) =
         claves_cache(&state.pool, r.aviso_id.as_deref(), titulo_fb.as_deref()).await?;
-    if let Some((texto, corregida)) =
-        buscar_cache(&state.pool, &firma_cache, &precio_hash, &catalog_hash).await?
+    if let Some((texto, corregida)) = buscar_cache_convivencia(
+        &state.pool,
+        &firma_cache,
+        firma_legacy.as_deref(),
+        &precio_hash,
+        &catalog_hash,
+    )
+    .await?
     {
         /* Hit: el plugin audita `hit`; aquí no se audita nada (el conteo de
          * usos ya subió en la misma sentencia del `UPDATE ... RETURNING`). */
@@ -361,9 +375,11 @@ pub async fn regenerar(
         return Err(AppError::Validation(errores.join("; ")));
     }
     /* [09AA-20] La llave se valida y se devuelve igual que en `borrador`
-     * (aquí no hay vuelo: gesto explícito, la última que escribe gana). */
+     * (aquí no hay vuelo: gesto explícito, la última que escribe gana).
+     * [09AA-22] F3: además se verifica contra hint+firma dentro de
+     * `regenerar_uno` (422 si es de otro hilo). */
     let clave_idem = clave_idempotencia(&headers)?;
-    let resp = regenerar_uno(&state.pool, r.0).await?;
+    let resp = regenerar_uno(&state.pool, r.0, clave_idem.as_ref()).await?;
     let resp = (StatusCode::OK, Json(resp)).into_response();
     Ok(con_idempotencia(resp, clave_idem.as_ref()))
 }
@@ -379,16 +395,22 @@ pub async fn regenerar(
 async fn regenerar_uno(
     pool: &sqlx::PgPool,
     mut r: BorradorRequest,
+    clave: Option<&String>,
 ) -> Result<BorradorResponse, AppError> {
     /* [09AA-20] Fuente compartida con `borrador`: estructurada (firma v2 +
      * excerpt renderizado) o texto plano con su limpieza de siempre.
      * [08AA-16/18] Con contexto del hilo y `clave_hilo()` (ver `fuente_v1`).
-     * [08AA-21] Crudo capturado antes de limpiar (ver `fuente_v1`). */
+     * [08AA-21] Crudo capturado antes de limpiar (ver `fuente_v1`).
+     * [09AA-22] F3: la llave se verifica contra hint+firma (la masiva pasa
+     * `None`: sus filas son plano sin conversacion y no hay nada que atar). */
+    let fuente = resolver_fuente(&mut r)?;
+    verificar_idempotencia_conversacion(&r, &fuente, clave)?;
     let FuenteBorrador {
         firma_cache,
         firma_version,
         crudo,
-    } = resolver_fuente(&mut r)?;
+        firma_legacy: _legacy,
+    } = fuente;
     let titulo_fb = aviso_fb_de_thread(r.thread_id.trim());
     let (seguro, precio_hash, catalog_hash, conocido) =
         claves_cache(pool, r.aviso_id.as_deref(), titulo_fb.as_deref()).await?;
@@ -516,7 +538,7 @@ pub async fn regenerar_todo(
              * excerpt ya normalizado, no burbujas. */
             conversacion: None,
         };
-        let fuente = regenerar_uno(&state.pool, req).await?.fuente;
+        let fuente = regenerar_uno(&state.pool, req, None).await?.fuente;
         detalle.push(RegenerarTodoFila {
             thread_id: f.thread_id.clone(),
             fuente,

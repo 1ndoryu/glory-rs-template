@@ -124,6 +124,12 @@ debug `:426-440`.
 Hilo edgarluis real limpio (cliente + propio, sin sistema, sin URL
 pegada), gate 0E sin nuevos, commit+push, lab promocionado en su
 ventana, 09AA-19 archivada.
+- Estado 2026-10-09 (lab `opencode-propio-dev`, SIN commit ni
+  reinicios por pedido de ella): F6a–F6g implementados en
+  `marketplace-float.ts` (V7) + espejo puro en main + tests escritos
+  (`mpPlace`, seleccionabilidad/ARIA, estados, orden IA-arriba con
+  plantilla intacta). Pendiente: `bun test` (lo corre ella), espejo F2
+  vs globo en lab, promoción en su ventana.
 
 ## F7 — Vínculo exacto por ID de aviso (pedido por ella 2026-10-09)
 Nota: VEF0 NO es código, es precio en 0 (`mpPrice` casa VEF+0). La idea
