@@ -46,7 +46,18 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   arregló. El backend NO verifica la sal (firma-v1 = clave de caché opaca);
   lo que exige es el token (MpAuth). Pendiente: ella prueba Facebook en el
   lab y confirma borrador del núcleo en Logs. Mejora opcional en el lab: marcar en la línea debug qué cocinó
-  cada borrador (núcleo vs local).
+  cada borrador (núcleo vs local). Causa raíz del "sigue la plantilla"
+  (01:35): el float abortaba a los 20s (`AbortSignal.timeout`, log
+  `http=red`) y la IA tarda 13-33s → caía al motor local; el backend sí
+  respondía 200 tarde. Fix SOLO en lab (`marketplace-nucleo.ts`:
+  `NUCLEO_TIMEOUT_MS` 20s→90s; el lab no es git, sin commit) + lab
+  reiniciado (:5174, esta vez con token 10y, equivalente). Gotchas: los Logs
+  son buffer en memoria — reiniciar el vivo los borra (la caché DB
+  sobrevive); `bun dev` sin `OPENCODE_CHANNEL` muere con exit 128/255
+  (`predev`→`git branch`, el lab no es git). Pendiente: ella Regenera en
+  Jorge y espera ~60s; promover el timeout a opencode-propio SOLO cuando
+  ella dé ventana (guardar archivos rompe su app viva); después, fix del
+  scraper (lee chrome, no burbujas).
 - **09AA-7 — Invariante persistencia mensajería (09AA-6 §8.1, siguiente
   bloque ejecutable):** `responder` idempotente + transaccional,
   dead-letter `pending`. NO toca regenerar. Sin empezar hasta cerrar
