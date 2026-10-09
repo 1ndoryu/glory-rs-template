@@ -26,6 +26,12 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 
 ## Pendientes
 
+- **09AA-6 — Auditoría lógica+SOLID en mensajería (pedido por él 2026-10-09,
+  ACTIVA):** 6 subagentes `code-analyst` en paralelo (Z1 pipeline borrador,
+  Z2 texto/excerpt M3, Z3 WhatsApp/transporte, Z4 proveedores IA, Z5 frontend
+  chat, Z6 frontera opencode), luego síntesis y plan de arreglo. Plan:
+  `Agente/planes/plan-auditoria-mensajeria-2026-10-09.md`. Sin editar código
+  hasta la Fase C.
 - **09AA-4 — Regenerar es un solo botón + IA vacía con reintento (pedido por
   ella 2026-10-09, ACTIVA):** su prueba de 09AA-3 falló: al abrir la
   conversación sigue el texto viejo. Causas confirmadas: (1) OpenCode Go
@@ -49,6 +55,18 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
    `"fotos"` en descripción de fotos. Gate: fmt 0 + clippy 0 + test 153/153;
    vivo `9280` binario 23:13 (health OK). Falta: prueba real con JWT
    (`/borrador` → confirmar `fuente=ia`, sin WARN de vacío).
+- **09AA-5 — Tab de Logs del puente (pedido por ella 2026-10-09, ACTIVA):**
+  en algunas conversaciones sigue saliendo la plantilla P1
+  («Hola, buenas noches. Sí, sigue disponible… 43.000$…») en vez de la IA.
+  El log del vivo local solo tiene polling del lab: sus pruebas NO llegan a
+  local (¿está probando en prod, que aún no tiene 09AA-4?). Fix-observabilidad:
+  buffer en memoria (500 eventos) + `GET /api/admin/marketplace/logs`
+  (solo admin; hilos como hash-8, jamás PII) con eventos `borrador.cache`,
+  `borrador.ia` (fuente+latencia+reintento), `ia.vacia` (WARN forma),
+  `ia.reintento_ok`, `regenerar` (borradas+fuente), `regenerar-todo`
+  (resumen); panel con tab «Logs»: tabla Hora|Nivel|Estado|Evento|Mensaje,
+  filtro por nivel, click → modal con detalle (prioridad: error=alta,
+  warn=media, info=baja), auto-refresh 5s + pausa.
 - **09AA-3 — Regenerar-todo + dieta del prompt (pedido por ella 2026-10-09,
   CERRADA pendiente de su prueba):** (1) botón «Regenerar todo» (secondary)
   al lado de Recargar, con confirmación y resumen
