@@ -32,7 +32,9 @@ use super::marketplace_texto::es_hex64;
 /// los alquileres como ventas (testigo: Townhouse Arivana, hilo cristo).
 pub const STRIP_VERSION: &str = "v2";
 /// Fallback exacto cuando no hay ficha o falla la IA.
-pub const FALLBACK_BORRADOR: &str = "Lo reviso y te confirmo precio/entrega por aquí";
+/// [09AA-2] Sin «confirmo»: el prompt prohíbe anunciar confirmaciones y el
+/// texto anterior («te confirmo precio/entrega») minaba ese veto.
+pub const FALLBACK_BORRADOR: &str = "Lo reviso y te escribo el precio por aquí";
 /// [07AA-8] Contacto fijo de los borradores (decisión de ella 2026-10-07):
 /// la IA no lo inventa, el prompt lo exige literal y `asegurar_contacto`
 /// lo agrega si falta. [08AA-14] Sin matriz negativa por decisión de ella
@@ -56,6 +58,222 @@ pub fn asegurar_contacto(texto: &str) -> String {
         t.push_str(CONTACTO_WA);
     }
     t
+}
+
+/// [09AA-2] Fin del bucle del párrafo de relleno (08AA-36/37/38 burlados con
+/// sinónimos): el prompt mismo ORDENABA el relleno («avanza la conversación:
+/// ofrece fotos o pregunta qué busca») y esa orden positiva siempre le ganó
+/// al veto. Ahora la invariante la impone Rust, no el wording: el borrador
+/// de IA sale como P1 + [una línea de dato útil] + CTA canónico + wa.
+/// Cualquier párrafo intermedio con pregunta, oferta de fotos o reafirmación
+/// se poda; el final se reconstruye literal (nunca se conserva el de la IA).
+/// No toca texto manual de la dueña ni la rama `reserva`.
+pub const CTA_FIJO: &str = "Cuéntame qué estás buscando y con gusto te ayudo.";
+
+/// Garantía determinista de forma sobre el texto crudo de la IA.
+#[must_use]
+pub fn imponer_forma_borrador(ia: &str) -> String {
+    let norm = formatear_parrafos(ia);
+    let ps: Vec<String> = norm
+        .split("\n\n")
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    if ps.is_empty() {
+        return borrador_minimo();
+    }
+    /* Ancla final: último párrafo con contacto o CTA (lo que la IA haya
+     * puesto ahí se descarta igual; el final se reconstruye canónico). */
+    let fin = ps
+        .iter()
+        .rposition(|p| {
+            p.contains(CONTACTO_WA) || p.contains(CONTACTO_TEL) || p.contains("qué estás buscando")
+        })
+        .unwrap_or(ps.len() - 1);
+    let p1 = sanear_p1(&ps[0]);
+    if !p1_valido(&p1) {
+        return borrador_minimo();
+    }
+    /* Medios = párrafos entre P1 y el ancla; se conserva como máximo UNA
+     * frase que sea dato útil (respuesta a pregunta concreta no cubierta). */
+    let mut medio: Option<String> = None;
+    for m in ps.iter().skip(1).take(fin.saturating_sub(1)) {
+        for f in partir_frases(m) {
+            if es_dato_util(&f) {
+                medio = Some(f);
+                break;
+            }
+        }
+        if medio.is_some() {
+            break;
+        }
+    }
+    let mut out = vec![p1];
+    if let Some(m) = medio {
+        out.push(m);
+    }
+    out.push(format!(
+        "{CTA_FIJO} Cualquier cosa escríbeme al {CONTACTO_TEL}."
+    ));
+    out.push(CONTACTO_WA.to_string());
+    formatear_parrafos(&out.join("\n\n"))
+}
+
+/// P1 trae disponibilidad o precio (o el fallback): si la IA alucinó otro
+/// texto, se descarta todo y va el mínimo.
+fn p1_valido(p1: &str) -> bool {
+    p1.contains("disponible") || p1.contains('$') || p1.contains(&FALLBACK_BORRADOR[..10])
+}
+
+/// Sanea el primer párrafo a nivel frase: fuera interrogativas (ofertas de
+/// fotos / preguntas pegadas) y frases de relleno que no aporten el dato
+/// central (el cual trae `$`, «disponible» o el fallback y por eso sobrevive).
+fn sanear_p1(p1: &str) -> String {
+    let frases: Vec<String> = partir_frases(p1)
+        .into_iter()
+        .filter(|f| {
+            f.contains("wa.me")
+                || (!f.contains('?')
+                    && !f.contains('¿')
+                    && (!es_relleno(f)
+                        || f.contains('$')
+                        || f.contains("disponible")
+                        || f.contains(&FALLBACK_BORRADOR[..10])))
+        })
+        .collect();
+    let unido = frases.join(" ");
+    unido.chars().take(400).collect()
+}
+
+/// Una frase sobrevive en el medio solo si es dato concreto (dígito o
+/// sustantivo de ficha), sin preguntas, sin contacto y sin relleno.
+fn es_dato_util(frase: &str) -> bool {
+    let t = frase.trim();
+    (3..=140).contains(&t.chars().count())
+        && !t.contains('?')
+        && !t.contains('¿')
+        && !t.contains("wa.me")
+        && !t.contains(CONTACTO_TEL)
+        && !es_relleno(t)
+        && tiene_dato_concreto(t)
+}
+
+/// Relleno por intención (actos de habla), no por frases: ofertas, preguntas,
+/// reafirmaciones de estado/precio y meta-coordinación. En minúsculas.
+fn es_relleno(frase: &str) -> bool {
+    const RELLENO: &[&str] = &[
+        "foto",
+        "compart",
+        "enví",
+        "envi",
+        "interesa",
+        "dispon",
+        "vige",
+        "publica",
+        "precio",
+        "$",
+        "mensual",
+        "canon",
+        "cuesta",
+        "vale",
+        "estatus",
+        "ficha",
+        "negociable",
+        "visita",
+        "coordin",
+        "confirm",
+        "busca",
+        "ayudo",
+        "gusto",
+        "encanta",
+        "oferta",
+        "descuento",
+        "oportunidad",
+        "aprovecha",
+        "anímate",
+        "animate",
+        "escríbeme",
+        "escribeme",
+        "llámame",
+        "llamame",
+        "contáctame",
+        "contactame",
+        "dueña",
+        "duena",
+    ];
+    let min = frase.to_lowercase();
+    RELLENO.iter().any(|r| min.contains(r))
+}
+
+/// Dato concreto = dígito o sustantivo de ficha (baños, m2, ubicación...).
+fn tiene_dato_concreto(frase: &str) -> bool {
+    const DATOS: &[&str] = &[
+        "bañ",
+        "habit",
+        "dormitorio",
+        "m2",
+        "m²",
+        "metro",
+        "terreno",
+        "puesto",
+        "amobl",
+        "ubic",
+        "financ",
+        "cuota",
+        "cocina",
+        "estaciona",
+        "piscina",
+        "pozo",
+        "planta",
+        "sala",
+        "comedor",
+        "vista",
+        "colegio",
+        "centro",
+        "cerca",
+        "villa",
+        "residenc",
+    ];
+    if frase.chars().any(|c| c.is_ascii_digit()) {
+        return true;
+    }
+    let min = frase.to_lowercase();
+    DATOS.iter().any(|d| min.contains(d))
+}
+
+/// Parte en frases por `.`/`?`/`!`/salto; el punto entre dígitos ($43.000)
+/// no parte para no romper cifras.
+fn partir_frases(t: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut act = String::new();
+    let mut it = t.chars().peekable();
+    while let Some(c) = it.next() {
+        act.push(c);
+        let corta = match c {
+            '?' | '!' | '\n' => true,
+            '.' => !matches!(it.peek(), Some(n) if n.is_ascii_digit()),
+            _ => false,
+        };
+        if corta {
+            let f = act.trim().to_string();
+            if !f.is_empty() {
+                out.push(f);
+            }
+            act.clear();
+        }
+    }
+    let f = act.trim().to_string();
+    if !f.is_empty() {
+        out.push(f);
+    }
+    out
+}
+
+/// Mínimo servible cuando la IA devolvió basura: fallback + contacto + wa.
+fn borrador_minimo() -> String {
+    formatear_parrafos(&format!(
+        "{FALLBACK_BORRADOR}\nCualquier cosa escríbeme al {CONTACTO_TEL}.\n{CONTACTO_WA}"
+    ))
 }
 
 /// [08AA-11] Párrafos coherentes para el borrador que se copia a
@@ -1886,5 +2104,72 @@ mod pruebas {
         let fila = filas.iter().find(|f| f.dia == hoy).expect("fila de hoy");
         assert!(fila.hit >= 2, "hit={}", fila.hit);
         assert!(fila.copiar >= 1, "copiar={}", fila.copiar);
+    }
+
+    /* [09AA-2] La forma del borrador la impone Rust: batería de regresión
+     * con los testigos reales (fotos, «sigue vigente», baños). */
+    fn ia_fabio(medio: &str) -> String {
+        format!(
+            "Hola, Fabio, buenas noches, la Casa en Riberas del Caroní está disponible en $43.000 negociable.\n\n{medio}\n\nCuéntame qué estás buscando y con gusto te ayudo, cualquier cosa escríbeme al 0424 9208855\nhttps://wa.me/584249208855"
+        )
+    }
+
+    #[test]
+    fn forma_poda_oferta_de_fotos() {
+        let r =
+            imponer_forma_borrador(&ia_fabio("¿Te comparto fotos para que la veas por dentro?"));
+        assert!(!r.contains("fotos"), "{r}");
+        assert!(!r.contains('?'), "{r}");
+        assert!(r.contains("$43.000"), "{r}");
+        assert!(r.contains(CTA_FIJO), "{r}");
+        assert!(r.trim_end().ends_with(CONTACTO_WA), "{r}");
+    }
+
+    #[test]
+    fn forma_poda_sinonimo_vigente() {
+        let r = imponer_forma_borrador(&ia_fabio("Sí, la publicación sigue vigente."));
+        assert!(!r.contains("vigente"), "{r}");
+        assert!(!r.contains("publicación"), "{r}");
+        /* P1 + CTA + teléfono + wa (el teléfono va en bloque propio). */
+        assert_eq!(r.split("\n\n").count(), 4, "{r}");
+    }
+
+    #[test]
+    fn forma_conserva_dato_banos() {
+        let r = imponer_forma_borrador(&ia_fabio("Tiene 2 baños y 3 habitaciones."));
+        assert!(r.contains("Tiene 2 baños y 3 habitaciones."), "{r}");
+        /* P1 + dato + CTA + teléfono + wa. */
+        assert_eq!(r.split("\n\n").count(), 5, "{r}");
+    }
+
+    #[test]
+    fn forma_sanea_pregunta_pegada_en_p1() {
+        let ia = "Hola, Fabio, ¿Te comparto fotos? La Casa en Riberas del Caroní está disponible en $43.000 negociable.\n\nCuéntame qué estás buscando y con gusto te ayudo.";
+        let r = imponer_forma_borrador(ia);
+        assert!(!r.contains('?'), "{r}");
+        assert!(r.contains("$43.000"), "{r}");
+    }
+
+    #[test]
+    fn forma_p1_invalido_da_minimo() {
+        let r = imponer_forma_borrador("¿Te comparto fotos para que la veas?");
+        assert!(r.contains(&FALLBACK_BORRADOR[..10]), "{r}");
+        assert!(r.trim_end().ends_with(CONTACTO_WA), "{r}");
+    }
+
+    #[test]
+    fn forma_final_siempre_canonico() {
+        let r = imponer_forma_borrador(&ia_fabio("Tiene 2 baños."));
+        assert!(
+            r.contains("Cualquier cosa escríbeme al 0424 9208855"),
+            "{r}"
+        );
+        assert!(r.trim_end().ends_with(CONTACTO_WA), "{r}");
+    }
+
+    #[test]
+    fn forma_partir_no_rompe_cifras() {
+        let f = partir_frases("Cuesta $43.000 negociable. Tiene 2 baños.");
+        assert!(f.iter().any(|x| x.contains("$43.000")), "{f:?}");
     }
 }

@@ -532,12 +532,21 @@ async fn generar_borrador(
      * «Sí, la publicación sigue vigente» burló la lista de frases de 08AA-37
      * con un sinónimo — fila sicilia v1, borrada en la limpieza 20:44).
      * Ahora: lógica condicional (pregunta ya respondida arriba → avanzar,
-     * no responder) + veto por PALABRAS, no por frases. */
+     * no responder) + veto por PALABRAS, no por frases.
+     * [09AA-2] Raíz del bucle (4 subagentes 2026-10-09): el prompt mismo
+     * ORDENABA el relleno («avanza la conversación: ofrece fotos o pregunta
+     * qué busca») y esa orden positiva siempre le ganó al veto; además
+     * «máximo 3» + 3 roles obligatorios se leía como «exactamente 3», y los
+     * comentarios [08AA-*] nunca viajan al modelo. Ahora: formato de DOS
+     * bloques + excepción de una línea, y la invariante la impone
+     * `imponer_forma_borrador` en Rust aunque el modelo desobedezca. */
     let (saludo, regla_nombre) = saludo_y_regla(&r.thread_id);
     let sistema = format!(
         "Eres el asistente de MN Inmobiliaria respondiendo en Marketplace. \
-         Tono {tono}, BREVE: máximo 3 párrafos cortos, cada uno en su \
-         párrafo separado por una línea en blanco (nada de líneas sueltas). \
+         Tono {tono}, BREVE: el mensaje son DOS párrafos (primero + final) \
+         y, solo si aplica la excepción de abajo, UNA línea intermedia; \
+         cada bloque va en su párrafo separado por una línea en blanco \
+         (nada de líneas sueltas). \
          Datos del inmueble: {datos}. \
          Aviso en Facebook: {aviso}. \
          Hora del mensaje: {hora}: saluda con buenos días, buenas tardes o \
@@ -556,19 +565,20 @@ async fn generar_borrador(
           aviso (si los datos traen «operacion»:«alquiler» es un ALQUILER: \
           la cifra es el canon mensual —«$1.500 mensuales»—, jamás hables \
           de venta ni uses la palabra «negociable»; si trae «venta», la \
-          cifra va seguida siempre de la palabra «negociable»); segundo párrafo \
-          = responde la última pregunta del Cliente en UNA línea; PERO si la \
-          pregunta es si sigue disponible o cuál es el precio (datos ya dados \
-          en el primer párrafo), no la respondas: avanza la conversación \
-          (ofrece fotos o pregunta qué busca). En este párrafo están \
-          prohibidas las palabras disponible, vigente, vigencia, publicado, \
-          publicación, precio, estatus, ficha y cualquier cifra: jamás \
-          reafirmes con sinónimos lo que el primer párrafo ya dijo; \
-          tercer párrafo = invítalo a \
-         contarte qué busca para ayudarlo (cálido, p. ej. \
-         «Cuéntame qué estás buscando y con gusto te ayudo») e incluye \
-         siempre «cualquier cosa escríbeme al {CONTACTO_TEL}»; cierra \
-         siempre con {CONTACTO_WA}. \
+          cifra va seguida siempre de la palabra «negociable»); segundo bloque \
+          = párrafo final con este texto literal, sin cambiar ni una palabra: \
+          «Cuéntame qué estás buscando y con gusto te ayudo. Cualquier cosa \
+          escríbeme al {CONTACTO_TEL}» y en línea aparte {CONTACTO_WA}. \
+          Excepción: un párrafo intermedio de UNA sola línea (máximo 140 \
+          caracteres, sin signos ? ni ¿) SOLO si la última pregunta del \
+          Cliente pide un dato concreto no dicho en el primer párrafo \
+          (baños, habitaciones, m2, ubicación). Si pregunta si sigue \
+          disponible, cuál es el precio, o no hay pregunta concreta, OMITE \
+          el párrafo por completo: no lo sustituyas con transición, oferta \
+          de fotos ni pregunta alguna. Prohibido en todo el texto, salvo el \
+          párrafo final: los signos ? y ¿, ofrecer o mencionar fotos, \
+          preguntar qué busca o si le interesa, y reafirmar disponibilidad o \
+          precio con cualquier palabra; \
           Reglas: jamás inventes teléfono, email, dirección ni cifras fuera \
           de los datos y el aviso; jamás prometas visitas ni coordinación \
            («puedes visitarla», «te coordinamos»): la disponibilidad real \
@@ -593,8 +603,13 @@ async fn generar_borrador(
             };
         }
     };
+    /* [09AA-2] La invariante de forma la impone Rust: el texto de la IA
+     * pasa por `imponer_forma_borrador` (poda de relleno + final canónico)
+     * antes de garantizar el contacto. */
     Generado {
-        texto: formatear_parrafos(&crate::services::marketplace::asegurar_contacto(&texto)),
+        texto: formatear_parrafos(&crate::services::marketplace::asegurar_contacto(
+            &crate::services::marketplace::imponer_forma_borrador(&formatear_parrafos(&texto)),
+        )),
         fuente: "ia".to_string(),
     }
 }
