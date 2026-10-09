@@ -28,7 +28,7 @@ function textoSinMarca(linea: string): string {
 }
 
 export function ChatsMarketplace() {
-  const { lista, seleccion, error, recargar, elegir } = useChatsMarketplace();
+  const { lista, seleccion, error, recargar, elegir, limpiar } = useChatsMarketplace();
 
   return (
     <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
@@ -63,9 +63,13 @@ export function ChatsMarketplace() {
             </li>
           )}
         </ul>
-        <div className="mt-2">
+        <div className="mt-2 flex gap-2">
           <Button variant="outline" size="sm" onClick={() => void recargar()}>
             Recargar
+          </Button>
+          {/* [08AA-39] Limpieza total al lado de Recargar, con confirmación. */}
+          <Button variant="destructive" size="sm" onClick={() => void limpiar()}>
+            Limpiar
           </Button>
         </div>
       </section>

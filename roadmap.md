@@ -26,6 +26,38 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 
 ## Pendientes
 
+- **08AA-39 — Botón Limpiar chats (pedido por ella 2026-10-08, ACTIVA):**
+  botón «Limpiar» (destructive) al lado de «Recargar», con confirmación;
+  `DELETE /api/admin/marketplace/chats` (solo admin) → `borrar_todo_cache`
+  (`DELETE FROM mp_respuestas_cache`, responde `{"borrados": n}`). Gotcha:
+  mi `oldString` coincidió con la cola de `registrar_token` (`Ok(jti)` →
+  `Ok(())`, E0308) + import `delete` sobraba (método de `MethodRouter`).
+- **09AA-1 — Publicar Loma Linda + mejorar fotos (pedido por ella 2026-10-09,
+  ACTIVA):** plan en `Agente/planes/plan-loma-linda-2026-10-09.md`. Casa en
+  venta en Loma Linda (hilo +52 sesión `cea7a25d`, descripción + 13 fotos
+  únicas tras dedup de 15 por sha). F1 HECHA: slug
+  `casa-en-venta-en-loma-linda`, 13 originales + publicado en local+prod
+  (`estado` exit 0). F2 BLOQUEADA esperando a ella: cookie Gemini caducada
+  (`UNAUTHENTICATED`, fallosSeguidos=3) → lanzar acceso directo
+  "Chrome-Horacio-debug" y esperar AVAILABLE; al volver se re-lanza
+  `mejorar --slug` y sigue solo.
+- **08AA-38 — 2º párrafo: regla estructural + veto por palabras (reportado
+  por ella 2026-10-08, ACTIVA):** «Sí, la publicación sigue vigente»
+  burló la lista de frases de 08AA-37 con un sinónimo. El 2º párrafo ahora
+  es condicional (pregunta ya respondida arriba → avanzar, no responder) +
+  veto por palabras (disponible, vigente, publicado, precio, estatus,
+  ficha, cifras). Commit `2df97c16` (origin+template); vivo nuevo con
+  binario 21:00. Sus 2 filas (sicilia/melisa 20:49) SÍ se guardaron —
+  el «no apareció» fue mi limpieza 20:44 + timing.
+- **08AA-37 — Borrador: nombre mal + 2º párrafo repite (reportado por ella
+  2026-10-08 con mensaje pegado, ACTIVA):** con hilo `marializ|...` saludó
+  «Ordaz» (tomó apellido/lugar del excerpt) y el 2º párrafo repitió lo del
+  1º («Sí, se mantiene publicada en venta al momento»). Fix en
+  `handlers/marketplace.rs` (`saludo_y_regla`: nombre del hilo único válido;
+  2º párrafo jamás reafirma disponibilidad/precio ni usa «publicada»/
+  «estatus»/«ficha»). Gate: fmt 0 + clippy 0 + test 143/143. Commit
+  `ced4cc2d` (origin+template). Vivo `29332` con binario 20:43; chats
+  limpiados (0) para que pruebe.
 - **08AA-36 — Borrador repite "confirmo con la dueña" (reportado por ella
   2026-10-08 con mensaje pegado, ACTIVA):** el prompt ordenaba "di solo que
   está disponible y que lo confirmas con ella" (`marketplace.rs`, testigo:

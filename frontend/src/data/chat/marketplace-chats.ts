@@ -29,3 +29,8 @@ export function listarChats(): Promise<ChatResumen[]> {
 export function leerChat(thread: string): Promise<ChatFila[]> {
   return apiFetch<ChatFila[]>(`/api/admin/marketplace/chats/${encodeURIComponent(thread)}`);
 }
+
+/* [08AA-39] Limpieza total del panel: borra toda la caché de borradores. */
+export function limpiarChats(): Promise<{ borrados: number }> {
+  return apiFetch<{ borrados: number }>('/api/admin/marketplace/chats', { method: 'DELETE' });
+}

@@ -2,7 +2,7 @@
 // El hilo es la clave de ventana del puente (trae nombre+aviso: solo-admin).
 
 import { useCallback, useEffect, useState } from 'react';
-import { leerChat, listarChats, type ChatFila, type ChatResumen } from '../../data/chat/marketplace-chats';
+import { leerChat, limpiarChats, listarChats, type ChatFila, type ChatResumen } from '../../data/chat/marketplace-chats';
 import { ErrorApi } from '../../data/inmuebles/api';
 
 export interface DetalleChat {
@@ -46,5 +46,18 @@ export function useChatsMarketplace() {
     }
   }, []);
 
-  return { lista, seleccion, error, recargar, elegir };
+  /* [08AA-39] Limpieza total con confirmación: vacía caché + panel. */
+  const limpiar = useCallback(async () => {
+    if (!window.confirm('¿Borrar todos los chats y borradores? No se puede deshacer.')) return;
+    try {
+      await limpiarChats();
+      setLista([]);
+      setSeleccion(null);
+      setError(null);
+    } catch (e: unknown) {
+      setError(e instanceof ErrorApi ? e.message : 'Fallo inesperado.');
+    }
+  }, []);
+
+  return { lista, seleccion, error, recargar, elegir, limpiar };
 }

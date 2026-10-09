@@ -548,6 +548,16 @@ pub async fn registrar_token(
     Ok(jti)
 }
 
+/// [08AA-39] Limpieza total del panel: borra TODAS las filas de caché de una
+/// vez (la dueña lo pidió como botón al lado de «Recargar» para no depender
+/// de limpiezas manuales por SQL). Devuelve cuántas filas cayeron.
+pub async fn borrar_todo_cache(pool: &sqlx::PgPool) -> Result<u64, AppError> {
+    let r = sqlx::query("DELETE FROM mp_respuestas_cache")
+        .execute(pool)
+        .await?;
+    Ok(r.rows_affected())
+}
+
 /// Fila del dashboard M2: conteos por día y evento. Sin PII: el HMAC del hilo
 /// jamás sale, solo día + evento + conteo.
 #[derive(Debug, Clone, Serialize, ToSchema)]

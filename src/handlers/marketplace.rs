@@ -18,8 +18,8 @@ use crate::errors::AppError;
 use crate::middleware::AuthUser;
 use crate::repositories::InmuebleRepository;
 use crate::services::marketplace::{
-    aviso_fb_de_thread, borrar_cache, buscar_cache, clave_hilo, consumir_minuto, corregir_cache,
-    detalle_chat, formatear_parrafos, guardar_cache, hash_ficha, nombre_de_thread,
+    aviso_fb_de_thread, borrar_cache, borrar_todo_cache, buscar_cache, clave_hilo, consumir_minuto,
+    corregir_cache, detalle_chat, formatear_parrafos, guardar_cache, hash_ficha, nombre_de_thread,
     normalizar_excerpt_hilo, precio_hash_seguro, reemplazar_cache, releer_foto, resumen_chats,
     resumen_uso, strip_ficha_para_prompt, sub_exento, validar_borrador, BorradorRequest, FotoHilo,
     FALLBACK_BORRADOR, SIN_FICHA, STRIP_VERSION,
@@ -672,7 +672,7 @@ pub fn routes() -> Router<AppState> {
         .route("/marketplace/corregir", post(corregir))
         .route("/marketplace/audit", post(audit))
         .route("/marketplace/uso", get(uso))
-        .route("/marketplace/chats", get(chats))
+        .route("/marketplace/chats", get(chats).delete(borrar_todo))
         .route("/marketplace/chats/:thread", get(chat_detalle))
 }
 
@@ -735,4 +735,21 @@ pub async fn chat_detalle(
     }
     let filas = detalle_chat(&state.pool, hilo).await?;
     Ok((StatusCode::OK, Json(filas)).into_response())
+}
+
+/// [08AA-39] Limpieza total del panel: borra toda la caché de borradores.
+/// Solo JWT admin. Responde cuántas filas cayeron.
+#[utoipa::path(
+    delete,
+    path = "/api/admin/marketplace/chats",
+    responses(
+        (status = 200, description = "Caché limpiada")
+    )
+)]
+pub async fn borrar_todo(
+    State(state): State<AppState>,
+    _auth: AuthUser,
+) -> Result<Response, AppError> {
+    let n = borrar_todo_cache(&state.pool).await?;
+    Ok((StatusCode::OK, Json(serde_json::json!({"borrados": n}))).into_response())
 }
