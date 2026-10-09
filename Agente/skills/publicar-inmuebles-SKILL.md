@@ -74,8 +74,24 @@ propio CLI abre el Chrome dedicado (`chrome.exe --remote-debugging-port=9223
 `node frontend/scripts/renovar-cookies.mjs`. Códigos: 0 seguir sin
 molestar; 2/3/4 → decirle a ella qué hacer (abrir acceso / iniciar sesión /
 revisar cuenta). OJO: `listo:true` no garantiza sesión viva — si el worker
-falla con `UNAUTHENTICATED`, se renueva igual y se reintenta. Las ORIGINALES
+falla con `UNAUTHENTICATED` (ver `frontend/logs/eventos-<fecha>.log`,
+`fallosSeguidos>0`, `procesadosHoy=0`), se renueva igual y se reintenta.
+Si el acceso directo del escritorio no existe, el comando documentado
+equivale a lanzarlo (el perfil dedicado ya trae la sesión; el script es
+autónomo dado el CDP y termina con `AVAILABLE`; exit 3 = falta login
+manual de ella). Las ORIGINALES
 siempre se publican primero; la mejora nunca bloquea la publicación.
+
+Gotchas 09AA-1 (verificados): tras renovar cookies, la bomba puede seguir
+dormida hasta ~35 min — el `bombear` en curso ya calculó su espera con el
+backoff previo (2m×2^(fallos-1), 5 fallos ≈ 34 min) y los `void bombear()`
+nuevos vuelven por el guard `procesando`. No esperes: reinicia el `:3122`
+(la cola es solo memoria; si nada se procesó, nada se pierde), fija ritmo
+rápido con `POST /api/config {"intervaloSeg":30,"jitterPct":10}` (mínimo
+30 s, en memoria; ~1 min/foto; si sube `fallosSeguidos`, vuelve a 60 s) y
+relanza `mejorar --slug` (no duplica por foto: 13 fotos en ~15 min).
+`verificar` puede dar un `ERROR-DESCARGA` transitorio: reintenta una vez
+antes de concluir.
 
 Gotchas vencidos (08AA-27, verificados): lo que devuelve Gemini no siempre es
 PNG decodificable aunque traiga esa magia — el CLI normaliza TODO a JPG con
