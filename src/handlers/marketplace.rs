@@ -34,6 +34,8 @@ use super::marketplace_token::limite;
 pub use super::marketplace_token::{
     emitir_token, emitir_token_cli, CliTokenRequest, MpAuth, TokenResponse,
 };
+/* [09AA-5] Buffer de eventos del puente para la tab de Logs (sin PII). */
+use super::mp_logs::{hilo8, mp_log, LogNivel};
 
 const TOPE_BORRADOR_MINUTO: i64 = 30;
 
@@ -122,6 +124,42 @@ async fn claves_por_titulo(
 /// stripea (sin ficha → no se afirma precio), consulta la caché (hit → sin
 /// gastar IA) y si es miss genera con singleflight (un doble clic = una IA)
 /// y guarda. Solo se cachea `fuente=ia`; el fallback nunca (ver M4).
+/* [09AA-5] Eventos para la tab de Logs, fuera de `borrador` (tope 100
+ * líneas): un hit viejo aquí explica la «plantilla fantasma» (texto de otra
+ * época servido como fresco). Sin PII: solo hash-8 del hilo. */
+fn log_borrador_cache(thread_id: &str, corregida: bool) {
+    mp_log(
+        LogNivel::Info,
+        "borrador.cache",
+        "cache",
+        format!(
+            "hit de caché (firma conocida{})",
+            if corregida {
+                ", corrección de la dueña"
+            } else {
+                ""
+            }
+        ),
+        &[
+            ("hilo", serde_json::json!(hilo8(thread_id))),
+            ("corregida", serde_json::json!(corregida)),
+        ],
+    );
+}
+
+fn log_borrador_ia(thread_id: &str, fuente: &str, latencia_ms: u64, conocido: bool) {
+    mp_log(
+        LogNivel::Info,
+        "borrador.ia",
+        fuente,
+        format!("pasada generada en {latencia_ms} ms (aviso conocido: {conocido})"),
+        &[
+            ("hilo", serde_json::json!(hilo8(thread_id))),
+            ("latencia_ms", serde_json::json!(latencia_ms)),
+            ("aviso_conocido", serde_json::json!(conocido)),
+        ],
+    );
+}
 #[utoipa::path(
     post,
     path = "/api/admin/marketplace/borrador",
@@ -173,6 +211,7 @@ pub async fn borrador(
     {
         /* Hit: el plugin audita `hit`; aquí no se audita nada (el conteo de
          * usos ya subió en la misma sentencia del `UPDATE ... RETURNING`). */
+        log_borrador_cache(r.thread_id.trim(), corregida);
         return Ok((
             StatusCode::OK,
             Json(BorradorResponse {
@@ -187,12 +226,23 @@ pub async fn borrador(
     }
     /* Miss (el plugin audita `miss`): una sola IA por clave en vuelo. */
     let clave_vuelo = format!("{}:{precio_hash}:{catalog_hash}", r.firma);
+    /* [09AA-5] Latencia real de la pasada para la tab de Logs. */
+    let inicio = std::time::Instant::now();
     let gen = state
         .mp_vuelo
         .ejecutar(&clave_vuelo, || {
             generar_borrador(&r, seguro.as_ref(), &state.pool)
         })
         .await;
+    /* `u128` sin cast: `serde_json` no lo representa; si algún día no
+     * cupiera en `u64`, se satura en vez de envolver. */
+    let latencia_ms = u64::try_from(inicio.elapsed().as_millis()).unwrap_or(u64::MAX);
+    log_borrador_ia(
+        r.thread_id.trim(),
+        gen.fuente.as_str(),
+        latencia_ms,
+        conocido,
+    );
     if gen.fuente == "ia" {
         let foto = FotoHilo {
             thread_id: r.thread_id.trim(),
@@ -284,10 +334,26 @@ async fn regenerar_uno(
      * `clave_hilo()` es idempotente (ver `guardar_cache`), así que vale
      * tanto el `thread_id` crudo del flotante como el ya guardado que
      * trae `regenerar_todo`. Las correcciones de la dueña quedan. */
-    borrar_hilo_no_corregidas(pool, &clave_hilo(r.thread_id.trim())).await?;
+    let borradas = borrar_hilo_no_corregidas(pool, &clave_hilo(r.thread_id.trim())).await?;
     /* Bypass: directo a la IA, sin vuelo (Regenerar es gesto explícito; si
      * dos llegan juntas, la última que escribe gana por `reemplazar`). */
     let gen = generar_borrador(&r, seguro.as_ref(), pool).await;
+    /* [09AA-5] Evento para la tab de Logs: si esto dice `ia` y el panel
+     * sigue mostrando lo viejo, el problema está del otro lado (caché del
+     * front o el puente local). */
+    mp_log(
+        LogNivel::Info,
+        "regenerar",
+        gen.fuente.as_str(),
+        format!(
+            "regeneración directa: {borradas} filas viejas borradas (aviso conocido: {conocido})"
+        ),
+        &[
+            ("hilo", serde_json::json!(hilo8(r.thread_id.trim()))),
+            ("borradas", serde_json::json!(borradas)),
+            ("aviso_conocido", serde_json::json!(conocido)),
+        ],
+    );
     if gen.fuente == "ia" {
         let foto = FotoHilo {
             thread_id: r.thread_id.trim(),
@@ -394,17 +460,30 @@ pub async fn regenerar_todo(
     let cuenta = |fuente: &str| {
         i64::try_from(detalle.iter().filter(|d| d.fuente == fuente).count()).unwrap_or(i64::MAX)
     };
-    Ok((
-        StatusCode::OK,
-        Json(RegenerarTodoResponse {
-            candidatos: i64::try_from(detalle.len()).unwrap_or(i64::MAX),
-            regenerados: cuenta("ia"),
-            en_reserva: cuenta("reserva"),
-            omitidos: cuenta("omitido"),
-            detalle,
-        }),
-    )
-        .into_response())
+    let respuesta = RegenerarTodoResponse {
+        candidatos: i64::try_from(detalle.len()).unwrap_or(i64::MAX),
+        regenerados: cuenta("ia"),
+        en_reserva: cuenta("reserva"),
+        omitidos: cuenta("omitido"),
+        detalle,
+    };
+    /* [09AA-5] Resumen a la tab de Logs. */
+    mp_log(
+        LogNivel::Info,
+        "regenerar-todo",
+        "ok",
+        format!(
+            "masiva: {} regenerados de {} ({} sin fresco, {} omitidos)",
+            respuesta.regenerados, respuesta.candidatos, respuesta.en_reserva, respuesta.omitidos
+        ),
+        &[
+            ("candidatos", serde_json::json!(respuesta.candidatos)),
+            ("regenerados", serde_json::json!(respuesta.regenerados)),
+            ("en_reserva", serde_json::json!(respuesta.en_reserva)),
+            ("omitidos", serde_json::json!(respuesta.omitidos)),
+        ],
+    );
+    Ok((StatusCode::OK, Json(respuesta)).into_response())
 }
 
 #[derive(Debug, Clone, Deserialize, ToSchema)]
@@ -800,6 +879,8 @@ pub fn routes() -> Router<AppState> {
         .route("/marketplace/uso", get(uso))
         .route("/marketplace/chats", get(chats).delete(borrar_todo))
         .route("/marketplace/chats/:thread", get(chat_detalle))
+        /* [09AA-5] Tab de Logs: eventos del puente, recientes-primero. */
+        .route("/marketplace/logs", get(super::mp_logs::logs))
 }
 
 /// [03AA-3 M2] Dashboard agregado para el panel: conteos por día y evento de

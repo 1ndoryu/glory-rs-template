@@ -2,7 +2,9 @@
 // (conversación + borradores + usos + vigencia) y detalle con la foto de
 // la conversación (`excerpt_texto`) al lado del texto guardado.
 
+import { useState } from 'react';
 import { useChatsMarketplace } from './use-chats-marketplace';
+import { LogsMarketplace } from './logs-marketplace';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
@@ -29,8 +31,23 @@ function textoSinMarca(linea: string): string {
 
 export function ChatsMarketplace() {
   const { lista, seleccion, error, recargar, elegir, regenerando, resumenRegen, regenerarTodoPanel } = useChatsMarketplace();
+  /* [09AA-5] Tab de Logs: qué hizo el puente (caché/IA/fallback) por cada
+   * borrador, para cazar la «plantilla fantasma» sin leer el log de texto. */
+  const [tab, setTab] = useState<'chats' | 'logs'>('chats');
 
   return (
+    <div className="grid gap-4">
+      <div className="flex gap-2">
+        <Button variant={tab === 'chats' ? 'default' : 'outline'} size="sm" onClick={() => setTab('chats')}>
+          Chats
+        </Button>
+        <Button variant={tab === 'logs' ? 'default' : 'outline'} size="sm" onClick={() => setTab('logs')}>
+          Logs
+        </Button>
+      </div>
+      {tab === 'logs' ? (
+        <LogsMarketplace />
+      ) : (
     <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
       {error && (
         <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive md:col-span-2">
@@ -138,6 +155,8 @@ export function ChatsMarketplace() {
           </p>
         )}
       </section>
+    </div>
+      )}
     </div>
   );
 }

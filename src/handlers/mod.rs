@@ -15,6 +15,7 @@ mod ia_proveedores; // [08AA-8] split god-object: GloryAPI+OpenCode+Groq STT
 mod inmuebles;
 pub mod marketplace;
 pub(crate) mod marketplace_token; // [08AA-8] split límite 500: extractor `MpAuth` + emisión panel/CLI
+pub(crate) mod mp_logs; // [09AA-5] split: buffer de eventos + `GET /marketplace/logs`
 mod notes;
 mod public;
 mod rate_limit;
@@ -98,6 +99,7 @@ impl utoipa::Modify for SecurityAddon {
         marketplace::borrador,
         marketplace::regenerar,
         marketplace::regenerar_todo,
+        mp_logs::logs,
         marketplace::corregir,
         marketplace::audit,
         marketplace::uso,
@@ -147,6 +149,9 @@ impl utoipa::Modify for SecurityAddon {
         crate::services::marketplace::Largo,
         crate::handlers::marketplace_token::TokenResponse,
         crate::handlers::marketplace::BorradorResponse,
+        crate::handlers::mp_logs::LogEvento,
+        crate::handlers::mp_logs::LogNivel,
+        crate::handlers::mp_logs::LogsResponse,
         crate::handlers::marketplace::AuditIn,
         crate::handlers::marketplace::EventoAudit,
         crate::handlers::marketplace_token::CliTokenRequest,

@@ -11,6 +11,8 @@ use std::time::Duration;
 use crate::errors::AppError;
 
 use super::ia::{glory_base, leer_env, MAX_FOTOS};
+/* [09AA-5] Eventos de la tab de Logs (sin PII). */
+use super::mp_logs::{mp_log, LogNivel};
 
 fn cliente_http(segs: u64) -> Result<reqwest::Client, AppError> {
     reqwest::Client::builder()
@@ -263,6 +265,28 @@ pub(crate) async fn completar_opencode(
     if texto_ia.is_none() {
         respuesta = llamar_opencode(&config, &entrada, &cliente, TOPE_BORRADOR, sesion).await?;
         texto_ia = glory_agent::providers::extract_first_text(&respuesta);
+        /* [09AA-5] Lo que hizo el reintento queda en la tab de Logs (el
+         * WARN de abajo sigue yendo además al log de texto del vivo). */
+        if texto_ia.is_some() {
+            mp_log(
+                LogNivel::Info,
+                "ia.reintento_ok",
+                "ia",
+                "el reintento trajo texto; se usa la IA".to_string(),
+                &[("modelo", serde_json::json!(config.model))],
+            );
+        } else {
+            mp_log(
+                LogNivel::Warn,
+                "ia.vacia",
+                "fallback",
+                format!(
+                    "OpenCode Go vacío tras reintento ({}); va fallback",
+                    diagnostico_respuesta_vacia(&respuesta)
+                ),
+                &[("modelo", serde_json::json!(config.model))],
+            );
+        }
     }
     texto_ia.map(|t| (t, config.model.clone())).ok_or_else(|| {
         tracing::warn!(
