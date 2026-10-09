@@ -19,7 +19,9 @@ use crate::AppState;
  * `ia_proveedores.rs` (split god-object). Re-export `pub(crate)` para
  * `marketplace`/`turno`; el resto para rutas y tests (`super::*`). */
 pub(super) use super::ia_proveedores::{completar_glory, ping_glory, ping_opencode};
-pub(crate) use super::ia_proveedores::{completar_opencode, describir_foto, transcribir_audio};
+pub(crate) use super::ia_proveedores::{
+    completar_opencode, completar_opencode_rapido, describir_foto, transcribir_audio,
+};
 /* Solo tests (`super::transcribir_audio_con`): fuera de `cfg(test)` sería
  * import sin uso y rompería `clippy -D warnings`. */
 #[cfg(test)]

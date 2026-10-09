@@ -773,7 +773,10 @@ async fn generar_borrador(
      * exige `x-opencode-session` y premia la estabilidad con ruteo afin y
      * prompt caching. */
     let sesion_hilo = sha_hex(&clave_hilo(r.thread_id.trim()));
-    let texto = match crate::handlers::ia::completar_opencode(
+    /* [09AA-15] Vía rápida sin razonamiento (pedido de ella por los 75 s):
+     * si no trae texto cae sola a la estándar; la forma la sigue
+     * imponiendo `imponer_forma_borrador` abajo. */
+    let texto = match crate::handlers::ia::completar_opencode_rapido(
         &sistema,
         &r.excerpt.texto,
         &[],

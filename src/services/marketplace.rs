@@ -1454,6 +1454,26 @@ mod pruebas {
     }
 
     #[test]
+    fn normalizar_hilo_edickson_pela_chrome_nuevo() {
+        /* [09AA-16] Testigo exacto en BD (`edickson|VEF0 casa en venta en
+         * riberas del caroní, puerto ordaz`, `length(excerpt_texto)=137`):
+         * chrome nuevo del visor — eco del título con cabeza cortada
+         * (`n · Casa...`), `Se unió a Facebook en 2010`, cola huérfana
+         * `del comprador` y etiqueta `Comprador`. Solo la pregunta del
+         * cliente sobrevive. */
+        let hilo = "edickson|VEF0 casa en venta en riberas del caroní, puerto ordaz";
+        let crudo = "n · Casa en venta en Riberas del Caroní, Puerto Ordaz\n\
+            Se unió a Facebook en 2010\n\
+            del comprador\n\
+            Comprador\n\
+            Hola. ¿Sigue estando disponible?";
+        assert_eq!(
+            normalizar_excerpt_hilo(hilo, crudo),
+            "Hola. ¿Sigue estando disponible?"
+        );
+    }
+
+    #[test]
     fn normalizar_hilo_tina_limpia_cola_y_marcas() {
         /* [08AA-16] Testigo exacto en BD (`tina|VEF0 casa en venta en
          * riberas del caroní, puerto ordaz`): el float cortó a mitad de
@@ -1671,13 +1691,13 @@ mod pruebas {
         assert!(!directo);
         assert!(solape < 3 || distintivo < 1);
         /* Título suelto de 1 palabra jamás es directo. */
-        assert_eq!(puntaje_titulo("apto precioso apTO", "apto").0, false);
+        assert!(!puntaje_titulo("apto precioso apTO", "apto").0);
     }
 
     #[test]
     fn formatear_parrafos_une_saltos_sueltos_y_separa_bloques() {
         let entrado = "Hola, Andreina, buenas noches.\nTe escribo por la casa.\nSí, sigue disponible.\nCuéntame qué estás buscando y con gusto te ayudo, cualquier cosa escríbeme al 0424 9208855 https://wa.me/584249208855";
-        let salido = formatear_parrafos(&entrado);
+        let salido = formatear_parrafos(entrado);
         assert_eq!(
             salido,
             "Hola, Andreina, buenas noches. Te escribo por la casa. Sí, sigue disponible. Cuéntame qué estás buscando y con gusto te ayudo, cualquier cosa escríbeme al 0424 9208855\n\nhttps://wa.me/584249208855"
@@ -1687,7 +1707,7 @@ mod pruebas {
     #[test]
     fn formatear_parrafos_respeta_lista_y_no_duplica() {
         let entrado = "Tiene:\n1. Piscina\n2. Planta eléctrica\n\nhttps://wa.me/584249208855";
-        let salido = formatear_parrafos(&entrado);
+        let salido = formatear_parrafos(entrado);
         assert!(salido.contains("Tiene:\n\n1. Piscina\n\n2. Planta eléctrica"));
         assert_eq!(salido.matches(CONTACTO_WA).count(), 1);
     }

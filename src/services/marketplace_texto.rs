@@ -403,6 +403,10 @@ const RUIDO_EXCERPT_CONTENIDO: &[&str] = &[
     "familiares y amigos ad",
     "compartir la ubicaci",
     "consejos de seguridad",
+    /* [09AA-16] `Se unió a Facebook en 2010` (testigo edickson en BD):
+     * el año varía por comprador, así que casa por contenido y no por
+     * línea exacta. Nadie escribe eso como mensaje. */
+    "se unio a facebook en",
 ];
 
 fn quitar_prefijo_enviado<'a>(linea: &'a str, nombre: Option<&str>) -> &'a str {
@@ -646,6 +650,17 @@ fn es_cabecera_hilo(linea: &str, nombre: Option<&str>, aviso: Option<&str>) -> b
             if a_canon.contains(&c_canon) {
                 return true;
             }
+            /* [09AA-16] Eco con cabeza cortada (`n · Casa en venta...`,
+             * testigo edickson en BD): el corte del float deja 1-3
+             * letras + `·`/`-` delante del título y rompe el
+             * `contains`. Se compara también sin esa cabeza. */
+            let pelado = sin_cabeza_corta(cuerpo);
+            if pelado.len() != cuerpo.len()
+                && pelado.chars().count() >= 12
+                && a_canon.contains(&canon_separadores(&pelado.to_lowercase()))
+            {
+                return true;
+            }
         }
     }
     false
@@ -656,6 +671,22 @@ fn es_cabecera_hilo(linea: &str, nombre: Option<&str>, aviso: Option<&str>) -> b
 /// se canonizan a un espacio en ambos lados antes del `contains`.
 fn canon_separadores(s: &str) -> String {
     s.replace(" - ", " ").replace(" · ", " ")
+}
+
+/// [09AA-16] Pela la cabeza que deja el corte del float delante del eco
+/// del título (`n · Casa en venta...`, testigo edickson en BD): 1-3
+/// letras sin espacios + `·`/`-`. Solo para comparar en
+/// `es_cabecera_hilo`; un mensaje real jamás empieza así y además el
+/// `contains` del aviso debe casar con el resto.
+fn sin_cabeza_corta(linea: &str) -> &str {
+    for sep in [" · ", " - "] {
+        if let Some((cabeza, resto)) = linea.split_once(sep) {
+            if !cabeza.is_empty() && cabeza.chars().count() <= 3 && !cabeza.contains(' ') {
+                return resto.trim_start();
+            }
+        }
+    }
+    linea
 }
 
 /// Minúsculas sin tildes para comparar cabeceras (`Kerley`/`kerley`,
@@ -743,6 +774,17 @@ const RUIDO_EXCERPT_EXACTO: &[&str] = &[
     "Seen",
 ];
 
+/// Colas huérfanas y etiquetas sueltas del visor (comparación exacta,
+/// como `RUIDO_EXCERPT_EXACTO`, pero SIN partir el texto pegado:
+/// `segmentar_pegado` usa `EXACTO` como marcadores de corte y un
+/// fragmento ahí partiría `Detalles del comprador` dejando `Detalles`
+/// huérfano —testigo wilmery— en vez de filtrar la línea entera).
+/// [09AA-16] `del comprador` (el float parte `Ver perfil del comprador`
+/// en dos líneas y la cabeza `Ver perfil` ya se filtra sola) y
+/// `Comprador` (etiqueta de rol; testigo edickson en BD). Ningún mensaje
+/// real es solo una de estas líneas.
+const RUIDO_EXCERPT_COLA: &[&str] = &["del comprador", "Comprador"];
+
 /// Respuestas rápidas sugeridas por Facebook: solo se filtran sin marca de
 /// rol (el chip centrado no trae `Cliente:`/`Dueña:`). Si el cliente las
 /// escribe de verdad, llevan marca y se conservan.
@@ -775,6 +817,9 @@ fn es_ruido_excerpt(linea: &str) -> bool {
         return true;
     }
     if RUIDO_EXCERPT_EXACTO.contains(&cuerpo) {
+        return true;
+    }
+    if RUIDO_EXCERPT_COLA.contains(&cuerpo) {
         return true;
     }
     /* [08AA-29] Ruido por contenido (aviso de seguridad de Meta dejado

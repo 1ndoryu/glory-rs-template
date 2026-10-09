@@ -57,7 +57,7 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   (`predev`→`git branch`, el lab no es git). Pendiente: ella Regenera en
   Jorge y espera ~60s; promover el timeout a opencode-propio SOLO cuando
   ella dé ventana (guardar archivos rompe su app viva); después, fix del
-  scraper (lee chrome, no burbujas).
+   scraper (lee chrome, no burbujas).
 - **09AA-7 — Invariante persistencia mensajería (09AA-6 §8.1, siguiente
   bloque ejecutable):** `responder` idempotente + transaccional,
   dead-letter `pending`. NO toca regenerar. Sin empezar hasta cerrar
