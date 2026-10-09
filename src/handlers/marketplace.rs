@@ -527,7 +527,12 @@ async fn generar_borrador(
      * lugar del excerpt en vez del nombre del hilo; y el 2º párrafo repetía
      * lo del 1º: «Sí, se mantiene publicada en venta al momento»).
      * Ahora: el nombre del hilo es el único válido y el 2º párrafo jamás
-     * reafirma disponibilidad/precio ni usa jerga interna. */
+     * reafirma disponibilidad/precio ni usa jerga interna.
+     * [08AA-38] Regla estructural del 2º párrafo (mensaje de ella 2026-10-08:
+     * «Sí, la publicación sigue vigente» burló la lista de frases de 08AA-37
+     * con un sinónimo — fila sicilia v1, borrada en la limpieza 20:44).
+     * Ahora: lógica condicional (pregunta ya respondida arriba → avanzar,
+     * no responder) + veto por PALABRAS, no por frases. */
     let (saludo, regla_nombre) = saludo_y_regla(&r.thread_id);
     let sistema = format!(
         "Eres el asistente de MN Inmobiliaria respondiendo en Marketplace. \
@@ -552,13 +557,14 @@ async fn generar_borrador(
           la cifra es el canon mensual —«$1.500 mensuales»—, jamás hables \
           de venta ni uses la palabra «negociable»; si trae «venta», la \
           cifra va seguida siempre de la palabra «negociable»); segundo párrafo \
-          = responde la última pregunta del Cliente en una línea, SOLO si \
-          aporta algo no dicho en el primer párrafo; prohibido reafirmar \
-          disponibilidad o precio con otras palabras («sigue en venta», «se \
-          mantiene publicada», «sí, está disponible», «estatus actual» y \
-          similares) y prohibida la jerga interna («publicada», «estatus», \
-          «ficha»): si la pregunta ya quedó respondida arriba, usa el \
-          párrafo para avanzar (ofrecer fotos o preguntar qué busca); tercer párrafo = invítalo a \
+          = responde la última pregunta del Cliente en UNA línea; PERO si la \
+          pregunta es si sigue disponible o cuál es el precio (datos ya dados \
+          en el primer párrafo), no la respondas: avanza la conversación \
+          (ofrece fotos o pregunta qué busca). En este párrafo están \
+          prohibidas las palabras disponible, vigente, vigencia, publicado, \
+          publicación, precio, estatus, ficha y cualquier cifra: jamás \
+          reafirmes con sinónimos lo que el primer párrafo ya dijo; \
+          tercer párrafo = invítalo a \
          contarte qué busca para ayudarlo (cálido, p. ej. \
          «Cuéntame qué estás buscando y con gusto te ayudo») e incluye \
          siempre «cualquier cosa escríbeme al {CONTACTO_TEL}»; cierra \
