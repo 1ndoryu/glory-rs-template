@@ -26,12 +26,14 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 
 ## Pendientes
 
-- **08AA-39 — Botón Limpiar chats (pedido por ella 2026-10-08, ACTIVA):**
-  botón «Limpiar» (destructive) al lado de «Recargar», con confirmación;
-  `DELETE /api/admin/marketplace/chats` (solo admin) → `borrar_todo_cache`
-  (`DELETE FROM mp_respuestas_cache`, responde `{"borrados": n}`). Gotcha:
-  mi `oldString` coincidió con la cola de `registrar_token` (`Ok(jti)` →
-  `Ok(())`, E0308) + import `delete` sobraba (método de `MethodRouter`).
+- **08AA-39 — Botón Limpiar chats (pedido por ella 2026-10-08, CERRADA
+  pendiente de su prueba):** botón «Limpiar» (destructive) al lado de
+  «Recargar», con confirmación; `DELETE /api/admin/marketplace/chats`
+  (solo admin) → `borrar_todo_cache` (responde `{"borrados": n}`).
+  Gate: fmt 0 + tsc 0 + clippy 0 + test 143/143. Commit `463d70ef`
+  (origin+template); vivo `21688` binario 21:39 (health OK, sonda DELETE
+  sin token → 401 = ruta+guard OK); frontend dev recarga solo el botón.
+  Sus 2 filas intactas. Gotchas en completada.
 - **09AA-1 — Publicar Loma Linda + mejorar fotos (pedido por ella 2026-10-09,
   ACTIVA):** plan en `Agente/planes/plan-loma-linda-2026-10-09.md`. Casa en
   venta en Loma Linda (hilo +52 sesión `cea7a25d`, descripción + 13 fotos
@@ -41,14 +43,25 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   (`UNAUTHENTICATED`, fallosSeguidos=3) → lanzar acceso directo
   "Chrome-Horacio-debug" y esperar AVAILABLE; al volver se re-lanza
   `mejorar --slug` y sigue solo.
+- **09AA-2 — Fix definitivo párrafo de relleno (pedido por ella 2026-10-09,
+  CERRADA pendiente de su prueba):** 4 subagentes confirmaron la raíz: el
+  prompt mismo ORDENABA el relleno («avanza la conversación: ofrece fotos o
+  pregunta qué busca») y esa orden positiva siempre le ganó al veto; además
+  «máximo 3» + 3 roles se leía como «exactamente 3». Fix en 4 puntos:
+  `imponer_forma_borrador` en `services/marketplace.rs` (poda determinista
+  por intención + final canónico reconstruido, excepción 1 línea solo para
+  dato concreto no cubierto), prompt reescrito a 2 bloques + excepción +
+  veto a `?/¿` fuera del final, poda conectada en rama IA de
+  `generar_borrador`, fallback sin «confirmo». Gate: fmt 0 + clippy 0 +
+  test 150/150 (7 tests nuevos con testigos reales). Commit `2697e6b2`
+  (origin+template); vivo `24304` binario 22:04 health OK. PROBAR con
+  mensaje NUEVO (Regenerar mismo texto = caché). Sin deploy prod todavía.
 - **08AA-38 — 2º párrafo: regla estructural + veto por palabras (reportado
-  por ella 2026-10-08, ACTIVA):** «Sí, la publicación sigue vigente»
-  burló la lista de frases de 08AA-37 con un sinónimo. El 2º párrafo ahora
-  es condicional (pregunta ya respondida arriba → avanzar, no responder) +
-  veto por palabras (disponible, vigente, publicado, precio, estatus,
-  ficha, cifras). Commit `2df97c16` (origin+template); vivo nuevo con
-  binario 21:00. Sus 2 filas (sicilia/melisa 20:49) SÍ se guardaron —
-  el «no apareció» fue mi limpieza 20:44 + timing.
+  por ella 2026-10-08, CERRADA sustituida por 09AA-2):** «Sí, la publicación
+  sigue vigente» burló la lista de frases de 08AA-37 con un sinónimo. El
+  veto por palabras no bastó (el prompt ordenaba el relleno); ver 09AA-2.
+  Commit `2df97c16` (origin+template). Sus 2 filas (sicilia/melisa 20:49)
+  SÍ se guardaron — el «no apareció» fue mi limpieza 20:44 + timing.
 - **08AA-37 — Borrador: nombre mal + 2º párrafo repite (reportado por ella
   2026-10-08 con mensaje pegado, ACTIVA):** con hilo `marializ|...` saludó
   «Ordaz» (tomó apellido/lugar del excerpt) y el 2º párrafo repitió lo del
