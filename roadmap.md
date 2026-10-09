@@ -26,12 +26,20 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 
 ## Pendientes
 
-- **09AA-6 — Auditoría lógica+SOLID en mensajería (pedido por él 2026-10-09,
-  ACTIVA):** 6 subagentes `code-analyst` en paralelo (Z1 pipeline borrador,
-  Z2 texto/excerpt M3, Z3 WhatsApp/transporte, Z4 proveedores IA, Z5 frontend
-  chat, Z6 frontera opencode), luego síntesis y plan de arreglo. Plan:
-  `Agente/planes/plan-auditoria-mensajeria-2026-10-09.md`. Sin editar código
-  hasta la Fase C.
+- **09AA-7 — Épica invariante persistencia mensajería (09AA-6 §8.1,
+  siguiente bloque ejecutable):** prerrequisito elegir clave canónica
+  (`clave_hilo` vs `thread_id`, 08AA-30) + backfill legacy; luego
+  agrupar-por-hilo y borrar-1-vez, conservar-ante-fallo-IA, `responder`
+  idempotente + transaccional, dead-letter `pending`. Sin empezar hasta
+  cerrar 09AA-4/09AA-5 (mismo pipeline) o serializar con esas sesiones.
+- **09AA-8 — Webhook fail-closed + tope media (09AA-6 §8.2).**
+- **09AA-9 — Auth con rol en consola staff (09AA-6 §8.3, requiere verificar
+  contrato float opencode-propio antes de codificar).**
+- **09AA-10 — Dedup + espejo M3 (09AA-6 §8.4).**
+- **09AA-11 — Proveedores IA: abstracción + reintento glory coordinado con
+  09AA-4 (09AA-6 §8.5).**
+- **09AA-12 — Frontend chat: sub-hook + feedback visible (09AA-6 §8.6,
+  paralelizable).**
 - **09AA-4 — Regenerar es un solo botón + IA vacía con reintento (pedido por
   ella 2026-10-09, ACTIVA):** su prueba de 09AA-3 falló: al abrir la
   conversación sigue el texto viejo. Causas confirmadas: (1) OpenCode Go

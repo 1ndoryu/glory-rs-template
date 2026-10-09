@@ -203,6 +203,13 @@ Reglas obligatorias:
 4. **Tareas paralelizables:** si hay 3 archivos para leer o 3 comandos para ejecutar, lanza subagentes en paralelo. El flujo del bloque se acelera y el costo se reduce.
 5. **Excepcion (NO delegar):** logica de edicion, diseno arquitectonico, decisiones de implementacion, validacion final del bloque. El agente principal retiene el control de las decisiones.
 
+**Seleccion del tipo de subagente (obligatoria, 2026-10-09):** no todo es "investigar". Elegir segun el VERBO de la tarea:
+- **Revisar/juzgar codigo (auditoria, hallar defectos, veredicto con severidad):** `supervisor-review`. Es el unico que dictamina si algo es defecto real o mejora opcional.
+- **Explicar como funciona codigo (entender un flujo, trazar entradas/salidas):** `code-analysis`. Solo explica; NO juzga ni emite veredictos.
+- **Desafiar un plan o decision antes de implementar:** `supervisor-thinking`.
+- **Explorar/buscar codigo o ficheros:** `explore`.
+Leccion 09AA-6: auditar logica+SOLID con `code-analysis` devolvio descripciones sin juicio; hubo que relanzar con `supervisor-review`.
+
 **Mecanismo tecnico:** La extension `vizards.deepseek-v4-for-copilot` clasifica cada request como `main-agent` o subagente segun el system prompt que VS Code le envia. Cuando un subagente ejecuta con el modelo Pro seleccionado, la extension intercepta y cambia el modelo a Flash antes de enviarlo a FreeLLMAPI. FreeLLMAPI entonces usa la cadena restringida Flash (opencode-zen gratis → opencode-go pago). El agente principal nunca se ve afectado.
 
 **Compatibilidad con modelos:** Si el usuario selecciona "DeepSeek V4 Flash" en el picker, todo (principal y subagentes) usa Flash — no hay routing diferencial. La optimizacion solo opera cuando el picker esta en "DeepSeek V4 Pro".
