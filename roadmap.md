@@ -33,19 +33,18 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   mensaje lo trae 2 veces). Fix: prohibir anunciar confirmación con la
   dueña (el dato se da una sola vez) + borrar las 7 filas guardadas de
   Riberas para empezar limpio.
-- **08AA-35 — Detector diferencias prod↔local + push local→prod (activa
-  2026-10-08, solo plan, sin código):** plan en
-  `Agente/planes/plan-verificar-sync-push-2026-10-08.md`. Reto hostil
-  2026-10-08: VIABLE-CON-AJUSTES aplicado (verificar en 2 pasadas, canónico
-  de núcleo, política huérfanas solo-faltantes, forense F0 previo, un solo
-  CLI `inmueble.mjs verificar|push-full`, `ai_enabled_global=on` fuera del
-  plan). F0 + verificación profunda HECHAS 2026-10-08 (255 pares, 0 errores):
-  núcleo/ficha/publicado 100% igual, originales 128/128 bytes idénticos;
-  único frente = `mejorada` de `casa-en-venta-en-altos-del-caron` (4 solo en
-  prod incl. portada + 11 con bytes distintos) → recomendado prod→local, no
-  pisar. F1 HECHA 2026-10-08 (`verificar` permanente, reproduce forense 15
-  difs exit 1). Requiere de ella: dirección por slug, política de
-  `publicado`, y ventana del push real (F2).
+- **08AA-35 — Detector diferencias prod↔local + convergencia (CERRADA
+  2026-10-09):** `verificar` permanente (`inmueble.mjs`, exit 0/1/2, cero
+  escrituras) + pull quirúrgico `sync-pull.mjs --slug` (flag nuevo; parser
+  `--dry-run` corregido + drenaje tolerante con relectura ante cascada
+  original→mejorada). Forense: único frente `mejorada` de
+  `casa-en-venta-en-altos-del-caron`; `push-full` descartado con razón (prod
+  tenía el juego completo) y convergencia por pull prod→local aprobado por
+  ella. Evidencia: `verificar` total LIMPIO exit 0 (13/259 = 13/259, 259
+  pares de bytes OK); gate re-analizado 0E/436W sin nuevos; respaldo
+  file-level en `C:\tmp\backup-08AA-35-caron`; prod intacta. Plan archivado
+  en `Agente/planes/completados/plan-verificar-sync-push-2026-10-08.md`,
+  detalle en `Agente/completados/tareas-2026-10-09.md`.
 - **08AA-34 — Migrar /ask a componentes del sistema (hallazgo gate 2026-10-08
   cerrando 08AA-33):** 15 `html-nativo-en-vez-de-componente` en
   `entrada-pregunta.tsx` (8) y `pagina-ask.tsx` (7); son `<button>`/`<input>`

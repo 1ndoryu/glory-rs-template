@@ -104,7 +104,17 @@ web y confirma visualmente.
 bytes por par con pool (`--par`, default 6; `--sin-bytes` lo salta;
 `--slug` acota). Exit 0 limpio / 1 con diferencias / 2 preflight. Solo
 login + GETs: cero escrituras. Testigo 2026-10-08: 13/259 vs 13/255 con el
-único frente en `mejorada` de `casa-en-venta-en-altos-del-caron`.
+único frente en `mejorada` de `casa-en-venta-en-altos-del-caron`;
+2026-10-09 convergencia total por pull prod→local: 13/259 = 13/259 exit 0.
+
+Pull quirúrgico (08AA-35 F2, permanente): `sync-pull.mjs --slug <slug>`
+reemplaza núcleo + ficha + publicado + TODAS las fotos del slug con bytes
+de prod (siempre dry-run primero). Solo escribe en local, jamás en prod.
+Gotchas fijados en código: el parser tomaba la siguiente flag como valor
+(`--dry-run --slug` ejecutaba de verdad) — el valor solo se consume si no
+empieza por `--`; el borrado es drenaje con relectura (borrar una
+`original` arrastra a su `mejorada` + renumera, la lista stale da 404);
+respaldo file-level del slug en `C:\tmp` si no hay pg_dump.
 
 ## 7. Fallos típicos
 

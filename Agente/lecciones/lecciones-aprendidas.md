@@ -148,3 +148,5 @@
   trabajos `lista` por foto, así que reintentar con el mismo `fotoId` reutiliza
   el resultado anterior. Usar `fotoId` único por intento cuando se quiere
   trabajo fresco.
+- Flag que come la siguiente flag (08AA-35): `arr[i+1] ?? 'true' convierte --dry-run --slug X en dry-run=--slug y el dry-run ejecuta de verdad. El valor solo se consume si no empieza por --. Mismo patron ya blindado en inmueble.mjs; revisar cualquier parser manual nuevo con el caso --flag --otra antes de fiarse.
+- Borrado con cascada + lista stale (08AA-35): si borrar A arrastra a B (hermanas, renumeracion), el bucle sobre la lista inicial muere con 404 a mitad. Patron: drenaje con relectura hasta vaciar, 404 tolerado (= ya cayo por cascada), cota 3x inicial contra giros infinitos.

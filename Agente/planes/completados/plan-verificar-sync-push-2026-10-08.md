@@ -1,7 +1,6 @@
 # Plan detector de diferencias + push local→prod — 2026-10-08 (08AA-35)
 
-> Estado: ACTIVO (solo plan, sin código; AJUSTADO tras 2 rondas de reto
-> hostil 2026-10-08, veredicto VIABLE-CON-AJUSTES x2). Origen: pedido de
+> Estado: CERRADO 2026-10-09 (ver "Cierre" al final). Origen: pedido de
 > ella 2026-10-08 ("detectar cosas que difieran entre prod y local; todo
 > sincronizado; subo a prod la versión local para coherencia").
 > Base existente: `scripts/sync-pull.mjs` (prod→local) + `scripts/inmueble.mjs
@@ -114,23 +113,57 @@ backup y cero sorpresas.
 - F1 — `verificar` + primera pasada (HECHA 2026-10-08, permanente en
   `scripts/inmueble.mjs:cmdVerificar`): reproduce el forense exacto (15 difs,
   exit 1, cero escrituras). DoD cumplido.
-- F2 — `push-full --dry-run` → revisión contigo → backups → `--si` real →
-  `verificar` limpio. DoD: exit 0 + humo público (`/api/public/inmuebles/
-  :slug` tocados + total correcto).
-- F3 — Docs: skill `publicar-inmuebles` (verificar + push-full) + completada
-  + roadmap + commit `08AA-35` + push. Gate sin hallazgos nuevos.
+- F2 — `push-full` DESCARTADO 2026-10-09 con razón registrada: el forense
+  demostró que prod tenía el juego completo (15/15 mejoradas) y local el
+  incompleto; empujar local→prod habría destruido la portada y 3 mejoradas
+  de prod. Dirección aprobada por ella ("si ok" 2026-10-09): prod→local.
+  Ejecutado como pull quirúrgico con `sync-pull.mjs --slug
+  casa-en-venta-en-altos-del-caron` (flag `--slug` añadido permanente 2026-
+  10-09): núcleo + ficha + publicado + reemplazo total de las 27 fotos con
+  bytes de prod. DoD: `verificar` exit 0 por slug y total + espejo OK.
+- F3 — Docs: skill `publicar-inmuebles` (verificar + pull quirúrgico) +
+  completada + roadmap + commits `08AA-35` + push. Gate sin hallazgos nuevos
+  (re-análisis 2026-10-09: 0E/436W, igual que baseline).
+
+## Cierre 2026-10-09 (convergencia total por pull, no por push)
+
+- `verificar --slug casa-en-venta-en-altos-del-caron`: 1/27 = 1/27, 27 pares
+  de bytes OK, exit 0. `verificar` total: prod 13/259 = local 13/259, 259
+  pares (128 originales + 131 mejoradas) 0 errores, exit 0.
+- Gotchas del pull (fijados en código, no solo en papel):
+  1. `--dry-run` MENTÍA si iba seguido de otra flag: el parser
+     `arr[i+1] ?? 'true'` tomaba `--slug` como valor de `dry-run` y ejecutó
+     de verdad (borró 7 fotos locales antes de fallar). Fix permanente: el
+     valor solo se consume si no empieza por `--`.
+  2. El borrado foto-a-foto con lista stale muere con 404: borrar una
+     `original` arrastra a su `mejorada` hermana (+ renumera). Fix
+     permanente: drenaje tolerante con relectura hasta vaciar (cota 3×).
+  3. Daño del run accidental: PUT núcleo/ficha con valores prod (= estado
+     final deseado, sin efecto) + 7 fotos locales borradas (4 originales
+     byte-idénticas a prod → recuperadas exactas del pull; 3-4 mejoradas
+     locales con bytes distintos → sustituidas por las de prod según la
+     dirección aprobada). Respaldo file-level previo al pull real: 16 fotos
+     + manifiesto en `C:\tmp\backup-08AA-35-caron` (pg_dump no disponible en
+     esta máquina).
+- Decisión 2 (publicados) quedó sin objeto: `publicado` igual en los 13
+  slugs. Decisión 3 (ventana push) quedó sin objeto: no hubo nada que
+  empujar a prod; prod intacta en todo el bloque (cero escrituras en prod).
 
 ## Verificación (DoD global)
 
 - [x] Forense F0 hecho (deriva + renombres + duplicados explicados).
 - [x] Verificador calibra con testigo + P2 acotada sin OOM/timeout/bucle.
-- [ ] Tras push: `verificar` exit 0 + humo público OK.
-- [ ] Cero escrituras fuera de catálogo; backups local+prod con id en log.
-- [ ] Commit + push del bloque.
+- [x] Tras pull: `verificar` exit 0 por slug y total (13/259 = 13/259, 259
+  pares de bytes OK). Humo público sin objeto: prod intacta, nada cambió
+  fuera.
+- [x] Cero escrituras fuera de catálogo local; respaldo file-level
+  `C:\tmp\backup-08AA-35-caron` (16 fotos + manifiesto) ante ausencia de
+  pg_dump; prod con cero escrituras en todo el bloque.
+- [x] Commit + push del bloque.
 
-## Decisiones que requiere de ella (defaults tras retos)
+## Decisiones que requiere de ella (defaults tras retos) — RESUELTAS 2026-10-09
 
-1. Dirección: default **solo-faltantes** hasta el forense F0; total solo con
-   forense visto por slug.
-2. Publicados en conflicto: ¿manda local o se excluyen y revisan a mano?
-3. Ventana: ¿push real tras dry-run, o primero solo detector (F1)?
+1. Dirección: aprobada prod→local para `casa-en-venta-en-altos-del-caron`
+   ("si ok"). Ejecutado.
+2. Publicados en conflicto: sin objeto (13/13 iguales).
+3. Ventana: sin objeto (push-full descartado; convergencia por pull).

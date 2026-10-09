@@ -1,8 +1,10 @@
 // [08AA-2] Trae el snapshot prod→local (inmuebles + fotos) y lo deja espejo.
 // Solo LEE prod (login + GETs, como un navegador). Todo lo que escribe es LOCAL.
-// Uso: node scripts/sync-pull.mjs [--dry-run] [--env RUTA]
+// Uso: node scripts/sync-pull.mjs [--dry-run] [--env RUTA] [--slug <slug>]
 //   --dry-run: compara y muestra qué haría, sin escribir nada en local.
 //   --env: ruta del fichero de credenciales (defecto: scripts/.env.prod.local).
+//   --slug: acota a un solo slug (pull quirúrgico; la verificación final
+//     también se acota). [08AA-35]
 // Credenciales en scripts/.env.prod.local (gitignored, nunca en git ni en logs):
 //   PROD_BASE=https://mn-inmobiliaria.com
 //   PROD_EMAIL=admin@admin.com
@@ -15,11 +17,21 @@
 
 import { api, leerEnv, login, nucleo, ENV_DEFECTO } from './lib-api.mjs';
 
+// [08AA-35] El valor solo se consume si el siguiente token NO es otra flag:
+// `--dry-run --slug X` dejaba `dry-run="--slug"` y el dry-run mentía
+// (llegó a borrar de verdad en local el 2026-10-09).
 const args = Object.fromEntries(
-  process.argv.slice(2).map((a, i, arr) => (a.startsWith('--') ? [a.slice(2), arr[i + 1] ?? 'true'] : [])).filter((p) => p.length),
+  process.argv.slice(2).map((a, i, arr) => {
+    if (!a.startsWith('--')) return [];
+    const sig = arr[i + 1];
+    return [[a.slice(2), sig !== undefined && !sig.startsWith('--') ? sig : 'true']];
+  }).flat(),
 );
 const DRY = args['dry-run'] === 'true' || args['dry-run'] === '';
 const ENV_RUTA = args.env ?? ENV_DEFECTO;
+// [08AA-35] Acote quirúrgico: solo este slug (evita reescribir 255 fotos
+// cuando el frente es uno solo). Sin --slug = catálogo completo.
+const SOLO = typeof args.slug === 'string' && args.slug !== 'true' ? args.slug : null;
 
 async function main() {
   const cfg = leerEnv(ENV_RUTA, ['PROD_BASE', 'PROD_EMAIL', 'PROD_PASSWORD', 'LOCAL_EMAIL', 'LOCAL_PASSWORD']);
@@ -43,7 +55,15 @@ async function main() {
   const tokenL = await login(LOCAL, cfg.LOCAL_EMAIL, cfg.LOCAL_PASSWORD, 'local', ENV_RUTA);
   console.log('Auth prod+local OK (tokens solo en memoria).');
 
-  const itemsP = (await api(PROD, '/api/admin/inmuebles?page=1&per_page=200', { token: tokenP })).items;
+  let itemsP = (await api(PROD, '/api/admin/inmuebles?page=1&per_page=200', { token: tokenP })).items;
+  if (SOLO) {
+    itemsP = itemsP.filter((i) => i.slug === SOLO);
+    if (!itemsP.length) {
+      console.error(`FALLO preflight: slug ${SOLO} no existe en prod.`);
+      process.exit(2);
+    }
+    console.log(`Acotado a slug ${SOLO} (pull quirúrgico).`);
+  }
   const itemsL = (await api(LOCAL, '/api/admin/inmuebles?page=1&per_page=200', { token: tokenL })).items;
   const porSlugL = new Map(itemsL.map((i) => [i.slug, i]));
   console.log(`Prod: ${itemsP.length} inmuebles, ${itemsP.reduce((n, i) => n + i.fotos.length, 0)} fotos.`);
@@ -79,8 +99,23 @@ async function main() {
       console.log(`aviso ${p.slug}: sin ficha en prod, se conserva la local`);
     }
     // Fotos: reemplazo total por (orden, origen) para quedar espejo exacto.
-    for (const f of localAhora.fotos) {
-      await api(LOCAL, `/api/admin/fotos/${f.id}`, { metodo: 'DELETE', token: tokenL });
+    // [08AA-35] Drenaje tolerante con relectura: borrar una `original`
+    // arrastra a su hermana `mejorada` (+ renumera), así que los ids listados
+    // caducan a mitad del barrido. Se re-lee hasta vaciar; 404 = ya cayó por
+    // cascada. Cota = 3× inicial para no girar infinito ante un error real.
+    {
+      const quota = localAhora.fotos.length * 3 + 5;
+      let intentos = 0;
+      for (;;) {
+        const actuales = (await api(LOCAL, '/api/admin/inmuebles?page=1&per_page=200', { token: tokenL })).items.find((i) => i.slug === p.slug)?.fotos ?? [];
+        if (!actuales.length) break;
+        if (++intentos > quota) throw new Error(`drenaje ${p.slug}: no vacía tras ${quota} intentos`);
+        try {
+          await api(LOCAL, `/api/admin/fotos/${actuales[0].id}`, { metodo: 'DELETE', token: tokenL });
+        } catch (e) {
+          if (!/404|not_found/.test(e.message)) throw e;
+        }
+      }
     }
     const ordenadas = [...p.fotos].sort((a, b) => a.orden - b.orden);
     for (const f of ordenadas) {
@@ -92,14 +127,15 @@ async function main() {
     console.log(`OK ${p.slug} (${ordenadas.length} fotos)`);
   }
 
-  // Verificación: el espejo debe cuadrar.
+  // Verificación: el espejo debe cuadrar (acotada al slug con --slug).
   const finL = (await api(LOCAL, '/api/admin/inmuebles?page=1&per_page=200', { token: tokenL })).items;
-  const fotosL = finL.reduce((n, i) => n + i.fotos.length, 0);
+  const fotosL = (SOLO ? finL.filter((i) => i.slug === SOLO) : finL).reduce((n, i) => n + i.fotos.length, 0);
   const fotosP = itemsP.reduce((n, i) => n + i.fotos.length, 0);
-  console.log(`Local (después): ${finL.length} inmuebles, ${fotosL} fotos.`);
-  console.log(JSON.stringify({ ...resumen, prod: { inmuebles: itemsP.length, fotos: fotosP }, local: { inmuebles: finL.length, fotos: fotosL } }));
+  const nL = SOLO ? finL.filter((i) => i.slug === SOLO).length : finL.length;
+  console.log(`Local (después): ${finL.length} inmuebles, ${fotosL} fotos${SOLO ? ` (slug ${SOLO})` : ''}.`);
+  console.log(JSON.stringify({ ...resumen, prod: { inmuebles: itemsP.length, fotos: fotosP }, local: { inmuebles: nL, fotos: fotosL } }));
   if (DRY) return;
-  if (finL.length !== itemsP.length || fotosL !== fotosP) {
+  if (nL !== itemsP.length || fotosL !== fotosP) {
     console.error('FALLO verificación: el espejo no cuadra. Revisa el log; prod intacta.');
     process.exit(4);
   }
