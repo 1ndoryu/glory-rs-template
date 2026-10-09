@@ -27,16 +27,24 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 ## Pendientes
 
 - **09AA-3 — Regenerar-todo + dieta del prompt (pedido por ella 2026-10-09,
-  ACTIVA):** (1) botón «Regenerar todo» al lado de Limpiar:
-  `POST /api/admin/marketplace/regenerar-todo` regenera en serie cada fila
-  con borrador (salta `corregida=TRUE` y `respuesta=''`), responde resumen;
-  (2) dieta del prompt (~-30% tokens de entrada: bans 08AA-36/37/38
-  fusionados, la forma la impone Rust desde 09AA-2); (3) respuesta honesta:
-  NO hay perilla minimal/low (el provider `glory-agent` solo expone
-  `max_output_tokens`+`timeout_secs`, el relay da 400 a campos extra) y la
-  «plantilla» que ve a veces es del puente local (timeout 20s del puente
-  vs 120s del backend), no del backend — subir ese timeout queda para el
-  lab de opencode-propio.
+  CERRADA pendiente de su prueba):** (1) botón «Regenerar todo» (secondary)
+  al lado de Recargar, con confirmación y resumen
+  (`Regenerados X de N (+Y en reserva, +Z omitidos)`):
+  `POST /api/admin/marketplace/regenerar-todo` (solo admin) regenera EN SERIE
+  cada fila con borrador (`filas_para_regenerar`: salta `corregida=TRUE` y
+  `respuesta=''`, recientes-primero), responde
+  `{candidatos, regenerados, en_reserva, omitidos, detalle[]}`; (2) dieta del
+  prompt (~-40%: bans fusionados, la forma la impone Rust desde 09AA-2);
+  (3) `Regenerar` ya NO borra en reserva: `regenerar_uno` extraído conserva
+  el viejo si la IA cae. Gate: fmt 0 + tsc 0 + clippy 0 + test 151/151
+  (nuevo `regen_solo_borradores_no_corregidos` con testigo a/b/c). Commit
+  `b6308adf` (origin+template); vivo `5612` binario 22:27 (health OK,
+  POST sin token → 401, openapi lista `regenerar-todo`). Gotcha: el vivo real
+  era el hijo `21024`, no el `cmd 24304`; `23732` PROYECTO TASKS ajeno
+  preservado. Respuesta honesta pendiente en el chat: NO hay perilla
+  minimal/low (provider solo `max_output_tokens`+`timeout_secs`, relay 400 a
+  extras) y la «plantilla» a veces es del puente local (timeout puente 20s
+  vs backend 120s) — subirlo queda para el lab de opencode-propio.
 - **08AA-39 — Botón Limpiar chats (pedido por ella 2026-10-08, CERRADA
   pendiente de su prueba):** botón «Limpiar» (destructive) al lado de
   «Recargar», con confirmación; `DELETE /api/admin/marketplace/chats`
