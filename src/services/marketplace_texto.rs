@@ -11,6 +11,8 @@ use chrono::DateTime;
 use serde::Deserialize;
 use utoipa::ToSchema;
 
+use super::marketplace::{CONTACTO_TEL, CONTACTO_WA, CTA_FIJO};
+
 /// `$43.000`: miles con punto, sin decimales, solo con strings (sin casts).
 #[must_use]
 pub fn precio_publico(precio: f64) -> String {
@@ -207,15 +209,26 @@ pub fn normalizar_excerpt_con_hilo(
                 && !es_marca_tiempo_fb(msg)
                 && !es_cabecera_hilo(msg, nombre, aviso)
             {
-                retirar_bloque_duplicado(&mut fuera, msg);
-                fuera.push(format!("Tú: {msg}"));
+                /* [09AA-17] Sin los cierres (ver `sin_cierres_propios`). */
+                let msg = sin_cierres_propios(msg);
+                if !msg.is_empty() {
+                    retirar_bloque_duplicado(&mut fuera, &msg);
+                    fuera.push(format!("Tú: {msg}"));
+                }
             }
             continue;
         }
         let t = quitar_prefijo_enviado(t, nombre).trim();
+        /* [09AA-17] URL con `wa.me` pegado + eco propio sin marca (testigo
+         * edgarluis): va antes del filtro de ruido para que el cierre
+         * corrupto recupere su forma canónica y caiga aquí. */
+        let t = despegar_url_wa(t);
         /* [08AA-24] El pelado (cola truncada, `sionar Enter,`) puede dejar
          * la línea vacía: no es mensaje, se salta antes del split. */
         if t.is_empty() {
+            continue;
+        }
+        if es_eco_propio_sin_marca(t, nombre) {
             continue;
         }
         let duplicada = fuera.last().is_some_and(|u| u == t);
@@ -834,6 +847,85 @@ fn es_ruido_excerpt(linea: &str) -> bool {
     }
     let sin_marca = cuerpo.len() == linea.len();
     sin_marca && RESPUESTAS_RAPIDAS_FB.contains(&cuerpo)
+}
+
+/* [09AA-17] El aria del visor pega el fragmento `wa.me` tras la URL
+ * completa sin separador (`...855wa.mewa.me`, testigo edgarluis en BD):
+ * si tras la URL solo quedan repeticiones de `wa.me`, se truncan para
+ * recuperar el cierre canónico. Con cualquier otra cola no se toca. */
+fn despegar_url_wa(linea: &str) -> &str {
+    const ESQUEMA: &str = "https://wa.me/";
+    let Some(pos) = linea.find(ESQUEMA) else {
+        return linea;
+    };
+    let mut fin = pos + ESQUEMA.len();
+    let bytes = linea.as_bytes();
+    while fin < bytes.len() && bytes[fin].is_ascii_digit() {
+        fin += 1;
+    }
+    if fin == pos + ESQUEMA.len() {
+        return linea;
+    }
+    let mut resto = &linea[fin..];
+    while let Some(siguiente) = resto.strip_prefix("wa.me") {
+        resto = siguiente;
+    }
+    if resto.is_empty() {
+        linea[..fin].trim_end()
+    } else {
+        linea
+    }
+}
+
+/// Cierre canónico del borrador propio (`CTA_FIJO` + contacto de
+/// `imponer_forma_borrador`): igualdad exacta; el cliente nunca escribe
+/// estas líneas tal cual.
+fn es_cierre_propio(linea: &str) -> bool {
+    let cuerpo = linea.trim();
+    if cuerpo == CTA_FIJO || cuerpo == CONTACTO_WA {
+        return true;
+    }
+    cuerpo
+        .strip_prefix("Cualquier cosa escríbeme al")
+        .is_some_and(|resto| resto.trim().trim_end_matches('.').trim() == CONTACTO_TEL)
+}
+
+/* [09AA-17] Eco del borrador propio como líneas sin marca (testigo
+ * edgarluis en BD: la burbuja de las 12:59am trae `por Edgarluis:` + el
+ * tip + NUESTRO borrador, y el pelado de la atribución lo deja como
+ * supuesto Cliente). Sin marca de rol, los cierres canónicos y el
+ * saludo `Hola, {nombre},` (fórmula de `saludo_y_regla`: el comprador
+ * nunca se saluda a sí mismo por su nombre) solo pueden ser eco propio.
+ * Lo marcado (`Cliente:`/`Dueña:`/`Tú:`) se conserva siempre: la marca
+ * es atribución explícita del visor. */
+fn es_eco_propio_sin_marca(linea: &str, nombre: Option<&str>) -> bool {
+    if linea.starts_with("Cliente:") || linea.starts_with("Dueña:") || es_etiqueta(linea) {
+        return false;
+    }
+    let cuerpo = despegar_url_wa(linea.trim());
+    if es_cierre_propio(cuerpo) {
+        return true;
+    }
+    if let Some(nom) = nombre.map(str::trim).filter(|n| !n.is_empty()) {
+        let saludo = format!("hola, {},", sin_tilde_min(nom));
+        if sin_tilde_min(cuerpo).starts_with(&saludo) {
+            return true;
+        }
+    }
+    false
+}
+
+/* [09AA-17] Del eco propio (`por Tú:`) se guardan solo las líneas con
+ * contenido real: los cierres son boilerplate que `imponer_forma`
+ * re-agrega al generar, y sueltos sin marca el panel los muestra como
+ * Cliente (la segunda copia del testigo edgarluis). */
+fn sin_cierres_propios(mensaje: &str) -> String {
+    mensaje
+        .lines()
+        .map(|linea| despegar_url_wa(linea.trim()))
+        .filter(|linea| !linea.is_empty() && !es_cierre_propio(linea))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// [07AA-9] Precio publicado en el título del aviso (`125.000$`, `$95.000`,

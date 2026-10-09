@@ -26,6 +26,12 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 
 ## Pendientes
 
+- **09AA-18 — Partir `marketplace_texto.rs` (gate 2026-10-09: 0E/445W,
+  `limite-lineas` 738 efectivas > tope 700 + `god-object-rs`; el bloque
+  09AA-17 lo empujó por encima del tope):** extraer por dominio
+  (ruido/excerpt vs eco/cierres vs tests) sin cambiar comportamiento,
+  con fmt+clippy+test en verde al cierre. Prioridad baja, no bloquea
+  nada; el resto del gate son familias preexistentes ajenas al bloque.
 - **09AA-14 — Conectar el flotante al núcleo local (pedido por ella
   2026-10-10, EN CURSO):** la ventanita negra cocinaba sola con receta vieja
   (plantilla "sigue disponible + precio" con solo el título, intención

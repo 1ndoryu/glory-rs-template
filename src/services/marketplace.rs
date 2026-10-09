@@ -1474,6 +1474,26 @@ mod pruebas {
     }
 
     #[test]
+    fn normalizar_hilo_edgarluis_pela_eco_propio_y_despega_url() {
+        /* [09AA-17] Testigo exacto en BD (`edgarluis|VEF0 casa en venta en
+         * urbanización villa icabarú, puerto ordaz`,
+         * `length(excerpt_texto)=353`): la burbuja de las 12:59am trae
+         * `por Edgarluis:` + tip + NUESTRO borrador sin marca (el pelado
+         * de la atribución lo dejaba como Cliente: CTA + teléfono + wa
+         * con `wa.me` pegado por el aria `...855wa.mewa.me`), y el eco
+         * `por Tú:` repite el borrador completo. Sobreviven el fragmento
+         * de corte (`nión.`, irrecuperable) y el saludo propio etiquetado;
+         * los cierres caen en ambas copias (son boilerplate que
+         * `imponer_forma` re-agrega). */
+        let hilo = "edgarluis|VEF0 casa en venta en urbanización villa icabarú, puerto ordaz";
+        let crudo = "nión. Ver más consejos de seguridadPresionar Enter, Mensaje enviado 12:59 am por Edgarluis: Si te vas a reunir con alguien en persona, cuéntales a familiares y amigos adónde vas. Usa la función de compartir la ubicación en tiempo real directamente con un amigo o familiar durante la reunión.Hola, Edgarluis, buenas noches, la Casa en Villa Icabarú está disponible en $90.000 negociable.\n\nCuéntame qué estás buscando y con gusto te ayudo.\n\nCualquier cosa escríbeme al 0424 9208855.\n\nhttps://wa.me/584249208855wa.mewa.meEnviado hace 3 hPresionar Enter, Mensaje enviado 1:10 am por Tú: Hola, Edgarluis, buenas noches, la Casa en Villa Icabarú está disponible en $90.000 negociable.\n\nCuéntame qué estás buscando y con gusto te ayudo.\n\nCualquier cosa escríbeme al 0424 9208855.\n\nhttps://wa.me/584249208855Meta podría usar tecnología para revisar los mensajes de Marketplace con el fin de detectar y reducir las estafas y el fraude.Presionar Enter, Mensaje enviado 1:10 am por Tú: Meta podría usar tecnología para revisar los mensajes de Marketplace con el fin de detectar y reducir las estafas y el fraude.Escribir mensajeEscribe en Edgarluis · Casa en venta en Urbanización Villa Icabarú, Puerto Ordaz.Aa";
+        assert_eq!(
+            normalizar_excerpt_hilo(hilo, crudo),
+            "nión.\nTú: Hola, Edgarluis, buenas noches, la Casa en Villa Icabarú está disponible en $90.000 negociable."
+        );
+    }
+
+    #[test]
     fn normalizar_hilo_tina_limpia_cola_y_marcas() {
         /* [08AA-16] Testigo exacto en BD (`tina|VEF0 casa en venta en
          * riberas del caroní, puerto ordaz`): el float cortó a mitad de
