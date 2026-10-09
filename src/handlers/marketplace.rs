@@ -19,9 +19,9 @@ use crate::middleware::AuthUser;
 use crate::repositories::InmuebleRepository;
 use crate::services::marketplace::{
     aviso_fb_de_thread, borrar_cache, buscar_cache, clave_hilo, consumir_minuto, corregir_cache,
-    detalle_chat, formatear_parrafos, guardar_cache, hash_ficha, normalizar_excerpt_hilo,
-    precio_hash_seguro, reemplazar_cache, releer_foto, resumen_chats, resumen_uso,
-    strip_ficha_para_prompt, sub_exento, validar_borrador, BorradorRequest, FotoHilo,
+    detalle_chat, formatear_parrafos, guardar_cache, hash_ficha, nombre_de_thread,
+    normalizar_excerpt_hilo, precio_hash_seguro, reemplazar_cache, releer_foto, resumen_chats,
+    resumen_uso, strip_ficha_para_prompt, sub_exento, validar_borrador, BorradorRequest, FotoHilo,
     FALLBACK_BORRADOR, SIN_FICHA, STRIP_VERSION,
 };
 use crate::AppState;
@@ -439,14 +439,35 @@ pub async fn corregir(
     Ok((StatusCode::OK, Json(CorregirResponse { corregida: true })).into_response())
 }
 
+/* [08AA-37] Saludo + regla de nombre fuera de `generar_borrador` (clippy
+ * `too_many_lines` 108/100): el nombre del hilo es el único válido. */
+fn saludo_y_regla(thread_id: &str) -> (String, String) {
+    let nombre_hilo = nombre_de_thread(thread_id.trim());
+    let saludo = match nombre_hilo.as_deref() {
+        Some(n) => format!("salúdalo por su nombre («Hola, {n}, ...»)"),
+        None => "salúdalo sin nombre (solo «Hola, ...»)".to_string(),
+    };
+    let regla = match nombre_hilo.as_deref() {
+        Some(n) => format!(
+            "El cliente se llama «{n}»: es el único nombre permitido para \
+            dirigirte a él; ignora cualquier otro nombre, apellido o lugar \
+            que aparezca en la conversación (p. ej. «Ordaz» de Puerto Ordaz): \
+            jamás saludes con un nombre distinto ni inventes apellidos"
+        ),
+        None => "No sabes su nombre: saluda solo con «Hola» y jamás uses \
+            ningún nombre propio para dirigirte a él"
+            .to_string(),
+    };
+    (saludo, regla)
+}
+
 async fn generar_borrador(
     r: &BorradorRequest,
     seguro: Option<&crate::services::marketplace::PromptSeguro>,
     pool: &sqlx::PgPool,
 ) -> crate::services::marketplace::Generado {
     use crate::services::marketplace::{
-        aviso_fb_de_thread, hilo_previo, nombre_de_thread, precio_del_aviso, Generado,
-        CONTACTO_TEL, CONTACTO_WA,
+        aviso_fb_de_thread, hilo_previo, precio_del_aviso, Generado, CONTACTO_TEL, CONTACTO_WA,
     };
     /* [07AA-8] El aviso de Facebook viaja en el hilo (`comprador|aviso`):
      * contexto aproximado para abrir con la ficha breve en el piloto. */
@@ -500,11 +521,14 @@ async fn generar_borrador(
      * confirmas con ella», testigo fila olear). Ahora: el dato se da una
      * sola vez, prohibido «confirmo», «te confirmo su estatus» o cualquier
      * meta-comentario de coordinación; sin precio solo vale el FALLBACK
-     * exacto. */
-    let saludo = match nombre_de_thread(r.thread_id.trim()) {
-        Some(n) => format!("salúdalo por su nombre («Hola, {n}, ...»)"),
-        None => "salúdalo sin nombre (solo «Hola, ...»)".to_string(),
-    };
+     * exacto.
+     * [08AA-37] Nombre autoritativo + sin re-afirmar (mensajes de ella
+     * 2026-10-08: saludó «Ordaz» con hilo `lidia|...` — tomó el apellido/
+     * lugar del excerpt en vez del nombre del hilo; y el 2º párrafo repetía
+     * lo del 1º: «Sí, se mantiene publicada en venta al momento»).
+     * Ahora: el nombre del hilo es el único válido y el 2º párrafo jamás
+     * reafirma disponibilidad/precio ni usa jerga interna. */
+    let (saludo, regla_nombre) = saludo_y_regla(&r.thread_id);
     let sistema = format!(
         "Eres el asistente de MN Inmobiliaria respondiendo en Marketplace. \
          Tono {tono}, BREVE: máximo 3 párrafos cortos, cada uno en su \
@@ -515,8 +539,8 @@ async fn generar_borrador(
          buenas noches según corresponda. \
          La conversación trae marcas: `Cliente:` es el comprador, `Dueña:` \
          es la dueña (tú no eres la dueña: no repitas lo que ella ya dijo). \
-         Formato obligatorio, en este orden exacto: primer párrafo = el \
-         saludo, {saludo}, más el nombre corto del inmueble (solo tipo + \
+          Formato obligatorio, en este orden exacto: primer párrafo = el \
+          saludo, {saludo} ({regla_nombre}), más el nombre corto del inmueble (solo tipo + \
           residencia, sin dirección ni zona duplicada), más si está \
           disponible (sin prometer visitas ni coordinación: no sabes la \
            disponibilidad real de la dueña; di solo que está disponible y \
@@ -528,8 +552,13 @@ async fn generar_borrador(
           la cifra es el canon mensual —«$1.500 mensuales»—, jamás hables \
           de venta ni uses la palabra «negociable»; si trae «venta», la \
           cifra va seguida siempre de la palabra «negociable»); segundo párrafo \
-         = responde la última pregunta del Cliente en una línea, con \
-         coherencia y sin repetir lo ya dicho; tercer párrafo = invítalo a \
+          = responde la última pregunta del Cliente en una línea, SOLO si \
+          aporta algo no dicho en el primer párrafo; prohibido reafirmar \
+          disponibilidad o precio con otras palabras («sigue en venta», «se \
+          mantiene publicada», «sí, está disponible», «estatus actual» y \
+          similares) y prohibida la jerga interna («publicada», «estatus», \
+          «ficha»): si la pregunta ya quedó respondida arriba, usa el \
+          párrafo para avanzar (ofrecer fotos o preguntar qué busca); tercer párrafo = invítalo a \
          contarte qué busca para ayudarlo (cálido, p. ej. \
          «Cuéntame qué estás buscando y con gusto te ayudo») e incluye \
          siempre «cualquier cosa escríbeme al {CONTACTO_TEL}»; cierra \
@@ -541,8 +570,9 @@ async fn generar_borrador(
           aviso, no lo inventes; \
          si preguntan precio y no hay precio en los datos ni en el aviso, responde exactamente: {FALLBACK_BORRADOR} \
          (el sistema agrega el contacto y el enlace al final). \
-         Ya le dijiste (no lo repitas igual): {ya_dicho}",
-        hora = r.excerpt.hora
+          Ya le dijiste (no lo repitas igual): {ya_dicho}",
+        hora = r.excerpt.hora,
+        regla_nombre = regla_nombre
     );
     let texto = match crate::handlers::ia::completar_opencode(&sistema, &r.excerpt.texto, &[]).await
     {
