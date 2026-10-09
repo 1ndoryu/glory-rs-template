@@ -18,8 +18,8 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
-use super::marketplace_token::MpAuth;
 use crate::errors::AppError;
+use crate::middleware::AuthUser;
 use crate::services::marketplace::{clave_hilo, sha_hex};
 use crate::AppState;
 
@@ -118,7 +118,9 @@ fn nivel_de(s: &str) -> Option<LogNivel> {
 }
 
 /// [09AA-5] Lee el buffer de eventos del puente (recientes-primero).
-/// Solo JWT admin; sin PII (ver `hilo8`).
+/// Solo JWT admin (`AuthUser`, como `chats`): con `MpAuth` el JWT del panel
+/// daba 401 y el front tumbaba la sesión al abrir la tab (09AA-5b).
+/// Sin PII (ver `hilo8`).
 #[utoipa::path(
     get,
     path = "/api/admin/marketplace/logs",
@@ -129,7 +131,7 @@ fn nivel_de(s: &str) -> Option<LogNivel> {
 )]
 pub async fn logs(
     State(_state): State<AppState>,
-    _auth: MpAuth,
+    _auth: AuthUser,
     Query(q): Query<LogsQuery>,
 ) -> Result<Response, AppError> {
     let tope = q.limite.unwrap_or(200).clamp(1, TOPE_LOGS);
