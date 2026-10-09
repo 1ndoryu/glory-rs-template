@@ -38,7 +38,14 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
   replicando al flotante: `/borrador` con firma-v1 → `fuente=ia` con receta
   09AA-2/09AA-4 + evento `borrador.ia` en Logs. Vivo `29028` debe seguir
   encendido al usar Facebook (si está apagado, el flotante vuelve a local en
-  silencio). Mejora opcional en el lab: marcar en la línea debug qué cocinó
+  silencio). 2026-10-10: a pedido de ella cerré el lab viejo y lo reabrí yo
+  con su misma receta (channel propio, MP_NUCLEO=on, su token+sal+API 3110;
+  wrapper pid 1320, :5174, 6 electron) — su app viva ni se tocó. Gotcha: un
+  `bun run dev` huérfano de ayer (hijo del lanzador muerto) tumbaba el
+  arranque nuevo con `exit 255` sin más texto; matar el huérfano antes lo
+  arregló. El backend NO verifica la sal (firma-v1 = clave de caché opaca);
+  lo que exige es el token (MpAuth). Pendiente: ella prueba Facebook en el
+  lab y confirma borrador del núcleo en Logs. Mejora opcional en el lab: marcar en la línea debug qué cocinó
   cada borrador (núcleo vs local).
 - **09AA-7 — Invariante persistencia mensajería (09AA-6 §8.1, siguiente
   bloque ejecutable):** `responder` idempotente + transaccional,
