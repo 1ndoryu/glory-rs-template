@@ -77,6 +77,11 @@ pub struct BorradorRequest {
     #[serde(rename = "avisoId")]
     pub aviso_id: Option<String>,
     pub extras: Option<ExtrasIn>,
+    /* [09AA-20] F0: conversación estructurada opcional. `None` = texto
+     * plano legacy (sigue válido); `Some` = el handler valida, firma v2 y
+     * renderiza a `excerpt.texto` antes de seguir el flujo normal. */
+    #[serde(default)]
+    pub conversacion: Option<super::marketplace_burbujas::ConversacionEstructurada>,
 }
 
 /* `pub(super)`: lo usan los tests de `marketplace` vía `super::*`
@@ -96,8 +101,16 @@ pub fn validar_borrador(r: &BorradorRequest) -> Vec<String> {
     if !es_hex64(&r.firma) {
         errores.push("firma debe ser hex64".to_string());
     }
-    if r.firma_version != "firma-v1" {
-        errores.push("firma_version debe ser firma-v1".to_string());
+    /* [09AA-20] F0: convive `firma-v1` (texto plano) con `firma-v2`
+     * (burbujas estructuradas, que además requiere `conversacion`). */
+    if r.firma_version != "firma-v1"
+        && r.firma_version != super::marketplace_burbujas::FIRMA_VERSION_V2
+    {
+        errores.push("firma_version debe ser firma-v1 o firma-v2".to_string());
+    } else if r.firma_version == super::marketplace_burbujas::FIRMA_VERSION_V2
+        && r.conversacion.is_none()
+    {
+        errores.push("firma-v2 requiere conversacion".to_string());
     }
     if !(r.lang.len() == 2 && r.lang.chars().all(|c| c.is_ascii_lowercase())) {
         errores.push("lang ISO 2 letras minúsculas".to_string());

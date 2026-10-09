@@ -216,6 +216,13 @@ export interface InmuebleRemoto
    * backend los incluye en los endpoints admin (nunca en los públicos). */
   extras?: Record<string, string | number | boolean> | null;
   precio_minimo?: number | null;
+  /* [09AA-19 F7c] Vínculo exacto con el aviso (`/marketplace/item/<id>`).
+   * La migración F7a aún no existe: el backend ni lo envía ni lo guarda.
+   * Se lee tolerante (ausente = sin vincular) y se envía siempre; serde lo
+   * ignora hasta que exista la columna. `aviso_conocido` es la futura
+   * fuente de verdad del emparejado (hoy solo vive en `/borrador`). */
+  marketplace_id?: string | null;
+  aviso_conocido?: boolean;
 }
 
 export function urlAbsoluta(url: string): string {
@@ -290,6 +297,9 @@ export function remotoADominio(r: InmuebleRemoto): Inmueble {
     /* Ficha /ask (ausente = aún sin responder; nunca sale a lo público). */
     extras: r.extras ?? undefined,
     precioMinimo: r.precio_minimo ?? undefined,
+    /* Vínculo Marketplace (ausente en el backend hasta F7a = sin vincular). */
+    marketplaceId: r.marketplace_id ?? null,
+    avisoConocido: r.aviso_conocido,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -310,6 +320,12 @@ function dominioACuerpo(i: Inmueble): Record<string, unknown> {
     metros_terreno: i.metrosTerreno,
     puestos: i.puestos,
     estado: i.estado,
+    /* [09AA-19 F7c] La migración F7a aún no existe (`ALTER TABLE inmuebles
+     * ADD COLUMN marketplace_id TEXT UNIQUE NULL` + `find_by_marketplace_id`
+     * + rama prioritaria en `claves_cache` de `handlers/marketplace.rs`):
+     * el backend ignora este campo hasta entonces (serde descarta lo
+     * desconocido). Se envía igual para dejar el front preparado. */
+    marketplace_id: i.marketplaceId,
     copy: copyARemoto(i.copy),
     receta: recetaADominio(i.receta),
   };

@@ -15,6 +15,17 @@ use crate::repositories::InmuebleRepository;
  * re-exporta para no mover sus usos externos (`lib.rs`, handlers, sombra). */
 pub use super::marketplace_vuelo::{Generado, Singleflight};
 
+/* [09AA-20] Burbujas estructuradas F0: tipos+validador+firma-v2 viven en su
+ * dominio (`marketplace_burbujas`); se re-exporta para no mover sus usos
+ * externos (handlers, utoipa, tests). */
+pub use super::marketplace_burbujas::{
+    estructuradas_apagadas, llave_esperada, texto_para_prompt, validar_conversacion,
+    validar_idempotency_key, BurbujaIn, BurbujaUtil, ConversacionEstructurada,
+    ConversacionValidada, ErrorEstructurado, Lado, LadoUtil, CODIGO_ESQUEMA, CODIGO_IDEMPOTENCIA,
+    CODIGO_PAYLOAD_GIGANTE, CODIGO_REINTENTO_FOREGROUND, CODIGO_VERSION_DESCONOCIDA,
+    ENV_KILL_SWITCH, FIRMA_VERSION_V2, MAX_BURBUJAS, MAX_HINT_CARACTERES, MAX_IDEMPOTENCY_CHARS,
+    MAX_POR_BURBUJA, MAX_TOTAL_CARACTERES, VERSION_ESTRUCTURADA,
+};
 /* [08AA-8] Texto puro (schema, excerpt, precio) vive en su dominio
  * (`marketplace_texto`); se re-exporta para no mover sus usos externos
  * (handlers, utoipa, sombra, tests). */
@@ -857,6 +868,8 @@ pub async fn resumen_uso(pool: &sqlx::PgPool, dias: i32) -> Result<Vec<UsoDia>, 
 /// [07AA-7] Panel por chat: un chat = un `thread_id` (= clave de ventana
 /// del puente, trae nombre+aviso: PII solo-admin por decisión de ella
 /// 2026-10-07, misma retención 90d + purga).
+/// [09AA-21] `aviso_conocido`: el aviso del hilo empareja con una ficha
+/// (ID exacto o título); el front lo usa para la vista de huérfanos.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct ChatResumen {
     pub thread_id: String,
@@ -864,6 +877,7 @@ pub struct ChatResumen {
     pub usos: i64,
     pub corregidas: i64,
     pub ultimo: String,
+    pub aviso_conocido: bool,
 }
 
 /// [07AA-7] Una fila del chat: foto de la conversación + texto guardado.
@@ -876,7 +890,10 @@ pub struct ChatFila {
     pub valida_hasta: String,
 }
 
-/// Chats con borradores, ordenados por el más reciente. Una sola consulta.
+/// Chats con borradores, ordenados por el más reciente. Una sola consulta
+/// para el agregado + dos para el vínculo (títulos e IDs publicados, una
+/// vez, sin N+1): cada hilo resuelve en memoria si su aviso es conocido.
+/// Si las auxiliares fallan, todo queda `false` (el panel jamás se bloquea).
 pub async fn resumen_chats(pool: &sqlx::PgPool) -> Result<Vec<ChatResumen>, AppError> {
     let filas: Vec<(String, i64, i64, i64, chrono::DateTime<chrono::Utc>)> = sqlx::query_as(
         "SELECT thread_id, COUNT(*)::BIGINT, COALESCE(SUM(usos), 0)::BIGINT, \
@@ -885,18 +902,76 @@ pub async fn resumen_chats(pool: &sqlx::PgPool) -> Result<Vec<ChatResumen>, AppE
     )
     .fetch_all(pool)
     .await?;
+    let candidatos: Vec<(uuid::Uuid, String)> =
+        match InmuebleRepository::titulos_publicados(pool).await {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::warn!("resumen_chats: sin títulos publicados ({e}), avisos no conocidos");
+                Vec::new()
+            }
+        };
+    let ids: std::collections::HashSet<String> =
+        match InmuebleRepository::marketplace_ids_publicados(pool).await {
+            Ok(v) => v.into_iter().collect(),
+            Err(e) => {
+                tracing::warn!("resumen_chats: sin IDs de aviso ({e}), solo título");
+                std::collections::HashSet::new()
+            }
+        };
     Ok(filas
         .into_iter()
-        .map(
-            |(thread_id, borradores, usos, corregidas, ultimo)| ChatResumen {
+        .map(|(thread_id, borradores, usos, corregidas, ultimo)| {
+            let aviso_conocido = aviso_conocido_del_hilo(&thread_id, &candidatos, &ids);
+            ChatResumen {
                 thread_id,
                 borradores,
                 usos,
                 corregidas,
                 ultimo: ultimo.to_rfc3339(),
-            },
-        )
+                aviso_conocido,
+            }
+        })
         .collect())
+}
+
+/* [09AA-21] ¿El aviso del hilo empareja con una ficha? Rama exacta primero:
+ * el texto tras `|` son dígitos 5–32 vinculados; si no, emparejado por título
+ * (misma regla que `ficha_por_titulo`: directo o solape ≥3 con distintiva,
+ * empate = no conocido). Pura en memoria (sin BD). */
+fn aviso_conocido_del_hilo(
+    thread_id: &str,
+    candidatos: &[(uuid::Uuid, String)],
+    ids: &std::collections::HashSet<String>,
+) -> bool {
+    let aviso = aviso_fb_de_thread(thread_id).unwrap_or_default();
+    let recortado = aviso.trim();
+    if recortado.is_empty() {
+        return false;
+    }
+    if recortado.chars().all(|c| c.is_ascii_digit())
+        && (5..=32).contains(&recortado.len())
+        && ids.contains(recortado)
+    {
+        return true;
+    }
+    let mut mejor: Option<(usize, usize)> = None;
+    let mut empate = false;
+    for (_, titulo) in candidatos {
+        let (directo, solape, distintivo) = puntaje_titulo(recortado, titulo);
+        if !(directo || (solape >= 3 && distintivo >= 1)) {
+            continue;
+        }
+        let clave = (distintivo, solape);
+        match mejor {
+            Some(m) if m == clave => empate = true,
+            Some(m) if m > clave => {}
+            _ => {
+                mejor = Some(clave);
+                empate = false;
+            }
+        }
+    }
+    mejor.is_some() && !empate
 }
 
 /// Filas de un chat (tope 200, recientes primero).
@@ -1298,6 +1373,7 @@ mod pruebas {
             /* El mínimo privado jamás viaja al prompt: el test de claves lo
              * amarra junto al slug y al estado interno. */
             precio_minimo: Some(40000.0),
+            marketplace_id: None,
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         }
@@ -1714,6 +1790,53 @@ mod pruebas {
         assert!(!puntaje_titulo("apto precioso apTO", "apto").0);
     }
 
+    /* [09AA-21] `aviso_conocido` del panel: ID exacto vinculado, título que
+     * empareja, huérfano que no empareja, y empate entre dos fichas que no
+     * reclama a ninguna (mismo criterio que `ficha_por_titulo`). */
+    #[test]
+    fn aviso_conocido_id_titulo_huerfano_y_empate() {
+        use std::collections::HashSet;
+        let id = Uuid::new_v4();
+        let candidatos = vec![(id, "Casa en venta en Riberas del Caroní".to_string())];
+        let ids: HashSet<String> = ["123456789012345".to_string()].into_iter().collect();
+        assert!(aviso_conocido_del_hilo(
+            "tina|123456789012345",
+            &candidatos,
+            &ids
+        ));
+        assert!(!aviso_conocido_del_hilo(
+            "tina|999999999999999",
+            &candidatos,
+            &ids
+        ));
+        assert!(aviso_conocido_del_hilo(
+            "tina|VEF0 casa en venta en riberas del caroní, puerto ordaz",
+            &candidatos,
+            &ids
+        ));
+        assert!(!aviso_conocido_del_hilo(
+            "tina|casa en venta en arivana",
+            &candidatos,
+            &ids
+        ));
+        assert!(!aviso_conocido_del_hilo("sin-separador", &candidatos, &ids));
+        let empatados = vec![
+            (
+                Uuid::new_v4(),
+                "Casa en venta en Riberas del Caroní Norte".to_string(),
+            ),
+            (
+                Uuid::new_v4(),
+                "Casa en venta en Riberas del Caroní Sur".to_string(),
+            ),
+        ];
+        assert!(!aviso_conocido_del_hilo(
+            "tina|casa en venta en riberas del caroní",
+            &empatados,
+            &HashSet::new()
+        ));
+    }
+
     #[test]
     fn formatear_parrafos_une_saltos_sueltos_y_separa_bloques() {
         let entrado = "Hola, Andreina, buenas noches.\nTe escribo por la casa.\nSí, sigue disponible.\nCuéntame qué estás buscando y con gusto te ayudo, cualquier cosa escríbeme al 0424 9208855 https://wa.me/584249208855";
@@ -1813,6 +1936,7 @@ mod pruebas {
             receta: None,
             extras: sqlx::types::Json(serde_json::json!({})),
             precio_minimo: None,
+            marketplace_id: None,
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         }

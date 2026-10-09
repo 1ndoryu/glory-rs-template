@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 /* [08AA-13] Celdas y menú viven en módulos propios: la tabla supera 300 líneas. */
-import { claseEstadoDe, Foto, precioVisible, Publico, SemaforoFicha } from './tabla/celdas-tabla-inmuebles';
+import { claseEstadoDe, Foto, precioVisible, Publico, SemaforoFicha, VinculoBadge } from './tabla/celdas-tabla-inmuebles';
 import { MenuAcciones } from './tabla/menu-acciones-inmueble';
 
 interface Props {
@@ -108,6 +108,7 @@ export function TablaInmuebles({ inmuebles, onVer, onEditar, onEliminar, onAnadi
               <TableHead>Estado</TableHead>
               <TableHead>Público</TableHead>
               <TableHead>Ficha</TableHead>
+              <TableHead>Vínculo</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
@@ -148,6 +149,9 @@ export function TablaInmuebles({ inmuebles, onVer, onEditar, onEliminar, onAnadi
                   <SemaforoFicha inmueble={i} />
                 </TableCell>
                 <TableCell>
+                  <VinculoBadge inmueble={i} />
+                </TableCell>
+                <TableCell>
                   <div className="flex justify-end">
                     <MenuAcciones inmueble={i} {...acciones(i)} />
                   </div>
@@ -185,6 +189,7 @@ export function TablaInmuebles({ inmuebles, onVer, onEditar, onEliminar, onAnadi
                 <div className="flex shrink-0 items-center gap-1.5">
                   <Publico publicado={i.publicado} />
                   <SemaforoFicha inmueble={i} />
+                  <VinculoBadge inmueble={i} />
                   <Badge variant="secondary" className={cn('capitalize', claseEstadoDe(i.estado))}>
                     {i.estado}
                   </Badge>

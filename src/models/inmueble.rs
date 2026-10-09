@@ -101,6 +101,9 @@ pub struct InmuebleRow {
      * tools de IA que citen cifras (solo insinuación). Solo viaja en
      * `FichaAskResponse` (rutas admin con JWT). */
     pub precio_minimo: Option<f64>,
+    /* [09AA-21] Vínculo exacto con el aviso (`/marketplace/item/<id>`):
+     * dígitos como TEXT (`None` = sin vincular). UNIQUE en BD. */
+    pub marketplace_id: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -133,6 +136,9 @@ pub struct Inmueble {
      * pública y el contexto de la IA. Lo privado (`precio_minimo`) jamás
      * entra aquí: la frontera es por construcción (no existe el campo). */
     pub extras: serde_json::Value,
+    /* [09AA-21] Vínculo exacto con el aviso (dígitos, `None` = sin vincular).
+     * Viaja en admin y en público (es el ID del aviso, ya público en FB). */
+    pub marketplace_id: Option<String>,
     pub fotos: Vec<FotoPublica>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -176,6 +182,7 @@ impl Inmueble {
             copy,
             receta: row.receta.map(|j| j.0),
             extras: row.extras.0,
+            marketplace_id: row.marketplace_id,
             fotos: fotos.into_iter().map(FotoPublica::from).collect(),
             created_at: row.created_at,
             updated_at: row.updated_at,
@@ -272,6 +279,11 @@ pub struct CreateInmuebleRequest {
     pub metros_terreno: f64,
     #[serde(default = "default_estado")]
     pub estado: String,
+    /* [09AA-21] Vínculo exacto (`/marketplace/item/<id>` o dígitos).
+     * `None`/ausente = sin vincular; el servicio normaliza y valida
+     * (dígitos 5–32, URL → dígitos). */
+    #[serde(default)]
+    pub marketplace_id: Option<String>,
     /// Copy IA (`None` = sin copy); al crear, `None` deja las columnas NULL
     #[serde(default)]
     #[validate(nested)]
@@ -304,6 +316,12 @@ pub struct UpdateInmuebleRequest {
     #[validate(range(min = 0.0))]
     pub metros_terreno: Option<f64>,
     pub estado: Option<String>,
+    /* [09AA-21] Vínculo exacto tri-estado: ausente = dejar como está,
+     * `null` = desvincular (NULL), texto = fijar (URL o dígitos, el
+     * servicio normaliza a dígitos 5–32). `Option<Option<..>>` distingue
+     * ausente (`None`) de `null` (`Some(None)`). */
+    #[serde(default)]
+    pub marketplace_id: Option<Option<String>>,
     /// Copy IA (`Some` la fija, `None` la deja como está; no se puede borrar por PUT)
     #[validate(nested)]
     pub copy: Option<CopyInmueble>,
@@ -336,6 +354,9 @@ pub struct ActualizacionInmueble<'a> {
     pub copy_modelo: Option<&'a str>,
     pub copy_actualizada_en: Option<DateTime<Utc>>,
     pub receta: Option<sqlx::types::Json<RecetaPublicidad>>,
+    /* [09AA-21] Tri-estado listo para bindear: `None` = no tocar,
+     * `Some(None)` = SET NULL (desvincular), `Some(Some(v))` = fijar. */
+    pub marketplace_id: Option<Option<&'a str>>,
 }
 
 /// Cambio de visibilidad pública — el backend decide qué se publica

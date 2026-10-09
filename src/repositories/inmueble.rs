@@ -14,15 +14,17 @@ use crate::models::{ActualizacionInmueble, FiltrosPublicos, Foto, InmuebleRow};
 const COLUMNAS: &str = "id, titulo, descripcion, ubicacion, puestos, residencia, precio, \
     tipo, operacion, habitaciones, banos, metros, metros_terreno, estado, publicado, \
     slug, copy_corta, copy_larga, copy_modelo, copy_actualizada_en, receta, extras, \
-    precio_minimo, created_at, updated_at";
+    precio_minimo, marketplace_id, created_at, updated_at";
 
 /* [279A-3] Columnas para la web pública: las mismas salvo `extras` y
  * `precio_minimo` (privados de la dueña). Se rellenan con valores vacíos
- * para reutilizar `InmuebleRow` sin exponer nada sensible. */
+ * para reutilizar `InmuebleRow` sin exponer nada sensible.
+ * [09AA-21] `marketplace_id` sí viaja en público: es el ID del aviso de FB,
+ * ya público, y el front lo necesita para el vínculo exacto. */
 const COLUMNAS_PUBLICAS: &str = "id, titulo, descripcion, ubicacion, puestos, residencia, precio, \
     tipo, operacion, habitaciones, banos, metros, metros_terreno, estado, publicado, \
     slug, copy_corta, copy_larga, copy_modelo, copy_actualizada_en, receta, \
-    '{}'::JSONB AS extras, NULL::FLOAT8 AS precio_minimo, created_at, updated_at";
+    '{}'::JSONB AS extras, NULL::FLOAT8 AS precio_minimo, marketplace_id, created_at, updated_at";
 
 /// Valores ya normalizados listos para insertar
 pub struct NuevoInmueble<'a> {
@@ -44,6 +46,8 @@ pub struct NuevoInmueble<'a> {
     pub copy_larga: Option<&'a str>,
     pub copy_modelo: Option<&'a str>,
     pub copy_actualizada_en: Option<chrono::DateTime<chrono::Utc>>,
+    /* [09AA-21] Vínculo exacto ya normalizado (dígitos) o `None` = sin vincular. */
+    pub marketplace_id: Option<&'a str>,
 }
 
 pub struct InmuebleRepository;
@@ -57,9 +61,9 @@ impl InmuebleRepository {
         sqlx::query_as::<_, InmuebleRow>(&format!(
             "INSERT INTO inmuebles (id, titulo, descripcion, ubicacion, puestos, residencia, \
               precio, tipo, operacion, habitaciones, banos, metros, metros_terreno, estado, \
-              slug, copy_corta, copy_larga, copy_modelo, copy_actualizada_en) \
+              slug, copy_corta, copy_larga, copy_modelo, copy_actualizada_en, marketplace_id) \
               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, \
-               $16, $17, $18, $19) \
+               $16, $17, $18, $19, $20) \
               RETURNING {COLUMNAS}",
         ))
         .bind(id)
@@ -81,6 +85,7 @@ impl InmuebleRepository {
         .bind(nuevo.copy_larga)
         .bind(nuevo.copy_modelo)
         .bind(nuevo.copy_actualizada_en)
+        .bind(nuevo.marketplace_id)
         .fetch_one(pool)
         .await
     }
@@ -91,11 +96,36 @@ impl InmuebleRepository {
         matches!(err, sqlx::Error::Database(db) if db.code().as_deref() == Some("23505"))
     }
 
+    /* [09AA-21] El `marketplace_id` ya lo reclama otra ficha (UNIQUE 23505 en
+     * la constraint de `marketplace_id`). Distingue del slug por el nombre de
+     * la constraint para no reintentar slug cuando el conflicto es de aviso. */
+    #[must_use]
+    pub fn es_conflicto_marketplace(err: &sqlx::Error) -> bool {
+        matches!(err, sqlx::Error::Database(db)
+            if db.code().as_deref() == Some("23505")
+                && db.constraint().is_some_and(|c| c.contains("marketplace")))
+    }
+
     pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<InmuebleRow>, sqlx::Error> {
         sqlx::query_as::<_, InmuebleRow>(&format!("SELECT {COLUMNAS} FROM inmuebles WHERE id = $1"))
             .bind(id)
             .fetch_optional(pool)
             .await
+    }
+
+    /* [09AA-21] Búsqueda exacta por aviso (`WHERE marketplace_id = $1`).
+     * El llamador normaliza antes (dígitos 5–32); aquí coincidencia exacta.
+     * `None`/vacío nunca llega: el servicio la filtra y devuelve `Ok(None)`. */
+    pub async fn find_by_marketplace_id(
+        pool: &PgPool,
+        marketplace_id: &str,
+    ) -> Result<Option<InmuebleRow>, sqlx::Error> {
+        sqlx::query_as::<_, InmuebleRow>(&format!(
+            "SELECT {COLUMNAS} FROM inmuebles WHERE marketplace_id = $1"
+        ))
+        .bind(marketplace_id)
+        .fetch_optional(pool)
+        .await
     }
 
     /// Detalle público: solo visible si está publicado
@@ -118,6 +148,17 @@ impl InmuebleRepository {
         sqlx::query_as("SELECT id, titulo FROM inmuebles WHERE publicado = TRUE")
             .fetch_all(pool)
             .await
+    }
+
+    /* [09AA-21] IDs de aviso vinculados en publicados, para `aviso_conocido`
+     * del panel (`resumen_chats`): una sola query, sin N+1. */
+    pub async fn marketplace_ids_publicados(pool: &PgPool) -> Result<Vec<String>, sqlx::Error> {
+        sqlx::query_scalar(
+            "SELECT marketplace_id FROM inmuebles \
+             WHERE publicado = TRUE AND marketplace_id IS NOT NULL",
+        )
+        .fetch_all(pool)
+        .await
     }
 
     pub async fn list_admin(
@@ -186,12 +227,20 @@ impl InmuebleRepository {
     }
 
     /* [08AA-3] B5: 21 params -> struct `ActualizacionInmueble` (ver modelo).
-     * El orden de los `.bind` sigue al de las columnas ($1..$18, $19 = id). */
+     * El orden de los `.bind` sigue al de las columnas ($1..$18, $19/$20
+     * vínculo exacto, $21 = id).
+     * [09AA-21] `marketplace_id` es tri-estado (`COALESCE` no puede poner
+     * NULL): `CASE WHEN $20 THEN $19 ELSE marketplace_id END` — `false` =
+     * no tocar, `true` + NULL = desvincular, `true` + valor = fijar. */
     pub async fn update(
         pool: &PgPool,
         id: Uuid,
         cambios: &ActualizacionInmueble<'_>,
     ) -> Result<Option<InmuebleRow>, sqlx::Error> {
+        let (mp_valor, mp_fijar): (Option<&str>, bool) = match cambios.marketplace_id {
+            None => (None, false),
+            Some(v) => (v, true),
+        };
         sqlx::query_as::<_, InmuebleRow>(&format!(
             "UPDATE inmuebles \
              SET titulo = COALESCE($1, titulo), \
@@ -212,6 +261,7 @@ impl InmuebleRepository {
                   copy_modelo = COALESCE($16, copy_modelo), \
                   copy_actualizada_en = COALESCE($17, copy_actualizada_en), \
                   receta = COALESCE($18, receta), \
+                  marketplace_id = CASE WHEN $20 THEN $19 ELSE marketplace_id END, \
                   /* [279A-7] Al llegar el dato real se borra su marca «no sé»
                    * de `extras` (el front la borra en local al mismo tiempo).
                    * Quitar una clave ausente es no-op, por eso el ELSE ''. */
@@ -222,7 +272,7 @@ impl InmuebleRepository {
                     - CASE WHEN $11 IS NOT NULL AND $11 > 0 THEN 'metros_nose' ELSE '' END \
                     - CASE WHEN $12 IS NOT NULL AND $12 > 0 THEN 'metros_terreno_nose' ELSE '' END, \
                   updated_at = NOW() \
-              WHERE id = $19 \
+              WHERE id = $21 \
               RETURNING {COLUMNAS}",
         ))
         .bind(cambios.titulo)
@@ -243,6 +293,8 @@ impl InmuebleRepository {
         .bind(cambios.copy_modelo)
         .bind(cambios.copy_actualizada_en)
         .bind(cambios.receta.clone())
+        .bind(mp_valor)
+        .bind(mp_fijar)
         .bind(id)
         .fetch_optional(pool)
         .await

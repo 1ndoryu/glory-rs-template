@@ -4,7 +4,7 @@
  * conducta ni de estilos. `claseEstadoDe` es función (no objeto exportado)
  * para no disparar `objeto-mutable-exportado`: el mapa vive dentro. */
 import { Building2, Globe } from 'lucide-react';
-import { formatearPrecio, type EstadoInmueble, type Inmueble } from '@/domain/inmueble';
+import { estaVerificado, formatearPrecio, type EstadoInmueble, type Inmueble } from '@/domain/inmueble';
 import { calcularCompletitud } from '@/domain/ficha-ask';
 import { Badge } from '@/components/ui/badge';
 
@@ -69,5 +69,29 @@ export function Foto({ src, titulo }: { src?: string; titulo: string }) {
         (e.target as HTMLImageElement).style.display = 'none';
       }}
     />
+  );
+}
+
+/* [09AA-19 F7c] Badge de vínculo Marketplace: `verificado` con ficha exacta,
+ * `sin vincular` sin ella. Fuente de verdad futura: `avisoConocido` del
+ * backend (`aviso_conocido`); sin ella se deriva de `marketplaceId`.
+ * Presentacional puro (la tabla no decide). */
+export function VinculoBadge({ inmueble }: { inmueble: Inmueble }) {
+  const verificado = estaVerificado(inmueble);
+  if (verificado) {
+    return (
+      <Badge
+        variant="secondary"
+        className="border-transparent bg-emerald-100 text-emerald-900"
+        title={inmueble.marketplaceId ? `Aviso ${inmueble.marketplaceId}` : 'Aviso conocido por el backend'}
+      >
+        verificado
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="outline" className="text-muted-foreground" title="Sin ID de aviso: el borrador usa título aproximado">
+      sin vincular
+    </Badge>
   );
 }

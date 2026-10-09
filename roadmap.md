@@ -26,12 +26,24 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 
 ## Pendientes
 
+- **09AA-19 — Burbujas estructuradas (pedido por ella 2026-10-09, EN
+  CURSO):** cerrado F0 (09AA-20✓) y F7a+F7c (09AA-21✓) con commit+push
+  (ver `Agente/completados/tareas-2026-10-09.md`): splits exigidos por el
+  gate (`marketplace_estructuradas.rs`, `inmueble_vinculo.rs`; gate final
+  0E/449W, error god-object liquidado); F7b+F1 en lab (implementado+tests
+  verdes, pendiente promocionar en su ventana). Falta: F3 cablear
+  `conversacion` en el handler, F4 retest, F5/F6/F7d.
 - **09AA-18 — Partir `marketplace_texto.rs` (gate 2026-10-09: 0E/445W,
   `limite-lineas` 738 efectivas > tope 700 + `god-object-rs`; el bloque
   09AA-17 lo empujó por encima del tope):** extraer por dominio
   (ruido/excerpt vs eco/cierres vs tests) sin cambiar comportamiento,
-  con fmt+clippy+test en verde al cierre. Prioridad baja, no bloquea
-  nada; el resto del gate son familias preexistentes ajenas al bloque.
+   con fmt+clippy+test en verde al cierre. Prioridad baja, no bloquea
+   nada; el resto del gate son familias preexistentes ajenas al bloque.
+- **Mejora (nueva 2026-10-09):** crear `Select` en
+  `frontend/src/components/ui/` y migrar los `<select>` nativos
+  (`ficha-formulario`, `modal-inmueble`, `vincular-hilo`, …). Hoy ese
+  componente no existe; `vincular-hilo` (09AA-21) sigue la convención
+  vigente (`CLASE_SELECT`). No mezclar con 09AA-19.
 - **09AA-14 — Conectar el flotante al núcleo local (pedido por ella
   2026-10-10, EN CURSO):** la ventanita negra cocinaba sola con receta vieja
   (plantilla "sigue disponible + precio" con solo el título, intención

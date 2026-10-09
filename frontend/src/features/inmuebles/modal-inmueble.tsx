@@ -238,6 +238,22 @@ export function ModalInmueble(props: Props) {
                 inputMode="numeric"
               />
             </div>
+            <div className="space-y-1">
+              <Etiqueta error={errores.marketplaceId}>ID aviso Marketplace</Etiqueta>
+              <Input
+                value={form.marketplaceId}
+                onChange={(e) => cambiar('marketplaceId', e.target.value)}
+                placeholder="1234567890 (/marketplace/item/<id>)"
+                inputMode="numeric"
+                aria-invalid={Boolean(errores.marketplaceId)}
+                className={cn(errores.marketplaceId && 'border-destructive')}
+              />
+              {errores.marketplaceId ? (
+                <p className="text-xs text-destructive">{errores.marketplaceId}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">Vincula este inmueble con su aviso para el borrador exacto (F7).</p>
+              )}
+            </div>
             <div className="space-y-1 sm:col-span-2">
               <Etiqueta>Descripción</Etiqueta>
               <Textarea

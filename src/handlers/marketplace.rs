@@ -6,7 +6,7 @@
  * solo boundary HTTP + 429 con `Retry-After`. */
 
 use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
@@ -23,9 +23,15 @@ use crate::services::marketplace::{
     guardar_cache, hash_ficha, nombre_de_thread, normalizar_excerpt_hilo, precio_hash_seguro,
     reemplazar_cache, releer_foto, resumen_chats, resumen_uso, sha_hex, strip_ficha_para_prompt,
     sub_exento, validar_borrador, BorradorRequest, ExcerptIn, FotoHilo, FALLBACK_BORRADOR,
-    SIN_FICHA, STRIP_VERSION,
+    FIRMA_VERSION_V2, SIN_FICHA, STRIP_VERSION,
 };
 use crate::AppState;
+
+/* F0 estructuradas/idempotencia vive en `marketplace_estructuradas.rs`
+ * (split god-object): aquí solo el wiring para `borrador`/`regenerar`. */
+use super::marketplace_estructuradas::{
+    clave_idempotencia, con_idempotencia, resolver_fuente, FuenteBorrador,
+};
 
 /* [08AA-8] Token mp (extractor + emisión) vive en `marketplace_token.rs`
  * (split límite 500). Re-export `pub` para las rutas utoipa de `mod.rs`
@@ -57,6 +63,11 @@ pub struct BorradorResponse {
 /// contra publicados (`ficha_por_titulo`): el precio del catálogo entra al
 /// prompt en vez del dodge. Sin emparejamiento o con la BD caída, sin ficha
 /// (el borrador jamás se bloquea por esto).
+/// [09AA-21] Rama prioritaria exacta: si hay `avisoId` con dígitos de aviso
+/// (`/marketplace/item/<id>` o dígitos 5–32) va `WHERE marketplace_id = $1`
+/// sin pasar por el título. UUID legacy intacto (misma ruta de siempre);
+/// ID exacto inexistente = sin ficha (no se cita un precio dudoso);
+/// forma no-UUID-no-dígitos o sin ID = fallback por título.
 async fn claves_cache(
     pool: &sqlx::PgPool,
     aviso_id: Option<&str>,
@@ -70,20 +81,61 @@ async fn claves_cache(
     ),
     AppError,
 > {
-    match aviso_id {
-        Some(a) => match Uuid::parse_str(a) {
-            Ok(id) => match InmuebleRepository::find_by_id(pool, id).await? {
-                Some(f) => {
-                    let seguro = strip_ficha_para_prompt(&f, STRIP_VERSION)?;
-                    let precio = precio_hash_seguro(&seguro);
-                    let catalogo = hash_ficha(&f);
-                    Ok((Some(seguro), precio, catalogo, true))
+    match aviso_id.map(str::trim) {
+        Some(a) if !a.is_empty() => {
+            /* UUID legacy: ruta intacta (existe → ficha, no existe → sin ficha). */
+            if let Ok(id) = Uuid::parse_str(a) {
+                match InmuebleRepository::find_by_id(pool, id).await? {
+                    Some(f) => {
+                        let seguro = strip_ficha_para_prompt(&f, STRIP_VERSION)?;
+                        let precio = precio_hash_seguro(&seguro);
+                        let catalogo = hash_ficha(&f);
+                        return Ok((Some(seguro), precio, catalogo, true));
+                    }
+                    None => {
+                        return Ok((None, SIN_FICHA.to_string(), SIN_FICHA.to_string(), false));
+                    }
                 }
-                None => Ok((None, SIN_FICHA.to_string(), SIN_FICHA.to_string(), false)),
-            },
-            Err(_) => claves_por_titulo(pool, titulo_fb).await,
-        },
-        None => claves_por_titulo(pool, titulo_fb).await,
+            }
+            /* Dígitos de aviso: rama exacta prioritaria. */
+            match crate::services::InmuebleService::normalizar_marketplace_id(Some(a)) {
+                Ok(Some(mp)) => claves_por_marketplace_id(pool, &mp).await,
+                /* Vacío normalizado o forma inválida: cae al título como antes. */
+                Ok(None) | Err(_) => claves_por_titulo(pool, titulo_fb).await,
+            }
+        }
+        _ => claves_por_titulo(pool, titulo_fb).await,
+    }
+}
+
+/// Ficha por ID exacto de aviso (`WHERE marketplace_id = $1`): con vínculo,
+/// hashes reales de la fila; si el ID no lo reclama nadie, ruta sin-ficha
+/// (sin fallback al título: un ID explícito que no existe no debe citar el
+/// precio de otra ficha por aproximación). La BD caída sí degrada a sin ficha.
+async fn claves_por_marketplace_id(
+    pool: &sqlx::PgPool,
+    marketplace_id: &str,
+) -> Result<
+    (
+        Option<crate::services::marketplace::PromptSeguro>,
+        String,
+        String,
+        bool,
+    ),
+    AppError,
+> {
+    match InmuebleRepository::find_by_marketplace_id(pool, marketplace_id).await {
+        Ok(Some(f)) => {
+            let seguro = strip_ficha_para_prompt(&f, STRIP_VERSION)?;
+            let precio = precio_hash_seguro(&seguro);
+            let catalogo = hash_ficha(&f);
+            Ok((Some(seguro), precio, catalogo, true))
+        }
+        Ok(None) => Ok((None, SIN_FICHA.to_string(), SIN_FICHA.to_string(), false)),
+        Err(e) => {
+            tracing::warn!("claves_cache: buscar por marketplace_id falló ({e}), va sin ficha");
+            Ok((None, SIN_FICHA.to_string(), SIN_FICHA.to_string(), false))
+        }
     }
 }
 
@@ -160,6 +212,10 @@ fn log_borrador_ia(thread_id: &str, fuente: &str, latencia_ms: u64, conocido: bo
         ],
     );
 }
+/* F0 estructuradas/idempotencia → `marketplace_estructuradas.rs`
+ * (`FuenteBorrador`, `resolver_fuente`, `fuente_v1/v2`,
+ * `clave_idempotencia`, `con_idempotencia`): aquí solo wiring. */
+
 #[utoipa::path(
     post,
     path = "/api/admin/marketplace/borrador",
@@ -173,6 +229,7 @@ fn log_borrador_ia(thread_id: &str, fuente: &str, latencia_ms: u64, conocido: bo
 pub async fn borrador(
     State(state): State<AppState>,
     auth: MpAuth,
+    headers: HeaderMap,
     r: Result<Json<BorradorRequest>, axum::extract::rejection::JsonRejection>,
 ) -> Result<Response, AppError> {
     if !sub_exento(&auth.sub)
@@ -190,42 +247,43 @@ pub async fn borrador(
     if !errores.is_empty() {
         return Err(AppError::Validation(errores.join("; ")));
     }
-    /* [08AA-5] El excerpt del puente trae cada mensaje dos veces + ruido
-     * de Facebook: se limpia antes del prompt y del guardado. Si solo
-     * había ruido se conserva el original (nunca se guarda vacío).
-     * [08AA-16] Con contexto del hilo: fuera cabeceras del visor.
-     * [08AA-18] Contexto con `clave_hilo()`: la cifra inyectada por el
-     * puente (07AA-11) parpadea y el aviso con `$` no empareja el eco.
-     * [08AA-21] El crudo se captura antes de limpiar: se guarda tal cual
-     * llegó para calibrar el filtro (08AA-8). */
-    let crudo = r.excerpt.texto.clone();
-    let limpio = normalizar_excerpt_hilo(&clave_hilo(r.thread_id.trim()), &r.excerpt.texto);
-    if !limpio.is_empty() {
-        r.excerpt.texto = limpio;
-    }
+    /* [09AA-20] `Idempotency-Key` opcional (422 si es basura) + F0: la
+     * estructurada deja `excerpt.texto` renderizado y su firma v2; el texto
+     * plano sigue el camino de siempre (`fuente_v1`: limpia excerpt,
+     * conserva el original si solo había ruido, crudo para calibrar). */
+    let clave_idem = clave_idempotencia(&headers)?;
+    let FuenteBorrador {
+        firma_cache,
+        firma_version,
+        crudo,
+    } = resolver_fuente(&mut r)?;
     let titulo_fb = aviso_fb_de_thread(r.thread_id.trim());
     let (seguro, precio_hash, catalog_hash, conocido) =
         claves_cache(&state.pool, r.aviso_id.as_deref(), titulo_fb.as_deref()).await?;
     if let Some((texto, corregida)) =
-        buscar_cache(&state.pool, &r.firma, &precio_hash, &catalog_hash).await?
+        buscar_cache(&state.pool, &firma_cache, &precio_hash, &catalog_hash).await?
     {
         /* Hit: el plugin audita `hit`; aquí no se audita nada (el conteo de
          * usos ya subió en la misma sentencia del `UPDATE ... RETURNING`). */
         log_borrador_cache(r.thread_id.trim(), corregida);
-        return Ok((
+        let resp = (
             StatusCode::OK,
             Json(BorradorResponse {
                 borrador: texto,
                 fuente: "cache".to_string(),
                 aviso_conocido: conocido,
-                firma_version: "firma-v1".to_string(),
+                firma_version: firma_version.clone(),
                 corregida,
             }),
         )
-            .into_response());
+            .into_response();
+        return Ok(con_idempotencia(resp, clave_idem.as_ref()));
     }
-    /* Miss (el plugin audita `miss`): una sola IA por clave en vuelo. */
-    let clave_vuelo = format!("{}:{precio_hash}:{catalog_hash}", r.firma);
+    /* Miss (el plugin audita `miss`): una sola IA por clave en vuelo. La
+     * llave de idempotencia entra al vuelo para que un reintento colapse
+     * con el original en vez de disparar otra IA. */
+    let huella_idem = clave_idem.as_deref().unwrap_or("sin-clave");
+    let clave_vuelo = format!("{firma_cache}:{precio_hash}:{catalog_hash}:{huella_idem}");
     /* [09AA-5] Latencia real de la pasada para la tab de Logs. */
     let inicio = std::time::Instant::now();
     let gen = state
@@ -251,7 +309,7 @@ pub async fn borrador(
         };
         guardar_cache(
             &state.pool,
-            &r.firma,
+            &firma_cache,
             &precio_hash,
             &catalog_hash,
             &gen.texto,
@@ -259,17 +317,18 @@ pub async fn borrador(
         )
         .await?;
     }
-    Ok((
+    let resp = (
         StatusCode::OK,
         Json(BorradorResponse {
             borrador: gen.texto.clone(),
             fuente: gen.fuente.clone(),
             aviso_conocido: conocido,
-            firma_version: "firma-v1".to_string(),
+            firma_version,
             corregida: false,
         }),
     )
-        .into_response())
+        .into_response();
+    Ok(con_idempotencia(resp, clave_idem.as_ref()))
 }
 
 /// Regenerar explícito de la dueña: borra las filas no-corregidas del hilo +
@@ -293,6 +352,7 @@ pub async fn borrador(
 pub async fn regenerar(
     State(state): State<AppState>,
     _auth: MpAuth,
+    headers: HeaderMap,
     r: Result<Json<BorradorRequest>, axum::extract::rejection::JsonRejection>,
 ) -> Result<Response, AppError> {
     let r = r.map_err(|e| AppError::Validation(format!("JSON inválido: {e}")))?;
@@ -300,8 +360,12 @@ pub async fn regenerar(
     if !errores.is_empty() {
         return Err(AppError::Validation(errores.join("; ")));
     }
+    /* [09AA-20] La llave se valida y se devuelve igual que en `borrador`
+     * (aquí no hay vuelo: gesto explícito, la última que escribe gana). */
+    let clave_idem = clave_idempotencia(&headers)?;
     let resp = regenerar_uno(&state.pool, r.0).await?;
-    Ok((StatusCode::OK, Json(resp)).into_response())
+    let resp = (StatusCode::OK, Json(resp)).into_response();
+    Ok(con_idempotencia(resp, clave_idem.as_ref()))
 }
 
 /// [09AA-3] Núcleo compartido de Regenerar (uno y todo): normaliza el
@@ -316,15 +380,15 @@ async fn regenerar_uno(
     pool: &sqlx::PgPool,
     mut r: BorradorRequest,
 ) -> Result<BorradorResponse, AppError> {
-    /* [08AA-5] Igual que en `borrador`: excerpt limpio al prompt y al reemplazo.
-     * [08AA-16] Con contexto del hilo.
-     * [08AA-18] Contexto con `clave_hilo()` (ver `borrador`).
-     * [08AA-21] Crudo capturado antes de limpiar (ver `borrador`). */
-    let crudo = r.excerpt.texto.clone();
-    let limpio = normalizar_excerpt_hilo(&clave_hilo(r.thread_id.trim()), &r.excerpt.texto);
-    if !limpio.is_empty() {
-        r.excerpt.texto = limpio;
-    }
+    /* [09AA-20] Fuente compartida con `borrador`: estructurada (firma v2 +
+     * excerpt renderizado) o texto plano con su limpieza de siempre.
+     * [08AA-16/18] Con contexto del hilo y `clave_hilo()` (ver `fuente_v1`).
+     * [08AA-21] Crudo capturado antes de limpiar (ver `fuente_v1`). */
+    let FuenteBorrador {
+        firma_cache,
+        firma_version,
+        crudo,
+    } = resolver_fuente(&mut r)?;
     let titulo_fb = aviso_fb_de_thread(r.thread_id.trim());
     let (seguro, precio_hash, catalog_hash, conocido) =
         claves_cache(pool, r.aviso_id.as_deref(), titulo_fb.as_deref()).await?;
@@ -362,7 +426,7 @@ async fn regenerar_uno(
         };
         reemplazar_cache(
             pool,
-            &r.firma,
+            &firma_cache,
             &precio_hash,
             &catalog_hash,
             &gen.texto,
@@ -374,7 +438,7 @@ async fn regenerar_uno(
         borrador: gen.texto,
         fuente: gen.fuente,
         aviso_conocido: conocido,
-        firma_version: "firma-v1".to_string(),
+        firma_version,
         corregida: false,
     })
 }
@@ -448,6 +512,9 @@ pub async fn regenerar_todo(
             },
             aviso_id: None,
             extras: None,
+            /* [09AA-20] Masiva siempre por texto plano: las filas guardan
+             * excerpt ya normalizado, no burbujas. */
+            conversacion: None,
         };
         let fuente = regenerar_uno(&state.pool, req).await?.fuente;
         detalle.push(RegenerarTodoFila {
@@ -622,9 +689,9 @@ pub async fn corregir(
     if r.firma.len() != 64 || !r.firma.chars().all(|c| c.is_ascii_hexdigit()) {
         return Err(AppError::Validation("firma debe ser hex64".to_string()));
     }
-    if r.firma_version != "firma-v1" {
+    if r.firma_version != "firma-v1" && r.firma_version != FIRMA_VERSION_V2 {
         return Err(AppError::Validation(
-            "firma_version debe ser firma-v1".to_string(),
+            "firma_version debe ser firma-v1 o firma-v2".to_string(),
         ));
     }
     let (_, precio_hash, catalog_hash, _) =
@@ -962,4 +1029,94 @@ pub async fn borrar_todo(
 ) -> Result<Response, AppError> {
     let n = borrar_todo_cache(&state.pool).await?;
     Ok((StatusCode::OK, Json(serde_json::json!({"borrados": n}))).into_response())
+}
+
+/* [09AA-21] Matriz de `claves_cache`: ID exacto válido (ficha + conocido),
+ * ID exacto inexistente (sin ficha, sin fallback al título), sin ID con
+ * título que empareja (ficha por título) y UUID legacy intacto (ficha por
+ * UUID). Humo contra la BD real de rama (`DATABASE_URL`); sin ella se omite.
+ * El borrador jamás se bloquea: los casos negativos dan `SIN_FICHA`. */
+#[cfg(test)]
+mod pruebas_claves_cache_mp_id {
+    use super::*;
+    use crate::models::CreateInmuebleRequest;
+    use crate::services::InmuebleService;
+
+    fn pool_si_hay() -> Option<sqlx::PgPool> {
+        let url = std::env::var("DATABASE_URL").ok()?;
+        sqlx::postgres::PgPoolOptions::new()
+            .max_connections(1)
+            .connect_lazy(&url)
+            .ok()
+    }
+
+    fn crear_humo(titulo: &str, marketplace_id: Option<&str>) -> CreateInmuebleRequest {
+        CreateInmuebleRequest {
+            titulo: titulo.to_string(),
+            descripcion: String::new(),
+            ubicacion: String::new(),
+            puestos: 0,
+            residencia: String::new(),
+            precio: 0.0,
+            tipo: "apartamento".to_string(),
+            operacion: "venta".to_string(),
+            habitaciones: 0,
+            banos: 0,
+            metros: 0.0,
+            metros_terreno: 0.0,
+            estado: "disponible".to_string(),
+            marketplace_id: marketplace_id.map(str::to_string),
+            copy: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn matriz_id_valido_inexistente_titulo_y_uuid_legacy() {
+        let Some(pool) = pool_si_hay() else { return };
+        let aviso = "123456789066666";
+        let titulo = "Casa clavescache mp-id 09AA-21 en Riberas del Caroní Norte";
+        let creado = InmuebleService::create(&pool, crear_humo(titulo, Some(aviso)))
+            .await
+            .unwrap();
+        InmuebleService::set_publicado(&pool, creado.id, true)
+            .await
+            .unwrap();
+
+        let (ficha, precio, catalogo, conocido) =
+            claves_cache(&pool, Some(aviso), Some("título que no empareja nada"))
+                .await
+                .unwrap();
+        assert!(ficha.is_some() && conocido, "ID válido da ficha exacta");
+        assert_ne!(precio, SIN_FICHA);
+        assert_ne!(catalogo, SIN_FICHA);
+
+        let (ficha, precio, _, conocido) =
+            claves_cache(&pool, Some("999999999066666"), Some(titulo))
+                .await
+                .unwrap();
+        assert!(
+            ficha.is_none() && !conocido,
+            "ID inexistente no cita otra ficha"
+        );
+        assert_eq!(precio, SIN_FICHA);
+
+        let (ficha, _, _, conocido) = claves_cache(&pool, None, Some(titulo)).await.unwrap();
+        assert!(ficha.is_some() && conocido, "sin ID el título empareja");
+
+        let uuid = creado.id.to_string();
+        let (ficha, _, _, conocido) = claves_cache(&pool, Some(&uuid), None).await.unwrap();
+        assert!(ficha.is_some() && conocido, "UUID legacy sigue resolviendo");
+
+        let (ficha, _, _, conocido) = claves_cache(&pool, Some(&Uuid::new_v4().to_string()), None)
+            .await
+            .unwrap();
+        assert!(
+            ficha.is_none() && !conocido,
+            "UUID inexistente es sin ficha"
+        );
+
+        InmuebleService::delete(&pool, std::path::Path::new("."), creado.id)
+            .await
+            .unwrap();
+    }
 }

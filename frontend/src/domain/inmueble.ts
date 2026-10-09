@@ -81,7 +81,8 @@ export interface Inmueble
     ClasificacionInmueble,
     MedidasInmueble,
     MultimediaInmueble,
-    AuditoriaInmueble {
+    AuditoriaInmueble,
+    VinculoMarketplace {
   precio: number;
   /* [279A-3] Ficha /ask: respuestas por tipo (`extras`) y
    * mínimo privado. Opcionales: registros leídos antes de existir la
@@ -89,6 +90,44 @@ export interface Inmueble
    * pública (el backend los excluye de los endpoints públicos). */
   extras?: Record<string, string | number | boolean>;
   precioMinimo?: number | null;
+}
+
+/* [09AA-19 F7c] Vínculo exacto con el aviso de Marketplace (`/marketplace/item/<id>`).
+ * `marketplaceId` = dígitos del aviso (`null` = sin vincular). El backend aún
+ * no expone la columna (migración F7a pendiente): el front la envía y la lee
+ * de forma tolerante (ausente = `null`). `avisoConocido` es la futura fuente
+ * de verdad del backend (`aviso_conocido` de `/borrador`); ausente = se
+ * deriva de `marketplaceId`. */
+export interface VinculoMarketplace {
+  marketplaceId: string | null;
+  avisoConocido?: boolean;
+}
+
+/* Extrae los dígitos del aviso desde un ID pegado o una URL
+ * (`.../marketplace/item/123` → `123`). Vacío = `null`. */
+export function normalizarMarketplaceId(entrada: string): string | null {
+  const texto = entrada.trim();
+  if (texto === '') return null;
+  const porUrl = /\/marketplace\/item\/(\d+)/.exec(texto);
+  if (porUrl) return porUrl[1];
+  const soloDigitos = /^(\d+)$/.exec(texto);
+  if (soloDigitos) return soloDigitos[1];
+  return null;
+}
+
+/* Formato válido: vacío (sin vincular) o solo dígitos (5–32). Pura. */
+export function esMarketplaceIdValido(entrada: string): boolean {
+  const texto = entrada.trim();
+  if (texto === '') return true;
+  const id = normalizarMarketplaceId(texto);
+  return id !== null && id.length >= 5 && id.length <= 32;
+}
+
+/* Badge de vínculo: la futura `avisoConocido` manda; sin ella, la presencia
+ * de `marketplaceId` decide. Pura (la tabla la usa sin lógica). */
+export function estaVerificado(i: Pick<Inmueble, 'marketplaceId' | 'avisoConocido'>): boolean {
+  if (typeof i.avisoConocido === 'boolean') return i.avisoConocido;
+  return i.marketplaceId !== null && i.marketplaceId !== '';
 }
 
 /** Mejora IA guardada en el servidor, emparejada con su original por `orden`.
@@ -172,8 +211,13 @@ export interface ClaseDraft {
   estado: EstadoInmueble;
 }
 
+/* Vínculo del borrador (texto del formulario; se normaliza al guardar). */
+export interface VinculoDraft {
+  marketplaceId: string;
+}
+
 /** Borrador del modal: opcional salvo fotos (siempre array). */
-export interface InmuebleDraft extends TextoDraft, NumerosDraft, ClaseDraft {
+export interface InmuebleDraft extends TextoDraft, NumerosDraft, ClaseDraft, VinculoDraft {
   fotos: string[];
 }
 
@@ -192,6 +236,7 @@ export const DRAFT_VACIO: InmuebleDraft = {
   puestos: '',
   fotos: [],
   estado: 'disponible',
+  marketplaceId: '',
 };
 
 export const TIPOS: TipoInmueble[] = ['apartamento', 'casa', 'local', 'terreno', 'townhouse'];
@@ -206,13 +251,18 @@ export const ETIQUETAS_TIPO: Record<TipoInmueble, string> = {
 };
 export const ESTADOS: EstadoInmueble[] = ['disponible', 'reservado', 'vendido', 'alquilado'];
 
-export type ErroresDraft = Partial<Record<'titulo' | 'ubicacion' | 'residencia' | 'precio' | 'tipo' | 'operacion' | 'habitaciones' | 'banos' | 'metros' | 'metrosTerreno' | 'puestos', string>>;
+export type ErroresDraft = Partial<Record<'titulo' | 'ubicacion' | 'residencia' | 'precio' | 'tipo' | 'operacion' | 'habitaciones' | 'banos' | 'metros' | 'metrosTerreno' | 'puestos' | 'marketplaceId', string>>;
 
 /* Ningún campo es obligatorio: se trabaja con la información disponible.
  * La validación nunca bloquea el guardado; la conversión (`draftAInmueble`)
  * sanea los valores (texto recortado, números no válidos a 0, enums a su
- * defecto). Se conserva la firma para futuros chequeos de formato. */
-export function validarDraft(_d: InmuebleDraft): ErroresDraft {
+ * defecto). Se conserva la firma para futuros chequeos de formato.
+ * [09AA-19 F7c] Excepción: `marketplaceId` con formato claramente inválido
+ * (no vacío y sin dígitos extraíbles) sí bloquea, para no guardar basura. */
+export function validarDraft(d: InmuebleDraft): ErroresDraft {
+  if (!esMarketplaceIdValido(d.marketplaceId)) {
+    return { marketplaceId: 'Pega el ID numérico del aviso o su URL (/marketplace/item/<id>).' };
+  }
   return {};
 }
 
@@ -230,6 +280,7 @@ export function draftTieneContenido(d: InmuebleDraft): boolean {
       d.metros.trim() ||
       d.metrosTerreno.trim() ||
       d.puestos.trim() ||
+      d.marketplaceId.trim() ||
       d.fotos.length > 0,
   );
 }
@@ -260,6 +311,10 @@ export function draftAInmueble(d: InmuebleDraft, base?: Inmueble): Inmueble {
     // Las mejoradas del servidor no se editan en el formulario: se conservan.
     mejoradasServidor: base?.mejoradasServidor ?? [],
     estado: d.estado,
+    /* [09AA-19 F7c] El vínculo se normaliza (URL → dígitos); vacío = `null`.
+     * `avisoConocido` no se edita en el formulario: lo dirá el backend. */
+    marketplaceId: normalizarMarketplaceId(d.marketplaceId),
+    avisoConocido: base?.avisoConocido,
     // El copy y la receta no se editan en el formulario: se conservan.
     publicado: base?.publicado ?? false,
     copy: base?.copy ?? null,
@@ -289,6 +344,7 @@ export function inmuebleADraft(i: Inmueble): InmuebleDraft {
     puestos: String(i.puestos ?? 0),
     fotos: [...i.fotos],
     estado: i.estado,
+    marketplaceId: i.marketplaceId ?? '',
   };
 }
 

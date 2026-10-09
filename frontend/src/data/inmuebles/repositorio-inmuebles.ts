@@ -123,3 +123,15 @@ export async function publicarInmueble(
     return { lista: actuales, resultado: { ok: false, motivo: motivo(error, 'No se pudo cambiar la publicación.') } };
   }
 }
+
+/* [09AA-19 F7c] Vinculación manual hilo→inmueble (vista de huérfanos): fija
+ * `marketplaceId` con el PUT completo (`actualizarRemoto` ya lo envía como
+ * `marketplace_id`). Hasta F7a el backend lo ignora (queda preparado); el
+ * `avisoConocido` futuro lo confirmará al siguiente borrador. */
+export async function vincularMarketplace(
+  inmueble: Inmueble,
+  marketplaceId: string | null,
+  actuales: Inmueble[],
+): Promise<{ lista: Inmueble[]; resultado: ResultadoGuardado }> {
+  return actualizarInmueble({ ...inmueble, marketplaceId }, actuales);
+}

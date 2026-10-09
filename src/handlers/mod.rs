@@ -14,6 +14,7 @@ pub(crate) mod ia;
 mod ia_proveedores; // [08AA-8] split god-object: GloryAPI+OpenCode+Groq STT
 mod inmuebles;
 pub mod marketplace;
+pub(crate) mod marketplace_estructuradas; // split god-object: F0 estructuradas/idempotencia (FuenteBorrador, resolver_fuente, idempotencia)
 pub(crate) mod marketplace_token; // [08AA-8] split límite 500: extractor `MpAuth` + emisión panel/CLI
 pub(crate) mod mp_logs; // [09AA-5] split: buffer de eventos + `GET /marketplace/logs`
 mod notes;

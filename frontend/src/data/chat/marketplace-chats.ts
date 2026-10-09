@@ -11,6 +11,10 @@ export interface ChatResumen {
   usos: number;
   corregidas: number;
   ultimo: string;
+  /* [09AA-19 F7c] Fuente de verdad futura del vínculo (el backend aún no la
+   * envía): ausente = sin dato (la vista de huérfanos los muestra todos con
+   * aviso). Cuando exista, `true` = hilo con ficha, `false` = huérfano. */
+  aviso_conocido?: boolean;
 }
 
 /* Fila de `GET /api/admin/marketplace/chats/:thread`. */

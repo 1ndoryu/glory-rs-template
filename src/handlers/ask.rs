@@ -137,6 +137,7 @@ mod pruebas {
                 metros: 0.0,
                 metros_terreno: 0.0,
                 estado: "disponible".to_string(),
+                marketplace_id: None,
                 copy: None,
             },
         )

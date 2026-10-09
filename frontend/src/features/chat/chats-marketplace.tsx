@@ -4,6 +4,7 @@
 
 import { useState } from 'react';
 import { useChatsMarketplace } from './use-chats-marketplace';
+import { HilosHuerfanos } from './hilos-huerfanos';
 import { LogsMarketplace } from './logs-marketplace';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -32,8 +33,10 @@ function textoSinMarca(linea: string): string {
 export function ChatsMarketplace() {
   const { lista, seleccion, error, recargar, elegir, regenerando, resumenRegen, regenerarTodoPanel } = useChatsMarketplace();
   /* [09AA-5] Tab de Logs: qué hizo el puente (caché/IA/fallback) por cada
-   * borrador, para cazar la «plantilla fantasma» sin leer el log de texto. */
-  const [tab, setTab] = useState<'chats' | 'logs'>('chats');
+   * borrador, para cazar la «plantilla fantasma» sin leer el log de texto.
+   * [09AA-19 F7c] Tab de Huérfanos: hilos sin ficha exacta con vínculo
+   * manual (reutiliza esta lista + detalle, sin segundo fetch). */
+  const [tab, setTab] = useState<'chats' | 'logs' | 'huerfanos'>('chats');
 
   return (
     <div className="grid gap-4">
@@ -44,9 +47,14 @@ export function ChatsMarketplace() {
         <Button variant={tab === 'logs' ? 'default' : 'outline'} size="sm" onClick={() => setTab('logs')}>
           Logs
         </Button>
+        <Button variant={tab === 'huerfanos' ? 'default' : 'outline'} size="sm" onClick={() => setTab('huerfanos')}>
+          Huérfanos
+        </Button>
       </div>
       {tab === 'logs' ? (
         <LogsMarketplace />
+      ) : tab === 'huerfanos' ? (
+        <HilosHuerfanos hilos={lista} seleccion={seleccion} alElegir={(hilo) => void elegir(hilo)} />
       ) : (
     <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
       {error && (
