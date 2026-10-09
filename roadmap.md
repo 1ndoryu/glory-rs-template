@@ -26,12 +26,13 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 
 ## Pendientes
 
-- **09AA-7 — Épica invariante persistencia mensajería (09AA-6 §8.1,
-  siguiente bloque ejecutable):** prerrequisito elegir clave canónica
-  (`clave_hilo` vs `thread_id`, 08AA-30) + backfill legacy; luego
-  agrupar-por-hilo y borrar-1-vez, conservar-ante-fallo-IA, `responder`
-  idempotente + transaccional, dead-letter `pending`. Sin empezar hasta
-  cerrar 09AA-4/09AA-5 (mismo pipeline) o serializar con esas sesiones.
+- **09AA-7 — Invariante persistencia mensajería (09AA-6 §8.1, siguiente
+  bloque ejecutable):** `responder` idempotente + transaccional,
+  dead-letter `pending`. NO toca regenerar. Sin empezar hasta cerrar
+  09AA-4/09AA-5 (mismo pipeline) o serializar con esas sesiones.
+- **09AA-13 — Regenerar: loop + conserva (BLOQUEADA, la testea él):**
+  comportamiento actual de `regenerar_todo` intencional, funcionalidad
+  sin terminar. No tocar hasta que avise; coordinar con 09AA-4.
 - **09AA-8 — Webhook fail-closed + tope media (09AA-6 §8.2).**
 - **09AA-9 — Auth con rol en consola staff (09AA-6 §8.3, requiere verificar
   contrato float opencode-propio antes de codificar).**

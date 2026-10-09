@@ -130,17 +130,20 @@ claves ×120s sin backoff; `get(uso)` rama muerta; triage dedup volátil.
 Z5 quedó parcial (cuota: QR y polling NO verificados).
 
 Orden (no codificar sin el prerrequisito indicado):
-1. **09AA-7 — Épica invariante persistencia (fusiona F1+F4+`pending`):**
-   prerrequisito elegir clave canónica (`clave_hilo` vs `thread_id`,
-   08AA-30) + backfill legacy; luego agrupar-por-hilo y borrar-1-vez
-   (`marketplace.rs:424-438` + `:337`, SELECT sin DISTINCT :940-941),
-   conservar-ante-fallo-IA (`:357-372` solo persiste si `fuente==ia`,
-   testigo :385-387), `responder` con clave idempotente + transacción
+1. **09AA-7 — Épica invariante persistencia (sin regenerar):**
+   `responder` con clave idempotente + transacción
    (`chat_staff.rs:168-233`, `manual` excluido `outbox:53-57`), contador +
    dead-letter para `pending`-sin-admin. Invariante:
-   `clave_idem UNIQUE + queued→sent/failed-terminal + delete solo
-   terminal`. Verificación: tests 2-filas-mismo-hilo, fallo-IA-conserva,
+   `clave_idem UNIQUE + queued→sent/failed-terminal`. Verificación:
    doble-POST→1 envío, gateway caído.
+   **09AA-13 — Regenerar (BLOQUEADA: él testea `regenerar_todo`,
+   comportamiento actual intencional, funcionalidad sin terminar):**
+   agrupar-por-hilo y borrar-1-vez (`marketplace.rs:424-438` + `:337`,
+   SELECT sin DISTINCT :940-941), conservar-ante-fallo-IA (`:357-372`
+   solo persiste si `fuente==ia`, testigo :385-387), prerrequisito clave
+   canónica (08AA-30) + backfill legacy. No tocar hasta que él avise;
+   coordinar con 09AA-4 (mismo `regenerar_uno`). Verificación:
+   tests 2-filas-mismo-hilo, fallo-IA-conserva.
 2. **09AA-8 — Webhook fail-closed + tope media:** `transporte.rs:95-99`
    a fail-closed con `ALLOW_EMPTY_IN_DEV` (o rompe local);
    `sesion.rs:124,147` tope previo a `bytes()` + solo-esquema ya en
