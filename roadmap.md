@@ -26,6 +26,26 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 
 ## Pendientes
 
+- **08AA-36 — Borrador repite "confirmo con la dueña" (reportado por ella
+  2026-10-08 con mensaje pegado, ACTIVA):** el prompt ordenaba "di solo que
+  está disponible y que lo confirmas con ella" (`marketplace.rs`, testigo:
+  fila guardada olear "está disponible y lo confirmo con la dueña"; su
+  mensaje lo trae 2 veces). Fix: prohibir anunciar confirmación con la
+  dueña (el dato se da una sola vez) + borrar las 7 filas guardadas de
+  Riberas para empezar limpio.
+- **08AA-35 — Detector diferencias prod↔local + push local→prod (activa
+  2026-10-08, solo plan, sin código):** plan en
+  `Agente/planes/plan-verificar-sync-push-2026-10-08.md`. Reto hostil
+  2026-10-08: VIABLE-CON-AJUSTES aplicado (verificar en 2 pasadas, canónico
+  de núcleo, política huérfanas solo-faltantes, forense F0 previo, un solo
+  CLI `inmueble.mjs verificar|push-full`, `ai_enabled_global=on` fuera del
+  plan). F0 + verificación profunda HECHAS 2026-10-08 (255 pares, 0 errores):
+  núcleo/ficha/publicado 100% igual, originales 128/128 bytes idénticos;
+  único frente = `mejorada` de `casa-en-venta-en-altos-del-caron` (4 solo en
+  prod incl. portada + 11 con bytes distintos) → recomendado prod→local, no
+  pisar. F1 HECHA 2026-10-08 (`verificar` permanente, reproduce forense 15
+  difs exit 1). Requiere de ella: dirección por slug, política de
+  `publicado`, y ventana del push real (F2).
 - **08AA-34 — Migrar /ask a componentes del sistema (hallazgo gate 2026-10-08
   cerrando 08AA-33):** 15 `html-nativo-en-vez-de-componente` en
   `entrada-pregunta.tsx` (8) y `pagina-ask.tsx` (7); son `<button>`/`<input>`

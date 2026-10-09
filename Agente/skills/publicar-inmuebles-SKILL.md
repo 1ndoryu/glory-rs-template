@@ -23,6 +23,7 @@ node scripts/inmueble.mjs estado --slug <slug>            # reimprime local+prod
 node scripts/inmueble.mjs publicar --fotos <carpeta> --datos <json> [--solo-local|--solo-prod] [--borrador] [--sobrescribir] [--dry-run]
 node scripts/inmueble.mjs mejorar --slug <slug> [--limite N] [--repetir]   # solo local
 node scripts/inmueble.mjs push --slug <slug> [--dry-run] [--sobrescribir]  # local → prod
+node scripts/inmueble.mjs verificar [--slug <slug>] [--sin-bytes] [--par N]  # prod↔local, solo lectura (08AA-35 F1)
 ```
 
 Sin CLI a mano (fallback): los endpoints de §2 con `scripts/.env.prod.local`
@@ -91,11 +92,19 @@ intento. `--repetir` borra la mejorada vieja del mismo orden antes de subir.
   Reordenar = re-subir con `orden` nuevo + mejoradas seguidoras (lección 199A-6).
 - Tras CUALQUIER cambio en local que deba verse fuera: `push --slug` (dry-run).
 
-## 6. Verificación (DoD por inmueble)
+## 6. Verificación (DoD por inmueble + sync total)
 
 `estado --slug`: mismo conteo de fotos en local+prod, `publicado:true` en ambos,
 GET público 200 con portada = mejorada `orden=0` si existe. Ella recarga la
 web y confirma visualmente.
+
+`verificar` (sync total, 08AA-35 F1, permanente en el CLI): P1 metadatos
+(presencia por slug, núcleo canónico campo a campo, ficha útil sin
+`inmueble_id`, publicado, set `origen:orden`, duplicados) + P2 sha256 de
+bytes por par con pool (`--par`, default 6; `--sin-bytes` lo salta;
+`--slug` acota). Exit 0 limpio / 1 con diferencias / 2 preflight. Solo
+login + GETs: cero escrituras. Testigo 2026-10-08: 13/259 vs 13/255 con el
+único frente en `mejorada` de `casa-en-venta-en-altos-del-caron`.
 
 ## 7. Fallos típicos
 
