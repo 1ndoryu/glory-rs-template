@@ -26,6 +26,20 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 
 ## Pendientes
 
+- **09AA-14 — Conectar el flotante al núcleo local (pedido por ella
+  2026-10-10, EN CURSO):** la ventanita negra cocinaba sola con receta vieja
+  (plantilla "sigue disponible + precio" con solo el título, intención
+  `desconocida`) y por eso los Logs salían vacíos (solo anotan el backend).
+  Hecho: `MP_CLI_MINUTOS=5256000` (10 años, atado a máquina, revocable por
+  `jti`) en `.env` gitignored + token CLI emitido (`jti 2a82d043…`, exp 2036)
+  + `MP_SAL` 32 bytes + los 4 valores en `.env` y en env de usuario (`setx`:
+  `MP_NUCLEO=on`, `MP_MN_TOKEN`, `MP_SAL`, `MP_MN_API`) — surten efecto cuando
+  ella reinicie su app (yo nunca la toco). Verificado de extremo a extremo
+  replicando al flotante: `/borrador` con firma-v1 → `fuente=ia` con receta
+  09AA-2/09AA-4 + evento `borrador.ia` en Logs. Vivo `29028` debe seguir
+  encendido al usar Facebook (si está apagado, el flotante vuelve a local en
+  silencio). Mejora opcional en el lab: marcar en la línea debug qué cocinó
+  cada borrador (núcleo vs local).
 - **09AA-7 — Invariante persistencia mensajería (09AA-6 §8.1, siguiente
   bloque ejecutable):** `responder` idempotente + transaccional,
   dead-letter `pending`. NO toca regenerar. Sin empezar hasta cerrar
