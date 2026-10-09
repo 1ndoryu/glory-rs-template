@@ -494,6 +494,13 @@ async fn generar_borrador(
      * nombre corto del inmueble (tipo + residencia, sin dirección ni zona
      * duplicada) y sin párrafo de relleno ("sigue disponible y con gusto…"
      * ya va dicho en la apertura). */
+    /* [08AA-36] Sin anuncio de confirmación con la dueña (mensaje de ella
+     * 2026-10-08: el borrador decía «lo confirmo con la dueña» dos veces —
+     * el prompt lo ORDENABA («di solo que está disponible y que lo
+     * confirmas con ella», testigo fila olear). Ahora: el dato se da una
+     * sola vez, prohibido «confirmo», «te confirmo su estatus» o cualquier
+     * meta-comentario de coordinación; sin precio solo vale el FALLBACK
+     * exacto. */
     let saludo = match nombre_de_thread(r.thread_id.trim()) {
         Some(n) => format!("salúdalo por su nombre («Hola, {n}, ...»)"),
         None => "salúdalo sin nombre (solo «Hola, ...»)".to_string(),
@@ -512,8 +519,11 @@ async fn generar_borrador(
          saludo, {saludo}, más el nombre corto del inmueble (solo tipo + \
           residencia, sin dirección ni zona duplicada), más si está \
           disponible (sin prometer visitas ni coordinación: no sabes la \
-          disponibilidad real de la dueña; di solo que está disponible y \
-          que lo confirmas con ella), más el precio con la cifra exacta de los datos o del \
+           disponibilidad real de la dueña; di solo que está disponible y \
+          jamás anuncies que confirmas o coordinas nada con ella \
+          (prohibido «lo confirmo con la dueña», «te confirmo su estatus» \
+          o similar: el dato se da una sola vez, sin meta-comentarios), \
+          más el precio con la cifra exacta de los datos o del \
           aviso (si los datos traen «operacion»:«alquiler» es un ALQUILER: \
           la cifra es el canon mensual —«$1.500 mensuales»—, jamás hables \
           de venta ni uses la palabra «negociable»; si trae «venta», la \
@@ -526,9 +536,9 @@ async fn generar_borrador(
          siempre con {CONTACTO_WA}. \
           Reglas: jamás inventes teléfono, email, dirección ni cifras fuera \
           de los datos y el aviso; jamás prometas visitas ni coordinación \
-          («puedes visitarla», «te coordinamos»): la disponibilidad real \
+           («puedes visitarla», «te coordinamos»): la disponibilidad real \
           solo la confirma la dueña; si no hay precio en los datos ni en el \
-         aviso, no lo inventes: di que lo confirmas con la dueña; \
+          aviso, no lo inventes; \
          si preguntan precio y no hay precio en los datos ni en el aviso, responde exactamente: {FALLBACK_BORRADOR} \
          (el sistema agrega el contacto y el enlace al final). \
          Ya le dijiste (no lo repitas igual): {ya_dicho}",

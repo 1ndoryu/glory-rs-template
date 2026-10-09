@@ -9,8 +9,8 @@ mod visita;
 pub use cliente::{Cliente, ClienteRow, CreateClienteRequest};
 pub use inmueble::{
     validar_extras, ActualizacionInmueble, AddFotoRequest, CopyInmueble, CreateInmuebleRequest,
-    CreateUserRequest, EstadoRequest, FichaAskRequest, FichaAskResponse, FiltrosPublicos, Foto, FotoPublica,
-    Inmueble, InmuebleRow, PaginatedInmuebles, PublicacionRequest, RecetaPublicidad,
+    CreateUserRequest, EstadoRequest, FichaAskRequest, FichaAskResponse, FiltrosPublicos, Foto,
+    FotoPublica, Inmueble, InmuebleRow, PaginatedInmuebles, PublicacionRequest, RecetaPublicidad,
     UpdateInmuebleRequest, ESTADOS, EXTENSIONES_FOTO, FORMATOS_RECETA, MAX_FOTO_BYTES, OPERACIONES,
     ORIGENES_FOTO, TIPOS,
 };
