@@ -870,6 +870,8 @@ pub async fn resumen_uso(pool: &sqlx::PgPool, dias: i32) -> Result<Vec<UsoDia>, 
 /// 2026-10-07, misma retención 90d + purga).
 /// [09AA-21] `aviso_conocido`: el aviso del hilo empareja con una ficha
 /// (ID exacto o título); el front lo usa para la vista de huérfanos.
+/// [09AA-23] `inmueble_vinculado`: título de la ficha emparejada (`None` =
+/// huérfano); el front lo muestra como «Vinculado: X»/«Sin ficha» en chats.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct ChatResumen {
     pub thread_id: String,
@@ -878,6 +880,7 @@ pub struct ChatResumen {
     pub corregidas: i64,
     pub ultimo: String,
     pub aviso_conocido: bool,
+    pub inmueble_vinculado: Option<String>,
 }
 
 /// [07AA-7] Una fila del chat: foto de la conversación + texto guardado.
@@ -910,25 +913,26 @@ pub async fn resumen_chats(pool: &sqlx::PgPool) -> Result<Vec<ChatResumen>, AppE
                 Vec::new()
             }
         };
-    let ids: std::collections::HashSet<String> =
-        match InmuebleRepository::marketplace_ids_publicados(pool).await {
+    let vinculos: std::collections::HashMap<String, String> =
+        match InmuebleRepository::vinculos_publicados(pool).await {
             Ok(v) => v.into_iter().collect(),
             Err(e) => {
-                tracing::warn!("resumen_chats: sin IDs de aviso ({e}), solo título");
-                std::collections::HashSet::new()
+                tracing::warn!("resumen_chats: sin vínculos de aviso ({e}), solo título");
+                std::collections::HashMap::new()
             }
         };
     Ok(filas
         .into_iter()
         .map(|(thread_id, borradores, usos, corregidas, ultimo)| {
-            let aviso_conocido = aviso_conocido_del_hilo(&thread_id, &candidatos, &ids);
+            let vinculado = titulo_vinculado_del_hilo(&thread_id, &candidatos, &vinculos);
             ChatResumen {
                 thread_id,
                 borradores,
                 usos,
                 corregidas,
                 ultimo: ultimo.to_rfc3339(),
-                aviso_conocido,
+                aviso_conocido: vinculado.is_some(),
+                inmueble_vinculado: vinculado,
             }
         })
         .collect())
@@ -937,24 +941,25 @@ pub async fn resumen_chats(pool: &sqlx::PgPool) -> Result<Vec<ChatResumen>, AppE
 /* [09AA-21] ¿El aviso del hilo empareja con una ficha? Rama exacta primero:
  * el texto tras `|` son dígitos 5–32 vinculados; si no, emparejado por título
  * (misma regla que `ficha_por_titulo`: directo o solape ≥3 con distintiva,
- * empate = no conocido). Pura en memoria (sin BD). */
-fn aviso_conocido_del_hilo(
+ * empate = no conocido). Pura en memoria (sin BD).
+ * [09AA-23] Devuelve el título emparejado (rama exacta: el título del
+ * vínculo; rama título: el título candidato). `resumen_chats` deriva
+ * `aviso_conocido` como `vinculado.is_some()`. */
+fn titulo_vinculado_del_hilo(
     thread_id: &str,
     candidatos: &[(uuid::Uuid, String)],
-    ids: &std::collections::HashSet<String>,
-) -> bool {
+    vinculos: &std::collections::HashMap<String, String>,
+) -> Option<String> {
     let aviso = aviso_fb_de_thread(thread_id).unwrap_or_default();
     let recortado = aviso.trim();
     if recortado.is_empty() {
-        return false;
+        return None;
     }
-    if recortado.chars().all(|c| c.is_ascii_digit())
-        && (5..=32).contains(&recortado.len())
-        && ids.contains(recortado)
-    {
-        return true;
+    if recortado.chars().all(|c| c.is_ascii_digit()) && (5..=32).contains(&recortado.len()) {
+        return vinculos.get(recortado).cloned();
     }
     let mut mejor: Option<(usize, usize)> = None;
+    let mut titulo_mejor: Option<String> = None;
     let mut empate = false;
     for (_, titulo) in candidatos {
         let (directo, solape, distintivo) = puntaje_titulo(recortado, titulo);
@@ -967,11 +972,16 @@ fn aviso_conocido_del_hilo(
             Some(m) if m > clave => {}
             _ => {
                 mejor = Some(clave);
+                titulo_mejor = Some(titulo.clone());
                 empate = false;
             }
         }
     }
-    mejor.is_some() && !empate
+    if mejor.is_some() && !empate {
+        titulo_mejor
+    } else {
+        None
+    }
 }
 
 /// Filas de un chat (tope 200, recientes primero).
@@ -1792,34 +1802,43 @@ mod pruebas {
 
     /* [09AA-21] `aviso_conocido` del panel: ID exacto vinculado, título que
      * empareja, huérfano que no empareja, y empate entre dos fichas que no
-     * reclama a ninguna (mismo criterio que `ficha_por_titulo`). */
+     * reclama a ninguna (mismo criterio que `ficha_por_titulo`).
+     * [09AA-23] Los vínculos ahora son mapa ID→título y se verifica además
+     * que el título devuelto es el de la ficha emparejada. */
     #[test]
     fn aviso_conocido_id_titulo_huerfano_y_empate() {
-        use std::collections::HashSet;
+        use std::collections::HashMap;
+        let conocido =
+            |hilo: &str, candidatos: &[(Uuid, String)], vinculos: &HashMap<String, String>| {
+                titulo_vinculado_del_hilo(hilo, candidatos, vinculos).is_some()
+            };
         let id = Uuid::new_v4();
-        let candidatos = vec![(id, "Casa en venta en Riberas del Caroní".to_string())];
-        let ids: HashSet<String> = ["123456789012345".to_string()].into_iter().collect();
-        assert!(aviso_conocido_del_hilo(
-            "tina|123456789012345",
-            &candidatos,
-            &ids
-        ));
-        assert!(!aviso_conocido_del_hilo(
-            "tina|999999999999999",
-            &candidatos,
-            &ids
-        ));
-        assert!(aviso_conocido_del_hilo(
-            "tina|VEF0 casa en venta en riberas del caroní, puerto ordaz",
-            &candidatos,
-            &ids
-        ));
-        assert!(!aviso_conocido_del_hilo(
+        let titulo_riberas = "Casa en venta en Riberas del Caroní".to_string();
+        let candidatos = vec![(id, titulo_riberas.clone())];
+        let vinculos: HashMap<String, String> =
+            [("123456789012345".to_string(), titulo_riberas.clone())]
+                .into_iter()
+                .collect();
+        assert_eq!(
+            titulo_vinculado_del_hilo("tina|123456789012345", &candidatos, &vinculos),
+            Some(titulo_riberas.clone())
+        );
+        assert!(conocido("tina|123456789012345", &candidatos, &vinculos));
+        assert!(!conocido("tina|999999999999999", &candidatos, &vinculos));
+        assert_eq!(
+            titulo_vinculado_del_hilo(
+                "tina|VEF0 casa en venta en riberas del caroní, puerto ordaz",
+                &candidatos,
+                &vinculos
+            ),
+            Some(titulo_riberas.clone())
+        );
+        assert!(!conocido(
             "tina|casa en venta en arivana",
             &candidatos,
-            &ids
+            &vinculos
         ));
-        assert!(!aviso_conocido_del_hilo("sin-separador", &candidatos, &ids));
+        assert!(!conocido("sin-separador", &candidatos, &vinculos));
         let empatados = vec![
             (
                 Uuid::new_v4(),
@@ -1830,11 +1849,20 @@ mod pruebas {
                 "Casa en venta en Riberas del Caroní Sur".to_string(),
             ),
         ];
-        assert!(!aviso_conocido_del_hilo(
+        assert!(!conocido(
             "tina|casa en venta en riberas del caroní",
             &empatados,
-            &HashSet::new()
+            &HashMap::new()
         ));
+        /* Huérfano real de hoy: Río Aro no está en el catálogo → None. */
+        assert_eq!(
+            titulo_vinculado_del_hilo(
+                "salazar|VEF0 apartamento residencias rio aro plaza puerto ordaz",
+                &candidatos,
+                &vinculos
+            ),
+            None
+        );
     }
 
     #[test]

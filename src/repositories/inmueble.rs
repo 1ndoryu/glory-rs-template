@@ -151,10 +151,12 @@ impl InmuebleRepository {
     }
 
     /* [09AA-21] IDs de aviso vinculados en publicados, para `aviso_conocido`
-     * del panel (`resumen_chats`): una sola query, sin N+1. */
-    pub async fn marketplace_ids_publicados(pool: &PgPool) -> Result<Vec<String>, sqlx::Error> {
-        sqlx::query_scalar(
-            "SELECT marketplace_id FROM inmuebles \
+     * del panel (`resumen_chats`): una sola query, sin N+1.
+     * [09AA-23] Devuelve también el título: el panel muestra con qué
+     * inmueble está vinculado cada hilo (`inmueble_vinculado`). */
+    pub async fn vinculos_publicados(pool: &PgPool) -> Result<Vec<(String, String)>, sqlx::Error> {
+        sqlx::query_as(
+            "SELECT marketplace_id, titulo FROM inmuebles \
              WHERE publicado = TRUE AND marketplace_id IS NOT NULL",
         )
         .fetch_all(pool)

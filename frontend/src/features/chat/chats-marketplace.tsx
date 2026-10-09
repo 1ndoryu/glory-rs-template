@@ -4,6 +4,7 @@
 
 import { useState } from 'react';
 import { useChatsMarketplace } from './use-chats-marketplace';
+import type { ChatResumen } from '../../data/chat/marketplace-chats';
 import { HilosHuerfanos } from './hilos-huerfanos';
 import { LogsMarketplace } from './logs-marketplace';
 import { Badge } from '@/components/ui/badge';
@@ -32,6 +33,28 @@ function textoSinMarca(linea: string): string {
 
 export function ChatsMarketplace() {
   const { lista, seleccion, error, recargar, elegir, regenerando, resumenRegen, regenerarTodoPanel } = useChatsMarketplace();
+  /* [09AA-23] Vínculo del hilo con su inmueble: el backend manda
+   * `inmueble_vinculado` (título) + `aviso_conocido`. Sin dato (filas de
+   * backend viejo) no se pinta nada; `false` explícito = «Sin ficha». */
+  const vinculoDe = (hilo: string): ChatResumen | undefined => lista.find((c) => c.thread_id === hilo);
+  const insigniaVinculo = (c: ChatResumen | undefined) => {
+    if (!c) return null;
+    if (c.inmueble_vinculado) {
+      return (
+        <Badge variant="default" className="text-[10px]">
+          Vinculado: {c.inmueble_vinculado}
+        </Badge>
+      );
+    }
+    if (c.aviso_conocido === false) {
+      return (
+        <Badge variant="destructive" className="text-[10px]">
+          Sin ficha
+        </Badge>
+      );
+    }
+    return null;
+  };
   /* [09AA-5] Tab de Logs: qué hizo el puente (caché/IA/fallback) por cada
    * borrador, para cazar la «plantilla fantasma» sin leer el log de texto.
    * [09AA-19 F7c] Tab de Huérfanos: hilos sin ficha exacta con vínculo
@@ -75,6 +98,7 @@ export function ChatsMarketplace() {
                 }`}
               >
                 <span className="block break-all font-medium">{c.thread_id}</span>
+                <span className="mt-0.5 flex flex-wrap items-center gap-1">{insigniaVinculo(c)}</span>
                 <span className="mt-0.5 block text-muted-foreground">
                   {c.borradores} borrador{c.borradores === 1 ? '' : 'es'} · {c.usos} uso{c.usos === 1 ? '' : 's'} ·{' '}
                   {fechaCorta(c.ultimo)}
@@ -111,8 +135,9 @@ export function ChatsMarketplace() {
         )}
       </section>
       <section>
-        <h3 className="mb-2 text-sm font-medium">
+        <h3 className="mb-2 flex flex-wrap items-center gap-2 text-sm font-medium">
           {seleccion ? `Hilo: ${seleccion.hilo}` : 'Elige un chat para ver sus borradores'}
+          {seleccion && insigniaVinculo(vinculoDe(seleccion.hilo))}
         </h3>
         {seleccion?.cargando && <p className="text-sm text-muted-foreground">Cargando borradores…</p>}
         <ul className="space-y-2">

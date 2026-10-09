@@ -13,8 +13,13 @@ export interface ChatResumen {
   ultimo: string;
   /* [09AA-19 F7c] Fuente de verdad futura del vínculo (el backend aún no la
    * envía): ausente = sin dato (la vista de huérfanos los muestra todos con
-   * aviso). Cuando exista, `true` = hilo con ficha, `false` = huérfano. */
+   * aviso). Cuando exista, `true` = hilo con ficha, `false` = huérfano.
+   * [09AA-23] El backend ya la envía (siempre presente en filas nuevas);
+   * se conserva opcional por compatibilidad con respuestas viejas. */
   aviso_conocido?: boolean;
+  /* [09AA-23] Título del inmueble vinculado (ID exacto o título emparejado);
+   * ausente/null = huérfano («Sin ficha»). */
+  inmueble_vinculado?: string | null;
 }
 
 /* Fila de `GET /api/admin/marketplace/chats/:thread`. */

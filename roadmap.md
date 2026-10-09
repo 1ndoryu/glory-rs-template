@@ -26,6 +26,25 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 
 ## Pendientes
 
+- **09AA-23 — Vínculo visible en chats (pedido por ella 2026-10-09, ACTIVA):**
+  vio en el admin el borrador de `salazar|VEF0 apartamento residencias rio
+  aro plaza` sin precio y pidió que el admin muestre con qué inmueble está
+  vinculado cada hilo. Diagnóstico: no es bug del borrador — ese apartamento
+  NO está en su catálogo (14 publicados revisados, ninguno es Río Aro; todos
+  con `marketplace_id` NULL) y el fallback por título rehúsa correctamente
+  (Río Aro ≠ Caroní Plaza), así que la IA va SIN_FICHA y no inventa precio.
+  Fix suyo: crear el inmueble en el admin con precio y Regenerar. Alcance
+  código: `ChatResumen.inmueble_vinculado: Option<String>` (título emparejado
+  por ID o título, `None` = huérfano) + badge «Vinculado: X»/«Sin ficha» en
+  la lista y el detalle de chats. **Cerrada 2026-10-09 (commit, ver
+  `Agente/completados/tareas-2026-10-09.md`):** `vinculos_publicados()`
+  (ID+título en una query) + `titulo_vinculado_del_hilo()` (el bool viejo
+  era envoltorio muerto: eliminado, tests usan el núcleo) + badge con
+  `Badge` del sistema; gate fmt 0 + clippy 0 + test 182/182 + tsc 0 +
+  OpenAPI vivo con `inmueble_vinculado nullable`; re-análisis **0E/449W**
+  (el +1 es la nueva `query_as` en `inmueble.rs:157`, misma familia
+  preexistente `sqlx-sin-macro` que sus 17 vecinas). Pendiente de ella:
+  crear el inmueble Río Aro con precio y Regenerar el hilo salazar.
 - **09AA-19 — Burbujas estructuradas (pedido por ella 2026-10-09, EN
   CURSO):** cerrado F0 (09AA-20✓), F7a+F7c (09AA-21✓) y F3 (09AA-22✓) con
   commit+push (ver `Agente/completados/tareas-2026-10-09.md`): splits
