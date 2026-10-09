@@ -30,7 +30,9 @@ export function leerChat(thread: string): Promise<ChatFila[]> {
   return apiFetch<ChatFila[]>(`/api/admin/marketplace/chats/${encodeURIComponent(thread)}`);
 }
 
-/* [08AA-39] Limpieza total del panel: borra toda la caché de borradores. */
+/* [08AA-39] Limpieza total del panel: borra toda la caché de borradores.
+ * [09AA-4] Sin botón en el panel (un solo «Regenerar», lo pidió ella
+ * 2026-10-09): queda como cliente del endpoint admin `DELETE /chats`. */
 export function limpiarChats(): Promise<{ borrados: number }> {
   return apiFetch<{ borrados: number }>('/api/admin/marketplace/chats', { method: 'DELETE' });
 }

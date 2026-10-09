@@ -154,12 +154,92 @@ pub(super) async fn completar_glory(
 }
 
 /* [03AA-3 M3] Se expone al handler `marketplace` para generar borradores;
- * sigue sin ruta HTTP propia (solo `probar`/`completar` del centro de IA). */
+ * sigue sin ruta HTTP propia (solo `probar`/`completar` del centro de IA).
+ * [09AA-4] Diagnóstico sin PII de una respuesta Responses sin texto: solo
+ * forma (estado, tipos de `output[]`, uso, motivo de `incomplete`), nunca el
+ * contenido. El vacío existe de verdad (2026-10-09: 200 sin `message`, sin
+ * `AI incompleta` en el log = no es tope de tokens; el relay estaba sano en
+ * replay mínimo), así que ante un vacío persistente el WARN dice QUÉ vino. */
+pub(super) fn diagnostico_respuesta_vacia(resp: &serde_json::Value) -> String {
+    let estado = resp
+        .get("status")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("?");
+    let mut tipos: Vec<&str> = Vec::new();
+    if let Some(items) = resp.get("output").and_then(serde_json::Value::as_array) {
+        for item in items {
+            if let Some(t) = item.get("type").and_then(serde_json::Value::as_str) {
+                tipos.push(t);
+            }
+        }
+    }
+    let motivo = resp
+        .get("incomplete_details")
+        .and_then(|d| d.get("reason"))
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("-");
+    let uso = resp.get("uso").map_or_else(
+        || {
+            resp.get("usage")
+                .map_or_else(|| "-".to_string(), uso_responses)
+        },
+        uso_responses,
+    );
+    format!(
+        "estado={estado} tipos=[{}] motivo={motivo} uso={uso}",
+        tipos.join(",")
+    )
+}
+
+/// `in/out` de `usage` como texto; ausente o no numérico → `-`.
+fn uso_responses(uso: &serde_json::Value) -> String {
+    let num = |c: &str| uso.get(c).and_then(serde_json::Value::as_u64).unwrap_or(0);
+    format!("in={} out={}", num("input_tokens"), num("output_tokens"))
+}
+
+async fn llamar_opencode(
+    config: &glory_agent::providers::ProviderConfig,
+    entrada: &[serde_json::Value],
+    cliente: &reqwest::Client,
+    tope: u32,
+    sesion: &str,
+) -> Result<serde_json::Value, String> {
+    glory_agent::providers::call_provider(
+        config,
+        entrada,
+        None,
+        glory_agent::providers::ChatApiOptions {
+            max_output_tokens: tope,
+            timeout_secs: 120,
+        },
+        Some(sesion),
+        cliente,
+    )
+    .await
+    .map_err(|e| format!("OpenCode Go: {e}"))
+}
+
+/* `sesion`: id estable por conversación para `x-opencode-session` (afinidad
+ * de ruteo + prompt caching del relay; ver docs de Go). Estable = mismo
+ * valor para el mismo hilo (un hash, jamás PII en claro); quien no tiene
+ * hilo pasa una etiqueta fija (`"centro-ia"`, `"fotos"`). Un uuid fresco por
+ * llamada también evita el 400, pero rompe la afinidad y parece abuso. */
 pub(crate) async fn completar_opencode(
     system: &str,
     texto: &str,
     fotos: &[String],
+    sesion: &str,
 ) -> Result<(String, String), String> {
+    /* [08AA-19] 4000, no 2500: el modelo razona antes de redactar
+     * y un prompt normal ya quema ~1788 tokens de razonamiento
+     * (medido 2026-10-08 contra el endpoint real); con 2500 el
+     * borrador largo caía en `incomplete` sin `message` y acababa
+     * en `reserva`. El texto útil son ~150 tokens.
+     * [09AA-4] 8000, no 4000: el vacío del 2026-10-09 no era tope
+     * (sin `AI incompleta`), pero el razonamiento varía por hilo y
+     * 4000 se midió una sola vez; 8000 da aire como `standard()`
+     * (8192) sin cambiar el coste del texto útil. */
+    const TOPE_BORRADOR: u32 = 8000;
     let key = leer_env("OPENCODE_GO_API_KEY");
     if key.is_empty() {
         return Err("Sin OPENCODE_GO_API_KEY en .env".to_string());
@@ -175,27 +255,22 @@ pub(crate) async fn completar_opencode(
         serde_json::json!({"role": "user", "content": contenido}),
     ];
     let cliente = cliente_http(120).map_err(|e| e.to_string())?;
-    let respuesta = glory_agent::providers::call_provider(
-        &config,
-        &entrada,
-        None,
-        glory_agent::providers::ChatApiOptions {
-            /* [08AA-19] 4000, no 2500: el modelo razona antes de redactar
-             * y un prompt normal ya quema ~1788 tokens de razonamiento
-             * (medido 2026-10-08 contra el endpoint real); con 2500 el
-             * borrador largo caía en `incomplete` sin `message` y acababa
-             * en `reserva`. El texto útil son ~150 tokens. */
-            max_output_tokens: 4000,
-            timeout_secs: 120,
-        },
-        Some(&uuid::Uuid::new_v4().to_string()),
-        &cliente,
-    )
-    .await
-    .map_err(|e| format!("OpenCode Go: {e}"))?;
-    glory_agent::providers::extract_first_text(&respuesta)
-        .map(|t| (t, config.model.clone()))
-        .ok_or_else(|| "OpenCode Go devolvio una respuesta sin texto".to_string())
+    let mut respuesta = llamar_opencode(&config, &entrada, &cliente, TOPE_BORRADOR, sesion).await?;
+    let mut texto_ia = glory_agent::providers::extract_first_text(&respuesta);
+    /* [09AA-4] Un reintento ante vacío: el relay a veces devuelve 200 sin
+     * `message` de forma transitoria (incidente 2026-10-09 con relay sano
+     * en replay). Solo en el camino de fallo, como mucho una llamada más. */
+    if texto_ia.is_none() {
+        respuesta = llamar_opencode(&config, &entrada, &cliente, TOPE_BORRADOR, sesion).await?;
+        texto_ia = glory_agent::providers::extract_first_text(&respuesta);
+    }
+    texto_ia.map(|t| (t, config.model.clone())).ok_or_else(|| {
+        tracing::warn!(
+            "OpenCode Go vacío persistente ({}); va fallback",
+            diagnostico_respuesta_vacia(&respuesta)
+        );
+        "OpenCode Go devolvio una respuesta sin texto".to_string()
+    })
 }
 
 /// [309A-4] Transcribe una nota de voz con Groq Whisper
@@ -326,7 +401,42 @@ pub(crate) async fn describir_foto(data_url: &str, pie: &str) -> Result<String, 
          la descripción de la foto, texto plano, sin adornos.",
         &texto,
         &[data_url.to_string()],
+        "fotos",
     )
     .await?;
     Ok(texto.chars().take(1200).collect())
+}
+
+/* [09AA-4] Puras, sin DB: el diagnóstico solo describe la forma. */
+#[cfg(test)]
+mod pruebas {
+    use super::diagnostico_respuesta_vacia;
+
+    #[test]
+    fn diagnostico_describe_respuesta_vacia_sin_pii() {
+        let vacia = serde_json::json!({
+            "status": "completed",
+            "output": [{"type": "reasoning"}],
+            "usage": {"input_tokens": 12, "output_tokens": 118},
+        });
+        assert_eq!(
+            diagnostico_respuesta_vacia(&vacia),
+            "estado=completed tipos=[reasoning] motivo=- uso=in=12 out=118"
+        );
+        let incompleta = serde_json::json!({
+            "status": "incomplete",
+            "output": [{"type": "reasoning"}],
+            "incomplete_details": {"reason": "max_output_tokens"},
+            "usage": {"input_tokens": 2000, "output_tokens": 8000},
+        });
+        assert_eq!(
+            diagnostico_respuesta_vacia(&incompleta),
+            "estado=incomplete tipos=[reasoning] motivo=max_output_tokens uso=in=2000 out=8000"
+        );
+        let rota: serde_json::Value = serde_json::json!({"output": "no-es-arreglo"});
+        assert_eq!(
+            diagnostico_respuesta_vacia(&rota),
+            "estado=? tipos=[] motivo=- uso=-"
+        );
+    }
 }

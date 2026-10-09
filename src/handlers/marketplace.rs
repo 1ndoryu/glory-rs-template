@@ -18,12 +18,12 @@ use crate::errors::AppError;
 use crate::middleware::AuthUser;
 use crate::repositories::InmuebleRepository;
 use crate::services::marketplace::{
-    aviso_fb_de_thread, borrar_todo_cache, buscar_cache, clave_hilo, consumir_minuto,
-    corregir_cache, detalle_chat, filas_para_regenerar, formatear_parrafos, guardar_cache,
-    hash_ficha, nombre_de_thread, normalizar_excerpt_hilo, precio_hash_seguro, reemplazar_cache,
-    releer_foto, resumen_chats, resumen_uso, sha_hex, strip_ficha_para_prompt, sub_exento,
-    validar_borrador, BorradorRequest, ExcerptIn, FotoHilo, FALLBACK_BORRADOR, SIN_FICHA,
-    STRIP_VERSION,
+    aviso_fb_de_thread, borrar_hilo_no_corregidas, borrar_todo_cache, buscar_cache, clave_hilo,
+    consumir_minuto, corregir_cache, detalle_chat, filas_para_regenerar, formatear_parrafos,
+    guardar_cache, hash_ficha, nombre_de_thread, normalizar_excerpt_hilo, precio_hash_seguro,
+    reemplazar_cache, releer_foto, resumen_chats, resumen_uso, sha_hex, strip_ficha_para_prompt,
+    sub_exento, validar_borrador, BorradorRequest, ExcerptIn, FotoHilo, FALLBACK_BORRADOR,
+    SIN_FICHA, STRIP_VERSION,
 };
 use crate::AppState;
 
@@ -222,10 +222,12 @@ pub async fn borrador(
         .into_response())
 }
 
-/// Regenerar explícito de la dueña: `DELETE` + bypass de lectura (nueva IA
-/// siempre) + reemplazo (pisa incluso correcciones: lo pidió ella).
-/// Sin tope por minuto por decisión 2026-10-05 (freno = ritmo humano); el
-/// resto del flujo (schema 422, reserva si cae la IA, no cachear fallback)
+/// Regenerar explícito de la dueña: borra las filas no-corregidas del hilo +
+/// bypass de lectura (nueva IA siempre) + reemplazo (pisa incluso
+/// correcciones de la MISMA firma: lo pidió ella). Si la IA cae no se guarda
+/// nada ([09AA-4]: antes se conservaba el viejo y el panel lo seguía
+/// mostrando al abrir). Sin tope por minuto por decisión 2026-10-05 (freno
+/// = ritmo humano); el resto del flujo (schema 422, no cachear fallback)
 /// es idéntico al `borrador`. [08AA-14] Sin matriz negativa por decisión de
 /// ella 2026-10-08: el texto de la IA pasa por `imponer_forma_borrador`
 /// (09AA-2) y conserva la regla de no inventar contacto.
@@ -254,8 +256,11 @@ pub async fn regenerar(
 
 /// [09AA-3] Núcleo compartido de Regenerar (uno y todo): normaliza el
 /// excerpt, genera directo a la IA (bypass, gesto explícito) y reemplaza
-/// la fila si es `ia`. En `reserva` se CONSERVA el borrador viejo: antes
-/// se borraba primero y la fila se perdía en silencio.
+/// la fila si es `ia`.
+/// [09AA-4] Borra PRIMERO las filas no-corregidas del hilo y NO conserva
+/// nada si la IA cae: 09AA-3 conservaba el viejo en `reserva` y el panel
+/// seguía mostrando el texto viejo al abrir (reporte de ella 2026-10-09).
+/// Las correcciones de la dueña (`corregida`) jamás se tocan.
 /// Sin validar schema: las filas masivas ya se validaron al ingresar.
 async fn regenerar_uno(
     pool: &sqlx::PgPool,
@@ -273,6 +278,13 @@ async fn regenerar_uno(
     let titulo_fb = aviso_fb_de_thread(r.thread_id.trim());
     let (seguro, precio_hash, catalog_hash, conocido) =
         claves_cache(pool, r.aviso_id.as_deref(), titulo_fb.as_deref()).await?;
+    /* [09AA-4] Borrar primero, generar después: cada excerpt nuevo es una
+     * firma nueva y las filas viejas del hilo viven 90 días; sin esto el
+     * panel lista lo viejo junto a lo fresco y parece «cacheado».
+     * `clave_hilo()` es idempotente (ver `guardar_cache`), así que vale
+     * tanto el `thread_id` crudo del flotante como el ya guardado que
+     * trae `regenerar_todo`. Las correcciones de la dueña quedan. */
+    borrar_hilo_no_corregidas(pool, &clave_hilo(r.thread_id.trim())).await?;
     /* Bypass: directo a la IA, sin vuelo (Regenerar es gesto explícito; si
      * dos llegan juntas, la última que escribe gana por `reemplazar`). */
     let gen = generar_borrador(&r, seguro.as_ref(), pool).await;
@@ -304,8 +316,9 @@ async fn regenerar_uno(
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct RegenerarTodoFila {
     pub thread_id: String,
-    /// `ia` (reemplazado), `reserva` (IA caída: se conservó el viejo) u
-    /// `omitido` (sin excerpt con que regenerar).
+    /// `ia` (reemplazado), `reserva` (la IA cayó y NO quedó borrador fresco:
+    /// lo viejo se borró antes de generar, ver `regenerar_uno`) u `omitido`
+    /// (sin excerpt con que regenerar).
     pub fuente: String,
 }
 
@@ -677,7 +690,17 @@ async fn generar_borrador(
         hora = r.excerpt.hora,
         regla_nombre = regla_nombre
     );
-    let texto = match crate::handlers::ia::completar_opencode(&sistema, &r.excerpt.texto, &[]).await
+    /* [09AA-4] Sesión estable por hilo (hash, jamás PII en claro): el relay
+     * exige `x-opencode-session` y premia la estabilidad con ruteo afin y
+     * prompt caching. */
+    let sesion_hilo = sha_hex(&clave_hilo(r.thread_id.trim()));
+    let texto = match crate::handlers::ia::completar_opencode(
+        &sistema,
+        &r.excerpt.texto,
+        &[],
+        &sesion_hilo,
+    )
+    .await
     {
         Ok((t, _)) => t,
         Err(e) => {

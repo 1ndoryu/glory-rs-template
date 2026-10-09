@@ -26,6 +26,29 @@ Ver `Agente/completados/tareas-2026-03-25.md` para detalles.
 
 ## Pendientes
 
+- **09AA-4 — Regenerar es un solo botón + IA vacía con reintento (pedido por
+  ella 2026-10-09, ACTIVA):** su prueba de 09AA-3 falló: al abrir la
+  conversación sigue el texto viejo. Causas confirmadas: (1) OpenCode Go
+  devuelve 200 sin `message` (WARN `IA caída (... respuesta sin texto)`,
+  latencia 12s; el relay está sano — replay mínimo `completed` con 118
+  tokens; sin `AI incompleta` en el log = no es tope, es vacío del relay);
+  (2) el `conserva` de 09AA-3 devuelve lo viejo en `reserva` = literalmente
+  «el mensaje cacheado»; (3) cada excerpt nuevo es firma nueva y las filas
+  viejas viven 90 días (el panel las lista junto a la fresca). Fix:
+  `completar_opencode` a 8000 tokens + 1 reintento ante vacío + WARN con la
+  forma cruda (estado/tipos/uso/motivo, sin PII); `regenerar_uno` borra
+  primero las filas no-corregidas del hilo (correcciones intactas) y NO
+  conserva nada si la IA cae; panel con un solo botón «Regenerar» (fuera
+   «Limpiar»; el endpoint `DELETE /chats` queda como API admin). Añadido
+   2026-10-09 noche: sesión estable en `x-opencode-session` — el relay exige
+   ese header (400 `MissingSessionID` sin él) y premia la estabilidad con
+   ruteo afín y prompt caching; antes mandábamos uuid fresco por llamada
+   (evita el 400 pero rompe la afinidad y parece abuso). Ahora
+   `completar_opencode(..., sesion)` recibe `sha_hex(clave_hilo(thread))` en
+   borradores (hash, jamás PII en claro), `"centro-ia"` en el centro IA y
+   `"fotos"` en descripción de fotos. Gate: fmt 0 + clippy 0 + test 153/153;
+   vivo `9280` binario 23:13 (health OK). Falta: prueba real con JWT
+   (`/borrador` → confirmar `fuente=ia`, sin WARN de vacío).
 - **09AA-3 — Regenerar-todo + dieta del prompt (pedido por ella 2026-10-09,
   CERRADA pendiente de su prueba):** (1) botón «Regenerar todo» (secondary)
   al lado de Recargar, con confirmación y resumen

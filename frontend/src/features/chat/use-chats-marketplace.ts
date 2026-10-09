@@ -2,7 +2,7 @@
 // El hilo es la clave de ventana del puente (trae nombre+aviso: solo-admin).
 
 import { useCallback, useEffect, useState } from 'react';
-import { leerChat, limpiarChats, listarChats, regenerarTodo, type ChatFila, type ChatResumen, type RegenerarTodoResumen } from '../../data/chat/marketplace-chats';
+import { leerChat, listarChats, regenerarTodo, type ChatFila, type ChatResumen, type RegenerarTodoResumen } from '../../data/chat/marketplace-chats';
 import { ErrorApi } from '../../data/inmuebles/api';
 
 export interface DetalleChat {
@@ -46,19 +46,6 @@ export function useChatsMarketplace() {
     }
   }, []);
 
-  /* [08AA-39] Limpieza total con confirmación: vacía caché + panel. */
-  const limpiar = useCallback(async () => {
-    if (!window.confirm('¿Borrar todos los chats y borradores? No se puede deshacer.')) return;
-    try {
-      await limpiarChats();
-      setLista([]);
-      setSeleccion(null);
-      setError(null);
-    } catch (e: unknown) {
-      setError(e instanceof ErrorApi ? e.message : 'Fallo inesperado.');
-    }
-  }, []);
-
   /* [09AA-3] Regeneración masiva con confirmación: refresca toda la
    * lista al terminar y muestra el resumen por hilo. Tarda ~15s por
    * chat (una pasada en serie contra la IA). */
@@ -80,5 +67,5 @@ export function useChatsMarketplace() {
     }
   }, []);
 
-  return { lista, seleccion, error, recargar, elegir, limpiar, regenerando, resumenRegen, regenerarTodoPanel };
+  return { lista, seleccion, error, recargar, elegir, regenerando, resumenRegen, regenerarTodoPanel };
 }

@@ -28,7 +28,7 @@ function textoSinMarca(linea: string): string {
 }
 
 export function ChatsMarketplace() {
-  const { lista, seleccion, error, recargar, elegir, limpiar, regenerando, resumenRegen, regenerarTodoPanel } = useChatsMarketplace();
+  const { lista, seleccion, error, recargar, elegir, regenerando, resumenRegen, regenerarTodoPanel } = useChatsMarketplace();
 
   return (
     <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
@@ -67,20 +67,20 @@ export function ChatsMarketplace() {
           <Button variant="outline" size="sm" onClick={() => void recargar()}>
             Recargar
           </Button>
-          {/* [09AA-3] Regeneración masiva al lado de Recargar: refresca
-           * todos los borradores sin borrar la caché. Tarda ~15s por chat. */}
+          {/* [09AA-3] Regeneración masiva al lado de Recargar: borra los
+           * borradores viejos y genera frescos con la IA en una pasada en
+           * serie. Tarda ~15s por chat.
+           * [09AA-4] Este botón ES el limpiar+regenerar en uno (lo pidió
+           * ella 2026-10-09): fuera el «Limpiar» separado (el endpoint
+           * DELETE /chats queda como API admin). */}
           <Button variant="secondary" size="sm" disabled={regenerando} onClick={() => void regenerarTodoPanel()}>
-            {regenerando ? 'Regenerando…' : 'Regenerar todo'}
-          </Button>
-          {/* [08AA-39] Limpieza total al lado de Recargar, con confirmación. */}
-          <Button variant="destructive" size="sm" onClick={() => void limpiar()}>
-            Limpiar
+            {regenerando ? 'Regenerando…' : 'Regenerar'}
           </Button>
         </div>
         {resumenRegen && (
           <p className="mt-2 text-xs text-muted-foreground">
             Regenerados {resumenRegen.regenerados} de {resumenRegen.candidatos}
-            {resumenRegen.en_reserva > 0 && ` (${resumenRegen.en_reserva} en reserva: IA caída, se conservó el viejo)`}
+            {resumenRegen.en_reserva > 0 && ` (${resumenRegen.en_reserva} sin borrador fresco: la IA falló)`}
             {resumenRegen.omitidos > 0 && `, ${resumenRegen.omitidos} omitidos`}.
           </p>
         )}

@@ -776,6 +776,23 @@ pub async fn borrar_todo_cache(pool: &sqlx::PgPool) -> Result<u64, AppError> {
     Ok(r.rows_affected())
 }
 
+/// [09AA-4] Borrado previo a regenerar: elimina las filas del hilo que NO
+/// son correcciones de la dueña (borradores viejos de excerpts anteriores).
+/// Las correcciones (`corregida`, puestas por ella con el lápiz) jamás se
+/// tocan: son su texto, no caché. Devuelve cuántas filas cayeron.
+/// Sin esto, cada excerpt nuevo es una firma nueva y sus filas viejas viven
+/// 90 días: el panel lista lo viejo junto a lo fresco y parece «cacheado».
+pub async fn borrar_hilo_no_corregidas(
+    pool: &sqlx::PgPool,
+    thread_clave: &str,
+) -> Result<u64, AppError> {
+    let r = sqlx::query("DELETE FROM mp_respuestas_cache WHERE thread_id = $1 AND NOT corregida")
+        .bind(thread_clave)
+        .execute(pool)
+        .await?;
+    Ok(r.rows_affected())
+}
+
 /// Fila del dashboard M2: conteos por día y evento. Sin PII: el HMAC del hilo
 /// jamás sale, solo día + evento + conteo.
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -1997,6 +2014,70 @@ mod pruebas {
         borrar_cache(&pool, &fa, &pa, &ca).await.expect("limpia a");
         borrar_cache(&pool, &fb, &pb, &cb).await.expect("limpia b");
         borrar_cache(&pool, &fc, &pc, &cc).await.expect("limpia c");
+    }
+
+    /* [09AA-4] Borrado previo a regenerar: caen los borradores viejos del
+     * hilo, queda la corrección de la dueña y no se toca otro hilo. */
+    #[tokio::test]
+    async fn borrar_hilo_respeta_correccion_y_otro_hilo() {
+        let Some(pool) = pool_si_hay() else { return };
+        let (f1, p1, c1) = (clave_azar(), clave_azar(), clave_azar());
+        guardar_cache(
+            &pool,
+            &f1,
+            &p1,
+            &c1,
+            "viejo-1",
+            &foto_prueba("hilo-r", "x", "crudo-x"),
+        )
+        .await
+        .expect("guarda 1");
+        let (f2, p2, c2) = (clave_azar(), clave_azar(), clave_azar());
+        guardar_cache(
+            &pool,
+            &f2,
+            &p2,
+            &c2,
+            "viejo-2",
+            &foto_prueba("hilo-r", "y", "crudo-y"),
+        )
+        .await
+        .expect("guarda 2");
+        corregir_cache(&pool, &f2, &p2, &c2, "texto duena")
+            .await
+            .expect("corrige 2");
+        let (f3, p3, c3) = (clave_azar(), clave_azar(), clave_azar());
+        guardar_cache(
+            &pool,
+            &f3,
+            &p3,
+            &c3,
+            "otro-hilo",
+            &foto_prueba("hilo-otro", "z", "crudo-z"),
+        )
+        .await
+        .expect("guarda 3");
+        let n = borrar_hilo_no_corregidas(&pool, &clave_hilo("hilo-r"))
+            .await
+            .expect("borra");
+        assert_eq!(n, 1, "solo cae el borrador viejo del hilo");
+        assert!(
+            buscar_cache(&pool, &f2, &p2, &c2)
+                .await
+                .expect("busca 2")
+                .is_some(),
+            "la corrección de la dueña queda"
+        );
+        assert!(
+            buscar_cache(&pool, &f3, &p3, &c3)
+                .await
+                .expect("busca 3")
+                .is_some(),
+            "el otro hilo no se toca"
+        );
+        borrar_cache(&pool, &f1, &p1, &c1).await.expect("limpia 1");
+        borrar_cache(&pool, &f2, &p2, &c2).await.expect("limpia 2");
+        borrar_cache(&pool, &f3, &p3, &c3).await.expect("limpia 3");
     }
 
     #[tokio::test]

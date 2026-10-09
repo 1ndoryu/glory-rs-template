@@ -417,7 +417,7 @@ async fn completar(
             texto_fallback
         };
         let intento = if id == ID_OPENCODE {
-            completar_opencode(&input.system, &texto_enviar, &input.fotos).await
+            completar_opencode(&input.system, &texto_enviar, &input.fotos, "centro-ia").await
         } else {
             completar_glory(&input.system, &texto_enviar, &input.fotos).await
         };
