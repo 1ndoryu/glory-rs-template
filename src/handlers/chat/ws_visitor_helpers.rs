@@ -208,8 +208,14 @@ async fn handle_visitor_text_message(
     state.chat_hub.broadcast(session_id, &ws_msg);
 
     /* [237A-9] Si la sesión está en human_priority, crear response cycle
-     * para que el worker active fallback IA si nadie responde en 10 min. */
-    match crate::repositories::ChatRepository::find_session_by_id(&state.pool, session_id).await {
+     * para que el worker active fallback IA si nadie responde en 10 min.
+     * [por que] La relectura de sesión y la lista de admins son consultas
+     * independientes: join! ahorra un round-trip de BD en el handler WS. */
+    let (session_res, admin_res) = tokio::join!(
+        crate::repositories::ChatRepository::find_session_by_id(&state.pool, session_id),
+        crate::repositories::UserRepository::admin_ids(&state.pool),
+    );
+    match session_res {
         Ok(Some(session)) if session.ai_mode == "human_priority" => {
             if let Err(error) = crate::repositories::ResponseCycleRepository::create_if_needed(
                 &state.pool,
@@ -228,7 +234,7 @@ async fn handle_visitor_text_message(
     }
 
     /* Push conteo de notificaciones no leídas a admins via WS */
-    match crate::repositories::UserRepository::admin_ids(&state.pool).await {
+    match admin_res {
         Ok(admin_ids) => {
             for admin_id in admin_ids {
                 state.notification_hub.send_unread_count(admin_id).await;

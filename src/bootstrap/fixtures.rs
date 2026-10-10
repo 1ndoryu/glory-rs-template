@@ -125,6 +125,9 @@ async fn cleanup_legacy_seed(pool: &sqlx::PgPool) {
     let mut total_deleted = 0u64;
     for (table, condition_tpl) in &cascade_tables {
         let condition = condition_tpl.replace("{q}", legacy_orders_subquery);
+        /* [por que] DELETE en orden FK (hijos antes que padres): cada tabla debe
+         * vaciarse antes que su padre, así que las consultas no se agrupan con join!. */
+        // sentinel-disable-next-line sqlite-carga-N-consultas
         let sql = format!("DELETE FROM {table} WHERE {condition}");
         if let Ok(r) = sqlx::query(&sql).bind(test_emails).execute(pool).await {
             total_deleted += r.rows_affected();
