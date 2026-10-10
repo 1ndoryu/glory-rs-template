@@ -7,10 +7,11 @@ import { usePublicidades } from '@/hooks/publicidad/use-publicidades';
 import { ModalDescargarFotos } from '@/features/inmuebles/modal-descargar-fotos';
 import { ModalEditorPublicidad } from '@/features/publicidad/modal-editor-publicidad';
 import { Badge } from '@/components/ui/badge';
+import { MiniaturaFoto } from '@/components/ui/miniatura-foto';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 /* [08AA-13] Celdas y menú viven en módulos propios: la tabla supera 300 líneas. */
-import { claseEstadoDe, Foto, precioVisible, Publico, SemaforoFicha, VinculoBadge } from './tabla/celdas-tabla-inmuebles';
+import { claseEstadoDe, precioVisible, Publico, SemaforoFicha, VinculoBadge } from './tabla/celdas-tabla-inmuebles';
 import { MenuAcciones } from './tabla/menu-acciones-inmueble';
 
 interface Props {
@@ -123,7 +124,7 @@ export function TablaInmuebles({ inmuebles, onVer, onEditar, onEliminar, onAnadi
                     aria-label={`Ver ${i.titulo || 'Sin título'}`}
                     className="block cursor-pointer rounded-md transition hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
                   >
-                    <Foto src={portadaDe(i)} titulo={i.titulo || 'Inmueble'} />
+                    <MiniaturaFoto key={portadaDe(i)} src={portadaDe(i)} titulo={i.titulo || 'Inmueble'} />
                   </button>
                 </TableCell>
                 <TableCell className="max-w-[220px]">

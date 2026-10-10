@@ -20,6 +20,9 @@ export interface ChatResumen {
   /* [09AA-23] Título del inmueble vinculado (ID exacto o título emparejado);
    * ausente/null = huérfano («Sin ficha»). */
   inmueble_vinculado?: string | null;
+  /* [09AA-28] URL pública (`/uploads/…`, relativa a la API) de la portada del
+   * inmueble vinculado; ausente/null = sin vínculo o ficha sin fotos. */
+  inmueble_foto?: string | null;
 }
 
 /* Fila de `GET /api/admin/marketplace/chats/:thread`. */

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { EVENTO_SESION_EXPIRADA, borrarSesion, entrar, leerEmailSesion, leerToken } from '../../data/inmuebles/api';
 import { suscribirEvento, nombreHost } from '../../platform/ventana';
 
@@ -11,6 +11,15 @@ import { suscribirEvento, nombreHost } from '../../platform/ventana';
 // VITE_DEV_PASSWORD). Si falla (API caída, clave cambiada) se muestra el
 // login normal sin reintentos; "Salir" no se sabotea porque el intento solo
 // ocurre al montar sin token.
+/* [09AA-26] La petición de auto-entrada vive a nivel de módulo: `StrictMode`
+ * (dev) monta, desmonta y vuelve a montar el efecto. Con un `useRef` por
+ * instancia, el 1.er montaje lanzaba el login pero su resultado se descartaba
+ * (`vivo=false`) y el 2.º se saltaba el intento, así que `autoEntrando` nunca
+ * volvía a false y el panel se quedaba en «Entrando automáticamente…» con el
+ * token ya guardado. Compartir la promesa en vuelo hace que ambos montajes
+ * esperen la misma respuesta (un solo POST). */
+let entradaDevEnVuelo: Promise<string> | null = null;
+
 const HOSTS_LOCALES = new Set(['localhost', '127.0.0.1', 'inmobiliaria.localhost']);
 
 function credencialesDev(): { email: string; clave: string } | null {
@@ -29,7 +38,6 @@ export function useSesion() {
     leerToken() ? (leerEmailSesion() ?? 'admin') : null,
   );
   const [autoEntrando, setAutoEntrando] = useState(false);
-  const intentado = useRef(false);
 
   useEffect(() => {
     const alExpirar = () => setEmail(null);
@@ -37,15 +45,17 @@ export function useSesion() {
   }, []);
 
   useEffect(() => {
-    if (leerToken() || intentado.current) return;
+    if (leerToken()) return;
     const cred = credencialesDev();
     if (!cred) return;
-    intentado.current = true;
     setAutoEntrando(true);
     /* Sin AbortController: `entrar` no acepta señal; el flag `vivo` evita
      * fijar estado si el componente se desmontó antes de responder. */
     let vivo = true;
-    entrar(cred.email, cred.clave)
+    entradaDevEnVuelo ??= entrar(cred.email, cred.clave).finally(() => {
+      entradaDevEnVuelo = null;
+    });
+    entradaDevEnVuelo
       .then((quien) => {
         if (vivo) setEmail(quien);
       })

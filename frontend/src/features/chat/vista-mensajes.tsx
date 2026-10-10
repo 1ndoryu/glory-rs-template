@@ -3,7 +3,7 @@
 // vinculación WhatsApp. Pestañas internas para no ocupar más huecos del menú.
 // [07AA-7] suma la pestaña Marketplace: borradores por chat del puente.
 
-import { useState } from 'react';
+import { usePestanaPersistida } from '../../hooks/app/use-pestana-persistida';
 import { BandejaMensajes } from './bandeja-mensajes';
 import { ChatsMarketplace } from './chats-marketplace';
 import { ClientesDuena } from './clientes-duena';
@@ -23,8 +23,11 @@ const PESTANAS: { clave: Pestana; titulo: string }[] = [
   { clave: 'config', titulo: 'Configuración del chat' },
 ];
 
+/* [09AA-27] La pestaña abierta sobrevive a recargas (admin:mensajes:pestana). */
+const CLAVES_PESTANAS = PESTANAS.map((p) => p.clave);
+
 export function VistaMensajes() {
-  const [pestana, setPestana] = useState<Pestana>('bandeja');
+  const [pestana, setPestana] = usePestanaPersistida<Pestana>('admin:mensajes:pestana', CLAVES_PESTANAS, 'bandeja');
   return (
     <div>
       <div className="mb-4 flex flex-wrap gap-2">

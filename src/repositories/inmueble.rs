@@ -164,16 +164,38 @@ impl InmuebleRepository {
      * [09AA-23] Devuelve también el título: el panel muestra con qué
      * inmueble está vinculado cada hilo (`inmueble_vinculado`).
      * [09AA-24] Y los alias: la rama exacta también muestra el canónico
-     * aunque el hilo nombre un alias. */
+     * aunque el hilo nombre un alias.
+     * [09AA-28] Y el id del inmueble: el panel resuelve su portada. */
     pub async fn vinculos_publicados(
         pool: &PgPool,
-    ) -> Result<Vec<(String, String, Vec<String>)>, sqlx::Error> {
+    ) -> Result<Vec<(String, Uuid, String, Vec<String>)>, sqlx::Error> {
         sqlx::query_as(
-            "SELECT marketplace_id, titulo, alias_titulos FROM inmuebles \
+            "SELECT marketplace_id, id, titulo, alias_titulos FROM inmuebles \
              WHERE publicado = TRUE AND marketplace_id IS NOT NULL",
         )
         .fetch_all(pool)
         .await
+    }
+
+    /* [09AA-28] Clave de la portada (primera foto original por `orden`) de
+     * varios inmuebles en una sola query. Misma portada que ve la tabla del
+     * admin; las mejoradas se ignoran (la miniatura sale del original). */
+    pub async fn portadas_por_inmuebles(
+        pool: &PgPool,
+        ids: &[Uuid],
+    ) -> Result<HashMap<Uuid, String>, sqlx::Error> {
+        if ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let filas: Vec<(Uuid, String)> = sqlx::query_as(
+            "SELECT DISTINCT ON (inmueble_id) inmueble_id, storage_key FROM fotos \
+             WHERE inmueble_id = ANY($1) AND origen <> 'mejorada' \
+             ORDER BY inmueble_id, orden ASC",
+        )
+        .bind(ids)
+        .fetch_all(pool)
+        .await?;
+        Ok(filas.into_iter().collect())
     }
 
     pub async fn list_admin(

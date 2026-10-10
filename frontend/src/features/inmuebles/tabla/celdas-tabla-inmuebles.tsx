@@ -3,7 +3,7 @@
  * y para no abarrotar `features/inmuebles/` (máx 10 archivos). Sin cambio de
  * conducta ni de estilos. `claseEstadoDe` es función (no objeto exportado)
  * para no disparar `objeto-mutable-exportado`: el mapa vive dentro. */
-import { Building2, Globe } from 'lucide-react';
+import { Globe } from 'lucide-react';
 import { estaVerificado, formatearPrecio, type EstadoInmueble, type Inmueble } from '@/domain/inmueble';
 import { calcularCompletitud } from '@/domain/ficha-ask';
 import { Badge } from '@/components/ui/badge';
@@ -49,26 +49,6 @@ export function Publico({ publicado }: { publicado: boolean }) {
     <Badge variant="secondary" className="border-transparent bg-emerald-100 text-emerald-900">
       <Globe className="h-3 w-3" /> Público
     </Badge>
-  );
-}
-
-export function Foto({ src, titulo }: { src?: string; titulo: string }) {
-  if (!src) {
-    return (
-      <div className="flex h-14 w-20 items-center justify-center rounded-md bg-muted">
-        <Building2 className="h-5 w-5 text-muted-foreground" />
-      </div>
-    );
-  }
-  return (
-    <img
-      src={src}
-      alt={titulo}
-      className="h-14 w-20 rounded-md object-cover"
-      onError={(e) => {
-        (e.target as HTMLImageElement).style.display = 'none';
-      }}
-    />
   );
 }
 

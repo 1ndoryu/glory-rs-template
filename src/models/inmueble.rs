@@ -220,12 +220,19 @@ pub struct FotoPublica {
     pub created_at: DateTime<Utc>,
 }
 
+/// [09AA-28] URL pública de una clave de `fotos.storage_key` (una sola
+/// fuente: `FotoPublica` y la portada del panel de chats la comparten).
+#[must_use]
+pub fn url_publica_de_foto(storage_key: &str) -> String {
+    format!("/uploads/{storage_key}")
+}
+
 impl From<Foto> for FotoPublica {
     fn from(f: Foto) -> Self {
         Self {
             id: f.id,
             inmueble_id: f.inmueble_id,
-            url: format!("/uploads/{}", f.storage_key),
+            url: url_publica_de_foto(&f.storage_key),
             orden: f.orden,
             origen: f.origen,
             created_at: f.created_at,

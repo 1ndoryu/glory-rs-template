@@ -14,7 +14,10 @@ import {
 } from '../../data/chat/cliente-admin';
 import { ErrorApi } from '../../data/inmuebles/api';
 import { repetirCada } from '../../platform/ventana';
+import { usePestanaPersistida } from '../app/use-pestana-persistida';
 import { useHiloPaginado } from './use-hilo-paginado';
+
+const FILTROS_VALIDOS = ['todas', 'open', 'escalated', 'closed'] as const;
 
 function mensajeError(e: unknown): string {
   return e instanceof ErrorApi ? e.message : 'Fallo inesperado del chat.';
@@ -24,7 +27,12 @@ export function useBandejaChat() {
   const [sesiones, setSesiones] = useState<ResumenSesion[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filtro, setFiltro] = useState<'todas' | EstadoSesionChat>('todas');
+  /* [09AA-27] El filtro (Todas/Abiertas/…) sobrevive a recargas. */
+  const [filtro, setFiltro] = usePestanaPersistida<'todas' | EstadoSesionChat>(
+    'admin:mensajes:filtro',
+    FILTROS_VALIDOS,
+    'todas',
+  );
   const [seleccionada, setSeleccionada] = useState<string | null>(null);
   const [respondiendo, setRespondiendo] = useState(false);
   const hilo = useHiloPaginado();

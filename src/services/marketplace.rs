@@ -8,7 +8,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::errors::AppError;
-use crate::models::InmuebleRow;
+use crate::models::{url_publica_de_foto, InmuebleRow};
 use crate::repositories::InmuebleRepository;
 
 /* [08AA-7] Singleflight vive en su dominio (`marketplace_vuelo`); se
@@ -888,7 +888,9 @@ pub async fn resumen_uso(pool: &sqlx::PgPool, dias: i32) -> Result<Vec<UsoDia>, 
 /// [09AA-21] `aviso_conocido`: el aviso del hilo empareja con una ficha
 /// (ID exacto o título); el front lo usa para la vista de huérfanos.
 /// [09AA-23] `inmueble_vinculado`: título de la ficha emparejada (`None` =
-/// huérfano); el front lo muestra como «Vinculado: X»/«Sin ficha» en chats.
+/// huérfano); el front lo muestra junto a su miniatura, o «Sin ficha».
+/// [09AA-28] `inmueble_foto`: URL pública (`/uploads/…`) de la portada del
+/// inmueble vinculado; `None` si no hay vínculo o la ficha no tiene fotos.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct ChatResumen {
     pub thread_id: String,
@@ -898,7 +900,11 @@ pub struct ChatResumen {
     pub ultimo: String,
     pub aviso_conocido: bool,
     pub inmueble_vinculado: Option<String>,
+    pub inmueble_foto: Option<String>,
 }
+
+/// [09AA-28] Vínculos de aviso: `marketplace_id` → (id, título, alias).
+type VinculosAviso = std::collections::HashMap<String, (uuid::Uuid, String, Vec<String>)>;
 
 /// [07AA-7] Una fila del chat: foto de la conversación + texto guardado.
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -930,31 +936,54 @@ pub async fn resumen_chats(pool: &sqlx::PgPool) -> Result<Vec<ChatResumen>, AppE
                 Vec::new()
             }
         };
-    let vinculos: std::collections::HashMap<String, (String, Vec<String>)> =
-        match InmuebleRepository::vinculos_publicados(pool).await {
-            Ok(v) => v
-                .into_iter()
-                .map(|(aviso, titulo, alias)| (aviso, (titulo, alias)))
-                .collect(),
-            Err(e) => {
-                tracing::warn!("resumen_chats: sin vínculos de aviso ({e}), solo título");
-                std::collections::HashMap::new()
-            }
-        };
+    let vinculos: VinculosAviso = match InmuebleRepository::vinculos_publicados(pool).await {
+        Ok(v) => v
+            .into_iter()
+            .map(|(aviso, id, titulo, alias)| (aviso, (id, titulo, alias)))
+            .collect(),
+        Err(e) => {
+            tracing::warn!("resumen_chats: sin vínculos de aviso ({e}), solo título");
+            std::collections::HashMap::new()
+        }
+    };
+    let vinculados: Vec<Option<(uuid::Uuid, String)>> = filas
+        .iter()
+        .map(|(thread_id, ..)| titulo_vinculado_del_hilo(thread_id, &candidatos, &vinculos))
+        .collect();
+    /* [09AA-28] Portadas de los inmuebles vinculados en una sola query
+     * (únicos); si falla, el panel sigue sin miniaturas (jamás se bloquea). */
+    let mut ids_vinculados: Vec<uuid::Uuid> =
+        vinculados.iter().flatten().map(|(id, _)| *id).collect();
+    ids_vinculados.sort_unstable();
+    ids_vinculados.dedup();
+    let portadas = match InmuebleRepository::portadas_por_inmuebles(pool, &ids_vinculados).await {
+        Ok(p) => p,
+        Err(e) => {
+            tracing::warn!("resumen_chats: sin portadas ({e}), chats sin miniatura");
+            std::collections::HashMap::new()
+        }
+    };
     Ok(filas
         .into_iter()
-        .map(|(thread_id, borradores, usos, corregidas, ultimo)| {
-            let vinculado = titulo_vinculado_del_hilo(&thread_id, &candidatos, &vinculos);
-            ChatResumen {
-                thread_id,
-                borradores,
-                usos,
-                corregidas,
-                ultimo: ultimo.to_rfc3339(),
-                aviso_conocido: vinculado.is_some(),
-                inmueble_vinculado: vinculado,
-            }
-        })
+        .zip(vinculados)
+        .map(
+            |((thread_id, borradores, usos, corregidas, ultimo), vinculado)| {
+                let inmueble_foto = vinculado
+                    .as_ref()
+                    .and_then(|(id, _)| portadas.get(id))
+                    .map(|clave| url_publica_de_foto(clave));
+                ChatResumen {
+                    thread_id,
+                    borradores,
+                    usos,
+                    corregidas,
+                    ultimo: ultimo.to_rfc3339(),
+                    aviso_conocido: vinculado.is_some(),
+                    inmueble_vinculado: vinculado.map(|(_, titulo)| titulo),
+                    inmueble_foto,
+                }
+            },
+        )
         .collect())
 }
 
@@ -967,24 +996,27 @@ pub async fn resumen_chats(pool: &sqlx::PgPool) -> Result<Vec<ChatResumen>, AppE
  * `aviso_conocido` como `vinculado.is_some()`.
  * [09AA-24] Las ramas por título puntúan título + alias: el hilo puede
  * nombrar cualquiera de los nombres del inmueble, pero el badge muestra
- * siempre el título canónico. */
+ * siempre el título canónico.
+ * [09AA-28] Devuelve (id, título): el id resuelve la portada del panel. */
 fn titulo_vinculado_del_hilo(
     thread_id: &str,
     candidatos: &[(uuid::Uuid, String, Vec<String>)],
-    vinculos: &std::collections::HashMap<String, (String, Vec<String>)>,
-) -> Option<String> {
+    vinculos: &VinculosAviso,
+) -> Option<(uuid::Uuid, String)> {
     let aviso = aviso_fb_de_thread(thread_id).unwrap_or_default();
     let recortado = aviso.trim();
     if recortado.is_empty() {
         return None;
     }
     if recortado.chars().all(|c| c.is_ascii_digit()) && (5..=32).contains(&recortado.len()) {
-        return vinculos.get(recortado).map(|(titulo, _)| titulo.clone());
+        return vinculos
+            .get(recortado)
+            .map(|(id, titulo, _)| (*id, titulo.clone()));
     }
     let mut mejor: Option<(usize, usize)> = None;
-    let mut titulo_mejor: Option<String> = None;
+    let mut vinculo_mejor: Option<(uuid::Uuid, String)> = None;
     let mut empate = false;
-    for (_, titulo, alias) in candidatos {
+    for (id, titulo, alias) in candidatos {
         let (directo, solape, distintivo) = mejor_puntaje_con_alias(recortado, titulo, alias);
         if !(directo || (solape >= 3 && distintivo >= 1)) {
             continue;
@@ -995,13 +1027,13 @@ fn titulo_vinculado_del_hilo(
             Some(m) if m > clave => {}
             _ => {
                 mejor = Some(clave);
-                titulo_mejor = Some(titulo.clone());
+                vinculo_mejor = Some((*id, titulo.clone()));
                 empate = false;
             }
         }
     }
     if mejor.is_some() && !empate {
-        titulo_mejor
+        vinculo_mejor
     } else {
         None
     }
@@ -1831,27 +1863,29 @@ mod pruebas {
      * que el título devuelto es el de la ficha emparejada.
      * [09AA-24] Candidatos y vínculos viajan con alias: el hilo puede nombrar
      * cualquiera de los nombres, pero el vinculado es siempre el canónico.
-     * Testigo Río Aro: el hilo salazar nombra el alias y empareja Caroní. */
+     * Testigo Río Aro: el hilo salazar nombra el alias y empareja Caroní.
+     * [09AA-28] El vínculo trae también el id (resuelve la portada): ambas
+     * ramas (ID exacto y título) deben devolver el id de la ficha, no solo
+     * el título. */
     #[test]
     fn aviso_conocido_id_titulo_huerfano_y_empate() {
         use std::collections::HashMap;
         type Candidatos = Vec<(Uuid, String, Vec<String>)>;
-        type Vinculos = HashMap<String, (String, Vec<String>)>;
-        let conocido = |hilo: &str, candidatos: &Candidatos, vinculos: &Vinculos| {
+        let conocido = |hilo: &str, candidatos: &Candidatos, vinculos: &VinculosAviso| {
             titulo_vinculado_del_hilo(hilo, candidatos, vinculos).is_some()
         };
         let id = Uuid::new_v4();
         let titulo_riberas = "Casa en venta en Riberas del Caroní".to_string();
         let candidatos: Candidatos = vec![(id, titulo_riberas.clone(), Vec::new())];
-        let vinculos: Vinculos = [(
+        let vinculos: VinculosAviso = [(
             "123456789012345".to_string(),
-            (titulo_riberas.clone(), Vec::new()),
+            (id, titulo_riberas.clone(), Vec::new()),
         )]
         .into_iter()
         .collect();
         assert_eq!(
             titulo_vinculado_del_hilo("tina|123456789012345", &candidatos, &vinculos),
-            Some(titulo_riberas.clone())
+            Some((id, titulo_riberas.clone()))
         );
         assert!(conocido("tina|123456789012345", &candidatos, &vinculos));
         assert!(!conocido("tina|999999999999999", &candidatos, &vinculos));
@@ -1861,7 +1895,7 @@ mod pruebas {
                 &candidatos,
                 &vinculos
             ),
-            Some(titulo_riberas.clone())
+            Some((id, titulo_riberas.clone()))
         );
         assert!(!conocido(
             "tina|casa en venta en arivana",
@@ -1889,8 +1923,9 @@ mod pruebas {
         /* Testigo Río Aro [09AA-24]: la ficha Caroní Plaza declara el alias y
          * el hilo salazar —que nombra el alias— empareja con el canónico. */
         let titulo_caroni = "Apartamento en Caroní Plaza".to_string();
+        let id_caroni = Uuid::new_v4();
         let candidatos_alias: Candidatos = vec![(
-            Uuid::new_v4(),
+            id_caroni,
             titulo_caroni.clone(),
             vec!["Apartamento en Río Aro Plaza".to_string()],
         )];
@@ -1900,7 +1935,7 @@ mod pruebas {
                 &candidatos_alias,
                 &HashMap::new()
             ),
-            Some(titulo_caroni.clone())
+            Some((id_caroni, titulo_caroni.clone()))
         );
         /* Sin el alias declarado, el mismo hilo sigue huérfano (calibrado). */
         let candidatos_sin_alias: Candidatos = vec![(Uuid::new_v4(), titulo_caroni, Vec::new())];
